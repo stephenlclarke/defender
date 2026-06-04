@@ -136,7 +136,7 @@ fn adapt_snapshot(snapshot: AcceptedSnapshot) -> GameState {
         current_player: snapshot.current_player,
         player_count: snapshot.player_count,
         wave: snapshot.wave,
-        wave_profile: adapt_wave_profile(snapshot.wave_profile),
+        wave_profile: adapt_wave_profile(snapshot.wave_profile, snapshot.wave),
         player,
         player_stocks: snapshot.player_stocks.map(adapt_player_stock),
         scores: ScoreSnapshot {
@@ -152,6 +152,7 @@ fn adapt_snapshot(snapshot: AcceptedSnapshot) -> GameState {
             .map(adapt_high_score_submission),
         high_score_tables: adapt_high_score_tables(snapshot.high_score_tables),
         attract,
+        post_game_playfield: None,
         game_over,
         world: WorldSnapshot {
             object_evidence,
@@ -180,8 +181,8 @@ fn adapt_high_score_initials(
     }
 }
 
-fn adapt_wave_profile(profile: AcceptedWaveProfile) -> WaveProfileSnapshot {
-    WaveProfileSnapshot {
+fn adapt_wave_profile(profile: AcceptedWaveProfile, wave: u8) -> WaveProfileSnapshot {
+    let raw = WaveProfileSnapshot {
         landers: profile.landers,
         bombers: profile.bombers,
         pods: profile.pods,
@@ -205,7 +206,8 @@ fn adapt_wave_profile(profile: AcceptedWaveProfile) -> WaveProfileSnapshot {
         baiter_delay: profile.baiter_delay,
         baiter_shot_time: profile.baiter_shot_time,
         baiter_seek_probability: profile.baiter_seek_probability,
-    }
+    };
+    WaveProfileSnapshot::from_raw_source_profile(wave, raw)
 }
 
 fn adapt_high_score_entry(entry: AcceptedHighScoreEntry) -> HighScoreEntrySnapshot {
@@ -1387,8 +1389,9 @@ mod tests {
             HighScoreTablesSnapshot, OBJECT_EVIDENCE_DETAIL_LIMIT, ObjectEvidenceDetailSnapshot,
             ObjectEvidenceList, ObjectEvidenceSnapshot, PlayerStockSnapshot,
             SOURCE_EXPLOSION_INITIAL_SIZE, SOURCE_EXPLOSION_LIFETIME_FRAMES,
-            SOURCE_EXPLOSION_SIZE_DELTA, SOURCE_SCORE_POPUP_LIFETIME_TICKS, ScannerRadarSnapshot,
-            TerrainBlowSnapshot, TerrainBlowStage, WaveProfileSnapshot, WorldVector,
+            SOURCE_EXPLOSION_SIZE_DELTA, SOURCE_SCORE_POPUP_LIFETIME_TICKS, SOURCE_VISUAL_STATE,
+            ScannerRadarSnapshot, TerrainBlowSnapshot, TerrainBlowStage, WaveProfileSnapshot,
+            WorldVector,
         },
         renderer::{Color, RenderLayer, SpriteId},
         systems::{
@@ -1611,8 +1614,22 @@ mod tests {
         assert!(
             border_sprites
                 .iter()
-                .all(|sprite| { sprite.layer == RenderLayer::Hud && sprite.tint == Color::WHITE })
+                .filter(|sprite| {
+                    sprite.position != [152.0, 7.0] && sprite.position != [152.0, 40.0]
+                })
+                .all(|sprite| {
+                    sprite.layer == RenderLayer::Hud
+                        && sprite.tint == SOURCE_VISUAL_STATE.top_display_border_tint()
+                })
         );
+        assert!(border_sprites.iter().any(|sprite| {
+            sprite.position == [152.0, 7.0]
+                && sprite.tint == SOURCE_VISUAL_STATE.top_display_scanner_marker_tint()
+        }));
+        assert!(border_sprites.iter().any(|sprite| {
+            sprite.position == [152.0, 40.0]
+                && sprite.tint == SOURCE_VISUAL_STATE.top_display_scanner_marker_tint()
+        }));
         assert!(
             border_sprites
                 .iter()
@@ -1682,16 +1699,44 @@ mod tests {
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::SCANNER_OBJECT_BLIP
                 && sprite.layer == RenderLayer::Hud
-                && sprite.position == [150.0, 17.0]
-                && sprite.size == [2.0, 2.0]
-                && sprite.tint == Color::WHITE
+                && sprite.position == [151.0, 17.0]
+                && sprite.size == [1.0, 1.0]
+                && sprite.tint == SOURCE_VISUAL_STATE.scanner_object_blip_tint(0x0002)
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCANNER_OBJECT_BLIP
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [150.0, 18.0]
+                && sprite.size == [1.0, 1.0]
+                && sprite.tint == SOURCE_VISUAL_STATE.scanner_object_blip_tint(0x0003)
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCANNER_OBJECT_BLIP
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [151.0, 18.0]
+                && sprite.size == [1.0, 1.0]
+                && sprite.tint == SOURCE_VISUAL_STATE.scanner_object_blip_tint(0x0004)
         }));
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::SCANNER_PLAYER_BLIP
                 && sprite.layer == RenderLayer::Hud
                 && sprite.position == [166.0, 15.0]
-                && sprite.size == [3.0, 2.0]
-                && sprite.tint == Color::WHITE
+                && sprite.size == [1.0, 1.0]
+                && sprite.tint == SOURCE_VISUAL_STATE.scanner_player_blip_tint(0x0009)
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCANNER_PLAYER_BLIP
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [167.0, 16.0]
+                && sprite.size == [1.0, 1.0]
+                && sprite.tint == SOURCE_VISUAL_STATE.scanner_player_blip_tint(0x0009)
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCANNER_PLAYER_BLIP
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [166.0, 17.0]
+                && sprite.size == [1.0, 1.0]
+                && sprite.tint == SOURCE_VISUAL_STATE.scanner_player_blip_tint(0x0009)
         }));
     }
 
@@ -2543,10 +2588,11 @@ mod tests {
             terrain_blow: Some(TerrainBlowSnapshot {
                 stage: TerrainBlowStage::ExplosionPassSleeping,
                 status_terrain_blown: true,
+                source_elapsed_frames: 0,
                 source_iteration: 0,
                 source_iteration_limit: 16,
-                source_sleep_remaining: Some(2),
-                source_pseudo_color: 0x3C,
+                source_sleep_remaining: Some(1),
+                source_pseudo_color: 0,
                 source_overload_counter: 8,
                 terrain_erase_entries: 0x98,
                 scanner_terrain_erase_entries: 0x40,
@@ -2574,7 +2620,7 @@ mod tests {
             ]
         );
         assert_eq!(state.wave_profile.landers, 15);
-        assert_eq!(state.wave_profile.baiter_delay, 212);
+        assert_eq!(state.wave_profile.baiter_delay, 192);
         assert_eq!(
             state.high_score_initials,
             HighScoreInitialsState {
@@ -2741,7 +2787,7 @@ mod tests {
         };
 
         assert_eq!(
-            adapt_wave_profile(accepted),
+            adapt_wave_profile(accepted, 2),
             WaveProfileSnapshot::for_wave(2)
         );
     }

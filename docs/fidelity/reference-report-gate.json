@@ -1,0 +1,425 @@
+{
+  "coverage_requirements": [
+    {
+      "name": "sprite shapes, colors, HUD, terrain, scanner, and starfield visuals",
+      "coverage": "sprite_visuals",
+      "accepted_axis": "visual",
+      "min_reports": 21
+    },
+    {
+      "name": "player laser visual shape, span, fizzle, tip, and endpoint",
+      "coverage": "player_laser_visual",
+      "accepted_axis": "visual",
+      "min_reports": 7
+    },
+    {
+      "name": "player laser sound command and waveform",
+      "coverage": "player_laser_audio",
+      "accepted_axis": "audio",
+      "min_reports": 5
+    },
+    {
+      "name": "reverse-facing player orientation",
+      "coverage": "reverse_player_visual",
+      "accepted_axis": "visual",
+      "min_reports": 2
+    },
+    {
+      "name": "enemy explosion placement, growth, and fragmentation",
+      "coverage": "enemy_explosion_visual",
+      "accepted_axis": "visual",
+      "min_reports": 8
+    },
+    {
+      "name": "terrain-blow explosion visuals",
+      "coverage": "terrain_blow_visual",
+      "accepted_axis": "visual",
+      "min_reports": 1
+    },
+    {
+      "name": "terrain-blow sound command and waveform",
+      "coverage": "terrain_blow_audio",
+      "accepted_axis": "audio",
+      "min_reports": 1
+    },
+    {
+      "name": "materialization and pixel coalescence visuals",
+      "coverage": "coalescence_visual",
+      "accepted_axis": "visual",
+      "min_reports": 6
+    },
+    {
+      "name": "gameplay sound command timing and waveform families",
+      "coverage": "gameplay_audio",
+      "accepted_axis": "audio",
+      "min_reports": 22
+    },
+    {
+      "name": "thrust and background audio",
+      "coverage": "thrust_audio",
+      "accepted_axis": "audio",
+      "min_reports": 3
+    },
+    {
+      "name": "enemy shot audio",
+      "coverage": "enemy_shot_audio",
+      "accepted_axis": "audio",
+      "min_reports": 3
+    },
+    {
+      "name": "non-lander sound command waveforms",
+      "coverage": "non_lander_audio",
+      "accepted_axis": "audio",
+      "min_reports": 4
+    },
+    {
+      "name": "non-lander visual presentation",
+      "coverage": "non_lander_visual",
+      "accepted_axis": "visual",
+      "min_reports": 6
+    },
+    {
+      "name": "core controls and playability",
+      "coverage": "playability",
+      "accepted_axis": "all",
+      "min_reports": 16
+    },
+    {
+      "name": "rescue, landing, and human-loss behavior",
+      "coverage": "rescue_loss",
+      "accepted_axis": "all",
+      "min_reports": 3
+    },
+    {
+      "name": "death, respawn, game-over, and attract return behavior",
+      "coverage": "death_respawn",
+      "accepted_axis": "all",
+      "min_reports": 3
+    },
+    {
+      "name": "smart bomb behavior and audio",
+      "coverage": "smart_bomb",
+      "accepted_axis": "all",
+      "min_reports": 1
+    },
+    {
+      "name": "hyperspace behavior and audio",
+      "coverage": "hyperspace",
+      "accepted_axis": "all",
+      "min_reports": 1
+    },
+    {
+      "name": "organic non-lander presentation",
+      "coverage": "organic_non_lander_visual",
+      "accepted_axis": "visual",
+      "min_reports": 3
+    }
+  ],
+  "reports": [
+    {
+      "name": "scoring laser/explosion",
+      "path": "target/reference-media/scoring-laser-explosion-check/report.json",
+      "acceptance_mode": "all",
+      "coverage": [
+        "sprite_visuals",
+        "player_laser_visual",
+        "enemy_explosion_visual"
+      ]
+    },
+    {
+      "name": "delayed-start fire/reverse",
+      "path": "target/reference-media/gameplay-fire-reverse-delayed-check/report.json",
+      "acceptance_mode": "all",
+      "coverage": [
+        "sprite_visuals",
+        "player_laser_visual",
+        "player_laser_audio",
+        "reverse_player_visual",
+        "playability",
+        "gameplay_audio"
+      ]
+    },
+    {
+      "name": "delayed-start thrust",
+      "path": "target/reference-media/gameplay-thrust-delayed-check/report.json",
+      "acceptance_mode": "all",
+      "coverage": [
+        "sprite_visuals",
+        "playability",
+        "gameplay_audio",
+        "thrust_audio"
+      ]
+    },
+    {
+      "name": "delayed-start thrust/reverse",
+      "path": "target/reference-media/gameplay-thrust-reverse-delayed-check/report.json",
+      "acceptance_mode": "all",
+      "coverage": [
+        "sprite_visuals",
+        "reverse_player_visual",
+        "playability",
+        "gameplay_audio",
+        "thrust_audio"
+      ]
+    },
+    {
+      "name": "delayed-start enemy shot",
+      "path": "target/reference-media/gameplay-enemy-shot-delayed-check/report.json",
+      "acceptance_mode": "all",
+      "coverage": [
+        "sprite_visuals",
+        "playability",
+        "gameplay_audio",
+        "enemy_shot_audio"
+      ]
+    },
+    {
+      "name": "delayed-start enemy shot narrow window",
+      "path": "target/reference-media/gameplay-enemy-shot-narrow-check/report.json",
+      "acceptance_mode": "all",
+      "coverage": [
+        "gameplay_audio",
+        "enemy_shot_audio"
+      ]
+    },
+    {
+      "name": "delayed-start enemy shot pre-window background",
+      "path": "target/reference-media/gameplay-enemy-shot-pre-window-check/report.json",
+      "acceptance_mode": "all",
+      "coverage": [
+        "gameplay_audio",
+        "thrust_audio"
+      ]
+    },
+    {
+      "name": "delayed-start smart bomb",
+      "path": "target/reference-media/gameplay-smart-bomb-delayed-check/report.json",
+      "acceptance_mode": "all",
+      "coverage": [
+        "sprite_visuals",
+        "smart_bomb",
+        "enemy_explosion_visual",
+        "gameplay_audio",
+        "playability"
+      ]
+    },
+    {
+      "name": "hyperspace death",
+      "path": "target/reference-media/gameplay-hyperspace-death-probe-check/report.json",
+      "acceptance_mode": "all",
+      "coverage": [
+        "sprite_visuals",
+        "hyperspace",
+        "death_respawn",
+        "gameplay_audio",
+        "playability"
+      ]
+    },
+        {
+            "name": "first gameplay laser hit",
+            "path": "target/reference-media/gameplay-laser-hit-single-check-window/report.json",
+            "acceptance_mode": "all",
+            "coverage": [
+                "sprite_visuals",
+                "player_laser_visual",
+                "player_laser_audio",
+                "enemy_explosion_visual",
+                "gameplay_audio",
+                "playability"
+            ]
+        },
+        {
+            "name": "first gameplay laser hit centered window",
+            "path": "target/reference-media/gameplay-laser-hit-single-center-check/report.json",
+            "acceptance_mode": "all",
+            "coverage": [
+                "sprite_visuals",
+                "player_laser_visual",
+                "player_laser_audio",
+                "enemy_explosion_visual",
+                "gameplay_audio",
+                "playability"
+            ]
+        },
+        {
+            "name": "first gameplay laser hit materialize window",
+            "path": "target/reference-media/gameplay-laser-hit-single-materialize-check/report.json",
+            "acceptance_mode": "all",
+            "coverage": [
+                "sprite_visuals",
+                "player_laser_visual",
+                "player_laser_audio",
+                "coalescence_visual",
+                "enemy_explosion_visual",
+                "gameplay_audio",
+                "playability"
+            ]
+        },
+        {
+            "name": "down030 post-death laser all-axis window",
+            "path": "target/reference-media/laser-hit-down030-fire2437-check-fixed/report.json",
+            "acceptance_mode": "all",
+            "coverage": [
+                "sprite_visuals",
+                "player_laser_visual",
+                "player_laser_audio",
+                "coalescence_visual",
+                "gameplay_audio",
+                "playability",
+                "death_respawn"
+            ]
+        },
+        {
+            "name": "non-lander target6",
+            "path": "target/reference-media/non-lander-target6-fire2524-check/report.json",
+            "acceptance_mode": "all",
+            "coverage": [
+        "sprite_visuals",
+        "player_laser_visual",
+        "coalescence_visual",
+        "enemy_explosion_visual",
+        "non_lander_visual",
+        "gameplay_audio",
+        "playability"
+      ]
+    },
+    {
+      "name": "lander pickup/pull/loss",
+      "path": "target/reference-media/abduction-hold-up-pickup-pull-check/report.json",
+      "acceptance_mode": "all",
+      "coverage": [
+        "sprite_visuals",
+        "rescue_loss",
+        "gameplay_audio",
+        "playability"
+      ]
+    },
+    {
+      "name": "falling-human catch",
+      "path": "target/reference-media/afall-player-catch-check/report.json",
+      "acceptance_mode": "all",
+      "coverage": [
+        "sprite_visuals",
+        "rescue_loss",
+        "gameplay_audio",
+        "playability"
+      ]
+    },
+    {
+      "name": "safe landing",
+      "path": "target/reference-media/afall-safe-landing-check/report.json",
+      "acceptance_mode": "all",
+      "coverage": [
+        "sprite_visuals",
+        "rescue_loss",
+        "gameplay_audio",
+        "playability"
+      ]
+    },
+    {
+      "name": "terrain blow",
+      "path": "target/reference-media/terrain-blow-check/report.json",
+      "acceptance_mode": "all",
+      "coverage": [
+        "sprite_visuals",
+        "terrain_blow_visual",
+        "terrain_blow_audio",
+        "gameplay_audio",
+        "playability"
+      ]
+    },
+    {
+      "name": "enemy explosion matrix",
+      "path": "target/reference-media/enemy-explosion-matrix-check/report.json",
+      "acceptance_mode": "visual",
+      "coverage": [
+        "sprite_visuals",
+        "enemy_explosion_visual",
+        "coalescence_visual",
+        "non_lander_visual"
+      ]
+    },
+    {
+      "name": "enemy materialization matrix",
+      "path": "target/reference-media/enemy-materialize-matrix-check/report.json",
+      "acceptance_mode": "visual",
+      "coverage": [
+        "sprite_visuals",
+        "coalescence_visual",
+        "non_lander_visual"
+      ]
+    },
+    {
+      "name": "bomber hit sound command",
+      "path": "target/reference-media/nonlander-sound-command-fe-check/report.json",
+      "acceptance_mode": "audio",
+      "coverage": [
+        "gameplay_audio",
+        "non_lander_audio"
+      ]
+    },
+    {
+      "name": "pod hit sound command",
+      "path": "target/reference-media/nonlander-sound-command-fa-check/report.json",
+      "acceptance_mode": "audio",
+      "coverage": [
+        "gameplay_audio",
+        "non_lander_audio"
+      ]
+    },
+    {
+      "name": "swarmer/baiter hit sound command",
+      "path": "target/reference-media/nonlander-sound-command-f8-check/report.json",
+      "acceptance_mode": "audio",
+      "coverage": [
+        "gameplay_audio",
+        "non_lander_audio"
+      ]
+    },
+    {
+      "name": "swarmer shot sound command",
+      "path": "target/reference-media/nonlander-sound-command-f3-check/report.json",
+      "acceptance_mode": "audio",
+      "coverage": [
+        "gameplay_audio",
+        "non_lander_audio",
+        "enemy_shot_audio"
+      ]
+    },
+    {
+      "name": "organic non-lander long-window",
+      "path": "target/reference-media/organic-nonlander-holdup-7000-check/report.json",
+      "acceptance_mode": "all",
+      "coverage": [
+        "sprite_visuals",
+        "organic_non_lander_visual",
+        "non_lander_visual",
+        "death_respawn",
+        "playability"
+      ]
+    },
+    {
+      "name": "organic non-lander hold-down visual",
+      "path": "target/reference-media/organic-nonlander-holddown-7000-check/report.json",
+      "acceptance_mode": "visual",
+      "coverage": [
+        "sprite_visuals",
+        "organic_non_lander_visual",
+        "non_lander_visual",
+        "coalescence_visual",
+        "enemy_explosion_visual"
+      ]
+    },
+    {
+      "name": "organic PRBP1 pod up-thrust all-axis",
+      "path": "target/reference-media/organic-nonlander-prbp1-upthrust-check/report.json",
+      "acceptance_mode": "all",
+      "coverage": [
+        "sprite_visuals",
+        "organic_non_lander_visual",
+        "non_lander_visual",
+        "gameplay_audio"
+      ]
+    }
+  ]
+}

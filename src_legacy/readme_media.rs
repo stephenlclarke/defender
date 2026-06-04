@@ -5,7 +5,7 @@
 //! accepted machine.
 
 use crate::{
-    game::{AttractPresentationPage, Game, GameFrame, GameInput},
+    game::{AttractPresentationPage, Game, GameFrame, GameInput, ReferenceCaptureSteer},
     renderer::{
         AtlasRegion, Color, NativeRendererResources, RenderLayer, RenderScene, SceneRaster,
         SceneSprite, SpriteId, SurfaceSize, TextureAtlas, ViewportLayout,
@@ -23,8 +23,12 @@ pub struct ReadmeMediaFrameSource {
 
 impl ReadmeMediaFrameSource {
     pub fn new(output_width: u32, output_height: u32) -> Self {
+        Self::new_with_first_input(output_width, output_height, GameInput::NONE)
+    }
+
+    pub fn new_with_first_input(output_width: u32, output_height: u32, input: GameInput) -> Self {
         let mut game = Game::new();
-        let current_frame = game.step(GameInput::NONE);
+        let current_frame = game.step(input);
 
         Self {
             game,
@@ -34,7 +38,11 @@ impl ReadmeMediaFrameSource {
     }
 
     pub fn step(&mut self) {
-        self.current_frame = self.game.step(GameInput::NONE);
+        self.step_with_input(GameInput::NONE);
+    }
+
+    pub fn step_with_input(&mut self, input: GameInput) {
+        self.current_frame = self.game.step(input);
     }
 
     pub fn frame(&self) -> u64 {
@@ -43,6 +51,14 @@ impl ReadmeMediaFrameSource {
 
     pub fn attract_page(&self) -> AttractPresentationPage {
         self.current_frame.state.attract.page
+    }
+
+    pub fn sound_events(&self) -> &[crate::SoundEvent] {
+        self.current_frame.events.sounds()
+    }
+
+    pub fn seed_reference_capture_window(&mut self, steer: ReferenceCaptureSteer) {
+        self.current_frame = self.game.seed_reference_capture_window(steer);
     }
 
     pub fn render_frame(&mut self) -> Result<ReadmeMediaFrame, ReadmeMediaError> {

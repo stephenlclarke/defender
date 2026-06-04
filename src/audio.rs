@@ -1,7 +1,6 @@
 //! Runtime boundary for gameplay-facing sound events.
 
 use std::any::Any;
-use std::f32::consts::TAU;
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
@@ -18,11 +17,13 @@ use cpal::{
 };
 
 use crate::game::{GameFrame, SoundEvent};
+use crate::sound_board::{
+    OrganTune, RenderedSound, SoundAction, SoundBoardSynth, SpecialSound, sound_actions_for_command,
+};
 
 pub const LIVE_AUDIO_TEST_SAMPLE_RATE_HZ: u32 = 48_000;
 pub const LIVE_AUDIO_QUEUE_CAPACITY: usize = 8;
 pub const LIVE_AUDIO_EVENT_CAPACITY: usize = 8;
-const LIVE_AUDIO_MAX_SYNTH_VOICES: usize = 16;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum LiveAudioMode {
@@ -194,111 +195,188 @@ where
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct SynthClipSpec {
-    frequency_hz: f32,
-    duration_ms: u32,
-    amplitude: f32,
-}
-
-impl SynthClipSpec {
-    const fn new(frequency_hz: f32, duration_ms: u32, amplitude: f32) -> Self {
-        Self {
-            frequency_hz,
-            duration_ms,
-            amplitude,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct SynthVoice {
-    phase: f32,
-    phase_step: f32,
-    remaining_samples: u32,
-    amplitude: f32,
-}
-
-impl SynthVoice {
-    fn new(sample_rate_hz: u32, spec: SynthClipSpec) -> Self {
-        let sample_rate = sample_rate_hz.max(1) as f32;
-        let remaining_samples = ((u64::from(sample_rate_hz.max(1)) * u64::from(spec.duration_ms))
-            / 1_000)
-            .clamp(1, u64::from(u32::MAX)) as u32;
-        Self {
-            phase: 0.0,
-            phase_step: TAU * spec.frequency_hz / sample_rate,
-            remaining_samples,
-            amplitude: spec.amplitude,
-        }
-    }
-
-    fn next_sample(&mut self) -> f32 {
-        if self.remaining_samples == 0 {
-            return 0.0;
-        }
-
-        let sample = self.phase.sin() * self.amplitude;
-        self.phase = (self.phase + self.phase_step) % TAU;
-        self.remaining_samples = self.remaining_samples.saturating_sub(1);
-        sample
-    }
-
-    const fn is_active(&self) -> bool {
-        self.remaining_samples > 0
-    }
-}
-
 #[derive(Debug)]
 struct SynthMixer {
     sample_rate_hz: u32,
-    voices: Vec<SynthVoice>,
+    board: SoundBoardSynth,
+    foreground_voice: Option<SampleVoice>,
+    thrust_voice: Option<SampleVoice>,
 }
 
 impl SynthMixer {
     fn new(sample_rate_hz: u32) -> Self {
         Self {
             sample_rate_hz: sample_rate_hz.max(1),
-            voices: Vec::new(),
+            board: SoundBoardSynth::default(),
+            foreground_voice: None,
+            thrust_voice: None,
         }
     }
 
     fn queue_event(&mut self, event: SoundEvent) {
-        self.queue_clip(synth_clip_for_event(event));
+        if event == SoundEvent::ThrustStopped {
+            self.thrust_voice = None;
+            let actions = sound_actions_for_event(event);
+            if actions.is_empty() {
+                return;
+            }
+            let rendered = self.board.render_actions(&actions);
+            self.thrust_voice = SampleVoice::new(self.sample_rate_hz, rendered, true);
+            return;
+        }
+
+        let actions = sound_actions_for_event(event);
+        if actions.is_empty() {
+            return;
+        }
+        if actions.contains(&SoundAction::Special(SpecialSound::BackgroundEnd)) {
+            self.thrust_voice = None;
+        }
+        let rendered = self.board.render_actions(&actions);
+        if event == SoundEvent::ThrustStarted {
+            self.foreground_voice = None;
+            self.thrust_voice = SampleVoice::new(self.sample_rate_hz, rendered, true);
+        } else {
+            self.queue_rendered(rendered);
+        }
     }
 
-    fn queue_clip(&mut self, spec: SynthClipSpec) {
-        if self.voices.len() >= LIVE_AUDIO_MAX_SYNTH_VOICES {
-            self.voices.remove(0);
-        }
-        self.voices.push(SynthVoice::new(self.sample_rate_hz, spec));
+    fn queue_rendered(&mut self, rendered: RenderedSound) {
+        self.foreground_voice = SampleVoice::new(self.sample_rate_hz, rendered, false);
     }
 
     fn clear(&mut self) {
-        self.voices.clear();
+        self.foreground_voice = None;
+        self.thrust_voice = None;
     }
 
     fn next_sample(&mut self) -> f32 {
         let mut mixed = 0.0;
-        for voice in &mut self.voices {
-            mixed += voice.next_sample();
+        if let Some(thrust_voice) = &mut self.thrust_voice
+            && let Some(sample) = thrust_voice.next_sample()
+        {
+            mixed += sample;
         }
-        self.voices.retain(SynthVoice::is_active);
+        if let Some(foreground_voice) = &mut self.foreground_voice
+            && let Some(sample) = foreground_voice.next_sample()
+        {
+            mixed += sample;
+        }
+        if self
+            .foreground_voice
+            .as_ref()
+            .is_some_and(|voice| !voice.is_active())
+        {
+            self.foreground_voice = None;
+        }
         mixed.clamp(-0.85, 0.85)
     }
 }
 
-fn synth_clip_for_event(event: SoundEvent) -> SynthClipSpec {
-    match event {
-        SoundEvent::Startup => SynthClipSpec::new(220.0, 120, 0.18),
-        SoundEvent::CreditAdded => SynthClipSpec::new(880.0, 90, 0.20),
-        SoundEvent::GameStarted => SynthClipSpec::new(660.0, 160, 0.22),
-        SoundEvent::ThrustStarted => SynthClipSpec::new(140.0, 110, 0.16),
-        SoundEvent::ThrustStopped => SynthClipSpec::new(95.0, 70, 0.12),
-        SoundEvent::UnmappedSoundCommand { command } => {
-            SynthClipSpec::new(300.0 + f32::from(command), 80, 0.12)
+pub fn render_sound_event_timeline_to_samples(
+    timeline: &[(u64, Vec<SoundEvent>)],
+    total_frames: u64,
+    frame_rate_millihz: u32,
+    sample_rate_hz: u32,
+) -> Vec<f32> {
+    let frame_rate_millihz = frame_rate_millihz.max(1);
+    let sample_rate_hz = sample_rate_hz.max(1);
+    let target_samples = sample_count_for_frame(total_frames, frame_rate_millihz, sample_rate_hz);
+    let mut entries = timeline
+        .iter()
+        .filter(|(frame, events)| *frame < total_frames && !events.is_empty())
+        .map(|(frame, events)| (*frame, events.as_slice()))
+        .collect::<Vec<_>>();
+    entries.sort_by_key(|(frame, _)| *frame);
+
+    let mut entry_index = 0;
+    let mut mixer = SynthMixer::new(sample_rate_hz);
+    let mut samples = Vec::with_capacity(target_samples);
+    for frame in 0..total_frames {
+        while let Some((event_frame, events)) = entries.get(entry_index)
+            && *event_frame == frame
+        {
+            for event in *events {
+                mixer.queue_event(*event);
+            }
+            entry_index += 1;
+        }
+
+        let next_frame_samples =
+            sample_count_for_frame(frame + 1, frame_rate_millihz, sample_rate_hz);
+        while samples.len() < next_frame_samples {
+            samples.push(mixer.next_sample());
         }
     }
+
+    debug_assert_eq!(samples.len(), target_samples);
+    samples
+}
+
+fn sample_count_for_frame(frame: u64, frame_rate_millihz: u32, sample_rate_hz: u32) -> usize {
+    let numerator = u128::from(frame) * u128::from(sample_rate_hz) * 1_000;
+    let denominator = u128::from(frame_rate_millihz);
+    usize::try_from(numerator.div_ceil(denominator)).unwrap_or(usize::MAX)
+}
+
+#[derive(Debug, Clone)]
+struct SampleVoice {
+    samples: Vec<f32>,
+    cursor: f32,
+    step: f32,
+    looping: bool,
+}
+
+impl SampleVoice {
+    fn new(output_sample_rate_hz: u32, rendered: RenderedSound, looping: bool) -> Option<Self> {
+        if rendered.samples.is_empty() {
+            return None;
+        }
+        let step = rendered.sample_rate_hz.max(1) as f32 / output_sample_rate_hz.max(1) as f32;
+        Some(Self {
+            samples: rendered.samples,
+            cursor: 0.0,
+            step,
+            looping,
+        })
+    }
+
+    fn next_sample(&mut self) -> Option<f32> {
+        if self.samples.is_empty() {
+            return None;
+        }
+        if self.cursor >= self.samples.len() as f32 {
+            if !self.looping {
+                return None;
+            }
+            self.cursor %= self.samples.len() as f32;
+        }
+        let sample = self.samples[self.cursor as usize];
+        self.cursor += self.step;
+        if self.looping && self.cursor >= self.samples.len() as f32 {
+            self.cursor %= self.samples.len() as f32;
+        }
+        Some(sample)
+    }
+
+    fn is_active(&self) -> bool {
+        self.looping || self.cursor < self.samples.len() as f32
+    }
+}
+
+fn sound_actions_for_event(event: SoundEvent) -> Vec<SoundAction> {
+    match event {
+        SoundEvent::Startup => vec![SoundAction::OrganTune(OrganTune::Phantom)],
+        SoundEvent::CreditAdded => source_command_sound_actions(0xE6),
+        SoundEvent::GameStarted => source_command_sound_actions(0xF5),
+        SoundEvent::ThrustStarted => vec![SoundAction::Special(SpecialSound::Thrust)],
+        SoundEvent::ThrustStopped => source_command_sound_actions(0xF0),
+        SoundEvent::UnmappedSoundCommand { command } => source_command_sound_actions(command),
+    }
+}
+
+fn source_command_sound_actions(command: u8) -> Vec<SoundAction> {
+    sound_actions_for_command(command)
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -559,13 +637,15 @@ mod tests {
         audio::{
             LIVE_AUDIO_TEST_SAMPLE_RATE_HZ, LiveAudioBackend, LiveAudioEventBatch, LiveAudioMode,
             LiveAudioRuntime, LiveAudioStats, LiveAudioWorkerError, LiveAudioWorkerState,
-            SynthClipSpec, SynthMixer, SynthVoice, synth_clip_for_event,
+            SampleVoice, SynthMixer, render_sound_event_timeline_to_samples,
+            sound_actions_for_event,
         },
         game::{
             Direction, GameEvents, GameFrame, GamePhase, GameState, PlayerSnapshot, ScoreSnapshot,
             SoundEvent, WorldSnapshot, WorldVector,
         },
         renderer::{RenderScene, SurfaceSize},
+        sound_board::{GWaveSound, OrganTune, RenderedSound, SoundAction, SpecialSound},
     };
 
     #[derive(Default)]
@@ -629,6 +709,7 @@ mod tests {
                 attract: crate::AttractPresentationSnapshot::for_page_frame(
                     u16::try_from(frame).unwrap_or(u16::MAX),
                 ),
+                post_game_playfield: None,
                 high_score_initials: crate::systems::HighScoreInitialsState::EMPTY,
                 high_score_entry: None,
                 high_score_submission: None,
@@ -659,70 +740,168 @@ mod tests {
     }
 
     #[test]
-    fn synth_clip_specs_cover_clean_sound_events() {
+    fn source_sound_actions_cover_clean_sound_events() {
         assert_eq!(
-            synth_clip_for_event(SoundEvent::Startup).frequency_hz,
-            220.0
+            sound_actions_for_event(SoundEvent::Startup),
+            vec![SoundAction::OrganTune(OrganTune::Phantom)]
         );
         assert_eq!(
-            synth_clip_for_event(SoundEvent::CreditAdded).frequency_hz,
-            880.0
+            sound_actions_for_event(SoundEvent::CreditAdded),
+            vec![SoundAction::Special(SpecialSound::Hyper)]
         );
         assert_eq!(
-            synth_clip_for_event(SoundEvent::GameStarted).frequency_hz,
-            660.0
+            sound_actions_for_event(SoundEvent::GameStarted),
+            vec![SoundAction::GWave(GWaveSound::Vector(10))]
         );
         assert_eq!(
-            synth_clip_for_event(SoundEvent::ThrustStarted).frequency_hz,
-            140.0
+            sound_actions_for_event(SoundEvent::ThrustStarted),
+            vec![SoundAction::Special(SpecialSound::Thrust)]
         );
         assert_eq!(
-            synth_clip_for_event(SoundEvent::ThrustStopped).frequency_hz,
-            95.0
+            sound_actions_for_event(SoundEvent::ThrustStopped),
+            vec![SoundAction::Special(SpecialSound::BackgroundNoise)]
         );
         assert_eq!(
-            synth_clip_for_event(SoundEvent::UnmappedSoundCommand { command: 0xE9 }).frequency_hz,
-            533.0
+            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: 0xEB }),
+            vec![SoundAction::Special(SpecialSound::Turbo)]
+        );
+        assert_eq!(
+            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: 0xEA }),
+            vec![SoundAction::Special(SpecialSound::Materialize)]
+        );
+        assert_eq!(
+            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: 0xE6 }),
+            vec![SoundAction::Special(SpecialSound::Hyper)]
+        );
+        assert_eq!(
+            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: 0xEE }),
+            vec![SoundAction::Special(SpecialSound::Lightning)]
+        );
+        assert_eq!(
+            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: 0xF7 }),
+            vec![SoundAction::GWave(GWaveSound::Vector(8))]
+        );
+        assert_eq!(
+            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: 0xFC }),
+            vec![SoundAction::GWave(GWaveSound::Vector(3))]
+        );
+        assert!(
+            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: 0xFF }).is_empty()
         );
     }
 
     #[test]
-    fn synth_mixer_renders_nonzero_audio_and_drains() {
+    fn synth_mixer_renders_source_audio_and_drains() {
         let mut mixer = SynthMixer::new(LIVE_AUDIO_TEST_SAMPLE_RATE_HZ);
 
-        mixer.queue_event(SoundEvent::CreditAdded);
-        assert_eq!(mixer.voices.len(), 1);
+        mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: 0xE8 });
+        assert!(mixer.foreground_voice.is_some());
+
+        let mut saw_nonzero_sample = false;
+        for _ in 0..LIVE_AUDIO_TEST_SAMPLE_RATE_HZ * 4 {
+            saw_nonzero_sample |= mixer.next_sample().abs() > f32::EPSILON;
+        }
+
+        assert!(saw_nonzero_sample);
+        assert!(mixer.foreground_voice.is_none());
+    }
+
+    #[test]
+    fn offline_timeline_renderer_places_events_on_frame_boundaries() {
+        let samples = render_sound_event_timeline_to_samples(
+            &[(1, vec![SoundEvent::UnmappedSoundCommand { command: 0xE8 }])],
+            2,
+            1_000,
+            1_000,
+        );
+
+        assert_eq!(samples.len(), 2_000);
+        assert!(
+            samples[..1_000]
+                .iter()
+                .all(|sample| sample.abs() <= f32::EPSILON)
+        );
+        assert!(
+            samples[1_000..]
+                .iter()
+                .any(|sample| sample.abs() > f32::EPSILON)
+        );
+    }
+
+    #[test]
+    fn sample_voice_returns_none_after_duration() {
+        let rendered = RenderedSound {
+            sample_rate_hz: 1_000,
+            samples: vec![0.5],
+        };
+        let mut voice = SampleVoice::new(1_000, rendered, false).expect("sample voice");
+
+        assert_eq!(voice.next_sample(), Some(0.5));
+        assert!(!voice.is_active());
+        assert_eq!(voice.next_sample(), None);
+    }
+
+    #[test]
+    fn synth_mixer_thrust_stop_returns_to_background_noise() {
+        let mut mixer = SynthMixer::new(LIVE_AUDIO_TEST_SAMPLE_RATE_HZ);
+
+        mixer.queue_event(SoundEvent::ThrustStarted);
+        assert!(mixer.thrust_voice.is_some());
 
         let mut saw_nonzero_sample = false;
         for _ in 0..LIVE_AUDIO_TEST_SAMPLE_RATE_HZ {
             saw_nonzero_sample |= mixer.next_sample().abs() > f32::EPSILON;
         }
-
         assert!(saw_nonzero_sample);
-        assert_eq!(mixer.voices.len(), 0);
+        assert!(mixer.thrust_voice.is_some());
+
+        mixer.queue_event(SoundEvent::ThrustStopped);
+        assert!(mixer.thrust_voice.is_some());
+        let mut saw_background_sample = false;
+        for _ in 0..LIVE_AUDIO_TEST_SAMPLE_RATE_HZ {
+            saw_background_sample |= mixer.next_sample().abs() > f32::EPSILON;
+        }
+        assert!(saw_background_sample);
     }
 
     #[test]
-    fn synth_voice_returns_silence_after_duration() {
-        let mut voice = SynthVoice::new(1_000, SynthClipSpec::new(440.0, 1, 0.5));
-
-        let _ = voice.next_sample();
-        assert!(!voice.is_active());
-        assert_eq!(voice.next_sample(), 0.0);
-    }
-
-    #[test]
-    fn synth_mixer_bounds_overlapping_voice_count() {
+    fn synth_mixer_background_end_stops_thrust_voice() {
         let mut mixer = SynthMixer::new(LIVE_AUDIO_TEST_SAMPLE_RATE_HZ);
 
-        for _ in 0..(super::LIVE_AUDIO_MAX_SYNTH_VOICES + 4) {
-            mixer.queue_event(SoundEvent::ThrustStarted);
-        }
+        mixer.queue_event(SoundEvent::ThrustStarted);
+        assert!(mixer.thrust_voice.is_some());
 
-        assert_eq!(mixer.voices.len(), super::LIVE_AUDIO_MAX_SYNTH_VOICES);
+        mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: 0xEC });
+
+        assert!(mixer.thrust_voice.is_none());
+    }
+
+    #[test]
+    fn synth_mixer_interrupts_foreground_commands_like_the_source_sound_board() {
+        let mut mixer = SynthMixer::new(LIVE_AUDIO_TEST_SAMPLE_RATE_HZ);
+
+        mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: 0xEA });
+        assert!(mixer.foreground_voice.is_some());
+        mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: 0xEB });
+
+        assert!(mixer.foreground_voice.is_some());
 
         mixer.clear();
-        assert_eq!(mixer.voices.len(), 0);
+        assert!(mixer.foreground_voice.is_none());
+        assert!(mixer.thrust_voice.is_none());
+    }
+
+    #[test]
+    fn synth_mixer_thrust_start_preempts_foreground_sound() {
+        let mut mixer = SynthMixer::new(LIVE_AUDIO_TEST_SAMPLE_RATE_HZ);
+
+        mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: 0xEA });
+        assert!(mixer.foreground_voice.is_some());
+
+        mixer.queue_event(SoundEvent::ThrustStarted);
+
+        assert!(mixer.foreground_voice.is_none());
+        assert!(mixer.thrust_voice.is_some());
     }
 
     #[cfg(coverage)]

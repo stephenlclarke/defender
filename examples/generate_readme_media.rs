@@ -1,15 +1,19 @@
 use std::{
+    ffi::OsStr,
     fs::File,
+    io::Write,
     path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result, bail};
 use defender::AttractPresentationPage;
 use defender::readme_media::{FRAME_RATE_MILLIHZ, ReadmeMediaFrame, ReadmeMediaFrameSource};
+use defender::{SoundEvent, audio::render_sound_event_timeline_to_samples};
 use gif::{ColorOutput, DisposalMethod, Encoder, Frame, Repeat};
 
 const OUTPUT_WIDTH: u32 = 768;
 const OUTPUT_HEIGHT: u32 = 576;
+const CANDIDATE_AUDIO_SAMPLE_RATE_HZ: u32 = 22_050;
 const SAMPLE_STEP_FRAMES: u64 = 8;
 const PAGE_SEARCH_LIMIT_FRAMES: u64 = 10_000;
 const WILLIAMS_SECONDS: u64 = 8;
@@ -21,24 +25,58 @@ const ALLOW_REFERENCE_OVERWRITE_ENV: &str = "DEFENDER_ALLOW_REFERENCE_MEDIA_OVER
 const VISUAL_SAMPLE_STRIDE: u32 = 8;
 const RGBA_CHANNELS: usize = 4;
 const RGB_CHANNELS: usize = 3;
+const PCM_CHANNELS: u16 = 1;
+const PCM_BITS_PER_SAMPLE: u16 = 16;
+const PCM_BYTES_PER_SAMPLE: usize = 2;
 
 fn main() -> Result<()> {
-    let gif_path = gif_path_from_args(std::env::args_os().skip(1));
-    ensure_reference_overwrite_allowed(&gif_path)?;
+    let args = media_args_from_args(std::env::args_os().skip(1))?;
+    ensure_reference_overwrite_allowed(&args.gif_path)?;
 
-    ensure_parent_dir(&gif_path)?;
+    ensure_parent_dir(&args.gif_path)?;
     let sequence = build_start_sequence()?;
-    write_gif(&gif_path, &sequence)?;
+    write_gif(&args.gif_path, &sequence.visual_frames)?;
+    if let Some(audio_path) = &args.audio_path {
+        write_audio_wav(audio_path, &sequence)?;
+        println!("wrote {}", audio_path.display());
+    }
 
-    println!("wrote {}", gif_path.display());
-    print_reference_comparison(&gif_path)?;
+    println!("wrote {}", args.gif_path.display());
+    print_reference_comparison(&args.gif_path)?;
     Ok(())
 }
 
-fn gif_path_from_args(mut args: impl Iterator<Item = std::ffi::OsString>) -> PathBuf {
-    args.next()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(DEFAULT_CANDIDATE_GIF))
+fn media_args_from_args(mut args: impl Iterator<Item = std::ffi::OsString>) -> Result<MediaArgs> {
+    let mut gif_path = None;
+    let mut audio_path = None;
+
+    while let Some(arg) = args.next() {
+        if arg == OsStr::new("--audio") {
+            if audio_path.is_some() {
+                bail!("--audio was provided more than once");
+            }
+            let Some(path) = args.next() else {
+                bail!("--audio requires a path");
+            };
+            audio_path = Some(PathBuf::from(path));
+        } else if gif_path.is_none() {
+            gif_path = Some(PathBuf::from(arg));
+        } else {
+            bail!("unexpected extra argument after GIF path");
+        }
+    }
+
+    Ok(MediaArgs {
+        gif_path: gif_path.unwrap_or_else(|| PathBuf::from(DEFAULT_CANDIDATE_GIF)),
+        audio_path,
+    })
+}
+
+#[cfg(test)]
+fn gif_path_from_args(args: impl Iterator<Item = std::ffi::OsString>) -> PathBuf {
+    media_args_from_args(args)
+        .expect("valid media args")
+        .gif_path
 }
 
 fn ensure_reference_overwrite_allowed(path: &Path) -> Result<()> {
@@ -66,17 +104,30 @@ fn normalized_path(path: &Path) -> PathBuf {
         .collect()
 }
 
-fn build_start_sequence() -> Result<Vec<(RgbaImage, u16)>> {
+fn build_start_sequence() -> Result<ReadmeMediaSequence> {
     let mut source = ReadmeMediaFrameSource::new(OUTPUT_WIDTH, OUTPUT_HEIGHT);
     let mut delay = DelayAccumulator::new();
     let mut frames = Vec::new();
+    let mut audio_events = Vec::new();
+    let mut sequence_frame = 0;
 
     for segment in readme_segments() {
         step_until_segment_start(&mut source, segment.start)?;
-        capture_segment(&mut source, &mut delay, segment, &mut frames)?;
+        capture_segment(
+            &mut source,
+            &mut delay,
+            segment,
+            &mut frames,
+            &mut audio_events,
+            &mut sequence_frame,
+        )?;
     }
 
-    preserve_sampled_cadence(frames)
+    Ok(ReadmeMediaSequence {
+        visual_frames: preserve_sampled_cadence(frames)?,
+        audio_events,
+        frame_count: sequence_frame,
+    })
 }
 
 fn readme_segments() -> [ReadmeSegment; 3] {
@@ -125,6 +176,8 @@ fn capture_segment(
     delay: &mut DelayAccumulator,
     segment: ReadmeSegment,
     frames: &mut Vec<(RgbaImage, u16)>,
+    audio_events: &mut Vec<(u64, Vec<SoundEvent>)>,
+    sequence_frame: &mut u64,
 ) -> Result<()> {
     let mut remaining = segment.frame_count;
     while remaining > 0 {
@@ -136,16 +189,26 @@ fn capture_segment(
                 .into(),
             delay.centiseconds_for_frames(step_frames),
         ));
-        step_for_frames(source, step_frames);
+        step_for_frames(source, step_frames, audio_events, sequence_frame);
         remaining -= step_frames;
     }
 
     Ok(())
 }
 
-fn step_for_frames(source: &mut ReadmeMediaFrameSource, frames: u64) {
+fn step_for_frames(
+    source: &mut ReadmeMediaFrameSource,
+    frames: u64,
+    audio_events: &mut Vec<(u64, Vec<SoundEvent>)>,
+    sequence_frame: &mut u64,
+) {
     for _ in 0..frames {
+        let events = source.sound_events();
+        if !events.is_empty() {
+            audio_events.push((*sequence_frame, events.to_vec()));
+        }
         source.step();
+        *sequence_frame += 1;
     }
 }
 
@@ -183,6 +246,60 @@ fn write_gif(path: &Path, frames: &[(RgbaImage, u16)]) -> Result<()> {
         encoder.write_frame(&frame).context("writing GIF frame")?;
     }
 
+    Ok(())
+}
+
+fn write_audio_wav(path: &Path, sequence: &ReadmeMediaSequence) -> Result<()> {
+    ensure_parent_dir(path)?;
+    let samples = render_sound_event_timeline_to_samples(
+        &sequence.audio_events,
+        sequence.frame_count,
+        FRAME_RATE_MILLIHZ,
+        CANDIDATE_AUDIO_SAMPLE_RATE_HZ,
+    );
+    let mut file =
+        File::create(path).with_context(|| format!("creating WAV {}", path.display()))?;
+    write_wav_header(&mut file, samples.len())?;
+    for sample in samples {
+        let scaled = (sample.clamp(-1.0, 1.0) * f32::from(i16::MAX)).round() as i16;
+        file.write_all(&scaled.to_le_bytes())
+            .with_context(|| format!("writing WAV samples to {}", path.display()))?;
+    }
+    Ok(())
+}
+
+fn write_wav_header(file: &mut File, sample_count: usize) -> Result<()> {
+    let data_size = sample_count
+        .checked_mul(PCM_BYTES_PER_SAMPLE)
+        .context("candidate audio sample data is too large")?;
+    let data_size = u32::try_from(data_size).context("candidate audio WAV data is too large")?;
+    let byte_rate =
+        CANDIDATE_AUDIO_SAMPLE_RATE_HZ * u32::from(PCM_CHANNELS) * u32::from(PCM_BITS_PER_SAMPLE)
+            / 8;
+    let block_align = PCM_CHANNELS * PCM_BITS_PER_SAMPLE / 8;
+
+    file.write_all(b"RIFF").context("writing WAV RIFF header")?;
+    file.write_all(&(36 + data_size).to_le_bytes())
+        .context("writing WAV file size")?;
+    file.write_all(b"WAVEfmt ")
+        .context("writing WAV format header")?;
+    file.write_all(&16_u32.to_le_bytes())
+        .context("writing WAV fmt chunk size")?;
+    file.write_all(&1_u16.to_le_bytes())
+        .context("writing WAV PCM format")?;
+    file.write_all(&PCM_CHANNELS.to_le_bytes())
+        .context("writing WAV channel count")?;
+    file.write_all(&CANDIDATE_AUDIO_SAMPLE_RATE_HZ.to_le_bytes())
+        .context("writing WAV sample rate")?;
+    file.write_all(&byte_rate.to_le_bytes())
+        .context("writing WAV byte rate")?;
+    file.write_all(&block_align.to_le_bytes())
+        .context("writing WAV block alignment")?;
+    file.write_all(&PCM_BITS_PER_SAMPLE.to_le_bytes())
+        .context("writing WAV bit depth")?;
+    file.write_all(b"data").context("writing WAV data chunk")?;
+    file.write_all(&data_size.to_le_bytes())
+        .context("writing WAV data size")?;
     Ok(())
 }
 
@@ -544,6 +661,19 @@ impl ReadmeSegment {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct MediaArgs {
+    gif_path: PathBuf,
+    audio_path: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct ReadmeMediaSequence {
+    visual_frames: Vec<(RgbaImage, u16)>,
+    audio_events: Vec<(u64, Vec<SoundEvent>)>,
+    frame_count: u64,
+}
+
 struct DelayAccumulator {
     remainder: u64,
 }
@@ -562,7 +692,7 @@ impl DelayAccumulator {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct RgbaImage {
     width: u32,
     height: u32,
@@ -586,7 +716,8 @@ mod tests {
         GifFrameSample, GifSummary, HIGH_SCORE_SECONDS, PROTECTED_REFERENCE_GIF, RGBA_CHANNELS,
         ReadmeSegment, ReadmeSegmentStart, RgbaImage, SAMPLE_STEP_FRAMES, VISUAL_REGIONS,
         WILLIAMS_SECONDS, compare_summaries, frame_count_for_seconds, gif_path_from_args,
-        is_protected_reference_path, preserve_sampled_cadence, readme_segments,
+        is_protected_reference_path, media_args_from_args, preserve_sampled_cadence,
+        readme_segments,
     };
     use std::{ffi::OsString, path::Path};
 
@@ -667,6 +798,23 @@ mod tests {
         assert!(!is_protected_reference_path(Path::new(
             DEFAULT_CANDIDATE_GIF
         )));
+    }
+
+    #[test]
+    fn audio_argument_adds_candidate_wav_path() {
+        let args = vec![
+            OsString::from("target/readme-media/custom.gif"),
+            OsString::from("--audio"),
+            OsString::from("target/readme-media/custom.wav"),
+        ];
+
+        let parsed = media_args_from_args(args.into_iter()).expect("media args");
+
+        assert_eq!(parsed.gif_path, Path::new("target/readme-media/custom.gif"));
+        assert_eq!(
+            parsed.audio_path.as_deref(),
+            Some(Path::new("target/readme-media/custom.wav"))
+        );
     }
 
     #[test]

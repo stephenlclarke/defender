@@ -7,6 +7,7 @@
 #[cfg(all(test, feature = "legacy-tools"))]
 mod accepted;
 
+pub mod actor_game;
 pub mod audio;
 #[cfg(all(test, feature = "legacy-tools"))]
 mod clean_fidelity;
@@ -31,6 +32,7 @@ mod rom_report;
 #[cfg(feature = "legacy-tools")]
 mod roms;
 mod runtime;
+mod sound_board;
 pub mod systems;
 
 // Legacy bridge modules are compiled only for explicit developer tooling.

@@ -1,0 +1,2697 @@
+//! Actor-oriented Defender rewrite prototype.
+//!
+//! This module is intentionally independent from the current MAME-shaped
+//! `Game` implementation. It models the game as driver-owned actor threads:
+//! the driver prompts every asset once per frame, gathers commands, resolves
+//! world rules in a stable order, and publishes a frame description.
+
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::mpsc::{self, Receiver, Sender},
+    thread::{self, JoinHandle},
+};
+
+const PLAYER_SPEED: i16 = 2;
+const PLAYER_BOUNDS: Rect = Rect::new(0, 18, 255, 220);
+const LASER_SPEED: i16 = 8;
+const LASER_LIFETIME: u16 = 34;
+const LANDER_FIRE_PERIOD: u64 = 96;
+const EXPLOSION_LIFETIME: u16 = 20;
+const SCORE_POPUP_LIFETIME: u16 = 50;
+const WILLIAMS_REVEAL_STEPS: u16 = 36;
+const WILLIAMS_COLOR_PERIOD: u16 = 8;
+const DEFENDER_WORDMARK_START_FRAME: u64 = 72;
+const DEFENDER_WORDMARK_SLOTS: u16 = 15;
+const DEFENDER_WORDMARK_ROW_PAIRS: u16 = 6;
+const HUMAN_GROUND_Y: i16 = 214;
+const HUMAN_FALL_ACCELERATION: i16 = 1;
+const HUMAN_SAFE_LANDING_SPEED: i16 = 3;
+const LANDER_CARRY_SPEED: i16 = 2;
+const LANDER_PICKUP_RADIUS_X: i16 = 6;
+const LANDER_PICKUP_RADIUS_Y: i16 = 8;
+const LANDER_CONVERSION_Y: i16 = 24;
+const LANDER_SCORE: u32 = 150;
+const MUTANT_SCORE: u32 = 150;
+const HUMAN_RESCUE_SCORE: u32 = 500;
+const HUMAN_SAFE_LANDING_SCORE: u32 = 250;
+const INITIAL_HUMAN_POSITIONS: [Point; 10] = [
+    Point::new(28, HUMAN_GROUND_Y),
+    Point::new(52, HUMAN_GROUND_Y),
+    Point::new(76, HUMAN_GROUND_Y),
+    Point::new(104, HUMAN_GROUND_Y),
+    Point::new(128, HUMAN_GROUND_Y),
+    Point::new(152, HUMAN_GROUND_Y),
+    Point::new(176, HUMAN_GROUND_Y),
+    Point::new(200, HUMAN_GROUND_Y),
+    Point::new(224, HUMAN_GROUND_Y),
+    Point::new(244, HUMAN_GROUND_Y),
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ActorId(u64);
+
+impl ActorId {
+    pub const fn new(value: u64) -> Self {
+        Self(value)
+    }
+
+    pub const fn value(self) -> u64 {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct XyzzyMode {
+    pub active: bool,
+    pub auto_fire: bool,
+    pub invincible: bool,
+    pub overlay_smart_bomb: bool,
+}
+
+impl XyzzyMode {
+    pub const INACTIVE: Self = Self {
+        active: false,
+        auto_fire: false,
+        invincible: false,
+        overlay_smart_bomb: false,
+    };
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct GameInput {
+    pub coin: bool,
+    pub coin_two: bool,
+    pub coin_three: bool,
+    pub start_one: bool,
+    pub start_two: bool,
+    pub altitude_up: bool,
+    pub altitude_down: bool,
+    pub thrust: bool,
+    pub reverse: bool,
+    pub fire: bool,
+    pub smart_bomb: bool,
+    pub hyperspace: bool,
+    pub service_advance: bool,
+    pub high_score_reset: bool,
+    pub auto_up_manual_down: bool,
+    pub tilt: bool,
+    pub xyzzy: XyzzyMode,
+}
+
+impl GameInput {
+    pub const NONE: Self = Self {
+        coin: false,
+        coin_two: false,
+        coin_three: false,
+        start_one: false,
+        start_two: false,
+        altitude_up: false,
+        altitude_down: false,
+        thrust: false,
+        reverse: false,
+        fire: false,
+        smart_bomb: false,
+        hyperspace: false,
+        service_advance: false,
+        high_score_reset: false,
+        auto_up_manual_down: false,
+        tilt: false,
+        xyzzy: XyzzyMode::INACTIVE,
+    };
+
+    fn coin_insertions(self) -> u8 {
+        u8::from(self.coin) + u8::from(self.coin_two) + u8::from(self.coin_three)
+    }
+
+    fn wants_fire(self) -> bool {
+        self.fire || self.xyzzy.auto_fire
+    }
+
+    fn wants_smart_bomb(self) -> bool {
+        self.smart_bomb || self.xyzzy.overlay_smart_bomb
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum KeyboardProfile {
+    #[default]
+    Planetoid,
+    Cabinet,
+}
+
+impl KeyboardProfile {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "planetoid" => Some(Self::Planetoid),
+            "cabinet" => Some(Self::Cabinet),
+            _ => None,
+        }
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Planetoid => "planetoid",
+            Self::Cabinet => "cabinet",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyboardKey {
+    Character(char),
+    Enter,
+    Backspace,
+    Escape,
+    Tab,
+    ArrowUp,
+    ArrowDown,
+    Function(u8),
+    LeftShift,
+    RightShift,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyTransition {
+    Press,
+    Repeat,
+    Release,
+}
+
+impl KeyTransition {
+    const fn contributes_input(self) -> bool {
+        matches!(self, Self::Press | Self::Repeat)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KeyboardEvent {
+    pub key: KeyboardKey,
+    pub transition: KeyTransition,
+}
+
+impl KeyboardEvent {
+    pub const fn press(key: KeyboardKey) -> Self {
+        Self {
+            key,
+            transition: KeyTransition::Press,
+        }
+    }
+
+    pub const fn release(key: KeyboardKey) -> Self {
+        Self {
+            key,
+            transition: KeyTransition::Release,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct KeyboardFrame {
+    pub input: GameInput,
+    pub typed_chars: Vec<char>,
+    pub quit_requested: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+struct HeldControls {
+    altitude_up: bool,
+    altitude_down: bool,
+    thrust: bool,
+    auto_up_manual_down: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyboardMapper {
+    profile: KeyboardProfile,
+    held: HeldControls,
+    xyzzy: XyzzyController,
+}
+
+impl KeyboardMapper {
+    pub fn new(profile: KeyboardProfile) -> Self {
+        Self {
+            profile,
+            held: HeldControls::default(),
+            xyzzy: XyzzyController::default(),
+        }
+    }
+
+    pub fn profile(&self) -> KeyboardProfile {
+        self.profile
+    }
+
+    pub fn xyzzy_mode(&self) -> XyzzyMode {
+        self.xyzzy.mode(false)
+    }
+
+    pub fn map_event(&mut self, event: KeyboardEvent, frame: &mut KeyboardFrame) {
+        let active = event.transition.contributes_input();
+        if event.transition == KeyTransition::Press {
+            match event.key {
+                KeyboardKey::Character(character) => {
+                    let typed = character.to_ascii_lowercase();
+                    frame.typed_chars.push(typed);
+                    self.xyzzy.ingest(typed);
+                }
+                KeyboardKey::Backspace => frame.typed_chars.push('\u{8}'),
+                _ => {}
+            }
+        }
+
+        match event.key {
+            KeyboardKey::Escape if active => frame.quit_requested = true,
+            KeyboardKey::Character('q' | 'Q') if active => frame.quit_requested = true,
+            _ => self.map_profile_event(event, frame),
+        }
+
+        if self.xyzzy.active() && active {
+            match event.key {
+                KeyboardKey::Character('f' | 'F') => self.xyzzy.toggle_auto_fire(),
+                KeyboardKey::Character('g' | 'G') => self.xyzzy.toggle_invincible(),
+                KeyboardKey::Tab => frame.input.xyzzy.overlay_smart_bomb = true,
+                _ => {}
+            }
+        }
+    }
+
+    pub fn finish_frame(&self, frame: &mut KeyboardFrame) {
+        frame.input.altitude_up |= self.held.altitude_up;
+        frame.input.altitude_down |= self.held.altitude_down;
+        frame.input.thrust |= self.held.thrust;
+        frame.input.auto_up_manual_down |= self.held.auto_up_manual_down;
+        let overlay_smart_bomb = frame.input.xyzzy.overlay_smart_bomb;
+        frame.input.xyzzy = self.xyzzy.mode(overlay_smart_bomb);
+        if frame.input.xyzzy.auto_fire {
+            frame.input.fire = true;
+        }
+    }
+
+    fn map_profile_event(&mut self, event: KeyboardEvent, frame: &mut KeyboardFrame) {
+        match self.profile {
+            KeyboardProfile::Planetoid => self.map_planetoid_event(event, frame),
+            KeyboardProfile::Cabinet => self.map_cabinet_event(event, frame),
+        }
+    }
+
+    fn map_planetoid_event(&mut self, event: KeyboardEvent, frame: &mut KeyboardFrame) {
+        let active = event.transition.contributes_input();
+        match event.key {
+            KeyboardKey::Enter if active => {
+                frame.input.start_one = true;
+                frame.input.fire = true;
+            }
+            KeyboardKey::Character('1') if active => frame.input.start_one = true,
+            KeyboardKey::Character('5') if active => frame.input.coin = true,
+            KeyboardKey::Character('6') if active => frame.input.coin_two = true,
+            KeyboardKey::Character('7') if active => frame.input.coin_three = true,
+            KeyboardKey::Character('a' | 'A') => set_held_control(
+                &mut self.held.altitude_up,
+                event.transition,
+                &mut frame.input.altitude_up,
+            ),
+            KeyboardKey::Character('z' | 'Z') => set_held_control(
+                &mut self.held.altitude_down,
+                event.transition,
+                &mut frame.input.altitude_down,
+            ),
+            KeyboardKey::LeftShift | KeyboardKey::RightShift => set_held_control(
+                &mut self.held.thrust,
+                event.transition,
+                &mut frame.input.thrust,
+            ),
+            KeyboardKey::Character(' ') if active => frame.input.reverse = true,
+            KeyboardKey::Tab if active => frame.input.smart_bomb = true,
+            KeyboardKey::Character('h' | 'H') if active => frame.input.hyperspace = true,
+            KeyboardKey::Function(2) if active => frame.input.service_advance = true,
+            KeyboardKey::Function(3) if active => frame.input.high_score_reset = true,
+            KeyboardKey::Function(4) => set_held_control(
+                &mut self.held.auto_up_manual_down,
+                event.transition,
+                &mut frame.input.auto_up_manual_down,
+            ),
+            KeyboardKey::Function(5) if active => frame.input.tilt = true,
+            _ => {}
+        }
+    }
+
+    fn map_cabinet_event(&mut self, event: KeyboardEvent, frame: &mut KeyboardFrame) {
+        let active = event.transition.contributes_input();
+        match event.key {
+            KeyboardKey::Character('5') if active => frame.input.coin = true,
+            KeyboardKey::Character('6') if active => frame.input.coin_two = true,
+            KeyboardKey::Character('7') if active => frame.input.coin_three = true,
+            KeyboardKey::Character('1') if active => frame.input.start_one = true,
+            KeyboardKey::Character('2') if active => frame.input.start_two = true,
+            KeyboardKey::ArrowUp => set_held_control(
+                &mut self.held.altitude_up,
+                event.transition,
+                &mut frame.input.altitude_up,
+            ),
+            KeyboardKey::ArrowDown => set_held_control(
+                &mut self.held.altitude_down,
+                event.transition,
+                &mut frame.input.altitude_down,
+            ),
+            KeyboardKey::Character('r' | 'R') if active => frame.input.reverse = true,
+            KeyboardKey::Character('t' | 'T') => set_held_control(
+                &mut self.held.thrust,
+                event.transition,
+                &mut frame.input.thrust,
+            ),
+            KeyboardKey::Character('f' | 'F') if active => frame.input.fire = true,
+            KeyboardKey::Character('b' | 'B') if active => frame.input.smart_bomb = true,
+            KeyboardKey::Character('h' | 'H') if active => frame.input.hyperspace = true,
+            KeyboardKey::Function(2) if active => frame.input.service_advance = true,
+            KeyboardKey::Function(3) if active => frame.input.high_score_reset = true,
+            KeyboardKey::Function(4) => set_held_control(
+                &mut self.held.auto_up_manual_down,
+                event.transition,
+                &mut frame.input.auto_up_manual_down,
+            ),
+            KeyboardKey::Function(5) if active => frame.input.tilt = true,
+            _ => {}
+        }
+    }
+}
+
+impl Default for KeyboardMapper {
+    fn default() -> Self {
+        Self::new(KeyboardProfile::default())
+    }
+}
+
+fn set_held_control(held: &mut bool, transition: KeyTransition, output: &mut bool) {
+    match transition {
+        KeyTransition::Press | KeyTransition::Repeat => {
+            *held = true;
+            *output = true;
+        }
+        KeyTransition::Release => *held = false,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct XyzzyController {
+    active: bool,
+    sequence_index: usize,
+    auto_fire: bool,
+    invincible: bool,
+}
+
+impl XyzzyController {
+    const CODE: [char; 5] = ['x', 'y', 'z', 'z', 'y'];
+
+    pub fn active(&self) -> bool {
+        self.active
+    }
+
+    pub fn auto_fire(&self) -> bool {
+        self.auto_fire
+    }
+
+    pub fn invincible(&self) -> bool {
+        self.invincible
+    }
+
+    pub fn ingest(&mut self, character: char) {
+        let character = character.to_ascii_lowercase();
+        if character == Self::CODE[self.sequence_index] {
+            self.sequence_index += 1;
+            if self.sequence_index == Self::CODE.len() {
+                self.active = !self.active;
+                self.sequence_index = 0;
+                if !self.active {
+                    self.auto_fire = false;
+                    self.invincible = false;
+                }
+            }
+        } else {
+            self.sequence_index = usize::from(character == Self::CODE[0]);
+        }
+    }
+
+    fn toggle_auto_fire(&mut self) {
+        if self.active {
+            self.auto_fire = !self.auto_fire;
+        }
+    }
+
+    fn toggle_invincible(&mut self) {
+        if self.active {
+            self.invincible = !self.invincible;
+        }
+    }
+
+    fn mode(&self, overlay_smart_bomb: bool) -> XyzzyMode {
+        XyzzyMode {
+            active: self.active,
+            auto_fire: self.active && self.auto_fire,
+            invincible: self.active && self.invincible,
+            overlay_smart_bomb: self.active && overlay_smart_bomb,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Point {
+    pub x: i16,
+    pub y: i16,
+}
+
+impl Point {
+    pub const fn new(x: i16, y: i16) -> Self {
+        Self { x, y }
+    }
+
+    pub const fn offset(self, velocity: Velocity) -> Self {
+        Self {
+            x: self.x + velocity.dx,
+            y: self.y + velocity.dy,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Velocity {
+    pub dx: i16,
+    pub dy: i16,
+}
+
+impl Velocity {
+    pub const fn new(dx: i16, dy: i16) -> Self {
+        Self { dx, dy }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rect {
+    pub left: i16,
+    pub top: i16,
+    pub right: i16,
+    pub bottom: i16,
+}
+
+impl Rect {
+    pub const fn new(left: i16, top: i16, right: i16, bottom: i16) -> Self {
+        Self {
+            left,
+            top,
+            right,
+            bottom,
+        }
+    }
+
+    pub const fn from_center(center: Point, width: i16, height: i16) -> Self {
+        let half_width = width / 2;
+        let half_height = height / 2;
+        Self {
+            left: center.x - half_width,
+            top: center.y - half_height,
+            right: center.x + half_width,
+            bottom: center.y + half_height,
+        }
+    }
+
+    pub const fn intersects(self, other: Self) -> bool {
+        self.left <= other.right
+            && self.right >= other.left
+            && self.top <= other.bottom
+            && self.bottom >= other.top
+    }
+
+    pub const fn clamp_point(self, point: Point) -> Point {
+        Point {
+            x: clamp_i16(point.x, self.left, self.right),
+            y: clamp_i16(point.y, self.top, self.bottom),
+        }
+    }
+}
+
+const fn clamp_i16(value: i16, min: i16, max: i16) -> i16 {
+    if value < min {
+        min
+    } else if value > max {
+        max
+    } else {
+        value
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Direction {
+    Left,
+    Right,
+}
+
+impl Direction {
+    const fn sign(self) -> i16 {
+        match self {
+            Self::Left => -1,
+            Self::Right => 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Phase {
+    Attract,
+    Playing,
+    GameOver,
+    HighScoreEntry,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActorKind {
+    AttractDirector,
+    AttractScript,
+    WilliamsLogo,
+    DefenderWordmark,
+    Player,
+    Lander,
+    Mutant,
+    Human,
+    Laser,
+    Explosion,
+    ScorePopup,
+    Text,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpriteKey {
+    WilliamsLogo,
+    DefenderCoalescence,
+    DefenderWordmark,
+    DefenderLogo,
+    HighScoreText,
+    PlayerRight,
+    PlayerLeft,
+    Lander,
+    Mutant,
+    Human,
+    HumanFalling,
+    HumanCarried,
+    Laser,
+    Explosion,
+    Score250,
+    Score500,
+    Text,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum VisualEffect {
+    #[default]
+    Static,
+    WilliamsReveal {
+        stroke_step: u16,
+        color_phase: u8,
+    },
+    DefenderCoalescence {
+        slot: u8,
+        row_pair: u8,
+    },
+    ExplosionCloud {
+        age: u16,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SoundCue {
+    Credit,
+    Start,
+    Thrust,
+    Laser,
+    SmartBomb,
+    Explosion,
+    LanderPickup,
+    HumanPulled,
+    HumanReleased,
+    HumanRescued,
+    HumanSafeLanding,
+    HumanLost,
+    MutantSpawn,
+    AttractPulse,
+    GameOver,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttractScript {
+    events: Vec<AttractScriptEvent>,
+}
+
+impl AttractScript {
+    pub fn new(mut events: Vec<AttractScriptEvent>) -> Self {
+        events.sort_by_key(|event| event.start_frame);
+        Self { events }
+    }
+
+    pub fn red_label_title() -> Self {
+        Self::new(vec![
+            AttractScriptEvent::williams_logo(1, None, Point::new(94, 34)),
+            AttractScriptEvent::defender_wordmark(
+                DEFENDER_WORDMARK_START_FRAME,
+                None,
+                Point::new(88, 78),
+            ),
+            AttractScriptEvent::text(1, None, Point::new(78, 176), "HIGH SCORES"),
+        ])
+    }
+
+    fn draws_for(&self, actor: ActorId, frame: u64) -> Vec<DrawCommand> {
+        self.events
+            .iter()
+            .filter(|event| event.active_at(frame))
+            .map(|event| event.draw(actor, frame))
+            .collect()
+    }
+}
+
+impl Default for AttractScript {
+    fn default() -> Self {
+        Self::red_label_title()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttractScriptEvent {
+    pub start_frame: u64,
+    pub end_frame: Option<u64>,
+    pub action: AttractScriptAction,
+}
+
+impl AttractScriptEvent {
+    pub fn text(
+        start_frame: u64,
+        end_frame: Option<u64>,
+        position: Point,
+        value: impl Into<String>,
+    ) -> Self {
+        Self {
+            start_frame,
+            end_frame,
+            action: AttractScriptAction::Text {
+                position,
+                value: value.into(),
+            },
+        }
+    }
+
+    pub fn sprite(
+        start_frame: u64,
+        end_frame: Option<u64>,
+        sprite: SpriteKey,
+        position: Point,
+    ) -> Self {
+        Self {
+            start_frame,
+            end_frame,
+            action: AttractScriptAction::Sprite { sprite, position },
+        }
+    }
+
+    pub fn williams_logo(start_frame: u64, end_frame: Option<u64>, position: Point) -> Self {
+        Self {
+            start_frame,
+            end_frame,
+            action: AttractScriptAction::WilliamsLogo {
+                position,
+                reveal_steps: WILLIAMS_REVEAL_STEPS,
+                color_period: WILLIAMS_COLOR_PERIOD,
+            },
+        }
+    }
+
+    pub fn defender_wordmark(start_frame: u64, end_frame: Option<u64>, position: Point) -> Self {
+        Self {
+            start_frame,
+            end_frame,
+            action: AttractScriptAction::DefenderWordmark {
+                position,
+                slots: DEFENDER_WORDMARK_SLOTS,
+                row_pairs: DEFENDER_WORDMARK_ROW_PAIRS,
+            },
+        }
+    }
+
+    fn active_at(&self, frame: u64) -> bool {
+        if frame < self.start_frame {
+            return false;
+        }
+        match self.end_frame {
+            Some(end_frame) => frame < end_frame,
+            None => true,
+        }
+    }
+
+    fn draw(&self, actor: ActorId, frame: u64) -> DrawCommand {
+        self.action.draw(actor, self.age(frame))
+    }
+
+    fn age(&self, frame: u64) -> u64 {
+        frame.saturating_sub(self.start_frame).saturating_add(1)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AttractScriptAction {
+    Text {
+        position: Point,
+        value: String,
+    },
+    Sprite {
+        sprite: SpriteKey,
+        position: Point,
+    },
+    WilliamsLogo {
+        position: Point,
+        reveal_steps: u16,
+        color_period: u16,
+    },
+    DefenderWordmark {
+        position: Point,
+        slots: u16,
+        row_pairs: u16,
+    },
+}
+
+impl AttractScriptAction {
+    fn draw(&self, actor: ActorId, age: u64) -> DrawCommand {
+        match self {
+            Self::Text { position, value } => DrawCommand::text(actor, *position, value.clone()),
+            Self::Sprite { sprite, position } => DrawCommand::sprite(actor, *sprite, *position),
+            Self::WilliamsLogo {
+                position,
+                reveal_steps,
+                color_period,
+            } => {
+                let color_period = (*color_period).max(1);
+                let color_phase = ((age.saturating_sub(1) / u64::from(color_period)) % 4) as u8;
+                DrawCommand::sprite_with_effect(
+                    actor,
+                    SpriteKey::WilliamsLogo,
+                    *position,
+                    VisualEffect::WilliamsReveal {
+                        stroke_step: (age as u16).min(*reveal_steps),
+                        color_phase,
+                    },
+                )
+            }
+            Self::DefenderWordmark {
+                position,
+                slots,
+                row_pairs,
+            } => {
+                let row_pairs = (*row_pairs).max(1);
+                let progress = age.saturating_sub(1) as u16;
+                let total_steps = slots.saturating_mul(row_pairs);
+                if progress >= total_steps {
+                    DrawCommand::sprite(actor, SpriteKey::DefenderWordmark, *position)
+                } else {
+                    DrawCommand::sprite_with_effect(
+                        actor,
+                        SpriteKey::DefenderCoalescence,
+                        *position,
+                        VisualEffect::DefenderCoalescence {
+                            slot: (progress / row_pairs) as u8,
+                            row_pair: (progress % row_pairs) as u8,
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CollisionBody {
+    pub owner: ActorId,
+    pub kind: ActorKind,
+    pub bounds: Rect,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorSnapshot {
+    pub id: ActorId,
+    pub kind: ActorKind,
+    pub position: Point,
+    pub bounds: Option<Rect>,
+    pub alive: bool,
+}
+
+impl ActorSnapshot {
+    fn collision_body(&self) -> Option<CollisionBody> {
+        Some(CollisionBody {
+            owner: self.id,
+            kind: self.kind,
+            bounds: self.bounds?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HumanMode {
+    Grounded,
+    Falling { velocity: i16 },
+    CarriedBy(ActorId),
+}
+
+impl HumanMode {
+    const fn sprite(self) -> SpriteKey {
+        match self {
+            Self::Grounded => SpriteKey::Human,
+            Self::Falling { .. } => SpriteKey::HumanFalling,
+            Self::CarriedBy(_) => SpriteKey::HumanCarried,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DrawCommand {
+    pub actor: ActorId,
+    pub sprite: SpriteKey,
+    pub position: Point,
+    pub effect: VisualEffect,
+    pub text: Option<String>,
+}
+
+impl DrawCommand {
+    pub fn sprite(actor: ActorId, sprite: SpriteKey, position: Point) -> Self {
+        Self::sprite_with_effect(actor, sprite, position, VisualEffect::Static)
+    }
+
+    pub fn sprite_with_effect(
+        actor: ActorId,
+        sprite: SpriteKey,
+        position: Point,
+        effect: VisualEffect,
+    ) -> Self {
+        Self {
+            actor,
+            sprite,
+            position,
+            effect,
+            text: None,
+        }
+    }
+
+    pub fn text(actor: ActorId, position: Point, value: impl Into<String>) -> Self {
+        Self {
+            actor,
+            sprite: SpriteKey::Text,
+            position,
+            effect: VisualEffect::Static,
+            text: Some(value.into()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SpawnRequest {
+    Laser {
+        position: Point,
+        direction: Direction,
+        owner: ActorId,
+    },
+    Lander {
+        position: Point,
+    },
+    Mutant {
+        position: Point,
+    },
+    Human {
+        position: Point,
+        mode: HumanMode,
+    },
+    Explosion {
+        position: Point,
+    },
+    ScorePopup {
+        position: Point,
+        points: u32,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GameCommand {
+    Credit,
+    StartOnePlayer,
+    StartTwoPlayer,
+    Spawn(SpawnRequest),
+    Destroy(ActorId),
+    AttachHuman {
+        lander: ActorId,
+        human: ActorId,
+        position: Point,
+    },
+    SmartBomb,
+    HumanLost(ActorId),
+    AddScore(u32),
+    PlaySound(SoundCue),
+    EnterGameOver,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FramePrompt {
+    pub frame: u64,
+    pub phase: Phase,
+    pub input: GameInput,
+    pub score: u32,
+    pub credits: u8,
+    pub snapshots: Vec<ActorSnapshot>,
+}
+
+impl FramePrompt {
+    pub fn player_position(&self) -> Option<Point> {
+        self.snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive)
+            .map(|snapshot| snapshot.position)
+    }
+
+    fn snapshot(&self, id: ActorId) -> Option<&ActorSnapshot> {
+        self.snapshots
+            .iter()
+            .find(|snapshot| snapshot.id == id && snapshot.alive)
+    }
+
+    fn nearest_human(&self, position: Point) -> Option<&ActorSnapshot> {
+        self.snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::Human && snapshot.alive)
+            .min_by_key(|snapshot| manhattan_distance(position, snapshot.position))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorReply {
+    pub id: ActorId,
+    pub snapshot: ActorSnapshot,
+    pub commands: Vec<GameCommand>,
+    pub draws: Vec<DrawCommand>,
+}
+
+pub trait AssetActor: Send + 'static {
+    fn id(&self) -> ActorId;
+
+    fn update(&mut self, prompt: &FramePrompt) -> ActorReply;
+}
+
+enum ActorRequest {
+    Prompt(FramePrompt),
+    Stop,
+}
+
+struct ThreadedAsset {
+    sender: Sender<ActorRequest>,
+    receiver: Receiver<ActorReply>,
+    handle: Option<JoinHandle<()>>,
+}
+
+impl ThreadedAsset {
+    fn spawn(actor: impl AssetActor) -> Self {
+        let (request_sender, request_receiver) = mpsc::channel();
+        let (reply_sender, reply_receiver) = mpsc::channel();
+        let handle = thread::spawn(move || run_actor_thread(actor, request_receiver, reply_sender));
+        Self {
+            sender: request_sender,
+            receiver: reply_receiver,
+            handle: Some(handle),
+        }
+    }
+
+    fn prompt(&self, prompt: FramePrompt) -> Option<ActorReply> {
+        self.sender.send(ActorRequest::Prompt(prompt)).ok()?;
+        self.receiver.recv().ok()
+    }
+}
+
+impl Drop for ThreadedAsset {
+    fn drop(&mut self) {
+        let _ = self.sender.send(ActorRequest::Stop);
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
+fn run_actor_thread(
+    mut actor: impl AssetActor,
+    receiver: Receiver<ActorRequest>,
+    sender: Sender<ActorReply>,
+) {
+    while let Ok(request) = receiver.recv() {
+        match request {
+            ActorRequest::Prompt(prompt) => {
+                if sender.send(actor.update(&prompt)).is_err() {
+                    break;
+                }
+            }
+            ActorRequest::Stop => break,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FrameReport {
+    pub frame: u64,
+    pub phase: Phase,
+    pub score: u32,
+    pub credits: u8,
+    pub lives: u8,
+    pub snapshots: Vec<ActorSnapshot>,
+    pub draws: Vec<DrawCommand>,
+    pub sounds: Vec<SoundCue>,
+    pub commands: Vec<GameCommand>,
+}
+
+pub struct ActorGameDriver {
+    frame: u64,
+    phase: Phase,
+    score: u32,
+    credits: u8,
+    lives: u8,
+    next_actor_id: u64,
+    actors: BTreeMap<ActorId, ThreadedAsset>,
+    snapshots: BTreeMap<ActorId, ActorSnapshot>,
+    high_scores: HighScoreTable,
+}
+
+impl ActorGameDriver {
+    pub fn new() -> Self {
+        Self::with_attract_script(AttractScript::red_label_title())
+    }
+
+    pub fn with_attract_script(attract_script: AttractScript) -> Self {
+        let mut driver = Self {
+            frame: 0,
+            phase: Phase::Attract,
+            score: 0,
+            credits: 0,
+            lives: 3,
+            next_actor_id: 1,
+            actors: BTreeMap::new(),
+            snapshots: BTreeMap::new(),
+            high_scores: HighScoreTable::default(),
+        };
+        let attract_id = driver.allocate_actor_id();
+        let script_id = driver.allocate_actor_id();
+        driver.spawn_actor(AttractDirector::new(attract_id));
+        driver.spawn_actor(ScriptedAttractProgram::new(script_id, attract_script));
+        driver
+    }
+
+    pub fn step(&mut self, input: GameInput) -> FrameReport {
+        self.frame = self.frame.saturating_add(1);
+        let base_prompt = FramePrompt {
+            frame: self.frame,
+            phase: self.phase,
+            input,
+            score: self.score,
+            credits: self.credits,
+            snapshots: self.snapshots.values().cloned().collect(),
+        };
+
+        let mut replies = Vec::new();
+        for (id, actor) in &self.actors {
+            if let Some(reply) = actor.prompt(base_prompt.clone()) {
+                replies.push((*id, reply));
+            }
+        }
+        replies.sort_by_key(|(id, _)| *id);
+
+        let mut draws = Vec::new();
+        let mut commands = Vec::new();
+        let mut dead_actor_ids = Vec::new();
+        self.snapshots.clear();
+        for (_, reply) in replies {
+            if reply.snapshot.alive {
+                self.snapshots.insert(reply.id, reply.snapshot);
+            } else {
+                dead_actor_ids.push(reply.id);
+            }
+            draws.extend(reply.draws);
+            commands.extend(reply.commands);
+        }
+
+        self.resolve_collisions(input, &mut commands);
+        let sounds = self.apply_commands(&commands);
+        self.remove_dead_actors(&dead_actor_ids);
+
+        FrameReport {
+            frame: self.frame,
+            phase: self.phase,
+            score: self.score,
+            credits: self.credits,
+            lives: self.lives,
+            snapshots: self.snapshots.values().cloned().collect(),
+            draws,
+            sounds,
+            commands,
+        }
+    }
+
+    pub fn phase(&self) -> Phase {
+        self.phase
+    }
+
+    pub fn actor_count(&self) -> usize {
+        self.actors.len()
+    }
+
+    pub fn snapshot_count(&self, kind: ActorKind) -> usize {
+        self.snapshots
+            .values()
+            .filter(|snapshot| snapshot.kind == kind)
+            .count()
+    }
+
+    pub fn spawn_lander_for_test(&mut self, position: Point) -> ActorId {
+        self.spawn_lander(position)
+    }
+
+    pub fn spawn_human_for_test(&mut self, position: Point) -> ActorId {
+        self.spawn_human(position, HumanMode::Grounded)
+    }
+
+    pub fn spawn_falling_human_for_test(&mut self, position: Point, velocity: i16) -> ActorId {
+        self.spawn_human(position, HumanMode::Falling { velocity })
+    }
+
+    pub fn spawn_carried_human_for_test(&mut self, position: Point, carrier: ActorId) -> ActorId {
+        self.spawn_human(position, HumanMode::CarriedBy(carrier))
+    }
+
+    fn allocate_actor_id(&mut self) -> ActorId {
+        let id = ActorId::new(self.next_actor_id);
+        self.next_actor_id = self.next_actor_id.saturating_add(1);
+        id
+    }
+
+    fn spawn_actor(&mut self, actor: impl AssetActor) {
+        let id = actor.id();
+        self.actors.insert(id, ThreadedAsset::spawn(actor));
+    }
+
+    fn spawn_player(&mut self) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(PlayerShip::new(id, Point::new(42, 120)));
+        id
+    }
+
+    fn spawn_lander(&mut self, position: Point) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(Lander::new(id, position));
+        id
+    }
+
+    fn spawn_mutant(&mut self, position: Point) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(Mutant::new(id, position));
+        id
+    }
+
+    fn spawn_human(&mut self, position: Point, mode: HumanMode) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(Human::new(id, position, mode));
+        id
+    }
+
+    fn spawn_laser(&mut self, position: Point, direction: Direction, owner: ActorId) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(LaserShot::new(id, position, direction, owner));
+        id
+    }
+
+    fn spawn_explosion(&mut self, position: Point) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(Explosion::new(id, position));
+        id
+    }
+
+    fn spawn_score_popup(&mut self, position: Point, points: u32) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(ScorePopup::new(id, position, points));
+        id
+    }
+
+    fn resolve_collisions(&self, input: GameInput, commands: &mut Vec<GameCommand>) {
+        if self.phase != Phase::Playing {
+            return;
+        }
+
+        let bodies = self
+            .snapshots
+            .values()
+            .filter_map(ActorSnapshot::collision_body)
+            .collect::<Vec<_>>();
+        let mut destroyed = BTreeSet::new();
+        for laser in bodies.iter().filter(|body| body.kind == ActorKind::Laser) {
+            for enemy in bodies.iter().filter(|body| is_hostile(body.kind)) {
+                if laser.bounds.intersects(enemy.bounds) {
+                    destroyed.insert(laser.owner);
+                    destroyed.insert(enemy.owner);
+                    commands.push(GameCommand::Destroy(laser.owner));
+                    commands.push(GameCommand::Destroy(enemy.owner));
+                    commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
+                        position: center_of(enemy.bounds),
+                    }));
+                    commands.push(GameCommand::AddScore(score_for_hostile(enemy.kind)));
+                    commands.push(GameCommand::PlaySound(SoundCue::Explosion));
+                    break;
+                }
+            }
+        }
+
+        let Some(player) = bodies.iter().find(|body| body.kind == ActorKind::Player) else {
+            return;
+        };
+        if input.xyzzy.invincible {
+            return;
+        }
+        for enemy in bodies.iter().filter(|body| is_hostile(body.kind)) {
+            if destroyed.contains(&enemy.owner) {
+                continue;
+            }
+            if player.bounds.intersects(enemy.bounds) {
+                commands.push(GameCommand::Destroy(enemy.owner));
+                commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
+                    position: center_of(player.bounds),
+                }));
+                commands.push(GameCommand::PlaySound(SoundCue::Explosion));
+                commands.push(GameCommand::EnterGameOver);
+                break;
+            }
+        }
+    }
+
+    fn apply_commands(&mut self, commands: &[GameCommand]) -> Vec<SoundCue> {
+        let mut sounds = Vec::new();
+        for command in commands {
+            match *command {
+                GameCommand::Credit => {
+                    self.credits = self.credits.saturating_add(1);
+                    sounds.push(SoundCue::Credit);
+                }
+                GameCommand::StartOnePlayer => {
+                    if self.phase == Phase::Attract && self.credits > 0 {
+                        self.credits = self.credits.saturating_sub(1);
+                        self.phase = Phase::Playing;
+                        self.score = 0;
+                        self.lives = 3;
+                        self.spawn_player();
+                        self.spawn_lander(Point::new(180, 88));
+                        self.spawn_lander(Point::new(218, 150));
+                        self.spawn_initial_humans();
+                        sounds.push(SoundCue::Start);
+                    }
+                }
+                GameCommand::StartTwoPlayer => {
+                    if self.phase == Phase::Attract && self.credits > 1 {
+                        self.credits = self.credits.saturating_sub(2);
+                        self.phase = Phase::Playing;
+                        self.score = 0;
+                        self.lives = 3;
+                        self.spawn_player();
+                        self.spawn_lander(Point::new(180, 88));
+                        self.spawn_lander(Point::new(218, 150));
+                        self.spawn_lander(Point::new(198, 48));
+                        self.spawn_initial_humans();
+                        sounds.push(SoundCue::Start);
+                    }
+                }
+                GameCommand::Spawn(SpawnRequest::Laser {
+                    position,
+                    direction,
+                    owner,
+                }) => {
+                    self.spawn_laser(position, direction, owner);
+                }
+                GameCommand::Spawn(SpawnRequest::Lander { position }) => {
+                    self.spawn_lander(position);
+                }
+                GameCommand::Spawn(SpawnRequest::Mutant { position }) => {
+                    self.spawn_mutant(position);
+                }
+                GameCommand::Spawn(SpawnRequest::Human { position, mode }) => {
+                    self.spawn_human(position, mode);
+                }
+                GameCommand::Spawn(SpawnRequest::Explosion { position }) => {
+                    self.spawn_explosion(position);
+                }
+                GameCommand::Spawn(SpawnRequest::ScorePopup { position, points }) => {
+                    self.spawn_score_popup(position, points);
+                }
+                GameCommand::Destroy(id) => {
+                    self.snapshots.remove(&id);
+                    self.actors.remove(&id);
+                }
+                GameCommand::AttachHuman {
+                    lander,
+                    human,
+                    position,
+                } => {
+                    self.snapshots.remove(&human);
+                    self.actors.remove(&human);
+                    self.spawn_actor(Human::new(human, position, HumanMode::CarriedBy(lander)));
+                }
+                GameCommand::SmartBomb => {
+                    self.detonate_smart_bomb(&mut sounds);
+                }
+                GameCommand::HumanLost(id) => {
+                    self.snapshots.remove(&id);
+                    self.actors.remove(&id);
+                }
+                GameCommand::AddScore(points) => {
+                    self.score = self.score.saturating_add(points);
+                }
+                GameCommand::PlaySound(sound) => sounds.push(sound),
+                GameCommand::EnterGameOver => {
+                    self.lives = 0;
+                    self.high_scores.record(self.score);
+                    self.phase = if self.high_scores.qualifies(self.score) {
+                        Phase::HighScoreEntry
+                    } else {
+                        Phase::GameOver
+                    };
+                    sounds.push(SoundCue::GameOver);
+                }
+            }
+        }
+        sounds
+    }
+
+    fn spawn_initial_humans(&mut self) {
+        for position in INITIAL_HUMAN_POSITIONS {
+            self.spawn_human(position, HumanMode::Grounded);
+        }
+    }
+
+    fn detonate_smart_bomb(&mut self, sounds: &mut Vec<SoundCue>) {
+        let targets = self
+            .snapshots
+            .values()
+            .filter(|snapshot| is_hostile(snapshot.kind))
+            .map(|snapshot| (snapshot.id, snapshot.kind, snapshot.position))
+            .collect::<Vec<_>>();
+        for (id, kind, position) in targets {
+            self.snapshots.remove(&id);
+            self.actors.remove(&id);
+            self.spawn_explosion(position);
+            self.score = self.score.saturating_add(score_for_hostile(kind));
+            sounds.push(SoundCue::Explosion);
+        }
+    }
+
+    fn remove_dead_actors(&mut self, dead_actor_ids: &[ActorId]) {
+        for id in dead_actor_ids {
+            self.snapshots.remove(id);
+            self.actors.remove(id);
+        }
+    }
+}
+
+impl Default for ActorGameDriver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn center_of(bounds: Rect) -> Point {
+    Point::new(
+        (bounds.left + bounds.right) / 2,
+        (bounds.top + bounds.bottom) / 2,
+    )
+}
+
+fn manhattan_distance(left: Point, right: Point) -> i16 {
+    (left.x - right.x).abs() + (left.y - right.y).abs()
+}
+
+fn is_hostile(kind: ActorKind) -> bool {
+    matches!(kind, ActorKind::Lander | ActorKind::Mutant)
+}
+
+fn score_for_hostile(kind: ActorKind) -> u32 {
+    match kind {
+        ActorKind::Lander => LANDER_SCORE,
+        ActorKind::Mutant => MUTANT_SCORE,
+        _ => 0,
+    }
+}
+
+#[derive(Debug, Clone)]
+struct HighScoreTable {
+    entries: [u32; 5],
+}
+
+impl HighScoreTable {
+    fn qualifies(&self, score: u32) -> bool {
+        self.entries.iter().any(|entry| score > *entry)
+    }
+
+    fn record(&mut self, score: u32) {
+        if !self.qualifies(score) {
+            return;
+        }
+        let mut entries = self.entries.to_vec();
+        entries.push(score);
+        entries.sort_by(|left, right| right.cmp(left));
+        self.entries.copy_from_slice(&entries[..5]);
+    }
+}
+
+impl Default for HighScoreTable {
+    fn default() -> Self {
+        Self {
+            entries: [10_000, 7_500, 5_000, 2_500, 1_000],
+        }
+    }
+}
+
+#[derive(Debug)]
+struct AttractDirector {
+    id: ActorId,
+}
+
+impl AttractDirector {
+    fn new(id: ActorId) -> Self {
+        Self { id }
+    }
+}
+
+impl AssetActor for AttractDirector {
+    fn id(&self) -> ActorId {
+        self.id
+    }
+
+    fn update(&mut self, prompt: &FramePrompt) -> ActorReply {
+        let mut commands = Vec::new();
+        let mut draws = Vec::new();
+        for _ in 0..prompt.input.coin_insertions() {
+            commands.push(GameCommand::Credit);
+        }
+        if prompt.input.start_one {
+            commands.push(GameCommand::StartOnePlayer);
+        }
+        if prompt.input.start_two {
+            commands.push(GameCommand::StartTwoPlayer);
+        }
+        if prompt.phase == Phase::HighScoreEntry {
+            draws.push(DrawCommand::text(
+                self.id,
+                Point::new(66, 120),
+                "ENTER INITIALS",
+            ));
+        }
+        ActorReply {
+            id: self.id,
+            snapshot: ActorSnapshot {
+                id: self.id,
+                kind: ActorKind::AttractDirector,
+                position: Point::new(0, 0),
+                bounds: None,
+                alive: true,
+            },
+            commands,
+            draws,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct ScriptedAttractProgram {
+    id: ActorId,
+    script: AttractScript,
+}
+
+impl ScriptedAttractProgram {
+    fn new(id: ActorId, script: AttractScript) -> Self {
+        Self { id, script }
+    }
+}
+
+impl AssetActor for ScriptedAttractProgram {
+    fn id(&self) -> ActorId {
+        self.id
+    }
+
+    fn update(&mut self, prompt: &FramePrompt) -> ActorReply {
+        let draws = if matches!(prompt.phase, Phase::Attract | Phase::GameOver) {
+            self.script.draws_for(self.id, prompt.frame)
+        } else {
+            Vec::new()
+        };
+
+        ActorReply {
+            id: self.id,
+            snapshot: ActorSnapshot {
+                id: self.id,
+                kind: ActorKind::AttractScript,
+                position: Point::new(0, 0),
+                bounds: None,
+                alive: true,
+            },
+            commands: Vec::new(),
+            draws,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct PlayerShip {
+    id: ActorId,
+    position: Point,
+    direction: Direction,
+    laser_cooldown: u8,
+}
+
+impl PlayerShip {
+    fn new(id: ActorId, position: Point) -> Self {
+        Self {
+            id,
+            position,
+            direction: Direction::Right,
+            laser_cooldown: 0,
+        }
+    }
+
+    fn bounds(&self) -> Rect {
+        Rect::from_center(self.position, 18, 10)
+    }
+}
+
+impl AssetActor for PlayerShip {
+    fn id(&self) -> ActorId {
+        self.id
+    }
+
+    fn update(&mut self, prompt: &FramePrompt) -> ActorReply {
+        let mut commands = Vec::new();
+        let mut draws = Vec::new();
+        if prompt.phase == Phase::Playing {
+            let mut velocity = Velocity::default();
+            if prompt.input.altitude_up {
+                velocity.dy -= PLAYER_SPEED;
+            }
+            if prompt.input.altitude_down {
+                velocity.dy += PLAYER_SPEED;
+            }
+            if prompt.input.thrust {
+                velocity.dx += self.direction.sign() * PLAYER_SPEED;
+                commands.push(GameCommand::PlaySound(SoundCue::Thrust));
+            }
+            if prompt.input.reverse {
+                self.direction = match self.direction {
+                    Direction::Left => Direction::Right,
+                    Direction::Right => Direction::Left,
+                };
+            }
+            self.position = PLAYER_BOUNDS.clamp_point(self.position.offset(velocity));
+            self.laser_cooldown = self.laser_cooldown.saturating_sub(1);
+            if prompt.input.wants_fire() && self.laser_cooldown == 0 {
+                self.laser_cooldown = 8;
+                let muzzle = self
+                    .position
+                    .offset(Velocity::new(self.direction.sign() * 12, 0));
+                commands.push(GameCommand::Spawn(SpawnRequest::Laser {
+                    position: muzzle,
+                    direction: self.direction,
+                    owner: self.id,
+                }));
+                commands.push(GameCommand::PlaySound(SoundCue::Laser));
+            }
+            if prompt.input.wants_smart_bomb() {
+                commands.push(GameCommand::SmartBomb);
+                commands.push(GameCommand::PlaySound(SoundCue::SmartBomb));
+            }
+            draws.push(DrawCommand::sprite(
+                self.id,
+                match self.direction {
+                    Direction::Left => SpriteKey::PlayerLeft,
+                    Direction::Right => SpriteKey::PlayerRight,
+                },
+                self.position,
+            ));
+        }
+        ActorReply {
+            id: self.id,
+            snapshot: ActorSnapshot {
+                id: self.id,
+                kind: ActorKind::Player,
+                position: self.position,
+                bounds: Some(self.bounds()),
+                alive: prompt.phase == Phase::Playing,
+            },
+            commands,
+            draws,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Lander {
+    id: ActorId,
+    position: Point,
+    drift: i16,
+    mode: LanderMode,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LanderMode {
+    Seeking,
+    Carrying {
+        human_id: ActorId,
+        pull_sound_sent: bool,
+    },
+}
+
+impl Lander {
+    fn new(id: ActorId, position: Point) -> Self {
+        Self {
+            id,
+            position,
+            drift: -1,
+            mode: LanderMode::Seeking,
+        }
+    }
+
+    fn bounds(&self) -> Rect {
+        Rect::from_center(self.position, 14, 12)
+    }
+}
+
+impl AssetActor for Lander {
+    fn id(&self) -> ActorId {
+        self.id
+    }
+
+    fn update(&mut self, prompt: &FramePrompt) -> ActorReply {
+        let mut commands = Vec::new();
+        let mut draws = Vec::new();
+        if prompt.phase == Phase::Playing {
+            match self.mode {
+                LanderMode::Seeking => self.update_seeking(prompt, &mut commands),
+                LanderMode::Carrying {
+                    human_id,
+                    pull_sound_sent,
+                } => {
+                    self.update_carrying(human_id, pull_sound_sent, &mut commands);
+                }
+            }
+            if prompt.frame % LANDER_FIRE_PERIOD == self.id.value() % LANDER_FIRE_PERIOD {
+                commands.push(GameCommand::PlaySound(SoundCue::Laser));
+            }
+            draws.push(DrawCommand::sprite(
+                self.id,
+                SpriteKey::Lander,
+                self.position,
+            ));
+        }
+        ActorReply {
+            id: self.id,
+            snapshot: ActorSnapshot {
+                id: self.id,
+                kind: ActorKind::Lander,
+                position: self.position,
+                bounds: Some(self.bounds()),
+                alive: prompt.phase == Phase::Playing,
+            },
+            commands,
+            draws,
+        }
+    }
+}
+
+impl Lander {
+    fn update_seeking(&mut self, prompt: &FramePrompt, commands: &mut Vec<GameCommand>) {
+        if let Some(target) = prompt.nearest_human(self.position) {
+            if pickup_distance(self.position, target.position) {
+                self.mode = LanderMode::Carrying {
+                    human_id: target.id,
+                    pull_sound_sent: false,
+                };
+                commands.push(GameCommand::AttachHuman {
+                    lander: self.id,
+                    human: target.id,
+                    position: target.position,
+                });
+                commands.push(GameCommand::PlaySound(SoundCue::LanderPickup));
+                return;
+            }
+            self.position = step_toward(self.position, target.position, 1);
+            return;
+        }
+
+        if let Some(player) = prompt.player_position() {
+            self.drift = if player.x < self.position.x { -1 } else { 1 };
+        }
+        self.position = self.position.offset(Velocity::new(self.drift, 0));
+    }
+
+    fn update_carrying(
+        &mut self,
+        human_id: ActorId,
+        pull_sound_sent: bool,
+        commands: &mut Vec<GameCommand>,
+    ) {
+        self.position = self.position.offset(Velocity::new(0, -LANDER_CARRY_SPEED));
+        if !pull_sound_sent {
+            self.mode = LanderMode::Carrying {
+                human_id,
+                pull_sound_sent: true,
+            };
+            commands.push(GameCommand::PlaySound(SoundCue::HumanPulled));
+        }
+        if self.position.y <= LANDER_CONVERSION_Y {
+            commands.push(GameCommand::Destroy(self.id));
+            commands.push(GameCommand::Destroy(human_id));
+            commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
+                position: self.position,
+            }));
+            commands.push(GameCommand::PlaySound(SoundCue::MutantSpawn));
+        }
+    }
+}
+
+fn pickup_distance(lander: Point, human: Point) -> bool {
+    (lander.x - human.x).abs() <= LANDER_PICKUP_RADIUS_X
+        && (lander.y - human.y).abs() <= LANDER_PICKUP_RADIUS_Y
+}
+
+fn step_toward(position: Point, target: Point, speed: i16) -> Point {
+    Point::new(
+        position.x + axis_step(target.x - position.x, speed),
+        position.y + axis_step(target.y - position.y, speed),
+    )
+}
+
+fn axis_step(delta: i16, speed: i16) -> i16 {
+    if delta == 0 {
+        0
+    } else if delta > 0 {
+        delta.min(speed)
+    } else {
+        delta.max(-speed)
+    }
+}
+
+#[derive(Debug)]
+struct Mutant {
+    id: ActorId,
+    position: Point,
+}
+
+impl Mutant {
+    fn new(id: ActorId, position: Point) -> Self {
+        Self { id, position }
+    }
+
+    fn bounds(&self) -> Rect {
+        Rect::from_center(self.position, 14, 12)
+    }
+}
+
+impl AssetActor for Mutant {
+    fn id(&self) -> ActorId {
+        self.id
+    }
+
+    fn update(&mut self, prompt: &FramePrompt) -> ActorReply {
+        let mut draws = Vec::new();
+        if prompt.phase == Phase::Playing {
+            if let Some(player) = prompt.player_position() {
+                self.position = step_toward(self.position, player, 1);
+            }
+            draws.push(DrawCommand::sprite(
+                self.id,
+                SpriteKey::Mutant,
+                self.position,
+            ));
+        }
+
+        ActorReply {
+            id: self.id,
+            snapshot: ActorSnapshot {
+                id: self.id,
+                kind: ActorKind::Mutant,
+                position: self.position,
+                bounds: Some(self.bounds()),
+                alive: prompt.phase == Phase::Playing,
+            },
+            commands: Vec::new(),
+            draws,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Human {
+    id: ActorId,
+    position: Point,
+    mode: HumanMode,
+    safe_landing_awarded: bool,
+}
+
+impl Human {
+    fn new(id: ActorId, position: Point, mode: HumanMode) -> Self {
+        Self {
+            id,
+            position,
+            mode,
+            safe_landing_awarded: false,
+        }
+    }
+
+    fn bounds(&self) -> Rect {
+        Rect::from_center(self.position, 4, 8)
+    }
+
+    fn update_falling(&mut self, velocity: i16, prompt: &FramePrompt) -> Vec<GameCommand> {
+        let mut commands = Vec::new();
+        let next_velocity = (velocity + HUMAN_FALL_ACCELERATION).min(8);
+        self.position = self.position.offset(Velocity::new(0, next_velocity));
+
+        if prompt.snapshots.iter().any(|snapshot| {
+            snapshot.kind == ActorKind::Player && intersects_snapshot(snapshot, self.bounds())
+        }) {
+            commands.push(GameCommand::Destroy(self.id));
+            commands.push(GameCommand::AddScore(HUMAN_RESCUE_SCORE));
+            commands.push(GameCommand::Spawn(SpawnRequest::ScorePopup {
+                position: self.position,
+                points: HUMAN_RESCUE_SCORE,
+            }));
+            commands.push(GameCommand::PlaySound(SoundCue::HumanRescued));
+            return commands;
+        }
+
+        if self.position.y >= HUMAN_GROUND_Y {
+            self.position.y = HUMAN_GROUND_Y;
+            if next_velocity <= HUMAN_SAFE_LANDING_SPEED {
+                self.mode = HumanMode::Grounded;
+                if !self.safe_landing_awarded {
+                    self.safe_landing_awarded = true;
+                    commands.push(GameCommand::AddScore(HUMAN_SAFE_LANDING_SCORE));
+                    commands.push(GameCommand::Spawn(SpawnRequest::ScorePopup {
+                        position: self.position,
+                        points: HUMAN_SAFE_LANDING_SCORE,
+                    }));
+                    commands.push(GameCommand::PlaySound(SoundCue::HumanSafeLanding));
+                }
+            } else {
+                commands.push(GameCommand::Destroy(self.id));
+                commands.push(GameCommand::HumanLost(self.id));
+                commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
+                    position: self.position,
+                }));
+                commands.push(GameCommand::PlaySound(SoundCue::HumanLost));
+            }
+        } else {
+            self.mode = HumanMode::Falling {
+                velocity: next_velocity,
+            };
+        }
+
+        commands
+    }
+
+    fn update_carried(&mut self, carrier: ActorId, prompt: &FramePrompt) -> Vec<GameCommand> {
+        let mut commands = Vec::new();
+        if let Some(carrier_snapshot) = prompt.snapshot(carrier) {
+            self.position = carrier_snapshot.position.offset(Velocity::new(0, 8));
+        } else {
+            self.mode = HumanMode::Falling { velocity: 0 };
+            commands.push(GameCommand::PlaySound(SoundCue::HumanReleased));
+        }
+        commands
+    }
+}
+
+impl AssetActor for Human {
+    fn id(&self) -> ActorId {
+        self.id
+    }
+
+    fn update(&mut self, prompt: &FramePrompt) -> ActorReply {
+        let mut commands = Vec::new();
+        let mut draws = Vec::new();
+        if prompt.phase == Phase::Playing {
+            commands.extend(match self.mode {
+                HumanMode::Grounded => Vec::new(),
+                HumanMode::Falling { velocity } => self.update_falling(velocity, prompt),
+                HumanMode::CarriedBy(carrier) => self.update_carried(carrier, prompt),
+            });
+            draws.push(DrawCommand::sprite(
+                self.id,
+                self.mode.sprite(),
+                self.position,
+            ));
+        }
+
+        ActorReply {
+            id: self.id,
+            snapshot: ActorSnapshot {
+                id: self.id,
+                kind: ActorKind::Human,
+                position: self.position,
+                bounds: human_collision_bounds(self.mode, self.position),
+                alive: prompt.phase == Phase::Playing,
+            },
+            commands,
+            draws,
+        }
+    }
+}
+
+fn intersects_snapshot(snapshot: &ActorSnapshot, bounds: Rect) -> bool {
+    snapshot
+        .bounds
+        .is_some_and(|snapshot_bounds| snapshot_bounds.intersects(bounds))
+}
+
+fn human_collision_bounds(mode: HumanMode, position: Point) -> Option<Rect> {
+    match mode {
+        HumanMode::CarriedBy(_) => None,
+        HumanMode::Grounded | HumanMode::Falling { .. } => Some(Rect::from_center(position, 4, 8)),
+    }
+}
+
+#[derive(Debug)]
+struct ScorePopup {
+    id: ActorId,
+    position: Point,
+    points: u32,
+    remaining: u16,
+}
+
+impl ScorePopup {
+    fn new(id: ActorId, position: Point, points: u32) -> Self {
+        Self {
+            id,
+            position,
+            points,
+            remaining: SCORE_POPUP_LIFETIME,
+        }
+    }
+}
+
+impl AssetActor for ScorePopup {
+    fn id(&self) -> ActorId {
+        self.id
+    }
+
+    fn update(&mut self, _prompt: &FramePrompt) -> ActorReply {
+        let mut commands = Vec::new();
+        let mut draws = Vec::new();
+        if self.remaining > 0 {
+            let sprite = match self.points {
+                HUMAN_RESCUE_SCORE => SpriteKey::Score500,
+                HUMAN_SAFE_LANDING_SCORE => SpriteKey::Score250,
+                _ => SpriteKey::Text,
+            };
+            draws.push(DrawCommand::sprite(self.id, sprite, self.position));
+            self.remaining = self.remaining.saturating_sub(1);
+        }
+        if self.remaining == 0 {
+            commands.push(GameCommand::Destroy(self.id));
+        }
+
+        ActorReply {
+            id: self.id,
+            snapshot: ActorSnapshot {
+                id: self.id,
+                kind: ActorKind::ScorePopup,
+                position: self.position,
+                bounds: None,
+                alive: self.remaining > 0,
+            },
+            commands,
+            draws,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct LaserShot {
+    id: ActorId,
+    position: Point,
+    velocity: Velocity,
+    remaining: u16,
+}
+
+impl LaserShot {
+    fn new(id: ActorId, position: Point, direction: Direction, _owner: ActorId) -> Self {
+        Self {
+            id,
+            position,
+            velocity: Velocity::new(direction.sign() * LASER_SPEED, 0),
+            remaining: LASER_LIFETIME,
+        }
+    }
+
+    fn bounds(&self) -> Rect {
+        Rect::from_center(self.position, 10, 2)
+    }
+}
+
+impl AssetActor for LaserShot {
+    fn id(&self) -> ActorId {
+        self.id
+    }
+
+    fn update(&mut self, prompt: &FramePrompt) -> ActorReply {
+        let mut commands = Vec::new();
+        let mut draws = Vec::new();
+        if prompt.phase == Phase::Playing && self.remaining > 0 {
+            self.position = self.position.offset(self.velocity);
+            self.remaining = self.remaining.saturating_sub(1);
+            draws.push(DrawCommand::sprite(
+                self.id,
+                SpriteKey::Laser,
+                self.position,
+            ));
+        }
+        if self.remaining == 0 || self.position.x < 0 || self.position.x > 255 {
+            commands.push(GameCommand::Destroy(self.id));
+        }
+        ActorReply {
+            id: self.id,
+            snapshot: ActorSnapshot {
+                id: self.id,
+                kind: ActorKind::Laser,
+                position: self.position,
+                bounds: Some(self.bounds()),
+                alive: self.remaining > 0,
+            },
+            commands,
+            draws,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Explosion {
+    id: ActorId,
+    position: Point,
+    remaining: u16,
+}
+
+impl Explosion {
+    fn new(id: ActorId, position: Point) -> Self {
+        Self {
+            id,
+            position,
+            remaining: EXPLOSION_LIFETIME,
+        }
+    }
+}
+
+impl AssetActor for Explosion {
+    fn id(&self) -> ActorId {
+        self.id
+    }
+
+    fn update(&mut self, _prompt: &FramePrompt) -> ActorReply {
+        let mut commands = Vec::new();
+        let mut draws = Vec::new();
+        if self.remaining > 0 {
+            let age = EXPLOSION_LIFETIME.saturating_sub(self.remaining);
+            draws.push(DrawCommand::sprite_with_effect(
+                self.id,
+                SpriteKey::Explosion,
+                self.position,
+                VisualEffect::ExplosionCloud { age },
+            ));
+            self.remaining = self.remaining.saturating_sub(1);
+        }
+        if self.remaining == 0 {
+            commands.push(GameCommand::Destroy(self.id));
+        }
+        ActorReply {
+            id: self.id,
+            snapshot: ActorSnapshot {
+                id: self.id,
+                kind: ActorKind::Explosion,
+                position: self.position,
+                bounds: None,
+                alive: self.remaining > 0,
+            },
+            commands,
+            draws,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn attract_actor_accepts_credit_and_start_commands() {
+        let mut driver = ActorGameDriver::new();
+
+        let credited = driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(credited.phase, Phase::Attract);
+        assert_eq!(credited.credits, 1);
+        assert!(credited.sounds.contains(&SoundCue::Credit));
+        assert!(
+            credited
+                .draws
+                .iter()
+                .any(|draw| draw.sprite == SpriteKey::WilliamsLogo
+                    && matches!(draw.effect, VisualEffect::WilliamsReveal { .. }))
+        );
+
+        let started = driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(started.phase, Phase::Playing);
+        assert_eq!(started.credits, 0);
+        assert!(started.sounds.contains(&SoundCue::Start));
+        assert_eq!(driver.snapshot_count(ActorKind::Player), 0);
+
+        let settled = driver.step(GameInput::NONE);
+        assert_eq!(settled.phase, Phase::Playing);
+        assert_eq!(driver.snapshot_count(ActorKind::Player), 1);
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 2);
+        assert_eq!(driver.snapshot_count(ActorKind::Human), 10);
+    }
+
+    #[test]
+    fn attract_title_uses_williams_animation_and_defender_coalescence() {
+        let mut driver = ActorGameDriver::new();
+
+        let williams = driver.step(GameInput::NONE);
+        assert!(williams.draws.iter().any(|draw| {
+            draw.sprite == SpriteKey::WilliamsLogo
+                && matches!(
+                    draw.effect,
+                    VisualEffect::WilliamsReveal {
+                        stroke_step: 1,
+                        color_phase: 0,
+                    }
+                )
+        }));
+
+        let mut coalescing = None;
+        for _ in 0..DEFENDER_WORDMARK_START_FRAME {
+            let frame = driver.step(GameInput::NONE);
+            if frame
+                .draws
+                .iter()
+                .any(|draw| draw.sprite == SpriteKey::DefenderCoalescence)
+            {
+                coalescing = Some(frame);
+                break;
+            }
+        }
+        let coalescing = coalescing.expect("wordmark should enter coalescence");
+        assert!(coalescing.draws.iter().any(|draw| {
+            draw.sprite == SpriteKey::DefenderCoalescence
+                && matches!(
+                    draw.effect,
+                    VisualEffect::DefenderCoalescence {
+                        slot: 0,
+                        row_pair: 0,
+                    }
+                )
+        }));
+
+        let mut settled = None;
+        for _ in 0..(DEFENDER_WORDMARK_SLOTS * DEFENDER_WORDMARK_ROW_PAIRS + 1) {
+            let frame = driver.step(GameInput::NONE);
+            if frame
+                .draws
+                .iter()
+                .any(|draw| draw.sprite == SpriteKey::DefenderWordmark)
+            {
+                settled = Some(frame);
+                break;
+            }
+        }
+        assert!(settled.is_some());
+    }
+
+    #[test]
+    fn custom_driver_can_script_its_own_attract_screen() {
+        let script = AttractScript::new(vec![
+            AttractScriptEvent::text(2, Some(5), Point::new(12, 20), "CUSTOM ATTRACT"),
+            AttractScriptEvent::sprite(3, None, SpriteKey::DefenderLogo, Point::new(40, 44)),
+            AttractScriptEvent::defender_wordmark(4, None, Point::new(70, 80)),
+        ]);
+        let mut driver = ActorGameDriver::with_attract_script(script);
+
+        let first = driver.step(GameInput::NONE);
+        assert!(!first.draws.iter().any(|draw| {
+            draw.text.as_deref() == Some("CUSTOM ATTRACT")
+                || draw.sprite == SpriteKey::DefenderLogo
+                || draw.sprite == SpriteKey::DefenderCoalescence
+        }));
+
+        let second = driver.step(GameInput::NONE);
+        assert!(
+            second
+                .draws
+                .iter()
+                .any(|draw| draw.text.as_deref() == Some("CUSTOM ATTRACT"))
+        );
+        assert!(
+            !second
+                .draws
+                .iter()
+                .any(|draw| draw.sprite == SpriteKey::DefenderLogo)
+        );
+
+        let third = driver.step(GameInput::NONE);
+        assert!(
+            third
+                .draws
+                .iter()
+                .any(|draw| draw.sprite == SpriteKey::DefenderLogo)
+        );
+
+        let fourth = driver.step(GameInput::NONE);
+        assert!(fourth.draws.iter().any(|draw| {
+            draw.sprite == SpriteKey::DefenderCoalescence
+                && matches!(
+                    draw.effect,
+                    VisualEffect::DefenderCoalescence {
+                        slot: 0,
+                        row_pair: 0
+                    }
+                )
+        }));
+    }
+
+    #[test]
+    fn custom_attract_script_keeps_coin_and_start_controls() {
+        let script = AttractScript::new(vec![AttractScriptEvent::text(
+            1,
+            None,
+            Point::new(10, 10),
+            "PRESS START",
+        )]);
+        let mut driver = ActorGameDriver::with_attract_script(script);
+
+        let credited = driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(credited.credits, 1);
+
+        let started = driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(started.phase, Phase::Playing);
+        assert!(started.sounds.contains(&SoundCue::Start));
+    }
+
+    #[test]
+    fn planetoid_mapper_matches_current_live_key_contract() {
+        let mut mapper = KeyboardMapper::new(KeyboardProfile::Planetoid);
+        let mut frame = KeyboardFrame::default();
+
+        for key in [
+            KeyboardKey::Character('5'),
+            KeyboardKey::Character('6'),
+            KeyboardKey::Character('7'),
+            KeyboardKey::Enter,
+            KeyboardKey::Character('A'),
+            KeyboardKey::Character('Z'),
+            KeyboardKey::LeftShift,
+            KeyboardKey::Character(' '),
+            KeyboardKey::Tab,
+            KeyboardKey::Character('H'),
+            KeyboardKey::Function(2),
+            KeyboardKey::Function(3),
+            KeyboardKey::Function(4),
+            KeyboardKey::Function(5),
+        ] {
+            mapper.map_event(KeyboardEvent::press(key), &mut frame);
+        }
+        mapper.finish_frame(&mut frame);
+
+        assert!(frame.input.coin);
+        assert!(frame.input.coin_two);
+        assert!(frame.input.coin_three);
+        assert!(frame.input.start_one);
+        assert!(frame.input.fire);
+        assert!(frame.input.altitude_up);
+        assert!(frame.input.altitude_down);
+        assert!(frame.input.thrust);
+        assert!(frame.input.reverse);
+        assert!(frame.input.smart_bomb);
+        assert!(frame.input.hyperspace);
+        assert!(frame.input.service_advance);
+        assert!(frame.input.high_score_reset);
+        assert!(frame.input.auto_up_manual_down);
+        assert!(frame.input.tilt);
+    }
+
+    #[test]
+    fn cabinet_mapper_keeps_enter_out_of_the_start_binding() {
+        let mut mapper = KeyboardMapper::new(KeyboardProfile::Cabinet);
+        let mut enter_frame = KeyboardFrame::default();
+
+        mapper.map_event(KeyboardEvent::press(KeyboardKey::Enter), &mut enter_frame);
+        mapper.finish_frame(&mut enter_frame);
+        assert!(!enter_frame.input.start_one);
+        assert!(!enter_frame.input.fire);
+
+        let mut frame = KeyboardFrame::default();
+        mapper.map_event(
+            KeyboardEvent::press(KeyboardKey::Character('1')),
+            &mut frame,
+        );
+        mapper.map_event(
+            KeyboardEvent::press(KeyboardKey::Character('2')),
+            &mut frame,
+        );
+        mapper.map_event(KeyboardEvent::press(KeyboardKey::ArrowUp), &mut frame);
+        mapper.map_event(KeyboardEvent::press(KeyboardKey::ArrowDown), &mut frame);
+        mapper.map_event(
+            KeyboardEvent::press(KeyboardKey::Character('R')),
+            &mut frame,
+        );
+        mapper.map_event(
+            KeyboardEvent::press(KeyboardKey::Character('T')),
+            &mut frame,
+        );
+        mapper.map_event(
+            KeyboardEvent::press(KeyboardKey::Character('F')),
+            &mut frame,
+        );
+        mapper.map_event(
+            KeyboardEvent::press(KeyboardKey::Character('B')),
+            &mut frame,
+        );
+        mapper.finish_frame(&mut frame);
+
+        assert!(frame.input.start_one);
+        assert!(frame.input.start_two);
+        assert!(frame.input.altitude_up);
+        assert!(frame.input.altitude_down);
+        assert!(frame.input.reverse);
+        assert!(frame.input.thrust);
+        assert!(frame.input.fire);
+        assert!(frame.input.smart_bomb);
+    }
+
+    #[test]
+    fn xyzzy_overlay_toggles_auto_fire_invincibility_and_overlay_bomb() {
+        let mut mapper = KeyboardMapper::default();
+        let mut frame = KeyboardFrame::default();
+
+        for character in ['x', 'y', 'z', 'z', 'y', 'f', 'g'] {
+            mapper.map_event(
+                KeyboardEvent::press(KeyboardKey::Character(character)),
+                &mut frame,
+            );
+        }
+        mapper.map_event(KeyboardEvent::press(KeyboardKey::Tab), &mut frame);
+        mapper.finish_frame(&mut frame);
+
+        assert!(frame.input.xyzzy.active);
+        assert!(frame.input.xyzzy.auto_fire);
+        assert!(frame.input.xyzzy.invincible);
+        assert!(frame.input.xyzzy.overlay_smart_bomb);
+        assert!(frame.input.fire);
+
+        for character in ['x', 'y', 'z', 'z', 'y'] {
+            mapper.map_event(
+                KeyboardEvent::press(KeyboardKey::Character(character)),
+                &mut KeyboardFrame::default(),
+            );
+        }
+        assert_eq!(mapper.xyzzy_mode(), XyzzyMode::INACTIVE);
+    }
+
+    #[test]
+    fn player_actor_emits_spawn_and_sound_when_prompted_to_fire() {
+        let mut driver = started_driver();
+
+        let fired = driver.step(GameInput {
+            fire: true,
+            ..GameInput::NONE
+        });
+
+        assert!(fired.sounds.contains(&SoundCue::Laser));
+        assert!(fired.commands.iter().any(|command| {
+            matches!(
+                command,
+                GameCommand::Spawn(SpawnRequest::Laser {
+                    direction: Direction::Right,
+                    ..
+                })
+            )
+        }));
+
+        let next = driver.step(GameInput::NONE);
+        assert!(
+            next.snapshots
+                .iter()
+                .any(|snapshot| snapshot.kind == ActorKind::Laser)
+        );
+    }
+
+    #[test]
+    fn smart_bomb_clears_hostiles_with_explosions_and_score() {
+        let mut driver = started_driver();
+
+        let report = driver.step(GameInput {
+            smart_bomb: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(report.score, LANDER_SCORE * 2);
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
+        assert_eq!(driver.snapshot_count(ActorKind::Human), 10);
+        assert!(report.sounds.contains(&SoundCue::SmartBomb));
+        assert!(report.sounds.contains(&SoundCue::Explosion));
+    }
+
+    #[test]
+    fn lander_picks_up_and_carries_a_grounded_human() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_lander_for_test(Point::new(100, HUMAN_GROUND_Y));
+        driver.spawn_human_for_test(Point::new(100, HUMAN_GROUND_Y));
+        driver.step(GameInput::NONE);
+
+        let pickup = driver.step(GameInput::NONE);
+        assert!(pickup.commands.iter().any(|command| {
+            matches!(
+                command,
+                GameCommand::AttachHuman {
+                    lander: _,
+                    human: _,
+                    position: Point {
+                        x: 100,
+                        y: HUMAN_GROUND_Y
+                    },
+                }
+            )
+        }));
+        assert!(pickup.sounds.contains(&SoundCue::LanderPickup));
+
+        let carried = driver.step(GameInput::NONE);
+        assert!(carried.sounds.contains(&SoundCue::HumanPulled));
+        assert!(
+            carried
+                .draws
+                .iter()
+                .any(|draw| draw.sprite == SpriteKey::HumanCarried)
+        );
+    }
+
+    #[test]
+    fn carried_human_falls_when_carrier_disappears() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_carried_human_for_test(Point::new(100, 120), ActorId::new(99));
+
+        let released = driver.step(GameInput::NONE);
+
+        assert!(released.sounds.contains(&SoundCue::HumanReleased));
+        assert!(
+            released
+                .draws
+                .iter()
+                .any(|draw| draw.sprite == SpriteKey::HumanFalling)
+        );
+    }
+
+    #[test]
+    fn falling_human_rescue_awards_500_points_and_score_popup() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_player();
+        driver.spawn_falling_human_for_test(Point::new(42, 120), 0);
+        driver.step(GameInput::NONE);
+
+        let rescued = driver.step(GameInput::NONE);
+
+        assert_eq!(rescued.score, HUMAN_RESCUE_SCORE);
+        assert!(rescued.sounds.contains(&SoundCue::HumanRescued));
+        assert!(
+            rescued
+                .commands
+                .contains(&GameCommand::AddScore(HUMAN_RESCUE_SCORE))
+        );
+        assert!(rescued.commands.iter().any(|command| {
+            matches!(
+                command,
+                GameCommand::Spawn(SpawnRequest::ScorePopup {
+                    points: HUMAN_RESCUE_SCORE,
+                    ..
+                })
+            )
+        }));
+    }
+
+    #[test]
+    fn slow_falling_human_lands_safely_for_250_points() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_falling_human_for_test(Point::new(100, HUMAN_GROUND_Y - 1), 1);
+
+        let landed = driver.step(GameInput::NONE);
+
+        assert_eq!(landed.score, HUMAN_SAFE_LANDING_SCORE);
+        assert!(landed.sounds.contains(&SoundCue::HumanSafeLanding));
+        assert!(
+            landed
+                .commands
+                .contains(&GameCommand::AddScore(HUMAN_SAFE_LANDING_SCORE))
+        );
+        assert!(
+            landed
+                .draws
+                .iter()
+                .any(|draw| draw.sprite == SpriteKey::Human)
+        );
+    }
+
+    #[test]
+    fn completed_abduction_consumes_human_and_spawns_mutant() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_lander_for_test(Point::new(100, HUMAN_GROUND_Y));
+        driver.spawn_human_for_test(Point::new(100, HUMAN_GROUND_Y));
+        driver.step(GameInput::NONE);
+        driver.step(GameInput::NONE);
+
+        let mut converted = None;
+        for _ in 0..120 {
+            let frame = driver.step(GameInput::NONE);
+            if frame.sounds.contains(&SoundCue::MutantSpawn) {
+                converted = Some(frame);
+                break;
+            }
+        }
+        let converted = converted.expect("carried human should convert into a mutant");
+
+        assert_eq!(driver.snapshot_count(ActorKind::Human), 0);
+        assert!(
+            converted
+                .commands
+                .iter()
+                .any(|command| matches!(command, GameCommand::Spawn(SpawnRequest::Mutant { .. })))
+        );
+        let settled = driver.step(GameInput::NONE);
+        assert!(
+            settled
+                .snapshots
+                .iter()
+                .any(|snapshot| snapshot.kind == ActorKind::Mutant)
+        );
+    }
+
+    #[test]
+    fn driver_resolves_laser_lander_collision_with_score_sound_and_explosion() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_player();
+        driver.spawn_lander_for_test(Point::new(62, 120));
+
+        let fired = driver.step(GameInput {
+            fire: true,
+            ..GameInput::NONE
+        });
+        assert!(fired.sounds.contains(&SoundCue::Laser));
+
+        let collision = driver.step(GameInput::NONE);
+        assert_eq!(collision.score, 150);
+        assert!(collision.sounds.contains(&SoundCue::Explosion));
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
+        assert!(collision.commands.contains(&GameCommand::AddScore(150)));
+    }
+
+    #[test]
+    fn high_score_entry_is_a_phase_not_a_legacy_frame_script() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.score = 12_000;
+        driver.spawn_player();
+        driver.spawn_lander_for_test(Point::new(42, 120));
+
+        let report = driver.step(GameInput::NONE);
+
+        assert_eq!(report.phase, Phase::HighScoreEntry);
+        assert_eq!(report.lives, 0);
+        assert!(report.sounds.contains(&SoundCue::GameOver));
+    }
+
+    #[test]
+    fn xyzzy_invincibility_keeps_player_alive_on_contact() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_player();
+        driver.spawn_lander_for_test(Point::new(42, 120));
+
+        let report = driver.step(GameInput {
+            xyzzy: XyzzyMode {
+                active: true,
+                invincible: true,
+                ..XyzzyMode::INACTIVE
+            },
+            ..GameInput::NONE
+        });
+
+        assert_eq!(report.phase, Phase::Playing);
+        assert_ne!(report.lives, 0);
+    }
+
+    #[test]
+    fn threaded_asset_is_prompted_once_per_driver_frame() {
+        let mut driver = ActorGameDriver::new();
+        let first = driver.step(GameInput::NONE);
+        let second = driver.step(GameInput::NONE);
+
+        assert_eq!(first.frame, 1);
+        assert_eq!(second.frame, 2);
+        assert!(
+            second
+                .snapshots
+                .iter()
+                .any(|snapshot| snapshot.kind == ActorKind::AttractDirector)
+        );
+    }
+
+    fn started_driver() -> ActorGameDriver {
+        let mut driver = ActorGameDriver::new();
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput::NONE);
+        driver
+    }
+}

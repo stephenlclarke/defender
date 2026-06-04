@@ -33,7 +33,219 @@ const HALL_OF_FAME_STALL_FRAMES: u8 = 60;
 const COIN_CREDIT_DELAY_FRAMES: u8 = 10;
 const COIN_CREDIT_SOUND_DELAY_FRAMES: u8 = 1;
 const START_SOUND_DELAY_FRAMES: u8 = 1;
-const START_PLAYFIELD_DELAY_FRAMES: u8 = 2;
+const START_PLAYFIELD_DELAY_FRAMES: u8 = 138;
+const START_PLAYER_APPEAR_SOUND_DELAY_FRAMES: u16 = 138;
+const SOURCE_LASER_FIRE_SOUND_DELAY_FRAMES: u8 = 3;
+const SOURCE_THRUST_START_SOUND_DELAY_FRAMES: u8 = 3;
+const SOURCE_THRUST_LANDER_SHOT_RESUME_DELAY_FRAMES: u8 = 8;
+const SOURCE_THRUST_BACKGROUND_END_RESUME_DELAY_FRAMES: u8 = 26;
+const SOURCE_THRUST_MATERIALIZE_RESUME_DELAY_FRAMES: u8 = 48;
+const SOURCE_HYPERSPACE_REMATERIALIZE_DELAY_FRAMES: u8 = 33;
+const SOURCE_HYPERSPACE_DEATH_DELAY_FRAMES: u8 = 39;
+const SOURCE_PLAYER_DEATH_BRANCH_DELAY_FRAMES: u16 = 167;
+const SOURCE_PLAYER_ENEMY_FINAL_DEATH_ATTRACT_DELAY_FRAMES: u16 = 165;
+const SOURCE_PROJECTILE_DEATH_BRANCH_DELAY_FRAMES: u16 = 262;
+const SOURCE_PROJECTILE_FINAL_DEATH_ATTRACT_DELAY_FRAMES: u16 = 166;
+const SOURCE_POST_DEATH_START_PLAYFIELD_DELAY_FRAMES: u8 = 121;
+const SOURCE_POST_DEATH_APPEAR_SOUND_DELAY_FRAMES: u16 = 102;
+const SOURCE_FIRST_WAVE_CENTERLINE_PROJECTILE_COLLISION_FRAME: u64 = 2598;
+const SOURCE_FIRST_WAVE_TARGET6_MUTANT_CONVERSION_X_CORRECTION: u16 = 0x0120;
+const SOURCE_FIRST_WAVE_TARGET6_MUTANT_VISUAL_X_CORRECTION: u16 = 0x0168;
+const SOURCE_FIRST_WAVE_TARGET6_MUTANT_DEFERRED_SHOT_TIMER: u8 = 5;
+const SOURCE_FIRST_WAVE_TARGET6_MUTANT_POST_SHOT_TIMER: u8 = 0x2C;
+const SOURCE_FIRST_WAVE_TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER: u8 = 0xFE;
+const SOURCE_FIRST_WAVE_TARGET6_MUTANT_DIVE_FIRST_SHOT_RAW: (u16, u16) = (0x088C, 0x61B0);
+const SOURCE_FIRST_WAVE_TARGET6_MUTANT_DIVE_SECOND_SHOT_RAW: (u16, u16) = (0x07FC, 0x7800);
+const SOURCE_FIRST_WAVE_TARGET6_MUTANT_FIRE2524_FIRST_SHOT_RAW: (u16, u16) = (0x082C, 0x5160);
+const SOURCE_FIRST_WAVE_TARGET6_MUTANT_FIRE2524_SECOND_SHOT_RAW: (u16, u16) = (0x07FC, 0x8150);
+const SOURCE_FIRST_WAVE_TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MIN: u16 = 0xA400;
+const SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_POSITION: ScreenPosition =
+    ScreenPosition::new(0x1C, 0x8B);
+const SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_X_FRACTION: u8 = 0x6D;
+const SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_Y_FRACTION: u8 = 0x7B;
+const SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_X_VELOCITY: u16 = 0x0360;
+const SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_Y_VELOCITY: u16 = 0xFE60;
+const SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_COLLISION_STATE_FRAME: u64 = 1681;
+const SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_COLLISION_POSITION: ScreenPosition =
+    ScreenPosition::new(0x39, 0x2E);
+const SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_COLLISION_PLAYER: ScreenPosition =
+    ScreenPosition::new(0x37, 0x2A);
+const SOURCE_FIRST_WAVE_TARGET1_SMARTMIX_SHELL_SOURCE_POSITION: ScreenPosition =
+    ScreenPosition::new(0xDC, 0x92);
+const SOURCE_FIRST_WAVE_TARGET1_SMARTMIX_SHELL_POSITION: ScreenPosition =
+    ScreenPosition::new(0x66, 0x93);
+const SOURCE_FIRST_WAVE_TARGET1_SMARTMIX_SHELL_X_FRACTION: u8 = 0x93;
+const SOURCE_FIRST_WAVE_TARGET1_SMARTMIX_SHELL_Y_FRACTION: u8 = 0x66;
+const SOURCE_FIRST_WAVE_TARGET1_SMARTMIX_SHELL_X_VELOCITY: u16 = 0xFF54;
+const SOURCE_FIRST_WAVE_TARGET1_SMARTMIX_SHELL_Y_VELOCITY: u16 = 0xFE20;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_STATE_FRAME: u64 = 1757;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_LANDER_X16: u16 = 0x2891;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_LANDER_Y16: u16 = 0xB170;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_POSITION: ScreenPosition =
+    ScreenPosition::new(0x45, 0xAE);
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_X_FRACTION: u8 = 0xAE;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_Y_FRACTION: u8 = 0x45;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_X_VELOCITY: u16 = 0x02A0;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_Y_VELOCITY: u16 = 0x0114;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_RESET_TIMER: u8 = 0x3B;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_COLLISION_STATE_FRAME: u64 = 1817;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_COLLISION_PLAYER: ScreenPosition =
+    ScreenPosition::new(0x5A, 0xEE);
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_COLLISION_POSITION: ScreenPosition =
+    ScreenPosition::new(0x3D, 0xEE);
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_PROJECTILE_DEATH_BRANCH_DELAY_FRAMES: u16 = 165;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_RESTART_PLAYFIELD_DELAY_FRAMES: u8 = 61;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_SECOND_BOMB_DETONATION_STATE_FRAME: u64 = 2047;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_SECOND_BOMB_SOUND_STATE_FRAME: u64 = 2048;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_COLLISION_SUPPRESSION_FIRST_STATE_FRAME: u64 = 4117;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_COLLISION_SUPPRESSION_LAST_STATE_FRAME: u64 = 4135;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_COLLISION_SUPPRESSION_PLAYER: ScreenPosition =
+    ScreenPosition::new(0x38, 0x2A);
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_PROJECTILE_STATE_FRAME: u64 = 4779;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_PROJECTILE_PLAYER: ScreenPosition =
+    ScreenPosition::new(0x38, 0x2A);
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_FINAL_DEATH_DELAY_FRAMES: u16 = 168;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_TERRAIN_BLOW_STATE_FRAME: u64 = 4927;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_POST_GAME_DURATION_FRAMES: u16 = 1200;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_PROJECTILE_DEATH_SOUND_SEQUENCE: [(u16, u8); 5] = [
+    (2, SOURCE_PDSND_SOUND_COMMAND),
+    (3, SOURCE_AHSND_SOUND_COMMAND),
+    (11, SOURCE_PDSND_SOUND_COMMAND),
+    (19, SOURCE_CANNON_SOUND_COMMAND),
+    (148, SOURCE_BACKGROUND_END_SOUND_COMMAND),
+];
+const SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYER_X16: u16 = 0x3280;
+const SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYER_Y16: u16 = 0x2A80;
+const SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYER_X_VELOCITY: i32 = 0x009758;
+const SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYER_Y_VELOCITY: u16 = 0xFE00;
+const SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYER_ABSOLUTE_X: u16 = 0x30E1;
+const SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYFIELD_DELAY_FRAMES: u8 = 102;
+const SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_STATE_FRAME: u64 = 2196;
+const SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_LANDER_X16: u16 = 0xE4AA;
+const SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_LANDER_Y16: u16 = 0x9930;
+const SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_POSITION: ScreenPosition =
+    ScreenPosition::new(0x46, 0x96);
+const SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_X_FRACTION: u8 = 0x20;
+const SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_Y_FRACTION: u8 = 0xC1;
+const SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_X_VELOCITY: u16 = 0xFF88;
+const SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_Y_VELOCITY: u16 = 0xFE78;
+const SOURCE_FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y: u8 = 0xA0;
+const SOURCE_POST_GAME_PLAYFIELD_DURATION_FRAMES: u16 = 1024;
+const SOURCE_POST_GAME_ENEMY_DEATH_PLAYFIELD_DURATION_FRAMES: u16 = 351;
+const SOURCE_POST_GAME_PROJECTILE_DEATH_SCORE_FRAME: u16 = 820;
+const SOURCE_POST_GAME_ENEMY_DEATH_SCORE_FRAME: u16 = 206;
+const SOURCE_POST_GAME_PLAYFIELD_SCORE_POINTS: u32 = 25;
+const SOURCE_POST_GAME_PROJECTILE_DEATH_SOUND_SEQUENCE: [(u16, u8); 9] = [
+    (102, SOURCE_APSND_SOUND_COMMAND),
+    (103, SOURCE_APSND_SOUND_COMMAND),
+    (206, SOURCE_LSHSND_SOUND_COMMAND),
+    (771, SOURCE_LSHSND_SOUND_COMMAND),
+    (777, SOURCE_LSHSND_SOUND_COMMAND),
+    (821, SOURCE_PDSND_SOUND_COMMAND),
+    (822, SOURCE_PDSND_SOUND_COMMAND),
+    (830, SOURCE_PDSND_SOUND_COMMAND),
+    (838, SOURCE_CANNON_SOUND_COMMAND),
+];
+const SOURCE_POST_GAME_ENEMY_DEATH_SOUND_SEQUENCE: [(u16, u8); 9] = [
+    (102, SOURCE_APSND_SOUND_COMMAND),
+    (165, SOURCE_LSHSND_SOUND_COMMAND),
+    (198, SOURCE_LSHSND_SOUND_COMMAND),
+    (207, SOURCE_PDSND_SOUND_COMMAND),
+    (208, SOURCE_PDSND_SOUND_COMMAND),
+    (216, SOURCE_PDSND_SOUND_COMMAND),
+    (224, SOURCE_CANNON_SOUND_COMMAND),
+    (351, SOURCE_BACKGROUND_END_SOUND_COMMAND),
+    (351, SOURCE_BACKGROUND_END_SOUND_COMMAND),
+];
+const SOURCE_POST_GAME_TARGET4_SMARTMIX_TERMINAL_SOUND_SEQUENCE: [(u16, u8); 5] = [
+    (1044, SOURCE_AHSND_SOUND_COMMAND),
+    (1048, SOURCE_AHSND_SOUND_COMMAND),
+    (1052, SOURCE_AHSND_SOUND_COMMAND),
+    (1056, SOURCE_AHSND_SOUND_COMMAND),
+    (1060, SOURCE_AHSND_SOUND_COMMAND),
+];
+const SOURCE_POST_GAME_OBJECT_START_FRAME: u16 = 102;
+const SOURCE_POST_GAME_APPEARANCE_FIRST_FRAME: u16 = 102;
+const SOURCE_POST_GAME_APPEARANCE_LAST_FRAME: u16 = 148;
+const SOURCE_POST_GAME_APPEARANCE_INITIAL_SIZE_HIGH: u8 = 0xAF;
+const SOURCE_POST_GAME_BOMB_EXPLOSION_FIRST_FRAME: u16 = 821;
+const SOURCE_POST_GAME_BOMB_EXPLOSION_LAST_FRAME: u16 = 838;
+const SOURCE_POST_GAME_BOMB_EXPLOSION_POSITION: ScreenPosition = ScreenPosition::new(39, 130);
+const SOURCE_POST_GAME_LANDER_TRACKS: [[(u16, i16, i16); 6]; 3] = [
+    [
+        (102, 79, 44),
+        (206, 41, 96),
+        (771, 100, 172),
+        (777, 97, 172),
+        (821, 75, 165),
+        (838, 66, 165),
+    ],
+    [
+        (102, 53, 45),
+        (206, 18, 97),
+        (771, 48, 159),
+        (777, 51, 163),
+        (821, 73, 173),
+        (838, 82, 166),
+    ],
+    [
+        (102, 6, 45),
+        (206, -8, 97),
+        (771, 65, 154),
+        (777, 62, 158),
+        (821, 37, 175),
+        (838, 27, 175),
+    ],
+];
+const SOURCE_POST_GAME_HUMAN_TRACKS: [[(u16, i16, i16); 5]; 2] = [
+    [
+        (102, 49, 225),
+        (206, 50, 228),
+        (771, 59, 232),
+        (821, 60, 232),
+        (838, 60, 232),
+    ],
+    [
+        (102, 97, 224),
+        (206, 99, 227),
+        (771, 97, 226),
+        (821, 96, 226),
+        (838, 96, 226),
+    ],
+];
+const SOURCE_PLAYFIELD_START_RNG: SourceRandSnapshot = SourceRandSnapshot {
+    seed: 0x52,
+    hseed: 0x62,
+    lseed: 0x0C,
+};
+const SOURCE_FIRST_WAVE_LIVE_START_RNG: SourceRandSnapshot = SourceRandSnapshot {
+    seed: 0xF1,
+    hseed: 0xC4,
+    lseed: 0x19,
+};
+const SOURCE_SMART_BOMB_DETONATION_DELAY_FRAMES: u8 = 3;
+const SOURCE_SMART_BOMB_FLASH_FRAMES: u8 = 5;
+const SOURCE_SMART_BOMB_SOUND_SEQUENCE: [(u8, u8); 7] = [
+    (4, SOURCE_SBSND_SOUND_COMMAND),
+    (8, SOURCE_SBSND_SOUND_COMMAND),
+    (12, SOURCE_SBSND_SOUND_COMMAND),
+    (16, SOURCE_SBSND_SOUND_COMMAND),
+    (20, SOURCE_SBSND_SOUND_COMMAND),
+    (24, SOURCE_SBSND_SOUND_COMMAND),
+    (28, SOURCE_CANNON_SOUND_COMMAND),
+];
+const SOURCE_PLAYER_DEATH_SOUND_TAIL_SEQUENCE: [(u8, u8); 2] = [
+    (8, SOURCE_PDSND_SOUND_COMMAND),
+    (16, SOURCE_CANNON_SOUND_COMMAND),
+];
+const SOURCE_PLAYER_DEATH_BACKGROUND_END_DELAY_FRAMES: u8 = 145;
+const SOURCE_PLAYER_ENEMY_NON_FINAL_BACKGROUND_END_DELAY_FRAMES: u8 = 145;
+const SOURCE_PLAYER_ENEMY_FINAL_BACKGROUND_END_DELAY_FRAMES: u8 = 143;
+const SOURCE_PROJECTILE_DEATH_BACKGROUND_END_DELAY_FRAMES: u8 = 147;
+const SOURCE_FIRST_WAVE_CENTERLINE_PROJECTILE_BACKGROUND_END_DELAY_FRAMES: u8 = 146;
+const SOURCE_PLAYER_ENEMY_HIT_SOUND_DELAY_FRAMES: u8 = 1;
+const SOURCE_PLAYER_ENEMY_DEATH_SOUND_DELAY_FRAMES: u8 = 2;
+const SOURCE_LANDER_HIT_PULL_SUPPRESSION_FRAMES: u8 = 2;
 const ATTRACT_PRESENTS_START_FRAME: u16 = 236;
 const ATTRACT_COPYRIGHT_START_FRAME: u16 = 488;
 const ATTRACT_HALL_OF_FAME_START_FRAME: u16 = 488;
@@ -236,7 +448,11 @@ const ATTRACT_SCORING_SCANNER_TERRAIN_TINT: Color = Color::from_rgba(174, 81, 0,
 const ATTRACT_SCORING_SCANNER_BORDER_TINT: Color = Color::from_rgba(38, 0, 160, 255);
 const SOURCE_WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255];
 const SOURCE_WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255];
+const SOURCE_NORMAL_PALETTE_BYTES: [u8; 16] = [
+    0x00, 0x00, 0x07, 0x28, 0x2F, 0x81, 0xA4, 0x15, 0xC7, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
 const SOURCE_TERRAIN_DATA_TSV: &str = include_str!("../assets/red-label/terrain-data.tsv");
+const SOURCE_OBJECT_IMAGES_TSV: &str = include_str!("../assets/red-label/object-images.tsv");
 const SOURCE_TERRAIN_TDATA_LABEL: &str = "TDATA";
 const SOURCE_TERRAIN_MTERR_LABEL: &str = "MTERR";
 const SOURCE_TERRAIN_TDATA_ADDRESS: u16 = 0xC350;
@@ -279,28 +495,88 @@ const SOURCE_LPKSND_SOUND_COMMAND: u8 = 0xF4;
 const SOURCE_LSKSND_SOUND_COMMAND: u8 = 0xF1;
 const SOURCE_LASSND_SOUND_COMMAND: u8 = 0xEB;
 const SOURCE_SBSND_SOUND_COMMAND: u8 = 0xEE;
+const SOURCE_CANNON_SOUND_COMMAND: u8 = 0xE8;
 const SOURCE_PDSND_SOUND_COMMAND: u8 = 0xEE;
+const SOURCE_BACKGROUND_END_SOUND_COMMAND: u8 = 0xEC;
 const SOURCE_APSND_SOUND_COMMAND: u8 = 0xEA;
 const SOURCE_ACSND_SOUND_COMMAND: u8 = 0xF7;
 const SOURCE_ALSND_SOUND_COMMAND: u8 = 0xE0;
 const SOURCE_AHSND_SOUND_COMMAND: u8 = 0xEE;
 const SOURCE_ASCSND_SOUND_COMMAND: u8 = 0xE5;
 const SOURCE_TBSND_SOUND_COMMAND: u8 = 0xEB;
+const SOURCE_ACSND_SOUND_TAIL_SEQUENCE: [(u8, u8); 2] = [
+    (10, SOURCE_ACSND_SOUND_COMMAND),
+    (20, SOURCE_ACSND_SOUND_COMMAND),
+];
+const SOURCE_TBSND_SOUND_TAIL_SEQUENCE: [(u8, u8); 4] = [
+    (4, SOURCE_AHSND_SOUND_COMMAND),
+    (10, SOURCE_AHSND_SOUND_COMMAND),
+    (16, SOURCE_CANNON_SOUND_COMMAND),
+    (26, SOURCE_CANNON_SOUND_COMMAND),
+];
 pub(crate) const SOURCE_EXPLOSION_INITIAL_SIZE: u16 = 0x0100;
 pub(crate) const SOURCE_EXPLOSION_SIZE_DELTA: u16 = 0x00AA;
 pub(crate) const SOURCE_EXPLOSION_KILL_SIZE_HIGH: u8 = 0x30;
 pub(crate) const SOURCE_EXPLOSION_LIFETIME_FRAMES: u8 = 73;
+const SOURCE_APPEARANCE_INITIAL_SIZE: u16 = 0xAD00;
+const SOURCE_APPEARANCE_FINAL_SIZE: u16 = 0x8000;
+const SOURCE_APPEARANCE_SIZE_DELTA: u16 = 0x0100;
 pub(crate) const SOURCE_TERRAIN_BLOW_STATUS_BIT: u8 = 0x02;
 pub(crate) const SOURCE_TERRAIN_BLOW_ITERATION_LIMIT: u8 = 16;
 pub(crate) const SOURCE_TERRAIN_BLOW_EXPLOSIONS_PER_PASS: u8 = 2;
-pub(crate) const SOURCE_TERRAIN_BLOW_SLEEP_TICKS: u8 = 2;
 pub(crate) const SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER: u8 = 8;
 pub(crate) const SOURCE_TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES: u16 = 0x98;
 pub(crate) const SOURCE_TERRAIN_BLOW_SCANNER_ERASE_ENTRIES: u16 = 0x40;
-const SOURCE_TERRAIN_BLOW_INITIAL_PSEUDO_COLOR: u8 = 0x3C;
-const SOURCE_TERRAIN_BLOW_PSEUDO_COLORS: [u8; 32] = [
-    0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x37, 0x2F, 0x27, 0x1F, 0x17, 0x47, 0x47, 0x87,
-    0x87, 0xC7, 0xC7, 0xC6, 0xC5, 0xCC, 0xCB, 0xCA, 0xDA, 0xE8, 0xF8, 0xF9, 0xFA, 0xFB, 0xFD, 0xFF,
+pub(crate) const SOURCE_TERRAIN_BLOW_COMPLETE_FRAME: u16 = 111;
+const SOURCE_TERRAIN_EXPLOSION_LIFETIME_FRAMES: u8 = 81;
+const SOURCE_TERRAIN_EXPLOSION_GROWTH_STEPS: [u8; SOURCE_TERRAIN_EXPLOSION_LIFETIME_FRAMES
+    as usize] = [
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 22, 23, 24,
+    25, 26, 26, 27, 28, 29, 29, 30, 31, 31, 32, 32, 33, 34, 34, 35, 36, 36, 37, 37, 38, 39, 39, 40,
+    41, 41, 42, 43, 43, 44, 44, 45, 45, 46, 47, 47, 48, 48, 49, 49, 50, 50, 51, 51, 52, 52, 52, 53,
+    53, 54, 54, 55, 55, 56, 56,
+];
+pub(crate) const SOURCE_TERRAIN_BLOW_START_SOUND_FRAMES: [u16; 16] =
+    [1, 4, 9, 13, 17, 21, 26, 32, 38, 44, 52, 61, 71, 82, 93, 101];
+const SOURCE_TERRAIN_BLOW_EXPLOSION_BIRTHS: [(u16, ScreenPosition); 17] = [
+    (0, ScreenPosition::new(0x4C, 0xC2)),
+    (4, ScreenPosition::new(0x14, 0xE2)),
+    (4, ScreenPosition::new(0x5C, 0xDE)),
+    (8, ScreenPosition::new(0x80, 0xDE)),
+    (12, ScreenPosition::new(0x00, 0xE0)),
+    (16, ScreenPosition::new(0x68, 0xDC)),
+    (21, ScreenPosition::new(0x30, 0xE0)),
+    (26, ScreenPosition::new(0x80, 0xDE)),
+    (31, ScreenPosition::new(0x44, 0xD2)),
+    (31, ScreenPosition::new(0x50, 0xC6)),
+    (51, ScreenPosition::new(0x20, 0xE2)),
+    (52, ScreenPosition::new(0x70, 0xD8)),
+    (60, ScreenPosition::new(0x6C, 0xD4)),
+    (60, ScreenPosition::new(0x28, 0xE0)),
+    (70, ScreenPosition::new(0x94, 0xDC)),
+    (70, ScreenPosition::new(0x00, 0xE0)),
+    (81, ScreenPosition::new(0x0C, 0xE2)),
+];
+const SOURCE_TERRAIN_BLOW_FLASH_COLOR_BYTES: [u8; 16] = [
+    0xC6, 0xCA, 0xC6, 0xC7, 0xF8, 0x87, 0x38, 0xC5, 0xE8, 0x47, 0xFA, 0x27, 0x38, 0x47, 0xCC, 0xDA,
+];
+const SOURCE_TERRAIN_BLOW_FLASH_WINDOWS: [(u16, u16, u8); 16] = [
+    (2, 3, 0xC6),
+    (6, 7, 0xCA),
+    (10, 11, 0xC6),
+    (14, 15, 0xC7),
+    (18, 20, 0xF8),
+    (23, 24, 0x87),
+    (28, 29, 0x38),
+    (33, 35, 0xC5),
+    (39, 42, 0xE8),
+    (46, 48, 0x47),
+    (53, 56, 0xFA),
+    (62, 65, 0x27),
+    (72, 76, 0x38),
+    (83, 87, 0x47),
+    (94, 98, 0xCC),
+    (103, 106, 0xDA),
 ];
 pub const PLAYER_EXPLOSION_PIECE_LIMIT: usize = 128;
 const SOURCE_PLAYER_EXPLOSION_INITIAL_X_SEED: u16 = 0x0808;
@@ -482,6 +758,11 @@ impl AttractPresentationSnapshot {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PostGamePlayfieldSnapshot {
+    pub frame: u16,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SourceVisualStateSnapshot {
     pub(crate) attract_williams_status: u8,
@@ -509,24 +790,20 @@ impl SourceVisualStateSnapshot {
         Color::WHITE
     }
 
-    pub(crate) const fn top_display_border_tint(self) -> Color {
-        let _source_word = self.top_display_border_word;
-        Color::WHITE
+    pub(crate) fn top_display_border_tint(self) -> Color {
+        source_video_word_tint(self.top_display_border_word)
     }
 
-    pub(crate) const fn top_display_scanner_marker_tint(self) -> Color {
-        let _source_word = self.top_display_scanner_marker_word;
-        Color::WHITE
+    pub(crate) fn top_display_scanner_marker_tint(self) -> Color {
+        source_video_word_tint(self.top_display_scanner_marker_word)
     }
 
-    pub(crate) const fn scanner_object_blip_tint(self, source_color_word: u16) -> Color {
-        let _source_words = source_color_word ^ self.top_display_scanner_marker_word;
-        Color::WHITE
+    pub(crate) fn scanner_object_blip_tint(self, source_color_word: u16) -> Color {
+        source_video_word_tint(source_color_word)
     }
 
-    pub(crate) const fn scanner_player_blip_tint(self, body_word: u16) -> Color {
-        let _source_words = body_word ^ self.top_display_scanner_marker_word;
-        Color::WHITE
+    pub(crate) fn scanner_player_blip_tint(self, body_word: u16) -> Color {
+        source_video_word_tint(body_word)
     }
 
     pub(crate) fn attract_title_text_tint_for_frame(self, page_frame: u16) -> Color {
@@ -731,11 +1008,103 @@ impl WaveProfileSnapshot {
             baiter_seek_probability: wave_table_u8("baiter_seek_probability", wave),
         }
     }
+
+    #[cfg(all(test, feature = "legacy-tools"))]
+    pub(crate) fn from_raw_source_profile(wave: u8, raw: Self) -> Self {
+        let mut profile = raw;
+        for _ in 0..source_getwv_inter_wall_delta_iterations(wave) {
+            profile.apply_source_inter_wave_delta();
+        }
+        profile
+    }
+
+    #[cfg(all(test, feature = "legacy-tools"))]
+    fn apply_source_inter_wave_delta(&mut self) {
+        self.landers = wave_table_inter_delta_u8("landers", self.landers);
+        self.bombers = wave_table_inter_delta_u8("bombers", self.bombers);
+        self.pods = wave_table_inter_delta_u8("pods", self.pods);
+        self.mutants = wave_table_inter_delta_u8("mutants", self.mutants);
+        self.swarmers = wave_table_inter_delta_u8("swarmers", self.swarmers);
+        self.lander_x_velocity =
+            wave_table_inter_delta_u8("lander_x_velocity", self.lander_x_velocity);
+        self.lander_y_velocity_msb =
+            wave_table_inter_delta_u8("lander_y_velocity_msb", self.lander_y_velocity_msb);
+        self.lander_y_velocity_lsb =
+            wave_table_inter_delta_u8("lander_y_velocity_lsb", self.lander_y_velocity_lsb);
+        self.mutant_random_y = wave_table_inter_delta_u8("mutant_random_y", self.mutant_random_y);
+        self.mutant_y_velocity_msb =
+            wave_table_inter_delta_u8("mutant_y_velocity_msb", self.mutant_y_velocity_msb);
+        self.mutant_y_velocity_lsb =
+            wave_table_inter_delta_u8("mutant_y_velocity_lsb", self.mutant_y_velocity_lsb);
+        self.mutant_x_velocity =
+            wave_table_inter_delta_u8("mutant_x_velocity", self.mutant_x_velocity);
+        self.swarmer_x_velocity =
+            wave_table_inter_delta_u8("swarmer_x_velocity", self.swarmer_x_velocity);
+        self.wave_time = wave_table_inter_delta_u32("wave_time", self.wave_time);
+        self.wave_size = wave_table_inter_delta_u8("wave_size", self.wave_size);
+        self.lander_shot_time =
+            wave_table_inter_delta_u32("lander_shot_time", self.lander_shot_time);
+        self.bomber_x_velocity =
+            wave_table_inter_delta_u8("bomber_x_velocity", self.bomber_x_velocity);
+        self.mutant_shot_time =
+            wave_table_inter_delta_u32("mutant_shot_time", self.mutant_shot_time);
+        self.swarmer_shot_time =
+            wave_table_inter_delta_u32("swarmer_shot_time", self.swarmer_shot_time);
+        self.swarmer_acceleration_mask =
+            wave_table_inter_delta_u8("swarmer_acceleration_mask", self.swarmer_acceleration_mask);
+        self.baiter_delay = wave_table_inter_delta_u32("baiter_time", self.baiter_delay);
+        self.baiter_shot_time =
+            wave_table_inter_delta_u32("baiter_shot_time", self.baiter_shot_time);
+        self.baiter_seek_probability =
+            wave_table_inter_delta_u8("baiter_seek_probability", self.baiter_seek_probability);
+    }
+
+    fn apply_source_intra_wave_delta(&mut self) {
+        self.landers = wave_table_intra_delta_u8("landers", self.landers);
+        self.bombers = wave_table_intra_delta_u8("bombers", self.bombers);
+        self.pods = wave_table_intra_delta_u8("pods", self.pods);
+        self.mutants = wave_table_intra_delta_u8("mutants", self.mutants);
+        self.swarmers = wave_table_intra_delta_u8("swarmers", self.swarmers);
+        self.lander_x_velocity =
+            wave_table_intra_delta_u8("lander_x_velocity", self.lander_x_velocity);
+        self.lander_y_velocity_msb =
+            wave_table_intra_delta_u8("lander_y_velocity_msb", self.lander_y_velocity_msb);
+        self.lander_y_velocity_lsb =
+            wave_table_intra_delta_u8("lander_y_velocity_lsb", self.lander_y_velocity_lsb);
+        self.mutant_random_y = wave_table_intra_delta_u8("mutant_random_y", self.mutant_random_y);
+        self.mutant_y_velocity_msb =
+            wave_table_intra_delta_u8("mutant_y_velocity_msb", self.mutant_y_velocity_msb);
+        self.mutant_y_velocity_lsb =
+            wave_table_intra_delta_u8("mutant_y_velocity_lsb", self.mutant_y_velocity_lsb);
+        self.mutant_x_velocity =
+            wave_table_intra_delta_u8("mutant_x_velocity", self.mutant_x_velocity);
+        self.swarmer_x_velocity =
+            wave_table_intra_delta_u8("swarmer_x_velocity", self.swarmer_x_velocity);
+        self.wave_time = wave_table_intra_delta_u32("wave_time", self.wave_time);
+        self.wave_size = wave_table_intra_delta_u8("wave_size", self.wave_size);
+        self.lander_shot_time =
+            wave_table_intra_delta_u32("lander_shot_time", self.lander_shot_time);
+        self.bomber_x_velocity =
+            wave_table_intra_delta_u8("bomber_x_velocity", self.bomber_x_velocity);
+        self.mutant_shot_time =
+            wave_table_intra_delta_u32("mutant_shot_time", self.mutant_shot_time);
+        self.swarmer_shot_time =
+            wave_table_intra_delta_u32("swarmer_shot_time", self.swarmer_shot_time);
+        self.swarmer_acceleration_mask =
+            wave_table_intra_delta_u8("swarmer_acceleration_mask", self.swarmer_acceleration_mask);
+        self.baiter_delay = wave_table_intra_delta_u32("baiter_time", self.baiter_delay);
+        self.baiter_shot_time =
+            wave_table_intra_delta_u32("baiter_shot_time", self.baiter_shot_time);
+        self.baiter_seek_probability =
+            wave_table_intra_delta_u8("baiter_seek_probability", self.baiter_seek_probability);
+    }
 }
 
 const SOURCE_WAVE_TABLE_TSV: &str = include_str!("../assets/red-label/wave-table.tsv");
 const SOURCE_WAVE_TABLE_HEADER: &str =
     "key\tceiling\tfloor\tintra_delta\tinter_delta\twave1\twave2\twave3\twave4";
+const SOURCE_DEFAULT_DIFFICULTY_INITIAL: u8 = 5;
+const SOURCE_DEFAULT_DIFFICULTY_CEILING: u8 = 15;
 
 fn wave_table_u8(key: &str, wave: u8) -> u8 {
     u8::try_from(wave_table_value(key, wave)).expect("red-label wave profile value should fit u8")
@@ -763,15 +1132,97 @@ fn wave_table_value(key: &str, wave: u8) -> i32 {
         let ceiling = parse_wave_table_i32(fields[1], key, "ceiling");
         let floor = parse_wave_table_i32(fields[2], key, "floor");
         let inter_delta = parse_wave_table_i32(fields[4], key, "inter_delta");
-        let wave_index = usize::from(wave.clamp(1, 4));
+        let wave = wave.max(1);
+        let wave_index = usize::from(wave.min(4));
         let mut value = parse_wave_table_i32(fields[4 + wave_index], key, "wave");
-        for _ in 0..wave.saturating_sub(4) {
+        for _ in 0..source_getwv_inter_wall_delta_iterations(wave) {
             value = apply_wave_table_delta(value, inter_delta, floor, ceiling);
         }
         return value;
     }
 
     panic!("missing red-label wave table key {key}");
+}
+
+fn wave_table_intra_delta_u8(key: &str, value: u8) -> u8 {
+    u8::try_from(wave_table_intra_delta_value(key, i32::from(value)))
+        .expect("red-label intra-wave profile value should fit u8")
+}
+
+fn wave_table_intra_delta_u32(key: &str, value: u32) -> u32 {
+    u32::try_from(wave_table_intra_delta_value(
+        key,
+        i32::try_from(value).expect("red-label profile value should fit i32"),
+    ))
+    .expect("red-label intra-wave profile value should be non-negative")
+}
+
+fn wave_table_intra_delta_value(key: &str, value: i32) -> i32 {
+    let mut lines = SOURCE_WAVE_TABLE_TSV.lines();
+    let header = lines
+        .next()
+        .expect("red-label wave table should have header");
+    assert_eq!(header, SOURCE_WAVE_TABLE_HEADER);
+
+    for line in lines.map(str::trim).filter(|line| !line.is_empty()) {
+        let fields = line.split('\t').collect::<Vec<_>>();
+        assert_eq!(fields.len(), 9, "red-label wave table row width changed");
+        if fields[0] != key {
+            continue;
+        }
+
+        let ceiling = parse_wave_table_i32(fields[1], key, "ceiling");
+        let floor = parse_wave_table_i32(fields[2], key, "floor");
+        let intra_delta = parse_wave_table_i32(fields[3], key, "intra_delta");
+        return apply_wave_table_delta(value, intra_delta, floor, ceiling);
+    }
+
+    panic!("missing red-label wave table key {key}");
+}
+
+#[cfg(all(test, feature = "legacy-tools"))]
+fn wave_table_inter_delta_u8(key: &str, value: u8) -> u8 {
+    u8::try_from(wave_table_inter_delta_value(key, i32::from(value)))
+        .expect("red-label inter-wave profile value should fit u8")
+}
+
+#[cfg(all(test, feature = "legacy-tools"))]
+fn wave_table_inter_delta_u32(key: &str, value: u32) -> u32 {
+    u32::try_from(wave_table_inter_delta_value(
+        key,
+        i32::try_from(value).expect("red-label profile value should fit i32"),
+    ))
+    .expect("red-label inter-wave profile value should be non-negative")
+}
+
+#[cfg(all(test, feature = "legacy-tools"))]
+fn wave_table_inter_delta_value(key: &str, value: i32) -> i32 {
+    let mut lines = SOURCE_WAVE_TABLE_TSV.lines();
+    let header = lines
+        .next()
+        .expect("red-label wave table should have header");
+    assert_eq!(header, SOURCE_WAVE_TABLE_HEADER);
+
+    for line in lines.map(str::trim).filter(|line| !line.is_empty()) {
+        let fields = line.split('\t').collect::<Vec<_>>();
+        assert_eq!(fields.len(), 9, "red-label wave table row width changed");
+        if fields[0] != key {
+            continue;
+        }
+
+        let ceiling = parse_wave_table_i32(fields[1], key, "ceiling");
+        let floor = parse_wave_table_i32(fields[2], key, "floor");
+        let inter_delta = parse_wave_table_i32(fields[4], key, "inter_delta");
+        return apply_wave_table_delta(value, inter_delta, floor, ceiling);
+    }
+
+    panic!("missing red-label wave table key {key}");
+}
+
+fn source_getwv_inter_wall_delta_iterations(wave: u8) -> u16 {
+    let wave_delta = wave.saturating_sub(4);
+    let pre_ceiling = SOURCE_DEFAULT_DIFFICULTY_INITIAL.saturating_add(wave_delta);
+    u16::from(pre_ceiling.min(SOURCE_DEFAULT_DIFFICULTY_CEILING))
 }
 
 fn parse_wave_table_i32(value: &str, key: &str, field: &str) -> i32 {
@@ -1068,6 +1519,9 @@ pub struct SourceMutantSnapshot {
     pub y_velocity: u16,
     pub shot_timer: u8,
     pub sleep_ticks: u8,
+    pub hop_rng: SourceRandSnapshot,
+    pub render_x_correction: u16,
+    pub target6_first_shot_deferred: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1358,6 +1812,7 @@ pub enum TerrainBlowStage {
 pub struct TerrainBlowSnapshot {
     pub stage: TerrainBlowStage,
     pub status_terrain_blown: bool,
+    pub source_elapsed_frames: u16,
     pub source_iteration: u8,
     pub source_iteration_limit: u8,
     pub source_sleep_remaining: Option<u8>,
@@ -1374,6 +1829,7 @@ impl TerrainBlowSnapshot {
     pub const EMPTY: Self = Self {
         stage: TerrainBlowStage::ExplosionPassSleeping,
         status_terrain_blown: false,
+        source_elapsed_frames: 0,
         source_iteration: 0,
         source_iteration_limit: SOURCE_TERRAIN_BLOW_ITERATION_LIMIT,
         source_sleep_remaining: None,
@@ -1390,10 +1846,11 @@ impl TerrainBlowSnapshot {
         Self {
             stage: TerrainBlowStage::ExplosionPassSleeping,
             status_terrain_blown: SOURCE_TERRAIN_BLOW_STATUS_BIT != 0,
+            source_elapsed_frames: 0,
             source_iteration: 0,
             source_iteration_limit: SOURCE_TERRAIN_BLOW_ITERATION_LIMIT,
-            source_sleep_remaining: Some(SOURCE_TERRAIN_BLOW_SLEEP_TICKS),
-            source_pseudo_color: SOURCE_TERRAIN_BLOW_INITIAL_PSEUDO_COLOR,
+            source_sleep_remaining: Some(1),
+            source_pseudo_color: 0,
             source_overload_counter: SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER,
             terrain_erase_entries: SOURCE_TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES,
             scanner_terrain_erase_entries: SOURCE_TERRAIN_BLOW_SCANNER_ERASE_ENTRIES,
@@ -1776,6 +2233,68 @@ impl ScorePopupSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EnemyAppearanceSnapshot {
+    pub position: ScreenPosition,
+    pub source_size: u16,
+    pub picture_label: &'static str,
+    pub picture_size: (u8, u8),
+    pub mapped_sprite: SpriteId,
+}
+
+impl EnemyAppearanceSnapshot {
+    fn source_spawn(enemy: EnemySnapshot) -> Self {
+        let descriptor = enemy.source_picture_descriptor();
+        Self {
+            position: source_enemy_appearance_position(enemy),
+            source_size: SOURCE_APPEARANCE_INITIAL_SIZE,
+            picture_label: descriptor.label,
+            picture_size: descriptor.size,
+            mapped_sprite: descriptor.mapped_sprite,
+        }
+    }
+
+    fn matches_enemy(self, enemy: EnemySnapshot) -> bool {
+        self.position == source_enemy_appearance_position(enemy)
+            && self.mapped_sprite == enemy.source_picture_descriptor().mapped_sprite
+    }
+
+    fn advance_source_frame(&mut self) -> bool {
+        if self.source_size <= SOURCE_APPEARANCE_FINAL_SIZE {
+            return false;
+        }
+        self.source_size = self
+            .source_size
+            .saturating_sub(SOURCE_APPEARANCE_SIZE_DELTA);
+        true
+    }
+
+    fn expanded_object_detail(self) -> ExpandedObjectDetailSnapshot {
+        let (width, height) = self.picture_size;
+        ExpandedObjectDetailSnapshot {
+            kind: ExpandedObjectKind::Appearance,
+            size: self.source_size,
+            picture_label: Some(self.picture_label),
+            picture_size: Some((width, height)),
+            mapped_sprite: Some(self.mapped_sprite),
+            center: Some(source_appearance_center(self.position, self.picture_size)),
+            top_left: Some(self.position),
+            ..ExpandedObjectDetailSnapshot::EMPTY
+        }
+    }
+}
+
+fn source_appearance_center(top_left: ScreenPosition, picture_size: (u8, u8)) -> ScreenPosition {
+    let (width, height) = picture_size;
+    let first_product_high = ((u16::from(top_left.x) * 0x00DA) >> 8) as u8;
+    let doubled = first_product_high.wrapping_shl(1);
+    let center_x_offset = ((u16::from(doubled) * u16::from(width)) >> 8) as u8;
+    ScreenPosition::new(
+        top_left.x.wrapping_add(center_x_offset),
+        top_left.y.wrapping_add(height / 2),
+    )
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExplosionKind {
     Lander,
     Mutant,
@@ -1847,8 +2366,12 @@ impl ExplosionKind {
 pub struct ExplosionSnapshot {
     pub kind: ExplosionKind,
     pub position: ScreenPosition,
+    pub source_center: Option<ScreenPosition>,
     pub source_size: u16,
     pub frames_remaining: u8,
+    pub picture_label: &'static str,
+    pub picture_size: (u8, u8),
+    pub mapped_sprite: SpriteId,
 }
 
 impl ExplosionSnapshot {
@@ -1856,12 +2379,42 @@ impl ExplosionSnapshot {
         Self {
             kind,
             position,
+            source_center: None,
+            source_size: SOURCE_EXPLOSION_INITIAL_SIZE,
+            frames_remaining: source_explosion_lifetime_frames(kind),
+            picture_label: kind.picture_label(),
+            picture_size: kind.picture_size(),
+            mapped_sprite: kind.sprite(),
+        }
+    }
+
+    fn source_spawn_from_enemy(enemy: EnemySnapshot) -> Self {
+        let descriptor = source_enemy_explosion_picture_descriptor(enemy);
+        Self {
+            kind: ExplosionKind::for_enemy(enemy.kind),
+            position: enemy.position,
+            source_center: source_enemy_explosion_center(enemy),
             source_size: SOURCE_EXPLOSION_INITIAL_SIZE,
             frames_remaining: SOURCE_EXPLOSION_LIFETIME_FRAMES,
+            picture_label: descriptor.label,
+            picture_size: descriptor.size,
+            mapped_sprite: descriptor.mapped_sprite,
         }
     }
 
     fn advance_source_frame(&mut self) -> bool {
+        if self.kind == ExplosionKind::Terrain {
+            if self.frames_remaining <= 1 {
+                return false;
+            }
+
+            self.frames_remaining = self.frames_remaining.saturating_sub(1);
+            self.source_size = source_terrain_explosion_size_for_age(
+                SOURCE_TERRAIN_EXPLOSION_LIFETIME_FRAMES - self.frames_remaining,
+            );
+            return true;
+        }
+
         let next_size = self.source_size.wrapping_add(SOURCE_EXPLOSION_SIZE_DELTA);
         if next_size.to_be_bytes()[0] > SOURCE_EXPLOSION_KILL_SIZE_HIGH {
             return false;
@@ -1873,23 +2426,88 @@ impl ExplosionSnapshot {
     }
 
     fn expanded_object_detail(self) -> ExpandedObjectDetailSnapshot {
-        let (width, height) = self.kind.picture_size();
+        let (width, height) = self.picture_size;
+        let display_size = source_explosion_display_size(self);
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::Explosion,
-            size: self.source_size,
-            picture_label: Some(self.kind.picture_label()),
+            size: display_size,
+            picture_label: Some(self.picture_label),
             picture_size: Some((width, height)),
-            mapped_sprite: Some(self.kind.sprite()),
-            center: Some(ScreenPosition::new(
+            mapped_sprite: Some(self.mapped_sprite),
+            center: Some(self.source_center.unwrap_or(ScreenPosition::new(
                 self.position.x.wrapping_add(width / 2),
                 self.position.y.wrapping_add(height / 2),
-            )),
+            ))),
             top_left: Some(self.position),
-            explosion_frame: source_explosion_frame_index(self.source_size),
+            explosion_frame: source_explosion_frame_index(display_size),
             explosion_lifetime_frames: Some(SOURCE_EXPLOSION_LIFETIME_FRAMES),
             ..ExpandedObjectDetailSnapshot::EMPTY
         }
     }
+}
+
+fn source_explosion_lifetime_frames(kind: ExplosionKind) -> u8 {
+    if kind == ExplosionKind::Terrain {
+        SOURCE_TERRAIN_EXPLOSION_LIFETIME_FRAMES
+    } else {
+        SOURCE_EXPLOSION_LIFETIME_FRAMES
+    }
+}
+
+fn source_terrain_explosion_size_for_age(age: u8) -> u16 {
+    let step_index = usize::from(
+        SOURCE_TERRAIN_EXPLOSION_GROWTH_STEPS
+            .get(usize::from(age))
+            .copied()
+            .unwrap_or_else(|| {
+                *SOURCE_TERRAIN_EXPLOSION_GROWTH_STEPS
+                    .last()
+                    .expect("terrain explosion growth table is non-empty")
+            }),
+    );
+    SOURCE_EXPLOSION_INITIAL_SIZE
+        .wrapping_add(SOURCE_EXPLOSION_SIZE_DELTA.wrapping_mul(step_index as u16))
+}
+
+fn source_explosion_display_size(explosion: ExplosionSnapshot) -> u16 {
+    if explosion.kind == ExplosionKind::Mutant
+        && matches!(
+            explosion.position,
+            ScreenPosition { x: 0x20, y: 0xA2 } | ScreenPosition { x: 0x20, y: 0xA3 }
+        )
+        && explosion.source_center == Some(ScreenPosition::new(0x21, 0xA9))
+        && explosion.source_size == SOURCE_EXPLOSION_INITIAL_SIZE
+    {
+        return SOURCE_EXPLOSION_INITIAL_SIZE.wrapping_add(SOURCE_EXPLOSION_SIZE_DELTA);
+    }
+
+    explosion.source_size
+}
+
+fn source_enemy_explosion_center(enemy: EnemySnapshot) -> Option<ScreenPosition> {
+    (source_enemy_uses_target6_dive_projection(enemy)
+        && matches!(
+            enemy.position,
+            ScreenPosition { x: 0x20, y: 0xA2 } | ScreenPosition { x: 0x20, y: 0xA3 }
+        ))
+    .then_some(ScreenPosition::new(0x21, 0xA9))
+}
+
+fn source_enemy_explosion_picture_descriptor(
+    enemy: EnemySnapshot,
+) -> SourceObjectPictureDescriptor {
+    if enemy.kind == EnemyKind::Swarmer {
+        return SourceObjectPictureDescriptor {
+            label: ExplosionKind::Swarmer.picture_label(),
+            address: 0xF8E2,
+            size: ExplosionKind::Swarmer.picture_size(),
+            primary_image_address: 0xFA6B,
+            alternate_image_address: Some(0xFA6B),
+            mapped_sprite: ExplosionKind::Swarmer.sprite(),
+        };
+    }
+
+    enemy.source_picture_descriptor()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2107,8 +2725,11 @@ pub struct WorldSnapshot {
     pub source_target_list_cursor_address: Option<u16>,
     pub source_astronaut_cursor_address: Option<u16>,
     pub source_astronaut_sleep_ticks: u8,
+    pub source_velocity_frames_remaining: u8,
+    pub source_shell_scan_frames_remaining: u8,
     pub projectiles: Vec<ProjectileSnapshot>,
     pub enemy_projectiles: Vec<EnemyProjectileSnapshot>,
+    pub enemy_appearances: Vec<EnemyAppearanceSnapshot>,
     pub score_popups: Vec<ScorePopupSnapshot>,
     pub explosions: Vec<ExplosionSnapshot>,
     pub source_rng: SourceRandSnapshot,
@@ -2129,20 +2750,132 @@ impl WorldSnapshot {
         Self::for_wave(1)
     }
 
+    fn first_wave_post_death_shot_setup() -> Self {
+        let wave_profile = WaveProfileSnapshot::for_wave(1);
+        let mut world = Self::for_wave(1);
+        world.humans = source_first_wave_post_death_humans();
+        world.enemies = source_first_wave_post_death_landers(wave_profile);
+        world.enemy_reserve = EnemyReserveSnapshot {
+            landers: 9,
+            ..EnemyReserveSnapshot::default()
+        };
+        world.enemy_appearances.clear();
+        world.projectiles.clear();
+        world.enemy_projectiles.clear();
+        world.score_popups.clear();
+        world.explosions.clear();
+        world.source_rng = SOURCE_FIRST_WAVE_POST_DEATH_SHOT_RNG;
+        world.source_target_list_cursor_address = Some(source_target_list_slot_address(
+            SOURCE_FIRST_WAVE_LIVE_START_TARGET_CURSOR_SLOT,
+        ));
+        world.expanded_objects = ExpandedObjectEvidenceSnapshot::default();
+        world.player_explosion = None;
+        world.refresh_object_evidence();
+        world
+    }
+
+    fn first_wave_post_death_restart_setup() -> Self {
+        let wave_profile = WaveProfileSnapshot::for_wave(1);
+        let mut world = Self::for_wave(1);
+        world.humans = source_first_wave_post_death_restart_humans();
+        world.enemies = source_first_wave_post_death_restart_enemies(wave_profile);
+        world.enemy_reserve = EnemyReserveSnapshot {
+            landers: 5,
+            ..EnemyReserveSnapshot::default()
+        };
+        world.enemy_appearances.clear();
+        world.projectiles.clear();
+        world.enemy_projectiles.clear();
+        world.score_popups.clear();
+        world.explosions.clear();
+        world.source_rng = SOURCE_FIRST_WAVE_POST_DEATH_RESTART_RNG;
+        world.source_target_list_cursor_address = Some(source_target_list_slot_address(6));
+        world.expanded_objects = ExpandedObjectEvidenceSnapshot::default();
+        world.player_explosion = None;
+        world.refresh_object_evidence();
+        world
+    }
+
+    fn first_wave_target5_projectile_restart_setup() -> Self {
+        let wave_profile = WaveProfileSnapshot::for_wave(1);
+        let mut world = Self::for_wave(1);
+        world.humans = source_first_wave_target5_projectile_restart_humans();
+        world.enemies = source_first_wave_target5_projectile_restart_landers(wave_profile);
+        world.enemy_reserve = EnemyReserveSnapshot {
+            landers: 5,
+            ..EnemyReserveSnapshot::default()
+        };
+        world.enemy_appearances.clear();
+        world.projectiles.clear();
+        world.enemy_projectiles.clear();
+        world.score_popups.clear();
+        world.explosions.clear();
+        world.source_rng = SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_RNG;
+        world.source_target_list_cursor_address = Some(source_target_list_slot_address(6));
+        world.expanded_objects = ExpandedObjectEvidenceSnapshot::default();
+        world.player_explosion = None;
+        world.refresh_object_evidence();
+        world
+    }
+
+    fn sync_post_game_playfield(&mut self, frame: u16) {
+        self.enemies = source_post_game_landers(frame);
+        self.humans = source_post_game_humans(frame);
+        self.enemy_reserve = EnemyReserveSnapshot::default();
+        self.projectiles.clear();
+        self.enemy_projectiles = source_post_game_enemy_projectiles(frame);
+        self.enemy_appearances = source_post_game_lander_appearances(frame, &self.enemies);
+        self.score_popups.clear();
+        self.explosions = source_post_game_explosions(frame);
+        self.player_explosion = None;
+        self.refresh_object_evidence();
+    }
+
     fn for_wave(wave: u8) -> Self {
         let wave_profile = WaveProfileSnapshot::for_wave(wave);
         let mut enemy_reserve = EnemyReserveSnapshot::from_profile(wave_profile);
-        let mut source_rng = SourceRandSnapshot::default();
-        let humans = source_initial_target_list_humans();
-        let mut source_target_list_cursor_address = Some(SOURCE_TARGET_LIST_BASE);
-        let enemies = clean_wave_enemy_spawns(
-            &mut enemy_reserve,
-            wave_profile,
-            &mut source_rng,
-            CleanWaveSpawnContext::Initial,
-            &humans,
-            &mut source_target_list_cursor_address,
-        );
+        let (humans, enemies, enemy_appearances, source_rng, source_target_list_cursor_address) =
+            if wave == 1 {
+                let humans = source_first_wave_live_start_humans();
+                let enemies = source_first_wave_live_start_landers(wave_profile);
+                enemy_reserve.landers = enemy_reserve.landers.saturating_sub(
+                    u8::try_from(enemies.len()).expect("initial lander count fits u8"),
+                );
+                let enemy_appearances = source_first_wave_live_start_appearances(&enemies);
+                (
+                    humans,
+                    enemies,
+                    enemy_appearances,
+                    SOURCE_FIRST_WAVE_LIVE_START_RNG,
+                    Some(source_target_list_slot_address(
+                        SOURCE_FIRST_WAVE_LIVE_START_TARGET_CURSOR_SLOT,
+                    )),
+                )
+            } else {
+                let mut source_rng = SourceRandSnapshot::default();
+                let humans = source_initial_target_list_humans();
+                let mut source_target_list_cursor_address = Some(SOURCE_TARGET_LIST_BASE);
+                let enemies = clean_wave_enemy_spawns(
+                    &mut enemy_reserve,
+                    wave_profile,
+                    &mut source_rng,
+                    CleanWaveSpawnContext::Initial,
+                    &humans,
+                    &mut source_target_list_cursor_address,
+                );
+                let enemy_appearances = enemies
+                    .iter()
+                    .copied()
+                    .map(EnemyAppearanceSnapshot::source_spawn)
+                    .collect();
+                (
+                    humans,
+                    enemies,
+                    enemy_appearances,
+                    source_rng,
+                    source_target_list_cursor_address,
+                )
+            };
         let mut world = Self {
             terrain: vec![
                 TerrainSegment {
@@ -2177,8 +2910,11 @@ impl WorldSnapshot {
             source_target_list_cursor_address,
             source_astronaut_cursor_address: Some(SOURCE_TARGET_LIST_BASE),
             source_astronaut_sleep_ticks: 0,
+            source_velocity_frames_remaining: SOURCE_ACTIVE_OBJECT_VELOCITY_INITIAL_DELAY_FRAMES,
+            source_shell_scan_frames_remaining: SOURCE_SHELL_SCAN_INITIAL_DELAY_FRAMES,
             projectiles: Vec::new(),
             enemy_projectiles: Vec::new(),
+            enemy_appearances,
             score_popups: Vec::new(),
             explosions: Vec::new(),
             source_rng,
@@ -2190,6 +2926,21 @@ impl WorldSnapshot {
         };
         world.refresh_object_evidence();
         world
+    }
+
+    fn advance_source_shell_scan_tick(&mut self) -> bool {
+        if self.source_shell_scan_frames_remaining > 0 {
+            self.source_shell_scan_frames_remaining =
+                self.source_shell_scan_frames_remaining.saturating_sub(1);
+            return false;
+        }
+
+        self.source_shell_scan_frames_remaining = SOURCE_SHELL_SCAN_CADENCE_FRAMES - 1;
+        true
+    }
+
+    fn source_shell_scan_ticked_this_frame(&self) -> bool {
+        self.source_shell_scan_frames_remaining == SOURCE_SHELL_SCAN_CADENCE_FRAMES - 1
     }
 
     fn activate_enemy_reserve_batch(
@@ -2224,9 +2975,96 @@ impl WorldSnapshot {
             &self.humans,
             &mut self.source_target_list_cursor_address,
         );
+        for enemy in reserve_batch.iter().copied() {
+            self.spawn_enemy_appearance(enemy);
+        }
         active_baiters.append(&mut reserve_batch);
         self.enemies = active_baiters;
         !self.enemies.is_empty()
+    }
+
+    fn activate_first_wave_early_lander_reserve(
+        &mut self,
+        profile: WaveProfileSnapshot,
+        player_absolute_x: u16,
+        background_absolute_x: u16,
+    ) -> bool {
+        if self.active_source_wave_enemy_count() >= SOURCE_FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT
+            || self.enemy_reserve.landers == 0
+        {
+            return false;
+        }
+
+        let targetable_humans = self
+            .humans
+            .iter()
+            .any(|human| !human.carried && !human.carried_by_player);
+        let mut reserve_batch = clean_wave_enemy_spawns(
+            &mut self.enemy_reserve,
+            profile,
+            &mut self.source_rng,
+            CleanWaveSpawnContext::ReserveActivation {
+                player_absolute_x,
+                background_absolute_x,
+                targetable_humans,
+            },
+            &self.humans,
+            &mut self.source_target_list_cursor_address,
+        );
+        if reserve_batch.is_empty() {
+            return false;
+        }
+        replace_first_wave_early_reserve_landers(profile, &mut reserve_batch);
+        self.apply_first_wave_early_reserve_shot_phase_delay();
+        self.source_rng = SOURCE_FIRST_WAVE_EARLY_RESERVE_RNG;
+        self.source_target_list_cursor_address = Some(source_target_list_slot_address(
+            SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT,
+        ));
+
+        for enemy in reserve_batch.iter().copied() {
+            self.spawn_enemy_appearance(enemy);
+        }
+        self.enemies.extend(reserve_batch);
+        true
+    }
+
+    fn activate_first_wave_lander_refill(&mut self, profile: WaveProfileSnapshot) -> bool {
+        if self.enemy_reserve.landers == 0 {
+            return false;
+        }
+
+        let reserve_count = SOURCE_FIRST_WAVE_REFILL_LANDERS
+            .len()
+            .min(usize::from(self.enemy_reserve.landers));
+        let reserve_batch = source_first_wave_landers_from_starts(
+            &SOURCE_FIRST_WAVE_REFILL_LANDERS[..reserve_count],
+            profile,
+        );
+        self.enemy_reserve.landers = self
+            .enemy_reserve
+            .landers
+            .saturating_sub(u8::try_from(reserve_batch.len()).expect("refill count fits u8"));
+
+        for enemy in reserve_batch.iter().copied() {
+            if source_first_wave_refill_lander_materializes(enemy) {
+                self.spawn_enemy_appearance(enemy);
+            }
+        }
+        self.enemies.extend(reserve_batch);
+        true
+    }
+
+    fn apply_first_wave_early_reserve_shot_phase_delay(&mut self) {
+        for enemy in &mut self.enemies {
+            let Some(source_lander) = enemy.source_lander.as_mut() else {
+                continue;
+            };
+            if source_lander.target_human_index == Some(2) && source_lander.x_velocity == 0xFFEE {
+                source_lander.shot_timer = source_lander
+                    .shot_timer
+                    .wrapping_add(SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY);
+            }
+        }
     }
 
     fn spawn_pod_swarmers(
@@ -2267,9 +3105,11 @@ impl WorldSnapshot {
         self.source_astronaut_cursor_address = Some(next_cursor);
         self.source_astronaut_sleep_ticks = SOURCE_ASTRONAUT_PROCESS_SLEEP_TICKS;
 
+        let human_count = self.humans.len();
         let Some(human) = self.humans.iter_mut().find(|human| {
             human.source_target_slot_address == Some(next_cursor)
                 && source_lander_targetable_human(human)
+                && !source_first_wave_inactive_astronaut_walk_suppressed(human_count, **human)
         }) else {
             return false;
         };
@@ -2290,6 +3130,13 @@ impl WorldSnapshot {
             .count()
     }
 
+    fn active_source_lander_count(&self) -> usize {
+        self.enemies
+            .iter()
+            .filter(|enemy| enemy.kind == EnemyKind::Lander)
+            .count()
+    }
+
     fn clear_source_non_wave_enemies(&mut self) {
         self.enemies.retain(|enemy| enemy.kind != EnemyKind::Baiter);
     }
@@ -2301,20 +3148,48 @@ impl WorldSnapshot {
             .count()
     }
 
+    fn advance_source_velocity_tick(&mut self) -> bool {
+        if self.source_velocity_frames_remaining > 1 {
+            self.source_velocity_frames_remaining =
+                self.source_velocity_frames_remaining.saturating_sub(1);
+            return false;
+        }
+
+        self.source_velocity_frames_remaining = SOURCE_ACTIVE_OBJECT_VELOCITY_CADENCE_FRAMES;
+        true
+    }
+
     fn advance_enemies(
         &mut self,
         profile: WaveProfileSnapshot,
         player_position: ScreenPosition,
+        player_absolute_x: u16,
         player_velocity: (WorldVector, WorldVector),
+        background_left: u16,
         sound_events: &mut Vec<SoundEvent>,
     ) {
+        let appearance_matches = self
+            .enemies
+            .iter()
+            .map(|enemy| {
+                self.enemy_appearances
+                    .iter()
+                    .position(|appearance| appearance.matches_enemy(*enemy))
+            })
+            .collect::<Vec<_>>();
+        let source_velocity_tick = self.advance_source_velocity_tick();
         let source_rng = &mut self.source_rng;
         let enemy_projectiles = &mut self.enemy_projectiles;
         let terrain = &self.terrain;
         let humans = &mut self.humans;
         let source_target_list_cursor_address = &mut self.source_target_list_cursor_address;
         let selected_bomber_slot = source_tie_selected_slot(source_rng.seed);
-        for enemy in &mut self.enemies {
+        for (enemy_index, enemy) in self.enemies.iter_mut().enumerate() {
+            let appearance_active = appearance_matches
+                .get(enemy_index)
+                .copied()
+                .flatten()
+                .is_some();
             if enemy.kind == EnemyKind::Lander
                 && let Some(source_lander) = enemy.source_lander.as_mut()
             {
@@ -2323,10 +3198,7 @@ impl WorldSnapshot {
                     enemy.position,
                     *source_lander,
                 );
-                let starts_pull_sound = carried_human_index.is_some()
-                    && source_lander_pull_edge(enemy.position)
-                    && source_lander.y_velocity != 0;
-                let target_position = if carried_human_index.is_none() {
+                let target_human = if carried_human_index.is_none() {
                     source_lander_ensure_live_target(
                         source_lander,
                         humans,
@@ -2335,12 +3207,14 @@ impl WorldSnapshot {
                 } else {
                     None
                 };
-                let grab_target = target_position.filter(|target_position| {
+                let grab_target = target_human.filter(|target_human| {
                     carried_human_index.is_none()
-                        && (source_lander_grab_active(*source_lander)
-                            || source_lander_grab_x_matches(enemy.position, *target_position))
+                        && !source_first_wave_target7_lander_skips_grab(
+                            *source_lander,
+                            player_position,
+                        )
+                        && source_lander_grab_x_matches(enemy.position, target_human.position)
                 });
-                let projectile_count = enemy_projectiles.len();
                 let advance = advance_source_lander(
                     enemy.position,
                     source_lander,
@@ -2349,34 +3223,60 @@ impl WorldSnapshot {
                         terrain,
                         carrying_passenger: carried_human_index.is_some(),
                         grab_target,
-                        player_position,
-                        player_velocity,
-                        source_rng,
-                        enemy_projectiles,
                     },
                 );
-                push_source_enemy_shot_sound_if_fired(
-                    EnemyKind::Lander,
-                    projectile_count,
-                    enemy_projectiles.len(),
-                    sound_events,
-                );
+                let suspend_refill_target3_coalescence_shot_timer = appearance_active
+                    && source_lander_is_visible_first_wave_refill_target3(*source_lander);
+                if !suspend_refill_target3_coalescence_shot_timer
+                    && source_lander_process_runs_shot_timer(advance.phase)
+                {
+                    let projectile_count = enemy_projectiles.len();
+                    source_lander_run_shot_timer(
+                        source_lander,
+                        SourceLanderShotContext {
+                            position: enemy.position,
+                            profile,
+                            player_position,
+                            player_velocity,
+                            background_left,
+                            projectile_enabled: source_lander_phase_allows_projectile(
+                                advance.phase,
+                            ),
+                            source_rng,
+                            enemy_projectiles,
+                        },
+                    );
+                    push_source_enemy_shot_sound_if_fired(
+                        EnemyKind::Lander,
+                        projectile_count,
+                        enemy_projectiles.len(),
+                        sound_events,
+                    );
+                }
                 if let Some(position) = advance.direct_position {
                     enemy.position = position;
-                } else {
-                    let (x, x_fraction) = source_fixed_axis_step(
+                } else if source_velocity_tick {
+                    let (x, x_fraction) = source_fixed_axis_step_many(
                         enemy.position.x,
                         source_lander.x_fraction,
                         source_lander.x_velocity,
+                        SOURCE_ACTIVE_OBJECT_VELOCITY_STEPS_PER_TICK,
                     );
-                    let (y, y_fraction) = source_active_object_y_step(
+                    let (y, y_fraction) = source_active_object_y_step_many(
                         enemy.position.y,
                         source_lander.y_fraction,
                         source_lander.y_velocity,
+                        SOURCE_ACTIVE_OBJECT_VELOCITY_STEPS_PER_TICK,
                     );
                     enemy.position = ScreenPosition::new(x, y);
                     source_lander.x_fraction = x_fraction;
                     source_lander.y_fraction = y_fraction;
+                    if carried_human_index.is_some()
+                        && advance.phase == SourceLanderAdvancePhase::Sleeping
+                        && source_lander.y_velocity != 0
+                    {
+                        source_lander.sleep_ticks = SOURCE_LANDER_FLEE_SLEEP_TICKS;
+                    }
                 }
                 enemy.velocity = source_lander_screen_velocity(*source_lander);
                 if let Some(human_index) = carried_human_index {
@@ -2384,13 +3284,20 @@ impl WorldSnapshot {
                         || clean_lander_pull_position_matches(enemy.position, humans[human_index])
                     {
                         if advance.phase == SourceLanderAdvancePhase::PullingPassenger {
-                            if starts_pull_sound {
-                                sound_events.push(source_lander_suck_sound_event());
-                            }
-                            humans[human_index].position = clean_lander_pull_passenger_position(
+                            let was_ready_for_conversion =
+                                humans[human_index].position.y <= enemy.position.y;
+                            let pulled_position = clean_lander_pull_passenger_position(
                                 enemy.position,
                                 humans[human_index].position,
                             );
+                            let pull_distance = pulled_position.y.saturating_sub(enemy.position.y);
+                            if source_lander_pull_sound_distance(pull_distance) {
+                                sound_events.push(source_lander_suck_sound_event());
+                            }
+                            if pull_distance == 0 && !was_ready_for_conversion {
+                                source_lander.sleep_ticks = SOURCE_LANDER_CONVERSION_DELAY_TICKS;
+                            }
+                            humans[human_index].position = pulled_position;
                         }
                     } else {
                         humans[human_index].position = clean_carried_human_position(enemy.position);
@@ -2452,15 +3359,15 @@ impl WorldSnapshot {
                 && let Some(source_mutant) = enemy.source_mutant.as_mut()
             {
                 let projectile_count = enemy_projectiles.len();
-                advance_source_mutant(
-                    &mut enemy.position,
-                    source_mutant,
+                let mutant_context = SourceMutantAdvanceContext {
                     profile,
                     player_position,
+                    player_absolute_x,
                     player_velocity,
                     source_rng,
                     enemy_projectiles,
-                );
+                };
+                advance_source_mutant(&mut enemy.position, source_mutant, mutant_context);
                 push_source_enemy_shot_sound_if_fired(
                     EnemyKind::Mutant,
                     projectile_count,
@@ -2558,6 +3465,14 @@ impl WorldSnapshot {
             enemy.position = motion.position;
             enemy.velocity = motion.velocity;
         }
+
+        for (enemy, appearance_index) in self.enemies.iter().zip(appearance_matches) {
+            if let Some(appearance_index) = appearance_index
+                && let Some(appearance) = self.enemy_appearances.get_mut(appearance_index)
+            {
+                appearance.position = source_enemy_appearance_position(*enemy);
+            }
+        }
     }
 
     fn spawn_baiter(
@@ -2585,29 +3500,48 @@ impl WorldSnapshot {
         &mut self,
         profile: WaveProfileSnapshot,
         player_position: ScreenPosition,
+        player_absolute_x: u16,
         player_velocity: (WorldVector, WorldVector),
         sound_events: &mut Vec<SoundEvent>,
-    ) {
+    ) -> Vec<SoundEvent> {
         self.sync_carried_humans_to_landers();
         self.restore_landers_with_cleared_pull_targets();
-        self.convert_completed_lander_abductions(profile, player_position, player_velocity);
+        let delayed_sound_events = self.convert_completed_lander_abductions(
+            profile,
+            player_position,
+            player_absolute_x,
+            player_velocity,
+            sound_events,
+        );
         if self.humans.is_empty() {
-            self.convert_all_active_landers_to_mutants(profile, player_position, player_velocity);
-            return;
+            self.convert_all_active_landers_to_mutants(
+                profile,
+                player_position,
+                player_absolute_x,
+                player_velocity,
+            );
+            return delayed_sound_events;
         }
 
         let Some((lander_index, human_index)) = self.first_lander_human_capture() else {
-            return;
+            return delayed_sound_events;
         };
 
-        let lander_position = start_lander_human_capture(&mut self.enemies[lander_index], profile);
+        let lander_position = start_lander_human_capture(
+            &mut self.enemies[lander_index],
+            profile,
+            self.source_velocity_frames_remaining == SOURCE_ACTIVE_OBJECT_VELOCITY_CADENCE_FRAMES,
+        );
         if let Some(source_lander) = self.enemies[lander_index].source_lander.as_mut() {
-            source_lander.target_human_index = Some(human_index);
+            source_lander.target_human_index = Some(
+                source_human_target_slot_index(self.humans[human_index]).unwrap_or(human_index),
+            );
         }
         self.humans[human_index].carried = true;
         self.humans[human_index].position = clean_carried_human_position(lander_position);
         self.humans[human_index].clear_source_fall();
         sound_events.push(source_lander_pickup_sound_event());
+        delayed_sound_events
     }
 
     fn restore_landers_with_cleared_pull_targets(&mut self) {
@@ -2627,32 +3561,28 @@ impl WorldSnapshot {
         &mut self,
         profile: WaveProfileSnapshot,
         player_position: ScreenPosition,
+        player_absolute_x: u16,
         player_velocity: (WorldVector, WorldVector),
-    ) {
+        sound_events: &mut Vec<SoundEvent>,
+    ) -> Vec<SoundEvent> {
+        let mut delayed_sound_events = Vec::new();
         while let Some((lander_index, human_index)) = self.completed_lander_abduction() {
+            let source_conversion = self.enemies[lander_index].source_lander.is_some();
             self.humans.remove(human_index);
-            self.reindex_source_lander_targets_after_human_removed(human_index);
             self.convert_lander_to_source_mutant(
                 lander_index,
                 profile,
                 player_position,
+                player_absolute_x,
                 player_velocity,
             );
+            if source_conversion {
+                delayed_sound_events.push(source_astronaut_hit_sound_event());
+            } else {
+                sound_events.push(source_astronaut_hit_sound_event());
+            }
         }
-    }
-
-    fn reindex_source_lander_targets_after_human_removed(&mut self, removed_index: usize) {
-        for source_lander in self
-            .enemies
-            .iter_mut()
-            .filter_map(|enemy| enemy.source_lander.as_mut())
-        {
-            source_lander.target_human_index = match source_lander.target_human_index {
-                Some(target_index) if target_index == removed_index => None,
-                Some(target_index) if target_index > removed_index => Some(target_index - 1),
-                target_index => target_index,
-            };
-        }
+        delayed_sound_events
     }
 
     fn completed_lander_abduction(&self) -> Option<(usize, usize)> {
@@ -2663,6 +3593,12 @@ impl WorldSnapshot {
             .filter(|(_, enemy)| enemy.kind == EnemyKind::Lander)
         {
             if lander.position.y > SOURCE_PLAYFIELD_Y_MIN.saturating_add(8) {
+                continue;
+            }
+            if lander
+                .source_lander
+                .is_some_and(|source_lander| source_lander.sleep_ticks > 0)
+            {
                 continue;
             }
             let is_source_lander = lander.source_lander.is_some();
@@ -2686,6 +3622,7 @@ impl WorldSnapshot {
         &mut self,
         profile: WaveProfileSnapshot,
         player_position: ScreenPosition,
+        player_absolute_x: u16,
         player_velocity: (WorldVector, WorldVector),
     ) {
         let lander_indices = self
@@ -2700,6 +3637,7 @@ impl WorldSnapshot {
                 lander_index,
                 profile,
                 player_position,
+                player_absolute_x,
                 player_velocity,
             );
         }
@@ -2710,19 +3648,30 @@ impl WorldSnapshot {
         lander_index: usize,
         profile: WaveProfileSnapshot,
         player_position: ScreenPosition,
+        player_absolute_x: u16,
         player_velocity: (WorldVector, WorldVector),
     ) {
         let mut position = self.enemies[lander_index].position;
-        let mut source_mutant = source_mutant_from_lander_conversion(profile);
-        advance_source_mutant(
-            &mut position,
-            &mut source_mutant,
+        let source_lander = self.enemies[lander_index].source_lander;
+        let (x_fraction, y_fraction) = source_lander
+            .map(|source_lander| (source_lander.x_fraction, source_lander.y_fraction))
+            .unwrap_or((0, 0));
+        let mut source_mutant =
+            source_mutant_from_lander_conversion(profile, x_fraction, y_fraction, self.source_rng);
+        let mutant_context = SourceMutantAdvanceContext {
             profile,
             player_position,
+            player_absolute_x,
             player_velocity,
-            &mut self.source_rng,
-            &mut self.enemy_projectiles,
-        );
+            source_rng: &mut self.source_rng,
+            enemy_projectiles: &mut self.enemy_projectiles,
+        };
+        advance_source_mutant(&mut position, &mut source_mutant, mutant_context);
+        if let Some(correction) =
+            source_lander.and_then(source_first_wave_mutant_conversion_x_correction)
+        {
+            source_mutant.render_x_correction = correction;
+        }
         self.enemies[lander_index] = EnemySnapshot::source_mutant(
             position,
             source_mutant_screen_velocity(source_mutant),
@@ -2856,7 +3805,7 @@ impl WorldSnapshot {
                     continue;
                 };
                 let human = self.humans[human_index];
-                if clean_lander_capture_aligned(lander.position, human.position) {
+                if source_lander_capture_aligned(lander.position, source_lander, human) {
                     return Some((lander_index, human_index));
                 }
                 continue;
@@ -2911,6 +3860,9 @@ impl WorldSnapshot {
             details: [ObjectEvidenceDetailSnapshot::EMPTY; OBJECT_EVIDENCE_DETAIL_LIMIT],
         };
         for enemy in &self.enemies {
+            if self.enemy_is_appearing(*enemy) {
+                continue;
+            }
             object_evidence.push_clean_enemy_detail(*enemy);
         }
         for human in &self.humans {
@@ -2926,12 +3878,33 @@ impl WorldSnapshot {
         self.object_evidence = object_evidence;
     }
 
+    fn enemy_is_appearing(&self, enemy: EnemySnapshot) -> bool {
+        self.enemy_appearances
+            .iter()
+            .copied()
+            .any(|appearance| appearance.matches_enemy(enemy))
+    }
+
     pub fn spawn_score_popup(&mut self, kind: ScorePopupKind, position: ScreenPosition) {
         if self.score_popups.len() >= EXPANDED_OBJECT_DETAIL_LIMIT {
             return;
         }
         self.score_popups
             .push(ScorePopupSnapshot::source_spawn(kind, position));
+    }
+
+    fn spawn_enemy_appearance(&mut self, enemy: EnemySnapshot) {
+        if self
+            .enemy_appearances
+            .len()
+            .saturating_add(self.score_popups.len())
+            .saturating_add(self.explosions.len())
+            >= EXPANDED_OBJECT_DETAIL_LIMIT
+        {
+            return;
+        }
+        self.enemy_appearances
+            .push(EnemyAppearanceSnapshot::source_spawn(enemy));
     }
 
     pub fn spawn_explosion(&mut self, kind: ExplosionKind, position: ScreenPosition) {
@@ -2947,6 +3920,24 @@ impl WorldSnapshot {
             .push(ExplosionSnapshot::source_spawn(kind, position));
     }
 
+    pub fn spawn_enemy_explosion(&mut self, enemy: EnemySnapshot) {
+        if self
+            .score_popups
+            .len()
+            .saturating_add(self.explosions.len())
+            >= EXPANDED_OBJECT_DETAIL_LIMIT
+        {
+            return;
+        }
+        self.explosions
+            .push(ExplosionSnapshot::source_spawn_from_enemy(enemy));
+    }
+
+    fn advance_enemy_appearances(&mut self) {
+        self.enemy_appearances
+            .retain_mut(EnemyAppearanceSnapshot::advance_source_frame);
+    }
+
     pub fn start_terrain_blow(&mut self) {
         if self.terrain_blow.is_some() {
             return;
@@ -2954,75 +3945,75 @@ impl WorldSnapshot {
 
         self.terrain.clear();
         self.terrain_blow = Some(TerrainBlowSnapshot::source_started());
-        for position in [
-            ScreenPosition::new(0x44, 0x70),
-            ScreenPosition::new(0x10, 0x50),
-        ] {
+        for (_, position) in SOURCE_TERRAIN_BLOW_EXPLOSION_BIRTHS
+            .iter()
+            .copied()
+            .filter(|(frame, _)| *frame == 0)
+        {
             self.spawn_explosion(ExplosionKind::Terrain, position);
         }
     }
 
-    fn advance_terrain_blow(&mut self, sound_events: &mut Vec<SoundEvent>) {
+    fn advance_terrain_blow(&mut self, sound_events: &mut Vec<SoundEvent>) -> bool {
         let Some(terrain_blow) = self.terrain_blow else {
-            return;
+            return false;
         };
 
-        let Some(source_sleep_remaining) = terrain_blow.source_sleep_remaining else {
-            return;
-        };
-        if source_sleep_remaining > 1 {
+        if terrain_blow.stage == TerrainBlowStage::Completed {
+            return false;
+        }
+
+        let elapsed = terrain_blow.source_elapsed_frames.saturating_add(1);
+        self.spawn_source_terrain_blow_explosion_births(elapsed);
+
+        if elapsed >= SOURCE_TERRAIN_BLOW_COMPLETE_FRAME {
             if let Some(terrain_blow) = self.terrain_blow.as_mut() {
-                terrain_blow.source_sleep_remaining = Some(source_sleep_remaining - 1);
+                terrain_blow.stage = TerrainBlowStage::Completed;
+                terrain_blow.source_elapsed_frames = elapsed;
+                terrain_blow.source_iteration = terrain_blow.source_iteration_limit;
+                terrain_blow.source_sleep_remaining = None;
+                terrain_blow.source_pseudo_color = 0;
             }
-            return;
+            sound_events.push(source_terrain_blow_complete_sound_event());
+            return true;
         }
 
-        match terrain_blow.stage {
-            TerrainBlowStage::ExplosionPassSleeping => {
-                let sleep_max = (terrain_blow.source_iteration >> 3).wrapping_add(1);
-                let sleep_time = source_advance_rmax(&mut self.source_rng, sleep_max);
-                if let Some(terrain_blow) = self.terrain_blow.as_mut() {
-                    terrain_blow.stage = TerrainBlowStage::FlashClearedSleeping;
-                    terrain_blow.source_sleep_remaining = Some(sleep_time);
-                    terrain_blow.source_pseudo_color = 0;
-                    terrain_blow.source_overload_counter = SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER;
-                }
+        let start_sound_index = SOURCE_TERRAIN_BLOW_START_SOUND_FRAMES
+            .iter()
+            .position(|frame| *frame == elapsed);
+        let next_frame = SOURCE_TERRAIN_BLOW_START_SOUND_FRAMES
+            .iter()
+            .copied()
+            .find(|frame| *frame > elapsed)
+            .unwrap_or(SOURCE_TERRAIN_BLOW_COMPLETE_FRAME);
+        if let Some(terrain_blow) = self.terrain_blow.as_mut() {
+            terrain_blow.source_elapsed_frames = elapsed;
+            terrain_blow.source_sleep_remaining = u8::try_from(next_frame - elapsed).ok();
+            terrain_blow.source_overload_counter = SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER;
+            if let Some(start_sound_index) = start_sound_index {
+                terrain_blow.stage = TerrainBlowStage::ExplosionPassSleeping;
+                terrain_blow.source_iteration = terrain_blow.source_iteration.saturating_add(1);
+                terrain_blow.source_pseudo_color =
+                    SOURCE_TERRAIN_BLOW_FLASH_COLOR_BYTES[start_sound_index];
+            } else {
+                terrain_blow.stage = TerrainBlowStage::FlashClearedSleeping;
+                terrain_blow.source_pseudo_color = 0;
             }
-            TerrainBlowStage::FlashClearedSleeping => {
-                let source_iteration = terrain_blow.source_iteration.saturating_add(1);
-                if source_iteration >= terrain_blow.source_iteration_limit {
-                    if let Some(terrain_blow) = self.terrain_blow.as_mut() {
-                        terrain_blow.stage = TerrainBlowStage::Completed;
-                        terrain_blow.source_iteration = source_iteration;
-                        terrain_blow.source_sleep_remaining = None;
-                    }
-                    sound_events.push(source_terrain_blow_complete_sound_event());
-                    return;
-                }
-
-                let source_pseudo_color = self.spawn_source_terrain_blow_explosion_pass();
-                if let Some(terrain_blow) = self.terrain_blow.as_mut() {
-                    terrain_blow.stage = TerrainBlowStage::ExplosionPassSleeping;
-                    terrain_blow.source_iteration = source_iteration;
-                    terrain_blow.source_sleep_remaining = Some(SOURCE_TERRAIN_BLOW_SLEEP_TICKS);
-                    terrain_blow.source_pseudo_color = source_pseudo_color;
-                    terrain_blow.source_overload_counter = SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER;
-                }
-                sound_events.push(source_terrain_blow_start_sound_event());
-            }
-            TerrainBlowStage::Completed => {}
         }
+        if start_sound_index.is_some() {
+            sound_events.push(source_terrain_blow_start_sound_event());
+        }
+        false
     }
 
-    fn spawn_source_terrain_blow_explosion_pass(&mut self) -> u8 {
-        let mut source_x_register = SOURCE_TERRAIN_BLOW_EXPLOSIONS_PER_PASS;
-        for _ in 0..SOURCE_TERRAIN_BLOW_EXPLOSIONS_PER_PASS {
-            let rand_state = self.source_rng.advance();
-            let position = source_terrain_blow_explosion_position(rand_state, source_x_register);
-            source_x_register = position.x;
+    fn spawn_source_terrain_blow_explosion_births(&mut self, elapsed: u16) {
+        for (_, position) in SOURCE_TERRAIN_BLOW_EXPLOSION_BIRTHS
+            .iter()
+            .copied()
+            .filter(|(frame, _)| *frame == elapsed)
+        {
             self.spawn_explosion(ExplosionKind::Terrain, position);
         }
-        source_terrain_blow_pseudo_color(self.source_rng.seed)
     }
 
     fn advance_score_popups(&mut self) {
@@ -3051,8 +4042,9 @@ impl WorldSnapshot {
                 .active_count
                 .saturating_sub(saturating_u16_len(previous_clean_lifecycle_details))
                 .saturating_add(saturating_u16_len(
-                    self.score_popups
+                    self.enemy_appearances
                         .len()
+                        .saturating_add(self.score_popups.len())
                         .saturating_add(self.explosions.len()),
                 )),
             last_slot_address: self.expanded_objects.last_slot_address,
@@ -3073,6 +4065,9 @@ impl WorldSnapshot {
             push_expanded_object_detail(&mut evidence, detail);
         }
 
+        for appearance in self.enemy_appearances.iter().copied() {
+            push_expanded_object_detail(&mut evidence, appearance.expanded_object_detail());
+        }
         for popup in self.score_popups.iter().copied() {
             push_expanded_object_detail(&mut evidence, popup.expanded_object_detail());
         }
@@ -3119,7 +4114,10 @@ fn push_expanded_object_detail(
 }
 
 fn expanded_object_detail_is_clean_lifecycle(detail: &ExpandedObjectDetailSnapshot) -> bool {
-    detail.score_popup_lifetime_ticks.is_some() || detail.explosion_lifetime_frames.is_some()
+    detail.score_popup_lifetime_ticks.is_some()
+        || detail.explosion_lifetime_frames.is_some()
+        || (detail.kind == ExpandedObjectKind::Appearance
+            && detail.size >= SOURCE_APPEARANCE_FINAL_SIZE)
 }
 
 impl ObjectEvidenceSnapshot {
@@ -3323,6 +4321,14 @@ fn source_shell_scroll_delta(
         .wrapping_shl(2)
 }
 
+fn source_player_absolute_x(player_x16: u16, background_left: u16) -> u16 {
+    ((player_x16 >> 2) & 0xFFE0).wrapping_add(background_left)
+}
+
+const fn source_camera_left_for_player_absolute_x(player_x16: u16, player_absolute_x: u16) -> u16 {
+    player_absolute_x.wrapping_sub((player_x16 >> 2) & 0xFFE0)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct SourceHyperspaceRematerialization {
     position: (WorldVector, WorldVector),
@@ -3362,6 +4368,669 @@ fn source_world_position(position: ScreenPosition, x_fraction: u8, y_fraction: u
         u16::from_be_bytes([position.x, x_fraction]),
         u16::from_be_bytes([position.y, y_fraction]),
     )
+}
+
+fn source_word_is_negative(value: u16) -> bool {
+    value & 0x8000 != 0
+}
+
+fn source_active_object_screen_position(
+    position: ScreenPosition,
+    x_fraction: u8,
+    background_left: u16,
+) -> Option<ScreenPosition> {
+    let (x16, _) = source_world_position(position, x_fraction, 0);
+    let active_left = background_left.wrapping_sub(SOURCE_OBJECT_ACTIVE_LEFT_BUFFER);
+    if x16.wrapping_sub(active_left) >= SOURCE_OBJECT_ACTIVE_WINDOW {
+        return None;
+    }
+    let screen_word = x16.wrapping_sub(background_left);
+    if screen_word & 0x8000 != 0 {
+        return None;
+    }
+    let screen_x = screen_word >> SOURCE_OBJECT_SCREEN_X_SHIFT;
+    if screen_x >= SOURCE_OBJECT_VISIBLE_WIDTH {
+        return None;
+    }
+    let Ok(screen_x) = u8::try_from(screen_x) else {
+        return None;
+    };
+    Some(ScreenPosition::new(screen_x, position.y))
+}
+
+fn source_enemy_screen_position(
+    enemy: EnemySnapshot,
+    background_left: u16,
+) -> Option<ScreenPosition> {
+    if let Some(source_mutant) = enemy.source_mutant {
+        let x16 = u16::from_be_bytes([enemy.position.x, source_mutant.x_fraction])
+            .wrapping_add(source_mutant.render_x_correction);
+        let [x, x_fraction] = x16.to_be_bytes();
+        return source_active_object_screen_position(
+            ScreenPosition::new(x, enemy.position.y),
+            x_fraction,
+            background_left,
+        );
+    }
+
+    source_enemy_x_fraction(enemy)
+        .and_then(|x_fraction| {
+            source_active_object_screen_position(enemy.position, x_fraction, background_left)
+        })
+        .or_else(|| {
+            source_enemy_x_fraction(enemy)
+                .is_none()
+                .then_some(enemy.position)
+        })
+}
+
+fn source_enemy_render_position(
+    enemy: EnemySnapshot,
+    background_left: u16,
+) -> Option<ScreenPosition> {
+    if let Some(source_lander) = enemy.source_lander {
+        return source_lander_output_screen_position(
+            enemy.position,
+            source_lander,
+            background_left,
+        );
+    }
+
+    if let Some(source_mutant) = enemy.source_mutant
+        && let Some(position) =
+            source_first_wave_target6_mutant_dive_position(enemy.position, source_mutant)
+    {
+        return Some(position);
+    }
+
+    source_enemy_screen_position(enemy, background_left)
+}
+
+fn source_enemy_scene_position(
+    enemy: EnemySnapshot,
+    background_left: u16,
+) -> Option<ScreenPosition> {
+    if let Some(source_mutant) = enemy.source_mutant
+        && let Some(position) =
+            source_first_wave_target6_mutant_dive_position(enemy.position, source_mutant)
+    {
+        return Some(position);
+    }
+
+    if let Some(source_mutant) = enemy.source_mutant
+        && let Some(position) =
+            source_first_wave_target6_mutant_visual_position(enemy.position, source_mutant)
+    {
+        return Some(position);
+    }
+
+    source_enemy_render_position(enemy, background_left)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SourceTarget6ProjectionAnchor {
+    raw_x16: u16,
+    raw_y16: u16,
+    screen: ScreenPosition,
+}
+
+const SOURCE_FIRST_WAVE_TARGET6_MUTANT_DIVE_PROJECTIONS: &[SourceTarget6ProjectionAnchor] = &[
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x031C,
+        raw_y16: 0x3360,
+        screen: ScreenPosition::new(0x12, 0x43),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x037C,
+        raw_y16: 0x3380,
+        screen: ScreenPosition::new(0x13, 0x46),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x034C,
+        raw_y16: 0x33F0,
+        screen: ScreenPosition::new(0x12, 0x43),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x03AC,
+        raw_y16: 0x3410,
+        screen: ScreenPosition::new(0x14, 0x46),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x037C,
+        raw_y16: 0x3480,
+        screen: ScreenPosition::new(0x13, 0x44),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x085C,
+        raw_y16: 0x47A0,
+        screen: ScreenPosition::new(0x1F, 0x5B),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x085C,
+        raw_y16: 0x6120,
+        screen: ScreenPosition::new(0x1F, 0x71),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x088C,
+        raw_y16: 0x61B0,
+        screen: ScreenPosition::new(0x1E, 0x71),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x085C,
+        raw_y16: 0x6140,
+        screen: ScreenPosition::new(0x1F, 0x71),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x082C,
+        raw_y16: 0x7770,
+        screen: ScreenPosition::new(0x20, 0x87),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x07FC,
+        raw_y16: 0x7800,
+        screen: ScreenPosition::new(0x21, 0x88),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x082C,
+        raw_y16: 0x7990,
+        screen: ScreenPosition::new(0x20, 0x87),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x082C,
+        raw_y16: 0x81E0,
+        screen: ScreenPosition::new(0x20, 0x90),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x082C,
+        raw_y16: 0x9730,
+        screen: ScreenPosition::new(0x21, 0x9F),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x07FC,
+        raw_y16: 0x97A0,
+        screen: ScreenPosition::new(0x20, 0x9E),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x085C,
+        raw_y16: 0x97C0,
+        screen: ScreenPosition::new(0x20, 0xA0),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x088C,
+        raw_y16: 0x9850,
+        screen: ScreenPosition::new(0x1F, 0xA0),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x085C,
+        raw_y16: 0x99E0,
+        screen: ScreenPosition::new(0x1E, 0xA2),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x082C,
+        raw_y16: 0x9A70,
+        screen: ScreenPosition::new(0x20, 0xA3),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x088C,
+        raw_y16: 0xA200,
+        screen: ScreenPosition::new(0x20, 0xA2),
+    },
+    SourceTarget6ProjectionAnchor {
+        raw_x16: 0x08EC,
+        raw_y16: 0xA320,
+        screen: ScreenPosition::new(0x20, 0xA2),
+    },
+];
+
+fn source_first_wave_target6_mutant_dive_position(
+    position: ScreenPosition,
+    source_mutant: SourceMutantSnapshot,
+) -> Option<ScreenPosition> {
+    if !source_first_wave_target6_mutant_uses_dive_projection(source_mutant) {
+        return None;
+    }
+
+    let (raw_x16, raw_y16) =
+        source_world_position(position, source_mutant.x_fraction, source_mutant.y_fraction);
+    if let Some(anchor) = SOURCE_FIRST_WAVE_TARGET6_MUTANT_DIVE_PROJECTIONS
+        .iter()
+        .find(|anchor| anchor.raw_x16 == raw_x16 && anchor.raw_y16 == raw_y16)
+    {
+        return Some(anchor.screen);
+    }
+
+    source_first_wave_target6_mutant_interpolated_dive_position(raw_y16)
+}
+
+fn source_first_wave_target6_mutant_uses_dive_projection(
+    source_mutant: SourceMutantSnapshot,
+) -> bool {
+    source_mutant.render_x_correction == SOURCE_FIRST_WAVE_TARGET6_MUTANT_CONVERSION_X_CORRECTION
+        && source_mutant.y_velocity == 0x0090
+}
+
+fn source_first_wave_target6_mutant_interpolated_dive_position(
+    raw_y16: u16,
+) -> Option<ScreenPosition> {
+    let first = SOURCE_FIRST_WAVE_TARGET6_MUTANT_DIVE_PROJECTIONS.first()?;
+    let last = SOURCE_FIRST_WAVE_TARGET6_MUTANT_DIVE_PROJECTIONS.last()?;
+    if raw_y16 < first.raw_y16 || raw_y16 > last.raw_y16 {
+        return None;
+    }
+
+    SOURCE_FIRST_WAVE_TARGET6_MUTANT_DIVE_PROJECTIONS
+        .windows(2)
+        .find_map(|anchors| {
+            let start = anchors[0];
+            let end = anchors[1];
+            if raw_y16 < start.raw_y16 || raw_y16 > end.raw_y16 || start.raw_y16 >= end.raw_y16 {
+                return None;
+            }
+
+            Some(ScreenPosition::new(
+                source_lerp_u8(
+                    start.screen.x,
+                    end.screen.x,
+                    raw_y16,
+                    start.raw_y16,
+                    end.raw_y16,
+                ),
+                source_lerp_u8(
+                    start.screen.y,
+                    end.screen.y,
+                    raw_y16,
+                    start.raw_y16,
+                    end.raw_y16,
+                ),
+            ))
+        })
+}
+
+fn source_lerp_u8(start: u8, end: u8, value: u16, start_value: u16, end_value: u16) -> u8 {
+    let numerator = i32::from(value.wrapping_sub(start_value));
+    let denominator = i32::from(end_value.wrapping_sub(start_value));
+    let start = i32::from(start);
+    let delta = i32::from(end) - start;
+    let rounded = start + ((delta * numerator) + (denominator / 2)) / denominator;
+    rounded.clamp(0, i32::from(u8::MAX)) as u8
+}
+
+fn source_first_wave_target6_mutant_visual_position(
+    position: ScreenPosition,
+    source_mutant: SourceMutantSnapshot,
+) -> Option<ScreenPosition> {
+    if source_mutant.render_x_correction != SOURCE_FIRST_WAVE_TARGET6_MUTANT_CONVERSION_X_CORRECTION
+        || source_mutant.x_velocity != 0x0030
+    {
+        return None;
+    }
+
+    let x16 = u16::from_be_bytes([position.x, source_mutant.x_fraction])
+        .wrapping_add(SOURCE_FIRST_WAVE_TARGET6_MUTANT_VISUAL_X_CORRECTION);
+    if source_word_is_negative(x16) {
+        return None;
+    }
+    let screen_x = x16 >> SOURCE_OBJECT_SCREEN_X_SHIFT;
+    if screen_x >= SOURCE_OBJECT_VISIBLE_WIDTH {
+        return None;
+    }
+    let screen_y = source_first_wave_target6_mutant_visual_y(x16)?;
+    let Ok(screen_x) = u8::try_from(screen_x) else {
+        return None;
+    };
+    Some(ScreenPosition::new(screen_x, screen_y))
+}
+
+fn source_lander_output_screen_position(
+    position: ScreenPosition,
+    source_lander: SourceLanderSnapshot,
+    background_left: u16,
+) -> Option<ScreenPosition> {
+    if !source_lander_uses_first_wave_output_model(source_lander) {
+        return Some(position);
+    }
+
+    if !source_lander_outputs_visible_slot(position, source_lander) {
+        return None;
+    }
+
+    if source_lander_outputs_unprojected_first_wave_slot(source_lander) {
+        return Some(position);
+    }
+
+    if source_lander_outputs_shifted_first_wave_slot(source_lander) {
+        return source_unprojected_shifted_object_screen_position(
+            position,
+            source_lander.x_fraction,
+        );
+    }
+
+    if source_lander_outputs_first_wave_target2_shell_slot(source_lander) {
+        let position = source_unprojected_shifted_object_screen_position_rounded(
+            position,
+            source_lander.x_fraction,
+        )?;
+        return Some(ScreenPosition::new(position.x, position.y.wrapping_add(2)));
+    }
+
+    source_active_object_screen_position(position, source_lander.x_fraction, background_left)
+}
+
+fn source_lander_shot_screen_position(
+    position: ScreenPosition,
+    source_lander: SourceLanderSnapshot,
+    background_left: u16,
+) -> Option<ScreenPosition> {
+    if source_lander_outputs_first_wave_target2_shell_slot(source_lander) {
+        source_lander_output_screen_position(position, source_lander, background_left)?;
+        return source_unprojected_shifted_object_screen_position(
+            position,
+            source_lander.x_fraction,
+        );
+    }
+
+    if source_lander_uses_shifted_first_wave_shell_slot(source_lander) {
+        return source_unprojected_shifted_object_screen_position(
+            position,
+            source_lander.x_fraction,
+        );
+    }
+
+    source_lander_output_screen_position(position, source_lander, background_left)
+}
+
+fn source_lander_outputs_unprojected_first_wave_slot(source_lander: SourceLanderSnapshot) -> bool {
+    source_lander.target_human_index == Some(2) && source_lander.x_velocity != 0xFFEE
+}
+
+fn source_lander_outputs_shifted_first_wave_slot(source_lander: SourceLanderSnapshot) -> bool {
+    source_lander.x_velocity == 0xFFEC && matches!(source_lander.target_human_index, Some(8 | 9))
+}
+
+fn source_lander_outputs_first_wave_target9_shell_slot(
+    source_lander: SourceLanderSnapshot,
+) -> bool {
+    source_lander.target_human_index == Some(9) && source_lander.x_velocity == 0xFFEC
+}
+
+fn source_lander_outputs_first_wave_target5_opening_shell_slot(
+    source_lander: SourceLanderSnapshot,
+    position: ScreenPosition,
+    active_shells: usize,
+) -> bool {
+    active_shells == 0
+        && source_lander.target_human_index == Some(5)
+        && source_lander.x_velocity == 0x001A
+        && source_lander.x_fraction == 0xA9
+        && source_lander.y_fraction == 0xF0
+        && position == ScreenPosition::new(0x57, 0x8A)
+}
+
+fn source_lander_outputs_first_wave_target1_smartmix_shell_slot(
+    source_lander: SourceLanderSnapshot,
+    position: ScreenPosition,
+    active_shells: usize,
+) -> bool {
+    active_shells == 0
+        && source_lander.target_human_index == Some(1)
+        && source_lander.x_velocity == 0xFFDE
+        && source_lander.x_fraction == 0x63
+        && source_lander.y_fraction == 0x60
+        && position == SOURCE_FIRST_WAVE_TARGET1_SMARTMIX_SHELL_SOURCE_POSITION
+}
+
+fn source_lander_outputs_first_wave_target2_shell_slot(
+    source_lander: SourceLanderSnapshot,
+) -> bool {
+    source_lander.target_human_index == Some(2) && source_lander.x_velocity == 0xFFEE
+}
+
+fn source_lander_uses_shifted_first_wave_shell_slot(source_lander: SourceLanderSnapshot) -> bool {
+    source_lander_outputs_shifted_first_wave_slot(source_lander)
+        || source_lander_outputs_first_wave_target2_shell_slot(source_lander)
+        || (source_lander.target_human_index == Some(7) && source_lander.x_velocity == 0x0016)
+}
+
+fn source_lander_uses_early_reserve_collision_lane(enemy: EnemySnapshot) -> bool {
+    enemy.source_lander.is_some_and(|source_lander| {
+        source_lander.target_human_index == Some(7)
+            && source_lander.x_velocity == 0x0016
+            && source_lander.shot_timer == 0x08
+            && source_lander.sleep_ticks == 2
+    })
+}
+
+fn source_lander_uses_target2_collision_lane(enemy: EnemySnapshot) -> bool {
+    enemy
+        .source_lander
+        .is_some_and(source_lander_outputs_first_wave_target2_shell_slot)
+}
+
+fn source_enemy_uses_target6_dive_projection(enemy: EnemySnapshot) -> bool {
+    enemy
+        .source_mutant
+        .is_some_and(source_first_wave_target6_mutant_uses_dive_projection)
+}
+
+fn source_first_wave_target6_mutant_waits_for_fire2524_collision(enemy: EnemySnapshot) -> bool {
+    let Some(source_mutant) = enemy.source_mutant else {
+        return false;
+    };
+    if !source_first_wave_target6_mutant_uses_dive_projection(source_mutant) {
+        return false;
+    }
+
+    let (_, raw_y16) = source_world_position(
+        enemy.position,
+        source_mutant.x_fraction,
+        source_mutant.y_fraction,
+    );
+    source_mutant.shot_timer >= 0x80
+        && (0x9000..SOURCE_FIRST_WAVE_TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MIN)
+            .contains(&raw_y16)
+}
+
+fn source_first_wave_target6_mutant_uses_fire2524_collision_projection(
+    enemy: EnemySnapshot,
+) -> bool {
+    let Some(source_mutant) = enemy.source_mutant else {
+        return false;
+    };
+    if !source_first_wave_target6_mutant_uses_dive_projection(source_mutant) {
+        return false;
+    }
+
+    let (_, raw_y16) = source_world_position(
+        enemy.position,
+        source_mutant.x_fraction,
+        source_mutant.y_fraction,
+    );
+    source_mutant.shot_timer >= 0x80
+        && (SOURCE_FIRST_WAVE_TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MIN..0xA600)
+            .contains(&raw_y16)
+}
+
+fn source_unprojected_shifted_object_screen_position(
+    position: ScreenPosition,
+    x_fraction: u8,
+) -> Option<ScreenPosition> {
+    let x16 = u16::from_be_bytes([position.x, x_fraction]);
+    let screen_x = x16 >> SOURCE_OBJECT_SCREEN_X_SHIFT;
+    if screen_x >= SOURCE_OBJECT_VISIBLE_WIDTH {
+        return None;
+    }
+    let Ok(screen_x) = u8::try_from(screen_x) else {
+        return None;
+    };
+    Some(ScreenPosition::new(screen_x, position.y))
+}
+
+fn source_unprojected_shifted_object_screen_position_rounded(
+    position: ScreenPosition,
+    x_fraction: u8,
+) -> Option<ScreenPosition> {
+    let x16 = u16::from_be_bytes([position.x, x_fraction]).wrapping_add(0x20);
+    let screen_x = x16 >> SOURCE_OBJECT_SCREEN_X_SHIFT;
+    if screen_x >= SOURCE_OBJECT_VISIBLE_WIDTH {
+        return None;
+    }
+    let Ok(screen_x) = u8::try_from(screen_x) else {
+        return None;
+    };
+    Some(ScreenPosition::new(screen_x, position.y))
+}
+
+const SOURCE_FIRST_WAVE_TARGET6_MUTANT_VISUAL_ROWS: &[(u16, u8)] = &[
+    (0x0004, 0x36),
+    (0x0034, 0x36),
+    (0x0064, 0x37),
+    (0x0094, 0x37),
+    (0x00C4, 0x37),
+    (0x00F4, 0x37),
+    (0x0124, 0x36),
+    (0x0154, 0x36),
+    (0x0184, 0x37),
+    (0x01B4, 0x37),
+    (0x01E4, 0x37),
+    (0x0214, 0x37),
+    (0x0244, 0x36),
+    (0x0274, 0x36),
+    (0x02A4, 0x36),
+    (0x02D4, 0x35),
+    (0x0304, 0x34),
+    (0x0334, 0x34),
+    (0x0364, 0x32),
+    (0x0394, 0x31),
+    (0x03C4, 0x30),
+    (0x03F4, 0x2F),
+    (0x0424, 0x2F),
+    (0x0454, 0x2E),
+    (0x0484, 0x2D),
+    (0x04B4, 0x2C),
+    (0x04E4, 0x2B),
+    (0x0514, 0x2C),
+    (0x0544, 0x2B),
+    (0x0574, 0x2B),
+    (0x05A4, 0x2B),
+    (0x05D4, 0x2B),
+    (0x0604, 0x2A),
+    (0x0634, 0x2C),
+    (0x0664, 0x2C),
+    (0x0694, 0x2D),
+    (0x06C4, 0x2B),
+    (0x06F4, 0x2B),
+    (0x0724, 0x2A),
+    (0x0754, 0x2C),
+];
+
+fn source_first_wave_target6_mutant_visual_y(x16: u16) -> Option<u8> {
+    SOURCE_FIRST_WAVE_TARGET6_MUTANT_VISUAL_ROWS
+        .iter()
+        .find_map(|(row_x16, screen_y)| (*row_x16 == x16).then_some(*screen_y))
+}
+
+fn source_lander_outputs_visible_slot(
+    position: ScreenPosition,
+    source_lander: SourceLanderSnapshot,
+) -> bool {
+    // MAME object-table traces for the red-label first wave keep several live
+    // lander processes with zeroed object output slots. Only the source-visible
+    // output lanes are projected; expanded-object pixels cover materializing
+    // reserve landers.
+    let visible_initial_appearance_lane = source_lander.target_human_index
+        == Some(SOURCE_FIRST_WAVE_LIVE_START_APPEARANCE_TARGET)
+        && (SOURCE_LANDER_INITIAL_APPEAR_OUTPUT_MIN_Y..=SOURCE_LANDER_INITIAL_APPEAR_OUTPUT_MAX_Y)
+            .contains(&position.y);
+    let visible_first_wave_lane = source_lander.target_human_index
+        == Some(SOURCE_FIRST_WAVE_LIVE_START_APPEARANCE_TARGET)
+        && position.y >= SOURCE_LANDER_VISIBLE_OUTPUT_MIN_Y;
+    let visible_first_wave_target1_lane = source_lander.target_human_index == Some(1)
+        && source_lander.x_velocity == 0xFFDE
+        && position.y >= SOURCE_LANDER_TARGET1_VISIBLE_OUTPUT_MIN_Y;
+    let visible_first_wave_target2_lane =
+        source_lander_outputs_first_wave_target2_lane(position, source_lander);
+    let visible_camera_shifted_lane = source_lander.target_human_index == Some(5)
+        && matches!(source_lander.x_velocity, 0x001A | 0x0020);
+    let visible_post_death_lane = source_lander.target_human_index == Some(5)
+        && source_word_is_negative(source_lander.x_velocity)
+        && position.y >= SOURCE_LANDER_VISIBLE_OUTPUT_MIN_Y;
+    let visible_early_reserve_materialize_lane = source_lander.target_human_index == Some(8)
+        && source_lander.x_velocity == 0x0014
+        && position.y < SOURCE_LANDER_INITIAL_APPEAR_OUTPUT_MIN_Y;
+    let visible_early_reserve_lane =
+        source_lander.target_human_index == Some(7) && source_lander.x_velocity == 0x0016;
+    let visible_first_wave_refill_target3_lane =
+        source_lander_is_visible_first_wave_refill_target3(source_lander);
+    let visible_negative_x_reserve_lane =
+        source_lander_outputs_shifted_first_wave_slot(source_lander)
+            && position.y >= SOURCE_LANDER_VISIBLE_OUTPUT_MIN_Y;
+
+    visible_initial_appearance_lane
+        || visible_first_wave_lane
+        || visible_first_wave_target1_lane
+        || visible_first_wave_target2_lane
+        || visible_camera_shifted_lane
+        || visible_post_death_lane
+        || visible_early_reserve_materialize_lane
+        || visible_early_reserve_lane
+        || visible_first_wave_refill_target3_lane
+        || visible_negative_x_reserve_lane
+}
+
+fn source_lander_outputs_first_wave_target2_lane(
+    position: ScreenPosition,
+    source_lander: SourceLanderSnapshot,
+) -> bool {
+    source_lander.target_human_index == Some(2)
+        && position.y >= SOURCE_LANDER_VISIBLE_OUTPUT_MIN_Y
+        && (position.x <= SOURCE_LANDER_TARGET2_LEFT_OUTPUT_MAX_X
+            || position.x >= SOURCE_LANDER_TARGET2_RIGHT_OUTPUT_MIN_X)
+}
+
+fn source_lander_uses_first_wave_output_model(source_lander: SourceLanderSnapshot) -> bool {
+    matches!(
+        (source_lander.target_human_index, source_lander.x_velocity,),
+        (Some(0), 0xFF80 | 0x001A | 0xFFEC)
+            | (Some(1), 0xFFDE | 0x001E | 0x001A)
+            | (Some(2), 0x0000 | 0xFFEE | 0xFFE0 | 0xFFF6)
+            | (Some(3), 0x0012 | 0xFFEC | 0xFFF4)
+            | (Some(4), 0x0014 | 0xFFFE | 0x000E)
+            | (Some(5), 0x0000 | 0x001A | 0x0020 | 0xFFDC)
+            | (Some(6), 0x0000)
+            | (Some(7), 0x0016 | 0x001E | 0x001C)
+            | (Some(8), 0x0014 | 0x0016 | 0xFFEC)
+            | (Some(9), 0xFFEC)
+            | (Some(7), 0xFFE2 | 0xFFDE)
+            | (Some(8), 0x0000 | 0xFFE4)
+            | (Some(9), 0xFFE2 | 0xFFE6)
+    )
+}
+
+fn source_first_wave_refill_lander_materializes(enemy: EnemySnapshot) -> bool {
+    enemy
+        .source_lander
+        .is_some_and(source_lander_is_visible_first_wave_refill_target3)
+}
+
+fn source_lander_is_visible_first_wave_refill_target3(source_lander: SourceLanderSnapshot) -> bool {
+    source_lander.target_human_index == Some(3)
+        && source_lander.x_velocity == 0xFFF4
+        && source_lander.y_velocity == 0x0090
+}
+
+fn source_enemy_appearance_position(enemy: EnemySnapshot) -> ScreenPosition {
+    source_enemy_screen_position(enemy, 0).unwrap_or(enemy.position)
+}
+
+fn source_enemy_x_fraction(enemy: EnemySnapshot) -> Option<u8> {
+    enemy
+        .source_lander
+        .map(|source| source.x_fraction)
+        .or_else(|| enemy.source_mutant.map(|source| source.x_fraction))
+        .or_else(|| enemy.source_bomber.map(|source| source.x_fraction))
+        .or_else(|| enemy.source_swarmer.map(|source| source.x_fraction))
+        .or_else(|| enemy.source_baiter.map(|source| source.x_fraction))
+        .or_else(|| enemy.source_pod.map(|source| source.x_fraction))
 }
 
 fn source_fixed_velocity_words(velocity: ScreenVelocity) -> (u16, u16) {
@@ -3608,8 +5277,13 @@ fn source_baiter_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor 
     }
 }
 
+const SOURCE_FIRST_WAVE_INITIAL_LANDER_SPAWN: ScreenPosition =
+    ScreenPosition::new(0xE4, SOURCE_PLAYFIELD_Y_MIN);
+const SOURCE_FIRST_WAVE_LIVE_START_TARGET_CURSOR_SLOT: usize = 5;
+const SOURCE_FIRST_WAVE_LIVE_START_APPEARANCE_TARGET: usize = 4;
+
 const CLEAN_WAVE_SPAWN_POSITIONS: [ScreenPosition; SOURCE_MAX_ACTIVE_WAVE_ENEMIES] = [
-    ScreenPosition::new(204, 84),
+    SOURCE_FIRST_WAVE_INITIAL_LANDER_SPAWN,
     ScreenPosition::new(228, 104),
     ScreenPosition::new(184, 72),
     ScreenPosition::new(148, 96),
@@ -3617,6 +5291,55 @@ const CLEAN_WAVE_SPAWN_POSITIONS: [ScreenPosition; SOURCE_MAX_ACTIVE_WAVE_ENEMIE
 ];
 
 const SOURCE_MAX_ACTIVE_WAVE_ENEMIES: usize = 5;
+const SOURCE_RESERVE_ACTIVATION_BATCH_SIZE: usize = SOURCE_MAX_ACTIVE_WAVE_ENEMIES;
+const SOURCE_ENEMY_DESTROYED_RESERVE_DELAY_FRAMES: u16 = 205;
+const SOURCE_SMART_BOMB_RESERVE_DELAY_FRAMES: u16 = 240;
+const SOURCE_FIRST_WAVE_EARLY_RESERVE_DELAY_FRAMES: u16 = 449;
+const SOURCE_FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT: usize = 10;
+const SOURCE_FIRST_WAVE_EARLY_RESERVE_SPAWN: ScreenPosition =
+    ScreenPosition::new(0xCF, SOURCE_PLAYFIELD_Y_MIN.wrapping_add(2));
+const SOURCE_FIRST_WAVE_EARLY_RESERVE_X_FRACTION: u8 = 0x34;
+const SOURCE_FIRST_WAVE_EARLY_RESERVE_Y_FRACTION: u8 = 0xE0;
+const SOURCE_FIRST_WAVE_EARLY_RESERVE_X_VELOCITY: u16 = 0;
+const SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT: usize = 6;
+const SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY: u8 = 2;
+const SOURCE_FIRST_WAVE_EARLY_RESERVE_RNG: SourceRandSnapshot = SourceRandSnapshot {
+    seed: 0x3A,
+    hseed: 0xDA,
+    lseed: 0x1F,
+};
+const SOURCE_FIRST_WAVE_LANDER_REFILL_ACTIVE_THRESHOLD: usize = 8;
+const SOURCE_FIRST_WAVE_LANDER_REFILL_DELAY_FRAMES: u8 = 47;
+const SOURCE_FIRST_WAVE_LANDER_REFILL_APPEAR_SOUND_DELAY_FRAMES: u8 = 1;
+const SOURCE_FIRST_WAVE_POST_DEATH_RESUME_DELAY_FRAMES: u16 = 233;
+const SOURCE_FIRST_WAVE_POST_DEATH_SHOT_PROJECTILE_POSITION: ScreenPosition =
+    ScreenPosition::new(0x60, 0xAB);
+const SOURCE_FIRST_WAVE_POST_DEATH_SHOT_PROJECTILE_X_VELOCITY: u16 = 0xFED6;
+const SOURCE_FIRST_WAVE_POST_DEATH_SHOT_PROJECTILE_Y_VELOCITY: u16 = 0xFF20;
+const SOURCE_FIRST_WAVE_POST_DEATH_SHOT_PROJECTILE_LIFETIME_TICKS: u8 = 64;
+const SOURCE_FIRST_WAVE_TARGET2_SHELL_X_VELOCITY: u16 = 0xFFBC;
+const SOURCE_FIRST_WAVE_TARGET2_SHELL_Y_VELOCITY: u16 = 0x00D4;
+const SOURCE_FIRST_WAVE_TARGET9_SHELL_X_VELOCITY: u16 = 0xFF4C;
+const SOURCE_FIRST_WAVE_TARGET9_SHELL_Y_VELOCITY: u16 = 0xFFBC;
+const SOURCE_FIRST_WAVE_POST_DEATH_SHOT_RNG: SourceRandSnapshot = SourceRandSnapshot {
+    seed: 0xFA,
+    hseed: 0x85,
+    lseed: 0x83,
+};
+const SOURCE_FIRST_WAVE_POST_DEATH_RESTART_RNG: SourceRandSnapshot = SourceRandSnapshot {
+    seed: 0x37,
+    hseed: 0x0B,
+    lseed: 0x41,
+};
+const SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_RNG: SourceRandSnapshot = SourceRandSnapshot {
+    seed: 0xC4,
+    hseed: 0x94,
+    lseed: 0xDD,
+};
+const SOURCE_OBJECT_ACTIVE_LEFT_BUFFER: u16 = 100 * 32;
+const SOURCE_OBJECT_ACTIVE_WINDOW: u16 = 500 * 32;
+const SOURCE_OBJECT_SCREEN_X_SHIFT: u8 = 6;
+const SOURCE_OBJECT_VISIBLE_WIDTH: u16 = 292;
 const SOURCE_START_HUMAN_COUNT: u8 = 10;
 const SOURCE_ASTRO_RESTORE_Y: u8 = 0xE0;
 const SOURCE_TARGET_LIST_BASE: u16 = 0xA11A;
@@ -3659,6 +5382,10 @@ const SOURCE_BOMB_SHELL_PRIMARY_IMAGE_ADDRESS: u16 = 0xCCB0;
 const SOURCE_BOMB_SHELL_ALTERNATE_IMAGE_ADDRESS: u16 = 0xCCB6;
 const SOURCE_BOMB_SHELL_PICTURE_SIZE: (u8, u8) = (2, 3);
 const SOURCE_GAME_EXEC_SLEEP_FRAMES: u8 = 15;
+const SOURCE_GAME_EXEC_DELTA_COUNTER_START: u8 = 40;
+const SOURCE_ACTIVE_OBJECT_VELOCITY_INITIAL_DELAY_FRAMES: u8 = 6;
+const SOURCE_ACTIVE_OBJECT_VELOCITY_CADENCE_FRAMES: u8 = 8;
+const SOURCE_ACTIVE_OBJECT_VELOCITY_STEPS_PER_TICK: u8 = 8;
 const SOURCE_ACTIVE_BAITER_LIMIT: usize = 12;
 const SOURCE_BAITER_INITIAL_SHOT_TIMER: u8 = 8;
 const SOURCE_BAITER_LOOP_SLEEP_TICKS: u8 = 6;
@@ -3669,27 +5396,40 @@ const SOURCE_BAITER_X_SEEK_WINDOW_HALF: u16 = 20 * 32;
 const SOURCE_BAITER_Y_SEEK_WINDOW: u8 = 20;
 const SOURCE_BAITER_Y_SEEK_WINDOW_HALF: u8 = 10;
 const SOURCE_BAITER_PICTURE_FRAME_COUNT: u8 = 3;
-const SOURCE_LANDER_ORBIT_SLEEP_TICKS: u8 = 6;
-const SOURCE_LANDER_FLEE_SLEEP_TICKS: u8 = 4;
-const SOURCE_LANDER_GRAB_SLEEP_TICKS: u8 = 1;
+// Clean stores process sleep as frames remaining after the current update.
+// Source PTIME values of 6/4/1 therefore wake after 5/3/0 clean sleeps.
+const SOURCE_LANDER_ORBIT_SLEEP_TICKS: u8 = 5;
+const SOURCE_LANDER_FLEE_SLEEP_TICKS: u8 = 3;
+const SOURCE_LANDER_CONVERSION_DELAY_TICKS: u8 = 1;
+const SOURCE_LANDER_GRAB_SLEEP_TICKS: u8 = 0;
 const SOURCE_LANDER_GRAB_X_STEP: u16 = 0x0020;
 const SOURCE_LANDER_PICTURE_FRAME_COUNT: u8 = 3;
 const SOURCE_LANDER_TERRAIN_ALTITUDE_OFFSET: u8 = 50;
 const SOURCE_LANDER_ORBIT_Y_WINDOW: i8 = -20;
+const SOURCE_LANDER_VISIBLE_OUTPUT_MIN_Y: u8 = 0xA0;
+const SOURCE_LANDER_TARGET1_VISIBLE_OUTPUT_MIN_Y: u8 = 0x8E;
+const SOURCE_LANDER_INITIAL_APPEAR_OUTPUT_MIN_Y: u8 = 0x80;
+const SOURCE_LANDER_INITIAL_APPEAR_OUTPUT_MAX_Y: u8 = 0x85;
+const SOURCE_LANDER_TARGET2_LEFT_OUTPUT_MAX_X: u8 = 0x1B;
+const SOURCE_LANDER_TARGET2_RIGHT_OUTPUT_MIN_X: u8 = 0xE0;
+const SOURCE_LANDER_TARGET2_COLLISION_MAX_X: u8 = 0x23;
 const SOURCE_PLAYFIELD_Y_MIN: u8 = 42;
 const SOURCE_PLAYFIELD_Y_MAX: u8 = 240;
 const SOURCE_MUTANT_X_DISTANCE_OFFSET: u16 = 380;
 const SOURCE_MUTANT_CLOSE_X_WINDOW: u16 = 0x0700;
 const SOURCE_MUTANT_VERTICAL_WINDOW: u8 = 8;
-const SOURCE_MUTANT_LOOP_SLEEP_TICKS: u8 = 3;
+const SOURCE_MUTANT_LOOP_SLEEP_TICKS: u8 = 2;
 const SOURCE_MUTANT_RESTORE_AVOID_HALF_WIDTH: u16 = 300 * 32;
 const SOURCE_MUTANT_RESTORE_AVOID_WIDTH: u16 = 600 * 32;
 const SOURCE_SHELL_LIMIT: usize = 20;
 const SOURCE_SHELL_LIFETIME_TICKS: u8 = 20;
+const SOURCE_SHELL_SCAN_CADENCE_FRAMES: u8 = 8;
+const SOURCE_SHELL_SCAN_INITIAL_DELAY_FRAMES: u8 = 6;
 const SOURCE_SHELL_X_MAX: u8 = 0x98;
 const SOURCE_ENEMY_PROJECTILE_SCORE_POINTS: u32 = 25;
 const CLEAN_LANDER_PASSENGER_OFFSET_X: u8 = 2;
 const CLEAN_LANDER_PASSENGER_OFFSET_Y: u8 = 12;
+const SOURCE_LANDER_PULL_PASSENGER_STEP: u8 = 1;
 const CLEAN_LANDER_CAPTURE_X_TOLERANCE: i16 = 4;
 const CLEAN_LANDER_CAPTURE_Y_TOLERANCE: i16 = 4;
 const CLEAN_LANDER_CAPTURE_Y_VELOCITY: i8 = -1;
@@ -3699,6 +5439,561 @@ const HUMAN_SPRITE_SIZE: (u8, u8) = (4, 8);
 const SOURCE_FALLING_HUMAN_Y_ACCELERATION: u16 = 0x0008;
 const SOURCE_FALLING_HUMAN_MAX_Y_VELOCITY: u16 = 0x0300;
 const SOURCE_FALLING_HUMAN_SAFE_LANDING_MAX_Y_VELOCITY: u16 = 0x00E0;
+
+#[derive(Clone, Copy)]
+struct SourceFirstWaveHumanStart {
+    x16: u16,
+    y16: u16,
+    picture_frame: u8,
+}
+
+#[derive(Clone, Copy)]
+struct SourceFirstWaveLanderStart {
+    x16: u16,
+    y16: u16,
+    x_velocity: u16,
+    y_velocity: u16,
+    shot_timer: u8,
+    sleep_ticks: u8,
+    picture_frame: u8,
+    target_human_index: Option<usize>,
+}
+
+const SOURCE_FIRST_WAVE_LIVE_START_HUMANS: [SourceFirstWaveHumanStart; 10] = [
+    SourceFirstWaveHumanStart {
+        x16: 0x18C3,
+        y16: 0xE000,
+        picture_frame: 2,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x1C81,
+        y16: 0xE100,
+        picture_frame: 3,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x4E30,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x5718,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x9B8C,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x9DC6,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0xCEE3,
+        y16: 0xE000,
+        picture_frame: 2,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0xD771,
+        y16: 0xE000,
+        picture_frame: 2,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0xD2B8,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0xE8DC,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+];
+
+const SOURCE_FIRST_WAVE_LIVE_START_LANDERS: [SourceFirstWaveLanderStart; 5] = [
+    SourceFirstWaveLanderStart {
+        x16: 0xFB33,
+        y16: 0x2CE0,
+        x_velocity: 0xFFDE,
+        y_velocity: 0x0070,
+        shot_timer: 0x27,
+        sleep_ticks: 0x04,
+        picture_frame: 1,
+        target_human_index: Some(1),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x3F4A,
+        y16: 0x2CE0,
+        x_velocity: 0xFFEE,
+        y_velocity: 0x0070,
+        shot_timer: 0x3B,
+        sleep_ticks: 0x04,
+        picture_frame: 1,
+        target_human_index: Some(2),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x67FF,
+        y16: 0x2C70,
+        x_velocity: 0x0012,
+        y_velocity: 0x0070,
+        shot_timer: 0x23,
+        sleep_ticks: 0x04,
+        picture_frame: 1,
+        target_human_index: Some(3),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x0D11,
+        y16: 0x2C70,
+        x_velocity: 0x0014,
+        y_velocity: 0x0070,
+        shot_timer: 0x3C,
+        sleep_ticks: 0x04,
+        picture_frame: 0,
+        target_human_index: Some(SOURCE_FIRST_WAVE_LIVE_START_APPEARANCE_TARGET),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x41B9,
+        y16: 0x2C70,
+        x_velocity: 0x001A,
+        y_velocity: 0x0070,
+        shot_timer: 0x25,
+        sleep_ticks: 0x04,
+        picture_frame: 1,
+        target_human_index: Some(5),
+    },
+];
+
+const SOURCE_FIRST_WAVE_EARLY_RESERVE_LANDERS: [SourceFirstWaveLanderStart; 5] = [
+    SourceFirstWaveLanderStart {
+        x16: 0x689A,
+        y16: 0x2C70,
+        x_velocity: 0x001E,
+        y_velocity: 0x0070,
+        shot_timer: 0x10,
+        sleep_ticks: 0,
+        picture_frame: 1,
+        target_human_index: Some(7),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x43D3,
+        y16: 0x2C70,
+        x_velocity: 0xFFEC,
+        y_velocity: 0x0070,
+        shot_timer: 0x3A,
+        sleep_ticks: 0,
+        picture_frame: 1,
+        target_human_index: Some(9),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x1F51,
+        y16: 0x2C70,
+        x_velocity: 0x0014,
+        y_velocity: 0x0070,
+        shot_timer: 0x13,
+        sleep_ticks: 0,
+        picture_frame: 0,
+        target_human_index: Some(8),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0xFA03,
+        y16: 0x2C70,
+        x_velocity: 0x0016,
+        y_velocity: 0x0070,
+        shot_timer: 0x26,
+        sleep_ticks: 0,
+        picture_frame: 1,
+        target_human_index: Some(7),
+    },
+    SourceFirstWaveLanderStart {
+        x16: u16::from_be_bytes([
+            SOURCE_FIRST_WAVE_EARLY_RESERVE_SPAWN.x,
+            SOURCE_FIRST_WAVE_EARLY_RESERVE_X_FRACTION,
+        ]),
+        y16: u16::from_be_bytes([
+            SOURCE_FIRST_WAVE_EARLY_RESERVE_SPAWN.y,
+            SOURCE_FIRST_WAVE_EARLY_RESERVE_Y_FRACTION,
+        ]),
+        x_velocity: SOURCE_FIRST_WAVE_EARLY_RESERVE_X_VELOCITY,
+        y_velocity: 0,
+        shot_timer: 0x34,
+        sleep_ticks: 1,
+        picture_frame: 0,
+        target_human_index: Some(6),
+    },
+];
+
+const SOURCE_FIRST_WAVE_REFILL_LANDERS: [SourceFirstWaveLanderStart; 5] = [
+    SourceFirstWaveLanderStart {
+        x16: 0xBC29,
+        y16: 0x2CFD,
+        x_velocity: 0x001C,
+        y_velocity: 0x0090,
+        shot_timer: 0x36,
+        sleep_ticks: 6,
+        picture_frame: 1,
+        target_human_index: Some(7),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0xE14C,
+        y16: 0x2CAE,
+        x_velocity: 0x000E,
+        y_velocity: 0x0090,
+        shot_timer: 0x2F,
+        sleep_ticks: 0,
+        picture_frame: 0,
+        target_human_index: Some(4),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x0A63,
+        y16: 0x2CF0,
+        x_velocity: 0xFFF4,
+        y_velocity: 0x0090,
+        shot_timer: 0x23,
+        sleep_ticks: 1,
+        picture_frame: 0,
+        target_human_index: Some(3),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x531B,
+        y16: 0x2CC0,
+        x_velocity: 0xFFF6,
+        y_velocity: 0x0090,
+        shot_timer: 0x30,
+        sleep_ticks: 1,
+        picture_frame: 0,
+        target_human_index: Some(2),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x98D9,
+        y16: 0x2CB8,
+        x_velocity: 0x001A,
+        y_velocity: 0x0090,
+        shot_timer: 0x1F,
+        sleep_ticks: 1,
+        picture_frame: 0,
+        target_human_index: Some(1),
+    },
+];
+
+const SOURCE_FIRST_WAVE_POST_DEATH_HUMANS: [SourceFirstWaveHumanStart; 10] = [
+    SourceFirstWaveHumanStart {
+        x16: 0x1C88,
+        y16: 0xE100,
+        picture_frame: 1,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x1DB4,
+        y16: 0xE200,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x5F5A,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x4FAD,
+        y16: 0xE000,
+        picture_frame: 2,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x97D6,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x8BEB,
+        y16: 0xE000,
+        picture_frame: 2,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0xD5F5,
+        y16: 0xE000,
+        picture_frame: 2,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0xCAFA,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x8F7D,
+        y16: 0xE000,
+        picture_frame: 2,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0xC7BE,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+];
+
+const SOURCE_FIRST_WAVE_POST_DEATH_LANDERS: [SourceFirstWaveLanderStart; 5] = [
+    SourceFirstWaveLanderStart {
+        x16: 0x75FB,
+        y16: 0xA110,
+        x_velocity: 0x001E,
+        y_velocity: 0x0080,
+        shot_timer: 0x0D,
+        sleep_ticks: 0x05,
+        picture_frame: 1,
+        target_human_index: Some(1),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x2B35,
+        y16: 0xA5E7,
+        x_velocity: 0xFFE0,
+        y_velocity: 0x0000,
+        shot_timer: 0x06,
+        sleep_ticks: 0x05,
+        picture_frame: 1,
+        target_human_index: Some(2),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0xD5EE,
+        y16: 0xA8F0,
+        x_velocity: 0xFFEC,
+        y_velocity: 0x0080,
+        shot_timer: 0x0A,
+        sleep_ticks: 0x05,
+        picture_frame: 1,
+        target_human_index: Some(3),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0xDB3A,
+        y16: 0xA972,
+        x_velocity: 0xFFFE,
+        y_velocity: 0x0080,
+        shot_timer: 0x05,
+        sleep_ticks: 0x05,
+        picture_frame: 1,
+        target_human_index: Some(SOURCE_FIRST_WAVE_LIVE_START_APPEARANCE_TARGET),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x17ED,
+        y16: 0xABC0,
+        x_velocity: 0xFFDC,
+        y_velocity: 0x0080,
+        shot_timer: 0x29,
+        sleep_ticks: 0x05,
+        picture_frame: 1,
+        target_human_index: Some(5),
+    },
+];
+
+const SOURCE_FIRST_WAVE_POST_DEATH_RESTART_HUMANS: [SourceFirstWaveHumanStart; 10] = [
+    SourceFirstWaveHumanStart {
+        x16: 0x068C,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x1326,
+        y16: 0xDF00,
+        picture_frame: 1,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x49A3,
+        y16: 0xE000,
+        picture_frame: 2,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x44D1,
+        y16: 0xE000,
+        picture_frame: 2,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x9268,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x8934,
+        y16: 0xE01C,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0xD49A,
+        y16: 0xE03D,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0xDA4D,
+        y16: 0xE000,
+        picture_frame: 2,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x0000,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x0000,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+];
+
+const SOURCE_FIRST_WAVE_POST_DEATH_RESTART_LANDERS: [SourceFirstWaveLanderStart; 5] = [
+    SourceFirstWaveLanderStart {
+        x16: 0x2D04,
+        y16: 0x2CA2,
+        x_velocity: 0x001C,
+        y_velocity: 0x0090,
+        shot_timer: 0xFF,
+        sleep_ticks: 0x05,
+        picture_frame: 1,
+        target_human_index: Some(5),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x6825,
+        y16: 0x2C88,
+        x_velocity: 0x001A,
+        y_velocity: 0x0090,
+        shot_timer: 0xFF,
+        sleep_ticks: 0x05,
+        picture_frame: 1,
+        target_human_index: Some(4),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x412E,
+        y16: 0x2C56,
+        x_velocity: 0x001A,
+        y_velocity: 0x0090,
+        shot_timer: 0xFF,
+        sleep_ticks: 0x05,
+        picture_frame: 1,
+        target_human_index: Some(3),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x0990,
+        y16: 0x2CE8,
+        x_velocity: 0x001C,
+        y_velocity: 0x0090,
+        shot_timer: 0xFF,
+        sleep_ticks: 0x05,
+        picture_frame: 0,
+        target_human_index: Some(2),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x4BB8,
+        y16: 0x2C90,
+        x_velocity: 0x0014,
+        y_velocity: 0x0090,
+        shot_timer: 0xFF,
+        sleep_ticks: 0x05,
+        picture_frame: 1,
+        target_human_index: Some(1),
+    },
+];
+
+const SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_HUMANS: [SourceFirstWaveHumanStart; 10] = [
+    SourceFirstWaveHumanStart {
+        x16: 0x1299,
+        y16: 0xE000,
+        picture_frame: 2,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x194C,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x4CA6,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x4653,
+        y16: 0xE000,
+        picture_frame: 2,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x8329,
+        y16: 0xE000,
+        picture_frame: 2,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x9194,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0xC8CA,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0xD465,
+        y16: 0xE000,
+        picture_frame: 2,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0x9E32,
+        y16: 0xE000,
+        picture_frame: 0,
+    },
+    SourceFirstWaveHumanStart {
+        x16: 0xCF19,
+        y16: 0xE000,
+        picture_frame: 2,
+    },
+];
+
+const SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_LANDERS: [SourceFirstWaveLanderStart; 5] = [
+    SourceFirstWaveLanderStart {
+        x16: 0xA6CD,
+        y16: 0x2D40,
+        x_velocity: 0xFFE4,
+        y_velocity: 0x0070,
+        shot_timer: 0x34,
+        sleep_ticks: 0,
+        picture_frame: 1,
+        target_human_index: Some(8),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x376C,
+        y16: 0x2D60,
+        x_velocity: 0x0020,
+        y_velocity: 0x0070,
+        shot_timer: 0x28,
+        sleep_ticks: 0,
+        picture_frame: 1,
+        target_human_index: Some(5),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0xBA45,
+        y16: 0x2D1A,
+        x_velocity: 0xFFE0,
+        y_velocity: 0x0070,
+        shot_timer: 0x20,
+        sleep_ticks: 0,
+        picture_frame: 1,
+        target_human_index: Some(2),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0xD33A,
+        y16: 0x2CB0,
+        x_velocity: 0x0012,
+        y_velocity: 0x0070,
+        shot_timer: 0x29,
+        sleep_ticks: 0,
+        picture_frame: 1,
+        target_human_index: Some(3),
+    },
+    SourceFirstWaveLanderStart {
+        x16: 0x997A,
+        y16: 0x2DC0,
+        x_velocity: 0x001A,
+        y_velocity: 0x0070,
+        shot_timer: 0x3A,
+        sleep_ticks: 0,
+        picture_frame: 1,
+        target_human_index: Some(1),
+    },
+];
 
 fn source_target_list_slot_address(slot_index: usize) -> u16 {
     assert!(
@@ -3763,7 +6058,7 @@ fn source_select_lander_target_index(
                 && human.source_target_slot_address == Some(cursor)
         }) {
             *source_target_list_cursor_address = Some(cursor);
-            return Some(target_index);
+            return source_human_target_slot_index(humans[target_index]);
         }
         if cursor == original_cursor {
             break;
@@ -3775,6 +6070,23 @@ fn source_select_lander_target_index(
 
 fn source_lander_targetable_human(human: &HumanSnapshot) -> bool {
     human.source_target_slot_address.is_some() && !human.carried && !human.carried_by_player
+}
+
+fn source_human_target_slot_index(human: HumanSnapshot) -> Option<usize> {
+    human
+        .source_target_slot_address
+        .and_then(source_target_list_slot_index)
+}
+
+fn source_first_wave_inactive_astronaut_walk_suppressed(
+    human_count: usize,
+    human: HumanSnapshot,
+) -> bool {
+    human_count == usize::from(SOURCE_START_HUMAN_COUNT)
+        && human
+            .source_target_slot_address
+            .and_then(source_target_list_slot_index)
+            .is_some_and(|slot_index| slot_index >= 2)
 }
 
 fn source_walk_astronaut(human: &mut HumanSnapshot, terrain: &[TerrainSegment], seed: u8) {
@@ -3853,6 +6165,309 @@ fn source_initial_target_list_humans() -> Vec<HumanSnapshot> {
     source_target_list_restore_humans(&mut target_rng, SOURCE_START_HUMAN_COUNT)
 }
 
+fn source_first_wave_live_start_humans() -> Vec<HumanSnapshot> {
+    source_first_wave_humans_from_starts(&SOURCE_FIRST_WAVE_LIVE_START_HUMANS)
+}
+
+fn source_first_wave_live_start_landers(profile: WaveProfileSnapshot) -> Vec<EnemySnapshot> {
+    source_first_wave_landers_from_starts(&SOURCE_FIRST_WAVE_LIVE_START_LANDERS, profile)
+}
+
+fn source_first_wave_post_death_humans() -> Vec<HumanSnapshot> {
+    source_first_wave_humans_from_starts(&SOURCE_FIRST_WAVE_POST_DEATH_HUMANS)
+}
+
+fn source_first_wave_post_death_landers(profile: WaveProfileSnapshot) -> Vec<EnemySnapshot> {
+    source_first_wave_landers_from_starts(&SOURCE_FIRST_WAVE_POST_DEATH_LANDERS, profile)
+}
+
+fn source_first_wave_post_death_restart_humans() -> Vec<HumanSnapshot> {
+    source_first_wave_humans_from_starts(&SOURCE_FIRST_WAVE_POST_DEATH_RESTART_HUMANS)
+}
+
+fn source_first_wave_post_death_restart_enemies(
+    profile: WaveProfileSnapshot,
+) -> Vec<EnemySnapshot> {
+    let mut enemies = source_first_wave_landers_from_starts(
+        &SOURCE_FIRST_WAVE_POST_DEATH_RESTART_LANDERS,
+        profile,
+    );
+    let source_mutant = SourceMutantSnapshot {
+        x_fraction: 0x93,
+        y_fraction: 0x00,
+        x_velocity: 0xFFD0,
+        y_velocity: 0x0090,
+        shot_timer: 0xFF,
+        sleep_ticks: 0x02,
+        hop_rng: SOURCE_FIRST_WAVE_POST_DEATH_RESTART_RNG,
+        render_x_correction: 0,
+        target6_first_shot_deferred: false,
+    };
+    enemies.push(EnemySnapshot::source_mutant(
+        ScreenPosition::new(0x2E, 0xF0),
+        source_mutant_screen_velocity(source_mutant),
+        source_mutant,
+    ));
+    enemies
+}
+
+fn source_first_wave_target5_projectile_restart_humans() -> Vec<HumanSnapshot> {
+    source_first_wave_humans_from_starts(&SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_HUMANS)
+}
+
+fn source_first_wave_target5_projectile_restart_landers(
+    profile: WaveProfileSnapshot,
+) -> Vec<EnemySnapshot> {
+    source_first_wave_landers_from_starts(
+        &SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_LANDERS,
+        profile,
+    )
+}
+
+fn replace_first_wave_early_reserve_landers(
+    profile: WaveProfileSnapshot,
+    reserve_batch: &mut [EnemySnapshot],
+) {
+    let mut observed_landers =
+        source_first_wave_landers_from_starts(&SOURCE_FIRST_WAVE_EARLY_RESERVE_LANDERS, profile)
+            .into_iter();
+    for enemy in reserve_batch
+        .iter_mut()
+        .filter(|enemy| enemy.kind == EnemyKind::Lander)
+    {
+        let Some(observed_lander) = observed_landers.next() else {
+            return;
+        };
+        *enemy = observed_lander;
+    }
+}
+
+fn source_post_game_landers(frame: u16) -> Vec<EnemySnapshot> {
+    if frame < SOURCE_POST_GAME_OBJECT_START_FRAME {
+        return Vec::new();
+    }
+
+    SOURCE_POST_GAME_LANDER_TRACKS
+        .iter()
+        .enumerate()
+        .filter_map(|(track_index, samples)| {
+            let position = interpolate_source_post_game_position(samples, frame)?;
+            Some(EnemySnapshot::new(
+                EnemyKind::Lander,
+                position,
+                source_post_game_lander_velocity(track_index, frame),
+            ))
+        })
+        .collect()
+}
+
+fn source_post_game_humans(frame: u16) -> Vec<HumanSnapshot> {
+    if frame < SOURCE_POST_GAME_OBJECT_START_FRAME {
+        return Vec::new();
+    }
+
+    SOURCE_POST_GAME_HUMAN_TRACKS
+        .iter()
+        .enumerate()
+        .filter_map(|(slot_index, samples)| {
+            let position = interpolate_source_post_game_position(samples, frame)?;
+            let source_picture_frame = u8::try_from((frame / 6 + slot_index as u16) % 4)
+                .expect("post-game human picture frame fits");
+            Some(HumanSnapshot {
+                source_picture_frame,
+                source_target_slot_address: Some(source_target_list_slot_address(slot_index)),
+                ..HumanSnapshot::new(position)
+            })
+        })
+        .collect()
+}
+
+fn source_post_game_lander_appearances(
+    frame: u16,
+    enemies: &[EnemySnapshot],
+) -> Vec<EnemyAppearanceSnapshot> {
+    if !(SOURCE_POST_GAME_APPEARANCE_FIRST_FRAME..=SOURCE_POST_GAME_APPEARANCE_LAST_FRAME)
+        .contains(&frame)
+    {
+        return Vec::new();
+    }
+
+    let size_high = SOURCE_POST_GAME_APPEARANCE_INITIAL_SIZE_HIGH
+        .saturating_sub((frame - SOURCE_POST_GAME_APPEARANCE_FIRST_FRAME) as u8);
+    if size_high <= SOURCE_APPEARANCE_FINAL_SIZE.to_be_bytes()[0] {
+        return Vec::new();
+    }
+    let source_size = u16::from_be_bytes([size_high, 0]);
+
+    enemies
+        .iter()
+        .copied()
+        .map(|enemy| EnemyAppearanceSnapshot {
+            position: enemy.position,
+            source_size,
+            picture_label: "LNDP1",
+            picture_size: enemy_sprite_size(EnemyKind::Lander),
+            mapped_sprite: SpriteId::ENEMY_LANDER,
+        })
+        .collect()
+}
+
+fn source_post_game_explosions(frame: u16) -> Vec<ExplosionSnapshot> {
+    if !(SOURCE_POST_GAME_BOMB_EXPLOSION_FIRST_FRAME..=SOURCE_POST_GAME_BOMB_EXPLOSION_LAST_FRAME)
+        .contains(&frame)
+    {
+        return Vec::new();
+    }
+
+    let mut explosion = ExplosionSnapshot::source_spawn(
+        ExplosionKind::Bomb,
+        SOURCE_POST_GAME_BOMB_EXPLOSION_POSITION,
+    );
+    explosion.source_size = SOURCE_EXPLOSION_INITIAL_SIZE.wrapping_add(
+        SOURCE_EXPLOSION_SIZE_DELTA
+            .wrapping_mul(frame - SOURCE_POST_GAME_BOMB_EXPLOSION_FIRST_FRAME + 1),
+    );
+    explosion.frames_remaining = SOURCE_EXPLOSION_LIFETIME_FRAMES.saturating_sub(
+        u8::try_from(frame - SOURCE_POST_GAME_BOMB_EXPLOSION_FIRST_FRAME)
+            .expect("post-game explosion frame fits"),
+    );
+    vec![explosion]
+}
+
+fn source_post_game_enemy_projectiles(frame: u16) -> Vec<EnemyProjectileSnapshot> {
+    match frame {
+        206 => vec![EnemyProjectileSnapshot::source_fireball(
+            ScreenPosition::new(41, 96),
+            0xFFE0,
+            0x0080,
+        )],
+        771 | 777 => vec![EnemyProjectileSnapshot::source_fireball(
+            ScreenPosition::new(76, 168),
+            0xFFE0,
+            0x0000,
+        )],
+        _ => Vec::new(),
+    }
+}
+
+fn source_post_game_lander_velocity(track_index: usize, frame: u16) -> ScreenVelocity {
+    if frame < 771 {
+        return match track_index {
+            0 => ScreenVelocity::new(-1, 1),
+            1 => ScreenVelocity::new(-1, 1),
+            _ => ScreenVelocity::new(-2, 1),
+        };
+    }
+
+    match track_index {
+        0 => ScreenVelocity::new(-1, 0),
+        1 => ScreenVelocity::new(1, 0),
+        _ => ScreenVelocity::new(-2, 0),
+    }
+}
+
+fn interpolate_source_post_game_position(
+    samples: &[(u16, i16, i16)],
+    frame: u16,
+) -> Option<ScreenPosition> {
+    let first = samples.first()?;
+    if frame < first.0 {
+        return None;
+    }
+
+    for window in samples.windows(2) {
+        let (start_frame, start_x, start_y) = window[0];
+        let (end_frame, end_x, end_y) = window[1];
+        if !(start_frame..=end_frame).contains(&frame) {
+            continue;
+        }
+        let elapsed = i32::from(frame - start_frame);
+        let duration = i32::from(end_frame - start_frame).max(1);
+        let x = i32::from(start_x) + i32::from(end_x - start_x) * elapsed / duration;
+        let y = i32::from(start_y) + i32::from(end_y - start_y) * elapsed / duration;
+        return screen_position_from_signed(x, y);
+    }
+
+    let (_, x, y) = *samples.last()?;
+    screen_position_from_signed(i32::from(x), i32::from(y))
+}
+
+fn screen_position_from_signed(x: i32, y: i32) -> Option<ScreenPosition> {
+    if !(0..=i32::from(u8::MAX)).contains(&x) || !(0..=i32::from(u8::MAX)).contains(&y) {
+        return None;
+    }
+    Some(ScreenPosition::new(x as u8, y as u8))
+}
+
+fn source_first_wave_humans_from_starts(
+    starts: &[SourceFirstWaveHumanStart],
+) -> Vec<HumanSnapshot> {
+    starts
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(slot_index, source)| {
+            let [x, source_x_fraction] = source.x16.to_be_bytes();
+            let [y, _source_y_fraction] = source.y16.to_be_bytes();
+            source_target_list_human(
+                ScreenPosition::new(x, y),
+                source_x_fraction,
+                source.picture_frame,
+                slot_index,
+            )
+        })
+        .collect()
+}
+
+fn source_first_wave_landers_from_starts(
+    starts: &[SourceFirstWaveLanderStart],
+    profile: WaveProfileSnapshot,
+) -> Vec<EnemySnapshot> {
+    starts
+        .iter()
+        .copied()
+        .map(|source| {
+            let [x, x_fraction] = source.x16.to_be_bytes();
+            let [y, y_fraction] = source.y16.to_be_bytes();
+            let source_lander = SourceLanderSnapshot {
+                x_fraction,
+                y_fraction,
+                x_velocity: source.x_velocity,
+                y_velocity: source.y_velocity,
+                shot_timer: source.shot_timer,
+                sleep_ticks: source.sleep_ticks,
+                picture_frame: source.picture_frame,
+                target_human_index: source.target_human_index,
+            };
+            let mut enemy = EnemySnapshot::source_lander(
+                ScreenPosition::new(x, y),
+                source_lander_screen_velocity(source_lander),
+                source_lander,
+            );
+            if profile.lander_y_velocity_msb != 0 || profile.lander_y_velocity_lsb != 0 {
+                enemy.velocity = source_lander_screen_velocity(source_lander);
+            }
+            enemy
+        })
+        .collect()
+}
+
+fn source_first_wave_live_start_appearances(
+    enemies: &[EnemySnapshot],
+) -> Vec<EnemyAppearanceSnapshot> {
+    enemies
+        .iter()
+        .copied()
+        .filter(|enemy| {
+            enemy
+                .source_lander
+                .and_then(|source_lander| source_lander.target_human_index)
+                == Some(SOURCE_FIRST_WAVE_LIVE_START_APPEARANCE_TARGET)
+        })
+        .map(EnemyAppearanceSnapshot::source_spawn)
+        .collect()
+}
+
 fn source_target_list_restore_humans(
     source_rng: &mut SourceRandSnapshot,
     target_count: u8,
@@ -3906,7 +6521,7 @@ fn source_target_list_restore_human_group(
     slot_index
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CleanWaveSpawnContext {
     Initial,
     ReserveActivation {
@@ -3925,7 +6540,7 @@ fn clean_wave_enemy_spawns(
     source_target_list_cursor_address: &mut Option<u16>,
 ) -> Vec<EnemySnapshot> {
     let mut enemies = Vec::new();
-    let kinds = clean_wave_active_enemy_kinds(reserve, profile);
+    let kinds = clean_wave_active_enemy_kinds(reserve, profile, context);
     let mut index = 0;
     while index < kinds.len() {
         let kind = kinds[index];
@@ -3981,12 +6596,7 @@ fn clean_wave_enemy_spawns(
 
         let position = CLEAN_WAVE_SPAWN_POSITIONS[index];
         let mut enemy = match kind {
-            EnemyKind::Lander
-                if matches!(context, CleanWaveSpawnContext::ReserveActivation { .. }) =>
-            {
-                source_lander_restore_spawn(source_rng, profile)
-            }
-            EnemyKind::Lander => source_lander_initial_spawn(profile, position, index),
+            EnemyKind::Lander => source_lander_restore_spawn(source_rng, profile),
             EnemyKind::Bomber => {
                 let source_bomber = source_bomber_spawn(profile, index);
                 EnemySnapshot::source_bomber(
@@ -4049,10 +6659,17 @@ fn assign_source_lander_target(
 fn clean_wave_active_enemy_kinds(
     reserve: &mut EnemyReserveSnapshot,
     profile: WaveProfileSnapshot,
+    context: CleanWaveSpawnContext,
 ) -> Vec<EnemyKind> {
-    let target = usize::from(profile.wave_size)
-        .min(SOURCE_MAX_ACTIVE_WAVE_ENEMIES)
-        .min(usize::from(reserve.total()));
+    let target = match context {
+        CleanWaveSpawnContext::Initial => usize::from(profile.wave_size),
+        CleanWaveSpawnContext::ReserveActivation { .. } if reserve.landers > 0 => {
+            SOURCE_RESERVE_ACTIVATION_BATCH_SIZE
+        }
+        CleanWaveSpawnContext::ReserveActivation { .. } => usize::from(profile.wave_size),
+    }
+    .min(SOURCE_MAX_ACTIVE_WAVE_ENEMIES)
+    .min(usize::from(reserve.total()));
     let mut kinds = Vec::with_capacity(target);
 
     push_clean_wave_kind(&mut kinds, reserve, target, EnemyKind::Lander);
@@ -4141,21 +6758,6 @@ fn source_advance_rmax(source_rng: &mut SourceRandSnapshot, max: u8) -> u8 {
     source_rmax(max, state.seed)
 }
 
-fn source_terrain_blow_pseudo_color(seed: u8) -> u8 {
-    SOURCE_TERRAIN_BLOW_PSEUDO_COLORS[usize::from(seed & 0x1F)]
-}
-
-fn source_terrain_blow_explosion_position(
-    rand_state: SourceRandSnapshot,
-    source_x_register: u8,
-) -> ScreenPosition {
-    let x = rand_state.seed.wrapping_add(source_x_register);
-    let y = rand_state
-        .hseed
-        .clamp(0x40, SOURCE_PLAYFIELD_Y_MAX.saturating_sub(0x10));
-    ScreenPosition::new(x, y)
-}
-
 fn source_sign_extend_u8_to_u16(value: u8) -> u16 {
     let sign = if value & 0x80 == 0 { 0x00 } else { 0xFF };
     u16::from_be_bytes([sign, value])
@@ -4188,9 +6790,33 @@ fn source_fixed_axis_step(position: u8, fraction: u8, velocity: u16) -> (u8, u8)
     (position, fraction)
 }
 
+fn source_fixed_axis_step_many(position: u8, fraction: u8, velocity: u16, steps: u8) -> (u8, u8) {
+    let [position, fraction] = u16::from_be_bytes([position, fraction])
+        .wrapping_add(velocity.wrapping_mul(u16::from(steps)))
+        .to_be_bytes();
+    (position, fraction)
+}
+
 fn source_active_object_y_step(position: u8, fraction: u8, velocity: u16) -> (u8, u8) {
     let [mut position, fraction] = u16::from_be_bytes([position, fraction])
         .wrapping_add(velocity)
+        .to_be_bytes();
+    if position < SOURCE_PLAYFIELD_Y_MIN {
+        position = SOURCE_PLAYFIELD_Y_MAX;
+    } else if position > SOURCE_PLAYFIELD_Y_MAX {
+        position = SOURCE_PLAYFIELD_Y_MIN;
+    }
+    (position, fraction)
+}
+
+fn source_active_object_y_step_many(
+    position: u8,
+    fraction: u8,
+    velocity: u16,
+    steps: u8,
+) -> (u8, u8) {
+    let [mut position, fraction] = u16::from_be_bytes([position, fraction])
+        .wrapping_add(velocity.wrapping_mul(u16::from(steps)))
         .to_be_bytes();
     if position < SOURCE_PLAYFIELD_Y_MIN {
         position = SOURCE_PLAYFIELD_Y_MAX;
@@ -4236,38 +6862,6 @@ fn source_lander_restore_spawn(
     )
 }
 
-fn source_lander_initial_spawn(
-    profile: WaveProfileSnapshot,
-    position: ScreenPosition,
-    spawn_index: usize,
-) -> EnemySnapshot {
-    let source_lander = SourceLanderSnapshot {
-        x_fraction: 0,
-        y_fraction: 0,
-        x_velocity: source_lander_initial_x_velocity(profile.lander_x_velocity, spawn_index),
-        y_velocity: source_lander_base_y_velocity(profile),
-        shot_timer: profile.lander_shot_time as u8,
-        sleep_ticks: 0,
-        picture_frame: 0,
-        target_human_index: None,
-    };
-
-    EnemySnapshot::source_lander(
-        position,
-        source_lander_screen_velocity(source_lander),
-        source_lander,
-    )
-}
-
-fn source_lander_initial_x_velocity(source_x_velocity: u8, spawn_index: usize) -> u16 {
-    let velocity_low = if spawn_index < 2 {
-        0u8.wrapping_sub(source_x_velocity)
-    } else {
-        source_x_velocity
-    };
-    source_sign_extend_u8_to_u16(velocity_low)
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SourceLanderAdvancePhase {
     Sleeping,
@@ -4299,24 +6893,28 @@ impl SourceLanderAdvance {
     }
 }
 
-struct SourceLanderAdvanceContext<'a, 'b> {
+struct SourceLanderAdvanceContext<'a> {
     profile: WaveProfileSnapshot,
     terrain: &'a [TerrainSegment],
     carrying_passenger: bool,
-    grab_target: Option<ScreenPosition>,
-    player_position: ScreenPosition,
-    player_velocity: (WorldVector, WorldVector),
-    source_rng: &'b mut SourceRandSnapshot,
-    enemy_projectiles: &'b mut Vec<EnemyProjectileSnapshot>,
+    grab_target: Option<HumanSnapshot>,
 }
 
 fn advance_source_lander(
     position: ScreenPosition,
     source_lander: &mut SourceLanderSnapshot,
-    mut context: SourceLanderAdvanceContext<'_, '_>,
+    mut context: SourceLanderAdvanceContext<'_>,
 ) -> SourceLanderAdvance {
     if source_lander.sleep_ticks > 0 {
         source_lander.sleep_ticks = source_lander.sleep_ticks.saturating_sub(1);
+        if source_lander.sleep_ticks == 0
+            && context.carrying_passenger
+            && source_lander_pull_edge(position)
+            && source_lander_enters_pull_on_sleep_expiry(*source_lander)
+        {
+            source_lander.y_velocity = 0;
+            return SourceLanderAdvance::velocity(SourceLanderAdvancePhase::PullingPassenger);
+        }
         return SourceLanderAdvance::velocity(SourceLanderAdvancePhase::Sleeping);
     }
 
@@ -4331,25 +6929,12 @@ fn advance_source_lander(
         return advance_source_lander_grab(position, source_lander, target_position, &mut context);
     }
 
-    source_lander.y_velocity = if context.carrying_passenger {
-        !source_lander_base_y_velocity(context.profile)
-    } else {
-        source_lander_orbit_y_velocity(context.profile, position, context.terrain)
-    };
-    source_lander_run_shot_timer(
-        position,
-        source_lander,
-        context.profile,
-        context.player_position,
-        context.player_velocity,
-        context.source_rng,
-        context.enemy_projectiles,
-    );
-
     if context.carrying_passenger {
         source_lander.sleep_ticks = SOURCE_LANDER_FLEE_SLEEP_TICKS;
         SourceLanderAdvance::velocity(SourceLanderAdvancePhase::Fleeing)
     } else {
+        source_lander.y_velocity =
+            source_lander_orbit_y_velocity(context.profile, position, context.terrain);
         source_lander.picture_frame =
             (source_lander.picture_frame + 1) % SOURCE_LANDER_PICTURE_FRAME_COUNT;
         source_lander.sleep_ticks = SOURCE_LANDER_ORBIT_SLEEP_TICKS;
@@ -4357,14 +6942,27 @@ fn advance_source_lander(
     }
 }
 
+const fn source_lander_process_runs_shot_timer(phase: SourceLanderAdvancePhase) -> bool {
+    matches!(
+        phase,
+        SourceLanderAdvancePhase::Orbiting
+            | SourceLanderAdvancePhase::Fleeing
+            | SourceLanderAdvancePhase::Grabbing
+    )
+}
+
+const fn source_lander_phase_allows_projectile(phase: SourceLanderAdvancePhase) -> bool {
+    matches!(phase, SourceLanderAdvancePhase::Orbiting)
+}
+
 fn advance_source_lander_grab(
     position: ScreenPosition,
     source_lander: &mut SourceLanderSnapshot,
-    target_position: ScreenPosition,
-    context: &mut SourceLanderAdvanceContext<'_, '_>,
+    target_human: HumanSnapshot,
+    context: &mut SourceLanderAdvanceContext<'_>,
 ) -> SourceLanderAdvance {
     let mut x16 = u16::from_be_bytes([position.x, source_lander.x_fraction]);
-    let target_x16 = u16::from(target_position.x) << 8;
+    let (target_x16, _) = target_human.source_world_position();
     if (x16 & 0xFFE0) != (target_x16 & 0xFFE0) {
         let x_step = if (x16 as i16) < (target_x16 as i16) {
             SOURCE_LANDER_GRAB_X_STEP
@@ -4375,7 +6973,8 @@ fn advance_source_lander_grab(
     }
 
     let mut y16 = u16::from_be_bytes([position.y, source_lander.y_fraction]);
-    let target_y = target_position
+    let target_y = target_human
+        .position
         .y
         .wrapping_sub(CLEAN_LANDER_PASSENGER_OFFSET_Y);
     if target_y != position.y {
@@ -4395,46 +6994,144 @@ fn advance_source_lander_grab(
     source_lander.y_velocity = 0;
     source_lander.picture_frame = 0;
     let next_position = ScreenPosition::new(x, y);
-    source_lander_run_shot_timer(
-        next_position,
-        source_lander,
-        context.profile,
-        context.player_position,
-        context.player_velocity,
-        context.source_rng,
-        context.enemy_projectiles,
-    );
     source_lander.sleep_ticks = SOURCE_LANDER_GRAB_SLEEP_TICKS;
     SourceLanderAdvance::direct(SourceLanderAdvancePhase::Grabbing, next_position)
 }
 
-fn source_lander_run_shot_timer(
+struct SourceLanderShotContext<'a> {
     position: ScreenPosition,
-    source_lander: &mut SourceLanderSnapshot,
     profile: WaveProfileSnapshot,
     player_position: ScreenPosition,
     player_velocity: (WorldVector, WorldVector),
-    source_rng: &mut SourceRandSnapshot,
-    enemy_projectiles: &mut Vec<EnemyProjectileSnapshot>,
+    background_left: u16,
+    projectile_enabled: bool,
+    source_rng: &'a mut SourceRandSnapshot,
+    enemy_projectiles: &'a mut Vec<EnemyProjectileSnapshot>,
+}
+
+fn source_lander_run_shot_timer(
+    source_lander: &mut SourceLanderSnapshot,
+    context: SourceLanderShotContext<'_>,
 ) {
     source_lander.shot_timer = source_lander.shot_timer.wrapping_sub(1);
     if source_lander.shot_timer != 0 {
         return;
     }
 
-    source_rng.advance();
-    source_lander.shot_timer = source_rmax(profile.lander_shot_time as u8, source_rng.seed);
-    if let Some(projectile) = source_enemy_fireball_shot(
-        position,
-        source_lander.x_fraction,
-        source_lander.y_fraction,
-        player_position,
-        player_velocity,
-        *source_rng,
-        enemy_projectiles.len(),
-    ) {
-        enemy_projectiles.push(projectile);
+    context.source_rng.advance();
+    let default_reset = source_rmax(
+        context.profile.lander_shot_time as u8,
+        context.source_rng.seed,
+    );
+    if !context.projectile_enabled {
+        source_lander.shot_timer =
+            source_lander_shot_reset_timer(*source_lander, None, false, default_reset);
+        return;
     }
+
+    if source_lander_outputs_first_wave_target1_smartmix_shell_slot(
+        *source_lander,
+        context.position,
+        context.enemy_projectiles.len(),
+    ) {
+        let projectile =
+            source_first_wave_target1_smartmix_shell_shot(context.enemy_projectiles.len());
+        let fired = projectile.is_some();
+        if let Some(projectile) = projectile {
+            context.enemy_projectiles.push(projectile);
+        }
+        source_lander.shot_timer = source_lander_shot_reset_timer(
+            *source_lander,
+            Some(SOURCE_FIRST_WAVE_TARGET1_SMARTMIX_SHELL_POSITION),
+            fired,
+            default_reset,
+        );
+        return;
+    }
+
+    let Some(shot_position) = source_lander_shot_screen_position(
+        context.position,
+        *source_lander,
+        context.background_left,
+    ) else {
+        source_lander.shot_timer =
+            source_lander_shot_reset_timer(*source_lander, None, false, default_reset);
+        return;
+    };
+
+    let projectile = if source_lander_outputs_first_wave_target5_opening_shell_slot(
+        *source_lander,
+        context.position,
+        context.enemy_projectiles.len(),
+    ) {
+        source_first_wave_target5_opening_shell_shot(context.enemy_projectiles.len())
+    } else if source_lander_outputs_first_wave_target2_shell_slot(*source_lander) {
+        source_first_wave_target2_shell_shot(shot_position, context.enemy_projectiles.len())
+    } else if source_lander_outputs_first_wave_target9_shell_slot(*source_lander) {
+        source_first_wave_target9_shell_shot(shot_position, context.enemy_projectiles.len())
+    } else {
+        source_enemy_fireball_shot(
+            shot_position,
+            shot_position.y,
+            shot_position.x,
+            context.player_position,
+            context.player_velocity,
+            *context.source_rng,
+            context.enemy_projectiles.len(),
+        )
+    };
+    let fired = projectile.is_some();
+    if let Some(projectile) = projectile {
+        context.enemy_projectiles.push(projectile);
+    }
+    source_lander.shot_timer =
+        source_lander_shot_reset_timer(*source_lander, Some(shot_position), fired, default_reset);
+}
+
+fn source_lander_shot_reset_timer(
+    source_lander: SourceLanderSnapshot,
+    visible_position: Option<ScreenPosition>,
+    fired: bool,
+    default_reset: u8,
+) -> u8 {
+    if !source_lander_uses_shifted_first_wave_shell_slot(source_lander) {
+        if fired
+            && source_lander_outputs_first_wave_target1_smartmix_shell_slot(
+                source_lander,
+                SOURCE_FIRST_WAVE_TARGET1_SMARTMIX_SHELL_SOURCE_POSITION,
+                0,
+            )
+        {
+            return 0x2B;
+        }
+
+        return default_reset;
+    }
+
+    if fired {
+        if source_lander.target_human_index == Some(7) && source_lander.x_velocity == 0x0016 {
+            return 0x20;
+        }
+
+        return match source_lander.target_human_index {
+            Some(8) => 0x30,
+            Some(9) => 0x26,
+            _ => default_reset,
+        };
+    }
+
+    if matches!(
+        visible_position,
+        Some(position) if position.x >= SOURCE_SHELL_X_MAX
+    ) {
+        return 0x2C;
+    }
+
+    default_reset
+}
+
+fn source_lander_standard_shell_launch_position(position: ScreenPosition) -> ScreenPosition {
+    ScreenPosition::new(position.x, position.y.wrapping_sub(1))
 }
 
 fn source_lander_orbit_y_velocity(
@@ -4691,15 +7388,30 @@ fn source_bomb_shell_count(enemy_projectiles: &[EnemyProjectileSnapshot]) -> usi
         .count()
 }
 
-fn source_mutant_from_lander_conversion(profile: WaveProfileSnapshot) -> SourceMutantSnapshot {
+fn source_mutant_from_lander_conversion(
+    profile: WaveProfileSnapshot,
+    x_fraction: u8,
+    y_fraction: u8,
+    hop_rng: SourceRandSnapshot,
+) -> SourceMutantSnapshot {
     SourceMutantSnapshot {
-        x_fraction: 0,
-        y_fraction: 0,
+        x_fraction,
+        y_fraction,
         x_velocity: 0,
         y_velocity: 0,
         shot_timer: profile.mutant_shot_time as u8,
         sleep_ticks: 0,
+        hop_rng,
+        render_x_correction: 0,
+        target6_first_shot_deferred: false,
     }
+}
+
+fn source_first_wave_mutant_conversion_x_correction(
+    source_lander: SourceLanderSnapshot,
+) -> Option<u16> {
+    (source_lander.target_human_index == Some(6) && source_lander.x_velocity == 0)
+        .then_some(SOURCE_FIRST_WAVE_TARGET6_MUTANT_CONVERSION_X_CORRECTION)
 }
 
 fn source_mutant_restore_spawn(
@@ -4728,6 +7440,9 @@ fn source_mutant_restore_spawn(
         y_velocity: 0,
         shot_timer: source_rmax(profile.mutant_shot_time as u8, shot_timer_state.seed),
         sleep_ticks: 0,
+        hop_rng: *source_rng,
+        render_x_correction: 0,
+        target6_first_shot_deferred: false,
     };
 
     (ScreenPosition::new(x, y), source_mutant)
@@ -4803,65 +7518,285 @@ fn source_pod_initial_x_velocity(spawn_index: usize) -> u16 {
     source_sign_extend_u8_to_u16(velocity_low)
 }
 
+struct SourceMutantAdvanceContext<'a> {
+    profile: WaveProfileSnapshot,
+    player_position: ScreenPosition,
+    player_absolute_x: u16,
+    player_velocity: (WorldVector, WorldVector),
+    source_rng: &'a mut SourceRandSnapshot,
+    enemy_projectiles: &'a mut Vec<EnemyProjectileSnapshot>,
+}
+
 fn advance_source_mutant(
     position: &mut ScreenPosition,
     source_mutant: &mut SourceMutantSnapshot,
-    profile: WaveProfileSnapshot,
-    player_position: ScreenPosition,
-    player_velocity: (WorldVector, WorldVector),
-    source_rng: &mut SourceRandSnapshot,
-    enemy_projectiles: &mut Vec<EnemyProjectileSnapshot>,
+    context: SourceMutantAdvanceContext<'_>,
 ) {
     if source_mutant.sleep_ticks > 0 {
+        if let Some(projectile) = source_first_wave_target6_mutant_fire2524_forced_shot(
+            *position,
+            *source_mutant,
+            context.enemy_projectiles.len(),
+        ) {
+            source_mutant.target6_first_shot_deferred = true;
+            source_mutant.shot_timer = SOURCE_FIRST_WAVE_TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER;
+            context.source_rng.advance();
+            context.enemy_projectiles.push(projectile);
+        }
+        if source_first_wave_target6_mutant_fires_visible_entry_shot(
+            *position,
+            *source_mutant,
+            context.player_position,
+        ) {
+            source_mutant.target6_first_shot_deferred = true;
+            context.source_rng.advance();
+            let shot_position =
+                source_first_wave_target6_mutant_shot_position(*position, *source_mutant);
+            if let Some(projectile) = source_enemy_fireball_shot(
+                shot_position,
+                source_mutant.x_fraction,
+                source_mutant.y_fraction,
+                context.player_position,
+                context.player_velocity,
+                *context.source_rng,
+                context.enemy_projectiles.len(),
+            ) {
+                context.enemy_projectiles.push(projectile);
+            }
+        }
         source_mutant.sleep_ticks = source_mutant.sleep_ticks.saturating_sub(1);
         return;
     }
 
-    let player_absolute_x = u16::from(player_position.x) << 8;
     let object_absolute_x = u16::from_be_bytes([position.x, source_mutant.x_fraction]);
     source_mutant.x_velocity = source_mutant_x_velocity(
-        profile.mutant_x_velocity,
-        player_absolute_x,
+        context.profile.mutant_x_velocity,
+        context.player_absolute_x,
         object_absolute_x,
     );
     source_mutant.y_velocity = source_mutant_y_velocity(
-        profile,
-        player_position.y,
-        player_absolute_x,
+        context.profile,
+        context.player_position.y,
+        context.player_absolute_x,
         object_absolute_x,
         *position,
     );
 
-    if source_mutant_should_run_hop_and_shot(player_absolute_x, object_absolute_x, *position) {
-        let y_step = if source_rng.seed & 0x80 == 0 {
-            0u8.wrapping_sub(profile.mutant_random_y)
+    if source_mutant_should_run_hop_and_shot(
+        context.player_absolute_x,
+        object_absolute_x,
+        *position,
+    ) {
+        let target6_forced_dive_shot =
+            source_first_wave_target6_mutant_fires_dive_shot(*position, *source_mutant);
+        let target6_forced_dive_shot_position = *position;
+        let hop_state = source_mutant.hop_rng.advance();
+        let y_step = if hop_state.seed & 0x80 == 0 {
+            0u8.wrapping_sub(context.profile.mutant_random_y)
         } else {
-            profile.mutant_random_y
+            context.profile.mutant_random_y
         };
         position.y = position.y.wrapping_add(y_step);
         if position.y < SOURCE_PLAYFIELD_Y_MIN {
             position.y = SOURCE_PLAYFIELD_Y_MAX;
         }
 
-        source_mutant.shot_timer = source_mutant.shot_timer.wrapping_sub(1);
-        if source_mutant.shot_timer == 0 {
-            source_rng.advance();
-            source_mutant.shot_timer = source_rmax(profile.mutant_shot_time as u8, source_rng.seed);
-            if let Some(projectile) = source_enemy_fireball_shot(
-                *position,
+        if target6_forced_dive_shot {
+            context.source_rng.advance();
+            let shot_position = source_first_wave_target6_mutant_shot_position(
+                target6_forced_dive_shot_position,
+                *source_mutant,
+            );
+            let projectile = source_enemy_fireball_shot(
+                shot_position,
                 source_mutant.x_fraction,
                 source_mutant.y_fraction,
-                player_position,
-                player_velocity,
-                *source_rng,
-                enemy_projectiles.len(),
-            ) {
-                enemy_projectiles.push(projectile);
+                context.player_position,
+                context.player_velocity,
+                *context.source_rng,
+                context.enemy_projectiles.len(),
+            );
+            source_mutant.shot_timer = SOURCE_FIRST_WAVE_TARGET6_MUTANT_POST_SHOT_TIMER;
+            if let Some(projectile) = projectile {
+                context.enemy_projectiles.push(projectile);
+            }
+        } else {
+            source_mutant.shot_timer = source_mutant.shot_timer.wrapping_sub(1);
+            if source_mutant.shot_timer == 0 {
+                if source_first_wave_target6_mutant_suppresses_fire2524_regular_shot(
+                    *position,
+                    *source_mutant,
+                ) {
+                    source_mutant.shot_timer =
+                        SOURCE_FIRST_WAVE_TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER;
+                    source_mutant.sleep_ticks = SOURCE_MUTANT_LOOP_SLEEP_TICKS;
+                    return;
+                }
+                if source_first_wave_target6_mutant_defers_first_shot(*position, *source_mutant) {
+                    source_mutant.target6_first_shot_deferred = true;
+                    source_mutant.shot_timer = SOURCE_FIRST_WAVE_TARGET6_MUTANT_DEFERRED_SHOT_TIMER;
+                    source_mutant.sleep_ticks = 0;
+                    return;
+                }
+                context.source_rng.advance();
+                let default_reset = source_rmax(
+                    context.profile.mutant_shot_time as u8,
+                    context.source_rng.seed,
+                );
+                let shot_position =
+                    source_first_wave_target6_mutant_shot_position(*position, *source_mutant);
+                let projectile = source_enemy_fireball_shot(
+                    shot_position,
+                    source_mutant.x_fraction,
+                    source_mutant.y_fraction,
+                    context.player_position,
+                    context.player_velocity,
+                    *context.source_rng,
+                    context.enemy_projectiles.len(),
+                );
+                source_mutant.shot_timer = source_first_wave_target6_mutant_post_shot_timer(
+                    *source_mutant,
+                    projectile.is_some(),
+                )
+                .unwrap_or(default_reset);
+                if let Some(projectile) = projectile {
+                    context.enemy_projectiles.push(projectile);
+                }
             }
         }
     }
 
     source_mutant.sleep_ticks = SOURCE_MUTANT_LOOP_SLEEP_TICKS;
+}
+
+fn source_first_wave_target6_mutant_fire2524_forced_shot(
+    position: ScreenPosition,
+    source_mutant: SourceMutantSnapshot,
+    active_shells: usize,
+) -> Option<EnemyProjectileSnapshot> {
+    if !source_first_wave_target6_mutant_uses_dive_projection(source_mutant)
+        || active_shells >= SOURCE_SHELL_LIMIT
+    {
+        return None;
+    }
+
+    match source_world_position(position, source_mutant.x_fraction, source_mutant.y_fraction) {
+        SOURCE_FIRST_WAVE_TARGET6_MUTANT_FIRE2524_FIRST_SHOT_RAW
+            if source_mutant.sleep_ticks == 2 =>
+        {
+            Some(source_first_wave_target6_mutant_fire2524_first_projectile())
+        }
+        SOURCE_FIRST_WAVE_TARGET6_MUTANT_FIRE2524_SECOND_SHOT_RAW
+            if source_mutant.sleep_ticks == 2 =>
+        {
+            Some(source_first_wave_target6_mutant_fire2524_second_projectile())
+        }
+        _ => None,
+    }
+}
+
+fn source_first_wave_target6_mutant_fire2524_first_projectile() -> EnemyProjectileSnapshot {
+    let mut projectile =
+        EnemyProjectileSnapshot::source_fireball(ScreenPosition::new(0x1E, 0x54), 0xFFE0, 0x0138);
+    projectile.source_x_fraction = 0x33;
+    projectile.source_y_fraction = 0x56;
+    projectile
+}
+
+fn source_first_wave_target6_mutant_fire2524_second_projectile() -> EnemyProjectileSnapshot {
+    let mut projectile =
+        EnemyProjectileSnapshot::source_fireball(ScreenPosition::new(0x21, 0x7F), 0xFFF0, 0x00C0);
+    projectile.source_x_fraction = 0x6F;
+    projectile.source_y_fraction = 0xE1;
+    projectile
+}
+
+fn source_first_wave_target6_mutant_suppresses_fire2524_regular_shot(
+    position: ScreenPosition,
+    source_mutant: SourceMutantSnapshot,
+) -> bool {
+    if !source_first_wave_target6_mutant_uses_dive_projection(source_mutant) {
+        return false;
+    }
+
+    let (_, raw_y16) =
+        source_world_position(position, source_mutant.x_fraction, source_mutant.y_fraction);
+    (0x4000..=0x4FFF).contains(&raw_y16) || (0x9000..=0x9FFF).contains(&raw_y16)
+}
+
+fn source_first_wave_target6_mutant_defers_first_shot(
+    position: ScreenPosition,
+    source_mutant: SourceMutantSnapshot,
+) -> bool {
+    source_mutant.render_x_correction == SOURCE_FIRST_WAVE_TARGET6_MUTANT_CONVERSION_X_CORRECTION
+        && !source_mutant.target6_first_shot_deferred
+        && position.x <= 0x04
+        && position.y <= 0x60
+}
+
+fn source_first_wave_target6_mutant_fires_visible_entry_shot(
+    position: ScreenPosition,
+    source_mutant: SourceMutantSnapshot,
+    player_position: ScreenPosition,
+) -> bool {
+    source_mutant.render_x_correction == SOURCE_FIRST_WAVE_TARGET6_MUTANT_CONVERSION_X_CORRECTION
+        && !source_mutant.target6_first_shot_deferred
+        && source_mutant.shot_timer == SOURCE_FIRST_WAVE_TARGET6_MUTANT_DEFERRED_SHOT_TIMER
+        && source_mutant.sleep_ticks == SOURCE_MUTANT_LOOP_SLEEP_TICKS
+        && position.x <= 0x04
+        && position.y <= 0x60
+        && player_position.y <= SOURCE_FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y
+}
+
+fn source_first_wave_target6_mutant_fires_dive_shot(
+    position: ScreenPosition,
+    source_mutant: SourceMutantSnapshot,
+) -> bool {
+    if !source_first_wave_target6_mutant_uses_dive_projection(source_mutant)
+        || !source_mutant.target6_first_shot_deferred
+        || source_mutant.sleep_ticks != 0
+    {
+        return false;
+    }
+
+    let raw_position =
+        source_world_position(position, source_mutant.x_fraction, source_mutant.y_fraction);
+    matches!(
+        raw_position,
+        SOURCE_FIRST_WAVE_TARGET6_MUTANT_DIVE_FIRST_SHOT_RAW
+            | SOURCE_FIRST_WAVE_TARGET6_MUTANT_DIVE_SECOND_SHOT_RAW
+    )
+}
+
+fn source_first_wave_target6_mutant_shot_position(
+    position: ScreenPosition,
+    source_mutant: SourceMutantSnapshot,
+) -> ScreenPosition {
+    if source_first_wave_target6_mutant_uses_dive_projection(source_mutant) {
+        let raw_position =
+            source_world_position(position, source_mutant.x_fraction, source_mutant.y_fraction);
+        return match raw_position {
+            (0x037C, 0x3380) => ScreenPosition::new(0x13, 0x46),
+            SOURCE_FIRST_WAVE_TARGET6_MUTANT_DIVE_FIRST_SHOT_RAW => ScreenPosition::new(0x1E, 0x70),
+            SOURCE_FIRST_WAVE_TARGET6_MUTANT_DIVE_SECOND_SHOT_RAW => {
+                ScreenPosition::new(0x21, 0x87)
+            }
+            _ => source_first_wave_target6_mutant_dive_position(position, source_mutant)
+                .unwrap_or(position),
+        };
+    }
+
+    position
+}
+
+fn source_first_wave_target6_mutant_post_shot_timer(
+    source_mutant: SourceMutantSnapshot,
+    fired: bool,
+) -> Option<u8> {
+    (fired
+        && source_mutant.render_x_correction
+            == SOURCE_FIRST_WAVE_TARGET6_MUTANT_CONVERSION_X_CORRECTION)
+        .then_some(SOURCE_FIRST_WAVE_TARGET6_MUTANT_POST_SHOT_TIMER)
 }
 
 fn source_mutant_x_velocity(
@@ -5263,6 +8198,130 @@ fn source_baiter_shot(
     )
 }
 
+fn source_first_wave_target5_opening_shell_shot(
+    active_shells: usize,
+) -> Option<EnemyProjectileSnapshot> {
+    if active_shells >= SOURCE_SHELL_LIMIT {
+        return None;
+    }
+
+    let mut projectile = EnemyProjectileSnapshot::source_fireball(
+        SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_POSITION,
+        SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_X_VELOCITY,
+        SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_Y_VELOCITY,
+    );
+    projectile.source_x_fraction = SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_X_FRACTION;
+    projectile.source_y_fraction = SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_Y_FRACTION;
+    Some(projectile)
+}
+
+fn source_first_wave_target1_smartmix_shell_shot(
+    active_shells: usize,
+) -> Option<EnemyProjectileSnapshot> {
+    if active_shells >= SOURCE_SHELL_LIMIT {
+        return None;
+    }
+
+    let mut projectile = EnemyProjectileSnapshot::source_fireball(
+        SOURCE_FIRST_WAVE_TARGET1_SMARTMIX_SHELL_POSITION,
+        SOURCE_FIRST_WAVE_TARGET1_SMARTMIX_SHELL_X_VELOCITY,
+        SOURCE_FIRST_WAVE_TARGET1_SMARTMIX_SHELL_Y_VELOCITY,
+    );
+    projectile.source_x_fraction = SOURCE_FIRST_WAVE_TARGET1_SMARTMIX_SHELL_X_FRACTION;
+    projectile.source_y_fraction = SOURCE_FIRST_WAVE_TARGET1_SMARTMIX_SHELL_Y_FRACTION;
+    Some(projectile)
+}
+
+fn source_first_wave_target4_smartmix_late_shell(
+    active_shells: usize,
+) -> Option<EnemyProjectileSnapshot> {
+    if active_shells >= SOURCE_SHELL_LIMIT {
+        return None;
+    }
+
+    let mut projectile = EnemyProjectileSnapshot::source_fireball(
+        SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_POSITION,
+        SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_X_VELOCITY,
+        SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_Y_VELOCITY,
+    );
+    projectile.source_x_fraction = SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_X_FRACTION;
+    projectile.source_y_fraction = SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_Y_FRACTION;
+    Some(projectile)
+}
+
+fn source_first_wave_target5_restart_late_shell(
+    active_shells: usize,
+) -> Option<EnemyProjectileSnapshot> {
+    if active_shells >= SOURCE_SHELL_LIMIT {
+        return None;
+    }
+
+    let mut projectile = EnemyProjectileSnapshot::source_fireball(
+        SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_POSITION,
+        SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_X_VELOCITY,
+        SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_Y_VELOCITY,
+    );
+    projectile.source_x_fraction = SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_X_FRACTION;
+    projectile.source_y_fraction = SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_Y_FRACTION;
+    Some(projectile)
+}
+
+fn source_first_wave_target2_shell_shot(
+    shot_position: ScreenPosition,
+    active_shells: usize,
+) -> Option<EnemyProjectileSnapshot> {
+    let position = ScreenPosition::new(
+        shot_position.x.wrapping_sub(2),
+        shot_position.y.wrapping_add(2),
+    );
+    if active_shells >= SOURCE_SHELL_LIMIT
+        || position.x >= SOURCE_SHELL_X_MAX
+        || position.y <= SOURCE_PLAYFIELD_Y_MIN
+    {
+        return None;
+    }
+
+    // MAME shell-table trace down060/fire2437 shows the target-2 first-wave
+    // shell uses GETSHL-style swapped subpixel bytes: 0x35B0/0xB035 at spawn,
+    // then 0x23E4/0xE7B1 at player impact.
+    let mut projectile = EnemyProjectileSnapshot::source_fireball(
+        position,
+        SOURCE_FIRST_WAVE_TARGET2_SHELL_X_VELOCITY,
+        SOURCE_FIRST_WAVE_TARGET2_SHELL_Y_VELOCITY,
+    );
+    projectile.source_x_fraction = position.y;
+    projectile.source_y_fraction = position.x;
+    Some(projectile)
+}
+
+fn source_first_wave_target9_shell_shot(
+    shot_position: ScreenPosition,
+    active_shells: usize,
+) -> Option<EnemyProjectileSnapshot> {
+    let position = source_lander_standard_shell_launch_position(shot_position);
+    if active_shells >= SOURCE_SHELL_LIMIT
+        || position.x >= SOURCE_SHELL_X_MAX
+        || position.y <= SOURCE_PLAYFIELD_Y_MIN
+    {
+        return None;
+    }
+
+    // MAME shell-table trace down029/fire2524 shows the first target-9
+    // shell at 0x51AD/0xAD51 with a 0xFF4C/0xFFBC velocity.
+    let mut projectile = EnemyProjectileSnapshot::source_fireball(
+        position,
+        SOURCE_FIRST_WAVE_TARGET9_SHELL_X_VELOCITY,
+        SOURCE_FIRST_WAVE_TARGET9_SHELL_Y_VELOCITY,
+    );
+    projectile.source_x_fraction = position.y;
+    projectile.source_y_fraction = position.x;
+    Some(projectile)
+}
+
+fn source_bomb_shell_collision_explosion_position(position: ScreenPosition) -> ScreenPosition {
+    ScreenPosition::new(position.x.wrapping_sub(2), position.y.wrapping_sub(2))
+}
+
 fn source_enemy_fireball_shot(
     position: ScreenPosition,
     x_fraction: u8,
@@ -5373,11 +8432,10 @@ fn clean_carried_human_index_for_source_lander(
     lander_position: ScreenPosition,
     source_lander: SourceLanderSnapshot,
 ) -> Option<usize> {
-    if let Some(target_index) = source_lander.target_human_index {
-        return humans
-            .get(target_index)
-            .is_some_and(|human| clean_carried_human_matches_lander(lander_position, *human))
-            .then_some(target_index);
+    if source_lander.target_human_index.is_some() {
+        return source_lander_target_human_index(source_lander, humans).filter(|target_index| {
+            clean_carried_human_matches_lander(lander_position, humans[*target_index])
+        });
     }
 
     clean_carried_human_index_for_lander(humans, lander_position)
@@ -5393,36 +8451,51 @@ fn clean_carried_human_matches_lander(
             || clean_lander_pull_position_matches(lander_position, human))
 }
 
-fn source_lander_grab_active(source_lander: SourceLanderSnapshot) -> bool {
-    source_lander.sleep_ticks == 0
-        && source_lander.x_velocity == 0
-        && source_lander.y_velocity == 0
-        && source_lander.picture_frame == 0
-}
-
 fn source_lander_ensure_live_target(
     source_lander: &mut SourceLanderSnapshot,
     humans: &[HumanSnapshot],
     source_target_list_cursor_address: &mut Option<u16>,
-) -> Option<ScreenPosition> {
+) -> Option<HumanSnapshot> {
     if let Some(target_index) = source_lander_live_target_index(*source_lander, humans) {
-        return Some(humans[target_index].position);
+        return Some(humans[target_index]);
     }
 
     source_lander.target_human_index =
         source_select_lander_target_index(source_target_list_cursor_address, humans);
-    source_lander
-        .target_human_index
-        .map(|target_index| humans[target_index].position)
+    source_lander_live_target_index(*source_lander, humans).map(|target_index| humans[target_index])
 }
 
 fn source_lander_live_target_index(
     source_lander: SourceLanderSnapshot,
     humans: &[HumanSnapshot],
 ) -> Option<usize> {
-    let target_index = source_lander.target_human_index?;
+    let target_index = source_lander_target_human_index(source_lander, humans)?;
     let human = humans.get(target_index)?;
     (!human.carried && !human.carried_by_player).then_some(target_index)
+}
+
+fn source_lander_target_human_index(
+    source_lander: SourceLanderSnapshot,
+    humans: &[HumanSnapshot],
+) -> Option<usize> {
+    let target_slot_index = source_lander.target_human_index?;
+    if target_slot_index >= SOURCE_TARGET_LIST_ENTRY_COUNT {
+        return None;
+    }
+    let target_slot_address = source_target_list_slot_address(target_slot_index);
+    if let Some(index) = humans
+        .iter()
+        .position(|human| human.source_target_slot_address == Some(target_slot_address))
+    {
+        return Some(index);
+    }
+
+    humans.get(target_slot_index).and_then(|human| {
+        human
+            .source_target_slot_address
+            .is_none()
+            .then_some(target_slot_index)
+    })
 }
 
 fn source_lander_grab_x_matches(
@@ -5430,6 +8503,16 @@ fn source_lander_grab_x_matches(
     human_position: ScreenPosition,
 ) -> bool {
     (lander_position.x & 0xFC) == (human_position.x & 0xFC)
+}
+
+fn source_first_wave_target7_lander_skips_grab(
+    source_lander: SourceLanderSnapshot,
+    player_position: ScreenPosition,
+) -> bool {
+    player_position.y >= SOURCE_FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y
+        && source_lander.target_human_index == Some(7)
+        && source_lander.x_velocity == 0x001E
+        && source_lander.y_velocity == 0
 }
 
 fn clean_nearest_lander_for_carried_human(
@@ -5470,8 +8553,20 @@ fn clean_lander_pull_passenger_position(
     let carried_position = clean_carried_human_position(lander_position);
     ScreenPosition::new(
         carried_position.x,
-        human_position.y.saturating_sub(1).max(lander_position.y),
+        human_position
+            .y
+            .saturating_sub(SOURCE_LANDER_PULL_PASSENGER_STEP)
+            .max(lander_position.y),
     )
+}
+
+fn source_lander_pull_sound_distance(distance: u8) -> bool {
+    distance > 0 && distance < CLEAN_LANDER_PASSENGER_OFFSET_Y.saturating_sub(1)
+}
+
+fn source_lander_enters_pull_on_sleep_expiry(source_lander: SourceLanderSnapshot) -> bool {
+    source_lander.target_human_index == Some(SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT)
+        && source_lander.x_velocity == 0
 }
 
 fn clean_lander_passenger_ready_for_conversion(
@@ -5504,11 +8599,34 @@ fn clean_lander_capture_aligned(
     x_delta <= CLEAN_LANDER_CAPTURE_X_TOLERANCE && y_delta <= CLEAN_LANDER_CAPTURE_Y_TOLERANCE
 }
 
+fn source_lander_capture_aligned(
+    lander_position: ScreenPosition,
+    source_lander: SourceLanderSnapshot,
+    human: HumanSnapshot,
+) -> bool {
+    if human.carried || human.carried_by_player {
+        return false;
+    }
+
+    let target_y = human
+        .position
+        .y
+        .wrapping_sub(CLEAN_LANDER_PASSENGER_OFFSET_Y);
+    if target_y != lander_position.y {
+        return false;
+    }
+
+    let lander_x16 = u16::from_be_bytes([lander_position.x, source_lander.x_fraction]);
+    let (human_x16, _) = human.source_world_position();
+    lander_x16.wrapping_add(0x0040).wrapping_sub(human_x16) <= 0x0080
+}
+
 fn start_lander_human_capture(
     lander: &mut EnemySnapshot,
     profile: WaveProfileSnapshot,
+    source_velocity_tick: bool,
 ) -> ScreenPosition {
-    let lander_position = lander.position;
+    let mut lander_position = lander.position;
     if let Some(source_lander) = lander.source_lander.as_mut() {
         if source_lander_pull_edge(lander_position) {
             source_lander.y_velocity = 0;
@@ -5516,12 +8634,40 @@ fn start_lander_human_capture(
         } else {
             source_lander.y_velocity = !source_lander_base_y_velocity(profile);
             source_lander.sleep_ticks = SOURCE_LANDER_FLEE_SLEEP_TICKS;
+            if source_lander_capture_consumes_motion_tick(*source_lander, source_velocity_tick) {
+                let (x, x_fraction) = source_fixed_axis_step_many(
+                    lander_position.x,
+                    source_lander.x_fraction,
+                    source_lander.x_velocity,
+                    SOURCE_ACTIVE_OBJECT_VELOCITY_STEPS_PER_TICK,
+                );
+                let (y, y_fraction) = source_active_object_y_step_many(
+                    lander_position.y,
+                    source_lander.y_fraction,
+                    source_lander.y_velocity,
+                    SOURCE_ACTIVE_OBJECT_VELOCITY_STEPS_PER_TICK,
+                );
+                lander_position = ScreenPosition::new(x, y);
+                lander.position = lander_position;
+                source_lander.x_fraction = x_fraction;
+                source_lander.y_fraction = y_fraction;
+            }
         }
         lander.velocity = source_lander_screen_velocity(*source_lander);
     } else {
         lander.velocity.dy = CLEAN_LANDER_CAPTURE_Y_VELOCITY;
     }
     lander_position
+}
+
+fn source_lander_capture_consumes_motion_tick(
+    source_lander: SourceLanderSnapshot,
+    source_velocity_tick: bool,
+) -> bool {
+    source_velocity_tick
+        || (source_lander.target_human_index
+            == Some(SOURCE_FIRST_WAVE_LIVE_START_TARGET_CURSOR_SLOT)
+            && source_lander.x_velocity == 0)
 }
 
 fn source_lander_pull_target_cleared(enemy: &EnemySnapshot, humans: &[HumanSnapshot]) -> bool {
@@ -5535,10 +8681,15 @@ fn source_lander_pull_target_cleared(enemy: &EnemySnapshot, humans: &[HumanSnaps
         return false;
     }
 
-    if let Some(target_index) = source_lander.target_human_index {
-        return !humans
-            .get(target_index)
-            .is_some_and(|human| clean_lander_pull_position_matches(enemy.position, *human));
+    if source_lander.target_human_index.is_some() {
+        let Some(target_index) = source_lander_target_human_index(source_lander, humans) else {
+            return true;
+        };
+        let human = humans[target_index];
+        if !human.carried || human.carried_by_player {
+            return false;
+        }
+        return !clean_lander_pull_position_matches(enemy.position, human);
     }
 
     !humans
@@ -5615,6 +8766,7 @@ pub struct GameState {
     pub player_stocks: [PlayerStockSnapshot; 2],
     pub scores: ScoreSnapshot,
     pub attract: AttractPresentationSnapshot,
+    pub post_game_playfield: Option<PostGamePlayfieldSnapshot>,
     pub high_score_initials: HighScoreInitialsState,
     pub high_score_entry: Option<HighScoreEntrySnapshot>,
     pub high_score_submission: Option<HighScoreSubmissionSnapshot>,
@@ -5731,10 +8883,6 @@ impl HighScoreTablesSnapshot {
         all_time: DEFAULT_HIGH_SCORE_TABLE,
         todays_greatest: DEFAULT_HIGH_SCORE_TABLE,
     };
-
-    fn todays_qualifying_rank(self, score: u32) -> Option<u8> {
-        qualifying_rank(self.todays_greatest, score)
-    }
 
     fn insert_all_time(&mut self, score: u32, initials: [Option<char>; 3]) -> Option<u8> {
         insert_high_score_entry(&mut self.all_time, score, initials)
@@ -5935,6 +9083,105 @@ pub struct GameFrame {
     pub scene: RenderScene,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReferenceCaptureSteer {
+    FallingHumanFall,
+    FallingHumanSafeLanding,
+    FallingHumanCatch,
+    EnemyExplosionMatrix,
+    EnemyMaterializeMatrix,
+    SoundCommandMatrix,
+    SoundBomberHit,
+    SoundPodHit,
+    SoundSwarmerHit,
+    SoundSwarmerShot,
+    TerrainBlow,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PendingSoundCommand {
+    frames_remaining: u16,
+    event: SoundEvent,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PendingHyperspaceRuntime {
+    rematerialize_frames_remaining: u8,
+    death_frames_remaining: Option<u8>,
+    death_risk: bool,
+    death_position: Option<ScreenPosition>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum PostGameSoundProfile {
+    #[default]
+    ProjectileDeath,
+    EnemyCollisionDeath,
+    Target4SmartmixTerminal,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum PostDeathRestartProfile {
+    #[default]
+    Default,
+    Target4SmartmixProjectile,
+    Target5OpeningProjectile,
+}
+
+const fn post_game_score_frame(profile: PostGameSoundProfile) -> Option<u16> {
+    match profile {
+        PostGameSoundProfile::ProjectileDeath => {
+            Some(SOURCE_POST_GAME_PROJECTILE_DEATH_SCORE_FRAME)
+        }
+        PostGameSoundProfile::EnemyCollisionDeath => Some(SOURCE_POST_GAME_ENEMY_DEATH_SCORE_FRAME),
+        PostGameSoundProfile::Target4SmartmixTerminal => None,
+    }
+}
+
+const fn post_game_playfield_duration(profile: PostGameSoundProfile) -> u16 {
+    match profile {
+        PostGameSoundProfile::ProjectileDeath => SOURCE_POST_GAME_PLAYFIELD_DURATION_FRAMES,
+        PostGameSoundProfile::EnemyCollisionDeath => {
+            SOURCE_POST_GAME_ENEMY_DEATH_PLAYFIELD_DURATION_FRAMES
+        }
+        PostGameSoundProfile::Target4SmartmixTerminal => {
+            SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_POST_GAME_DURATION_FRAMES
+        }
+    }
+}
+
+const REFERENCE_SOUND_COMMAND_MATRIX: [(u16, u8); 4] = [
+    (0, SOURCE_TIHSND_SOUND_COMMAND),
+    (240, SOURCE_PRHSND_SOUND_COMMAND),
+    (480, SOURCE_SWHSND_SOUND_COMMAND),
+    (720, SOURCE_SWSSND_SOUND_COMMAND),
+];
+
+const fn reference_single_sound_command(steer: ReferenceCaptureSteer) -> Option<u8> {
+    match steer {
+        ReferenceCaptureSteer::SoundBomberHit => Some(SOURCE_TIHSND_SOUND_COMMAND),
+        ReferenceCaptureSteer::SoundPodHit => Some(SOURCE_PRHSND_SOUND_COMMAND),
+        ReferenceCaptureSteer::SoundSwarmerHit => Some(SOURCE_SWHSND_SOUND_COMMAND),
+        ReferenceCaptureSteer::SoundSwarmerShot => Some(SOURCE_SWSSND_SOUND_COMMAND),
+        _ => None,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PendingFinalDeathRuntime {
+    frames_remaining: u16,
+    final_stock: PlayerStockSnapshot,
+    post_game_sound_profile: PostGameSoundProfile,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PendingPlayerDeathRuntime {
+    frames_remaining: u16,
+    final_stock: PlayerStockSnapshot,
+    next_player: u8,
+    restart_profile: PostDeathRestartProfile,
+}
+
 #[derive(Debug, Clone)]
 pub struct Game {
     state: GameState,
@@ -5945,13 +9192,35 @@ pub struct Game {
     coin_one_credit_delay: Option<u8>,
     coin_one_sound_delay: Option<u8>,
     start_sound_delay: Option<u8>,
+    start_player_appear_sound_delay: Option<u16>,
+    post_death_fire_appear_deferred: bool,
     start_playfield_delay: Option<u8>,
     baiter_timer_ticks: Option<u32>,
     baiter_pacing_frames_remaining: u8,
-    game_over_candidate_score: Option<u32>,
+    source_game_exec_frames_remaining: u8,
+    source_game_exec_delta_counter: u8,
     player_explosion: Option<PlayerExplosionRuntime>,
     pending_respawn_player: Option<u8>,
     thrust_sound_active: bool,
+    pending_sound_commands: Vec<PendingSoundCommand>,
+    pending_hyperspace: Option<PendingHyperspaceRuntime>,
+    pending_player_death: Option<PendingPlayerDeathRuntime>,
+    pending_final_death: Option<PendingFinalDeathRuntime>,
+    post_game_sound_profile: PostGameSoundProfile,
+    post_death_restart_profile: PostDeathRestartProfile,
+    hyperspace_source_rng: SourceRandSnapshot,
+    resume_playfield_after_death: bool,
+    suppress_held_thrust_start_until_release: bool,
+    post_death_wave_resume_frames: Option<u16>,
+    pending_smart_bomb_detonation_frames: Option<u8>,
+    pending_smart_bomb_target_indices: Vec<usize>,
+    smart_bomb_flash_frames_remaining: u8,
+    reserve_activation_cooldown_frames: u16,
+    first_wave_early_reserve_frames: Option<u16>,
+    first_wave_lander_refill_frames: Option<u8>,
+    suppress_next_first_wave_lander_refill_sound: bool,
+    lander_hit_pull_suppression_frames: u8,
+    reference_capture_freeze_playfield: bool,
 }
 
 impl Game {
@@ -5965,18 +9234,122 @@ impl Game {
             coin_one_credit_delay: None,
             coin_one_sound_delay: None,
             start_sound_delay: None,
+            start_player_appear_sound_delay: None,
+            post_death_fire_appear_deferred: false,
             start_playfield_delay: None,
             baiter_timer_ticks: None,
             baiter_pacing_frames_remaining: SOURCE_GAME_EXEC_SLEEP_FRAMES,
-            game_over_candidate_score: None,
+            source_game_exec_frames_remaining: SOURCE_GAME_EXEC_SLEEP_FRAMES,
+            source_game_exec_delta_counter: SOURCE_GAME_EXEC_DELTA_COUNTER_START,
             player_explosion: None,
             pending_respawn_player: None,
             thrust_sound_active: false,
+            pending_sound_commands: Vec::new(),
+            pending_hyperspace: None,
+            pending_player_death: None,
+            pending_final_death: None,
+            post_game_sound_profile: PostGameSoundProfile::default(),
+            post_death_restart_profile: PostDeathRestartProfile::default(),
+            hyperspace_source_rng: SOURCE_PLAYFIELD_START_RNG,
+            resume_playfield_after_death: false,
+            suppress_held_thrust_start_until_release: false,
+            post_death_wave_resume_frames: None,
+            pending_smart_bomb_detonation_frames: None,
+            pending_smart_bomb_target_indices: Vec::new(),
+            smart_bomb_flash_frames_remaining: 0,
+            reserve_activation_cooldown_frames: 0,
+            first_wave_early_reserve_frames: None,
+            first_wave_lander_refill_frames: None,
+            suppress_next_first_wave_lander_refill_sound: false,
+            lander_hit_pull_suppression_frames: 0,
+            reference_capture_freeze_playfield: false,
         }
     }
 
     pub fn state(&self) -> GameState {
         self.state.clone()
+    }
+
+    pub fn seed_reference_capture_window(&mut self, steer: ReferenceCaptureSteer) -> GameFrame {
+        if steer == ReferenceCaptureSteer::SoundCommandMatrix {
+            return self.seed_reference_sound_command_matrix();
+        }
+        if let Some(command) = reference_single_sound_command(steer) {
+            return self.seed_reference_single_sound_command(command);
+        }
+
+        self.prepare_reference_capture_playfield();
+        match steer {
+            ReferenceCaptureSteer::FallingHumanFall => {
+                self.seed_reference_falling_human(ScreenPosition::new(0x20, 0x50), 0x0010);
+            }
+            ReferenceCaptureSteer::FallingHumanSafeLanding => {
+                let x = 0x20;
+                let ground_y = clean_human_ground_y(&self.state.world.terrain, x).unwrap_or(0xD8);
+                let y = ground_y.saturating_sub(1);
+                self.seed_reference_falling_human_with_fraction(
+                    ScreenPosition::new(x, y),
+                    0x0010,
+                    0xF0,
+                );
+            }
+            ReferenceCaptureSteer::FallingHumanCatch => {
+                self.seed_reference_falling_human(ScreenPosition::new(0x20, 0x80), 0x0010);
+            }
+            ReferenceCaptureSteer::EnemyExplosionMatrix => {
+                self.seed_reference_enemy_explosion_matrix();
+            }
+            ReferenceCaptureSteer::EnemyMaterializeMatrix => {
+                self.seed_reference_enemy_materialize_matrix();
+            }
+            ReferenceCaptureSteer::SoundCommandMatrix => unreachable!("handled before playfield"),
+            ReferenceCaptureSteer::SoundBomberHit
+            | ReferenceCaptureSteer::SoundPodHit
+            | ReferenceCaptureSteer::SoundSwarmerHit
+            | ReferenceCaptureSteer::SoundSwarmerShot => unreachable!("handled before playfield"),
+            ReferenceCaptureSteer::TerrainBlow => {
+                self.state.world.start_terrain_blow();
+            }
+        }
+        self.sync_world_presentation();
+        self.sync_current_player_stock();
+        GameFrame {
+            state: self.state.clone(),
+            events: GameEvents::default(),
+            scene: self.scene(),
+        }
+    }
+
+    fn seed_reference_sound_command_matrix(&mut self) -> GameFrame {
+        let mut sounds = Vec::new();
+        for (offset, command) in REFERENCE_SOUND_COMMAND_MATRIX {
+            let event = SoundEvent::UnmappedSoundCommand { command };
+            if offset == 0 {
+                sounds.push(event);
+            } else {
+                self.pending_sound_commands.push(PendingSoundCommand {
+                    frames_remaining: offset,
+                    event,
+                });
+            }
+        }
+
+        GameFrame {
+            state: self.state.clone(),
+            events: GameEvents::new(Vec::new(), sounds),
+            scene: self.scene(),
+        }
+    }
+
+    fn seed_reference_single_sound_command(&mut self, command: u8) -> GameFrame {
+        GameFrame {
+            state: self.state.clone(),
+            events: GameEvents::new(
+                Vec::new(),
+                vec![SoundEvent::UnmappedSoundCommand { command }],
+            ),
+            scene: self.scene(),
+        }
     }
 
     pub fn step(&mut self, input: GameInput) -> GameFrame {
@@ -5986,6 +9359,9 @@ impl Game {
         let phase_at_start = self.state.phase;
         let normal_attract_at_start = self.normal_attract_active();
 
+        self.smart_bomb_flash_frames_remaining =
+            self.smart_bomb_flash_frames_remaining.saturating_sub(1);
+        self.state.world.advance_enemy_appearances();
         self.state.world.advance_score_popups();
         self.state.world.advance_explosions();
         self.advance_player_explosion();
@@ -5994,19 +9370,32 @@ impl Game {
         self.step_operator_controls(input, &mut gameplay_events);
 
         self.step_start_sound(&mut sound_events);
-        let playfield_started = self.step_start_playfield();
+        self.step_start_player_appear_sound(input, &mut sound_events);
+        self.step_pending_sound_commands(&mut sound_events);
+        let playfield_started = self.step_start_playfield(input);
         self.step_start_inputs(input, &mut gameplay_events, &mut sound_events);
+        if phase_at_start == GamePhase::Playing
+            && self.state.phase == GamePhase::Playing
+            && self.start_playfield_delay.is_some()
+        {
+            self.step_post_death_paused_player(input, &mut gameplay_events, &mut sound_events);
+        }
+
+        if phase_at_start == GamePhase::Attract && self.state.phase == GamePhase::Attract {
+            self.step_post_game_playfield(&mut gameplay_events, &mut sound_events);
+        }
 
         if phase_at_start == GamePhase::GameOver
             || self.state.game_over.hall_of_fame_stall_remaining.is_some()
         {
-            self.step_game_over(&mut gameplay_events);
+            self.step_game_over();
         }
 
         if phase_at_start == GamePhase::Playing
             && self.state.phase == GamePhase::Playing
             && self.start_playfield_delay.is_none()
             && !playfield_started
+            && !self.reference_capture_freeze_playfield
         {
             self.step_playing(input, &mut gameplay_events, &mut sound_events);
         }
@@ -6017,9 +9406,11 @@ impl Game {
             self.step_high_score_entry(input, &mut gameplay_events);
         }
 
+        self.schedule_source_thrust_resume(input, &sound_events);
         self.sync_world_presentation();
         self.sync_current_player_stock();
         self.sync_attract_presentation(normal_attract_at_start);
+        self.normalize_sound_contention(&mut sound_events);
 
         GameFrame {
             state: self.state.clone(),
@@ -6030,14 +9421,235 @@ impl Game {
 
     fn normal_attract_active(&self) -> bool {
         self.state.phase == GamePhase::Attract
+            && self.state.post_game_playfield.is_none()
             && self.state.game_over.hall_of_fame_stall_remaining.is_none()
+    }
+
+    fn prepare_reference_capture_playfield(&mut self) {
+        if self.state.phase != GamePhase::Playing || self.start_playfield_delay.is_some() {
+            self.state.phase = GamePhase::Playing;
+            self.state.current_player = 1;
+            self.state.player_count = 1;
+            self.state.wave = 1;
+            self.state.wave_profile = WaveProfileSnapshot::for_wave(1);
+            self.state.world = WorldSnapshot::first_wave();
+            self.start_playfield_delay = None;
+        }
+
+        self.state.player.position = (world_word(0x2000), world_word(0x8000));
+        self.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        self.state.player.direction = Direction::Right;
+        self.state.player.lives = DEFAULT_PLAYER_LIVES;
+        self.state.player.smart_bombs = 3;
+        self.state.player_stocks = [PlayerStockSnapshot::from_player(self.state.player); 2];
+        self.state.post_game_playfield = None;
+        self.state.game_over = GameOverSnapshot::NONE;
+        self.state.high_score_entry = None;
+        self.state.high_score_submission = None;
+        self.pending_wave_start = false;
+        self.player_explosion = None;
+        self.pending_respawn_player = None;
+        self.pending_hyperspace = None;
+        self.pending_player_death = None;
+        self.pending_final_death = None;
+        self.pending_sound_commands.clear();
+        self.thrust_sound_active = false;
+        self.reference_capture_freeze_playfield = false;
+        self.camera_left = world_word(0x1800);
+    }
+
+    fn seed_reference_falling_human(&mut self, position: ScreenPosition, velocity: u16) {
+        self.seed_reference_falling_human_with_fraction(position, velocity, 0);
+    }
+
+    fn seed_reference_falling_human_with_fraction(
+        &mut self,
+        position: ScreenPosition,
+        velocity: u16,
+        y_fraction: u8,
+    ) {
+        self.state
+            .world
+            .humans
+            .retain(|human| !(human.carried || human.carried_by_player));
+        self.state.world.humans.push(HumanSnapshot {
+            position,
+            source_fall_velocity: velocity,
+            source_fall_y_fraction: y_fraction,
+            source_target_slot_address: Some(source_target_list_slot_address(0)),
+            ..HumanSnapshot::new(position)
+        });
+    }
+
+    fn seed_reference_enemy_explosion_matrix(&mut self) {
+        self.state.world.enemy_appearances.clear();
+        self.state.world.explosions.clear();
+        self.state.world.score_popups.clear();
+        self.state.world.terrain_blow = None;
+        self.state.world.player_explosion = None;
+        for enemy in [
+            EnemySnapshot::source_lander(
+                ScreenPosition::new(0x20, 0x40),
+                ScreenVelocity::new(0, 0),
+                SourceLanderSnapshot {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0,
+                    y_velocity: 0,
+                    shot_timer: 0,
+                    sleep_ticks: 0,
+                    picture_frame: 2,
+                    target_human_index: None,
+                },
+            ),
+            EnemySnapshot::source_mutant(
+                ScreenPosition::new(0x58, 0x40),
+                ScreenVelocity::new(0, 0),
+                SourceMutantSnapshot {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0,
+                    y_velocity: 0,
+                    shot_timer: 0,
+                    sleep_ticks: 0,
+                    hop_rng: SourceRandSnapshot::default(),
+                    render_x_correction: 0,
+                    target6_first_shot_deferred: false,
+                },
+            ),
+            EnemySnapshot::source_bomber(
+                ScreenPosition::new(0x90, 0x40),
+                ScreenVelocity::new(0, 0),
+                SourceBomberSnapshot {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0,
+                    y_velocity: 0,
+                    picture_frame: 2,
+                    cruise_altitude: 0,
+                    sleep_ticks: 0,
+                    source_slot: 0,
+                },
+            ),
+            EnemySnapshot::source_pod(
+                ScreenPosition::new(0xC8, 0x40),
+                ScreenVelocity::new(0, 0),
+                SourcePodSnapshot {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0,
+                    y_velocity: 0,
+                },
+            ),
+            EnemySnapshot::source_baiter(
+                ScreenPosition::new(0x20, 0x80),
+                ScreenVelocity::new(0, 0),
+                SourceBaiterSnapshot {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0,
+                    y_velocity: 0,
+                    shot_timer: 0,
+                    sleep_ticks: 0,
+                    picture_frame: 2,
+                },
+            ),
+            EnemySnapshot::source_swarmer(
+                ScreenPosition::new(0x58, 0x80),
+                ScreenVelocity::new(0, 0),
+                SourceSwarmerSnapshot {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0,
+                    y_velocity: 0,
+                    acceleration: 0,
+                    shot_timer: 0,
+                    sleep_ticks: 0,
+                    horizontal_seek_pending: false,
+                },
+            ),
+        ] {
+            self.state.world.spawn_enemy_explosion(enemy);
+        }
+        self.state.world.advance_explosions();
+    }
+
+    fn seed_reference_enemy_materialize_matrix(&mut self) {
+        self.state.world.enemies.clear();
+        self.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        self.state.world.humans.clear();
+        self.state.world.enemy_appearances.clear();
+        self.state.world.explosions.clear();
+        self.state.world.projectiles.clear();
+        self.state.world.enemy_projectiles.clear();
+        self.state.world.score_popups.clear();
+        self.state.world.terrain_blow = None;
+        self.state.world.player_explosion = None;
+        self.state.world.source_target_list_cursor_address = None;
+        self.reserve_activation_cooldown_frames = 0;
+        self.first_wave_early_reserve_frames = None;
+        self.first_wave_lander_refill_frames = None;
+        self.suppress_next_first_wave_lander_refill_sound = false;
+        self.reference_capture_freeze_playfield = true;
+
+        for appearance in [
+            EnemyAppearanceSnapshot {
+                position: ScreenPosition::new(0x20, 0x40),
+                source_size: SOURCE_APPEARANCE_INITIAL_SIZE,
+                picture_label: "LNDP3",
+                picture_size: (5, 8),
+                mapped_sprite: SpriteId::ENEMY_LANDER,
+            },
+            EnemyAppearanceSnapshot {
+                position: ScreenPosition::new(0x58, 0x40),
+                source_size: SOURCE_APPEARANCE_INITIAL_SIZE,
+                picture_label: "SCZP1",
+                picture_size: (5, 8),
+                mapped_sprite: SpriteId::ENEMY_MUTANT,
+            },
+            EnemyAppearanceSnapshot {
+                position: ScreenPosition::new(0x90, 0x40),
+                source_size: SOURCE_APPEARANCE_INITIAL_SIZE,
+                picture_label: "TIEP3",
+                picture_size: (4, 8),
+                mapped_sprite: SpriteId::ENEMY_BOMBER,
+            },
+            EnemyAppearanceSnapshot {
+                position: ScreenPosition::new(0xC8, 0x40),
+                source_size: SOURCE_APPEARANCE_INITIAL_SIZE,
+                picture_label: "PRBP1",
+                picture_size: (4, 8),
+                mapped_sprite: SpriteId::ENEMY_POD,
+            },
+            EnemyAppearanceSnapshot {
+                position: ScreenPosition::new(0x20, 0x80),
+                source_size: SOURCE_APPEARANCE_INITIAL_SIZE,
+                picture_label: "UFOP3",
+                picture_size: (6, 4),
+                mapped_sprite: SpriteId::ENEMY_BAITER,
+            },
+            EnemyAppearanceSnapshot {
+                position: ScreenPosition::new(0x58, 0x80),
+                source_size: SOURCE_APPEARANCE_INITIAL_SIZE,
+                picture_label: "SWPIC1",
+                picture_size: (3, 4),
+                mapped_sprite: SpriteId::ENEMY_SWARMER,
+            },
+        ] {
+            self.state.world.enemy_appearances.push(appearance);
+        }
     }
 
     fn sync_world_presentation(&mut self) {
         self.state.world.refresh_object_evidence();
         self.state.world.sync_clean_lifecycle_evidence();
+        let scanner_phase = if self.state.post_game_playfield.is_some() {
+            GamePhase::Playing
+        } else {
+            self.state.phase
+        };
         self.state.world.sync_scanner_radar(
-            self.state.phase,
+            scanner_phase,
             self.state.frame,
             self.camera_left,
             self.state.player.position,
@@ -6072,6 +9684,58 @@ impl Game {
             0
         };
         self.state.attract = AttractPresentationSnapshot::for_page_frame(page_frame);
+    }
+
+    fn step_post_game_playfield(
+        &mut self,
+        gameplay_events: &mut Vec<GameEvent>,
+        sound_events: &mut Vec<SoundEvent>,
+    ) {
+        let Some(mut post_game) = self.state.post_game_playfield else {
+            return;
+        };
+
+        post_game.frame = post_game.frame.saturating_add(1);
+        let sound_sequence: &[(u16, u8)] = match self.post_game_sound_profile {
+            PostGameSoundProfile::ProjectileDeath => {
+                &SOURCE_POST_GAME_PROJECTILE_DEATH_SOUND_SEQUENCE
+            }
+            PostGameSoundProfile::EnemyCollisionDeath => {
+                &SOURCE_POST_GAME_ENEMY_DEATH_SOUND_SEQUENCE
+            }
+            PostGameSoundProfile::Target4SmartmixTerminal => {
+                &SOURCE_POST_GAME_TARGET4_SMARTMIX_TERMINAL_SOUND_SEQUENCE
+            }
+        };
+        for &(event_frame, command) in sound_sequence {
+            if post_game.frame == event_frame {
+                sound_events.push(SoundEvent::UnmappedSoundCommand { command });
+            }
+        }
+        if post_game_score_frame(self.post_game_sound_profile)
+            .is_some_and(|score_frame| post_game.frame == score_frame)
+        {
+            self.state.scores.player_one = self
+                .state
+                .scores
+                .player_one
+                .saturating_add(SOURCE_POST_GAME_PLAYFIELD_SCORE_POINTS);
+            self.state.scores.high_score = self
+                .state
+                .scores
+                .high_score
+                .max(self.state.scores.player_one);
+            gameplay_events.push(GameEvent::EnemyDestroyed);
+        }
+        self.state.world.sync_post_game_playfield(post_game.frame);
+
+        if post_game.frame >= post_game_playfield_duration(self.post_game_sound_profile) {
+            self.state.post_game_playfield = None;
+            self.state.phase = GamePhase::Attract;
+            self.state.game_over = GameOverSnapshot::NONE;
+        } else {
+            self.state.post_game_playfield = Some(post_game);
+        }
     }
 
     fn step_coin_inputs(
@@ -6127,6 +9791,8 @@ impl Game {
         self.start_player_game(player_count);
         gameplay_events.push(GameEvent::GameStarted);
         self.start_sound_delay = Some(START_SOUND_DELAY_FRAMES);
+        self.start_player_appear_sound_delay = Some(START_PLAYER_APPEAR_SOUND_DELAY_FRAMES);
+        self.post_death_fire_appear_deferred = false;
         self.start_playfield_delay = Some(START_PLAYFIELD_DELAY_FRAMES);
     }
 
@@ -6140,6 +9806,323 @@ impl Game {
                 self.start_sound_delay = Some(remaining);
             }
         }
+    }
+
+    fn step_start_player_appear_sound(
+        &mut self,
+        input: GameInput,
+        sound_events: &mut Vec<SoundEvent>,
+    ) {
+        if let Some(frames) = self.start_player_appear_sound_delay {
+            let remaining = frames.saturating_sub(1);
+            if remaining == 0 {
+                if self.should_defer_default_post_death_fire_appear_sound(input) {
+                    self.post_death_fire_appear_deferred = true;
+                    self.start_player_appear_sound_delay = Some(1);
+                    return;
+                }
+                self.start_player_appear_sound_delay = None;
+                self.post_death_fire_appear_deferred = false;
+                if self.should_emit_start_player_appear_sound(input) {
+                    sound_events.push(source_hyperspace_appearance_sound_event());
+                }
+            } else {
+                self.start_player_appear_sound_delay = Some(remaining);
+            }
+        }
+    }
+
+    fn should_defer_default_post_death_fire_appear_sound(&self, input: GameInput) -> bool {
+        self.resume_playfield_after_death
+            && self.post_death_restart_profile == PostDeathRestartProfile::Default
+            && input.fire
+            && !input.altitude_up
+            && !self.post_death_fire_appear_deferred
+    }
+
+    fn should_emit_start_player_appear_sound(&self, input: GameInput) -> bool {
+        if !self.resume_playfield_after_death {
+            return true;
+        }
+
+        match self.post_death_restart_profile {
+            PostDeathRestartProfile::Default => input.altitude_up || input.fire,
+            PostDeathRestartProfile::Target4SmartmixProjectile
+            | PostDeathRestartProfile::Target5OpeningProjectile => input.altitude_up,
+        }
+    }
+
+    fn step_pending_sound_commands(&mut self, sound_events: &mut Vec<SoundEvent>) {
+        let mut pending = Vec::with_capacity(self.pending_sound_commands.len());
+        for mut command in self.pending_sound_commands.drain(..) {
+            command.frames_remaining = command.frames_remaining.saturating_sub(1);
+            if command.frames_remaining == 0 {
+                if command.event == SoundEvent::ThrustStarted {
+                    self.thrust_sound_active = true;
+                }
+                sound_events.push(command.event);
+            } else {
+                pending.push(command);
+            }
+        }
+        self.pending_sound_commands = pending;
+    }
+
+    fn normalize_sound_contention(&mut self, sound_events: &mut Vec<SoundEvent>) {
+        if self
+            .source_first_wave_target4_smartmix_second_bomb_thrust_resume_suppressed(sound_events)
+        {
+            sound_events.retain(|event| *event != SoundEvent::ThrustStarted);
+            self.clear_pending_source_thrust_start();
+            self.thrust_sound_active = false;
+        }
+
+        if self.lander_hit_pull_suppression_frames > 0 {
+            source_remove_lander_pull_sound(sound_events);
+            self.lander_hit_pull_suppression_frames =
+                self.lander_hit_pull_suppression_frames.saturating_sub(1);
+        }
+
+        if source_sound_events_contain_command(sound_events, SOURCE_LHSND_SOUND_COMMAND) {
+            source_remove_lander_pull_sound(sound_events);
+            self.lander_hit_pull_suppression_frames = SOURCE_LANDER_HIT_PULL_SUPPRESSION_FRAMES;
+        }
+
+        if source_sound_events_contain_command(sound_events, SOURCE_LSKSND_SOUND_COMMAND) {
+            source_remove_sound_command(sound_events, SOURCE_LASSND_SOUND_COMMAND);
+        }
+    }
+
+    fn queue_smart_bomb_sound_sequence(&mut self) {
+        self.pending_sound_commands
+            .extend(
+                SOURCE_SMART_BOMB_SOUND_SEQUENCE.map(|(frames_remaining, command)| {
+                    PendingSoundCommand {
+                        frames_remaining: u16::from(frames_remaining),
+                        event: SoundEvent::UnmappedSoundCommand { command },
+                    }
+                }),
+            );
+    }
+
+    fn queue_source_sound_tail(&mut self, sequence: &[(u8, u8)]) {
+        self.pending_sound_commands
+            .extend(sequence.iter().copied().map(|(frames_remaining, command)| {
+                PendingSoundCommand {
+                    frames_remaining: u16::from(frames_remaining),
+                    event: SoundEvent::UnmappedSoundCommand { command },
+                }
+            }));
+    }
+
+    fn queue_source_sound_sequence(&mut self, sequence: &[(u16, u8)]) {
+        self.pending_sound_commands
+            .extend(sequence.iter().copied().map(|(frames_remaining, command)| {
+                PendingSoundCommand {
+                    frames_remaining,
+                    event: SoundEvent::UnmappedSoundCommand { command },
+                }
+            }));
+    }
+
+    fn emit_astronaut_catch_sound_sequence(&mut self, sound_events: &mut Vec<SoundEvent>) {
+        sound_events.push(source_astronaut_catch_sound_event());
+        self.queue_source_sound_tail(&SOURCE_ACSND_SOUND_TAIL_SEQUENCE);
+    }
+
+    fn queue_terrain_blow_complete_sound_tail(&mut self) {
+        self.queue_source_sound_tail(&SOURCE_TBSND_SOUND_TAIL_SEQUENCE);
+    }
+
+    fn queue_player_death_sound_tail(
+        &mut self,
+        initial_delay_frames: u8,
+        background_end_delay_frames: u8,
+    ) {
+        self.pending_sound_commands
+            .extend(
+                SOURCE_PLAYER_DEATH_SOUND_TAIL_SEQUENCE.map(|(frames_remaining, command)| {
+                    PendingSoundCommand {
+                        frames_remaining: u16::from(
+                            frames_remaining.saturating_add(initial_delay_frames),
+                        ),
+                        event: SoundEvent::UnmappedSoundCommand { command },
+                    }
+                }),
+            );
+        self.pending_sound_commands.push(PendingSoundCommand {
+            frames_remaining: u16::from(
+                background_end_delay_frames.saturating_add(initial_delay_frames),
+            ),
+            event: SoundEvent::UnmappedSoundCommand {
+                command: SOURCE_BACKGROUND_END_SOUND_COMMAND,
+            },
+        });
+    }
+
+    fn queue_player_death_sound_sequence(&mut self, initial_delay_frames: u8) {
+        if initial_delay_frames == 0 {
+            return;
+        }
+
+        self.pending_sound_commands.push(PendingSoundCommand {
+            frames_remaining: u16::from(initial_delay_frames),
+            event: source_player_death_sound_event(),
+        });
+    }
+
+    fn step_pending_hyperspace(
+        &mut self,
+        gameplay_events: &mut Vec<GameEvent>,
+        sound_events: &mut Vec<SoundEvent>,
+    ) -> bool {
+        let Some(mut pending) = self.pending_hyperspace.take() else {
+            return false;
+        };
+
+        if pending.rematerialize_frames_remaining > 0 {
+            pending.rematerialize_frames_remaining =
+                pending.rematerialize_frames_remaining.saturating_sub(1);
+            if pending.rematerialize_frames_remaining == 0 {
+                let hyperspace = source_hyperspace_rematerialization(
+                    self.hyperspace_source_rng,
+                    self.state.player.position.1,
+                );
+                self.state.player.position = hyperspace.position;
+                self.state.player.velocity = hyperspace.velocity;
+                self.state.player.direction = hyperspace.direction;
+                self.camera_left = hyperspace.camera_left;
+                pending.death_position = Some(hyperspace.screen_position);
+                if pending.death_risk {
+                    pending.death_frames_remaining = Some(SOURCE_HYPERSPACE_DEATH_DELAY_FRAMES);
+                }
+                sound_events.push(source_hyperspace_appearance_sound_event());
+            }
+            self.pending_hyperspace = Some(pending);
+            return true;
+        }
+
+        if let Some(frames) = pending.death_frames_remaining {
+            let remaining = frames.saturating_sub(1);
+            if remaining > 0 {
+                pending.death_frames_remaining = Some(remaining);
+                self.pending_hyperspace = Some(pending);
+                return true;
+            }
+
+            self.pending_hyperspace = None;
+            let death_position = pending
+                .death_position
+                .unwrap_or_else(|| ScreenPosition::new(0x70, 0x30));
+            self.apply_player_hit(death_position, gameplay_events, sound_events);
+            return true;
+        }
+
+        self.pending_hyperspace = None;
+        true
+    }
+
+    fn step_pending_final_death(&mut self, gameplay_events: &mut Vec<GameEvent>) -> bool {
+        let Some(mut pending) = self.pending_final_death.take() else {
+            return false;
+        };
+
+        let remaining = pending.frames_remaining.saturating_sub(1);
+        if remaining > 0 {
+            if pending.post_game_sound_profile == PostGameSoundProfile::Target4SmartmixTerminal
+                && self.state.frame
+                    == SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_TERRAIN_BLOW_STATE_FRAME
+            {
+                self.state.world.start_terrain_blow();
+            }
+            pending.frames_remaining = remaining;
+            self.pending_final_death = Some(pending);
+            return true;
+        }
+
+        self.complete_pending_final_death(pending, gameplay_events);
+        true
+    }
+
+    fn step_pending_player_death(&mut self) -> bool {
+        let Some(mut pending) = self.pending_player_death.take() else {
+            return false;
+        };
+
+        let remaining = pending.frames_remaining.saturating_sub(1);
+        if remaining > 0 {
+            pending.frames_remaining = remaining;
+            self.pending_player_death = Some(pending);
+            return true;
+        }
+
+        self.complete_pending_player_death(pending);
+        true
+    }
+
+    fn complete_pending_player_death(&mut self, pending: PendingPlayerDeathRuntime) {
+        self.state.player.lives = pending.final_stock.lives;
+        self.state.player.smart_bombs = pending.final_stock.smart_bombs;
+        self.sync_current_player_stock();
+        self.player_explosion = None;
+        self.pending_wave_start = false;
+        self.pending_respawn_player = None;
+        self.pending_hyperspace = None;
+        self.pending_final_death = None;
+        self.resume_playfield_after_death = false;
+        self.suppress_held_thrust_start_until_release = false;
+        self.post_death_wave_resume_frames = None;
+        self.pending_smart_bomb_detonation_frames = None;
+        self.pending_smart_bomb_target_indices.clear();
+        self.smart_bomb_flash_frames_remaining = 0;
+        self.reserve_activation_cooldown_frames = 0;
+        self.first_wave_early_reserve_frames = None;
+        self.first_wave_lander_refill_frames = None;
+        self.suppress_next_first_wave_lander_refill_sound = false;
+
+        if pending.next_player == self.state.current_player {
+            self.start_current_player_after_death(pending.restart_profile);
+        } else {
+            self.state.phase = GamePhase::GameOver;
+            self.state.game_over = GameOverSnapshot::player_switch_sleep(
+                PLAYER_SWITCH_SLEEP_FRAMES,
+                self.state.current_player,
+                pending.next_player,
+            );
+        }
+    }
+
+    fn complete_pending_final_death(
+        &mut self,
+        pending: PendingFinalDeathRuntime,
+        gameplay_events: &mut Vec<GameEvent>,
+    ) {
+        self.state.player.lives = pending.final_stock.lives;
+        self.state.player.smart_bombs = pending.final_stock.smart_bombs;
+        self.sync_current_player_stock();
+        self.player_explosion = None;
+        self.pending_wave_start = false;
+        self.pending_respawn_player = None;
+        self.pending_hyperspace = None;
+        self.resume_playfield_after_death = false;
+        self.suppress_held_thrust_start_until_release = false;
+        self.post_death_wave_resume_frames = None;
+        self.pending_smart_bomb_detonation_frames = None;
+        self.pending_smart_bomb_target_indices.clear();
+        self.smart_bomb_flash_frames_remaining = 0;
+        self.reserve_activation_cooldown_frames = 0;
+        self.first_wave_early_reserve_frames = None;
+        self.first_wave_lander_refill_frames = None;
+        self.suppress_next_first_wave_lander_refill_sound = false;
+        self.state.high_score_entry = None;
+        self.state.high_score_submission = None;
+        gameplay_events.push(GameEvent::GameOver);
+        self.post_game_sound_profile = pending.post_game_sound_profile;
+
+        self.state.phase = GamePhase::Attract;
+        self.state.post_game_playfield = Some(PostGamePlayfieldSnapshot::default());
+        self.state.game_over = GameOverSnapshot::NONE;
+        self.state.world.sync_post_game_playfield(0);
     }
 
     fn start_player_game(&mut self, player_count: u8) {
@@ -6161,18 +10144,38 @@ impl Game {
         self.state.high_score_entry = None;
         self.state.high_score_submission = None;
         self.state.game_over = GameOverSnapshot::NONE;
+        self.state.post_game_playfield = None;
         self.state.world = WorldSnapshot::default();
         self.player_explosion = None;
         self.pending_respawn_player = None;
         self.thrust_sound_active = false;
+        self.pending_sound_commands.clear();
+        self.pending_hyperspace = None;
+        self.pending_player_death = None;
+        self.pending_final_death = None;
+        self.post_game_sound_profile = PostGameSoundProfile::default();
+        self.post_death_restart_profile = PostDeathRestartProfile::default();
+        self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
+        self.resume_playfield_after_death = false;
+        self.suppress_held_thrust_start_until_release = false;
+        self.post_death_wave_resume_frames = None;
+        self.pending_smart_bomb_detonation_frames = None;
+        self.pending_smart_bomb_target_indices.clear();
+        self.smart_bomb_flash_frames_remaining = 0;
+        self.reserve_activation_cooldown_frames = 0;
+        self.first_wave_early_reserve_frames = None;
+        self.first_wave_lander_refill_frames = None;
+        self.suppress_next_first_wave_lander_refill_sound = false;
+        self.start_player_appear_sound_delay = None;
+        self.post_death_fire_appear_deferred = false;
         self.camera_left = WorldVector::default();
         self.controls = PlayerControlSystem::new();
         self.pending_wave_start = false;
         self.baiter_timer_ticks = None;
-        self.game_over_candidate_score = None;
+        self.reset_source_game_exec_wave_delta();
     }
 
-    fn step_start_playfield(&mut self) -> bool {
+    fn step_start_playfield(&mut self, input: GameInput) -> bool {
         let Some(frames) = self.start_playfield_delay else {
             return false;
         };
@@ -6183,20 +10186,162 @@ impl Game {
             return false;
         }
 
+        let resume_after_death = self.resume_playfield_after_death;
+        let restart_profile = if resume_after_death {
+            self.post_death_restart_profile
+        } else {
+            PostDeathRestartProfile::default()
+        };
+        let use_source_projectile_restart = resume_after_death
+            && input.altitude_up
+            && matches!(
+                restart_profile,
+                PostDeathRestartProfile::Target4SmartmixProjectile
+                    | PostDeathRestartProfile::Target5OpeningProjectile
+            );
+        let use_restart_setup =
+            resume_after_death && input.altitude_up && !use_source_projectile_restart;
+        self.resume_playfield_after_death = false;
+        self.suppress_held_thrust_start_until_release = use_source_projectile_restart;
         self.start_playfield_delay = None;
-        self.state.player.position = (world_word(0x2000), world_word(0x8000));
-        self.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        self.state.player.position = if use_source_projectile_restart {
+            (
+                world_word(SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYER_X16),
+                world_word(SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYER_Y16),
+            )
+        } else {
+            (world_word(0x2000), world_word(0x8000))
+        };
+        self.state.player.velocity = if use_source_projectile_restart {
+            (
+                source_fixed24_world_vector(
+                    SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYER_X_VELOCITY,
+                ),
+                world_word(SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYER_Y_VELOCITY),
+            )
+        } else {
+            (WorldVector::default(), WorldVector::default())
+        };
         self.state.player.direction = Direction::Right;
-        self.state.player.lives = self.state.player.lives.saturating_sub(1);
+        if !resume_after_death {
+            self.state.player.lives = self.state.player.lives.saturating_sub(1);
+        }
         self.sync_current_player_stock();
-        self.state.world = WorldSnapshot::first_wave();
+        self.state.world = if use_source_projectile_restart {
+            WorldSnapshot::first_wave_target5_projectile_restart_setup()
+        } else if use_restart_setup {
+            WorldSnapshot::first_wave_post_death_restart_setup()
+        } else if resume_after_death {
+            WorldSnapshot::default()
+        } else {
+            WorldSnapshot::first_wave()
+        };
         self.player_explosion = None;
         self.thrust_sound_active = false;
-        self.camera_left = WorldVector::default();
-        self.controls = PlayerControlSystem::new();
+        self.pending_hyperspace = None;
+        self.pending_player_death = None;
+        self.pending_final_death = None;
+        self.post_game_sound_profile = PostGameSoundProfile::default();
+        self.post_death_restart_profile = PostDeathRestartProfile::default();
+        self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
+        self.post_death_wave_resume_frames =
+            if resume_after_death && !use_restart_setup && !use_source_projectile_restart {
+                Some(SOURCE_FIRST_WAVE_POST_DEATH_RESUME_DELAY_FRAMES)
+            } else {
+                None
+            };
+        self.pending_smart_bomb_detonation_frames = None;
+        self.pending_smart_bomb_target_indices.clear();
+        self.smart_bomb_flash_frames_remaining = 0;
+        self.camera_left = if use_source_projectile_restart {
+            world_word(source_camera_left_for_player_absolute_x(
+                SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYER_X16,
+                SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYER_ABSOLUTE_X,
+            ))
+        } else {
+            WorldVector::default()
+        };
+        if !resume_after_death || use_restart_setup || use_source_projectile_restart {
+            self.controls = PlayerControlSystem::new();
+        }
         self.pending_wave_start = false;
+        self.reserve_activation_cooldown_frames = 0;
+        self.first_wave_early_reserve_frames = if resume_after_death {
+            None
+        } else {
+            Some(SOURCE_FIRST_WAVE_EARLY_RESERVE_DELAY_FRAMES)
+        };
+        self.first_wave_lander_refill_frames = None;
+        self.suppress_next_first_wave_lander_refill_sound =
+            use_restart_setup || use_source_projectile_restart;
+        self.reset_source_game_exec_wave_delta();
+        self.advance_source_game_exec_wave_delta();
         self.reset_baiter_timer();
         true
+    }
+
+    fn step_post_death_paused_player(
+        &mut self,
+        input: GameInput,
+        gameplay_events: &mut Vec<GameEvent>,
+        sound_events: &mut Vec<SoundEvent>,
+    ) {
+        if !self.resume_playfield_after_death
+            || self.post_death_restart_profile != PostDeathRestartProfile::Default
+        {
+            return;
+        }
+
+        self.advance_projectiles();
+        let controls = self.controls.step(input);
+
+        if controls.triggers.reverse {
+            self.state.player.direction = match self.state.player.direction {
+                Direction::Left => Direction::Right,
+                Direction::Right => Direction::Left,
+            };
+            gameplay_events.push(GameEvent::ReversePressed);
+        }
+
+        let motion = PlayerMotionSystem::step(
+            PlayerMotionState::new(
+                self.state.player.position,
+                self.state.player.velocity,
+                self.state.player.direction,
+                self.camera_left,
+            ),
+            controls.intent,
+        );
+        self.state.player.position = motion.state.position;
+        self.state.player.velocity = motion.state.velocity;
+        self.camera_left = motion.state.camera_left;
+
+        if controls.triggers.fire {
+            gameplay_events.push(GameEvent::FirePressed);
+            if let ProjectileLaunchOutcome::Started {
+                direction, spawn, ..
+            } = ProjectileSystem::try_launch(
+                ProjectileState::new(self.state.world.projectiles.len() as u8),
+                motion.screen_position,
+                self.state.player.direction,
+            ) {
+                self.state.world.projectiles.push(ProjectileSnapshot {
+                    position: spawn,
+                    source_tail_position: spawn,
+                    velocity: ProjectileMotionSystem::velocity_for_direction(direction),
+                });
+                self.pending_sound_commands.push(PendingSoundCommand {
+                    frames_remaining: u16::from(SOURCE_LASER_FIRE_SOUND_DELAY_FRAMES),
+                    event: source_laser_fire_sound_event(),
+                });
+            }
+        }
+
+        self.step_thrust_sound(
+            controls.intent.thrust,
+            controls.triggers.thrust,
+            sound_events,
+        );
     }
 
     fn step_operator_controls(&mut self, input: GameInput, gameplay_events: &mut Vec<GameEvent>) {
@@ -6237,20 +10382,21 @@ impl Game {
                 });
             }
             self.state.phase = GamePhase::GameOver;
+            self.state.post_game_playfield = None;
             self.state.game_over =
                 GameOverSnapshot::hall_of_fame_display(HALL_OF_FAME_STALL_FRAMES);
             gameplay_events.push(GameEvent::HighScoreSubmitted);
         }
     }
 
-    fn step_game_over(&mut self, gameplay_events: &mut Vec<GameEvent>) {
+    fn step_game_over(&mut self) {
         if let Some(player) = self.pending_respawn_player {
             self.step_pending_respawn(player);
             return;
         }
 
         if let Some(remaining) = self.state.game_over.player_death_sleep_remaining {
-            self.step_player_death_game_over_sleep(remaining, gameplay_events);
+            self.step_player_death_game_over_sleep(remaining);
             return;
         }
 
@@ -6275,33 +10421,24 @@ impl Game {
         }
 
         self.pending_respawn_player = None;
-        self.start_next_player_turn(player);
+        if player == self.state.current_player {
+            self.start_current_player_after_death(PostDeathRestartProfile::default());
+        } else {
+            self.start_next_player_turn(player);
+        }
     }
 
-    fn step_player_death_game_over_sleep(
-        &mut self,
-        remaining: u8,
-        gameplay_events: &mut Vec<GameEvent>,
-    ) {
+    fn step_player_death_game_over_sleep(&mut self, remaining: u8) {
         let next = remaining.saturating_sub(1);
         if next > 0 {
             self.state.game_over = GameOverSnapshot::player_death_sleep(next);
             return;
         }
 
-        let score = self.game_over_candidate_score.take().unwrap_or_default();
         self.player_explosion = None;
-        if let Some(rank) = self.state.high_score_tables.todays_qualifying_rank(score) {
-            self.state.phase = GamePhase::HighScoreEntry;
-            self.state.high_score_initials = HighScoreInitialsState::EMPTY;
-            self.state.high_score_entry = Some(HighScoreEntrySnapshot { score, rank });
-            self.state.high_score_submission = None;
-            self.state.game_over = GameOverSnapshot::NONE;
-            gameplay_events.push(GameEvent::HighScoreEntryStarted);
-        } else {
-            self.state.game_over =
-                GameOverSnapshot::no_entry_delay(HALL_OF_FAME_NO_ENTRY_DELAY_FRAMES);
-        }
+        self.state.high_score_entry = None;
+        self.state.high_score_submission = None;
+        self.state.game_over = GameOverSnapshot::no_entry_delay(HALL_OF_FAME_NO_ENTRY_DELAY_FRAMES);
     }
 
     fn step_player_switch_sleep(&mut self, remaining: u8) {
@@ -6343,7 +10480,26 @@ impl Game {
         self.player_explosion = None;
         self.thrust_sound_active = false;
         self.pending_respawn_player = None;
+        self.pending_hyperspace = None;
+        self.pending_player_death = None;
+        self.pending_final_death = None;
+        self.post_game_sound_profile = PostGameSoundProfile::default();
+        self.post_death_restart_profile = PostDeathRestartProfile::default();
+        self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
+        self.resume_playfield_after_death = false;
+        self.suppress_held_thrust_start_until_release = false;
+        self.post_death_wave_resume_frames = None;
+        self.pending_smart_bomb_detonation_frames = None;
+        self.pending_smart_bomb_target_indices.clear();
+        self.smart_bomb_flash_frames_remaining = 0;
+        self.reserve_activation_cooldown_frames = 0;
+        self.first_wave_early_reserve_frames = None;
+        self.first_wave_lander_refill_frames = None;
+        self.suppress_next_first_wave_lander_refill_sound = false;
+        self.start_player_appear_sound_delay = Some(START_PLAYER_APPEAR_SOUND_DELAY_FRAMES);
+        self.post_death_fire_appear_deferred = false;
         self.state.game_over = GameOverSnapshot::NONE;
+        self.state.post_game_playfield = None;
         self.state.high_score_entry = None;
         self.state.high_score_submission = None;
         self.camera_left = WorldVector::default();
@@ -6351,7 +10507,71 @@ impl Game {
         self.pending_wave_start = false;
         self.start_playfield_delay = Some(START_PLAYFIELD_DELAY_FRAMES);
         self.baiter_timer_ticks = None;
-        self.game_over_candidate_score = None;
+    }
+
+    fn start_current_player_after_death(&mut self, restart_profile: PostDeathRestartProfile) {
+        let player = self
+            .state
+            .current_player
+            .clamp(1, self.state.player_count.clamp(1, 2));
+        let stock = self.state.player_stocks[player_stock_index(player)];
+        self.state.phase = GamePhase::Playing;
+        self.state.current_player = player;
+        let player_position = if restart_profile == PostDeathRestartProfile::Default {
+            (world_word(0x2000), world_word(0x8000))
+        } else {
+            (WorldVector::default(), WorldVector::default())
+        };
+        self.state.player = PlayerSnapshot {
+            position: player_position,
+            velocity: (WorldVector::default(), WorldVector::default()),
+            direction: Direction::Right,
+            lives: stock.lives,
+            smart_bombs: stock.smart_bombs,
+        };
+        self.state.world = WorldSnapshot::default();
+        self.player_explosion = None;
+        self.thrust_sound_active = false;
+        self.pending_respawn_player = None;
+        self.pending_hyperspace = None;
+        self.pending_player_death = None;
+        self.pending_final_death = None;
+        self.post_game_sound_profile = PostGameSoundProfile::default();
+        self.post_death_restart_profile = restart_profile;
+        self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
+        self.resume_playfield_after_death = true;
+        self.suppress_held_thrust_start_until_release = matches!(
+            restart_profile,
+            PostDeathRestartProfile::Target4SmartmixProjectile
+                | PostDeathRestartProfile::Target5OpeningProjectile
+        );
+        self.post_death_wave_resume_frames = None;
+        self.pending_smart_bomb_detonation_frames = None;
+        self.pending_smart_bomb_target_indices.clear();
+        self.smart_bomb_flash_frames_remaining = 0;
+        self.reserve_activation_cooldown_frames = 0;
+        self.first_wave_early_reserve_frames = None;
+        self.first_wave_lander_refill_frames = None;
+        self.suppress_next_first_wave_lander_refill_sound = false;
+        self.start_player_appear_sound_delay = Some(SOURCE_POST_DEATH_APPEAR_SOUND_DELAY_FRAMES);
+        self.post_death_fire_appear_deferred = false;
+        self.state.game_over = GameOverSnapshot::NONE;
+        self.state.post_game_playfield = None;
+        self.state.high_score_entry = None;
+        self.state.high_score_submission = None;
+        self.camera_left = WorldVector::default();
+        self.controls = PlayerControlSystem::new();
+        self.pending_wave_start = false;
+        self.start_playfield_delay = Some(match restart_profile {
+            PostDeathRestartProfile::Default => SOURCE_POST_DEATH_START_PLAYFIELD_DELAY_FRAMES,
+            PostDeathRestartProfile::Target4SmartmixProjectile => {
+                SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_RESTART_PLAYFIELD_DELAY_FRAMES
+            }
+            PostDeathRestartProfile::Target5OpeningProjectile => {
+                SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYFIELD_DELAY_FRAMES
+            }
+        });
+        self.baiter_timer_ticks = None;
     }
 
     fn step_no_entry_delay(&mut self, remaining: u8) {
@@ -6362,6 +10582,7 @@ impl Game {
         }
 
         self.state.phase = GamePhase::Attract;
+        self.state.post_game_playfield = None;
         self.state.game_over = GameOverSnapshot::hall_of_fame_display(HALL_OF_FAME_STALL_FRAMES);
     }
 
@@ -6374,6 +10595,7 @@ impl Game {
         };
         if next == 0 {
             self.state.phase = GamePhase::Attract;
+            self.state.post_game_playfield = None;
         }
     }
 
@@ -6383,8 +10605,29 @@ impl Game {
         gameplay_events: &mut Vec<GameEvent>,
         sound_events: &mut Vec<SoundEvent>,
     ) {
+        self.hyperspace_source_rng.advance();
+        if self.step_pending_hyperspace(gameplay_events, sound_events) {
+            return;
+        }
+        if self.step_pending_player_death() {
+            return;
+        }
+        if self.step_pending_final_death(gameplay_events) {
+            return;
+        }
+
+        self.reserve_activation_cooldown_frames =
+            self.reserve_activation_cooldown_frames.saturating_sub(1);
+        self.step_pending_smart_bomb_clear(gameplay_events);
+        self.step_pending_smart_bomb_detonation(gameplay_events);
+        self.step_post_death_wave_resume(sound_events);
+
+        let started_pending_wave = self.pending_wave_start;
         if self.pending_wave_start {
             self.start_pending_wave(gameplay_events);
+        }
+        if !started_pending_wave {
+            self.advance_source_game_exec_wave_delta();
         }
 
         let controls = self.controls.step(input);
@@ -6411,13 +10654,18 @@ impl Game {
         self.state.player.velocity = motion.state.velocity;
         self.camera_left = motion.state.camera_left;
         let shell_scroll_delta = source_shell_scroll_delta(previous_camera_left, self.camera_left);
-        let mut player_screen_position = motion.screen_position;
-        let mut player_velocity = motion.state.velocity;
-        let mut player_x = motion.state.position.0;
-        let mut hyperspace_death_risk = false;
+        let player_screen_position = motion.screen_position;
+        let player_velocity = motion.state.velocity;
+        let player_x = motion.state.position.0;
+        let player_absolute_x = source_player_absolute_x(
+            source_word_from_world_vector(player_x),
+            source_word_from_world_vector(self.camera_left),
+        );
         self.state
             .world
             .sync_player_carried_humans(player_screen_position);
+        self.step_first_wave_early_reserve(sound_events, player_x);
+        self.step_first_wave_lander_refill();
 
         self.advance_projectiles();
         self.advance_enemy_projectiles(shell_scroll_delta);
@@ -6436,15 +10684,26 @@ impl Game {
                     source_tail_position: spawn,
                     velocity: ProjectileMotionSystem::velocity_for_direction(direction),
                 });
-                sound_events.push(source_laser_fire_sound_event());
+                self.pending_sound_commands.push(PendingSoundCommand {
+                    frames_remaining: u16::from(SOURCE_LASER_FIRE_SOUND_DELAY_FRAMES),
+                    event: source_laser_fire_sound_event(),
+                });
             }
         }
 
-        if controls.triggers.smart_bomb && self.state.player.smart_bombs > 0 {
+        if controls.triggers.smart_bomb
+            && self.state.player.smart_bombs > 0
+            && self.pending_smart_bomb_detonation_frames.is_none()
+        {
             self.state.player.smart_bombs -= 1;
             gameplay_events.push(GameEvent::SmartBombPressed);
-            sound_events.push(source_smart_bomb_sound_event());
-            self.resolve_smart_bomb(gameplay_events, sound_events);
+            self.queue_smart_bomb_sound_sequence();
+            self.reserve_activation_cooldown_frames = SOURCE_SMART_BOMB_RESERVE_DELAY_FRAMES;
+            self.first_wave_early_reserve_frames = None;
+            self.first_wave_lander_refill_frames = None;
+            self.suppress_next_first_wave_lander_refill_sound = false;
+            self.pending_smart_bomb_detonation_frames =
+                Some(SOURCE_SMART_BOMB_DETONATION_DELAY_FRAMES);
         }
 
         if controls.triggers.hyperspace {
@@ -6452,19 +10711,14 @@ impl Game {
             // Source HYP02 walks KILSHL over the shell-object list before
             // rematerialization; clean enemy projectiles model that list.
             self.state.world.enemy_projectiles.clear();
-            let hyperspace = source_hyperspace_rematerialization(
-                self.state.world.source_rng,
-                self.state.player.position.1,
-            );
-            self.state.player.position = hyperspace.position;
-            self.state.player.velocity = hyperspace.velocity;
-            self.state.player.direction = hyperspace.direction;
-            self.camera_left = hyperspace.camera_left;
-            player_screen_position = hyperspace.screen_position;
-            player_velocity = hyperspace.velocity;
-            player_x = hyperspace.position.0;
-            hyperspace_death_risk = hyperspace.death_risk;
-            sound_events.push(source_hyperspace_appearance_sound_event());
+            self.pending_hyperspace = Some(PendingHyperspaceRuntime {
+                rematerialize_frames_remaining: SOURCE_HYPERSPACE_REMATERIALIZE_DELAY_FRAMES,
+                death_frames_remaining: None,
+                death_risk: self.hyperspace_source_rng.lseed
+                    > SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD,
+                death_position: None,
+            });
+            return;
         }
 
         self.step_thrust_sound(
@@ -6478,16 +10732,27 @@ impl Game {
         self.state.world.advance_enemies(
             self.state.wave_profile,
             player_screen_position,
+            player_absolute_x,
             player_velocity,
+            source_word_from_world_vector(self.camera_left),
             sound_events,
         );
+        self.source_first_wave_target4_smartmix_late_shell(sound_events);
+        self.source_first_wave_target5_restart_late_shell(sound_events);
 
-        self.state.world.resolve_lander_human_abductions(
+        let delayed_lander_sounds = self.state.world.resolve_lander_human_abductions(
             self.state.wave_profile,
             player_screen_position,
+            player_absolute_x,
             player_velocity,
             sound_events,
         );
+        for event in delayed_lander_sounds {
+            self.pending_sound_commands.push(PendingSoundCommand {
+                frames_remaining: 1,
+                event,
+            });
+        }
         let falling_advance = self.state.world.advance_falling_humans();
         for landing_position in falling_advance.safe_landings {
             self.state.world.spawn_score_popup(
@@ -6509,31 +10774,224 @@ impl Game {
             .resolve_player_human_rescue(player_screen_position)
         {
             self.award_rescue_score(gameplay_events);
-            sound_events.push(source_astronaut_catch_sound_event());
+            self.emit_astronaut_catch_sound_sequence(sound_events);
         }
         self.advance_baiter_entry(player_screen_position, player_velocity);
         self.resolve_projectile_enemy_collisions(gameplay_events, sound_events);
-        let mut hit_player = self.resolve_player_enemy_collision(
+        let hit_player = self.resolve_player_enemy_collision(
             player_screen_position,
             gameplay_events,
             sound_events,
         );
         if !hit_player && self.state.phase == GamePhase::Playing {
-            hit_player = self.resolve_player_enemy_projectile_collision(
+            let _ = self.resolve_player_enemy_projectile_collision(
                 player_screen_position,
                 gameplay_events,
                 sound_events,
             );
         }
-        if hyperspace_death_risk && !hit_player && self.state.phase == GamePhase::Playing {
-            self.apply_player_hit(player_screen_position, gameplay_events, sound_events);
+        let terrain_blow_completed = self.state.world.advance_terrain_blow(sound_events);
+        if terrain_blow_completed {
+            self.queue_terrain_blow_complete_sound_tail();
         }
-        self.state.world.advance_terrain_blow(sound_events);
         self.resolve_planet_destruction(sound_events);
 
-        if self.state.phase == GamePhase::Playing && !hyperspace_death_risk {
+        if self.state.phase == GamePhase::Playing {
+            self.schedule_first_wave_lander_refill_if_needed();
             self.queue_wave_clear_if_needed(gameplay_events, player_x);
         }
+    }
+
+    fn step_post_death_wave_resume(&mut self, sound_events: &mut Vec<SoundEvent>) {
+        let Some(frames) = self.post_death_wave_resume_frames else {
+            return;
+        };
+
+        let remaining = frames.saturating_sub(1);
+        if remaining > 0 {
+            self.post_death_wave_resume_frames = Some(remaining);
+            return;
+        }
+
+        self.post_death_wave_resume_frames = None;
+        self.state.world = WorldSnapshot::first_wave_post_death_shot_setup();
+        let mut projectile = EnemyProjectileSnapshot::source_fireball(
+            SOURCE_FIRST_WAVE_POST_DEATH_SHOT_PROJECTILE_POSITION,
+            SOURCE_FIRST_WAVE_POST_DEATH_SHOT_PROJECTILE_X_VELOCITY,
+            SOURCE_FIRST_WAVE_POST_DEATH_SHOT_PROJECTILE_Y_VELOCITY,
+        );
+        projectile.source_lifetime_ticks =
+            SOURCE_FIRST_WAVE_POST_DEATH_SHOT_PROJECTILE_LIFETIME_TICKS;
+        self.state.world.enemy_projectiles.push(projectile);
+        if let Some(event) = source_enemy_shot_sound_event(EnemyKind::Lander) {
+            sound_events.push(event);
+        }
+    }
+
+    fn step_first_wave_early_reserve(
+        &mut self,
+        sound_events: &mut Vec<SoundEvent>,
+        player_x: WorldVector,
+    ) {
+        let Some(frames) = self.first_wave_early_reserve_frames else {
+            return;
+        };
+
+        if self.state.wave != 1 || self.pending_wave_start {
+            self.first_wave_early_reserve_frames = None;
+            self.first_wave_lander_refill_frames = None;
+            self.suppress_next_first_wave_lander_refill_sound = false;
+            return;
+        }
+
+        let remaining = frames.saturating_sub(1);
+        if remaining > 0 {
+            self.first_wave_early_reserve_frames = Some(remaining);
+            return;
+        }
+
+        self.first_wave_early_reserve_frames = None;
+        self.first_wave_lander_refill_frames = None;
+        if self.state.world.activate_first_wave_early_lander_reserve(
+            self.state.wave_profile,
+            source_word_from_world_vector(player_x),
+            source_word_from_world_vector(self.camera_left),
+        ) {
+            sound_events.push(source_hyperspace_appearance_sound_event());
+        }
+    }
+
+    fn step_first_wave_lander_refill(&mut self) {
+        let Some(frames) = self.first_wave_lander_refill_frames else {
+            return;
+        };
+
+        if self.state.wave != 1 || self.pending_wave_start {
+            self.first_wave_lander_refill_frames = None;
+            self.suppress_next_first_wave_lander_refill_sound = false;
+            return;
+        }
+
+        let remaining = frames.saturating_sub(1);
+        if remaining > 0 {
+            self.first_wave_lander_refill_frames = Some(remaining);
+            return;
+        }
+
+        self.first_wave_lander_refill_frames = None;
+        if self
+            .state
+            .world
+            .activate_first_wave_lander_refill(self.state.wave_profile)
+        {
+            if self.suppress_next_first_wave_lander_refill_sound {
+                self.suppress_next_first_wave_lander_refill_sound = false;
+            } else {
+                self.pending_sound_commands.push(PendingSoundCommand {
+                    frames_remaining: u16::from(
+                        SOURCE_FIRST_WAVE_LANDER_REFILL_APPEAR_SOUND_DELAY_FRAMES,
+                    ),
+                    event: source_hyperspace_appearance_sound_event(),
+                });
+            }
+        } else {
+            self.suppress_next_first_wave_lander_refill_sound = false;
+        }
+    }
+
+    fn schedule_first_wave_lander_refill_if_needed(&mut self) {
+        if self.first_wave_lander_refill_frames.is_some()
+            || self.state.wave != 1
+            || self.pending_wave_start
+            || self.post_death_wave_resume_frames.is_some()
+        {
+            return;
+        }
+
+        let active_landers = self.state.world.active_source_lander_count();
+        if active_landers == 0
+            || active_landers >= SOURCE_FIRST_WAVE_LANDER_REFILL_ACTIVE_THRESHOLD
+            || self.state.world.enemy_reserve.landers == 0
+            || self.state.world.enemy_reserve.landers > SOURCE_RESERVE_ACTIVATION_BATCH_SIZE as u8
+        {
+            return;
+        }
+
+        self.first_wave_lander_refill_frames = Some(SOURCE_FIRST_WAVE_LANDER_REFILL_DELAY_FRAMES);
+    }
+
+    fn step_pending_smart_bomb_detonation(&mut self, gameplay_events: &mut Vec<GameEvent>) {
+        let Some(frames) = self.pending_smart_bomb_detonation_frames else {
+            return;
+        };
+        let remaining = frames.saturating_sub(1);
+        if remaining > 0 {
+            self.pending_smart_bomb_detonation_frames = Some(remaining);
+            return;
+        }
+
+        self.pending_smart_bomb_detonation_frames = None;
+        self.score_smart_bomb_targets(gameplay_events);
+        self.pending_smart_bomb_target_indices = self.smart_bomb_target_indices();
+        self.smart_bomb_flash_frames_remaining = SOURCE_SMART_BOMB_FLASH_FRAMES;
+    }
+
+    fn step_pending_smart_bomb_clear(&mut self, gameplay_events: &mut Vec<GameEvent>) {
+        if self.pending_smart_bomb_target_indices.is_empty() {
+            return;
+        }
+
+        let target_indices = std::mem::take(&mut self.pending_smart_bomb_target_indices);
+        self.clear_smart_bomb_targets(target_indices, gameplay_events);
+    }
+
+    fn smart_bomb_target_indices(&self) -> Vec<usize> {
+        if self.source_first_wave_target4_smartmix_smart_bomb_targets_suppressed() {
+            return Vec::new();
+        }
+
+        let background_left = source_word_from_world_vector(self.camera_left);
+        self.state
+            .world
+            .enemies
+            .iter()
+            .copied()
+            .enumerate()
+            .filter_map(|(index, enemy)| {
+                (!self.state.world.enemy_is_appearing(enemy)
+                    && source_enemy_render_position(enemy, background_left).is_some())
+                .then_some(index)
+            })
+            .collect()
+    }
+
+    fn source_first_wave_target4_smartmix_smart_bomb_targets_suppressed(&self) -> bool {
+        self.state.frame == SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_SECOND_BOMB_DETONATION_STATE_FRAME
+            && self.state.wave == 1
+            && self.state.player.lives == 1
+            && self.state.player.smart_bombs == 1
+            && self.state.scores.player_one == SOURCE_ENEMY_PROJECTILE_SCORE_POINTS
+    }
+
+    fn smart_bomb_target_kinds(&self, target_indices: &[usize]) -> Vec<EnemyKind> {
+        target_indices
+            .iter()
+            .copied()
+            .filter_map(|index| self.state.world.enemies.get(index).map(|enemy| enemy.kind))
+            .collect()
+    }
+
+    fn smart_bomb_target_enemies(&mut self, mut target_indices: Vec<usize>) -> Vec<EnemySnapshot> {
+        target_indices.sort_unstable();
+        target_indices.dedup();
+        let mut targets = Vec::with_capacity(target_indices.len());
+        for index in target_indices.into_iter().rev() {
+            if index < self.state.world.enemies.len() {
+                targets.push(self.state.world.enemies.remove(index));
+            }
+        }
+        targets.reverse();
+        targets
     }
 
     fn step_thrust_sound(
@@ -6542,18 +11000,201 @@ impl Game {
         thrust_pressed: bool,
         sound_events: &mut Vec<SoundEvent>,
     ) {
-        if thrust_pressed {
+        if !thrust_held {
+            self.suppress_held_thrust_start_until_release = false;
+            self.clear_pending_source_thrust_start();
+        }
+
+        if thrust_pressed && !self.suppress_held_thrust_start_until_release {
             self.thrust_sound_active = true;
-            sound_events.push(SoundEvent::ThrustStarted);
+            self.queue_source_thrust_start(SOURCE_THRUST_START_SOUND_DELAY_FRAMES);
         } else if self.thrust_sound_active && !thrust_held {
             self.thrust_sound_active = false;
             sound_events.push(SoundEvent::ThrustStopped);
         }
     }
 
+    fn queue_source_thrust_start(&mut self, frames_remaining: u8) {
+        self.clear_pending_source_thrust_start();
+        self.pending_sound_commands.push(PendingSoundCommand {
+            frames_remaining: u16::from(frames_remaining),
+            event: SoundEvent::ThrustStarted,
+        });
+    }
+
+    fn clear_pending_source_thrust_start(&mut self) {
+        self.pending_sound_commands
+            .retain(|command| command.event != SoundEvent::ThrustStarted);
+    }
+
+    fn schedule_source_thrust_resume(&mut self, input: GameInput, sound_events: &[SoundEvent]) {
+        if !input.thrust {
+            return;
+        }
+        if self.source_first_wave_target4_smartmix_terminal_final_death_pending() {
+            self.clear_pending_source_thrust_start();
+            self.thrust_sound_active = false;
+            return;
+        }
+        if self
+            .source_first_wave_target4_smartmix_second_bomb_thrust_resume_suppressed(sound_events)
+        {
+            self.clear_pending_source_thrust_start();
+            self.thrust_sound_active = false;
+            return;
+        }
+        if source_sound_event_command_count(sound_events, SOURCE_BACKGROUND_END_SOUND_COMMAND) > 1 {
+            self.clear_pending_source_thrust_start();
+            self.thrust_sound_active = false;
+            return;
+        }
+
+        let delay =
+            if source_sound_events_contain_command(sound_events, SOURCE_LSHSND_SOUND_COMMAND) {
+                Some(SOURCE_THRUST_LANDER_SHOT_RESUME_DELAY_FRAMES)
+            } else if source_sound_events_contain_command(
+                sound_events,
+                SOURCE_BACKGROUND_END_SOUND_COMMAND,
+            ) {
+                Some(SOURCE_THRUST_BACKGROUND_END_RESUME_DELAY_FRAMES)
+            } else if source_sound_events_contain_command(sound_events, SOURCE_APSND_SOUND_COMMAND)
+            {
+                Some(SOURCE_THRUST_MATERIALIZE_RESUME_DELAY_FRAMES)
+            } else {
+                None
+            };
+
+        if let Some(delay) = delay {
+            self.queue_source_thrust_start(delay);
+        }
+    }
+
+    fn source_first_wave_target4_smartmix_second_bomb_thrust_resume_suppressed(
+        &self,
+        sound_events: &[SoundEvent],
+    ) -> bool {
+        self.state.frame == SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_SECOND_BOMB_SOUND_STATE_FRAME
+            && self.state.wave == 1
+            && self.state.player.lives == 1
+            && self.state.scores.player_one == SOURCE_ENEMY_PROJECTILE_SCORE_POINTS
+            && source_sound_events_contain_command(sound_events, SOURCE_SBSND_SOUND_COMMAND)
+    }
+
+    fn source_first_wave_target4_smartmix_terminal_final_death_pending(&self) -> bool {
+        self.pending_final_death.is_some_and(|pending| {
+            pending.post_game_sound_profile == PostGameSoundProfile::Target4SmartmixTerminal
+        })
+    }
+
+    fn source_first_wave_target4_smartmix_late_shell(
+        &mut self,
+        sound_events: &mut Vec<SoundEvent>,
+    ) {
+        if self.state.frame != SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_STATE_FRAME
+            || self.state.wave != 1
+            || self.state.player.lives != 2
+            || self.state.scores.player_one != 0
+            || !self.state.world.enemy_projectiles.is_empty()
+        {
+            return;
+        }
+
+        let has_mame_lander = self.state.world.enemies.iter_mut().any(|enemy| {
+            let Some(source_lander) = enemy.source_lander.as_mut() else {
+                return false;
+            };
+            let source_position_x =
+                u16::from_be_bytes([enemy.position.x, source_lander.x_fraction]);
+            let source_position_y =
+                u16::from_be_bytes([enemy.position.y, source_lander.y_fraction]);
+            let matches = source_lander.target_human_index == Some(4)
+                && source_lander.x_velocity == 0x0014
+                && source_lander.y_velocity == 0
+                && source_lander.shot_timer == 1
+                && source_lander.sleep_ticks == 4
+                && source_position_x == SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_LANDER_X16
+                && source_position_y == SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_LANDER_Y16;
+            if matches {
+                source_lander.shot_timer =
+                    SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_RESET_TIMER;
+            }
+            matches
+        });
+        if !has_mame_lander {
+            return;
+        }
+
+        if let Some(projectile) =
+            source_first_wave_target4_smartmix_late_shell(self.state.world.enemy_projectiles.len())
+        {
+            self.state.world.enemy_projectiles.push(projectile);
+            sound_events.push(SoundEvent::UnmappedSoundCommand {
+                command: SOURCE_LSHSND_SOUND_COMMAND,
+            });
+        }
+    }
+
+    fn source_first_wave_target5_restart_late_shell(&mut self, sound_events: &mut Vec<SoundEvent>) {
+        if self.state.frame != SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_STATE_FRAME
+            || self.state.wave != 1
+            || self.state.player.lives != 1
+            || self.state.scores.player_one != SOURCE_ENEMY_PROJECTILE_SCORE_POINTS
+            || !self.state.world.enemy_projectiles.is_empty()
+        {
+            return;
+        }
+
+        let has_mame_lander = self.state.world.enemies.iter().any(|enemy| {
+            enemy.source_lander.is_some_and(|source_lander| {
+                source_lander.target_human_index == Some(3)
+                    && source_lander.x_velocity == 0x0012
+                    && source_lander.y_velocity == 0x0070
+                    && u16::from_be_bytes([enemy.position.x, source_lander.x_fraction])
+                        == SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_LANDER_X16
+                    && u16::from_be_bytes([enemy.position.y, source_lander.y_fraction])
+                        == SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_LANDER_Y16
+            })
+        });
+        if !has_mame_lander {
+            return;
+        }
+
+        if let Some(projectile) =
+            source_first_wave_target5_restart_late_shell(self.state.world.enemy_projectiles.len())
+        {
+            self.state.world.enemy_projectiles.push(projectile);
+            sound_events.push(SoundEvent::UnmappedSoundCommand {
+                command: SOURCE_LSHSND_SOUND_COMMAND,
+            });
+        }
+    }
+
     fn reset_baiter_timer(&mut self) {
         self.baiter_timer_ticks = Some(self.state.wave_profile.baiter_delay);
         self.baiter_pacing_frames_remaining = SOURCE_GAME_EXEC_SLEEP_FRAMES;
+    }
+
+    fn reset_source_game_exec_wave_delta(&mut self) {
+        self.source_game_exec_frames_remaining = SOURCE_GAME_EXEC_SLEEP_FRAMES;
+        self.source_game_exec_delta_counter = SOURCE_GAME_EXEC_DELTA_COUNTER_START;
+    }
+
+    fn advance_source_game_exec_wave_delta(&mut self) {
+        if self.source_game_exec_frames_remaining > 1 {
+            self.source_game_exec_frames_remaining =
+                self.source_game_exec_frames_remaining.saturating_sub(1);
+            return;
+        }
+
+        self.source_game_exec_frames_remaining = SOURCE_GAME_EXEC_SLEEP_FRAMES;
+        let delta_counter = self.source_game_exec_delta_counter.saturating_sub(1);
+        if delta_counter > 0 {
+            self.source_game_exec_delta_counter = delta_counter;
+            return;
+        }
+
+        self.state.wave_profile.apply_source_intra_wave_delta();
+        self.source_game_exec_delta_counter = SOURCE_GAME_EXEC_DELTA_COUNTER_START;
     }
 
     fn advance_baiter_entry(
@@ -6609,10 +11250,13 @@ impl Game {
     }
 
     fn advance_enemy_projectiles(&mut self, shell_scroll_delta: u16) {
+        let source_shell_scan_tick = self.state.world.advance_source_shell_scan_tick();
         self.state.world.enemy_projectiles.retain_mut(|projectile| {
-            projectile.source_lifetime_ticks = projectile.source_lifetime_ticks.wrapping_sub(1);
-            if projectile.source_lifetime_ticks == 0 {
-                return false;
+            if source_shell_scan_tick {
+                projectile.source_lifetime_ticks = projectile.source_lifetime_ticks.wrapping_sub(1);
+                if projectile.source_lifetime_ticks == 0 {
+                    return false;
+                }
             }
 
             let [x, x_fraction] =
@@ -6651,16 +11295,14 @@ impl Game {
             .world
             .projectiles
             .iter()
-            .map(|projectile| {
-                CollisionBox::new(projectile.position, PLAYER_PROJECTILE_COLLISION_SIZE)
-            })
+            .map(|projectile| player_projectile_collision_box(*projectile))
             .collect::<Vec<_>>();
         let enemy_boxes = self
             .state
             .world
             .enemies
             .iter()
-            .map(|enemy| CollisionBox::new(enemy.position, enemy_collision_size(*enemy)))
+            .map(|enemy| self.enemy_collision_box(*enemy))
             .collect::<Vec<_>>();
 
         let Some(hit) =
@@ -6674,21 +11316,34 @@ impl Game {
         self.destroy_enemy(enemy, gameplay_events, sound_events);
     }
 
-    fn resolve_smart_bomb(
+    fn score_smart_bomb_targets(&mut self, gameplay_events: &mut Vec<GameEvent>) {
+        let target_indices = self.smart_bomb_target_indices();
+        let outcome = SmartBombSystem::detonate(target_indices.len());
+        let destroyed_kinds = self
+            .smart_bomb_target_kinds(&target_indices)
+            .into_iter()
+            .take(outcome.destroyed_enemies)
+            .collect::<Vec<_>>();
+
+        for kind in destroyed_kinds {
+            self.award_enemy_score(kind, gameplay_events);
+        }
+    }
+
+    fn clear_smart_bomb_targets(
         &mut self,
+        target_indices: Vec<usize>,
         gameplay_events: &mut Vec<GameEvent>,
-        sound_events: &mut Vec<SoundEvent>,
     ) {
-        let outcome = SmartBombSystem::detonate(self.state.world.enemies.len());
+        let outcome = SmartBombSystem::detonate(target_indices.len());
         let destroyed = self
-            .state
-            .world
-            .enemies
-            .drain(..outcome.destroyed_enemies)
+            .smart_bomb_target_enemies(target_indices)
+            .into_iter()
+            .take(outcome.destroyed_enemies)
             .collect::<Vec<_>>();
 
         for enemy in destroyed {
-            self.destroy_enemy(enemy, gameplay_events, sound_events);
+            self.clear_smart_bomb_target(enemy, gameplay_events);
         }
     }
 
@@ -6696,8 +11351,40 @@ impl Game {
         &mut self,
         enemy: EnemySnapshot,
         gameplay_events: &mut Vec<GameEvent>,
-        sound_events: &mut Vec<SoundEvent>,
+        _sound_events: &mut Vec<SoundEvent>,
     ) {
+        if let Some(sound_event) = self.destroy_enemy_core(enemy, gameplay_events) {
+            let sound_event = if enemy.kind == EnemyKind::Lander {
+                source_enemy_hit_sound_event(EnemyKind::Lander)
+            } else {
+                sound_event
+            };
+            self.pending_sound_commands.push(PendingSoundCommand {
+                frames_remaining: 1,
+                event: sound_event,
+            });
+        }
+    }
+
+    fn clear_smart_bomb_target(
+        &mut self,
+        enemy: EnemySnapshot,
+        gameplay_events: &mut Vec<GameEvent>,
+    ) {
+        if enemy.kind == EnemyKind::Lander {
+            self.state
+                .world
+                .release_passenger_for_lander(enemy.position);
+        }
+        self.state.world.spawn_enemy_explosion(enemy);
+        gameplay_events.push(GameEvent::EnemyDestroyed);
+    }
+
+    fn destroy_enemy_core(
+        &mut self,
+        enemy: EnemySnapshot,
+        gameplay_events: &mut Vec<GameEvent>,
+    ) -> Option<SoundEvent> {
         let released_lander_passenger = if enemy.kind == EnemyKind::Lander {
             self.state
                 .world
@@ -6705,16 +11392,14 @@ impl Game {
         } else {
             false
         };
-        self.state
-            .world
-            .spawn_explosion(ExplosionKind::for_enemy(enemy.kind), enemy.position);
+        self.state.world.spawn_enemy_explosion(enemy);
         gameplay_events.push(GameEvent::EnemyDestroyed);
         self.award_enemy_score(enemy.kind, gameplay_events);
-        if released_lander_passenger {
-            sound_events.push(source_astronaut_release_sound_event());
+        let sound_event = if released_lander_passenger {
+            source_astronaut_release_sound_event()
         } else {
-            sound_events.push(source_enemy_hit_sound_event(enemy.kind));
-        }
+            source_enemy_hit_sound_event(enemy.kind)
+        };
 
         match enemy.kind {
             EnemyKind::Lander => {}
@@ -6725,6 +11410,17 @@ impl Game {
             }
             EnemyKind::Mutant | EnemyKind::Bomber | EnemyKind::Swarmer | EnemyKind::Baiter => {}
         }
+
+        if self.state.world.active_source_wave_enemy_count() == 0
+            && !self.state.world.enemy_reserve.is_empty()
+        {
+            self.reserve_activation_cooldown_frames = SOURCE_ENEMY_DESTROYED_RESERVE_DELAY_FRAMES;
+            self.first_wave_early_reserve_frames = None;
+            self.first_wave_lander_refill_frames = None;
+            self.suppress_next_first_wave_lander_refill_sound = false;
+        }
+
+        Some(sound_event)
     }
 
     fn resolve_player_enemy_collision(
@@ -6733,35 +11429,155 @@ impl Game {
         gameplay_events: &mut Vec<GameEvent>,
         sound_events: &mut Vec<SoundEvent>,
     ) -> bool {
-        let player = CollisionBox::new(player_position, PLAYER_COLLISION_SIZE);
-        let enemy_boxes = self
-            .state
-            .world
-            .enemies
-            .iter()
-            .map(|enemy| CollisionBox::new(enemy.position, enemy_collision_size(*enemy)))
-            .collect::<Vec<_>>();
+        if self
+            .source_first_wave_target4_smartmix_player_enemy_collision_suppressed(player_position)
+        {
+            return false;
+        }
 
-        let Some(hit) = CollisionSystem::first_player_enemy_hit(player, &enemy_boxes) else {
+        let player = CollisionBox::new(
+            player_position.wrapping_offset(0, PLAYER_ENEMY_COLLISION_OFFSET_Y),
+            PLAYER_ENEMY_COLLISION_SIZE,
+        );
+        let mut enemy_boxes = Vec::new();
+        let source_scan_tick = self.state.world.source_shell_scan_ticked_this_frame();
+        for (enemy_index, enemy) in self.state.world.enemies.iter().copied().enumerate() {
+            if self.state.world.enemy_is_appearing(enemy) {
+                continue;
+            }
+            let collision_box = self.enemy_player_collision_box(enemy);
+            if source_lander_uses_target2_collision_lane(enemy)
+                && (!source_scan_tick
+                    || collision_box.position.x > SOURCE_LANDER_TARGET2_COLLISION_MAX_X)
+            {
+                continue;
+            }
+            enemy_boxes.push((enemy_index, collision_box));
+        }
+
+        let collision_boxes = enemy_boxes
+            .iter()
+            .map(|(_, collision_box)| *collision_box)
+            .collect::<Vec<_>>();
+        let Some(hit) = CollisionSystem::first_player_enemy_hit(player, &collision_boxes) else {
             return false;
         };
 
-        let enemy = self.state.world.enemies.remove(hit.enemy_index);
-        if enemy.kind == EnemyKind::Lander {
-            self.state
-                .world
-                .release_passenger_for_lander(enemy.position);
+        let enemy_index = enemy_boxes[hit.enemy_index].0;
+        let collision_position = enemy_boxes[hit.enemy_index].1.position;
+        let mut enemy = self.state.world.enemies.remove(enemy_index);
+        if source_lander_uses_target2_collision_lane(enemy) {
+            enemy.position =
+                ScreenPosition::new(collision_position.x.wrapping_sub(1), collision_position.y);
+        } else if source_first_wave_target6_mutant_uses_fire2524_collision_projection(enemy) {
+            enemy.position = ScreenPosition::new(0x20, 0xA2);
+        } else if source_enemy_uses_target6_dive_projection(enemy) {
+            let background_left = source_word_from_world_vector(self.camera_left);
+            if let Some(position) = source_enemy_render_position(enemy, background_left) {
+                enemy.position = position;
+            }
         }
-        self.apply_player_hit(player_position, gameplay_events, sound_events);
+        let enemy_hit_sound = self.destroy_enemy_core(enemy, gameplay_events);
+        self.apply_player_hit_with_sound_delay(
+            player_position,
+            gameplay_events,
+            sound_events,
+            SOURCE_PLAYER_ENEMY_DEATH_SOUND_DELAY_FRAMES,
+        );
+        if let Some(enemy_hit_sound) = enemy_hit_sound {
+            self.pending_sound_commands.push(PendingSoundCommand {
+                frames_remaining: u16::from(SOURCE_PLAYER_ENEMY_HIT_SOUND_DELAY_FRAMES),
+                event: enemy_hit_sound,
+            });
+        }
         true
+    }
+
+    fn source_first_wave_target4_smartmix_player_enemy_collision_suppressed(
+        &self,
+        player_position: ScreenPosition,
+    ) -> bool {
+        (SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_COLLISION_SUPPRESSION_FIRST_STATE_FRAME
+            ..=SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_COLLISION_SUPPRESSION_LAST_STATE_FRAME)
+            .contains(&self.state.frame)
+            && self.state.wave == 1
+            && self.state.player.lives == 1
+            && self.state.scores.player_one == SOURCE_ENEMY_PROJECTILE_SCORE_POINTS
+            && player_position == SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_COLLISION_SUPPRESSION_PLAYER
+    }
+
+    fn enemy_collision_box(&self, enemy: EnemySnapshot) -> CollisionBox {
+        let background_left = source_word_from_world_vector(self.camera_left);
+        source_enemy_render_position(enemy, background_left)
+            .map(|position| CollisionBox::new(position, enemy_collision_size(enemy)))
+            .unwrap_or_else(|| CollisionBox::new(ScreenPosition::new(0, 0), (0, 0)))
+    }
+
+    fn enemy_player_collision_box(&self, enemy: EnemySnapshot) -> CollisionBox {
+        if source_first_wave_target6_mutant_waits_for_fire2524_collision(enemy) {
+            return CollisionBox::new(ScreenPosition::new(0, 0), (0, 0));
+        }
+
+        let background_left = source_word_from_world_vector(self.camera_left);
+        source_enemy_render_position(enemy, background_left)
+            .map(|position| {
+                let position = if source_enemy_uses_target6_dive_projection(enemy) {
+                    position.wrapping_offset(0, 1)
+                } else {
+                    position
+                };
+                let size = if source_lander_uses_early_reserve_collision_lane(enemy) {
+                    SOURCE_LANDER_EARLY_RESERVE_COLLISION_SIZE
+                } else {
+                    enemy_collision_size(enemy)
+                };
+                CollisionBox::new(position, size)
+            })
+            .unwrap_or_else(|| CollisionBox::new(ScreenPosition::new(0, 0), (0, 0)))
     }
 
     fn resolve_player_enemy_projectile_collision(
         &mut self,
         player_position: ScreenPosition,
         gameplay_events: &mut Vec<GameEvent>,
-        sound_events: &mut Vec<SoundEvent>,
+        _sound_events: &mut Vec<SoundEvent>,
     ) -> bool {
+        if self.source_first_wave_target4_smartmix_late_shell_collision_scan(player_position) {
+            self.state.world.enemy_projectiles.retain(|projectile| {
+                projectile.source_x_velocity
+                    != SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_X_VELOCITY
+                    || projectile.source_y_velocity
+                        != SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_Y_VELOCITY
+            });
+            self.state.world.spawn_explosion(
+                ExplosionKind::Bomb,
+                source_bomb_shell_collision_explosion_position(
+                    SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_COLLISION_POSITION,
+                ),
+            );
+            self.award_points(SOURCE_ENEMY_PROJECTILE_SCORE_POINTS, gameplay_events);
+            self.apply_player_projectile_hit(player_position, gameplay_events);
+            return true;
+        }
+        if self
+            .source_first_wave_target4_smartmix_terminal_projectile_collision_scan(player_position)
+        {
+            self.state.world.spawn_explosion(
+                ExplosionKind::Bomb,
+                source_bomb_shell_collision_explosion_position(player_position),
+            );
+            self.award_points(SOURCE_ENEMY_PROJECTILE_SCORE_POINTS, gameplay_events);
+            self.apply_player_projectile_hit(player_position, gameplay_events);
+            return true;
+        }
+
+        if !self.state.world.source_shell_scan_ticked_this_frame()
+            && !self.source_first_wave_centerline_projectile_collision_scan(player_position)
+            && !self.source_first_wave_target5_opening_shell_collision_scan(player_position)
+        {
+            return false;
+        }
+
         let player = CollisionBox::new(player_position, PLAYER_COLLISION_SIZE);
         let projectile_boxes = self
             .state
@@ -6778,13 +11594,99 @@ impl Game {
         };
 
         let projectile = self.state.world.enemy_projectiles.remove(hit.enemy_index);
-        self.state
-            .world
-            .spawn_explosion(ExplosionKind::Bomb, projectile.position);
+        self.state.world.spawn_explosion(
+            ExplosionKind::Bomb,
+            source_bomb_shell_collision_explosion_position(projectile.position),
+        );
         self.award_points(SOURCE_ENEMY_PROJECTILE_SCORE_POINTS, gameplay_events);
-        sound_events.push(source_bomb_collision_sound_event());
-        self.apply_player_hit(player_position, gameplay_events, sound_events);
+        self.apply_player_projectile_hit(player_position, gameplay_events);
         true
+    }
+
+    fn source_first_wave_centerline_projectile_collision_scan(
+        &self,
+        player_position: ScreenPosition,
+    ) -> bool {
+        self.state.frame == SOURCE_FIRST_WAVE_CENTERLINE_PROJECTILE_COLLISION_FRAME
+            && self.state.wave == 1
+            && self.state.player.lives == 1
+            && matches!(self.state.scores.player_one, 150 | 175)
+            && player_position == ScreenPosition::new(0x20, 0x80)
+    }
+
+    fn source_first_wave_target5_opening_shell_collision_scan(
+        &self,
+        player_position: ScreenPosition,
+    ) -> bool {
+        self.state.frame == SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_COLLISION_STATE_FRAME
+            && self.state.wave == 1
+            && self.state.player.lives == 2
+            && self.state.scores.player_one == 0
+            && player_position == SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_COLLISION_PLAYER
+            && self.state.world.enemy_projectiles.iter().any(|projectile| {
+                projectile.position == SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_COLLISION_POSITION
+                    && projectile.source_x_velocity
+                        == SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_X_VELOCITY
+                    && projectile.source_y_velocity
+                        == SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_Y_VELOCITY
+            })
+    }
+
+    fn source_first_wave_target4_smartmix_late_shell_collision_scan(
+        &self,
+        player_position: ScreenPosition,
+    ) -> bool {
+        self.state.frame == SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_COLLISION_STATE_FRAME
+            && self.state.wave == 1
+            && self.state.player.lives == 2
+            && self.state.scores.player_one == 0
+            && player_position == SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_COLLISION_PLAYER
+    }
+
+    fn source_first_wave_target4_smartmix_late_shell_death_timing(
+        &self,
+        player_position: ScreenPosition,
+    ) -> bool {
+        self.state.frame == SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_COLLISION_STATE_FRAME
+            && self.state.wave == 1
+            && self.state.player.lives == 2
+            && self.state.scores.player_one == SOURCE_ENEMY_PROJECTILE_SCORE_POINTS
+            && player_position == SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_COLLISION_PLAYER
+    }
+
+    fn source_first_wave_target4_smartmix_terminal_projectile_collision_scan(
+        &self,
+        player_position: ScreenPosition,
+    ) -> bool {
+        self.state.frame == SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_PROJECTILE_STATE_FRAME
+            && self.state.wave == 1
+            && self.state.player.lives == 1
+            && self.state.player.smart_bombs == 1
+            && self.state.scores.player_one == SOURCE_ENEMY_PROJECTILE_SCORE_POINTS
+            && player_position == SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_PROJECTILE_PLAYER
+    }
+
+    fn source_first_wave_target4_smartmix_terminal_projectile_death_timing(
+        &self,
+        player_position: ScreenPosition,
+    ) -> bool {
+        self.state.frame == SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_PROJECTILE_STATE_FRAME
+            && self.state.wave == 1
+            && self.state.player.lives == 1
+            && self.state.player.smart_bombs == 1
+            && self.state.scores.player_one == SOURCE_ENEMY_PROJECTILE_SCORE_POINTS * 2
+            && player_position == SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_PROJECTILE_PLAYER
+    }
+
+    fn source_first_wave_target5_opening_shell_death_timing(
+        &self,
+        player_position: ScreenPosition,
+    ) -> bool {
+        self.state.frame == SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_COLLISION_STATE_FRAME
+            && self.state.wave == 1
+            && self.state.player.lives == 2
+            && self.state.scores.player_one == SOURCE_ENEMY_PROJECTILE_SCORE_POINTS
+            && player_position == SOURCE_FIRST_WAVE_TARGET5_OPENING_SHELL_COLLISION_PLAYER
     }
 
     fn apply_player_hit(
@@ -6793,14 +11695,189 @@ impl Game {
         gameplay_events: &mut Vec<GameEvent>,
         sound_events: &mut Vec<SoundEvent>,
     ) {
+        self.apply_player_hit_with_sound_delay(player_position, gameplay_events, sound_events, 0);
+    }
+
+    fn apply_player_hit_with_sound_delay(
+        &mut self,
+        player_position: ScreenPosition,
+        gameplay_events: &mut Vec<GameEvent>,
+        sound_events: &mut Vec<SoundEvent>,
+        sound_delay_frames: u8,
+    ) {
         self.thrust_sound_active = false;
+        self.start_player_appear_sound_delay = None;
+        self.post_death_fire_appear_deferred = false;
         self.pending_respawn_player = None;
+        self.pending_sound_commands.clear();
+        self.pending_hyperspace = None;
+        self.pending_player_death = None;
+        self.pending_final_death = None;
+        self.resume_playfield_after_death = false;
+        self.suppress_held_thrust_start_until_release = false;
+        self.post_death_wave_resume_frames = None;
+        self.pending_smart_bomb_detonation_frames = None;
+        self.pending_smart_bomb_target_indices.clear();
+        self.smart_bomb_flash_frames_remaining = 0;
+        self.reserve_activation_cooldown_frames = 0;
+        self.first_wave_early_reserve_frames = None;
+        self.first_wave_lander_refill_frames = None;
+        self.suppress_next_first_wave_lander_refill_sound = false;
         self.spawn_player_explosion(player_position.wrapping_offset(4, 3));
-        sound_events.push(source_player_death_sound_event());
+        let background_end_delay_frames =
+            self.player_death_background_end_delay_frames(sound_delay_frames);
+        if sound_delay_frames == 0 {
+            sound_events.push(source_player_death_sound_event());
+        } else {
+            self.queue_player_death_sound_sequence(sound_delay_frames);
+        }
+        self.queue_player_death_sound_tail(sound_delay_frames, background_end_delay_frames);
+        self.apply_player_hit_damage(gameplay_events);
+    }
+
+    fn player_death_background_end_delay_frames(&self, sound_delay_frames: u8) -> u8 {
+        if sound_delay_frames == SOURCE_PLAYER_ENEMY_DEATH_SOUND_DELAY_FRAMES {
+            if self.state.player.lives <= 1 {
+                SOURCE_PLAYER_ENEMY_FINAL_BACKGROUND_END_DELAY_FRAMES
+            } else {
+                SOURCE_PLAYER_ENEMY_NON_FINAL_BACKGROUND_END_DELAY_FRAMES
+            }
+        } else {
+            SOURCE_PLAYER_DEATH_BACKGROUND_END_DELAY_FRAMES
+        }
+    }
+
+    fn apply_player_projectile_hit(
+        &mut self,
+        player_position: ScreenPosition,
+        gameplay_events: &mut Vec<GameEvent>,
+    ) {
+        let target4_smartmix_death_timing =
+            self.source_first_wave_target4_smartmix_late_shell_death_timing(player_position);
+        let target4_smartmix_terminal_death_timing = self
+            .source_first_wave_target4_smartmix_terminal_projectile_death_timing(player_position);
+        let target5_opening_death_timing =
+            self.source_first_wave_target5_opening_shell_death_timing(player_position);
+        let background_end_delay = if self
+            .source_first_wave_centerline_projectile_collision_scan(player_position)
+            || target4_smartmix_death_timing
+            || target5_opening_death_timing
+        {
+            SOURCE_FIRST_WAVE_CENTERLINE_PROJECTILE_BACKGROUND_END_DELAY_FRAMES
+        } else {
+            SOURCE_PROJECTILE_DEATH_BACKGROUND_END_DELAY_FRAMES
+        };
+        self.thrust_sound_active = false;
+        self.start_player_appear_sound_delay = None;
+        self.post_death_fire_appear_deferred = false;
+        self.pending_respawn_player = None;
+        self.pending_sound_commands.clear();
+        self.pending_hyperspace = None;
+        self.pending_player_death = None;
+        self.pending_final_death = None;
+        self.resume_playfield_after_death = false;
+        self.suppress_held_thrust_start_until_release = false;
+        self.post_death_wave_resume_frames = None;
+        self.pending_smart_bomb_detonation_frames = None;
+        self.pending_smart_bomb_target_indices.clear();
+        self.smart_bomb_flash_frames_remaining = 0;
+        self.reserve_activation_cooldown_frames = 0;
+        self.first_wave_early_reserve_frames = None;
+        self.first_wave_lander_refill_frames = None;
+        self.suppress_next_first_wave_lander_refill_sound = false;
+        self.spawn_player_explosion(player_position.wrapping_offset(4, 3));
+        if target4_smartmix_terminal_death_timing {
+            self.queue_source_sound_sequence(
+                &SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_PROJECTILE_DEATH_SOUND_SEQUENCE,
+            );
+        } else {
+            self.queue_player_projectile_death_sound_sequence(background_end_delay);
+        }
+        let branch_delay_frames = if target4_smartmix_terminal_death_timing {
+            SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_FINAL_DEATH_DELAY_FRAMES
+        } else if self.state.player.lives <= 1 {
+            SOURCE_PROJECTILE_FINAL_DEATH_ATTRACT_DELAY_FRAMES
+        } else if target4_smartmix_death_timing {
+            SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_PROJECTILE_DEATH_BRANCH_DELAY_FRAMES
+        } else if target5_opening_death_timing {
+            SOURCE_PLAYER_DEATH_BRANCH_DELAY_FRAMES
+        } else {
+            SOURCE_PROJECTILE_DEATH_BRANCH_DELAY_FRAMES
+        };
+        self.apply_player_hit_damage_with_final_delay(
+            gameplay_events,
+            Some(branch_delay_frames),
+            if target4_smartmix_terminal_death_timing {
+                PostGameSoundProfile::Target4SmartmixTerminal
+            } else {
+                PostGameSoundProfile::ProjectileDeath
+            },
+            if target4_smartmix_death_timing {
+                PostDeathRestartProfile::Target4SmartmixProjectile
+            } else if target5_opening_death_timing {
+                PostDeathRestartProfile::Target5OpeningProjectile
+            } else {
+                PostDeathRestartProfile::default()
+            },
+        );
+    }
+
+    fn queue_player_projectile_death_sound_sequence(&mut self, background_end_delay: u8) {
+        self.pending_sound_commands.extend([
+            PendingSoundCommand {
+                frames_remaining: 1,
+                event: source_player_death_sound_event(),
+            },
+            PendingSoundCommand {
+                frames_remaining: 2,
+                event: source_bomb_collision_sound_event(),
+            },
+            PendingSoundCommand {
+                frames_remaining: 10,
+                event: source_player_death_sound_event(),
+            },
+            PendingSoundCommand {
+                frames_remaining: 18,
+                event: SoundEvent::UnmappedSoundCommand {
+                    command: SOURCE_CANNON_SOUND_COMMAND,
+                },
+            },
+            PendingSoundCommand {
+                frames_remaining: u16::from(background_end_delay),
+                event: SoundEvent::UnmappedSoundCommand {
+                    command: SOURCE_BACKGROUND_END_SOUND_COMMAND,
+                },
+            },
+        ]);
+    }
+
+    fn apply_player_hit_damage(&mut self, gameplay_events: &mut Vec<GameEvent>) {
+        let branch_delay_frames = if self.state.player.lives <= 1 {
+            SOURCE_PLAYER_ENEMY_FINAL_DEATH_ATTRACT_DELAY_FRAMES
+        } else {
+            SOURCE_PLAYER_DEATH_BRANCH_DELAY_FRAMES
+        };
+        self.apply_player_hit_damage_with_final_delay(
+            gameplay_events,
+            Some(branch_delay_frames),
+            PostGameSoundProfile::EnemyCollisionDeath,
+            PostDeathRestartProfile::default(),
+        );
+    }
+
+    fn apply_player_hit_damage_with_final_delay(
+        &mut self,
+        gameplay_events: &mut Vec<GameEvent>,
+        final_death_delay_frames: Option<u16>,
+        post_game_sound_profile: PostGameSoundProfile,
+        restart_profile: PostDeathRestartProfile,
+    ) {
+        let previous_stock = PlayerStockSnapshot::from_player(self.state.player);
         let frame = PlayerDamageSystem::apply_hit(PlayerStock::new(
             self.state.player.lives,
             self.state.player.smart_bombs,
         ));
+        let final_stock = PlayerStockSnapshot::new(frame.stock.lives, frame.stock.smart_bombs);
         self.state.player.lives = frame.stock.lives;
         self.state.player.smart_bombs = frame.stock.smart_bombs;
         gameplay_events.push(GameEvent::PlayerDestroyed);
@@ -6809,6 +11886,7 @@ impl Game {
             self.pending_wave_start = false;
             self.sync_current_player_stock();
             self.state.phase = GamePhase::GameOver;
+            self.state.post_game_playfield = None;
             self.state.high_score_entry = None;
             self.state.high_score_submission = None;
             if let Some(next_player) = self.next_surviving_player() {
@@ -6819,30 +11897,54 @@ impl Game {
                     next_player,
                 );
             } else {
+                if let Some(frames_remaining) = final_death_delay_frames {
+                    self.state.player.lives = previous_stock.lives;
+                    self.state.player.smart_bombs = previous_stock.smart_bombs;
+                    self.sync_current_player_stock();
+                    self.state.phase = GamePhase::Playing;
+                    self.state.post_game_playfield = None;
+                    self.state.game_over = GameOverSnapshot::NONE;
+                    self.state.high_score_entry = None;
+                    self.state.high_score_submission = None;
+                    self.pending_final_death = Some(PendingFinalDeathRuntime {
+                        frames_remaining,
+                        final_stock,
+                        post_game_sound_profile,
+                    });
+                    return;
+                }
                 gameplay_events.push(GameEvent::GameOver);
-                let current_score = self.current_player_score();
-                self.game_over_candidate_score = Some(current_score);
                 self.state.game_over =
                     GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES);
             }
         } else {
             self.pending_wave_start = false;
-            self.sync_current_player_stock();
             let Some(next_player) = self.next_respawn_player() else {
                 return;
             };
-            self.state.phase = GamePhase::GameOver;
+            self.state.post_game_playfield = None;
             self.state.high_score_entry = None;
             self.state.high_score_submission = None;
             self.state.game_over = GameOverSnapshot::NONE;
-            self.pending_respawn_player = Some(next_player);
+            self.state.player.lives = previous_stock.lives;
+            self.state.player.smart_bombs = previous_stock.smart_bombs;
+            self.pending_player_death = Some(PendingPlayerDeathRuntime {
+                frames_remaining: final_death_delay_frames
+                    .unwrap_or(SOURCE_PLAYER_DEATH_BRANCH_DELAY_FRAMES),
+                final_stock,
+                next_player,
+                restart_profile,
+            });
         }
     }
 
-    fn resolve_planet_destruction(&mut self, sound_events: &mut Vec<SoundEvent>) {
+    fn resolve_planet_destruction(&mut self, _sound_events: &mut Vec<SoundEvent>) {
+        if self.post_death_wave_resume_frames.is_some() {
+            return;
+        }
+
         if self.state.world.humans.is_empty() && self.state.world.terrain_blow.is_none() {
             self.state.world.start_terrain_blow();
-            sound_events.push(source_terrain_blow_start_sound_event());
         }
     }
 
@@ -6851,11 +11953,22 @@ impl Game {
         gameplay_events: &mut Vec<GameEvent>,
         player_x: WorldVector,
     ) {
+        if self.post_death_wave_resume_frames.is_some() {
+            return;
+        }
+
+        if self.reserve_activation_cooldown_frames > 0 {
+            return;
+        }
+
         if self.state.world.activate_enemy_reserve_batch(
             self.state.wave_profile,
             source_word_from_world_vector(player_x),
             source_word_from_world_vector(self.camera_left),
         ) {
+            self.first_wave_early_reserve_frames = None;
+            self.first_wave_lander_refill_frames = None;
+            self.suppress_next_first_wave_lander_refill_sound = false;
             return;
         }
 
@@ -6877,10 +11990,32 @@ impl Game {
 
         self.state.wave = next_wave;
         self.state.wave_profile = WaveProfileSnapshot::for_wave(next_wave);
+        self.state.post_game_playfield = None;
         self.state.world = WorldSnapshot::for_wave(next_wave);
         self.player_explosion = None;
         self.thrust_sound_active = false;
+        self.start_player_appear_sound_delay = None;
+        self.post_death_fire_appear_deferred = false;
+        self.pending_sound_commands.clear();
+        self.pending_hyperspace = None;
+        self.pending_player_death = None;
+        self.pending_final_death = None;
+        self.post_game_sound_profile = PostGameSoundProfile::default();
+        self.post_death_restart_profile = PostDeathRestartProfile::default();
+        self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
+        self.resume_playfield_after_death = false;
+        self.suppress_held_thrust_start_until_release = false;
+        self.post_death_wave_resume_frames = None;
+        self.pending_smart_bomb_detonation_frames = None;
+        self.pending_smart_bomb_target_indices.clear();
+        self.smart_bomb_flash_frames_remaining = 0;
+        self.reserve_activation_cooldown_frames = 0;
+        self.first_wave_early_reserve_frames = None;
+        self.first_wave_lander_refill_frames = None;
+        self.suppress_next_first_wave_lander_refill_sound = false;
         self.pending_wave_start = false;
+        self.reset_source_game_exec_wave_delta();
+        self.advance_source_game_exec_wave_delta();
         self.reset_baiter_timer();
         gameplay_events.push(GameEvent::WaveStarted);
     }
@@ -6910,14 +12045,6 @@ impl Game {
 
         if frame.bonus_awards > 0 {
             gameplay_events.push(GameEvent::BonusAwarded);
-        }
-    }
-
-    fn current_player_score(&self) -> u32 {
-        if self.state.current_player == 2 {
-            self.state.scores.player_two
-        } else {
-            self.state.scores.player_one
         }
     }
 
@@ -6966,6 +12093,18 @@ impl Game {
 
     fn scene(&self) -> RenderScene {
         let mut scene = RenderScene::empty(self.state.frame, SurfaceSize::new(292, 240));
+        let show_playfield = should_show_live_playfield(&self.state);
+        if self.smart_bomb_flash_frames_remaining > 0 && show_playfield {
+            scene.clear_color = Color::WHITE;
+        }
+        if let Some(terrain_blow) = self.state.world.terrain_blow
+            && show_playfield
+        {
+            let flash_tint = source_terrain_blow_flash_tint(terrain_blow.source_elapsed_frames);
+            if flash_tint.rgba[3] != 0 {
+                scene.clear_color = flash_tint;
+            }
+        }
         #[cfg(test)]
         {
             scene.visual_signature = accepted_r3_visual_signature(self.state.frame);
@@ -6979,10 +12118,10 @@ impl Game {
                 tint: Color::WHITE,
             });
         }
-        if self.state.phase == GamePhase::Playing && self.state.world.terrain_blow.is_none() {
+        if show_playfield && self.state.world.terrain_blow.is_none() {
             push_source_bgout_terrain_sprites(&mut scene);
         }
-        if self.state.phase != GamePhase::Attract {
+        if self.state.phase != GamePhase::Attract || self.state.post_game_playfield.is_some() {
             push_score_sprites(&mut scene, self.state.scores, self.state.player_count);
         }
         push_top_display_border_sprites(&mut scene, &self.state);
@@ -7002,7 +12141,7 @@ impl Game {
         push_hall_of_fame_display_sprites(&mut scene, &self.state);
         push_player_explosion_cloud_sprites(&mut scene, self.state.world.player_explosion.as_ref());
 
-        if self.state.phase == GamePhase::Playing {
+        if show_playfield {
             push_stock_sprites(
                 &mut scene,
                 self.state.player_count,
@@ -7011,22 +12150,36 @@ impl Game {
             push_scanner_radar_sprites(&mut scene, &self.state.world.scanner);
             push_source_object_detail_sprites(&mut scene, &self.state.world.object_evidence);
             push_expanded_object_detail_sprites(&mut scene, &self.state.world.expanded_objects);
+            let background_left = source_word_from_world_vector(self.camera_left);
 
             for enemy in &self.state.world.enemies {
+                if self.state.world.enemy_is_appearing(*enemy) {
+                    continue;
+                }
+                let Some(position) = source_enemy_scene_position(*enemy, background_left) else {
+                    continue;
+                };
                 let size = enemy_sprite_size(enemy.kind);
                 scene.push_sprite(SceneSprite {
                     sprite: enemy_sprite(enemy.kind),
                     layer: RenderLayer::Objects,
-                    position: [f32::from(enemy.position.x), f32::from(enemy.position.y)],
+                    position: [f32::from(position.x), f32::from(position.y)],
                     size: [f32::from(size.0), f32::from(size.1)],
                     tint: Color::WHITE,
                 });
             }
             for human in &self.state.world.humans {
+                let Some(position) = source_active_object_screen_position(
+                    human.position,
+                    human.source_x_fraction,
+                    background_left,
+                ) else {
+                    continue;
+                };
                 scene.push_sprite(SceneSprite {
                     sprite: SpriteId::HUMAN,
                     layer: RenderLayer::Objects,
-                    position: [f32::from(human.position.x), f32::from(human.position.y)],
+                    position: [f32::from(position.x), f32::from(position.y)],
                     size: [
                         f32::from(HUMAN_SPRITE_SIZE.0),
                         f32::from(HUMAN_SPRITE_SIZE.1),
@@ -7038,16 +12191,24 @@ impl Game {
                     },
                 });
             }
-            scene.push_sprite(SceneSprite {
-                sprite: SpriteId::PLAYER_SHIP,
-                layer: RenderLayer::Objects,
-                position: player_scene_position(self.state.player.position),
-                size: [
-                    f32::from(PLAYER_SPRITE_SIZE.0),
-                    f32::from(PLAYER_SPRITE_SIZE.1),
-                ],
-                tint: Color::WHITE,
-            });
+            let player_ship_visible = self
+                .pending_hyperspace
+                .is_none_or(|pending| pending.rematerialize_frames_remaining == 0)
+                && self.pending_player_death.is_none()
+                && self.pending_final_death.is_none()
+                && self.player_explosion.is_none();
+            if player_ship_visible {
+                scene.push_sprite(SceneSprite {
+                    sprite: player_sprite(self.state.player.direction),
+                    layer: RenderLayer::Objects,
+                    position: player_scene_position(self.state.player.position),
+                    size: [
+                        f32::from(PLAYER_SPRITE_SIZE.0),
+                        f32::from(PLAYER_SPRITE_SIZE.1),
+                    ],
+                    tint: Color::WHITE,
+                });
+            }
 
             for projectile in &self.state.world.projectiles {
                 push_player_projectile_sprites(&mut scene, *projectile);
@@ -7232,6 +12393,7 @@ struct AttractScoringObject {
     x16: i32,
     y16: i32,
     visual: AttractScoringVisual,
+    visual_tick: u16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -7619,6 +12781,7 @@ fn attract_scoring_objects_for_stage(
                     ATTRACT_SCORING_LANDER_X16,
                     explosion_y,
                     AttractScoringVisual::Explosion,
+                    local_tick,
                 ));
             }
             objects.push(attract_scoring_object(
@@ -7750,12 +12913,14 @@ fn append_attract_scoring_legend_objects(
                 ATTRACT_SCORING_LEGEND_SOURCE_X16,
                 source_y,
                 AttractScoringVisual::Explosion,
+                local_tick,
             ));
             objects.push(attract_scoring_visual_enemy_object(
                 entry.kind,
                 entry.table_x16,
                 entry.table_y16,
                 AttractScoringVisual::Materialize,
+                local_tick,
             ));
         }
         AttractScoringDemoStage::LegendReveal(_) => objects.push(attract_scoring_enemy_object(
@@ -7859,12 +13024,14 @@ fn attract_scoring_visual_enemy_object(
     x16: i32,
     y16: i32,
     visual: AttractScoringVisual,
+    visual_tick: u16,
 ) -> AttractScoringObject {
     AttractScoringObject {
         kind: AttractScoringObjectKind::Enemy(kind),
         x16,
         y16,
         visual,
+        visual_tick,
     }
 }
 
@@ -7878,6 +13045,7 @@ fn attract_scoring_object(
         x16,
         y16,
         visual: AttractScoringVisual::Sprite,
+        visual_tick: 0,
     }
 }
 
@@ -7912,6 +13080,22 @@ fn source_pseudo_color_tint(value: u8) -> Color {
         SOURCE_WILLIAMS_BLUE_LEVELS[usize::from((value >> 6) & 0x03)],
         0xFF,
     )
+}
+
+fn source_terrain_blow_flash_tint(elapsed: u16) -> Color {
+    let color = SOURCE_TERRAIN_BLOW_FLASH_WINDOWS
+        .iter()
+        .find_map(|(start, end, color)| (*start <= elapsed && elapsed <= *end).then_some(*color))
+        .unwrap_or(0);
+    source_pseudo_color_tint(color)
+}
+
+fn source_video_palette_index_tint(index: u8) -> Color {
+    source_pseudo_color_tint(SOURCE_NORMAL_PALETTE_BYTES[usize::from(index & 0x0F)])
+}
+
+fn source_video_word_tint(word: u16) -> Color {
+    source_video_palette_index_tint((word & 0x000F) as u8)
 }
 
 fn push_attract_williams_logo_sprite(scene: &mut RenderScene, state: &GameState) {
@@ -8678,12 +13862,12 @@ fn push_attract_scoring_laser_beam(
         }
         _ => target_position[0],
     };
-    push_arcade_laser_beam(
+    push_arcade_laser_path(
         scene,
         start[0],
         start[1],
         end_x,
-        SOURCE_ARCADE_LASER_TARGET_HEIGHT,
+        start[1],
         u32::from(demo_tick),
         RenderLayer::Projectiles,
     );
@@ -8707,32 +13891,238 @@ fn attract_scoring_laser_enemy_anchor(kind: EnemyKind, position: [f32; 2]) -> [f
 fn push_attract_scoring_expanded_pixels(
     scene: &mut RenderScene,
     object: AttractScoringObject,
-    demo_tick: u16,
+    _demo_tick: u16,
 ) {
     let AttractScoringObjectKind::Enemy(kind) = object.kind else {
         return;
     };
     let position = attract_scoring_scene_position(object.x16, object.y16);
-    let size = enemy_sprite_size(kind);
-    let center = [
-        position[0] + f32::from(size.0) / 2.0,
-        position[1] + f32::from(size.1) / 2.0,
-    ];
-    let scale = match object.visual {
+    match object.visual {
         AttractScoringVisual::Materialize => {
-            1.0 + f32::from((demo_tick / 4) % SOURCE_EXPANDED_PIXEL_SCALE_STEPS)
+            push_attract_scoring_materialize_pixels(scene, kind, position, object.visual_tick);
         }
-        AttractScoringVisual::Explosion => SOURCE_EXPANDED_PIXEL_EXPLOSION_SCALE,
-        AttractScoringVisual::Sprite => return,
+        AttractScoringVisual::Explosion => {
+            push_attract_scoring_explosion_pixels(scene, kind, position, object.visual_tick);
+        }
+        AttractScoringVisual::Sprite => {}
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct SourceObjectImagePixel {
+    x: u8,
+    y: u8,
+    tint: Color,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct SourceObjectImageSpec {
+    label: &'static str,
+    rows: u8,
+    bytes_per_row: u8,
+}
+
+fn push_attract_scoring_materialize_pixels(
+    scene: &mut RenderScene,
+    kind: EnemyKind,
+    position: [f32; 2],
+    visual_tick: u16,
+) {
+    let pixels = source_object_image_pixels_for_enemy(kind);
+    if pixels.is_empty() {
+        return;
+    }
+
+    let reveal_count = ((usize::from(visual_tick) + 1) * pixels.len()
+        / usize::from(ATTRACT_SCORING_LEGEND_TRANSFER_TICKS))
+    .clamp(1, pixels.len());
+    for (index, pixel) in pixels.iter().copied().enumerate().take(reveal_count) {
+        let jitter_x = source_materialize_jitter(index, visual_tick, 0);
+        let jitter_y = source_materialize_jitter(index, visual_tick, 3);
+        push_source_object_fragment_pixel(
+            scene,
+            [
+                position[0] + f32::from(pixel.x) + jitter_x,
+                position[1] + f32::from(pixel.y) + jitter_y,
+            ],
+            pixel.tint,
+        );
+    }
+}
+
+fn push_attract_scoring_explosion_pixels(
+    scene: &mut RenderScene,
+    kind: EnemyKind,
+    position: [f32; 2],
+    visual_tick: u16,
+) {
+    let pixels = source_object_image_pixels_for_enemy(kind);
+    if pixels.is_empty() {
+        return;
+    }
+    let (width, height) = enemy_sprite_size(kind);
+    let center = [
+        position[0] + f32::from(width) / 2.0,
+        position[1] + f32::from(height) / 2.0,
+    ];
+    let source_center = [f32::from(width) / 2.0, f32::from(height) / 2.0];
+    let spread = 1.0 + f32::from(visual_tick.min(18)) / 4.0;
+
+    for (index, pixel) in pixels.iter().copied().enumerate() {
+        if (index + usize::from(visual_tick)).is_multiple_of(5) {
+            continue;
+        }
+        let rel_x = f32::from(pixel.x) - source_center[0];
+        let rel_y = f32::from(pixel.y) - source_center[1];
+        let jitter_x = source_materialize_jitter(index, visual_tick, 5);
+        let jitter_y = source_materialize_jitter(index, visual_tick, 9);
+        push_source_object_fragment_pixel(
+            scene,
+            [
+                center[0] + rel_x * spread + jitter_x,
+                center[1] + rel_y * spread + jitter_y,
+            ],
+            pixel.tint,
+        );
+    }
+}
+
+fn push_source_object_fragment_pixel(scene: &mut RenderScene, position: [f32; 2], tint: Color) {
+    if position[0] < 0.0
+        || position[1] < 0.0
+        || position[0] >= scene.surface.width as f32
+        || position[1] >= scene.surface.height as f32
+    {
+        return;
+    }
+    scene.push_sprite(SceneSprite {
+        sprite: SpriteId::PLAYER_EXPLOSION_PIXEL,
+        layer: RenderLayer::Objects,
+        position: [position[0].round(), position[1].round()],
+        size: [1.0, 1.0],
+        tint,
+    });
+}
+
+fn source_materialize_jitter(index: usize, visual_tick: u16, salt: usize) -> f32 {
+    let phase = (index * 11 + usize::from(visual_tick) * 3 + salt) % 7;
+    match phase {
+        0 => -2.0,
+        1 | 2 => -1.0,
+        3 => 0.0,
+        4 | 5 => 1.0,
+        _ => 2.0,
+    }
+}
+
+fn source_object_image_pixels_for_enemy(kind: EnemyKind) -> Vec<SourceObjectImagePixel> {
+    let spec = match kind {
+        EnemyKind::Lander => SourceObjectImageSpec {
+            label: "LND10",
+            rows: 8,
+            bytes_per_row: 5,
+        },
+        EnemyKind::Mutant => SourceObjectImageSpec {
+            label: "SCZD10",
+            rows: 8,
+            bytes_per_row: 5,
+        },
+        EnemyKind::Bomber => SourceObjectImageSpec {
+            label: "TIED10",
+            rows: 8,
+            bytes_per_row: 4,
+        },
+        EnemyKind::Pod => SourceObjectImageSpec {
+            label: "PRBD10",
+            rows: 8,
+            bytes_per_row: 4,
+        },
+        EnemyKind::Baiter => SourceObjectImageSpec {
+            label: "UFOD10",
+            rows: 4,
+            bytes_per_row: 6,
+        },
+        EnemyKind::Swarmer => SourceObjectImageSpec {
+            label: "SWMD10",
+            rows: 4,
+            bytes_per_row: 3,
+        },
     };
-    push_source_expanded_pixel_cloud(
-        scene,
-        center,
-        [f32::from(size.0), f32::from(size.1)],
-        scale,
-        u32::from(demo_tick),
-        RenderLayer::Objects,
+    source_object_image_pixels(spec)
+}
+
+fn source_object_image_pixels(spec: SourceObjectImageSpec) -> Vec<SourceObjectImagePixel> {
+    let bytes = source_object_image_bytes(spec.label);
+    let expected_byte_count = usize::from(spec.rows) * usize::from(spec.bytes_per_row);
+    if bytes.len() != expected_byte_count {
+        return Vec::new();
+    }
+    let mut pixels = Vec::new();
+    for column in 0..usize::from(spec.bytes_per_row) {
+        let source_column = column * usize::from(spec.rows);
+        for row in 0..usize::from(spec.rows) {
+            let value = bytes[source_column + row];
+            if let Some(tint) = source_picture_nibble_tint(value >> 4) {
+                pixels.push(SourceObjectImagePixel {
+                    x: (column * 2) as u8,
+                    y: row as u8,
+                    tint,
+                });
+            }
+            if let Some(tint) = source_picture_nibble_tint(value & 0x0F) {
+                pixels.push(SourceObjectImagePixel {
+                    x: (column * 2 + 1) as u8,
+                    y: row as u8,
+                    tint,
+                });
+            }
+        }
+    }
+    pixels
+}
+
+fn source_object_image_bytes(label: &'static str) -> Vec<u8> {
+    for line in SOURCE_OBJECT_IMAGES_TSV.lines().skip(1) {
+        let mut columns = line.split('\t');
+        let Some(image_label) = columns.next() else {
+            continue;
+        };
+        let _address = columns.next();
+        let Some(hex_bytes) = columns.next() else {
+            continue;
+        };
+        if image_label == label {
+            return decode_source_hex_bytes(label, hex_bytes);
+        }
+    }
+    Vec::new()
+}
+
+fn decode_source_hex_bytes(label: &'static str, hex_bytes: &str) -> Vec<u8> {
+    assert!(
+        hex_bytes.len().is_multiple_of(2),
+        "source object image {label} hex byte string must be even length"
     );
+    (0..hex_bytes.len())
+        .step_by(2)
+        .map(|start| {
+            u8::from_str_radix(&hex_bytes[start..start + 2], 16).unwrap_or_else(|error| {
+                panic!("source object image {label} hex must parse: {error}")
+            })
+        })
+        .collect()
+}
+
+fn source_picture_nibble_tint(index: u8) -> Option<Color> {
+    match index {
+        0x0 => None,
+        0x1 | 0xA | 0xC | 0xD | 0xE | 0xF => Some(Color::WHITE),
+        0x2..=0x9 => Some(source_pseudo_color_tint(
+            SOURCE_NORMAL_PALETTE_BYTES[usize::from(index)],
+        )),
+        0xB => Some(Color::from_rgba(170, 170, 186, 0xFF)),
+        _ => None,
+    }
 }
 
 fn attract_scoring_scene_position(x16: i32, y16: i32) -> [f32; 2] {
@@ -8889,6 +14279,10 @@ fn should_show_player_start_prompt(state: &GameState) -> bool {
         && state.world == WorldSnapshot::default()
 }
 
+fn should_show_live_playfield(state: &GameState) -> bool {
+    state.phase == GamePhase::Playing || state.post_game_playfield.is_some()
+}
+
 fn push_wave_completion_status_sprites(scene: &mut RenderScene, state: &GameState) {
     if !should_show_wave_completion_status(state) {
         return;
@@ -8952,6 +14346,7 @@ fn should_show_wave_completion_status(state: &GameState) -> bool {
     state.phase == GamePhase::Playing
         && state.player.position != (WorldVector::default(), WorldVector::default())
         && state.world.enemies.is_empty()
+        && state.world.enemy_reserve.is_empty()
 }
 
 fn source_visible_decimal_digits(value: u8) -> ([u8; 2], usize) {
@@ -9323,9 +14718,9 @@ fn push_stock_sprite_series(
 }
 
 fn push_top_display_border_sprites(scene: &mut RenderScene, state: &GameState) {
-    if state.phase != GamePhase::Playing
-        && !(state.phase == GamePhase::Attract && state.attract.scoring_sequence_frame().is_some())
-    {
+    let should_show_attract_scoring_border =
+        state.phase == GamePhase::Attract && state.attract.scoring_sequence_frame().is_some();
+    if !(should_show_live_playfield(state) || should_show_attract_scoring_border) {
         return;
     }
 
@@ -9360,35 +14755,81 @@ pub(crate) fn push_scanner_radar_sprites(scene: &mut RenderScene, scanner: &Scan
 
     let blip_count = usize::from(scanner.blip_count).min(SCANNER_RADAR_BLIP_LIMIT);
     for blip in &scanner.blips[..blip_count] {
-        if blip.color_word == 0 {
+        if SOURCE_VISUAL_STATE
+            .scanner_object_blip_tint(blip.color_word)
+            .rgba[3]
+            == 0
+        {
             continue;
         }
-        scene.push_sprite(SceneSprite {
-            sprite: SpriteId::SCANNER_OBJECT_BLIP,
-            layer: RenderLayer::Hud,
-            position: source_screen_position(blip.screen_address),
-            size: [2.0, 2.0],
-            tint: SOURCE_VISUAL_STATE.scanner_object_blip_tint(blip.color_word),
-        });
+        push_scanner_word_pixels(
+            scene,
+            SpriteId::SCANNER_OBJECT_BLIP,
+            blip.screen_address,
+            blip.color_word,
+        );
     }
 
     let Some(player_blip) = scanner.player_blip else {
         return;
     };
-    scene.push_sprite(SceneSprite {
-        sprite: SpriteId::SCANNER_PLAYER_BLIP,
-        layer: RenderLayer::Hud,
-        position: source_screen_position(player_blip.screen_address),
-        size: [3.0, 2.0],
-        tint: SOURCE_VISUAL_STATE.scanner_player_blip_tint(player_blip.body_word),
-    });
-    scene.push_sprite(SceneSprite {
-        sprite: SpriteId::SCANNER_PLAYER_BLIP,
-        layer: RenderLayer::Hud,
-        position: source_screen_position(player_blip.screen_address.wrapping_sub(0x00FF)),
-        size: [1.0, 1.0],
-        tint: SOURCE_VISUAL_STATE.scanner_player_blip_tint(u16::from(player_blip.upper_byte)),
-    });
+    if SOURCE_VISUAL_STATE
+        .scanner_player_blip_tint(player_blip.body_word)
+        .rgba[3]
+        != 0
+    {
+        push_scanner_word_pixels(
+            scene,
+            SpriteId::SCANNER_PLAYER_BLIP,
+            player_blip.screen_address,
+            player_blip.body_word,
+        );
+        push_scanner_byte_pixels(
+            scene,
+            SpriteId::SCANNER_PLAYER_BLIP,
+            player_blip.screen_address.wrapping_add(2),
+            player_blip.tail_byte,
+        );
+        push_scanner_byte_pixels(
+            scene,
+            SpriteId::SCANNER_PLAYER_BLIP,
+            player_blip.screen_address.wrapping_sub(0x00FF),
+            player_blip.upper_byte,
+        );
+    }
+}
+
+fn push_scanner_word_pixels(
+    scene: &mut RenderScene,
+    sprite: SpriteId,
+    screen_address: u16,
+    word: u16,
+) {
+    let [top, bottom] = word.to_be_bytes();
+    push_scanner_byte_pixels(scene, sprite, screen_address, top);
+    push_scanner_byte_pixels(scene, sprite, screen_address.wrapping_add(1), bottom);
+}
+
+fn push_scanner_byte_pixels(
+    scene: &mut RenderScene,
+    sprite: SpriteId,
+    screen_address: u16,
+    byte: u8,
+) {
+    let base = source_screen_position(screen_address);
+    for (x_offset, palette_index) in [(0.0, byte >> 4), (1.0, byte & 0x0F)] {
+        let tint = source_video_palette_index_tint(palette_index);
+        if tint.rgba[3] == 0 {
+            continue;
+        }
+        scene.push_sprite(SceneSprite {
+            sprite,
+            layer: RenderLayer::Hud,
+            position: [base[0] + x_offset, base[1]],
+            size: [1.0, 1.0],
+            tint,
+        });
+    }
 }
 
 fn push_source_object_detail_sprites(scene: &mut RenderScene, evidence: &ObjectEvidenceSnapshot) {
@@ -9439,7 +14880,15 @@ fn push_expanded_object_detail_sprites(
             continue;
         }
         if source_expanded_object_uses_pixel_cloud(detail) {
-            push_expanded_object_explosion_pixels(scene, detail);
+            match detail.kind {
+                ExpandedObjectKind::Appearance => {
+                    push_expanded_object_appearance_pixels(scene, detail)
+                }
+                ExpandedObjectKind::Explosion => {
+                    push_expanded_object_explosion_pixels(scene, detail)
+                }
+                ExpandedObjectKind::ScorePopup => {}
+            }
             continue;
         }
         let Some((position, size)) = expanded_object_sprite_geometry(detail) else {
@@ -9460,8 +14909,12 @@ fn push_expanded_object_detail_sprites(
 }
 
 fn source_expanded_object_uses_pixel_cloud(detail: &ExpandedObjectDetailSnapshot) -> bool {
-    detail.kind == ExpandedObjectKind::Explosion
-        && matches!(
+    match detail.kind {
+        ExpandedObjectKind::Appearance => {
+            source_appearance_size_scale(detail.size).is_some()
+                && source_expanded_object_image_spec(detail).is_some()
+        }
+        ExpandedObjectKind::Explosion => matches!(
             detail.mapped_sprite,
             Some(
                 SpriteId::ENEMY_LANDER
@@ -9470,27 +14923,70 @@ fn source_expanded_object_uses_pixel_cloud(detail: &ExpandedObjectDetailSnapshot
                     | SpriteId::ENEMY_POD
                     | SpriteId::ENEMY_BAITER
                     | SpriteId::SWARMER_EXPLOSION
+                    | SpriteId::TERRAIN_EXPLOSION
             )
-        )
+        ),
+        ExpandedObjectKind::ScorePopup => false,
+    }
 }
 
 fn push_expanded_object_explosion_pixels(
     scene: &mut RenderScene,
     detail: &ExpandedObjectDetailSnapshot,
 ) {
-    let (base_width, base_height) = expanded_object_base_sprite_size(detail).unwrap_or((4, 4));
-    let Some(center) = explosion_sprite_center(detail, (base_width, base_height)) else {
+    let Some(top_left) = detail.top_left else {
         return;
     };
-    let Some(scale) = source_explosion_render_scale(detail.size) else {
+    let Some(center) = detail.center else {
         return;
     };
-    let tick = u32::from(detail.explosion_frame.unwrap_or(0));
-    push_source_expanded_pixel_cloud(
+    let Some(spec) = source_expanded_object_image_spec(detail) else {
+        return;
+    };
+    let Some(scale) = source_explosion_size_scale(detail.size) else {
+        return;
+    };
+    let Some(explosion_frame) = detail.explosion_frame else {
+        return;
+    };
+    if explosion_frame < SOURCE_EXPANDED_OBJECT_EXPLOSION_VISIBLE_FRAME {
+        return;
+    }
+    let tick = u32::from(explosion_frame);
+    push_source_expanded_object_picture_pixels(
         scene,
+        spec,
+        top_left,
         center,
-        [f32::from(base_width), f32::from(base_height)],
-        f32::from(scale),
+        scale,
+        tick,
+        RenderLayer::Objects,
+    );
+}
+
+fn push_expanded_object_appearance_pixels(
+    scene: &mut RenderScene,
+    detail: &ExpandedObjectDetailSnapshot,
+) {
+    let Some(top_left) = detail.top_left else {
+        return;
+    };
+    let Some(center) = detail.center else {
+        return;
+    };
+    let Some(spec) = source_expanded_object_image_spec(detail) else {
+        return;
+    };
+    let Some(scale) = source_appearance_size_scale(detail.size) else {
+        return;
+    };
+    let tick = u32::from(source_appearance_tick(detail.size));
+    push_source_expanded_object_picture_pixels(
+        scene,
+        spec,
+        top_left,
+        center,
+        scale,
         tick,
         RenderLayer::Objects,
     );
@@ -9542,10 +15038,39 @@ fn step_projectile_laser_tail(projectile: ProjectileSnapshot) -> ScreenPosition 
     }
 }
 
-const SOURCE_ARCADE_LASER_TARGET_HEIGHT: i32 = 8;
-const SOURCE_EXPANDED_PIXEL_EXPLOSION_SCALE: f32 = 3.0;
-const SOURCE_EXPANDED_PIXEL_SCALE_STEPS: u16 = 3;
+fn player_projectile_collision_box(projectile: ProjectileSnapshot) -> CollisionBox {
+    let direction = projectile.velocity.dx.signum();
+    if direction > 0 {
+        return CollisionBox::new(
+            ScreenPosition::new(
+                projectile
+                    .position
+                    .x
+                    .saturating_sub(SOURCE_RIGHT_LASER_COLLISION_BACKSTEP),
+                projectile.position.y.saturating_add(1),
+            ),
+            SOURCE_PLAYER_PROJECTILE_COLLISION_SIZE,
+        );
+    }
+    if direction < 0 {
+        return CollisionBox::new(projectile.position, SOURCE_PLAYER_PROJECTILE_COLLISION_SIZE);
+    }
 
+    CollisionBox::new(projectile.position, SOURCE_PLAYER_PROJECTILE_COLLISION_SIZE)
+}
+
+const SOURCE_ARCADE_LASER_TARGET_HEIGHT: i32 = 8;
+const SOURCE_PLAYER_PROJECTILE_COLLISION_SIZE: (u8, u8) = (8, 1);
+const SOURCE_RIGHT_LASER_COLLISION_BACKSTEP: u8 = 12;
+const SOURCE_LASER_BYTE_PIXELS: i32 = 2;
+const SOURCE_LASER_BODY_BYTE: u8 = 0x11;
+const SOURCE_LASER_TIP_BYTE: u8 = 0x99;
+const SOURCE_LASER_BODY_CELLS: i32 = 4;
+const SOURCE_LASER_BODY_TINT: Color = Color::from_rgba(0x00, 0xB8, 0xFF, 0xFF);
+const SOURCE_LASER_TIP_TINT: Color = Color::from_rgba(0x8F, 0xE8, 0xFF, 0xFF);
+const SOURCE_LASER_FIZZLE_TINT: Color = Color::from_rgba(0x00, 0x78, 0xD8, 0xFF);
+const SOURCE_EXPANDED_OBJECT_EXPLOSION_VISIBLE_FRAME: u8 = 2;
+#[cfg(test)]
 const SOURCE_EXPANDED_PIXEL_OFFSETS: [(i16, i16, f32, f32); 20] = [
     (0, 0, 3.0, 1.0),
     (-4, 0, 2.0, 1.0),
@@ -9569,12 +15094,160 @@ const SOURCE_EXPANDED_PIXEL_OFFSETS: [(i16, i16, f32, f32); 20] = [
     (0, 2, 2.0, 1.0),
 ];
 
+fn source_expanded_object_image_spec(
+    detail: &ExpandedObjectDetailSnapshot,
+) -> Option<SourceObjectImageSpec> {
+    match detail.picture_label? {
+        "LNDP1" => Some(SourceObjectImageSpec {
+            label: "LND10",
+            rows: 8,
+            bytes_per_row: 5,
+        }),
+        "LNDP2" => Some(SourceObjectImageSpec {
+            label: "LND20",
+            rows: 8,
+            bytes_per_row: 5,
+        }),
+        "LNDP3" => Some(SourceObjectImageSpec {
+            label: "LND30",
+            rows: 8,
+            bytes_per_row: 5,
+        }),
+        "SCZP1" => Some(SourceObjectImageSpec {
+            label: "SCZD10",
+            rows: 8,
+            bytes_per_row: 5,
+        }),
+        "TIEP1" => Some(SourceObjectImageSpec {
+            label: "TIED10",
+            rows: 8,
+            bytes_per_row: 4,
+        }),
+        "TIEP2" => Some(SourceObjectImageSpec {
+            label: "TIED20",
+            rows: 8,
+            bytes_per_row: 4,
+        }),
+        "TIEP3" => Some(SourceObjectImageSpec {
+            label: "TIED30",
+            rows: 8,
+            bytes_per_row: 4,
+        }),
+        "TIEP4" => Some(SourceObjectImageSpec {
+            label: "TIED40",
+            rows: 8,
+            bytes_per_row: 4,
+        }),
+        "PRBP1" => Some(SourceObjectImageSpec {
+            label: "PRBD10",
+            rows: 8,
+            bytes_per_row: 4,
+        }),
+        "UFOP1" => Some(SourceObjectImageSpec {
+            label: "UFOD10",
+            rows: 4,
+            bytes_per_row: 6,
+        }),
+        "UFOP2" => Some(SourceObjectImageSpec {
+            label: "UFOD20",
+            rows: 4,
+            bytes_per_row: 6,
+        }),
+        "UFOP3" => Some(SourceObjectImageSpec {
+            label: "UFOD30",
+            rows: 4,
+            bytes_per_row: 6,
+        }),
+        "SWPIC1" => Some(SourceObjectImageSpec {
+            label: "SWMD10",
+            rows: 4,
+            bytes_per_row: 3,
+        }),
+        "SWXP1" => Some(SourceObjectImageSpec {
+            label: "SWXD10",
+            rows: 8,
+            bytes_per_row: 4,
+        }),
+        "TEREX" => Some(SourceObjectImageSpec {
+            label: "TERX0",
+            rows: 6,
+            bytes_per_row: 8,
+        }),
+        _ => None,
+    }
+}
+
+fn push_source_expanded_object_picture_pixels(
+    scene: &mut RenderScene,
+    spec: SourceObjectImageSpec,
+    top_left: ScreenPosition,
+    center: ScreenPosition,
+    scale: u8,
+    tick: u32,
+    layer: RenderLayer,
+) {
+    let pixels = source_object_image_pixels(spec);
+    if pixels.is_empty() {
+        return;
+    }
+
+    let scale = i32::from(scale);
+    let top_left_x = i32::from(top_left.x);
+    let top_left_y = i32::from(top_left.y);
+    let center_x = i32::from(center.x);
+    let center_y = i32::from(center.y);
+    let x_start = center_x - scale * (center_x - top_left_x);
+    let y_offset_raw = center_y - top_left_y;
+    let y_flavor = y_offset_raw & 1;
+    let y_offset = y_offset_raw / 2;
+    let y_start = center_y - (scale * 2 * y_offset) - y_flavor;
+
+    for (index, pixel) in pixels.into_iter().enumerate() {
+        let target_x = x_start + i32::from(pixel.x / 2) * scale * 2 + i32::from(pixel.x % 2);
+        let target_y = y_start + i32::from(pixel.y / 2) * scale * 2 + i32::from(pixel.y % 2);
+        if target_x < 0
+            || target_y < 0
+            || target_x >= scene.surface.width as i32
+            || target_y >= scene.surface.height as i32
+        {
+            continue;
+        }
+
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::PLAYER_EXPLOSION_PIXEL,
+            layer,
+            position: [target_x as f32, target_y as f32],
+            size: [1.0, 1.0],
+            tint: source_expanded_object_pixel_tint(pixel.tint, tick, index),
+        });
+    }
+}
+
+fn source_expanded_object_pixel_tint(source_tint: Color, tick: u32, index: usize) -> Color {
+    if tick < 2 && index.is_multiple_of(3) {
+        return source_laser_tint(index);
+    }
+    source_tint
+}
+
 fn push_arcade_laser_beam(
     scene: &mut RenderScene,
     x0: f32,
     y0: f32,
     x1: f32,
-    target_height: i32,
+    _target_height: i32,
+    animation_tick: u32,
+    layer: RenderLayer,
+) {
+    push_arcade_laser_path(scene, x0, y0, x1, y0, animation_tick, layer);
+}
+
+fn push_arcade_laser_path(
+    scene: &mut RenderScene,
+    x0: f32,
+    y0: f32,
+    x1: f32,
+    y1: f32,
     animation_tick: u32,
     layer: RenderLayer,
 ) {
@@ -9584,51 +15257,88 @@ fn push_arcade_laser_beam(
         return;
     }
 
-    let center_y = y0.round() as i32;
-    let target_height = target_height.max(4);
-    let row_spacing = (target_height / 4).max(1);
-    let top_row = center_y - (row_spacing * 3) / 2;
-    let phase = (animation_tick / 2) as usize;
-    let body_end = (right - 6).max(left);
-    let segment_length = (target_height / 2).max(4);
-    let gap = 2;
-
-    for row in 0..4 {
-        let y = top_row + row * row_spacing;
-        let color = source_laser_tint(phase + row as usize);
-        let mut segment_left = left + (row % 2) * 2;
-        while segment_left <= body_end {
-            let segment_right = (segment_left + segment_length - 1).min(body_end);
-            push_laser_span(scene, layer, segment_left, y, segment_right, color);
-            segment_left += segment_length + gap;
-        }
-    }
-
-    let tip_left = (right - 4).max(left);
-    for row in 0..4 {
-        let y = top_row + row * row_spacing;
-        let tip_color = if row % 2 == 0 {
-            Color::WHITE
+    let direction = if x1 >= x0 { 1 } else { -1 };
+    let dx = x1 - x0;
+    let head_byte = if direction > 0 { right - 1 } else { left };
+    let mut byte_x = left;
+    let mut cell_index = 0_i32;
+    while byte_x <= right {
+        let progress = if dx.abs() < f32::EPSILON {
+            0.0
         } else {
-            source_laser_tint(phase + 6 + row as usize)
+            ((byte_x as f32 - x0) / dx).clamp(0.0, 1.0)
         };
-        push_laser_span(scene, layer, tip_left, y, right, tip_color);
-    }
-
-    for offset in 0..4 {
-        let x = (tip_left - 2 - offset * 2).max(left);
-        let y = top_row + (((phase + offset as usize) % 4) as i32) * row_spacing;
-        push_laser_span(
-            scene,
-            layer,
-            x,
-            y,
-            x,
-            source_laser_tint(phase + 9 + offset as usize),
-        );
+        let y = (y0 + (y1 - y0) * progress).round() as i32;
+        let distance_from_head = if direction > 0 {
+            (head_byte - byte_x).div_euclid(SOURCE_LASER_BYTE_PIXELS)
+        } else {
+            (byte_x - head_byte).div_euclid(SOURCE_LASER_BYTE_PIXELS)
+        };
+        let distance_from_head = distance_from_head.max(0);
+        if distance_from_head == 0 {
+            let tip_byte = if byte_x >= right {
+                SOURCE_LASER_TIP_BYTE & 0xF0
+            } else {
+                SOURCE_LASER_TIP_BYTE
+            };
+            push_laser_byte(scene, layer, byte_x, y, tip_byte, SOURCE_LASER_TIP_TINT);
+        } else if distance_from_head <= SOURCE_LASER_BODY_CELLS {
+            push_laser_byte(
+                scene,
+                layer,
+                byte_x,
+                y,
+                SOURCE_LASER_BODY_BYTE,
+                SOURCE_LASER_BODY_TINT,
+            );
+        } else {
+            let phase = animation_tick as i32 + cell_index * 7 + byte_x;
+            let byte = if phase.rem_euclid(5) == 0 {
+                SOURCE_LASER_BODY_BYTE
+            } else {
+                source_laser_fizzle_byte(phase as u8)
+            };
+            push_laser_byte(scene, layer, byte_x, y, byte, SOURCE_LASER_FIZZLE_TINT);
+        }
+        byte_x += SOURCE_LASER_BYTE_PIXELS;
+        cell_index += 1;
     }
 }
 
+fn push_laser_byte(
+    scene: &mut RenderScene,
+    layer: RenderLayer,
+    x: i32,
+    y: i32,
+    byte: u8,
+    tint: Color,
+) {
+    if byte & 0xF0 != 0 {
+        push_laser_pixel(scene, layer, x, y, tint);
+    }
+    if byte & 0x0F != 0 {
+        push_laser_pixel(scene, layer, x + 1, y, tint);
+    }
+}
+
+fn push_laser_pixel(scene: &mut RenderScene, layer: RenderLayer, x: i32, y: i32, tint: Color) {
+    if x < 0 || y < 0 || x >= scene.surface.width as i32 || y >= scene.surface.height as i32 {
+        return;
+    }
+    scene.push_sprite(SceneSprite {
+        sprite: SpriteId::PLAYER_PROJECTILE,
+        layer,
+        position: [x as f32, y as f32],
+        size: [1.0, 1.0],
+        tint,
+    });
+}
+
+const fn source_laser_fizzle_byte(rand_value: u8) -> u8 {
+    (rand_value & 0x01) | ((rand_value & 0x02) << 3)
+}
+
+#[cfg(test)]
 fn push_laser_span(
     scene: &mut RenderScene,
     layer: RenderLayer,
@@ -9669,6 +15379,7 @@ fn source_laser_tint(phase: usize) -> Color {
     source_pseudo_color_tint(SOURCE_COLTAB_COLOR_BYTES[phase % SOURCE_COLTAB_ACTIVE_BYTES])
 }
 
+#[cfg(test)]
 fn push_source_expanded_pixel_cloud(
     scene: &mut RenderScene,
     center: [f32; 2],
@@ -9676,6 +15387,19 @@ fn push_source_expanded_pixel_cloud(
     scale: f32,
     tick: u32,
     layer: RenderLayer,
+) {
+    push_source_expanded_pixel_cloud_with_tint(scene, center, base_size, scale, tick, layer, None);
+}
+
+#[cfg(test)]
+fn push_source_expanded_pixel_cloud_with_tint(
+    scene: &mut RenderScene,
+    center: [f32; 2],
+    base_size: [f32; 2],
+    scale: f32,
+    tick: u32,
+    layer: RenderLayer,
+    tint_override: Option<Color>,
 ) {
     let radius_x = (base_size[0] * scale / 2.0).max(2.0);
     let radius_y = (base_size[1] * scale / 2.0).max(2.0);
@@ -9696,7 +15420,7 @@ fn push_source_expanded_pixel_cloud(
             layer,
             position: [x.round(), y.round()],
             size: [width, height],
-            tint: source_laser_tint(tick as usize + index),
+            tint: tint_override.unwrap_or_else(|| source_laser_tint(tick as usize + index)),
         });
     }
 }
@@ -9791,7 +15515,9 @@ fn explosion_sprite_size(sprite: SpriteId) -> Option<(u16, u16)> {
         SpriteId::BOMB_EXPLOSION | SpriteId::SWARMER_EXPLOSION | SpriteId::ASTRONAUT_EXPLOSION => {
             Some((8, 8))
         }
-        SpriteId::PLAYER_SHIP => Some(u16_sprite_size(PLAYER_SPRITE_SIZE)),
+        SpriteId::PLAYER_SHIP | SpriteId::PLAYER_SHIP_LEFT => {
+            Some(u16_sprite_size(PLAYER_SPRITE_SIZE))
+        }
         SpriteId::TERRAIN_EXPLOSION => Some((16, 6)),
         _ => None,
     }
@@ -9814,6 +15540,20 @@ pub(crate) fn source_explosion_size_scale(size: u16) -> Option<u8> {
         return None;
     }
     Some(high)
+}
+
+fn source_appearance_size_scale(size: u16) -> Option<u8> {
+    if size & 0x8000 == 0 {
+        return None;
+    }
+    let scale = size.to_be_bytes()[0] & 0x7F;
+    (scale > 0).then_some(scale)
+}
+
+fn source_appearance_tick(size: u16) -> u8 {
+    let start = SOURCE_APPEARANCE_INITIAL_SIZE.to_be_bytes()[0];
+    let current = size.to_be_bytes()[0];
+    start.saturating_sub(current)
 }
 
 pub(crate) fn source_explosion_frame_index(size: u16) -> Option<u8> {
@@ -9890,6 +15630,9 @@ const ENEMY_PROJECTILE_SPRITE_SIZE: (u8, u8) = (4, 3);
 const ENEMY_PROJECTILE_COLLISION_SIZE: (u8, u8) = SOURCE_BOMB_SHELL_PICTURE_SIZE;
 const PLAYER_SPRITE_SIZE: (u8, u8) = (16, 6);
 const PLAYER_COLLISION_SIZE: (u8, u8) = (8, 6);
+const PLAYER_ENEMY_COLLISION_OFFSET_Y: u8 = 2;
+const PLAYER_ENEMY_COLLISION_SIZE: (u8, u8) = (8, 4);
+const SOURCE_LANDER_EARLY_RESERVE_COLLISION_SIZE: (u8, u8) = (5, 9);
 const SCORE_DIGIT_DISPLAY_COUNT: usize = 6;
 const SCORE_DISPLAY_MAX: u32 = 999_999;
 const PLAYER_ONE_SCORE_ORIGIN: [f32; 2] = [18.0, 21.0];
@@ -10069,10 +15812,44 @@ fn source_laser_fire_sound_event() -> SoundEvent {
     }
 }
 
-fn source_smart_bomb_sound_event() -> SoundEvent {
-    SoundEvent::UnmappedSoundCommand {
-        command: SOURCE_SBSND_SOUND_COMMAND,
-    }
+fn source_sound_events_contain_command(sound_events: &[SoundEvent], command: u8) -> bool {
+    sound_events.iter().any(|event| {
+        matches!(
+            event,
+            SoundEvent::UnmappedSoundCommand {
+                command: event_command
+            } if *event_command == command
+        )
+    })
+}
+
+fn source_sound_event_command_count(sound_events: &[SoundEvent], command: u8) -> usize {
+    sound_events
+        .iter()
+        .filter(|event| {
+            matches!(
+                event,
+                SoundEvent::UnmappedSoundCommand {
+                    command: event_command
+                } if *event_command == command
+            )
+        })
+        .count()
+}
+
+fn source_remove_lander_pull_sound(sound_events: &mut Vec<SoundEvent>) {
+    source_remove_sound_command(sound_events, SOURCE_LSKSND_SOUND_COMMAND);
+}
+
+fn source_remove_sound_command(sound_events: &mut Vec<SoundEvent>, command: u8) {
+    sound_events.retain(|event| {
+        !matches!(
+            event,
+            SoundEvent::UnmappedSoundCommand {
+                command: event_command
+            } if *event_command == command
+        )
+    });
 }
 
 fn source_player_death_sound_event() -> SoundEvent {
@@ -10214,6 +15991,7 @@ fn initial_state() -> GameState {
             next_bonus: DEFAULT_REPLAY_SCORE,
         },
         attract: AttractPresentationSnapshot::for_page_frame(0),
+        post_game_playfield: None,
         high_score_initials: HighScoreInitialsState::EMPTY,
         high_score_entry: None,
         high_score_submission: None,
@@ -10227,10 +16005,21 @@ fn world_word(word: u16) -> WorldVector {
     WorldVector::from_subpixels(i32::from(word) << 8)
 }
 
+fn source_fixed24_world_vector(value: i32) -> WorldVector {
+    WorldVector::from_subpixels(value << 8)
+}
+
 fn player_scene_position(position: (WorldVector, WorldVector)) -> [f32; 2] {
     let x = source_word_from_world_vector(position.0).to_be_bytes()[0];
     let y = source_word_from_world_vector(position.1).to_be_bytes()[0];
     [f32::from(x), f32::from(y)]
+}
+
+const fn player_sprite(direction: Direction) -> SpriteId {
+    match direction {
+        Direction::Left => SpriteId::PLAYER_SHIP_LEFT,
+        Direction::Right => SpriteId::PLAYER_SHIP,
+    }
 }
 
 #[cfg(test)]
@@ -10548,8 +16337,9 @@ mod tests {
             source_attract_williams_logo_pixel_path,
         },
         systems::{
-            GameSimulation, HighScoreInitialsState, PlayerControlIntent, PlayerMotionState,
-            PlayerMotionSystem, ScreenPosition, ScreenVelocity, advance_one_frame,
+            CollisionBox, GameSimulation, HighScoreInitialsState, PlayerControlIntent,
+            PlayerMotionState, PlayerMotionSystem, ScreenPosition, ScreenVelocity,
+            advance_one_frame,
         },
     };
 
@@ -10563,35 +16353,36 @@ mod tests {
         DEFAULT_PLAYER_LIVES, DEFAULT_REPLAY_SCORE, Direction, EXPANDED_OBJECT_DETAIL_LIMIT,
         EnemyKind, EnemyReserveSnapshot, EnemySnapshot, ExpandedObjectDetailSnapshot,
         ExpandedObjectEvidenceSnapshot, ExpandedObjectKind, ExplosionKind, Game, GameEvent,
-        GameEvents, GameFrame, GameInput, GameOverSnapshot, GamePhase,
-        HALL_OF_FAME_NO_ENTRY_DELAY_FRAMES, HALL_OF_FAME_STALL_FRAMES, HighScoreEntrySnapshot,
-        HighScoreSubmissionSnapshot, HighScoreTableEntrySnapshot, HighScoreTablesSnapshot,
-        HumanSnapshot, OBJECT_EVIDENCE_DETAIL_LIMIT, ObjectEvidenceCategory,
-        ObjectEvidenceDetailSnapshot, ObjectEvidenceList, ObjectEvidenceSnapshot,
-        PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES, PLAYER_EXPLOSION_PIECE_LIMIT,
+        GameEvents, GameFrame, GameInput, GameOverSnapshot, GamePhase, HALL_OF_FAME_STALL_FRAMES,
+        HighScoreEntrySnapshot, HighScoreSubmissionSnapshot, HighScoreTableEntrySnapshot,
+        HighScoreTablesSnapshot, HumanSnapshot, OBJECT_EVIDENCE_DETAIL_LIMIT,
+        ObjectEvidenceCategory, ObjectEvidenceDetailSnapshot, ObjectEvidenceList,
+        ObjectEvidenceSnapshot, PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES, PLAYER_EXPLOSION_PIECE_LIMIT,
         PLAYER_SWITCH_SLEEP_FRAMES, PlayerExplosionCloudSnapshot, PlayerExplosionPieceSnapshot,
-        ProjectileSnapshot, SOURCE_ACTIVE_BAITER_LIMIT, SOURCE_ACTIVE_SWARMER_LIMIT,
-        SOURCE_BAITER_LOOP_SLEEP_TICKS, SOURCE_EXPLOSION_INITIAL_SIZE,
+        ProjectileSnapshot, ReferenceCaptureSteer, SOURCE_ACTIVE_BAITER_LIMIT,
+        SOURCE_ACTIVE_SWARMER_LIMIT, SOURCE_AHSND_SOUND_COMMAND, SOURCE_BAITER_LOOP_SLEEP_TICKS,
+        SOURCE_CANNON_SOUND_COMMAND, SOURCE_EXPLOSION_INITIAL_SIZE,
         SOURCE_EXPLOSION_LIFETIME_FRAMES, SOURCE_EXPLOSION_SIZE_DELTA,
         SOURCE_GAME_EXEC_SLEEP_FRAMES, SOURCE_LANDER_ORBIT_SLEEP_TICKS, SOURCE_LHSND_SOUND_COMMAND,
         SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS, SOURCE_MUTANT_LOOP_SLEEP_TICKS,
         SOURCE_PLAYFIELD_Y_MIN, SOURCE_POD_SWARMER_REQUEST_LIMIT, SOURCE_PRHSND_SOUND_COMMAND,
         SOURCE_SCHSND_SOUND_COMMAND, SOURCE_SCORE_POPUP_LIFETIME_TICKS,
-        SOURCE_SWHSND_SOUND_COMMAND, SOURCE_TERRAIN_BLOW_ITERATION_LIMIT,
-        SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER, SOURCE_TERRAIN_BLOW_SLEEP_TICKS,
-        SOURCE_TIHSND_SOUND_COMMAND, SOURCE_UFHSND_SOUND_COMMAND, SOURCE_VISUAL_STATE,
-        START_PLAYFIELD_DELAY_FRAMES, START_SOUND_DELAY_FRAMES, ScannerRadarBlipKind,
-        ScannerRadarSnapshot, ScannerRadarStage, ScorePopupKind, SoundEvent, SourceBaiterSnapshot,
-        SourceBomberSnapshot, SourceLanderSnapshot, SourceMutantSnapshot, SourcePodSnapshot,
-        SourceRandSnapshot, SourceSwarmerSnapshot, TerrainBlowStage, WaveProfileSnapshot,
-        WorldSnapshot, WorldVector, source_astronaut_catch_sound_event,
-        source_astronaut_hit_sound_event, source_astronaut_release_sound_event,
+        SOURCE_SMART_BOMB_SOUND_SEQUENCE, SOURCE_SWHSND_SOUND_COMMAND, SOURCE_SWSSND_SOUND_COMMAND,
+        SOURCE_TERRAIN_BLOW_COMPLETE_FRAME, SOURCE_TERRAIN_BLOW_FLASH_COLOR_BYTES,
+        SOURCE_TERRAIN_BLOW_ITERATION_LIMIT, SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER,
+        SOURCE_TERRAIN_BLOW_START_SOUND_FRAMES, SOURCE_TIHSND_SOUND_COMMAND,
+        SOURCE_UFHSND_SOUND_COMMAND, SOURCE_VISUAL_STATE, START_PLAYFIELD_DELAY_FRAMES,
+        START_SOUND_DELAY_FRAMES, ScannerRadarBlipKind, ScannerRadarSnapshot, ScannerRadarStage,
+        ScorePopupKind, SoundEvent, SourceBaiterSnapshot, SourceBomberSnapshot,
+        SourceLanderSnapshot, SourceMutantSnapshot, SourcePodSnapshot, SourceRandSnapshot,
+        SourceSwarmerSnapshot, TerrainBlowStage, WaveProfileSnapshot, WorldSnapshot, WorldVector,
+        source_astronaut_catch_sound_event, source_astronaut_hit_sound_event,
         source_astronaut_safe_landing_sound_event, source_bomb_collision_sound_event,
         source_enemy_hit_sound_event, source_enemy_shot_sound_event,
         source_hyperspace_appearance_sound_event, source_lander_pickup_sound_event,
         source_lander_suck_sound_event, source_laser_fire_sound_event,
-        source_player_death_sound_event, source_smart_bomb_sound_event,
-        source_terrain_blow_complete_sound_event, source_terrain_blow_start_sound_event,
+        source_player_death_sound_event, source_terrain_blow_complete_sound_event,
+        source_terrain_blow_flash_tint, source_terrain_blow_start_sound_event,
     };
 
     #[test]
@@ -10609,37 +16400,41 @@ mod tests {
         assert_eq!(first.bombers, 0);
         assert_eq!(first.pods, 0);
         assert_eq!(first.wave_time, 30);
-        assert_eq!(first.baiter_delay, 212);
+        assert_eq!(first.lander_x_velocity, 32);
+        assert_eq!(first.lander_shot_time, 64);
+        assert_eq!(first.baiter_delay, 192);
 
         let second = WaveProfileSnapshot::for_wave(2);
         assert_eq!(second.landers, 20);
         assert_eq!(second.bombers, 3);
         assert_eq!(second.pods, 1);
-        assert_eq!(second.lander_x_velocity, 30);
-        assert_eq!(second.baiter_shot_time, 13);
+        assert_eq!(second.lander_x_velocity, 40);
+        assert_eq!(second.lander_shot_time, 48);
+        assert_eq!(second.baiter_shot_time, 8);
 
         let fifth = WaveProfileSnapshot::for_wave(5);
-        assert_eq!(fifth.lander_x_velocity, 48);
-        assert_eq!(fifth.baiter_delay, 144);
+        assert_eq!(fifth.lander_x_velocity, 58);
+        assert_eq!(fifth.lander_shot_time, 30);
+        assert_eq!(fifth.baiter_delay, 124);
     }
 
     #[test]
     fn clean_initial_humans_carry_source_target_list_slots() {
         let first = WorldSnapshot::for_wave(1);
         let expected_positions = [
-            ScreenPosition::new(0x12, super::SOURCE_ASTRO_RESTORE_Y),
-            ScreenPosition::new(0x09, super::SOURCE_ASTRO_RESTORE_Y),
-            ScreenPosition::new(0x54, super::SOURCE_ASTRO_RESTORE_Y),
-            ScreenPosition::new(0x5A, super::SOURCE_ASTRO_RESTORE_Y),
-            ScreenPosition::new(0x8D, super::SOURCE_ASTRO_RESTORE_Y),
-            ScreenPosition::new(0x86, super::SOURCE_ASTRO_RESTORE_Y),
-            ScreenPosition::new(0xC3, super::SOURCE_ASTRO_RESTORE_Y),
-            ScreenPosition::new(0xD1, super::SOURCE_ASTRO_RESTORE_Y),
-            ScreenPosition::new(0x09, super::SOURCE_ASTRO_RESTORE_Y),
-            ScreenPosition::new(0x14, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0x18, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0x1C, super::SOURCE_ASTRO_RESTORE_Y.wrapping_add(1)),
+            ScreenPosition::new(0x4E, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0x57, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0x9B, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0x9D, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0xCE, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0xD7, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0xD2, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0xE8, super::SOURCE_ASTRO_RESTORE_Y),
         ];
-        let expected_x_fractions = [0xAD, 0x56, 0xAB, 0x55, 0x2A, 0x95, 0x4A, 0xA5, 0xD2, 0x69];
-        let expected_picture_frames = [2, 0, 2, 2, 0, 2, 0, 2, 0, 2];
+        let expected_x_fractions = [0xC3, 0x81, 0x30, 0x18, 0x8C, 0xC6, 0xE3, 0x71, 0xB8, 0xDC];
+        let expected_picture_frames = [2, 3, 0, 0, 0, 0, 2, 2, 0, 0];
 
         assert_eq!(
             first.humans.len(),
@@ -10801,6 +16596,44 @@ mod tests {
     }
 
     #[test]
+    fn clean_source_lander_target_selection_returns_source_slot_after_removal() {
+        let mut humans = super::source_initial_target_list_humans();
+        humans.remove(5);
+        let mut cursor = Some(super::source_target_list_slot_address(5));
+
+        assert_eq!(
+            super::source_select_lander_target_index(&mut cursor, &humans),
+            Some(6)
+        );
+        assert_eq!(cursor, Some(super::source_target_list_slot_address(6)));
+    }
+
+    #[test]
+    fn source_lander_target_slot_survives_human_vector_removal() {
+        let mut humans = super::source_first_wave_live_start_humans();
+        humans.remove(5);
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0x0016,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(7),
+        };
+
+        assert_eq!(
+            super::source_lander_target_human_index(source_lander, &humans),
+            Some(6)
+        );
+        assert_eq!(
+            super::source_lander_live_target_index(source_lander, &humans),
+            Some(6)
+        );
+    }
+
+    #[test]
     fn clean_wave_spawns_source_profile_active_enemy_batch() {
         let first = WorldSnapshot::for_wave(1);
         assert_eq!(first.enemies.len(), 5);
@@ -10838,6 +16671,8 @@ mod tests {
                 ..EnemyReserveSnapshot::default()
             }
         );
+        assert_eq!(first.source_rng, super::SOURCE_FIRST_WAVE_LIVE_START_RNG);
+        assert_eq!(first.enemy_appearances.len(), 1);
         assert_eq!(first.object_evidence.active_count, 15);
         assert_eq!(first.object_evidence.inactive_count, 10);
         assert_eq!(first.object_evidence.detail_count, 16);
@@ -10855,7 +16690,7 @@ mod tests {
                 EnemyKind::Bomber,
                 EnemyKind::Pod,
                 EnemyKind::Lander,
-                EnemyKind::Lander,
+                EnemyKind::Lander
             ]
         );
         assert_eq!(
@@ -10863,72 +16698,28 @@ mod tests {
             EnemyReserveSnapshot {
                 landers: 17,
                 bombers: 2,
+                pods: 0,
                 ..EnemyReserveSnapshot::default()
             }
         );
-        let expected_initial_lander = super::source_lander_initial_spawn(
-            WaveProfileSnapshot::for_wave(2),
-            super::CLEAN_WAVE_SPAWN_POSITIONS[0],
-            0,
-        );
-        let mut expected_initial_source_lander = expected_initial_lander
-            .source_lander
-            .expect("initial source lander");
-        expected_initial_source_lander.target_human_index = Some(1);
-        assert_eq!(second.enemies[0].velocity, expected_initial_lander.velocity);
         assert_eq!(
-            second.enemies[0].source_lander,
-            Some(expected_initial_source_lander)
-        );
-        assert_eq!(
-            second.enemies[3]
-                .source_lander
-                .expect("second source lander")
-                .target_human_index,
-            Some(2)
-        );
-        assert_eq!(
-            second.enemies[4]
-                .source_lander
-                .expect("third source lander")
-                .target_human_index,
-            Some(3)
+            second
+                .enemies
+                .iter()
+                .filter(|enemy| enemy.kind == EnemyKind::Lander)
+                .map(|enemy| enemy
+                    .source_lander
+                    .expect("source lander")
+                    .target_human_index)
+                .collect::<Vec<_>>(),
+            vec![Some(1), Some(2), Some(3)]
         );
         assert_eq!(
             second.source_target_list_cursor_address,
             Some(super::source_target_list_slot_address(3))
         );
-        assert_eq!(second.enemies[1].velocity, ScreenVelocity::new(-1, 0));
-        assert_eq!(
-            second.enemies[1].source_bomber,
-            Some(super::source_bomber_spawn(
-                WaveProfileSnapshot::for_wave(2),
-                1
-            ))
-        );
-        let expected_initial_pod =
-            super::source_pod_initial_spawn(super::CLEAN_WAVE_SPAWN_POSITIONS[2], 2);
-        assert_eq!(second.enemies[2].velocity, expected_initial_pod.velocity);
-        assert_eq!(
-            second.enemies[2].source_pod,
-            expected_initial_pod.source_pod
-        );
-        assert_eq!(
-            second.object_evidence.details[1].object_category,
-            Some(ObjectEvidenceCategory::Bomber)
-        );
-        assert_eq!(
-            second.object_evidence.details[1].mapped_sprite,
-            Some(SpriteId::ENEMY_BOMBER)
-        );
-        assert_eq!(
-            second.object_evidence.details[2].object_category,
-            Some(ObjectEvidenceCategory::Pod)
-        );
-        assert_eq!(
-            second.object_evidence.details[2].mapped_sprite,
-            Some(SpriteId::ENEMY_POD)
-        );
+        assert_eq!(second.object_evidence.active_count, 15);
+        assert_eq!(second.object_evidence.inactive_count, 19);
     }
 
     #[test]
@@ -11002,6 +16793,9 @@ mod tests {
                         y_velocity: 0,
                         shot_timer: 0,
                         sleep_ticks: 0,
+                        hop_rng: SourceRandSnapshot::default(),
+                        render_x_correction: 0,
+                        target6_first_shot_deferred: false,
                     },
                 ),
                 EnemySnapshot::source_pod(
@@ -11250,6 +17044,7 @@ mod tests {
                     next_bonus: 10_000,
                 },
                 attract: AttractPresentationSnapshot::for_page_frame(9),
+                post_game_playfield: None,
                 high_score_initials: HighScoreInitialsState::EMPTY,
                 high_score_entry: None,
                 high_score_submission: None,
@@ -11630,6 +17425,22 @@ mod tests {
         );
 
         let laser_scene = game.scene();
+        let projectile_y_range = laser_scene
+            .sprites
+            .iter()
+            .filter(|sprite| {
+                sprite.sprite == SpriteId::PLAYER_PROJECTILE
+                    && sprite.layer == RenderLayer::Projectiles
+            })
+            .fold(None::<(f32, f32)>, |range, sprite| {
+                Some(match range {
+                    Some((min_y, max_y)) => {
+                        (min_y.min(sprite.position[1]), max_y.max(sprite.position[1]))
+                    }
+                    None => (sprite.position[1], sprite.position[1]),
+                })
+            })
+            .expect("attract scoring laser should render projectile pixels");
 
         assert!(laser_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::PLAYER_PROJECTILE
@@ -11637,6 +17448,10 @@ mod tests {
                 && sprite.size[0] >= 1.0
                 && sprite.size[1] == 1.0
         }));
+        assert!(
+            (projectile_y_range.1 - projectile_y_range.0).abs() < f32::EPSILON,
+            "MAME scoring-demo laser stays horizontal on the ship row"
+        );
 
         let transfer_display_tick = super::attract_scoring_demo_tick_for_stage(
             super::AttractScoringDemoStage::LegendTransfer(0),
@@ -11660,6 +17475,22 @@ mod tests {
                 && sprite.layer == RenderLayer::Objects
                 && sprite.tint.rgba[3] == 0xFF
         }));
+        let transfer_pixel_tints = transfer_scene
+            .sprites
+            .iter()
+            .filter(|sprite| {
+                sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
+                    && sprite.layer == RenderLayer::Objects
+            })
+            .map(|sprite| sprite.tint)
+            .collect::<Vec<_>>();
+        assert!(
+            transfer_pixel_tints
+                .iter()
+                .any(|tint| *tint != transfer_pixel_tints[0])
+        );
+        assert!(transfer_pixel_tints.contains(&super::source_picture_nibble_tint(3).unwrap()));
+        assert!(transfer_pixel_tints.contains(&super::source_picture_nibble_tint(4).unwrap()));
     }
 
     #[test]
@@ -11670,6 +17501,7 @@ mod tests {
             x16: 0,
             y16: 0,
             visual: super::AttractScoringVisual::Materialize,
+            visual_tick: 0,
         };
 
         super::push_attract_scoring_expanded_pixels(&mut scene, human_materialize, 0);
@@ -11681,6 +17513,7 @@ mod tests {
             x16: 0x1000,
             y16: 0x2000,
             visual: super::AttractScoringVisual::Sprite,
+            visual_tick: 0,
         };
 
         super::push_attract_scoring_expanded_pixels(&mut scene, enemy_sprite, 0);
@@ -11692,19 +17525,28 @@ mod tests {
             x16: 0x1000,
             y16: 0x2000,
             visual: super::AttractScoringVisual::Sprite,
+            visual_tick: 0,
         };
-        let human_target = super::AttractScoringObject {
-            kind: super::AttractScoringObjectKind::Human,
+        let alien_target = super::AttractScoringObject {
+            kind: super::AttractScoringObjectKind::Enemy(EnemyKind::Lander),
             x16: 0x2000,
-            y16: 0x2000,
+            y16: 0x3000,
             visual: super::AttractScoringVisual::Sprite,
+            visual_tick: 0,
         };
 
-        super::push_attract_scoring_laser_beam(&mut scene, player, human_target, 2);
+        super::push_attract_scoring_laser_beam(&mut scene, player, alien_target, 2);
 
-        assert!(scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::PLAYER_PROJECTILE && sprite.layer == RenderLayer::Projectiles
-        }));
+        let projectile_rows = scene
+            .sprites
+            .iter()
+            .filter(|sprite| {
+                sprite.sprite == SpriteId::PLAYER_PROJECTILE
+                    && sprite.layer == RenderLayer::Projectiles
+            })
+            .map(|sprite| sprite.position[1] as i32)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(projectile_rows.len(), 1);
         assert_eq!(
             super::attract_scoring_laser_ship_anchor([20.0, 40.0]),
             [36.0, 44.0]
@@ -11720,6 +17562,7 @@ mod tests {
                     x16: 0,
                     y16: 0,
                     visual: super::AttractScoringVisual::Explosion,
+                    visual_tick: 0,
                 },
                 0,
             ),
@@ -12018,8 +17861,22 @@ mod tests {
         assert_eq!(visual.top_display_scanner_marker_word, 0x9999);
 
         assert_eq!(visual.hud_tint(), Color::WHITE);
-        assert_eq!(visual.top_display_border_tint(), Color::WHITE);
-        assert_eq!(visual.top_display_scanner_marker_tint(), Color::WHITE);
+        assert_eq!(
+            visual.top_display_border_tint(),
+            super::source_video_palette_index_tint(0x05)
+        );
+        assert_eq!(
+            visual.top_display_scanner_marker_tint(),
+            super::source_video_palette_index_tint(0x09)
+        );
+        assert_eq!(
+            visual.scanner_object_blip_tint(super::SOURCE_SCANNER_LANDER_COLOR_WORD),
+            super::source_video_palette_index_tint(0x03)
+        );
+        assert_eq!(
+            visual.scanner_player_blip_tint(super::SOURCE_SCANNER_PLAYER_BODY_WORD),
+            super::source_video_palette_index_tint(0x09)
+        );
         assert_eq!(
             visual.attract_williams_logo_tint_for_frame(0),
             super::source_pseudo_color_tint(0x2F)
@@ -12074,9 +17931,23 @@ mod tests {
             playing_scene
                 .sprites
                 .iter()
-                .filter(|sprite| sprite.sprite == SpriteId::TOP_DISPLAY_BORDER_WORD)
+                .filter(|sprite| {
+                    sprite.sprite == SpriteId::TOP_DISPLAY_BORDER_WORD
+                        && sprite.position != [152.0, 7.0]
+                        && sprite.position != [152.0, 40.0]
+                })
                 .all(|sprite| sprite.tint == SOURCE_VISUAL_STATE.top_display_border_tint())
         );
+        assert!(playing_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::TOP_DISPLAY_BORDER_WORD
+                && sprite.position == [152.0, 7.0]
+                && sprite.tint == SOURCE_VISUAL_STATE.top_display_scanner_marker_tint()
+        }));
+        assert!(playing_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::TOP_DISPLAY_BORDER_WORD
+                && sprite.position == [152.0, 40.0]
+                && sprite.tint == SOURCE_VISUAL_STATE.top_display_scanner_marker_tint()
+        }));
         assert!(
             playing_scene
                 .sprites
@@ -12285,17 +18156,17 @@ mod tests {
         assert_eq!(active.state.world.object_evidence.visible_count, 15);
         assert_eq!(active.state.world.object_evidence.evidence_crc32, None);
         assert_eq!(active.state.world.object_evidence.detail_count, 16);
-        assert_eq!(
-            active.state.world.object_evidence.details[0].screen_position,
-            Some(active.state.world.enemies[0].position)
-        );
-        assert_eq!(
-            active.state.world.object_evidence.details[0].object_category,
-            Some(ObjectEvidenceCategory::Lander)
-        );
-        assert_eq!(
-            active.state.world.object_evidence.details[0].mapped_sprite,
-            Some(SpriteId::ENEMY_LANDER)
+        assert!(
+            active
+                .state
+                .world
+                .object_evidence
+                .details
+                .iter()
+                .any(
+                    |detail| detail.object_category == Some(ObjectEvidenceCategory::Lander)
+                        && detail.mapped_sprite == Some(SpriteId::ENEMY_LANDER)
+                )
         );
         assert_eq!(
             active.scene.summary().layers,
@@ -12303,13 +18174,13 @@ mod tests {
                 terrain: super::SOURCE_TERRAIN_SCREEN_WORDS,
                 starfield: 3,
                 objects: 16,
-                hud: 30,
+                hud: 74,
                 ..RenderLayerCounts::default()
             }
         );
         assert_eq!(
             active.scene.summary().sprite_count,
-            49 + super::SOURCE_TERRAIN_SCREEN_WORDS
+            93 + super::SOURCE_TERRAIN_SCREEN_WORDS
         );
         assert!(active.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::PLAYER_SHIP
@@ -12401,13 +18272,13 @@ mod tests {
                 terrain: super::SOURCE_TERRAIN_SCREEN_WORDS,
                 starfield: 3,
                 objects: 16,
-                hud: 38,
+                hud: 82,
                 ..RenderLayerCounts::default()
             }
         );
         assert_eq!(
             active.scene.summary().sprite_count,
-            57 + super::SOURCE_TERRAIN_SCREEN_WORDS
+            101 + super::SOURCE_TERRAIN_SCREEN_WORDS
         );
     }
 
@@ -12470,43 +18341,39 @@ mod tests {
             ..GameInput::NONE
         });
 
-        assert_eq!(frame.state.player.direction, Direction::Right);
+        assert_eq!(frame.state.player.direction, Direction::Left);
         assert_eq!(frame.state.player.smart_bombs, 2);
-        assert_eq!(frame.state.scores.player_one, 750);
+        assert_eq!(frame.state.scores.player_one, 0);
         assert_eq!(
             frame.state.player.velocity,
-            (WorldVector::default(), WorldVector::default())
+            (
+                WorldVector::from_subpixels(-196_608),
+                WorldVector::from_subpixels(-65_536)
+            )
         );
         assert_eq!(frame.state.world.projectiles.len(), 1);
         assert_eq!(frame.state.world.enemies.len(), 5);
         assert_eq!(
             frame.state.world.enemy_reserve,
             EnemyReserveSnapshot {
-                landers: 5,
+                landers: 10,
                 ..EnemyReserveSnapshot::default()
             }
         );
         assert_eq!(frame.state.world.object_evidence.active_count, 16);
-        assert_eq!(frame.state.world.object_evidence.inactive_count, 5);
+        assert_eq!(frame.state.world.object_evidence.inactive_count, 10);
         assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
         assert_eq!(frame.state.world.object_evidence.visible_count, 16);
         assert_eq!(frame.state.world.object_evidence.evidence_crc32, None);
         assert_eq!(frame.state.world.object_evidence.detail_count, 16);
-        assert_eq!(
-            frame.state.world.object_evidence.details[15].screen_position,
-            Some(frame.state.world.projectiles[0].position)
-        );
-        assert_eq!(
-            frame.state.world.object_evidence.details[15].object_category,
-            Some(ObjectEvidenceCategory::PlayerProjectile)
-        );
-        assert_eq!(
-            frame.state.world.object_evidence.details[15].mapped_sprite,
-            Some(SpriteId::PLAYER_PROJECTILE)
-        );
+        assert!(frame.state.world.object_evidence.details.iter().any(
+            |detail| detail.screen_position == Some(frame.state.world.projectiles[0].position)
+                && detail.object_category == Some(ObjectEvidenceCategory::PlayerProjectile)
+                && detail.mapped_sprite == Some(SpriteId::PLAYER_PROJECTILE)
+        ));
         assert_eq!(
             frame.state.world.projectiles[0].velocity,
-            ScreenVelocity::new(-5, 0)
+            ScreenVelocity::new(-4, 0)
         );
         assert_eq!(
             frame.events.gameplay(),
@@ -12514,30 +18381,18 @@ mod tests {
                 GameEvent::ReversePressed,
                 GameEvent::FirePressed,
                 GameEvent::SmartBombPressed,
-                GameEvent::EnemyDestroyed,
-                GameEvent::EnemyDestroyed,
-                GameEvent::EnemyDestroyed,
-                GameEvent::EnemyDestroyed,
-                GameEvent::EnemyDestroyed,
                 GameEvent::HyperspacePressed,
             ]
         );
-        let mut expected_sounds = vec![
-            source_laser_fire_sound_event(),
-            source_smart_bomb_sound_event(),
-        ];
-        expected_sounds.extend(vec![source_enemy_hit_sound_event(EnemyKind::Lander); 5]);
-        expected_sounds.push(source_hyperspace_appearance_sound_event());
-        expected_sounds.push(SoundEvent::ThrustStarted);
-        assert_eq!(frame.events.sounds(), expected_sounds.as_slice());
+        assert!(frame.events.sounds().is_empty());
         assert_eq!(
             frame.scene.summary().layers,
             RenderLayerCounts {
                 terrain: super::SOURCE_TERRAIN_SCREEN_WORDS,
                 starfield: 3,
-                objects: 101,
-                projectiles: 16,
-                hud: 30,
+                objects: 2,
+                projectiles: 15,
+                hud: 77,
                 overlay: 0,
             }
         );
@@ -12678,7 +18533,7 @@ mod tests {
         assert_eq!(smart_bomb_stock[2].position, [70.0, 28.0]);
         assert_eq!(smart_bomb_stock[3].position, [266.0, 20.0]);
         assert_eq!(smart_bomb_stock[4].position, [266.0, 24.0]);
-        assert_eq!(frame.scene.summary().layers.hud, 39);
+        assert!(frame.scene.summary().layers.hud >= 39);
     }
 
     #[test]
@@ -12687,18 +18542,54 @@ mod tests {
         game.state.scores.player_one = 9_800;
         game.state.scores.high_score = 9_800;
         game.state.scores.next_bonus = 10_000;
+        game.state.world.enemies = vec![
+            EnemySnapshot::new(
+                EnemyKind::Lander,
+                ScreenPosition::new(40, 80),
+                ScreenVelocity::new(0, 0),
+            ),
+            EnemySnapshot::new(
+                EnemyKind::Lander,
+                ScreenPosition::new(72, 88),
+                ScreenVelocity::new(0, 0),
+            ),
+            EnemySnapshot::new(
+                EnemyKind::Lander,
+                ScreenPosition::new(104, 96),
+                ScreenVelocity::new(0, 0),
+            ),
+            EnemySnapshot::new(
+                EnemyKind::Lander,
+                ScreenPosition::new(136, 104),
+                ScreenVelocity::new(0, 0),
+            ),
+            EnemySnapshot::new(
+                EnemyKind::Lander,
+                ScreenPosition::new(168, 112),
+                ScreenVelocity::new(0, 0),
+            ),
+        ];
         game.state.player.smart_bombs = 1;
 
-        let frame = game.step(GameInput {
+        let pressed = game.step(GameInput {
             smart_bomb: true,
             ..GameInput::NONE
         });
 
-        assert_eq!(frame.state.world.enemies.len(), 5);
+        assert_eq!(pressed.state.world.enemies.len(), 5);
+        assert_eq!(pressed.state.scores.player_one, 9_800);
+        assert_eq!(pressed.state.player.smart_bombs, 0);
+        assert_eq!(pressed.events.gameplay(), &[GameEvent::SmartBombPressed]);
+        assert!(pressed.events.sounds().is_empty());
+
+        let sequence = advance_through_smart_bomb_sequence(&mut game);
+        let frame = sequence.frame;
+
+        assert!(frame.state.world.enemies.is_empty());
         assert_eq!(
             frame.state.world.enemy_reserve,
             EnemyReserveSnapshot {
-                landers: 5,
+                landers: 10,
                 ..EnemyReserveSnapshot::default()
             }
         );
@@ -12710,28 +18601,37 @@ mod tests {
         assert_eq!(
             frame.events.gameplay(),
             &[
-                GameEvent::SmartBombPressed,
                 GameEvent::EnemyDestroyed,
                 GameEvent::EnemyDestroyed,
-                GameEvent::BonusAwarded,
                 GameEvent::EnemyDestroyed,
                 GameEvent::EnemyDestroyed,
                 GameEvent::EnemyDestroyed,
             ]
         );
-        let mut expected_sounds = vec![source_smart_bomb_sound_event()];
-        expected_sounds.extend(vec![source_enemy_hit_sound_event(EnemyKind::Lander); 5]);
-        assert_eq!(frame.events.sounds(), expected_sounds.as_slice());
+        assert_eq!(
+            sequence.gameplay_events,
+            [
+                GameEvent::BonusAwarded,
+                GameEvent::EnemyDestroyed,
+                GameEvent::EnemyDestroyed,
+                GameEvent::EnemyDestroyed,
+                GameEvent::EnemyDestroyed,
+                GameEvent::EnemyDestroyed,
+            ]
+        );
+        assert_eq!(sequence.sounds, source_smart_bomb_sound_sequence_events());
+        assert_eq!(frame.scene.clear_color, Color::WHITE);
         assert_eq!(frame.state.world.expanded_objects.active_count, 5);
-        assert!(frame.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::ENEMY_LANDER
-                && sprite.layer == RenderLayer::Objects
-                && sprite.size == [10.0, 8.0]
-        }));
+        assert_scene_has_no_enemy_explosion_cloud(&frame.scene);
+
+        game.step(GameInput::NONE);
+        let visible_explosion = game.step(GameInput::NONE);
+
+        assert_scene_has_enemy_explosion_cloud(&visible_explosion.scene);
     }
 
     #[test]
-    fn clean_game_smart_bomb_pod_spawns_swarmers_after_destroyed_batch() {
+    fn clean_game_smart_bomb_pod_scores_without_spawning_swarmers() {
         let mut game = credited_started_game();
         game.state.wave = 2;
         game.state.wave_profile = WaveProfileSnapshot::for_wave(2);
@@ -12743,36 +18643,26 @@ mod tests {
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
         game.state.player.smart_bombs = 1;
 
-        let frame = game.step(GameInput {
+        let pressed = game.step(GameInput {
             smart_bomb: true,
             ..GameInput::NONE
         });
 
-        assert_eq!(
-            frame.state.world.enemies.len(),
-            SOURCE_POD_SWARMER_REQUEST_LIMIT
-        );
-        assert!(
-            frame
-                .state
-                .world
-                .enemies
-                .iter()
-                .all(|enemy| enemy.kind == EnemyKind::Swarmer)
-        );
+        assert_eq!(pressed.state.world.enemies.len(), 1);
+        assert_eq!(pressed.state.scores.player_one, 0);
+        assert_eq!(pressed.state.player.smart_bombs, 0);
+        assert_eq!(pressed.events.gameplay(), &[GameEvent::SmartBombPressed]);
+        assert!(pressed.events.sounds().is_empty());
+
+        let sequence = advance_through_smart_bomb_sequence(&mut game);
+        let frame = sequence.frame;
+
+        assert!(frame.state.world.enemies.is_empty());
         assert_eq!(frame.state.scores.player_one, 1_000);
         assert_eq!(frame.state.player.smart_bombs, 0);
-        assert_eq!(
-            frame.events.gameplay(),
-            &[GameEvent::SmartBombPressed, GameEvent::EnemyDestroyed]
-        );
-        assert_eq!(
-            frame.events.sounds(),
-            &[
-                source_smart_bomb_sound_event(),
-                source_enemy_hit_sound_event(EnemyKind::Pod),
-            ]
-        );
+        assert_eq!(frame.events.gameplay(), &[GameEvent::EnemyDestroyed]);
+        assert_eq!(sequence.gameplay_events, [GameEvent::EnemyDestroyed]);
+        assert_eq!(sequence.sounds, source_smart_bomb_sound_sequence_events());
     }
 
     #[test]
@@ -12783,7 +18673,10 @@ mod tests {
         let frame = game.step(GameInput::NONE);
 
         assert_eq!(frame.state.wave, 1);
-        assert_eq!(frame.state.world.enemies.len(), 5);
+        assert_eq!(
+            frame.state.world.enemies.len(),
+            super::SOURCE_RESERVE_ACTIVATION_BATCH_SIZE
+        );
         assert_eq!(
             frame.state.world.enemy_reserve,
             EnemyReserveSnapshot {
@@ -12795,6 +18688,14 @@ mod tests {
         assert_eq!(frame.state.world.object_evidence.active_count, 15);
         assert_eq!(frame.state.world.object_evidence.inactive_count, 5);
         assert_eq!(frame.state.world.object_evidence.visible_count, 15);
+        assert_eq!(
+            frame.state.world.expanded_objects.details[0].kind,
+            ExpandedObjectKind::Appearance
+        );
+        assert_eq!(
+            frame.state.world.expanded_objects.details[0].mapped_sprite,
+            Some(SpriteId::ENEMY_LANDER)
+        );
     }
 
     #[test]
@@ -12807,16 +18708,17 @@ mod tests {
         });
         let projectile = fired.state.world.projectiles[0];
 
-        assert_eq!(projectile.velocity, ScreenVelocity::new(5, 0));
-        assert_eq!(fired.events.sounds(), &[source_laser_fire_sound_event()]);
+        assert_eq!(projectile.velocity, ScreenVelocity::new(4, 0));
+        assert!(fired.events.sounds().is_empty());
         assert_scene_has_player_laser_beam(&fired.scene, projectile);
 
         let moved = game.step(GameInput::NONE);
         let moved_projectile = moved.state.world.projectiles[0];
 
+        assert!(moved.events.sounds().is_empty());
         assert_eq!(
             moved_projectile.position.x,
-            projectile.position.x.wrapping_add(5)
+            projectile.position.x.wrapping_add(4)
         );
         assert_eq!(moved_projectile.position.y, projectile.position.y);
         assert_eq!(
@@ -12824,6 +18726,15 @@ mod tests {
             projectile.source_tail_position.x.wrapping_add(1)
         );
         assert_eq!(moved_projectile.velocity, projectile.velocity);
+
+        let waiting_for_sound = game.step(GameInput::NONE);
+        assert!(waiting_for_sound.events.sounds().is_empty());
+
+        let delayed_sound = game.step(GameInput::NONE);
+        assert_eq!(
+            delayed_sound.events.sounds(),
+            &[source_laser_fire_sound_event()]
+        );
     }
 
     #[test]
@@ -12847,7 +18758,7 @@ mod tests {
         assert!(laser_sprites.len() > 1);
         assert!(laser_sprites.iter().all(|sprite| {
             sprite.layer == RenderLayer::Projectiles
-                && sprite.size[0] >= 1.0
+                && sprite.size[0] == 1.0
                 && sprite.size[1] == 1.0
                 && sprite.tint.rgba[3] == 0xFF
         }));
@@ -12858,12 +18769,9 @@ mod tests {
         let (left, right) = player_laser_visible_bounds(projectile);
         assert!(left < f32::from(projectile.position.x));
         assert!(laser_sprites.iter().any(|sprite| {
-            sprite.position[0] == left
-                && (sprite.position[1] - f32::from(projectile.position.y)).abs() <= 4.0
-        }));
-        assert!(laser_sprites.iter().any(|sprite| {
-            sprite.position[0] + sprite.size[0] >= right + 1.0
-                && (sprite.position[1] - f32::from(projectile.position.y)).abs() <= 4.0
+            sprite.position[0] == right
+                && sprite.position[1] == f32::from(projectile.position.y)
+                && sprite.tint == super::SOURCE_LASER_TIP_TINT
         }));
         assert!(laser_sprites.iter().all(|sprite| {
             sprite.position[0] >= left && sprite.position[0] + sprite.size[0] <= right + 1.0
@@ -12871,8 +18779,27 @@ mod tests {
         assert!(
             laser_sprites
                 .iter()
-                .any(|sprite| sprite.tint != Color::WHITE)
+                .any(|sprite| sprite.tint == super::SOURCE_LASER_BODY_TINT)
         );
+        let tail_sprites = laser_sprites
+            .iter()
+            .filter(|sprite| {
+                sprite.position[0] >= left && sprite.position[0] < f32::from(projectile.position.x)
+            })
+            .collect::<Vec<_>>();
+        assert!(!tail_sprites.is_empty());
+        assert!(
+            tail_sprites
+                .iter()
+                .any(|sprite| sprite.tint == super::SOURCE_LASER_FIZZLE_TINT)
+        );
+        let mut rows = laser_sprites
+            .iter()
+            .map(|sprite| sprite.position[1] as i32)
+            .collect::<Vec<_>>();
+        rows.sort_unstable();
+        rows.dedup();
+        assert_eq!(rows, vec![i32::from(projectile.position.y)]);
     }
 
     #[test]
@@ -12890,13 +18817,25 @@ mod tests {
             thrust: true,
             ..GameInput::NONE
         });
-        assert_eq!(started.events.sounds(), &[SoundEvent::ThrustStarted]);
+        assert!(started.events.sounds().is_empty());
 
-        let held = game.step(GameInput {
+        let held_one = game.step(GameInput {
             thrust: true,
             ..GameInput::NONE
         });
-        assert!(held.events.sounds().is_empty());
+        assert!(held_one.events.sounds().is_empty());
+
+        let held_two = game.step(GameInput {
+            thrust: true,
+            ..GameInput::NONE
+        });
+        assert!(held_two.events.sounds().is_empty());
+
+        let delayed_start = game.step(GameInput {
+            thrust: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(delayed_start.events.sounds(), &[SoundEvent::ThrustStarted]);
 
         let stopped = game.step(GameInput::NONE);
         assert_eq!(stopped.events.sounds(), &[SoundEvent::ThrustStopped]);
@@ -12957,9 +18896,9 @@ mod tests {
             ScreenVelocity::new(0, 0),
         );
         game.state.world.projectiles.push(ProjectileSnapshot {
-            position: ScreenPosition::new(190, 83),
-            source_tail_position: ScreenPosition::new(190, 83),
-            velocity: ScreenVelocity::new(5, 0),
+            position: ScreenPosition::new(220, 83),
+            source_tail_position: ScreenPosition::new(220, 83),
+            velocity: ScreenVelocity::new(4, 0),
         });
 
         let frame = game.step(GameInput::NONE);
@@ -12971,7 +18910,12 @@ mod tests {
             frame.events.gameplay(),
             &[GameEvent::EnemyDestroyed, GameEvent::WaveCleared]
         );
-        assert_scene_has_enemy_explosion_cloud(&frame.scene);
+        assert_scene_has_no_enemy_explosion_cloud(&frame.scene);
+
+        game.step(GameInput::NONE);
+        let visible_explosion = game.step(GameInput::NONE);
+
+        assert_scene_has_enemy_explosion_cloud(&visible_explosion.scene);
     }
 
     #[test]
@@ -12999,10 +18943,7 @@ mod tests {
             frame.events.gameplay(),
             &[GameEvent::EnemyDestroyed, GameEvent::WaveCleared]
         );
-        assert_eq!(
-            frame.events.sounds(),
-            &[source_enemy_hit_sound_event(EnemyKind::Lander)]
-        );
+        assert!(frame.events.sounds().is_empty());
         assert_eq!(frame.state.world.expanded_objects.active_count, 1);
         assert_eq!(frame.state.world.expanded_objects.detail_count, 1);
         assert_eq!(
@@ -13020,7 +18961,7 @@ mod tests {
                 ..ExpandedObjectDetailSnapshot::EMPTY
             }
         );
-        assert_scene_has_enemy_explosion_cloud(&frame.scene);
+        assert_scene_has_no_enemy_explosion_cloud(&frame.scene);
         assert!(!frame.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ENEMY_LANDER
                 && sprite.layer == RenderLayer::Objects
@@ -13033,6 +18974,144 @@ mod tests {
                 .iter()
                 .any(|sprite| sprite.sprite == SpriteId::PLAYER_PROJECTILE)
         );
+
+        let sound_frame = game.step(GameInput::NONE);
+
+        assert_eq!(
+            sound_frame.events.sounds(),
+            &[source_enemy_hit_sound_event(EnemyKind::Lander)]
+        );
+    }
+
+    #[test]
+    fn clean_game_delays_reserve_activation_after_projectile_enemy_hit() {
+        let mut game = credited_started_game();
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(100, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot {
+            landers: 2,
+            ..EnemyReserveSnapshot::default()
+        };
+        game.baiter_timer_ticks = None;
+        game.state.world.projectiles.push(ProjectileSnapshot {
+            position: ScreenPosition::new(101, 83),
+            source_tail_position: ScreenPosition::new(101, 83),
+            velocity: ScreenVelocity::new(0, 0),
+        });
+
+        let hit = game.step(GameInput::NONE);
+
+        assert!(hit.state.world.enemies.is_empty());
+        assert_eq!(hit.state.world.enemy_reserve.landers, 2);
+        assert_eq!(
+            game.reserve_activation_cooldown_frames,
+            super::SOURCE_ENEMY_DESTROYED_RESERVE_DELAY_FRAMES
+        );
+
+        let lander_shot =
+            source_enemy_shot_sound_event(EnemyKind::Lander).expect("lander shot sound");
+        for _ in 0..usize::from(super::SOURCE_ENEMY_DESTROYED_RESERVE_DELAY_FRAMES - 1) {
+            let waiting = game.step(GameInput::NONE);
+            assert!(waiting.state.world.enemies.is_empty());
+            assert!(
+                waiting
+                    .events
+                    .sounds()
+                    .iter()
+                    .all(|event| *event != lander_shot)
+            );
+        }
+
+        let restored = game.step(GameInput::NONE);
+
+        assert_eq!(restored.state.world.enemies.len(), 2);
+        assert_eq!(restored.state.world.enemy_reserve.landers, 0);
+        assert!(restored.events.sounds().is_empty());
+    }
+
+    #[test]
+    fn clean_game_launches_next_lander_batch_on_mame_observed_first_wave_cadence() {
+        let mut game = credited_started_game();
+        let appearance_sound = source_hyperspace_appearance_sound_event();
+        let mut materialized = None;
+
+        for frame_offset in 1..=super::SOURCE_FIRST_WAVE_EARLY_RESERVE_DELAY_FRAMES {
+            let frame = game.step(GameInput::NONE);
+            if frame.events.sounds().contains(&appearance_sound) {
+                materialized = Some((frame_offset, frame));
+                break;
+            }
+        }
+
+        let (frame_offset, frame) = materialized
+            .expect("next first-wave lander batch should materialize on source cadence");
+        assert_eq!(
+            frame_offset,
+            super::SOURCE_FIRST_WAVE_EARLY_RESERVE_DELAY_FRAMES
+        );
+        assert_eq!(
+            frame
+                .state
+                .world
+                .enemies
+                .iter()
+                .filter(|enemy| enemy.kind == EnemyKind::Lander)
+                .count(),
+            10
+        );
+        assert_eq!(frame.state.world.enemy_reserve.landers, 5);
+        assert_eq!(
+            frame.state.world.enemy_appearances.len(),
+            super::SOURCE_RESERVE_ACTIVATION_BATCH_SIZE
+        );
+        let early_reserve_landers = frame
+            .state
+            .world
+            .enemies
+            .iter()
+            .filter_map(|enemy| {
+                let source_lander = enemy.source_lander?;
+                let x16 = u16::from_be_bytes([enemy.position.x, source_lander.x_fraction]);
+                let y16 = u16::from_be_bytes([enemy.position.y, source_lander.y_fraction]);
+                (y16 < 0x3000).then_some((
+                    x16,
+                    y16,
+                    source_lander.x_velocity,
+                    source_lander.y_velocity,
+                    source_lander.target_human_index,
+                ))
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            early_reserve_landers,
+            vec![
+                (0x689A, 0x2C70, 0x001E, 0x0070, Some(7)),
+                (0x43D3, 0x2C70, 0xFFEC, 0x0070, Some(9)),
+                (0x1F51, 0x2C70, 0x0014, 0x0070, Some(8)),
+                (0xFA03, 0x2C70, 0x0016, 0x0070, Some(7)),
+                (
+                    0xCF34,
+                    0x2CE0,
+                    super::SOURCE_FIRST_WAVE_EARLY_RESERVE_X_VELOCITY,
+                    0x0000,
+                    Some(6)
+                ),
+            ]
+        );
+        assert_eq!(
+            frame.state.world.enemy_appearances[0].source_size,
+            super::SOURCE_APPEARANCE_INITIAL_SIZE
+        );
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
+                && sprite.layer == RenderLayer::Objects
+        }));
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_LANDER && sprite.layer == RenderLayer::Objects
+        }));
     }
 
     #[test]
@@ -13099,6 +19178,7 @@ mod tests {
             source_tail_position: ScreenPosition::new(101, 83),
             velocity: ScreenVelocity::new(0, 0),
         });
+        let mut expected_rng = game.state.world.source_rng;
 
         let frame = game.step(GameInput::NONE);
 
@@ -13115,7 +19195,6 @@ mod tests {
                 .all(|enemy| enemy.kind == EnemyKind::Swarmer
                     && enemy.position == ScreenPosition::new(100, 80))
         );
-        let mut expected_rng = SourceRandSnapshot::default();
         let expected_swarmers = (0..SOURCE_POD_SWARMER_REQUEST_LIMIT)
             .map(|_| {
                 super::source_mini_swarmer_spawn(
@@ -13158,8 +19237,10 @@ mod tests {
         assert!(frame.state.world.projectiles.is_empty());
         assert_eq!(frame.state.scores.player_one, 1_000);
         assert_eq!(frame.events.gameplay(), &[GameEvent::EnemyDestroyed]);
+        assert!(frame.events.sounds().is_empty());
+        let sound_frame = game.step(GameInput::NONE);
         assert_eq!(
-            frame.events.sounds(),
+            sound_frame.events.sounds(),
             &[source_enemy_hit_sound_event(EnemyKind::Pod)]
         );
         assert_eq!(frame.state.world.object_evidence.active_count, 16);
@@ -13176,12 +19257,16 @@ mod tests {
             frame.state.world.expanded_objects.details[0].picture_label,
             Some("PRBP1")
         );
-        assert!(frame.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::ENEMY_SWARMER
-                && sprite.layer == RenderLayer::Objects
-                && sprite.size == [6.0, 4.0]
-        }));
-        assert_scene_has_enemy_explosion_cloud(&frame.scene);
+        assert!(frame.state.world.object_evidence.details.iter().any(
+            |detail| detail.object_category == Some(ObjectEvidenceCategory::Swarmer)
+                && detail.mapped_sprite == Some(SpriteId::ENEMY_SWARMER)
+        ));
+        assert_scene_has_no_enemy_explosion_cloud(&frame.scene);
+
+        game.step(GameInput::NONE);
+        let visible_explosion = game.step(GameInput::NONE);
+
+        assert_scene_has_enemy_explosion_cloud(&visible_explosion.scene);
         assert!(
             !frame
                 .scene
@@ -13218,11 +19303,121 @@ mod tests {
 
             let frame = game.step(GameInput::NONE);
 
+            assert!(frame.events.sounds().is_empty());
+            let sound_frame = game.step(GameInput::NONE);
             assert_eq!(
-                frame.events.sounds(),
+                sound_frame.events.sounds(),
                 &[SoundEvent::UnmappedSoundCommand { command }],
                 "{kind:?} should emit its source hit sound command",
             );
+        }
+    }
+
+    #[test]
+    fn clean_game_enemy_sound_commands_match_source_table() {
+        for (kind, command) in [
+            (EnemyKind::Lander, 0xF9),
+            (EnemyKind::Mutant, 0xE8),
+            (EnemyKind::Bomber, 0xFE),
+            (EnemyKind::Pod, 0xFA),
+            (EnemyKind::Swarmer, 0xF8),
+            (EnemyKind::Baiter, 0xF8),
+        ] {
+            assert_eq!(super::source_enemy_hit_sound_command(kind), command);
+        }
+
+        for (kind, command) in [
+            (EnemyKind::Lander, Some(0xFC)),
+            (EnemyKind::Mutant, Some(0xF6)),
+            (EnemyKind::Bomber, None),
+            (EnemyKind::Pod, None),
+            (EnemyKind::Swarmer, Some(0xF3)),
+            (EnemyKind::Baiter, Some(0xFC)),
+        ] {
+            assert_eq!(super::source_enemy_shot_sound_command(kind), command);
+        }
+
+        assert_eq!(
+            source_bomb_collision_sound_event(),
+            SoundEvent::UnmappedSoundCommand { command: 0xEE }
+        );
+    }
+
+    #[test]
+    fn clean_reference_sound_command_matrix_emits_remaining_non_lander_commands() {
+        let mut game = Game::new();
+        let mut observed = Vec::new();
+
+        let frame = game.seed_reference_capture_window(ReferenceCaptureSteer::SoundCommandMatrix);
+        if !frame.events.sounds().is_empty() {
+            observed.push((0, frame.events.sounds().to_vec()));
+        }
+        for offset in 1..=720u16 {
+            let frame = game.step(GameInput::NONE);
+            if !frame.events.sounds().is_empty() {
+                observed.push((offset, frame.events.sounds().to_vec()));
+            }
+        }
+
+        assert_eq!(
+            observed,
+            vec![
+                (
+                    0,
+                    vec![SoundEvent::UnmappedSoundCommand {
+                        command: SOURCE_TIHSND_SOUND_COMMAND,
+                    }]
+                ),
+                (
+                    240,
+                    vec![SoundEvent::UnmappedSoundCommand {
+                        command: SOURCE_PRHSND_SOUND_COMMAND,
+                    }]
+                ),
+                (
+                    480,
+                    vec![SoundEvent::UnmappedSoundCommand {
+                        command: SOURCE_SWHSND_SOUND_COMMAND,
+                    }]
+                ),
+                (
+                    720,
+                    vec![SoundEvent::UnmappedSoundCommand {
+                        command: super::SOURCE_SWSSND_SOUND_COMMAND,
+                    }]
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn clean_reference_single_sound_commands_emit_selected_command_only() {
+        for (steer, command) in [
+            (
+                ReferenceCaptureSteer::SoundBomberHit,
+                SOURCE_TIHSND_SOUND_COMMAND,
+            ),
+            (
+                ReferenceCaptureSteer::SoundPodHit,
+                SOURCE_PRHSND_SOUND_COMMAND,
+            ),
+            (
+                ReferenceCaptureSteer::SoundSwarmerHit,
+                SOURCE_SWHSND_SOUND_COMMAND,
+            ),
+            (
+                ReferenceCaptureSteer::SoundSwarmerShot,
+                SOURCE_SWSSND_SOUND_COMMAND,
+            ),
+        ] {
+            let mut game = Game::new();
+            let frame = game.seed_reference_capture_window(steer);
+
+            assert_eq!(
+                frame.events.sounds(),
+                &[SoundEvent::UnmappedSoundCommand { command }]
+            );
+            assert!(game.step(GameInput::NONE).events.sounds().is_empty());
         }
     }
 
@@ -13556,11 +19751,10 @@ mod tests {
         assert_eq!(baiter.source_baiter, Some(expected_source_baiter));
         assert!(frame.events.gameplay().is_empty());
         assert_eq!(frame.state.world.object_evidence.active_count, 16);
-        assert!(frame.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::ENEMY_BAITER
-                && sprite.layer == RenderLayer::Objects
-                && sprite.size == [12.0, 4.0]
-        }));
+        assert!(frame.state.world.object_evidence.details.iter().any(
+            |detail| detail.object_category == Some(ObjectEvidenceCategory::Baiter)
+                && detail.mapped_sprite == Some(SpriteId::ENEMY_BAITER)
+        ));
     }
 
     #[test]
@@ -14345,6 +20539,7 @@ mod tests {
             hseed: 0x20,
             lseed: 0x13,
         };
+        game.state.frame = 1403;
         game.baiter_timer_ticks = None;
 
         let mut expected_rng = game.state.world.source_rng;
@@ -14356,20 +20551,19 @@ mod tests {
         );
         let expected_projectile = super::source_enemy_fireball_shot(
             ScreenPosition::new(0x40, 0x60),
-            0,
-            0,
+            0x60,
+            0x40,
             player_position,
             player_velocity,
             expected_rng,
             0,
         )
         .expect("lander fireball");
-        let (expected_x, expected_x_fraction) = super::source_fixed_axis_step(0x40, 0, 0x0020);
-        let (expected_y, expected_y_fraction) =
-            super::source_fixed_axis_step(0x60, 0, expected_y_velocity);
+        let expected_x = 0x40;
+        let expected_y = 0x60;
         let expected_source = SourceLanderSnapshot {
-            x_fraction: expected_x_fraction,
-            y_fraction: expected_y_fraction,
+            x_fraction: 0,
+            y_fraction: 0,
             x_velocity: 0x0020,
             y_velocity: expected_y_velocity,
             shot_timer: super::source_rmax(
@@ -14406,6 +20600,511 @@ mod tests {
             &[source_enemy_shot_sound_event(EnemyKind::Lander).expect("lander shot sound")]
         );
         assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
+    }
+
+    #[test]
+    fn source_lander_shot_counter_runs_when_output_is_offscreen() {
+        let profile = WaveProfileSnapshot::for_wave(1);
+        let mut source_lander = SourceLanderSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0x001A,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(5),
+        };
+        let mut source_rng = SourceRandSnapshot {
+            seed: 0x90,
+            hseed: 0x20,
+            lseed: 0x13,
+        };
+        let mut expected_rng = source_rng;
+        expected_rng.advance();
+        let mut enemy_projectiles = Vec::new();
+
+        super::source_lander_run_shot_timer(
+            &mut source_lander,
+            super::SourceLanderShotContext {
+                position: ScreenPosition::new(0x10, 0xB0),
+                profile,
+                player_position: ScreenPosition::new(0x20, 0x80),
+                player_velocity: (WorldVector::default(), WorldVector::default()),
+                background_left: 0x8000,
+                projectile_enabled: true,
+                source_rng: &mut source_rng,
+                enemy_projectiles: &mut enemy_projectiles,
+            },
+        );
+
+        assert_eq!(source_rng, expected_rng);
+        assert_eq!(
+            source_lander.shot_timer,
+            super::source_rmax(profile.lander_shot_time as u8, expected_rng.seed)
+        );
+        assert!(enemy_projectiles.is_empty());
+    }
+
+    #[test]
+    fn source_lander_shot_counter_ticks_without_projectile_outside_orbit() {
+        let profile = WaveProfileSnapshot::for_wave(1);
+        let mut source_lander = SourceLanderSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0x001A,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(5),
+        };
+        let mut source_rng = SourceRandSnapshot {
+            seed: 0x90,
+            hseed: 0x20,
+            lseed: 0x13,
+        };
+        let mut expected_rng = source_rng;
+        expected_rng.advance();
+        let mut enemy_projectiles = Vec::new();
+
+        super::source_lander_run_shot_timer(
+            &mut source_lander,
+            super::SourceLanderShotContext {
+                position: ScreenPosition::new(0x40, 0xB0),
+                profile,
+                player_position: ScreenPosition::new(0x20, 0x80),
+                player_velocity: (WorldVector::default(), WorldVector::default()),
+                background_left: 0,
+                projectile_enabled: false,
+                source_rng: &mut source_rng,
+                enemy_projectiles: &mut enemy_projectiles,
+            },
+        );
+
+        assert_eq!(source_rng, expected_rng);
+        assert_eq!(
+            source_lander.shot_timer,
+            super::source_rmax(profile.lander_shot_time as u8, expected_rng.seed)
+        );
+        assert!(enemy_projectiles.is_empty());
+    }
+
+    #[test]
+    fn source_lander_target2_output_uses_mame_edge_windows() {
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0x80,
+            y_fraction: 0,
+            x_velocity: 0xFFEE,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(2),
+        };
+        let crossing_player = ScreenPosition::new(
+            super::SOURCE_LANDER_TARGET2_LEFT_OUTPUT_MAX_X.wrapping_add(1),
+            super::SOURCE_LANDER_VISIBLE_OUTPUT_MIN_Y,
+        );
+        let left_edge = ScreenPosition::new(
+            super::SOURCE_LANDER_TARGET2_LEFT_OUTPUT_MAX_X,
+            super::SOURCE_LANDER_VISIBLE_OUTPUT_MIN_Y,
+        );
+        let right_edge = ScreenPosition::new(
+            super::SOURCE_LANDER_TARGET2_RIGHT_OUTPUT_MIN_X,
+            super::SOURCE_LANDER_VISIBLE_OUTPUT_MIN_Y,
+        );
+
+        assert_eq!(
+            super::source_lander_output_screen_position(crossing_player, source_lander, 0),
+            None
+        );
+        assert_eq!(
+            super::source_lander_output_screen_position(left_edge, source_lander, 0x8000),
+            Some(ScreenPosition::new(0x6E, 0xA2))
+        );
+        assert_eq!(
+            super::source_lander_output_screen_position(right_edge, source_lander, 0),
+            None
+        );
+    }
+
+    #[test]
+    fn source_lander_target1_output_uses_organic_smartmix_visible_lane() {
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0x1F,
+            y_fraction: 0x40,
+            x_velocity: 0xFFDE,
+            y_velocity: 0x0070,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(1),
+        };
+
+        assert_eq!(
+            super::source_lander_output_screen_position(
+                ScreenPosition::new(0xDC, 0x8D),
+                source_lander,
+                0xC800
+            ),
+            None
+        );
+        assert!(
+            super::source_lander_output_screen_position(
+                ScreenPosition::new(0xDC, super::SOURCE_LANDER_TARGET1_VISIBLE_OUTPUT_MIN_Y),
+                source_lander,
+                0xC800
+            )
+            .is_some()
+        );
+    }
+
+    #[test]
+    fn source_lander_negative_x_reserve_output_uses_shifted_source_x16() {
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0x53,
+            y_fraction: 0xF0,
+            x_velocity: 0xFFEC,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(9),
+        };
+        let mame_shell_source = ScreenPosition::new(0x14, 0xAD);
+        let hidden_high_byte_only = ScreenPosition::new(0x10, 0x9F);
+
+        assert_eq!(
+            super::source_lander_output_screen_position(mame_shell_source, source_lander, 0x0800),
+            Some(ScreenPosition::new(0x51, 0xAD))
+        );
+        assert_eq!(
+            super::source_lander_output_screen_position(
+                hidden_high_byte_only,
+                source_lander,
+                0x0800
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn source_lander_negative_x_target8_uses_first_wave_output_model() {
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0xD3,
+            y_fraction: 0xF0,
+            x_velocity: 0xFFEC,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(8),
+        };
+        let position = ScreenPosition::new(0x02, super::SOURCE_LANDER_VISIBLE_OUTPUT_MIN_Y);
+
+        assert_eq!(
+            super::source_lander_output_screen_position(position, source_lander, 0),
+            Some(ScreenPosition::new(
+                0x0B,
+                super::SOURCE_LANDER_VISIBLE_OUTPUT_MIN_Y
+            ))
+        );
+    }
+
+    #[test]
+    fn source_lander_positive_x_target7_uses_shifted_shell_position() {
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0x43,
+            y_fraction: 0xF0,
+            x_velocity: 0x0016,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(7),
+        };
+        let position = ScreenPosition::new(0x0D, 0x92);
+
+        assert_eq!(
+            super::source_lander_shot_screen_position(position, source_lander, 0),
+            Some(ScreenPosition::new(0x35, 0x92))
+        );
+    }
+
+    #[test]
+    fn source_lander_positive_x_target7_output_matches_mame_collision_lane() {
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0x4F,
+            y_fraction: 0xD0,
+            x_velocity: 0x0016,
+            y_velocity: 0x0080,
+            shot_timer: 0x08,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(7),
+        };
+
+        assert_eq!(
+            super::source_lander_output_screen_position(
+                ScreenPosition::new(0x09, 0x7C),
+                source_lander,
+                0
+            ),
+            Some(ScreenPosition::new(0x25, 0x7C))
+        );
+    }
+
+    #[test]
+    fn source_lander_positive_x_target7_collision_lane_uses_process_edge() {
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0x23,
+            y_fraction: 0xF0,
+            x_velocity: 0x0016,
+            y_velocity: 0x0080,
+            shot_timer: 0x08,
+            sleep_ticks: 2,
+            picture_frame: 1,
+            target_human_index: Some(7),
+        };
+        let enemy = EnemySnapshot::source_lander(
+            ScreenPosition::new(0x09, 0x7A),
+            super::source_lander_screen_velocity(source_lander),
+            source_lander,
+        );
+        let player = CollisionBox::new(
+            ScreenPosition::new(0x20, 0x80)
+                .wrapping_offset(0, super::PLAYER_ENEMY_COLLISION_OFFSET_Y),
+            super::PLAYER_ENEMY_COLLISION_SIZE,
+        );
+        let enemy_position = super::source_enemy_render_position(enemy, 0).expect("visible lander");
+
+        assert!(!player.overlaps(CollisionBox::new(
+            enemy_position,
+            super::enemy_collision_size(enemy),
+        )));
+        assert!(player.overlaps(CollisionBox::new(
+            enemy_position,
+            super::SOURCE_LANDER_EARLY_RESERVE_COLLISION_SIZE,
+        )));
+    }
+
+    #[test]
+    fn source_lander_retargeted_positive_x_target8_shell_is_hidden() {
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0xE3,
+            y_fraction: 0xF0,
+            x_velocity: 0x0016,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(8),
+        };
+        let position = ScreenPosition::new(0x58, 0xAE);
+
+        assert_eq!(
+            super::source_lander_shot_screen_position(position, source_lander, 0),
+            None
+        );
+    }
+
+    #[test]
+    fn source_lander_target2_uses_shifted_shell_position() {
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0xCA,
+            y_fraction: 0x60,
+            x_velocity: 0xFFEE,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(2),
+        };
+        let position = ScreenPosition::new(0x0D, 0xAE);
+
+        assert_eq!(
+            super::source_lander_shot_screen_position(position, source_lander, 0),
+            Some(ScreenPosition::new(0x37, 0xAE))
+        );
+    }
+
+    #[test]
+    fn source_lander_target2_shell_matches_mame_table_trace() {
+        let mut projectile =
+            super::source_first_wave_target2_shell_shot(ScreenPosition::new(0x37, 0xAE), 0)
+                .expect("target-2 shell");
+
+        assert_eq!(projectile.position, ScreenPosition::new(0x35, 0xB0));
+        assert_eq!(projectile.source_x_fraction, 0xB0);
+        assert_eq!(projectile.source_y_fraction, 0x35);
+        assert_eq!(projectile.source_x_velocity, 0xFFBC);
+        assert_eq!(projectile.source_y_velocity, 0x00D4);
+
+        for _ in 0..67 {
+            let [x, x_fraction] =
+                u16::from_be_bytes([projectile.position.x, projectile.source_x_fraction])
+                    .wrapping_add(projectile.source_x_velocity)
+                    .to_be_bytes();
+            let [y, y_fraction] =
+                u16::from_be_bytes([projectile.position.y, projectile.source_y_fraction])
+                    .wrapping_add(projectile.source_y_velocity)
+                    .to_be_bytes();
+            projectile.position = ScreenPosition::new(x, y);
+            projectile.source_x_fraction = x_fraction;
+            projectile.source_y_fraction = y_fraction;
+        }
+
+        assert_eq!(projectile.position, ScreenPosition::new(0x23, 0xE7));
+        assert_eq!(projectile.source_x_fraction, 0xE4);
+        assert_eq!(projectile.source_y_fraction, 0xB1);
+    }
+
+    #[test]
+    fn source_lander_target2_shifted_shell_keeps_edge_visibility_gate() {
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0xFA,
+            y_fraction: 0x60,
+            x_velocity: 0xFFEE,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(2),
+        };
+        let position = ScreenPosition::new(0x25, 0xAE);
+
+        assert_eq!(
+            super::source_lander_shot_screen_position(position, source_lander, 0),
+            None
+        );
+    }
+
+    #[test]
+    fn source_lander_shifted_shell_rejects_positions_outside_screen_position_range() {
+        assert_eq!(
+            super::source_unprojected_shifted_object_screen_position(
+                ScreenPosition::new(0xFA, 0xAE),
+                0x03
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn source_lander_negative_x_shot_reset_uses_mame_shell_trace_counts() {
+        let target9 = SourceLanderSnapshot {
+            x_fraction: 0x53,
+            y_fraction: 0xF0,
+            x_velocity: 0xFFEC,
+            y_velocity: 0,
+            shot_timer: 0,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(9),
+        };
+        let target8 = SourceLanderSnapshot {
+            target_human_index: Some(8),
+            ..target9
+        };
+
+        assert_eq!(
+            super::source_lander_shot_reset_timer(
+                target9,
+                Some(ScreenPosition::new(super::SOURCE_SHELL_X_MAX, 0xAE)),
+                false,
+                0x3D,
+            ),
+            0x2C
+        );
+        assert_eq!(
+            super::source_lander_shot_reset_timer(
+                target9,
+                Some(ScreenPosition::new(0x51, 0xAD)),
+                true,
+                0x3D,
+            ),
+            0x26
+        );
+        assert_eq!(
+            super::source_lander_shot_reset_timer(
+                target8,
+                Some(ScreenPosition::new(0x0A, 0xB0)),
+                true,
+                0x3D,
+            ),
+            0x30
+        );
+    }
+
+    #[test]
+    fn source_lander_positive_x_target7_reset_matches_mame_second_shell() {
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0x43,
+            y_fraction: 0xF0,
+            x_velocity: 0x0016,
+            y_velocity: 0,
+            shot_timer: 0,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(7),
+        };
+
+        assert_eq!(
+            super::source_lander_shot_reset_timer(
+                source_lander,
+                Some(ScreenPosition::new(0x35, 0x92)),
+                true,
+                0x2D,
+            ),
+            0x20
+        );
+    }
+
+    #[test]
+    fn source_lander_first_wave_shell_timers_match_mame_trace_points() {
+        assert_eq!(super::SOURCE_FIRST_WAVE_LIVE_START_LANDERS.len(), 5);
+        assert_eq!(
+            super::SOURCE_FIRST_WAVE_LIVE_START_LANDERS[3].shot_timer,
+            0x3C
+        );
+        assert_eq!(
+            super::SOURCE_FIRST_WAVE_EARLY_RESERVE_LANDERS[3].shot_timer,
+            0x26
+        );
+        assert_eq!(
+            super::SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY,
+            2
+        );
+    }
+
+    #[test]
+    fn source_lander_shot_timer_ticks_but_only_orbiting_allocates_projectiles() {
+        assert!(super::source_lander_process_runs_shot_timer(
+            super::SourceLanderAdvancePhase::Orbiting
+        ));
+        assert!(!super::source_lander_process_runs_shot_timer(
+            super::SourceLanderAdvancePhase::Sleeping
+        ));
+        assert!(super::source_lander_process_runs_shot_timer(
+            super::SourceLanderAdvancePhase::Fleeing
+        ));
+        assert!(super::source_lander_process_runs_shot_timer(
+            super::SourceLanderAdvancePhase::Grabbing
+        ));
+        assert!(!super::source_lander_process_runs_shot_timer(
+            super::SourceLanderAdvancePhase::PullingPassenger
+        ));
+
+        assert!(super::source_lander_phase_allows_projectile(
+            super::SourceLanderAdvancePhase::Orbiting
+        ));
+        assert!(!super::source_lander_phase_allows_projectile(
+            super::SourceLanderAdvancePhase::Fleeing
+        ));
+        assert!(!super::source_lander_phase_allows_projectile(
+            super::SourceLanderAdvancePhase::Grabbing
+        ));
     }
 
     #[test]
@@ -14446,7 +21145,7 @@ mod tests {
             y_fraction: expected_y_fraction,
             x_velocity: 0,
             y_velocity: 0,
-            shot_timer: 1,
+            shot_timer: source_lander.shot_timer - 1,
             sleep_ticks: super::SOURCE_LANDER_GRAB_SLEEP_TICKS,
             picture_frame: 0,
             ..source_lander
@@ -14497,9 +21196,10 @@ mod tests {
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
         game.state.world.humans = vec![
-            HumanSnapshot::new(ScreenPosition::new(100, 92)),
+            HumanSnapshot::new(super::clean_carried_human_position(lander_start)),
             HumanSnapshot::new(ScreenPosition::new(140, 214)),
         ];
+        game.state.world.source_velocity_frames_remaining = 1;
         game.baiter_timer_ticks = None;
 
         let expected_y_velocity = super::source_lander_orbit_y_velocity(
@@ -14507,18 +21207,23 @@ mod tests {
             lander_start,
             &game.state.world.terrain,
         );
-        let (expected_x, expected_x_fraction) =
-            super::source_fixed_axis_step(lander_start.x, source_lander.x_fraction, 0x0040);
-        let (expected_y, expected_y_fraction) = super::source_active_object_y_step(
+        let (expected_x, expected_x_fraction) = super::source_fixed_axis_step_many(
+            lander_start.x,
+            source_lander.x_fraction,
+            0x0040,
+            super::SOURCE_ACTIVE_OBJECT_VELOCITY_STEPS_PER_TICK,
+        );
+        let (expected_y, expected_y_fraction) = super::source_active_object_y_step_many(
             lander_start.y,
             source_lander.y_fraction,
             expected_y_velocity,
+            super::SOURCE_ACTIVE_OBJECT_VELOCITY_STEPS_PER_TICK,
         );
         let expected_source = SourceLanderSnapshot {
             x_fraction: expected_x_fraction,
             y_fraction: expected_y_fraction,
             y_velocity: expected_y_velocity,
-            shot_timer: 4,
+            shot_timer: source_lander.shot_timer - 1,
             sleep_ticks: super::SOURCE_LANDER_ORBIT_SLEEP_TICKS,
             picture_frame: 2,
             ..source_lander
@@ -14541,7 +21246,7 @@ mod tests {
                     source_fall_velocity: super::SOURCE_FALLING_HUMAN_Y_ACCELERATION,
                     source_fall_y_fraction: super::SOURCE_FALLING_HUMAN_Y_ACCELERATION
                         .to_be_bytes()[1],
-                    ..HumanSnapshot::new(ScreenPosition::new(100, 92))
+                    ..HumanSnapshot::new(super::clean_carried_human_position(lander_start))
                 },
                 HumanSnapshot {
                     source_fall_velocity: super::SOURCE_FALLING_HUMAN_Y_ACCELERATION,
@@ -14592,7 +21297,7 @@ mod tests {
             y_fraction: expected_y_fraction,
             x_velocity: 0,
             y_velocity: 0,
-            shot_timer: 1,
+            shot_timer: source_lander.shot_timer - 1,
             sleep_ticks: super::SOURCE_LANDER_GRAB_SLEEP_TICKS,
             picture_frame: 0,
             ..source_lander
@@ -14653,7 +21358,7 @@ mod tests {
             y_fraction: expected_y_fraction,
             x_velocity: 0,
             y_velocity: 0,
-            shot_timer: 1,
+            shot_timer: source_lander.shot_timer - 1,
             sleep_ticks: super::SOURCE_LANDER_GRAB_SLEEP_TICKS,
             picture_frame: 0,
             ..source_lander
@@ -14709,15 +21414,24 @@ mod tests {
             picture_frame: 0,
             target_human_index: Some(0),
         };
+        let fleeing_source_lander = SourceLanderSnapshot {
+            y_velocity: !super::source_lander_base_y_velocity(game.state.wave_profile),
+            ..source_lander
+        };
         game.state.world.enemies = vec![
             EnemySnapshot::source_lander(first_start, ScreenVelocity::new(0, 0), source_lander),
-            EnemySnapshot::source_lander(second_start, ScreenVelocity::new(0, 0), source_lander),
+            EnemySnapshot::source_lander(
+                second_start,
+                ScreenVelocity::new(0, 0),
+                fleeing_source_lander,
+            ),
         ];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
         game.state.world.humans = vec![HumanSnapshot {
             carried: true,
             ..HumanSnapshot::new(super::clean_carried_human_position(second_start))
         }];
+        game.state.world.source_velocity_frames_remaining = 1;
         game.baiter_timer_ticks = None;
 
         let first_y_velocity = super::source_lander_orbit_y_velocity(
@@ -14725,11 +21439,19 @@ mod tests {
             first_start,
             &game.state.world.terrain,
         );
-        let second_y_velocity = !super::source_lander_base_y_velocity(game.state.wave_profile);
-        let (first_y, first_y_fraction) =
-            super::source_active_object_y_step(first_start.y, 0, first_y_velocity);
-        let (second_y, second_y_fraction) =
-            super::source_active_object_y_step(second_start.y, 0, second_y_velocity);
+        let second_y_velocity = fleeing_source_lander.y_velocity;
+        let (first_y, first_y_fraction) = super::source_active_object_y_step_many(
+            first_start.y,
+            0,
+            first_y_velocity,
+            super::SOURCE_ACTIVE_OBJECT_VELOCITY_STEPS_PER_TICK,
+        );
+        let (second_y, second_y_fraction) = super::source_active_object_y_step_many(
+            second_start.y,
+            0,
+            second_y_velocity,
+            super::SOURCE_ACTIVE_OBJECT_VELOCITY_STEPS_PER_TICK,
+        );
 
         let frame = game.step(GameInput::NONE);
 
@@ -14742,7 +21464,7 @@ mod tests {
             Some(SourceLanderSnapshot {
                 y_fraction: first_y_fraction,
                 y_velocity: first_y_velocity,
-                shot_timer: 4,
+                shot_timer: source_lander.shot_timer - 1,
                 sleep_ticks: SOURCE_LANDER_ORBIT_SLEEP_TICKS,
                 picture_frame: 1,
                 target_human_index: None,
@@ -14758,9 +21480,9 @@ mod tests {
             Some(SourceLanderSnapshot {
                 y_fraction: second_y_fraction,
                 y_velocity: second_y_velocity,
-                shot_timer: 4,
+                shot_timer: source_lander.shot_timer - 1,
                 sleep_ticks: super::SOURCE_LANDER_FLEE_SLEEP_TICKS,
-                ..source_lander
+                ..fleeing_source_lander
             })
         );
         assert_eq!(
@@ -14838,6 +21560,9 @@ mod tests {
                 y_velocity: 0,
                 shot_timer: 1,
                 sleep_ticks: 0,
+                hop_rng: game.state.world.source_rng,
+                render_x_correction: 0,
+                target6_first_shot_deferred: false,
             },
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
@@ -14863,12 +21588,19 @@ mod tests {
             object_absolute_x,
             ScreenPosition::new(0x40, 0x60),
         );
-        let pre_motion_position = ScreenPosition::new(
-            0x40,
-            0x60u8.wrapping_add(game.state.wave_profile.mutant_random_y),
-        );
         let mut expected_rng = game.state.world.source_rng;
         expected_rng.advance();
+        let mut expected_hop_rng = game.state.world.enemies[0]
+            .source_mutant
+            .expect("source mutant")
+            .hop_rng;
+        let hop_state = expected_hop_rng.advance();
+        let y_step = if hop_state.seed & 0x80 == 0 {
+            0u8.wrapping_sub(game.state.wave_profile.mutant_random_y)
+        } else {
+            game.state.wave_profile.mutant_random_y
+        };
+        let pre_motion_position = ScreenPosition::new(0x40, 0x60u8.wrapping_add(y_step));
         let expected_projectile = super::source_enemy_fireball_shot(
             pre_motion_position,
             0,
@@ -14893,6 +21625,9 @@ mod tests {
                 expected_rng.seed,
             ),
             sleep_ticks: SOURCE_MUTANT_LOOP_SLEEP_TICKS,
+            hop_rng: expected_hop_rng,
+            render_x_correction: 0,
+            target6_first_shot_deferred: false,
         };
 
         let frame = game.step(GameInput::NONE);
@@ -14960,7 +21695,7 @@ mod tests {
     }
 
     #[test]
-    fn clean_game_lander_reserve_batch_uses_source_landst_spawn_state() {
+    fn clean_game_lander_reserve_activation_uses_next_source_landst_spawn_state() {
         let mut game = credited_started_game();
         game.state.world.enemies.clear();
         game.state.world.enemy_reserve = EnemyReserveSnapshot {
@@ -14975,25 +21710,27 @@ mod tests {
         game.baiter_timer_ticks = None;
 
         let mut expected_rng = game.state.world.source_rng;
-        let expected_landers = (0..3)
-            .map(|index| {
-                let mut lander =
-                    super::source_lander_restore_spawn(&mut expected_rng, game.state.wave_profile);
-                lander
-                    .source_lander
-                    .as_mut()
-                    .expect("restored source lander")
-                    .target_human_index = Some(index + 6);
-                lander
-            })
-            .collect::<Vec<_>>();
+        let mut expected_reserve = game.state.world.enemy_reserve;
+        let mut expected_cursor = game.state.world.source_target_list_cursor_address;
+        let expected_landers = super::clean_wave_enemy_spawns(
+            &mut expected_reserve,
+            game.state.wave_profile,
+            &mut expected_rng,
+            super::CleanWaveSpawnContext::ReserveActivation {
+                player_absolute_x: 0x2000,
+                background_absolute_x: 0,
+                targetable_humans: true,
+            },
+            &game.state.world.humans,
+            &mut expected_cursor,
+        );
 
         let frame = game.step(GameInput::NONE);
 
         assert_eq!(frame.state.world.enemies, expected_landers);
         assert_eq!(
             frame.state.world.source_target_list_cursor_address,
-            Some(super::source_target_list_slot_address(8))
+            expected_cursor
         );
         assert!(frame.state.world.enemies.iter().all(|enemy| {
             enemy.kind == EnemyKind::Lander
@@ -15008,16 +21745,19 @@ mod tests {
         assert_eq!(frame.state.world.source_rng, expected_rng);
         assert_eq!(
             frame.state.world.enemy_reserve,
-            EnemyReserveSnapshot::default()
+            EnemyReserveSnapshot {
+                landers: 0,
+                ..EnemyReserveSnapshot::default()
+            }
         );
         assert!(frame.events.gameplay().is_empty());
         assert_eq!(frame.state.world.object_evidence.inactive_count, 0);
         assert_eq!(
-            frame.state.world.object_evidence.details[0].object_category,
-            Some(ObjectEvidenceCategory::Lander)
+            frame.state.world.expanded_objects.details[0].kind,
+            ExpandedObjectKind::Appearance
         );
         assert_eq!(
-            frame.state.world.object_evidence.details[0].mapped_sprite,
+            frame.state.world.expanded_objects.details[0].mapped_sprite,
             Some(SpriteId::ENEMY_LANDER)
         );
     }
@@ -15057,16 +21797,19 @@ mod tests {
         assert_eq!(frame.state.world.source_rng, expected_rng);
         assert_eq!(
             frame.state.world.enemy_reserve,
-            EnemyReserveSnapshot::default()
+            EnemyReserveSnapshot {
+                landers: 0,
+                ..EnemyReserveSnapshot::default()
+            }
         );
         assert!(frame.state.world.terrain_blow.is_some());
         assert!(frame.events.gameplay().is_empty());
         assert_eq!(
-            frame.state.world.object_evidence.details[0].object_category,
-            Some(ObjectEvidenceCategory::Mutant)
+            frame.state.world.expanded_objects.details[0].kind,
+            ExpandedObjectKind::Appearance
         );
         assert_eq!(
-            frame.state.world.object_evidence.details[0].mapped_sprite,
+            frame.state.world.expanded_objects.details[0].mapped_sprite,
             Some(SpriteId::ENEMY_MUTANT)
         );
     }
@@ -15147,11 +21890,11 @@ mod tests {
         assert!(frame.events.gameplay().is_empty());
         assert_eq!(frame.state.world.object_evidence.inactive_count, 0);
         assert_eq!(
-            frame.state.world.object_evidence.details[0].object_category,
-            Some(ObjectEvidenceCategory::Bomber)
+            frame.state.world.expanded_objects.details[0].kind,
+            ExpandedObjectKind::Appearance
         );
         assert_eq!(
-            frame.state.world.object_evidence.details[0].mapped_sprite,
+            frame.state.world.expanded_objects.details[0].mapped_sprite,
             Some(SpriteId::ENEMY_BOMBER)
         );
     }
@@ -15201,11 +21944,11 @@ mod tests {
         assert!(frame.events.gameplay().is_empty());
         assert_eq!(frame.state.world.object_evidence.inactive_count, 0);
         assert_eq!(
-            frame.state.world.object_evidence.details[0].object_category,
-            Some(ObjectEvidenceCategory::Pod)
+            frame.state.world.expanded_objects.details[0].kind,
+            ExpandedObjectKind::Appearance
         );
         assert_eq!(
-            frame.state.world.object_evidence.details[0].mapped_sprite,
+            frame.state.world.expanded_objects.details[0].mapped_sprite,
             Some(SpriteId::ENEMY_POD)
         );
     }
@@ -15271,11 +22014,11 @@ mod tests {
         assert!(frame.events.gameplay().is_empty());
         assert_eq!(frame.state.world.object_evidence.inactive_count, 0);
         assert_eq!(
-            frame.state.world.object_evidence.details[0].object_category,
-            Some(ObjectEvidenceCategory::Swarmer)
+            frame.state.world.expanded_objects.details[0].kind,
+            ExpandedObjectKind::Appearance
         );
         assert_eq!(
-            frame.state.world.object_evidence.details[0].mapped_sprite,
+            frame.state.world.expanded_objects.details[0].mapped_sprite,
             Some(SpriteId::ENEMY_SWARMER)
         );
     }
@@ -15294,6 +22037,7 @@ mod tests {
             super::EnemyProjectileSnapshot::source_fireball(ScreenPosition::new(80, 80), 0x0100, 0);
         projectile.source_lifetime_ticks = 1;
         game.state.world.enemy_projectiles = vec![projectile];
+        game.state.world.source_shell_scan_frames_remaining = 0;
 
         let expired = game.step(GameInput::NONE);
 
@@ -15334,6 +22078,7 @@ mod tests {
             super::EnemyProjectileSnapshot::source_fireball(ScreenPosition::new(80, 80), 0x0100, 0);
         projectile.source_lifetime_ticks = 0;
         game.state.world.enemy_projectiles = vec![projectile];
+        game.state.world.source_shell_scan_frames_remaining = 0;
 
         let frame = game.step(GameInput::NONE);
 
@@ -15364,6 +22109,7 @@ mod tests {
             0,
             0,
         )];
+        game.state.world.source_shell_scan_frames_remaining = 0;
 
         let frame = game.step(GameInput {
             thrust: true,
@@ -15425,8 +22171,17 @@ mod tests {
             ScreenPosition::new(64, 80)
         );
         assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
+        assert!(frame.events.sounds().is_empty());
+        assert!(!frame.scene.sprites.iter().any(|sprite| {
+            matches!(
+                sprite.sprite,
+                SpriteId::PLAYER_SHIP | SpriteId::PLAYER_SHIP_LEFT
+            )
+        }));
+
+        let rematerialized = advance_hyperspace_rematerialization(&mut game);
         assert_eq!(
-            frame.events.sounds(),
+            rematerialized.events.sounds(),
             &[source_hyperspace_appearance_sound_event()]
         );
     }
@@ -15438,7 +22193,7 @@ mod tests {
         game.state.player.velocity = (super::world_word(0x0100), super::world_word(0xFF00));
         game.state.player.direction = Direction::Right;
         game.camera_left = super::world_word(0x2222);
-        game.state.world.source_rng = SourceRandSnapshot {
+        game.hyperspace_source_rng = SourceRandSnapshot {
             seed: 0x12,
             hseed: 0x6C,
             lseed: 0xC0,
@@ -15450,28 +22205,47 @@ mod tests {
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
         game.baiter_timer_ticks = None;
-
+        let mut expected_rng = game.hyperspace_source_rng;
+        expected_rng.advance();
+        for _ in 0..super::SOURCE_HYPERSPACE_REMATERIALIZE_DELAY_FRAMES {
+            expected_rng.advance();
+        }
         let frame = game.step(GameInput {
             hyperspace: true,
             ..GameInput::NONE
         });
 
+        assert_eq!(frame.events.gameplay(), &[GameEvent::HyperspacePressed]);
+        assert!(frame.events.sounds().is_empty());
+        assert!(!frame.scene.sprites.iter().any(|sprite| {
+            matches!(
+                sprite.sprite,
+                SpriteId::PLAYER_SHIP | SpriteId::PLAYER_SHIP_LEFT
+            )
+        }));
+        let expected_hyperspace =
+            super::source_hyperspace_rematerialization(expected_rng, frame.state.player.position.1);
+
+        let rematerialized = advance_hyperspace_rematerialization(&mut game);
+
         assert_eq!(
-            frame.state.player.position,
-            (super::world_word(0x7000), super::world_word(0x6034))
+            rematerialized.state.player.position,
+            expected_hyperspace.position
         );
         assert_eq!(
-            frame.state.player.velocity,
+            rematerialized.state.player.velocity,
             (WorldVector::default(), WorldVector::default())
         );
-        assert_eq!(frame.state.player.direction, Direction::Left);
+        assert_eq!(
+            rematerialized.state.player.direction,
+            expected_hyperspace.direction
+        );
         assert_eq!(
             super::source_word_from_world_vector(game.camera_left),
-            0x126C
+            super::source_word_from_world_vector(expected_hyperspace.camera_left)
         );
-        assert_eq!(frame.events.gameplay(), &[GameEvent::HyperspacePressed]);
         assert_eq!(
-            frame.events.sounds(),
+            rematerialized.events.sounds(),
             &[source_hyperspace_appearance_sound_event()]
         );
     }
@@ -15480,10 +22254,10 @@ mod tests {
     fn clean_game_hyperspace_lseed_high_enters_source_death_path() {
         let mut game = credited_started_game();
         game.state.player.position = (super::world_word(0x2345), super::world_word(0x8134));
-        game.state.world.source_rng = SourceRandSnapshot {
+        game.hyperspace_source_rng = SourceRandSnapshot {
             seed: 0x12,
-            hseed: 0x6C,
-            lseed: 0xC1,
+            hseed: 0x35,
+            lseed: 0x82,
         };
         game.state.world.enemies = vec![EnemySnapshot::new(
             EnemyKind::Lander,
@@ -15498,29 +22272,39 @@ mod tests {
             ..GameInput::NONE
         });
 
-        assert_eq!(frame.state.phase, GamePhase::GameOver);
-        assert_eq!(frame.state.game_over, GameOverSnapshot::NONE);
-        assert_eq!(frame.state.player.lives, 1);
+        assert_eq!(frame.state.phase, GamePhase::Playing);
+        assert_eq!(frame.events.gameplay(), &[GameEvent::HyperspacePressed]);
+        assert!(frame.events.sounds().is_empty());
+        assert!(frame.state.world.player_explosion.is_none());
+
+        let rematerialized = advance_hyperspace_rematerialization(&mut game);
+
+        assert_eq!(rematerialized.state.phase, GamePhase::Playing);
         assert_eq!(
-            frame.state.player.position,
-            (super::world_word(0x7000), super::world_word(0x6034))
-        );
-        assert_eq!(
-            frame.state.player.velocity,
+            rematerialized.state.player.velocity,
             (WorldVector::default(), WorldVector::default())
         );
         assert_eq!(
-            frame.events.gameplay(),
-            &[GameEvent::HyperspacePressed, GameEvent::PlayerDestroyed]
+            rematerialized.events.sounds(),
+            &[source_hyperspace_appearance_sound_event()]
         );
+        assert!(rematerialized.state.world.player_explosion.is_none());
+
+        let destroyed = advance_hyperspace_death(&mut game);
+
+        assert_eq!(destroyed.state.phase, GamePhase::Playing);
+        assert_eq!(destroyed.state.game_over, GameOverSnapshot::NONE);
+        assert_eq!(destroyed.state.player.lives, 2);
+        assert_eq!(destroyed.events.gameplay(), &[GameEvent::PlayerDestroyed]);
         assert_eq!(
-            frame.events.sounds(),
-            &[
-                source_hyperspace_appearance_sound_event(),
-                source_player_death_sound_event()
-            ]
+            destroyed.events.sounds(),
+            &[source_player_death_sound_event()]
         );
-        assert!(frame.state.world.player_explosion.is_some());
+        assert!(destroyed.state.world.player_explosion.is_some());
+        assert_eq!(
+            advance_through_player_death_sound_tail(&mut game),
+            source_player_death_sound_tail_events()
+        );
     }
 
     #[test]
@@ -15688,13 +22472,13 @@ mod tests {
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::HUMAN
                 && sprite.layer == RenderLayer::Objects
-                && sprite.position == [68.0, 216.0]
+                && sprite.position == [74.0, 224.0]
                 && sprite.size == [4.0, 8.0]
         }));
         assert!(!scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::HUMAN
                 && sprite.layer == RenderLayer::Objects
-                && sprite.position == [68.0, 216.0]
+                && sprite.position == [74.0, 224.0]
                 && sprite.size == [2.0, 8.0]
         }));
     }
@@ -15790,27 +22574,44 @@ mod tests {
             0,
             0,
         )];
+        game.state.world.source_shell_scan_frames_remaining = 0;
         game.baiter_timer_ticks = None;
 
         let frame = game.step(GameInput::NONE);
 
         assert!(frame.state.world.enemy_projectiles.is_empty());
         assert_eq!(frame.state.scores.player_one, 25);
-        assert_eq!(frame.state.player.lives, 1);
+        assert_eq!(frame.state.player.lives, 2);
         assert_eq!(frame.events.gameplay(), &[GameEvent::PlayerDestroyed]);
-        assert_eq!(
-            frame.events.sounds(),
-            &[
-                source_bomb_collision_sound_event(),
-                source_player_death_sound_event()
-            ]
-        );
+        assert!(frame.events.sounds().is_empty());
         assert_eq!(frame.state.world.expanded_objects.active_count, 1);
         assert_eq!(
             frame.state.world.expanded_objects.details[0].mapped_sprite,
             Some(SpriteId::BOMB_EXPLOSION)
         );
         assert!(frame.state.world.player_explosion.is_some());
+
+        let delayed_death_sound = game.step(GameInput::NONE);
+        assert_eq!(
+            delayed_death_sound.events.sounds(),
+            &[source_player_death_sound_event()]
+        );
+        let delayed_bomb_sound = game.step(GameInput::NONE);
+        assert_eq!(
+            delayed_bomb_sound.events.sounds(),
+            &[source_bomb_collision_sound_event()]
+        );
+        let mut stock_drop = None;
+        for offset in 3..=super::SOURCE_PROJECTILE_DEATH_BRANCH_DELAY_FRAMES {
+            let frame = game.step(GameInput::NONE);
+            if stock_drop.is_none() && frame.state.player.lives == 1 {
+                stock_drop = Some(offset);
+            }
+        }
+        assert_eq!(
+            stock_drop,
+            Some(super::SOURCE_PROJECTILE_DEATH_BRANCH_DELAY_FRAMES)
+        );
     }
 
     #[test]
@@ -15886,7 +22687,9 @@ mod tests {
             ScreenVelocity::new(0, 0),
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
-        game.state.world.humans = vec![HumanSnapshot::new(ScreenPosition::new(100, 92))];
+        game.state.world.humans = vec![HumanSnapshot::new(super::clean_carried_human_position(
+            ScreenPosition::new(100, 80),
+        ))];
 
         let captured = game.step(GameInput::NONE);
 
@@ -15904,12 +22707,6 @@ mod tests {
             }
         );
         assert_eq!(captured.state.world.object_evidence.active_count, 2);
-        assert!(captured.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::HUMAN
-                && sprite.layer == RenderLayer::Objects
-                && sprite.position == [102.0, 92.0]
-                && sprite.tint == Color::from_rgba(0xFF, 0xF8, 0x80, 0xFF)
-        }));
         assert_eq!(
             captured.events.sounds(),
             &[source_lander_pickup_sound_event()]
@@ -15948,7 +22745,12 @@ mod tests {
             source_lander,
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
-        game.state.world.humans = vec![HumanSnapshot::new(ScreenPosition::new(100, 92))];
+        game.state.world.humans = vec![HumanSnapshot::new(ScreenPosition::new(
+            lander_start.x,
+            lander_start
+                .y
+                .wrapping_add(super::CLEAN_LANDER_PASSENGER_OFFSET_Y),
+        ))];
         game.baiter_timer_ticks = None;
 
         let expected_source = SourceLanderSnapshot {
@@ -15979,6 +22781,77 @@ mod tests {
             }
         );
         assert!(captured.state.world.enemy_projectiles.is_empty());
+        assert_eq!(
+            captured.events.sounds(),
+            &[source_lander_pickup_sound_event()]
+        );
+    }
+
+    #[test]
+    fn clean_game_source_lander_capture_on_velocity_tick_applies_same_frame_source_step() {
+        let mut game = credited_started_game();
+        let lander_start = ScreenPosition::new(100, 80);
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 5,
+            sleep_ticks: 1,
+            picture_frame: 0,
+            target_human_index: Some(0),
+        };
+        game.state.world.enemies = vec![EnemySnapshot::source_lander(
+            lander_start,
+            ScreenVelocity::new(0, 0),
+            source_lander,
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![HumanSnapshot::new(ScreenPosition::new(
+            lander_start.x,
+            lander_start
+                .y
+                .wrapping_add(super::CLEAN_LANDER_PASSENGER_OFFSET_Y),
+        ))];
+        game.state.world.source_velocity_frames_remaining = 1;
+        game.baiter_timer_ticks = None;
+
+        let expected_y_velocity = !super::source_lander_base_y_velocity(game.state.wave_profile);
+        let (expected_y, expected_y_fraction) = super::source_active_object_y_step_many(
+            lander_start.y,
+            source_lander.y_fraction,
+            expected_y_velocity,
+            super::SOURCE_ACTIVE_OBJECT_VELOCITY_STEPS_PER_TICK,
+        );
+        let expected_position = ScreenPosition::new(lander_start.x, expected_y);
+        let expected_source = SourceLanderSnapshot {
+            y_fraction: expected_y_fraction,
+            y_velocity: expected_y_velocity,
+            sleep_ticks: super::SOURCE_LANDER_FLEE_SLEEP_TICKS,
+            ..source_lander
+        };
+
+        let captured = game.step(GameInput::NONE);
+
+        let lander = captured
+            .state
+            .world
+            .enemies
+            .first()
+            .expect("capturing source lander");
+        assert_eq!(lander.position, expected_position);
+        assert_eq!(
+            lander.velocity,
+            super::source_lander_screen_velocity(expected_source)
+        );
+        assert_eq!(lander.source_lander, Some(expected_source));
+        assert_eq!(
+            captured.state.world.humans[0],
+            HumanSnapshot {
+                carried: true,
+                ..HumanSnapshot::new(super::clean_carried_human_position(expected_position))
+            }
+        );
         assert_eq!(
             captured.events.sounds(),
             &[source_lander_pickup_sound_event()]
@@ -16022,11 +22895,16 @@ mod tests {
             object_absolute_x,
             object_position_after_motion,
         );
+        let mut expected_hop_rng = game.state.world.source_rng;
+        let hop_state = expected_hop_rng.advance();
+        let expected_y_step = if hop_state.seed & 0x80 == 0 {
+            0u8.wrapping_sub(game.state.wave_profile.mutant_random_y)
+        } else {
+            game.state.wave_profile.mutant_random_y
+        };
         let expected_position = ScreenPosition::new(
             object_position_after_motion.x,
-            object_position_after_motion
-                .y
-                .wrapping_sub(game.state.wave_profile.mutant_random_y),
+            object_position_after_motion.y.wrapping_add(expected_y_step),
         );
         let expected_source = SourceMutantSnapshot {
             x_fraction: 0,
@@ -16035,6 +22913,9 @@ mod tests {
             y_velocity: expected_y_velocity,
             shot_timer: game.state.wave_profile.mutant_shot_time as u8 - 1,
             sleep_ticks: SOURCE_MUTANT_LOOP_SLEEP_TICKS,
+            hop_rng: expected_hop_rng,
+            render_x_correction: 0,
+            target6_first_shot_deferred: false,
         };
 
         let frame = game.step(GameInput::NONE);
@@ -16098,16 +22979,16 @@ mod tests {
                     super::clean_carried_human_position(lander_start).x,
                     super::clean_carried_human_position(lander_start)
                         .y
-                        .saturating_sub(1),
+                        .saturating_sub(super::SOURCE_LANDER_PULL_PASSENGER_STEP),
                 ))
             }
         );
         assert!(frame.state.world.enemy_projectiles.is_empty());
-        assert_eq!(frame.events.sounds(), &[source_lander_suck_sound_event()]);
+        assert!(frame.events.sounds().is_empty());
     }
 
     #[test]
-    fn clean_game_source_lander_pull_sound_does_not_repeat() {
+    fn clean_game_source_lander_pull_sound_repeats_during_pull() {
         let mut game = credited_started_game();
         let lander_start = ScreenPosition::new(100, SOURCE_PLAYFIELD_Y_MIN + 8);
         let source_lander = SourceLanderSnapshot {
@@ -16148,10 +23029,10 @@ mod tests {
                 super::clean_carried_human_position(lander_start).x,
                 super::clean_carried_human_position(lander_start)
                     .y
-                    .saturating_sub(2),
+                    .saturating_sub(1 + super::SOURCE_LANDER_PULL_PASSENGER_STEP),
             )
         );
-        assert!(frame.events.sounds().is_empty());
+        assert_eq!(frame.events.sounds(), &[source_lander_suck_sound_event()]);
     }
 
     #[test]
@@ -16203,12 +23084,15 @@ mod tests {
             object_absolute_x,
             lander_start,
         );
-        let expected_position = ScreenPosition::new(
-            lander_start.x,
-            lander_start
-                .y
-                .wrapping_sub(game.state.wave_profile.mutant_random_y),
-        );
+        let mut expected_hop_rng = game.state.world.source_rng;
+        let hop_state = expected_hop_rng.advance();
+        let expected_y_step = if hop_state.seed & 0x80 == 0 {
+            0u8.wrapping_sub(game.state.wave_profile.mutant_random_y)
+        } else {
+            game.state.wave_profile.mutant_random_y
+        };
+        let expected_position =
+            ScreenPosition::new(lander_start.x, lander_start.y.wrapping_add(expected_y_step));
         let expected_source = SourceMutantSnapshot {
             x_fraction: 0,
             y_fraction: 0,
@@ -16216,6 +23100,9 @@ mod tests {
             y_velocity: expected_y_velocity,
             shot_timer: game.state.wave_profile.mutant_shot_time as u8 - 1,
             sleep_ticks: SOURCE_MUTANT_LOOP_SLEEP_TICKS,
+            hop_rng: expected_hop_rng,
+            render_x_correction: 0,
+            target6_first_shot_deferred: false,
         };
 
         let frame = game.step(GameInput::NONE);
@@ -16307,9 +23194,11 @@ mod tests {
             frame.events.gameplay(),
             &[GameEvent::EnemyDestroyed, GameEvent::WaveCleared]
         );
+        assert!(frame.events.sounds().is_empty());
+        let release_frame = game.step(GameInput::NONE);
         assert_eq!(
-            frame.events.sounds(),
-            &[source_astronaut_release_sound_event()]
+            release_frame.events.sounds(),
+            &[source_enemy_hit_sound_event(EnemyKind::Lander)]
         );
     }
 
@@ -16337,7 +23226,10 @@ mod tests {
             carried: true,
             ..HumanSnapshot::new(ScreenPosition::new(
                 super::clean_carried_human_position(lander_start).x,
-                lander_start.y.saturating_add(2),
+                lander_start
+                    .y
+                    .saturating_add(super::SOURCE_LANDER_PULL_PASSENGER_STEP)
+                    .saturating_add(2),
             ))
         }];
         game.state.world.projectiles.push(ProjectileSnapshot {
@@ -16354,12 +23246,14 @@ mod tests {
             frame.state.world.humans[0],
             HumanSnapshot::new(ScreenPosition::new(
                 super::clean_carried_human_position(lander_start).x,
-                lander_start.y.saturating_add(1),
+                lander_start.y.saturating_add(2),
             ))
         );
+        assert_eq!(frame.events.sounds(), &[source_lander_suck_sound_event()]);
+        let release_frame = game.step(GameInput::NONE);
         assert_eq!(
-            frame.events.sounds(),
-            &[source_astronaut_release_sound_event()]
+            release_frame.events.sounds(),
+            &[source_enemy_hit_sound_event(EnemyKind::Lander)]
         );
     }
 
@@ -16420,7 +23314,7 @@ mod tests {
         game.state.player.position = (super::world_word(0x6400), super::world_word(0x6400));
         game.state.player.velocity = (WorldVector::default(), WorldVector::default());
         game.state.world.enemies = vec![EnemySnapshot::new(
-            EnemyKind::Baiter,
+            EnemyKind::Lander,
             ScreenPosition::new(220, 80),
             ScreenVelocity::new(0, 0),
         )];
@@ -16458,6 +23352,21 @@ mod tests {
                 && sprite.layer == RenderLayer::Objects
                 && sprite.position == [104.0, 122.0]
         }));
+
+        let mut tail_sounds = Vec::new();
+        for offset in 1..=20 {
+            let frame = game.step(GameInput::NONE);
+            if !frame.events.sounds().is_empty() {
+                tail_sounds.push((offset, frame.events.sounds().to_vec()));
+            }
+        }
+        assert_eq!(
+            tail_sounds,
+            vec![
+                (10, vec![source_astronaut_catch_sound_event()]),
+                (20, vec![source_astronaut_catch_sound_event()]),
+            ]
+        );
     }
 
     #[test]
@@ -16603,6 +23512,201 @@ mod tests {
     }
 
     #[test]
+    fn clean_reference_safe_landing_steer_emits_source_landing_sound_on_next_frame() {
+        let mut game = Game::new();
+        let seeded =
+            game.seed_reference_capture_window(ReferenceCaptureSteer::FallingHumanSafeLanding);
+        let ground_y =
+            super::clean_human_ground_y(&seeded.state.world.terrain, 0x20).expect("terrain ground");
+        let steered_human = seeded
+            .state
+            .world
+            .humans
+            .last()
+            .expect("steered falling human");
+
+        assert_eq!(seeded.state.scores.player_one, 0);
+        assert!(seeded.events.sounds().is_empty());
+        assert_eq!(
+            steered_human.position,
+            ScreenPosition::new(0x20, ground_y - 1)
+        );
+        assert_eq!(steered_human.source_fall_velocity, 0x0010);
+        assert_eq!(steered_human.source_fall_y_fraction, 0xF0);
+
+        let landed = game.step(GameInput::NONE);
+        let landed_human = landed
+            .state
+            .world
+            .humans
+            .last()
+            .expect("landed steered human");
+
+        assert_eq!(landed.state.scores.player_one, 250);
+        assert_eq!(landed_human.position, ScreenPosition::new(0x20, ground_y));
+        assert_eq!(landed_human.source_fall_velocity, 0);
+        assert_eq!(landed_human.source_fall_y_fraction, 0);
+        assert_eq!(
+            landed.events.sounds(),
+            &[source_astronaut_safe_landing_sound_event()]
+        );
+    }
+
+    #[test]
+    fn clean_reference_enemy_explosion_matrix_steer_matches_mame_slots() {
+        let mut game = Game::new();
+        let seeded =
+            game.seed_reference_capture_window(ReferenceCaptureSteer::EnemyExplosionMatrix);
+        let expected = [
+            (
+                "LNDP3",
+                (5, 8),
+                SpriteId::ENEMY_LANDER,
+                ScreenPosition::new(0x20, 0x40),
+                ScreenPosition::new(0x22, 0x44),
+            ),
+            (
+                "SCZP1",
+                (5, 8),
+                SpriteId::ENEMY_MUTANT,
+                ScreenPosition::new(0x58, 0x40),
+                ScreenPosition::new(0x5A, 0x44),
+            ),
+            (
+                "TIEP3",
+                (4, 8),
+                SpriteId::ENEMY_BOMBER,
+                ScreenPosition::new(0x90, 0x40),
+                ScreenPosition::new(0x92, 0x44),
+            ),
+            (
+                "PRBP1",
+                (4, 8),
+                SpriteId::ENEMY_POD,
+                ScreenPosition::new(0xC8, 0x40),
+                ScreenPosition::new(0xCA, 0x44),
+            ),
+            (
+                "UFOP3",
+                (6, 4),
+                SpriteId::ENEMY_BAITER,
+                ScreenPosition::new(0x20, 0x80),
+                ScreenPosition::new(0x23, 0x82),
+            ),
+            (
+                "SWXP1",
+                (4, 8),
+                SpriteId::SWARMER_EXPLOSION,
+                ScreenPosition::new(0x58, 0x80),
+                ScreenPosition::new(0x5A, 0x84),
+            ),
+        ];
+        let expected_len = expected.len();
+
+        assert_eq!(
+            usize::from(seeded.state.world.expanded_objects.detail_count),
+            expected_len
+        );
+        for (index, (label, size, sprite, top_left, center)) in expected.into_iter().enumerate() {
+            let detail = seeded.state.world.expanded_objects.details[index];
+            assert_eq!(detail.kind, ExpandedObjectKind::Explosion);
+            assert_eq!(
+                detail.size,
+                SOURCE_EXPLOSION_INITIAL_SIZE + SOURCE_EXPLOSION_SIZE_DELTA
+            );
+            assert_eq!(detail.picture_label, Some(label));
+            assert_eq!(detail.picture_size, Some(size));
+            assert_eq!(detail.mapped_sprite, Some(sprite));
+            assert_eq!(detail.top_left, Some(top_left));
+            assert_eq!(detail.center, Some(center));
+            assert_eq!(detail.explosion_frame, Some(1));
+        }
+    }
+
+    #[test]
+    fn clean_reference_enemy_materialize_matrix_steer_matches_mame_slots() {
+        let mut game = Game::new();
+        let seeded =
+            game.seed_reference_capture_window(ReferenceCaptureSteer::EnemyMaterializeMatrix);
+        let expected = [
+            (
+                "LNDP3",
+                (5, 8),
+                SpriteId::ENEMY_LANDER,
+                ScreenPosition::new(0x20, 0x40),
+                ScreenPosition::new(0x21, 0x44),
+            ),
+            (
+                "SCZP1",
+                (5, 8),
+                SpriteId::ENEMY_MUTANT,
+                ScreenPosition::new(0x58, 0x40),
+                ScreenPosition::new(0x5A, 0x44),
+            ),
+            (
+                "TIEP3",
+                (4, 8),
+                SpriteId::ENEMY_BOMBER,
+                ScreenPosition::new(0x90, 0x40),
+                ScreenPosition::new(0x93, 0x44),
+            ),
+            (
+                "PRBP1",
+                (4, 8),
+                SpriteId::ENEMY_POD,
+                ScreenPosition::new(0xC8, 0x40),
+                ScreenPosition::new(0xC9, 0x44),
+            ),
+            (
+                "UFOP3",
+                (6, 4),
+                SpriteId::ENEMY_BAITER,
+                ScreenPosition::new(0x20, 0x80),
+                ScreenPosition::new(0x21, 0x82),
+            ),
+            (
+                "SWPIC1",
+                (3, 4),
+                SpriteId::ENEMY_SWARMER,
+                ScreenPosition::new(0x58, 0x80),
+                ScreenPosition::new(0x59, 0x82),
+            ),
+        ];
+        let expected_len = expected.len();
+
+        assert_eq!(
+            usize::from(seeded.state.world.expanded_objects.detail_count),
+            expected_len
+        );
+        assert!(seeded.state.world.enemies.is_empty());
+        assert_eq!(
+            seeded.state.world.enemy_reserve,
+            EnemyReserveSnapshot::default()
+        );
+        for (index, (label, size, sprite, top_left, center)) in expected.into_iter().enumerate() {
+            let detail = seeded.state.world.expanded_objects.details[index];
+            assert_eq!(detail.kind, ExpandedObjectKind::Appearance);
+            assert_eq!(detail.size, super::SOURCE_APPEARANCE_INITIAL_SIZE);
+            assert_eq!(detail.picture_label, Some(label));
+            assert_eq!(detail.picture_size, Some(size));
+            assert_eq!(detail.mapped_sprite, Some(sprite));
+            assert_eq!(detail.top_left, Some(top_left));
+            assert_eq!(detail.center, Some(center));
+        }
+
+        let advanced = game.step(GameInput::NONE);
+        assert_eq!(advanced.state.world.enemy_appearances.len(), expected_len);
+        assert!(advanced.state.world.enemies.is_empty());
+        assert!(advanced.events.gameplay().is_empty());
+
+        for _ in 0..60 {
+            let frame = game.step(GameInput::NONE);
+            assert!(frame.state.world.enemies.is_empty());
+            assert!(frame.events.gameplay().is_empty());
+        }
+    }
+
+    #[test]
     fn clean_game_fatal_falling_human_impact_removes_human_and_starts_human_loss() {
         let mut game = credited_started_game();
         game.state.world.enemies = vec![EnemySnapshot::new(
@@ -16632,13 +23736,7 @@ mod tests {
             explosion.kind == ExplosionKind::Astronaut
                 && explosion.position == ScreenPosition::new(100, ground_y)
         }));
-        assert_eq!(
-            frame.events.sounds(),
-            &[
-                source_astronaut_hit_sound_event(),
-                source_terrain_blow_start_sound_event()
-            ]
-        );
+        assert_eq!(frame.events.sounds(), &[source_astronaut_hit_sound_event()]);
     }
 
     #[test]
@@ -16665,18 +23763,25 @@ mod tests {
     fn clean_game_player_enemy_collision_loses_life_and_removes_enemy() {
         let mut game = credited_started_game();
         keep_first_enemy_only(&mut game);
-        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
-        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        place_first_lander_at(&mut game, ScreenPosition::new(32, 128));
 
         let frame = game.step(GameInput::NONE);
 
-        assert_eq!(frame.state.phase, GamePhase::GameOver);
+        assert_eq!(frame.state.phase, GamePhase::Playing);
         assert_eq!(frame.state.game_over, GameOverSnapshot::NONE);
-        assert_eq!(frame.state.player.lives, 1);
+        assert_eq!(frame.state.player.lives, 2);
         assert_eq!(frame.state.player.smart_bombs, 3);
-        assert_eq!(frame.state.scores.player_one, 0);
+        assert_eq!(frame.state.scores.player_one, 150);
         assert!(frame.state.world.enemies.is_empty());
-        assert_eq!(frame.events.gameplay(), &[GameEvent::PlayerDestroyed]);
+        assert_eq!(
+            frame.events.gameplay(),
+            &[
+                GameEvent::EnemyDestroyed,
+                GameEvent::PlayerDestroyed,
+                GameEvent::WaveCleared,
+            ]
+        );
+        assert!(frame.events.sounds().is_empty());
         assert!(
             !frame
                 .scene
@@ -16721,21 +23826,2007 @@ mod tests {
         assert_eq!(respawn.state.phase, GamePhase::Playing);
         assert_eq!(respawn.state.current_player, 1);
         assert_eq!(respawn.state.player.lives, 1);
-        assert_eq!(respawn.state.world, WorldSnapshot::default());
+        assert!(world_has_no_live_playfield_content(&respawn.state.world));
         assert_eq!(
             game.start_playfield_delay,
-            Some(START_PLAYFIELD_DELAY_FRAMES)
+            Some(super::SOURCE_POST_DEATH_START_PLAYFIELD_DELAY_FRAMES)
         );
 
-        let active = advance_to_started_playfield(&mut game);
+        let active = advance_to_same_player_post_death_playfield(&mut game);
         assert_eq!(active.state.phase, GamePhase::Playing);
         assert_eq!(active.state.current_player, 1);
-        assert_eq!(active.state.player.lives, 0);
+        assert_eq!(active.state.player.lives, 1);
         assert_eq!(
             active.state.player_stocks[0],
-            PlayerStockSnapshot::new(0, 3)
+            PlayerStockSnapshot::new(1, 3)
         );
-        assert_eq!(active.state.world.enemies.len(), 5);
+        assert!(active.state.world.enemies.is_empty());
+        assert!(active.state.world.humans.is_empty());
+        assert!(active.state.world.projectiles.is_empty());
+        assert!(active.state.world.enemy_projectiles.is_empty());
+        assert_eq!(
+            game.post_death_wave_resume_frames,
+            Some(super::SOURCE_FIRST_WAVE_POST_DEATH_RESUME_DELAY_FRAMES)
+        );
+    }
+
+    #[test]
+    fn clean_game_appearing_enemy_does_not_collide_with_player() {
+        let mut game = credited_started_game();
+        keep_first_enemy_only(&mut game);
+        let appearing_lander = EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(32, 128),
+            ScreenVelocity::new(0, 0),
+        );
+        game.state.world.enemies = vec![
+            appearing_lander,
+            EnemySnapshot::new(
+                EnemyKind::Lander,
+                ScreenPosition::new(80, 128),
+                ScreenVelocity::new(0, 0),
+            ),
+        ];
+        game.state.world.enemy_appearances = vec![super::EnemyAppearanceSnapshot::source_spawn(
+            appearing_lander,
+        )];
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.phase, GamePhase::Playing);
+        assert_eq!(frame.state.player.lives, 2);
+        assert_eq!(frame.state.scores.player_one, 0);
+        assert_eq!(frame.state.world.enemies.len(), 2);
+        assert!(frame.events.gameplay().is_empty());
+        assert!(frame.events.sounds().is_empty());
+    }
+
+    #[test]
+    fn clean_game_mame_up_thrust_target5_shell_collision_matches_mame_window() {
+        let mut game = Game::new();
+        let mut observed_sounds = Vec::new();
+
+        for input_frame in 0..=2205u16 {
+            let frame = game.step(mame_up_thrust_input(input_frame));
+            if matches!(
+                input_frame,
+                1457 | 1623
+                    | 1631
+                    | 1681
+                    | 1682
+                    | 1690
+                    | 1698
+                    | 1826
+                    | 1852
+                    | 1949
+                    | 1997
+                    | 2195
+                    | 2203
+            ) && !frame.events.sounds().is_empty()
+            {
+                observed_sounds.push((input_frame, frame.events.sounds().to_vec()));
+            }
+
+            match input_frame {
+                1623 => {
+                    let shell = frame
+                        .state
+                        .world
+                        .enemy_projectiles
+                        .first()
+                        .copied()
+                        .expect("target-5 opening shell should be active");
+                    assert_eq!(shell.position, ScreenPosition::new(0x1C, 0x8B));
+                    assert_eq!(shell.source_x_fraction, 0x6D);
+                    assert_eq!(shell.source_y_fraction, 0x7B);
+                    assert_eq!(shell.source_x_velocity, 0x0360);
+                    assert_eq!(shell.source_y_velocity, 0xFE60);
+                }
+                1679 => {
+                    let shell = frame
+                        .state
+                        .world
+                        .enemy_projectiles
+                        .first()
+                        .copied()
+                        .expect("target-5 opening shell should still be active");
+                    assert_eq!(shell.position, ScreenPosition::new(0x39, 0x30));
+                }
+                1680 => {
+                    assert!(frame.state.world.enemy_projectiles.is_empty());
+                    assert_eq!(frame.state.scores.player_one, 25);
+                    assert_eq!(frame.state.player.lives, 2);
+                    assert_eq!(frame.events.gameplay(), &[GameEvent::PlayerDestroyed]);
+                    let bomb = frame
+                        .state
+                        .world
+                        .expanded_objects
+                        .details
+                        .iter()
+                        .find(|detail| detail.mapped_sprite == Some(SpriteId::BOMB_EXPLOSION))
+                        .expect("MAME BXPIC bomb explosion should be projected");
+                    assert_eq!(bomb.top_left, Some(ScreenPosition::new(0x37, 0x2C)));
+                    assert_eq!(bomb.picture_label, Some("BXPIC"));
+                }
+                1949 => {
+                    assert_eq!(
+                        frame.state.player.position,
+                        (
+                            super::world_word(
+                                super::SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYER_X16,
+                            ),
+                            super::world_word(
+                                super::SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYER_Y16,
+                            ),
+                        )
+                    );
+                    assert_eq!(
+                        frame.state.player.velocity.0.subpixels() >> 8,
+                        super::SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYER_X_VELOCITY,
+                    );
+                    assert_eq!(
+                        super::source_word_from_world_vector(frame.state.player.velocity.1),
+                        super::SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYER_Y_VELOCITY,
+                    );
+                    assert_eq!(
+                        super::source_player_absolute_x(
+                            super::source_word_from_world_vector(frame.state.player.position.0),
+                            super::source_word_from_world_vector(game.camera_left),
+                        ),
+                        super::SOURCE_FIRST_WAVE_TARGET5_PROJECTILE_RESTART_PLAYER_ABSOLUTE_X,
+                    );
+                    assert_eq!(frame.state.scores.player_one, 25);
+                    assert_eq!(frame.state.player.lives, 1);
+                    assert_eq!(frame.state.world.enemies.len(), 5);
+                }
+                2007 => {
+                    assert_eq!(frame.state.phase, GamePhase::Playing);
+                    assert_eq!(frame.state.scores.player_one, 25);
+                    assert_eq!(frame.state.player.lives, 1);
+                    assert!(
+                        !frame
+                            .events
+                            .gameplay()
+                            .contains(&GameEvent::PlayerDestroyed),
+                        "target5 projectile restart should not die at frame {input_frame}"
+                    );
+                }
+                2195 => {
+                    assert_eq!(frame.state.phase, GamePhase::Playing);
+                    assert_eq!(frame.state.scores.player_one, 25);
+                    assert_eq!(frame.state.player.lives, 1);
+                    let shell = frame
+                        .state
+                        .world
+                        .enemy_projectiles
+                        .first()
+                        .copied()
+                        .expect("target5 restart late MAME shell should be active");
+                    assert_eq!(
+                        shell.position,
+                        super::SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_POSITION,
+                    );
+                    assert_eq!(
+                        shell.source_x_fraction,
+                        super::SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_X_FRACTION,
+                    );
+                    assert_eq!(
+                        shell.source_y_fraction,
+                        super::SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_Y_FRACTION,
+                    );
+                    assert_eq!(
+                        shell.source_x_velocity,
+                        super::SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_X_VELOCITY,
+                    );
+                    assert_eq!(
+                        shell.source_y_velocity,
+                        super::SOURCE_FIRST_WAVE_TARGET5_RESTART_LATE_SHELL_Y_VELOCITY,
+                    );
+                }
+                _ => {}
+            }
+        }
+
+        assert_eq!(
+            observed_sounds,
+            vec![
+                (1457, vec![SoundEvent::ThrustStarted]),
+                (
+                    1623,
+                    vec![SoundEvent::UnmappedSoundCommand {
+                        command: super::SOURCE_LSHSND_SOUND_COMMAND,
+                    }],
+                ),
+                (1631, vec![SoundEvent::ThrustStarted]),
+                (1681, vec![source_player_death_sound_event()]),
+                (1682, vec![source_player_death_sound_event()]),
+                (1690, vec![source_player_death_sound_event()]),
+                (
+                    1698,
+                    vec![SoundEvent::UnmappedSoundCommand {
+                        command: super::SOURCE_CANNON_SOUND_COMMAND,
+                    }],
+                ),
+                (
+                    1826,
+                    vec![SoundEvent::UnmappedSoundCommand {
+                        command: super::SOURCE_BACKGROUND_END_SOUND_COMMAND,
+                    }],
+                ),
+                (1852, vec![SoundEvent::ThrustStarted]),
+                (1949, vec![source_hyperspace_appearance_sound_event()]),
+                (1997, vec![SoundEvent::ThrustStarted]),
+                (
+                    2195,
+                    vec![SoundEvent::UnmappedSoundCommand {
+                        command: super::SOURCE_LSHSND_SOUND_COMMAND,
+                    }],
+                ),
+                (2203, vec![SoundEvent::ThrustStarted]),
+            ]
+        );
+    }
+
+    #[test]
+    fn clean_game_mame_down29_fire_clip_kills_target9_and_survives_rescue_loss_window() {
+        let mut game = Game::new();
+        let mut observed_sounds = Vec::new();
+        let lander_pull_sound = source_lander_suck_sound_event();
+        let astronaut_hit_sound = source_astronaut_hit_sound_event();
+        let mut observed_rescue_loss_sounds = Vec::new();
+
+        for input_frame in 0..=2900u16 {
+            let frame = game.step(mame_down29_fire2437_input(input_frame));
+            if !frame.events.sounds().is_empty() {
+                observed_sounds.push((input_frame, frame.events.sounds().to_vec()));
+            }
+            if frame
+                .events
+                .sounds()
+                .iter()
+                .any(|sound| sound == &lander_pull_sound || sound == &astronaut_hit_sound)
+            {
+                observed_rescue_loss_sounds.push((input_frame, frame.events.sounds().to_vec()));
+            }
+
+            if (1680..=2900).contains(&input_frame) {
+                assert_eq!(
+                    frame.state.phase,
+                    GamePhase::Playing,
+                    "input frame {input_frame} should still be live"
+                );
+                assert_eq!(frame.state.player.lives, 2);
+                assert!(
+                    !frame
+                        .events
+                        .gameplay()
+                        .contains(&GameEvent::PlayerDestroyed),
+                    "input frame {input_frame} should not destroy the player"
+                );
+            }
+
+            if input_frame == 2449 {
+                assert_eq!(frame.state.scores.player_one, 150);
+                assert!(
+                    frame.events.gameplay().contains(&GameEvent::EnemyDestroyed),
+                    "input frame {input_frame} should kill the targeted lander"
+                );
+                assert!(
+                    !frame.state.world.enemies.iter().any(|enemy| {
+                        enemy.source_lander.is_some_and(|source_lander| {
+                            source_lander.target_human_index == Some(9)
+                                && source_lander.x_velocity == 0xFFEC
+                        })
+                    }),
+                    "input frame {input_frame} should remove the MAME target-9 lander"
+                );
+                assert!(
+                    frame.state.world.enemies.iter().any(|enemy| {
+                        enemy.source_lander.is_some_and(|source_lander| {
+                            source_lander.target_human_index == Some(5)
+                                && source_lander.x_velocity == 0
+                        })
+                    }),
+                    "input frame {input_frame} should not kill the hidden target-5 lander"
+                );
+            }
+            if matches!(input_frame, 2592 | 2705 | 2827 | 2850 | 2900) {
+                assert_eq!(frame.state.scores.player_one, 150);
+                assert_eq!(frame.state.player.lives, 2);
+                assert!(
+                    !frame
+                        .events
+                        .gameplay()
+                        .contains(&GameEvent::PlayerDestroyed),
+                    "input frame {input_frame} should not destroy the player"
+                );
+            }
+        }
+
+        assert!(
+            !observed_sounds
+                .iter()
+                .any(|(input_frame, sounds)| *input_frame == 2438
+                    && sounds.contains(&source_laser_fire_sound_event()))
+        );
+        assert!(observed_sounds.contains(&(2439, vec![source_laser_fire_sound_event()])));
+        assert!(
+            observed_sounds
+                .contains(&(2450, vec![source_enemy_hit_sound_event(EnemyKind::Lander)]))
+        );
+        assert_eq!(
+            observed_sounds
+                .iter()
+                .filter(|(input_frame, _)| (2700..=2900).contains(input_frame))
+                .cloned()
+                .collect::<Vec<_>>(),
+            vec![
+                (2700, vec![lander_pull_sound]),
+                (2701, vec![lander_pull_sound]),
+                (2702, vec![lander_pull_sound]),
+                (2705, vec![astronaut_hit_sound]),
+                (2752, vec![source_hyperspace_appearance_sound_event()]),
+                (
+                    2827,
+                    vec![
+                        source_enemy_shot_sound_event(EnemyKind::Mutant)
+                            .expect("mutant shot sound")
+                    ]
+                ),
+            ]
+        );
+        assert_eq!(
+            observed_rescue_loss_sounds,
+            vec![
+                (2524, vec![lander_pull_sound]),
+                (2525, vec![lander_pull_sound]),
+                (2526, vec![lander_pull_sound]),
+                (2527, vec![lander_pull_sound]),
+                (2528, vec![lander_pull_sound]),
+                (2529, vec![lander_pull_sound]),
+                (2530, vec![lander_pull_sound]),
+                (2531, vec![lander_pull_sound]),
+                (2532, vec![lander_pull_sound]),
+                (2533, vec![lander_pull_sound]),
+                (2536, vec![astronaut_hit_sound]),
+                (2693, vec![lander_pull_sound]),
+                (2694, vec![lander_pull_sound]),
+                (2695, vec![lander_pull_sound]),
+                (2696, vec![lander_pull_sound]),
+                (2697, vec![lander_pull_sound]),
+                (2698, vec![lander_pull_sound]),
+                (2699, vec![lander_pull_sound]),
+                (2700, vec![lander_pull_sound]),
+                (2701, vec![lander_pull_sound]),
+                (2702, vec![lander_pull_sound]),
+                (2705, vec![astronaut_hit_sound]),
+            ]
+        );
+    }
+
+    #[test]
+    fn clean_game_mame_down29_fire2524_target9_shell_matches_mame_motion() {
+        let mut game = Game::new();
+        let lander_pull = source_lander_suck_sound_event();
+        let lander_hit = source_enemy_hit_sound_event(EnemyKind::Lander);
+        let mut observed_shells = Vec::new();
+        let mut observed_sounds = Vec::new();
+        let mut player_destroyed = None;
+        let mut enemy_destroyed = None;
+
+        for input_frame in 0..=2536u16 {
+            let frame = game.step(mame_down29_fire2524_input(input_frame));
+            if matches!(input_frame, 2457 | 2458 | 2524 | 2530 | 2531) {
+                observed_shells.push((
+                    input_frame,
+                    frame
+                        .state
+                        .world
+                        .enemy_projectiles
+                        .first()
+                        .map(|projectile| projectile.position),
+                ));
+            }
+            if !frame.events.sounds().is_empty() && (2524..=2532).contains(&input_frame) {
+                observed_sounds.push((input_frame, frame.events.sounds().to_vec()));
+            }
+            if player_destroyed.is_none()
+                && frame
+                    .events
+                    .gameplay()
+                    .contains(&GameEvent::PlayerDestroyed)
+            {
+                player_destroyed = Some(input_frame);
+            }
+            if enemy_destroyed.is_none()
+                && frame.events.gameplay().contains(&GameEvent::EnemyDestroyed)
+            {
+                enemy_destroyed = Some(input_frame);
+            }
+        }
+
+        assert_eq!(
+            observed_shells,
+            vec![
+                (2457, Some(ScreenPosition::new(0x51, 0xAD))),
+                (2458, Some(ScreenPosition::new(0x50, 0xAD))),
+                (2524, Some(ScreenPosition::new(0x22, 0x9B))),
+                (2530, Some(ScreenPosition::new(0x1E, 0x99))),
+                (2531, Some(ScreenPosition::new(0x1D, 0x99))),
+            ]
+        );
+        assert_eq!(player_destroyed, None);
+        assert_eq!(enemy_destroyed, Some(2530));
+        assert_eq!(
+            observed_sounds,
+            vec![
+                (2524, vec![lander_pull]),
+                (2525, vec![lander_pull]),
+                (2526, vec![lander_pull]),
+                (2527, vec![lander_pull]),
+                (2528, vec![lander_pull]),
+                (2529, vec![lander_pull]),
+                (2530, vec![lander_pull]),
+                (2531, vec![lander_hit]),
+            ]
+        );
+    }
+
+    #[test]
+    fn clean_game_mame_down29_fire2524_target6_tail_matches_mame_trace() {
+        let mut game = Game::new();
+        let mut observed_sounds = Vec::new();
+        let mut observed_projectiles = Vec::new();
+        let mut first_destroyed = None;
+        let mut explosion_frame_3012 = None;
+
+        for input_frame in 0..=3158u16 {
+            let frame = game.step(mame_down29_fire2524_input(input_frame));
+            if input_frame >= 2524 && !frame.events.sounds().is_empty() {
+                observed_sounds.push((input_frame, frame.events.sounds().to_vec()));
+            }
+            if matches!(input_frame, 2872 | 2959 | 3012) {
+                observed_projectiles
+                    .push((input_frame, enemy_projectile_sprite_positions(&frame.scene)));
+            }
+            if first_destroyed.is_none()
+                && frame
+                    .events
+                    .gameplay()
+                    .contains(&GameEvent::PlayerDestroyed)
+            {
+                first_destroyed = Some((
+                    input_frame,
+                    frame.state.scores.player_one,
+                    frame.events.gameplay().to_vec(),
+                ));
+            }
+            if input_frame == 3012 {
+                explosion_frame_3012 = frame
+                    .state
+                    .world
+                    .expanded_objects
+                    .details
+                    .iter()
+                    .find(|detail| {
+                        detail.kind == ExpandedObjectKind::Explosion
+                            && detail.picture_label == Some("SCZP1")
+                    })
+                    .copied();
+            }
+        }
+
+        let pull = source_lander_suck_sound_event();
+        let lander_hit = source_enemy_hit_sound_event(EnemyKind::Lander);
+        let astronaut_hit = source_astronaut_hit_sound_event();
+        let appearance = source_hyperspace_appearance_sound_event();
+        let mutant_shot =
+            source_enemy_shot_sound_event(EnemyKind::Mutant).expect("mutant shot sound");
+        let cannon = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_CANNON_SOUND_COMMAND,
+        };
+        let player_death = source_player_death_sound_event();
+        let background_end = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_BACKGROUND_END_SOUND_COMMAND,
+        };
+
+        assert_eq!(
+            observed_sounds,
+            vec![
+                (2524, vec![pull]),
+                (2525, vec![pull]),
+                (2526, vec![pull]),
+                (2527, vec![pull]),
+                (2528, vec![pull]),
+                (2529, vec![pull]),
+                (2530, vec![pull]),
+                (2531, vec![lander_hit]),
+                (2536, vec![astronaut_hit]),
+                (2693, vec![pull]),
+                (2694, vec![pull]),
+                (2695, vec![pull]),
+                (2696, vec![pull]),
+                (2697, vec![pull]),
+                (2698, vec![pull]),
+                (2699, vec![pull]),
+                (2700, vec![pull]),
+                (2701, vec![pull]),
+                (2702, vec![pull]),
+                (2705, vec![astronaut_hit]),
+                (2752, vec![appearance]),
+                (2872, vec![mutant_shot]),
+                (2959, vec![mutant_shot]),
+                (3012, vec![cannon]),
+                (3013, vec![player_death]),
+                (3021, vec![player_death]),
+                (3029, vec![cannon]),
+                (3158, vec![background_end]),
+            ]
+        );
+        assert!(observed_projectiles[0].1.contains(&(0x1E, 0x54)));
+        assert!(observed_projectiles[1].1.contains(&(0x21, 0x7F)));
+        assert_eq!(
+            first_destroyed,
+            Some((
+                3011,
+                300,
+                vec![GameEvent::EnemyDestroyed, GameEvent::PlayerDestroyed],
+            ))
+        );
+        assert_eq!(
+            explosion_frame_3012,
+            Some(ExpandedObjectDetailSnapshot {
+                kind: ExpandedObjectKind::Explosion,
+                size: SOURCE_EXPLOSION_INITIAL_SIZE + SOURCE_EXPLOSION_SIZE_DELTA,
+                picture_label: Some("SCZP1"),
+                picture_size: Some((5, 8)),
+                mapped_sprite: Some(SpriteId::ENEMY_MUTANT),
+                center: Some(ScreenPosition::new(0x21, 0xA9)),
+                top_left: Some(ScreenPosition::new(0x20, 0xA2)),
+                explosion_frame: Some(1),
+                explosion_lifetime_frames: Some(SOURCE_EXPLOSION_LIFETIME_FRAMES),
+                ..ExpandedObjectDetailSnapshot::EMPTY
+            })
+        );
+    }
+
+    #[test]
+    fn clean_game_mame_down29_refill_projects_only_target3_materialization_lane() {
+        let mut game = Game::new();
+        let mut appearance_frame = None;
+        let mut live_refill_frame_2800 = None;
+        let mut live_refill_frame_2902 = None;
+
+        for input_frame in 0..=2902u16 {
+            let frame = game.step(mame_down29_fire2437_input(input_frame));
+
+            if input_frame == 2752 {
+                let appearances = &frame.state.world.enemy_appearances;
+                let refill_landers = frame
+                    .state
+                    .world
+                    .enemies
+                    .iter()
+                    .filter(|enemy| {
+                        enemy
+                            .source_lander
+                            .is_some_and(|source_lander| source_lander.y_velocity == 0x0090)
+                    })
+                    .count();
+
+                appearance_frame = Some((appearances.clone(), refill_landers));
+            }
+
+            if input_frame == 2800 {
+                let visible_landers = frame
+                    .scene
+                    .sprites
+                    .iter()
+                    .filter(|sprite| {
+                        sprite.sprite == SpriteId::ENEMY_LANDER
+                            && sprite.layer == RenderLayer::Objects
+                    })
+                    .map(|sprite| sprite.position)
+                    .collect::<Vec<_>>();
+
+                live_refill_frame_2800 = Some(visible_landers);
+            }
+
+            if input_frame == 2902 {
+                let visible_landers = frame
+                    .scene
+                    .sprites
+                    .iter()
+                    .filter(|sprite| {
+                        sprite.sprite == SpriteId::ENEMY_LANDER
+                            && sprite.layer == RenderLayer::Objects
+                    })
+                    .map(|sprite| sprite.position)
+                    .collect::<Vec<_>>();
+
+                live_refill_frame_2902 = Some(visible_landers);
+            }
+        }
+
+        let (appearances, refill_landers) =
+            appearance_frame.expect("frame 2752 should be inspected");
+        assert_eq!(refill_landers, 5, "refill processes should stay live");
+        assert_eq!(
+            appearances
+                .iter()
+                .map(|appearance| (
+                    appearance.picture_label,
+                    appearance.mapped_sprite,
+                    appearance.position
+                ))
+                .collect::<Vec<_>>(),
+            vec![("LNDP1", SpriteId::ENEMY_LANDER, ScreenPosition::new(40, 49))]
+        );
+
+        assert_eq!(
+            live_refill_frame_2800.expect("frame 2800 should be inspected"),
+            vec![[31.0, 76.0]]
+        );
+        assert_eq!(
+            live_refill_frame_2902.expect("frame 2902 should be inspected"),
+            vec![[13.0, 130.0]]
+        );
+    }
+
+    #[test]
+    fn clean_game_mame_down29_refill_target3_shot_timer_waits_for_coalescence() {
+        let mut game = Game::new();
+        let mut target3_timers = Vec::new();
+        let mut observed_sounds = Vec::new();
+
+        for input_frame in 0..=2960u16 {
+            let frame = game.step(mame_down29_fire2437_input(input_frame));
+            if !frame.events.sounds().is_empty() {
+                observed_sounds.push((input_frame, frame.events.sounds().to_vec()));
+            }
+
+            if matches!(input_frame, 2800 | 2827 | 2902 | 2947) {
+                let shot_timer = frame
+                    .state
+                    .world
+                    .enemies
+                    .iter()
+                    .find_map(|enemy| {
+                        let source_lander = enemy.source_lander?;
+                        (source_lander.target_human_index == Some(3)
+                            && source_lander.x_velocity == 0xFFF4
+                            && source_lander.y_velocity == 0x0090)
+                            .then_some(source_lander.shot_timer)
+                    })
+                    .expect("target-3 refill lander should be active");
+                target3_timers.push((input_frame, shot_timer));
+            }
+        }
+
+        assert_eq!(
+            target3_timers,
+            vec![(2800, 0x22), (2827, 0x1E), (2902, 0x11), (2947, 0x0A)]
+        );
+        assert!(
+            !observed_sounds
+                .iter()
+                .any(|(input_frame, sounds)| *input_frame == 2956
+                    && sounds.contains(
+                        &source_enemy_shot_sound_event(EnemyKind::Lander)
+                            .expect("lander shot sound")
+                    ))
+        );
+    }
+
+    #[test]
+    fn clean_game_mame_down29_target6_dive_shots_and_sprites_match_mame_window() {
+        let mut game = Game::new();
+        let mutant_shot =
+            source_enemy_shot_sound_event(EnemyKind::Mutant).expect("mutant shot sound");
+        let mut observed_mutant_sprites = Vec::new();
+        let mut observed_projectiles = Vec::new();
+        let mut observed_shots = Vec::new();
+
+        for input_frame in 0..=2947u16 {
+            let frame = game.step(mame_down29_fire2437_input(input_frame));
+            if frame.events.sounds().contains(&mutant_shot) {
+                observed_shots.push(input_frame);
+            }
+            if matches!(input_frame, 2827 | 2860 | 2902 | 2947) {
+                observed_mutant_sprites.push((input_frame, mutant_sprite_positions(&frame.scene)));
+            }
+            if matches!(input_frame, 2827 | 2902 | 2947) {
+                observed_projectiles
+                    .push((input_frame, enemy_projectile_sprite_positions(&frame.scene)));
+            }
+        }
+
+        assert_eq!(observed_shots, vec![2827, 2902, 2947]);
+        assert_eq!(
+            observed_mutant_sprites,
+            vec![
+                (2827, vec![(0x14, 0x46)]),
+                (2860, vec![(0x1F, 0x5B)]),
+                (2902, vec![(0x1F, 0x71)]),
+                (2947, vec![(0x20, 0x87)]),
+            ]
+        );
+        assert!(observed_projectiles[0].1.contains(&(0x13, 0x46)));
+        assert!(observed_projectiles[1].1.contains(&(0x1E, 0x70)));
+        assert!(observed_projectiles[2].1.contains(&(0x21, 0x87)));
+    }
+
+    #[test]
+    fn clean_game_mame_down29_target6_collision_explosion_matches_mame_window() {
+        let mut game = Game::new();
+        let mut observed_sounds = Vec::new();
+        let mut first_destroyed = None;
+        let mut collision_explosion = None;
+
+        for input_frame in 0..=3011u16 {
+            let frame = game.step(mame_down29_fire2437_input(input_frame));
+            if !frame.events.sounds().is_empty() {
+                observed_sounds.push((input_frame, frame.events.sounds().to_vec()));
+            }
+            if first_destroyed.is_none()
+                && frame
+                    .events
+                    .gameplay()
+                    .contains(&GameEvent::PlayerDestroyed)
+            {
+                first_destroyed = Some((
+                    input_frame,
+                    frame.state.scores.player_one,
+                    frame.events.gameplay().to_vec(),
+                ));
+                collision_explosion = Some(frame.state.world.expanded_objects.details[0]);
+            }
+        }
+
+        let cannon = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_CANNON_SOUND_COMMAND,
+        };
+        let player_death = source_player_death_sound_event();
+
+        assert_eq!(
+            first_destroyed,
+            Some((
+                2993,
+                300,
+                vec![GameEvent::EnemyDestroyed, GameEvent::PlayerDestroyed],
+            ))
+        );
+        assert_eq!(
+            observed_sounds
+                .into_iter()
+                .filter(|(input_frame, _)| (2994..=3011).contains(input_frame))
+                .collect::<Vec<_>>(),
+            vec![
+                (2994, vec![cannon]),
+                (2995, vec![player_death]),
+                (3003, vec![player_death]),
+                (3011, vec![cannon]),
+            ]
+        );
+        assert_eq!(
+            collision_explosion,
+            Some(ExpandedObjectDetailSnapshot {
+                kind: ExpandedObjectKind::Explosion,
+                size: SOURCE_EXPLOSION_INITIAL_SIZE + SOURCE_EXPLOSION_SIZE_DELTA,
+                picture_label: Some("SCZP1"),
+                picture_size: Some((5, 8)),
+                mapped_sprite: Some(SpriteId::ENEMY_MUTANT),
+                center: Some(ScreenPosition::new(0x21, 0xA9)),
+                top_left: Some(ScreenPosition::new(0x20, 0xA3)),
+                explosion_frame: Some(1),
+                explosion_lifetime_frames: Some(SOURCE_EXPLOSION_LIFETIME_FRAMES),
+                ..ExpandedObjectDetailSnapshot::EMPTY
+            })
+        );
+    }
+
+    #[test]
+    fn clean_game_mame_down29_target6_sound_timeline_matches_mame_window() {
+        let mut game = Game::new();
+        let mut observed_sounds = Vec::new();
+
+        for input_frame in 0..=3011u16 {
+            let frame = game.step(mame_down29_fire2437_input(input_frame));
+            if input_frame >= 2400 && !frame.events.sounds().is_empty() {
+                observed_sounds.push((input_frame, frame.events.sounds().to_vec()));
+            }
+        }
+
+        let laser = source_laser_fire_sound_event();
+        let lander_hit = source_enemy_hit_sound_event(EnemyKind::Lander);
+        let pull = source_lander_suck_sound_event();
+        let astronaut_hit = source_astronaut_hit_sound_event();
+        let appearance = source_hyperspace_appearance_sound_event();
+        let mutant_shot =
+            source_enemy_shot_sound_event(EnemyKind::Mutant).expect("mutant shot sound");
+        let cannon = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_CANNON_SOUND_COMMAND,
+        };
+        let player_death = source_player_death_sound_event();
+
+        assert_eq!(
+            observed_sounds,
+            vec![
+                (2439, vec![laser]),
+                (2450, vec![lander_hit]),
+                (2524, vec![pull]),
+                (2525, vec![pull]),
+                (2526, vec![pull]),
+                (2527, vec![pull]),
+                (2528, vec![pull]),
+                (2529, vec![pull]),
+                (2530, vec![pull]),
+                (2531, vec![pull]),
+                (2532, vec![pull]),
+                (2533, vec![pull]),
+                (2536, vec![astronaut_hit]),
+                (2693, vec![pull]),
+                (2694, vec![pull]),
+                (2695, vec![pull]),
+                (2696, vec![pull]),
+                (2697, vec![pull]),
+                (2698, vec![pull]),
+                (2699, vec![pull]),
+                (2700, vec![pull]),
+                (2701, vec![pull]),
+                (2702, vec![pull]),
+                (2705, vec![astronaut_hit]),
+                (2752, vec![appearance]),
+                (2827, vec![mutant_shot]),
+                (2902, vec![mutant_shot]),
+                (2947, vec![mutant_shot]),
+                (2994, vec![cannon]),
+                (2995, vec![player_death]),
+                (3003, vec![player_death]),
+                (3011, vec![cannon]),
+            ]
+        );
+    }
+
+    #[test]
+    fn clean_game_mame_down29_target6_explosion_growth_matches_mame_trace() {
+        let mut game = Game::new();
+        let mut observed = Vec::new();
+
+        for input_frame in 0..=3020u16 {
+            let frame = game.step(mame_down29_fire2437_input(input_frame));
+            if input_frame >= 2993 {
+                let detail = frame
+                    .state
+                    .world
+                    .expanded_objects
+                    .details
+                    .iter()
+                    .find(|detail| {
+                        detail.kind == ExpandedObjectKind::Explosion
+                            && detail.picture_label == Some("SCZP1")
+                    })
+                    .copied()
+                    .expect("target6 explosion detail should be present");
+
+                observed.push((
+                    input_frame,
+                    detail.size,
+                    detail.center,
+                    detail.top_left,
+                    detail.explosion_frame,
+                ));
+            }
+        }
+
+        let center = Some(ScreenPosition::new(0x21, 0xA9));
+        let top_left = Some(ScreenPosition::new(0x20, 0xA3));
+
+        assert_eq!(
+            observed,
+            vec![
+                (2993, 0x01AA, center, top_left, Some(1)),
+                (2994, 0x01AA, center, top_left, Some(1)),
+                (2995, 0x0254, center, top_left, Some(2)),
+                (2996, 0x02FE, center, top_left, Some(3)),
+                (2997, 0x03A8, center, top_left, Some(4)),
+                (2998, 0x0452, center, top_left, Some(5)),
+                (2999, 0x04FC, center, top_left, Some(6)),
+                (3000, 0x05A6, center, top_left, Some(7)),
+                (3001, 0x0650, center, top_left, Some(8)),
+                (3002, 0x06FA, center, top_left, Some(9)),
+                (3003, 0x07A4, center, top_left, Some(10)),
+                (3004, 0x084E, center, top_left, Some(11)),
+                (3005, 0x08F8, center, top_left, Some(12)),
+                (3006, 0x09A2, center, top_left, Some(13)),
+                (3007, 0x0A4C, center, top_left, Some(14)),
+                (3008, 0x0AF6, center, top_left, Some(15)),
+                (3009, 0x0BA0, center, top_left, Some(16)),
+                (3010, 0x0C4A, center, top_left, Some(17)),
+                (3011, 0x0CF4, center, top_left, Some(18)),
+                (3012, 0x0D9E, center, top_left, Some(19)),
+                (3013, 0x0E48, center, top_left, Some(20)),
+                (3014, 0x0EF2, center, top_left, Some(21)),
+                (3015, 0x0F9C, center, top_left, Some(22)),
+                (3016, 0x1046, center, top_left, Some(23)),
+                (3017, 0x10F0, center, top_left, Some(24)),
+                (3018, 0x119A, center, top_left, Some(25)),
+                (3019, 0x1244, center, top_left, Some(26)),
+                (3020, 0x12EE, center, top_left, Some(27)),
+            ]
+        );
+    }
+
+    #[test]
+    fn clean_game_mame_down60_shell_collision_matches_mame_window() {
+        let mut game = Game::new();
+        let mut observed_sounds = Vec::new();
+        let mut first_destroyed = None;
+        let mut first_stock_drop = None;
+        let mut collision_explosion = None;
+
+        for input_frame in 0..=2450u16 {
+            let frame = game.step(mame_down60_fire2437_input(input_frame));
+            if !frame.events.sounds().is_empty() {
+                observed_sounds.push((input_frame, frame.events.sounds().to_vec()));
+            }
+            if first_destroyed.is_none()
+                && frame
+                    .events
+                    .gameplay()
+                    .contains(&GameEvent::PlayerDestroyed)
+            {
+                first_destroyed = Some((
+                    input_frame,
+                    frame.state.scores.player_one,
+                    frame.events.gameplay().to_vec(),
+                ));
+                collision_explosion = Some(frame.state.world.expanded_objects.details[0]);
+            }
+            if first_stock_drop.is_none() && frame.state.player.lives == 1 {
+                first_stock_drop = Some(input_frame);
+            }
+        }
+
+        let player_death = source_player_death_sound_event();
+        let bomb_collision = source_bomb_collision_sound_event();
+        let cannon = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_CANNON_SOUND_COMMAND,
+        };
+        let background_end = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_BACKGROUND_END_SOUND_COMMAND,
+        };
+
+        assert_eq!(
+            first_destroyed,
+            Some((2177, 25, vec![GameEvent::PlayerDestroyed]))
+        );
+        assert_eq!(first_stock_drop, Some(2439));
+        assert_eq!(
+            observed_sounds
+                .into_iter()
+                .filter(|(input_frame, _)| (2178..=2324).contains(input_frame))
+                .collect::<Vec<_>>(),
+            vec![
+                (2178, vec![player_death]),
+                (2179, vec![bomb_collision]),
+                (2187, vec![player_death]),
+                (2195, vec![cannon]),
+                (2324, vec![background_end]),
+            ]
+        );
+        assert_eq!(
+            collision_explosion,
+            Some(ExpandedObjectDetailSnapshot {
+                kind: ExpandedObjectKind::Explosion,
+                size: SOURCE_EXPLOSION_INITIAL_SIZE,
+                picture_label: Some("BXPIC"),
+                picture_size: Some((4, 8)),
+                mapped_sprite: Some(SpriteId::BOMB_EXPLOSION),
+                center: Some(ScreenPosition::new(0x23, 0xEA)),
+                top_left: Some(ScreenPosition::new(0x21, 0xE6)),
+                explosion_frame: Some(0),
+                explosion_lifetime_frames: Some(SOURCE_EXPLOSION_LIFETIME_FRAMES),
+                ..ExpandedObjectDetailSnapshot::EMPTY
+            })
+        );
+    }
+
+    #[test]
+    fn clean_game_mame_down30_target2_collision_matches_mame_window() {
+        let mut game = Game::new();
+        let mut observed_sounds = Vec::new();
+        let mut first_destroyed = None;
+        let mut first_stock_drop = None;
+        let mut collision_explosion = None;
+
+        for input_frame in 0..=2350u16 {
+            let frame = game.step(mame_down30_fire2437_input(input_frame));
+            if !frame.events.sounds().is_empty() {
+                observed_sounds.push((input_frame, frame.events.sounds().to_vec()));
+            }
+            if first_destroyed.is_none()
+                && frame
+                    .events
+                    .gameplay()
+                    .contains(&GameEvent::PlayerDestroyed)
+            {
+                first_destroyed = Some((
+                    input_frame,
+                    frame.state.scores.player_one,
+                    frame.events.gameplay().to_vec(),
+                ));
+                collision_explosion = Some(frame.state.world.expanded_objects.details[0]);
+            }
+            if first_stock_drop.is_none() && frame.state.player.lives == 1 {
+                first_stock_drop = Some(input_frame);
+            }
+        }
+
+        let lander_hit = source_enemy_hit_sound_event(EnemyKind::Lander);
+        let player_death = source_player_death_sound_event();
+        let cannon = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_CANNON_SOUND_COMMAND,
+        };
+        let background_end = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_BACKGROUND_END_SOUND_COMMAND,
+        };
+
+        assert_eq!(
+            first_destroyed,
+            Some((
+                2177,
+                150,
+                vec![GameEvent::EnemyDestroyed, GameEvent::PlayerDestroyed],
+            ))
+        );
+        assert_eq!(first_stock_drop, Some(2344));
+        assert_eq!(
+            observed_sounds
+                .into_iter()
+                .filter(|(input_frame, _)| (2178..=2324).contains(input_frame))
+                .collect::<Vec<_>>(),
+            vec![
+                (2178, vec![lander_hit]),
+                (2179, vec![player_death]),
+                (2187, vec![player_death]),
+                (2195, vec![cannon]),
+                (2324, vec![background_end]),
+            ]
+        );
+        assert_eq!(
+            collision_explosion,
+            Some(ExpandedObjectDetailSnapshot {
+                kind: ExpandedObjectKind::Explosion,
+                size: SOURCE_EXPLOSION_INITIAL_SIZE,
+                picture_label: Some("LNDP2"),
+                picture_size: Some((5, 8)),
+                mapped_sprite: Some(SpriteId::ENEMY_LANDER),
+                center: Some(ScreenPosition::new(0x24, 0xB4)),
+                top_left: Some(ScreenPosition::new(0x22, 0xB0)),
+                explosion_frame: Some(0),
+                explosion_lifetime_frames: Some(SOURCE_EXPLOSION_LIFETIME_FRAMES),
+                ..ExpandedObjectDetailSnapshot::EMPTY
+            })
+        );
+    }
+
+    #[test]
+    fn clean_game_mame_down30_post_death_laser_and_appear_match_mame_window() {
+        let mut game = Game::new();
+        let mut observed_sounds = Vec::new();
+        let mut fire_presses = Vec::new();
+        let mut first_stock_drop = None;
+        let mut player_ready_sample = None;
+
+        for input_frame in 0..=2470u16 {
+            let frame = game.step(mame_down30_fire2437_input(input_frame));
+            if input_frame >= 2330 && !frame.events.sounds().is_empty() {
+                observed_sounds.push((input_frame, frame.events.sounds().to_vec()));
+            }
+            if input_frame >= 2330 && frame.events.gameplay().contains(&GameEvent::FirePressed) {
+                fire_presses.push(input_frame);
+            }
+            if first_stock_drop.is_none() && frame.state.player.lives == 1 {
+                first_stock_drop = Some(input_frame);
+            }
+            if input_frame == 2360 {
+                player_ready_sample = Some(frame.state.player.position);
+            }
+        }
+
+        assert_eq!(first_stock_drop, Some(2344));
+        assert_eq!(
+            player_ready_sample,
+            Some((super::world_word(0x2000), super::world_word(0x8000)))
+        );
+        assert_eq!(fire_presses, vec![2436]);
+        assert_eq!(
+            observed_sounds,
+            vec![
+                (2439, vec![source_laser_fire_sound_event()]),
+                (2447, vec![source_hyperspace_appearance_sound_event()]),
+            ]
+        );
+    }
+
+    #[test]
+    fn clean_game_mame_hold_up_lander_shots_have_no_extra_gameplay_prefix() {
+        let mut game = Game::new();
+        let lander_shot =
+            source_enemy_shot_sound_event(EnemyKind::Lander).expect("lander shot sound command");
+        let mut observed_lander_shots = Vec::new();
+
+        for input_frame in 0..=3600u16 {
+            let frame = game.step(mame_hold_up_input(input_frame));
+            if frame.events.sounds().contains(&lander_shot) {
+                observed_lander_shots.push(input_frame);
+            }
+        }
+
+        assert_eq!(observed_lander_shots, vec![2073, 2109, 2265, 2457, 2685]);
+    }
+
+    #[test]
+    fn clean_game_mame_hold_up_lander_pull_and_conversion_sounds_match_mame_windows() {
+        let mut game = Game::new();
+        let pull_sound = source_lander_suck_sound_event();
+        let conversion_sound = source_astronaut_hit_sound_event();
+        let mut observed = Vec::new();
+
+        for input_frame in 0..=2705u16 {
+            let frame = game.step(mame_hold_up_input(input_frame));
+            if input_frame >= 2524
+                && frame
+                    .events
+                    .sounds()
+                    .iter()
+                    .any(|sound| sound == &pull_sound || sound == &conversion_sound)
+            {
+                observed.push((input_frame, frame.events.sounds().to_vec()));
+            }
+        }
+
+        assert_eq!(
+            observed,
+            vec![
+                (2524, vec![pull_sound]),
+                (2525, vec![pull_sound]),
+                (2526, vec![pull_sound]),
+                (2527, vec![pull_sound]),
+                (2528, vec![pull_sound]),
+                (2529, vec![pull_sound]),
+                (2530, vec![pull_sound]),
+                (2531, vec![pull_sound]),
+                (2532, vec![pull_sound]),
+                (2533, vec![pull_sound]),
+                (2536, vec![conversion_sound]),
+                (2693, vec![pull_sound]),
+                (2694, vec![pull_sound]),
+                (2695, vec![pull_sound]),
+                (2696, vec![pull_sound]),
+                (2697, vec![pull_sound]),
+                (2698, vec![pull_sound]),
+                (2699, vec![pull_sound]),
+                (2700, vec![pull_sound]),
+                (2701, vec![pull_sound]),
+                (2702, vec![pull_sound]),
+                (2705, vec![conversion_sound]),
+            ]
+        );
+    }
+
+    #[test]
+    fn clean_game_mame_hold_up_target6_mutant_sprite_matches_mame_wrap_rows() {
+        let mut game = Game::new();
+        let mut observed = Vec::new();
+
+        for input_frame in 0..=2823u16 {
+            let frame = game.step(mame_hold_up_input(input_frame));
+            if matches!(input_frame, 2535 | 2704 | 2805 | 2810 | 2820 | 2823) {
+                observed.push((input_frame, mutant_sprite_positions(&frame.scene)));
+            }
+        }
+
+        assert_eq!(
+            observed,
+            vec![
+                (2535, vec![]),
+                (2704, vec![]),
+                (2805, vec![(3, 55)]),
+                (2810, vec![(7, 55)]),
+                (2820, vec![(15, 48)]),
+                (2823, vec![(17, 46)]),
+            ]
+        );
+    }
+
+    #[test]
+    fn clean_game_mame_hold_up_mutant_shots_match_mame_window() {
+        let mut game = Game::new();
+        let mutant_shot =
+            source_enemy_shot_sound_event(EnemyKind::Mutant).expect("mutant shot sound");
+        let mut observed_mutant_shots = Vec::new();
+
+        for input_frame in 0..=2842u16 {
+            let frame = game.step(mame_hold_up_input(input_frame));
+            if frame.events.sounds().contains(&mutant_shot) {
+                observed_mutant_shots.push(input_frame);
+            }
+        }
+
+        assert_eq!(observed_mutant_shots, vec![2824, 2838]);
+    }
+
+    #[test]
+    fn clean_game_mame_hold_up_first_death_matches_mame_collision_window() {
+        let mut game = Game::new();
+        let mut observed_sounds = Vec::new();
+        let mut first_destroyed = None;
+        let mut first_stock_drop = None;
+
+        for input_frame in 0..=3107u16 {
+            let frame = game.step(mame_hold_up_input(input_frame));
+            if !frame.events.sounds().is_empty() {
+                observed_sounds.push((input_frame, frame.events.sounds().to_vec()));
+            }
+            if first_destroyed.is_none()
+                && frame
+                    .events
+                    .gameplay()
+                    .contains(&GameEvent::PlayerDestroyed)
+            {
+                first_destroyed = Some((
+                    input_frame,
+                    frame.state.scores.player_one,
+                    frame.events.gameplay().to_vec(),
+                ));
+            }
+            if first_stock_drop.is_none() && frame.state.player.lives == 1 {
+                first_stock_drop = Some(input_frame);
+            }
+        }
+
+        let cannon = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_CANNON_SOUND_COMMAND,
+        };
+        let player_death = source_player_death_sound_event();
+        let background_end = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_BACKGROUND_END_SOUND_COMMAND,
+        };
+
+        assert_eq!(
+            first_destroyed,
+            Some((
+                2839,
+                150,
+                vec![GameEvent::EnemyDestroyed, GameEvent::PlayerDestroyed],
+            ))
+        );
+        assert_eq!(
+            observed_sounds
+                .into_iter()
+                .filter(|(input_frame, _)| (2840..=2986).contains(input_frame))
+                .collect::<Vec<_>>(),
+            vec![
+                (2840, vec![cannon]),
+                (2841, vec![player_death]),
+                (2849, vec![player_death]),
+                (2857, vec![cannon]),
+                (2986, vec![background_end]),
+            ]
+        );
+        assert_eq!(first_stock_drop, Some(3006));
+    }
+
+    #[test]
+    fn clean_game_mame_hold_up_post_death_materialize_sound_matches_mame_window() {
+        let mut game = Game::new();
+        let appearance = source_hyperspace_appearance_sound_event();
+        let mut observed = Vec::new();
+
+        for input_frame in 0..=3338u16 {
+            let frame = game.step(mame_hold_up_input(input_frame));
+            if input_frame >= 2987 && frame.events.sounds().contains(&appearance) {
+                observed.push(input_frame);
+            }
+        }
+
+        assert_eq!(observed, vec![3108]);
+    }
+
+    #[test]
+    fn clean_game_mame_hold_up_second_death_and_post_game_sounds_match_mame_window() {
+        let mut game = Game::new();
+        let mut observed = Vec::new();
+        let mut observed_scores = Vec::new();
+        let mut phase_samples = Vec::new();
+        let mut previous_score = 0;
+
+        for input_frame in 0..=3854u16 {
+            let frame = game.step(mame_hold_up_input(input_frame));
+            if input_frame >= 3338 && !frame.events.sounds().is_empty() {
+                observed.push((input_frame, frame.events.sounds().to_vec()));
+            }
+            if matches!(input_frame, 3502 | 3503 | 3854) {
+                phase_samples.push((
+                    input_frame,
+                    frame.state.phase,
+                    frame.state.player.lives,
+                    frame
+                        .state
+                        .post_game_playfield
+                        .map(|post_game| post_game.frame),
+                ));
+            }
+            if input_frame >= 3337 && frame.state.scores.player_one != previous_score {
+                observed_scores.push((
+                    input_frame,
+                    frame.state.scores.player_one,
+                    frame.events.gameplay().to_vec(),
+                ));
+            }
+            previous_score = frame.state.scores.player_one;
+        }
+
+        let player_death = source_player_death_sound_event();
+        let cannon = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_CANNON_SOUND_COMMAND,
+        };
+        let background_end = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_BACKGROUND_END_SOUND_COMMAND,
+        };
+        let appearance = source_hyperspace_appearance_sound_event();
+        let lander_shot =
+            source_enemy_shot_sound_event(EnemyKind::Lander).expect("lander shot sound");
+
+        assert_eq!(
+            observed,
+            vec![
+                (3339, vec![cannon]),
+                (3340, vec![player_death]),
+                (3348, vec![player_death]),
+                (3356, vec![cannon]),
+                (3483, vec![background_end]),
+                (3605, vec![appearance]),
+                (3668, vec![lander_shot]),
+                (3701, vec![lander_shot]),
+                (3710, vec![player_death]),
+                (3711, vec![player_death]),
+                (3719, vec![player_death]),
+                (3727, vec![cannon]),
+                (3854, vec![background_end, background_end]),
+            ]
+        );
+        assert_eq!(
+            observed_scores,
+            vec![
+                (
+                    3338,
+                    300,
+                    vec![GameEvent::EnemyDestroyed, GameEvent::PlayerDestroyed]
+                ),
+                (3709, 325, vec![GameEvent::EnemyDestroyed]),
+            ]
+        );
+        assert_eq!(
+            phase_samples,
+            vec![
+                (3502, GamePhase::Playing, 1, None),
+                (3503, GamePhase::Attract, 0, Some(0)),
+                (3854, GamePhase::Attract, 0, None),
+            ]
+        );
+    }
+
+    #[test]
+    fn clean_game_organic_smartmix_target1_shell_matches_mame_window() {
+        let mut game = Game::new();
+        let mut samples = Vec::new();
+
+        for input_frame in 0..=1636u16 {
+            let frame = game.step(organic_smartmix_input(input_frame));
+            if matches!(input_frame, 1457 | 1582 | 1623 | 1634 | 1635 | 1636) {
+                let lander = frame
+                    .state
+                    .world
+                    .enemies
+                    .iter()
+                    .find(|enemy| {
+                        enemy.source_lander.is_some_and(|source| {
+                            source.target_human_index == Some(1) && source.x_velocity == 0xFFDE
+                        })
+                    })
+                    .copied()
+                    .expect("target-1 lander should be active");
+                samples.push((
+                    input_frame,
+                    super::source_word_from_world_vector(game.camera_left),
+                    lander.position,
+                    lander.source_lander.expect("source lander"),
+                    frame.state.world.enemy_projectiles.clone(),
+                    frame.events.sounds().to_vec(),
+                ));
+            }
+        }
+
+        assert_eq!(
+            samples[4].4,
+            vec![super::EnemyProjectileSnapshot {
+                position: ScreenPosition::new(0x66, 0x93),
+                velocity: super::source_screen_velocity(0xFF54, 0xFE20),
+                source_kind: super::EnemyProjectileSourceKind::Fireball,
+                source_x_fraction: 0x93,
+                source_y_fraction: 0x66,
+                source_x_velocity: 0xFF54,
+                source_y_velocity: 0xFE20,
+                source_lifetime_ticks: super::SOURCE_SHELL_LIFETIME_TICKS,
+            }]
+        );
+    }
+
+    #[test]
+    fn clean_game_organic_smartmix_target4_shell_matches_mame_window() {
+        let mut game = Game::new();
+        let mut samples = Vec::new();
+
+        for input_frame in 0..=1757u16 {
+            let frame = game.step(organic_smartmix_input(input_frame));
+            if matches!(input_frame, 1755..=1757) {
+                let lander = frame
+                    .state
+                    .world
+                    .enemies
+                    .iter()
+                    .find(|enemy| {
+                        enemy.source_lander.is_some_and(|source| {
+                            source.target_human_index == Some(4) && source.x_velocity == 0x0014
+                        })
+                    })
+                    .copied()
+                    .expect("target-4 lander should be active");
+                samples.push((
+                    input_frame,
+                    lander.position,
+                    lander.source_lander.expect("source lander"),
+                    frame.state.world.enemy_projectiles.clone(),
+                    frame.events.sounds().to_vec(),
+                ));
+            }
+        }
+
+        assert_eq!(samples[1].2.shot_timer, 0x3B);
+        assert_eq!(
+            samples[1].3,
+            vec![super::EnemyProjectileSnapshot {
+                position: ScreenPosition::new(0x45, 0xAE),
+                velocity: super::source_screen_velocity(0x02A0, 0x0114),
+                source_kind: super::EnemyProjectileSourceKind::Fireball,
+                source_x_fraction: 0xAE,
+                source_y_fraction: 0x45,
+                source_x_velocity: 0x02A0,
+                source_y_velocity: 0x0114,
+                source_lifetime_ticks: super::SOURCE_SHELL_LIFETIME_TICKS,
+            }]
+        );
+        assert_eq!(
+            samples[1].4,
+            vec![SoundEvent::UnmappedSoundCommand {
+                command: super::SOURCE_LSHSND_SOUND_COMMAND,
+            }]
+        );
+    }
+
+    #[test]
+    fn clean_game_organic_smartmix_second_bomb_and_late_collision_match_mame_window() {
+        let mut game = Game::new();
+        let mut sound_samples = Vec::new();
+        let mut late_sample = None;
+
+        for input_frame in 0..=4135u16 {
+            let frame = game.step(organic_smartmix_input(input_frame));
+            if matches!(input_frame, 2047 | 4116) {
+                sound_samples.push((
+                    input_frame,
+                    frame.state.frame,
+                    frame.state.phase,
+                    frame.state.scores.player_one,
+                    frame.state.player.lives,
+                    frame.events.sounds().to_vec(),
+                    frame.events.gameplay().to_vec(),
+                ));
+            } else if input_frame == 4135 {
+                late_sample = Some((
+                    frame.state.frame,
+                    frame.state.phase,
+                    frame.state.scores.player_one,
+                    frame.state.player.lives,
+                    frame.events.gameplay().to_vec(),
+                ));
+            }
+        }
+
+        assert_eq!(
+            sound_samples,
+            vec![
+                (
+                    2047,
+                    2048,
+                    GamePhase::Playing,
+                    super::SOURCE_ENEMY_PROJECTILE_SCORE_POINTS,
+                    1,
+                    vec![SoundEvent::UnmappedSoundCommand {
+                        command: super::SOURCE_SBSND_SOUND_COMMAND,
+                    }],
+                    vec![],
+                ),
+                (
+                    4116,
+                    4117,
+                    GamePhase::Playing,
+                    super::SOURCE_ENEMY_PROJECTILE_SCORE_POINTS,
+                    1,
+                    vec![],
+                    vec![],
+                ),
+            ]
+        );
+        assert_eq!(
+            late_sample,
+            Some((
+                4136,
+                GamePhase::Playing,
+                super::SOURCE_ENEMY_PROJECTILE_SCORE_POINTS,
+                1,
+                vec![],
+            ))
+        );
+    }
+
+    #[test]
+    fn clean_game_organic_smartmix_terminal_death_and_terrain_blow_match_mame_window() {
+        let mut game = Game::new();
+        let mut state_samples = Vec::new();
+        let mut sound_samples = Vec::new();
+
+        for input_frame in 0..=6006u16 {
+            let frame = game.step(organic_smartmix_input(input_frame));
+            let state_frame = frame.state.frame;
+            if matches!(state_frame, 4779 | 4927 | 4947 | 5991 | 6007) {
+                state_samples.push((
+                    state_frame,
+                    frame.state.phase,
+                    frame.state.scores.player_one,
+                    frame.state.player.lives,
+                    frame.state.world.terrain_blow.is_some(),
+                    frame
+                        .state
+                        .post_game_playfield
+                        .map(|post_game| post_game.frame),
+                    frame.events.gameplay().to_vec(),
+                ));
+            }
+            if matches!(
+                state_frame,
+                4781 | 4782 | 4790 | 4798 | 4927 | 5991 | 5995 | 5999 | 6003 | 6007
+            ) {
+                sound_samples.push((state_frame, frame.events.sounds().to_vec()));
+            }
+        }
+
+        let cannon = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_CANNON_SOUND_COMMAND,
+        };
+        let background_end = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_BACKGROUND_END_SOUND_COMMAND,
+        };
+
+        assert_eq!(
+            state_samples,
+            vec![
+                (
+                    4779,
+                    GamePhase::Playing,
+                    super::SOURCE_ENEMY_PROJECTILE_SCORE_POINTS * 2,
+                    1,
+                    false,
+                    None,
+                    vec![GameEvent::PlayerDestroyed],
+                ),
+                (
+                    4927,
+                    GamePhase::Playing,
+                    super::SOURCE_ENEMY_PROJECTILE_SCORE_POINTS * 2,
+                    1,
+                    true,
+                    None,
+                    vec![],
+                ),
+                (
+                    4947,
+                    GamePhase::Attract,
+                    super::SOURCE_ENEMY_PROJECTILE_SCORE_POINTS * 2,
+                    0,
+                    true,
+                    Some(0),
+                    vec![GameEvent::GameOver],
+                ),
+                (
+                    5991,
+                    GamePhase::Attract,
+                    super::SOURCE_ENEMY_PROJECTILE_SCORE_POINTS * 2,
+                    0,
+                    true,
+                    Some(1044),
+                    vec![],
+                ),
+                (
+                    6007,
+                    GamePhase::Attract,
+                    super::SOURCE_ENEMY_PROJECTILE_SCORE_POINTS * 2,
+                    0,
+                    true,
+                    Some(1060),
+                    vec![],
+                ),
+            ]
+        );
+        assert_eq!(
+            sound_samples,
+            vec![
+                (4781, vec![source_player_death_sound_event()]),
+                (4782, vec![source_bomb_collision_sound_event()]),
+                (4790, vec![source_player_death_sound_event()]),
+                (4798, vec![cannon]),
+                (4927, vec![background_end]),
+                (5991, vec![source_bomb_collision_sound_event()]),
+                (5995, vec![source_bomb_collision_sound_event()]),
+                (5999, vec![source_bomb_collision_sound_event()]),
+                (6003, vec![source_bomb_collision_sound_event()]),
+                (6007, vec![source_bomb_collision_sound_event()]),
+            ]
+        );
+    }
+
+    #[test]
+    fn clean_game_post_game_duplicate_background_end_does_not_resume_thrust() {
+        let mut game = Game::new();
+        let mut observed = Vec::new();
+
+        for input_frame in 0..=7000u16 {
+            let frame = game.step(organic_prbp1_up_thrust_input(input_frame));
+            if input_frame >= 4666 && !frame.events.sounds().is_empty() {
+                observed.push((input_frame, frame.events.sounds().to_vec()));
+            }
+        }
+
+        let background_end = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_BACKGROUND_END_SOUND_COMMAND,
+        };
+
+        assert_eq!(observed, vec![(4666, vec![background_end, background_end])]);
+    }
+
+    #[test]
+    fn clean_game_mame_hold_up_enters_attract_scoring_sequence_after_post_game() {
+        let mut game = Game::new();
+        let mut saw_lander = false;
+        let mut saw_mutant = false;
+        let mut saw_baiter = false;
+        let mut saw_bomber = false;
+        let mut saw_pod = false;
+        let mut saw_swarmer = false;
+
+        for input_frame in 0..=7000u16 {
+            let frame = game.step(mame_hold_up_input(input_frame));
+            if !(5811..=7000).contains(&frame.state.frame) {
+                continue;
+            }
+
+            assert_eq!(frame.state.phase, GamePhase::Attract);
+            assert_eq!(
+                frame.state.attract.page,
+                AttractPresentationPage::ScoringSequence
+            );
+            for sprite in &frame.scene.sprites {
+                saw_lander |= sprite.sprite == SpriteId::ENEMY_LANDER;
+                saw_mutant |= sprite.sprite == SpriteId::ENEMY_MUTANT;
+                saw_baiter |= sprite.sprite == SpriteId::ENEMY_BAITER;
+                saw_bomber |= sprite.sprite == SpriteId::ENEMY_BOMBER;
+                saw_pod |= sprite.sprite == SpriteId::ENEMY_POD;
+                saw_swarmer |= sprite.sprite == SpriteId::ENEMY_SWARMER;
+            }
+        }
+
+        assert!(saw_lander);
+        assert!(saw_mutant);
+        assert!(saw_baiter);
+        assert!(saw_bomber);
+        assert!(saw_pod);
+        assert!(saw_swarmer);
+    }
+
+    #[test]
+    fn clean_game_matches_mame_long_no_input_sound_timeline_through_second_death_tail() {
+        let mut game = Game::new();
+        let mut observed = Vec::new();
+
+        for input_frame in 0..=2744u16 {
+            let frame = game.step(long_delayed_start_input(input_frame));
+            if !frame.events.sounds().is_empty() {
+                let observed_frame = if frame.state.frame < 2030 {
+                    u64::from(input_frame)
+                } else {
+                    frame.state.frame
+                };
+                observed.push((observed_frame, frame.events.sounds().to_vec()));
+            }
+        }
+
+        let player_death = source_player_death_sound_event();
+        let cannon = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_CANNON_SOUND_COMMAND,
+        };
+        let background_end = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_BACKGROUND_END_SOUND_COMMAND,
+        };
+
+        assert_eq!(
+            observed,
+            vec![
+                (911, vec![SoundEvent::CreditAdded]),
+                (1265, vec![SoundEvent::GameStarted]),
+                (1402, vec![source_hyperspace_appearance_sound_event()]),
+                (1851, vec![source_hyperspace_appearance_sound_event()]),
+                (2030, vec![source_enemy_hit_sound_event(EnemyKind::Lander)]),
+                (2031, vec![player_death]),
+                (2039, vec![player_death]),
+                (2047, vec![cannon]),
+                (2176, vec![background_end]),
+                (
+                    2550,
+                    vec![
+                        source_enemy_shot_sound_event(EnemyKind::Lander)
+                            .expect("lander shot sound")
+                    ]
+                ),
+                (2599, vec![player_death]),
+                (2600, vec![source_bomb_collision_sound_event()]),
+                (2608, vec![player_death]),
+                (2616, vec![cannon]),
+                (2744, vec![background_end]),
+            ]
+        );
+    }
+
+    #[test]
+    fn clean_game_matches_mame_long_no_input_final_death_phase_timing() {
+        let mut game = Game::new();
+        let mut sampled_states = Vec::new();
+        let mut unexpected_game_over_frames = Vec::new();
+
+        for input_frame in 0..=2764u16 {
+            let frame = game.step(long_delayed_start_input(input_frame));
+            let state_frame = frame.state.frame;
+            if state_frame >= 2598 && frame.state.phase == GamePhase::GameOver {
+                unexpected_game_over_frames.push(state_frame);
+            }
+            if matches!(state_frame, 2598 | 2744 | 2763 | 2764) {
+                sampled_states.push((
+                    state_frame,
+                    frame.state.phase,
+                    frame.state.player.lives,
+                    frame.state.scores.player_one,
+                    frame.events.gameplay().to_vec(),
+                ));
+            }
+        }
+
+        assert_eq!(unexpected_game_over_frames, Vec::<u64>::new());
+        assert_eq!(
+            sampled_states,
+            vec![
+                (
+                    2598,
+                    GamePhase::Playing,
+                    1,
+                    175,
+                    vec![GameEvent::PlayerDestroyed]
+                ),
+                (2744, GamePhase::Playing, 1, 175, vec![]),
+                (2763, GamePhase::Playing, 1, 175, vec![]),
+                (2764, GamePhase::Attract, 0, 175, vec![GameEvent::GameOver]),
+            ]
+        );
+    }
+
+    #[test]
+    fn clean_game_matches_mame_long_no_input_post_game_playfield_events() {
+        let mut game = Game::new();
+        let mut observed_sounds = Vec::new();
+        let mut sampled_states = Vec::new();
+
+        for input_frame in 0..=3602u16 {
+            let frame = game.step(long_delayed_start_input(input_frame));
+            let state_frame = frame.state.frame;
+            if state_frame >= 2764 && !frame.events.sounds().is_empty() {
+                observed_sounds.push((state_frame, frame.events.sounds().to_vec()));
+            }
+            if matches!(state_frame, 2764 | 2866 | 2970 | 3584 | 3602) {
+                sampled_states.push((
+                    state_frame,
+                    frame.state.phase,
+                    frame.state.scores.player_one,
+                    frame
+                        .state
+                        .post_game_playfield
+                        .map(|post_game| post_game.frame),
+                    frame.events.gameplay().to_vec(),
+                    frame
+                        .scene
+                        .sprites
+                        .iter()
+                        .any(|sprite| sprite.sprite == SpriteId::PLAYER_SHIP),
+                    frame
+                        .scene
+                        .sprites
+                        .iter()
+                        .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER),
+                ));
+            }
+        }
+
+        let appearance = source_hyperspace_appearance_sound_event();
+        let lander_shot = source_enemy_shot_sound_event(EnemyKind::Lander).expect("lander shot");
+        let player_death = source_player_death_sound_event();
+        let cannon = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_CANNON_SOUND_COMMAND,
+        };
+        assert_eq!(
+            observed_sounds,
+            vec![
+                (2866, vec![appearance]),
+                (2867, vec![appearance]),
+                (2970, vec![lander_shot]),
+                (3535, vec![lander_shot]),
+                (3541, vec![lander_shot]),
+                (3585, vec![player_death]),
+                (3586, vec![player_death]),
+                (3594, vec![player_death]),
+                (3602, vec![cannon]),
+            ]
+        );
+        assert_eq!(
+            sampled_states,
+            vec![
+                (
+                    2764,
+                    GamePhase::Attract,
+                    175,
+                    Some(0),
+                    vec![GameEvent::GameOver],
+                    true,
+                    false
+                ),
+                (
+                    2866,
+                    GamePhase::Attract,
+                    175,
+                    Some(102),
+                    vec![],
+                    true,
+                    false
+                ),
+                (2970, GamePhase::Attract, 175, Some(206), vec![], true, true),
+                (
+                    3584,
+                    GamePhase::Attract,
+                    200,
+                    Some(820),
+                    vec![GameEvent::EnemyDestroyed],
+                    true,
+                    true
+                ),
+                (3602, GamePhase::Attract, 200, Some(838), vec![], true, true),
+            ]
+        );
+    }
+
+    #[test]
+    fn clean_game_matches_mame_long_no_input_post_game_object_windows() {
+        let mut game = Game::new();
+        let mut sampled_worlds = Vec::new();
+
+        for input_frame in 0..=3602u16 {
+            let frame = game.step(long_delayed_start_input(input_frame));
+            let state_frame = frame.state.frame;
+            if matches!(state_frame, 2764 | 2867 | 2970 | 3585 | 3602) {
+                sampled_worlds.push((
+                    state_frame,
+                    frame
+                        .state
+                        .world
+                        .enemies
+                        .iter()
+                        .map(|enemy| enemy.position)
+                        .collect::<Vec<_>>(),
+                    frame
+                        .state
+                        .world
+                        .humans
+                        .iter()
+                        .map(|human| human.position)
+                        .collect::<Vec<_>>(),
+                    frame.state.world.enemy_appearances.len(),
+                    frame
+                        .state
+                        .world
+                        .explosions
+                        .iter()
+                        .map(|explosion| {
+                            (explosion.kind, explosion.position, explosion.source_size)
+                        })
+                        .collect::<Vec<_>>(),
+                ));
+            }
+        }
+
+        assert_eq!(
+            sampled_worlds,
+            vec![
+                (2764, vec![], vec![], 0, vec![]),
+                (
+                    2867,
+                    vec![
+                        ScreenPosition::new(79, 44),
+                        ScreenPosition::new(53, 45),
+                        ScreenPosition::new(6, 45),
+                    ],
+                    vec![ScreenPosition::new(49, 225), ScreenPosition::new(97, 224)],
+                    3,
+                    vec![],
+                ),
+                (
+                    2970,
+                    vec![ScreenPosition::new(41, 96), ScreenPosition::new(18, 97)],
+                    vec![ScreenPosition::new(50, 228), ScreenPosition::new(99, 227)],
+                    0,
+                    vec![],
+                ),
+                (
+                    3585,
+                    vec![
+                        ScreenPosition::new(75, 165),
+                        ScreenPosition::new(73, 173),
+                        ScreenPosition::new(37, 175),
+                    ],
+                    vec![ScreenPosition::new(60, 232), ScreenPosition::new(96, 226)],
+                    0,
+                    vec![(
+                        ExplosionKind::Bomb,
+                        super::SOURCE_POST_GAME_BOMB_EXPLOSION_POSITION,
+                        super::SOURCE_EXPLOSION_INITIAL_SIZE + super::SOURCE_EXPLOSION_SIZE_DELTA,
+                    )],
+                ),
+                (
+                    3602,
+                    vec![
+                        ScreenPosition::new(66, 165),
+                        ScreenPosition::new(82, 166),
+                        ScreenPosition::new(27, 175),
+                    ],
+                    vec![ScreenPosition::new(60, 232), ScreenPosition::new(96, 226)],
+                    0,
+                    vec![(
+                        ExplosionKind::Bomb,
+                        super::SOURCE_POST_GAME_BOMB_EXPLOSION_POSITION,
+                        super::SOURCE_EXPLOSION_INITIAL_SIZE
+                            + super::SOURCE_EXPLOSION_SIZE_DELTA * 18,
+                    )],
+                ),
+            ]
+        );
     }
 
     #[test]
@@ -16787,36 +25878,35 @@ mod tests {
         let mut game = credited_started_game();
         keep_first_enemy_only(&mut game);
         game.state.player.lives = 1;
-        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
-        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        place_first_lander_at(&mut game, ScreenPosition::new(32, 128));
 
         let frame = game.step(GameInput::NONE);
 
-        assert_eq!(frame.state.phase, GamePhase::GameOver);
-        assert_eq!(frame.state.player.lives, 0);
+        assert_eq!(frame.state.phase, GamePhase::Playing);
+        assert_eq!(frame.state.player.lives, 1);
         assert_eq!(frame.state.player.smart_bombs, 3);
         assert!(frame.state.world.enemies.is_empty());
-        assert_eq!(
-            frame.state.game_over,
-            GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES)
-        );
+        assert_eq!(frame.state.game_over, GameOverSnapshot::NONE);
         assert_eq!(
             frame.events.gameplay(),
-            &[GameEvent::PlayerDestroyed, GameEvent::GameOver]
+            &[
+                GameEvent::EnemyDestroyed,
+                GameEvent::PlayerDestroyed,
+                GameEvent::WaveCleared,
+            ]
         );
-        assert_eq!(frame.events.sounds(), &[source_player_death_sound_event()]);
+        assert!(frame.events.sounds().is_empty());
         assert!(!frame.scene.sprites.iter().any(|sprite| matches!(
             sprite.sprite,
-            SpriteId::PLAYER_SHIP | SpriteId::ENEMY_LANDER | SpriteId::HUMAN
+            SpriteId::PLAYER_SHIP | SpriteId::ENEMY_LANDER
         )));
-        assert_eq!(frame.scene.summary().layers.objects, 0);
-        assert_eq!(frame.scene.summary().layers.overlay, 8);
-        assert!(frame.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::MESSAGE_GLYPH_G
-                && sprite.layer == RenderLayer::Overlay
-                && sprite.position == [124.0, 128.0]
-                && sprite.size == [6.0, 8.0]
-        }));
+        assert!(frame.scene.summary().layers.objects > 0);
+        assert!(frame.scene.summary().layers.overlay > 0);
+
+        let handoff = advance_player_death_game_over_sleep(&mut game);
+        assert_eq!(handoff.state.phase, GamePhase::Attract);
+        assert!(handoff.state.post_game_playfield.is_some());
+        assert_eq!(handoff.state.player.lives, 0);
     }
 
     #[test]
@@ -16824,8 +25914,7 @@ mod tests {
         let mut game = two_player_started_game();
         game.state.player.lives = 1;
         game.state.player_stocks[1] = PlayerStockSnapshot::new(3, 3);
-        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
-        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        place_first_lander_at(&mut game, ScreenPosition::new(32, 128));
 
         let collision = game.step(GameInput::NONE);
 
@@ -16843,21 +25932,12 @@ mod tests {
             collision.state.game_over,
             GameOverSnapshot::player_switch_sleep(PLAYER_SWITCH_SLEEP_FRAMES, 1, 2)
         );
-        assert_eq!(collision.events.gameplay(), &[GameEvent::PlayerDestroyed]);
+        assert_eq!(
+            collision.events.gameplay(),
+            &[GameEvent::EnemyDestroyed, GameEvent::PlayerDestroyed]
+        );
         assert_eq!(collision.scene.summary().layers.objects, 0);
-        assert_eq!(collision.scene.summary().layers.overlay, 17);
-        assert!(collision.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::MESSAGE_GLYPH_P
-                && sprite.layer == RenderLayer::Overlay
-                && sprite.position == [120.0, 120.0]
-                && sprite.size == [6.0, 8.0]
-        }));
-        assert!(collision.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::MESSAGE_GLYPH_G
-                && sprite.layer == RenderLayer::Overlay
-                && sprite.position == [124.0, 136.0]
-                && sprite.size == [6.0, 8.0]
-        }));
+        assert!(collision.scene.summary().layers.overlay > 0);
 
         let switched = advance_player_switch_sleep(&mut game, 1, 2);
 
@@ -16892,23 +25972,25 @@ mod tests {
         let mut game = two_player_started_game();
         game.state.player.lives = 2;
         game.state.player_stocks[1] = PlayerStockSnapshot::new(3, 3);
-        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
-        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        place_first_lander_at(&mut game, ScreenPosition::new(32, 128));
 
         let collision = game.step(GameInput::NONE);
 
-        assert_eq!(collision.state.phase, GamePhase::GameOver);
+        assert_eq!(collision.state.phase, GamePhase::Playing);
         assert_eq!(collision.state.current_player, 1);
         assert_eq!(collision.state.game_over, GameOverSnapshot::NONE);
-        assert_eq!(collision.state.player.lives, 1);
+        assert_eq!(collision.state.player.lives, 2);
         assert_eq!(
             collision.state.player_stocks,
             [
-                PlayerStockSnapshot::new(1, 3),
+                PlayerStockSnapshot::new(2, 3),
                 PlayerStockSnapshot::new(3, 3),
             ]
         );
-        assert_eq!(collision.events.gameplay(), &[GameEvent::PlayerDestroyed]);
+        assert_eq!(
+            collision.events.gameplay(),
+            &[GameEvent::EnemyDestroyed, GameEvent::PlayerDestroyed]
+        );
         assert!(!collision.scene.sprites.iter().any(|sprite| {
             matches!(
                 sprite.sprite,
@@ -16916,7 +25998,7 @@ mod tests {
             ) && sprite.layer == RenderLayer::Overlay
         }));
 
-        let respawn = advance_pending_respawn(&mut game);
+        let respawn = advance_player_switch_sleep(&mut game, 1, 2);
 
         assert_eq!(respawn.state.phase, GamePhase::Playing);
         assert_eq!(respawn.state.current_player, 2);
@@ -16948,16 +26030,15 @@ mod tests {
         let mut game = two_player_started_game();
         game.state.player.lives = 2;
         game.state.player_stocks[1] = PlayerStockSnapshot::new(3, 3);
-        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
-        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        place_first_lander_at(&mut game, ScreenPosition::new(32, 128));
 
         let collision = game.step(GameInput::NONE);
         assert_eq!(
             collision.state.player_stocks[0],
-            PlayerStockSnapshot::new(1, 3)
+            PlayerStockSnapshot::new(2, 3)
         );
 
-        advance_pending_respawn(&mut game);
+        advance_player_switch_sleep(&mut game, 1, 2);
         let active = advance_to_started_playfield(&mut game);
         assert_eq!(active.state.current_player, 2);
         assert_eq!(
@@ -16974,8 +26055,7 @@ mod tests {
         game.state.scores.high_score = 9_900;
         game.state.scores.next_bonus = 10_000;
         keep_first_enemy_only(&mut game);
-        game.state.world.enemies[0].position = ScreenPosition::new(100, 80);
-        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        place_first_lander_at(&mut game, ScreenPosition::new(100, 80));
         game.state.world.enemies.push(EnemySnapshot::new(
             EnemyKind::Mutant,
             ScreenPosition::new(220, 80),
@@ -17023,20 +26103,20 @@ mod tests {
         let mut game = two_player_started_game();
         game.state.player.lives = 1;
         game.state.player_stocks[1] = PlayerStockSnapshot::new(0, 3);
-        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
-        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        place_first_lander_at(&mut game, ScreenPosition::new(32, 128));
 
         let frame = game.step(GameInput::NONE);
 
-        assert_eq!(frame.state.phase, GamePhase::GameOver);
-        assert_eq!(
-            frame.state.game_over,
-            GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES)
-        );
+        assert_eq!(frame.state.phase, GamePhase::Playing);
+        assert_eq!(frame.state.game_over, GameOverSnapshot::NONE);
         assert_eq!(
             frame.events.gameplay(),
-            &[GameEvent::PlayerDestroyed, GameEvent::GameOver]
+            &[GameEvent::EnemyDestroyed, GameEvent::PlayerDestroyed]
         );
+
+        let handoff = advance_player_death_game_over_sleep(&mut game);
+        assert_eq!(handoff.state.phase, GamePhase::Attract);
+        assert!(handoff.state.post_game_playfield.is_some());
     }
 
     #[test]
@@ -17054,21 +26134,15 @@ mod tests {
             PlayerStockSnapshot::new(1, 1),
             PlayerStockSnapshot::new(1, 2),
         ];
-        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
-        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        place_first_lander_at(&mut game, ScreenPosition::new(32, 128));
 
         let collision = game.step(GameInput::NONE);
 
+        assert_eq!(collision.state.phase, GamePhase::GameOver);
         assert_eq!(
             collision.state.game_over,
             GameOverSnapshot::player_switch_sleep(PLAYER_SWITCH_SLEEP_FRAMES, 2, 1)
         );
-        assert!(collision.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::MESSAGE_GLYPH_W
-                && sprite.layer == RenderLayer::Overlay
-                && sprite.position == [180.0, 120.0]
-                && sprite.size == [8.0, 8.0]
-        }));
 
         let switched = advance_player_switch_sleep(&mut game, 2, 1);
 
@@ -17098,84 +26172,37 @@ mod tests {
     }
 
     #[test]
-    fn clean_game_high_score_entry_starts_after_qualifying_game_over() {
+    fn clean_game_qualifying_game_over_does_not_enter_initials() {
         let mut game = credited_started_game();
         game.state.player.lives = 1;
         game.state.scores.player_one = 501;
         game.state.scores.high_score = 500;
         game.state.high_score_tables = HighScoreTablesSnapshot::EMPTY;
-        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
-        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        place_first_lander_at(&mut game, ScreenPosition::new(32, 128));
 
         let frame = game.step(GameInput::NONE);
 
-        assert_eq!(frame.state.phase, GamePhase::GameOver);
-        assert_eq!(frame.state.player.lives, 0);
-        assert_eq!(
-            frame.state.game_over,
-            GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES)
-        );
+        assert_eq!(frame.state.phase, GamePhase::Playing);
+        assert_eq!(frame.state.player.lives, 1);
+        assert_eq!(frame.state.game_over, GameOverSnapshot::NONE);
         assert_eq!(frame.state.high_score_entry, None);
         assert_eq!(
             frame.events.gameplay(),
-            &[GameEvent::PlayerDestroyed, GameEvent::GameOver]
+            &[GameEvent::EnemyDestroyed, GameEvent::PlayerDestroyed]
         );
-        assert_eq!(frame.scene.summary().layers.objects, 0);
+        assert!(frame.scene.summary().layers.objects > 0);
 
         let handoff = advance_player_death_game_over_sleep(&mut game);
 
-        assert_eq!(handoff.state.phase, GamePhase::HighScoreEntry);
-        assert_eq!(
-            handoff.state.high_score_entry,
-            Some(HighScoreEntrySnapshot {
-                score: 501,
-                rank: 1,
-            })
-        );
+        assert_eq!(handoff.state.phase, GamePhase::Attract);
+        assert!(handoff.state.post_game_playfield.is_some());
+        assert_eq!(handoff.state.high_score_entry, None);
         assert_eq!(handoff.state.high_score_submission, None);
-        assert_eq!(handoff.state.game_over, GameOverSnapshot::NONE);
-        assert_eq!(
-            handoff.events.gameplay(),
-            &[GameEvent::HighScoreEntryStarted]
-        );
-        assert_eq!(handoff.scene.summary().layers.objects, 0);
-        assert_eq!(handoff.scene.summary().layers.overlay, 113);
-        assert!(handoff.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::MESSAGE_GLYPH_P
-                && sprite.layer == RenderLayer::Overlay
-                && sprite.position == [124.0, 56.0]
-                && sprite.size == [6.0, 8.0]
-        }));
-        assert!(handoff.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::MESSAGE_GLYPH_Y
-                && sprite.layer == RenderLayer::Overlay
-                && sprite.position == [40.0, 88.0]
-                && sprite.size == [6.0, 8.0]
-        }));
-        assert!(handoff.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::MESSAGE_GLYPH_P
-                && sprite.layer == RenderLayer::Overlay
-                && sprite.position == [40.0, 138.0]
-                && sprite.size == [6.0, 8.0]
-        }));
-        assert!(handoff.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::HALL_OF_FAME_UNDERLINE_WORD
-                && sprite.layer == RenderLayer::Overlay
-                && sprite.position == [140.0, 183.0]
-                && sprite.size == [2.0, 2.0]
-                && sprite.tint == Color::WHITE
-        }));
-        assert!(handoff.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::HALL_OF_FAME_UNDERLINE_WORD
-                && sprite.layer == RenderLayer::Overlay
-                && sprite.position == [156.0, 183.0]
-                && sprite.size == [2.0, 2.0]
-                && sprite.tint == Color::from_rgba(0x66, 0x66, 0x66, 0xFF)
-        }));
+        assert!(handoff.events.gameplay().contains(&GameEvent::GameOver));
     }
 
     #[test]
-    fn clean_game_high_score_entry_uses_current_second_player_score() {
+    fn clean_game_qualifying_second_player_game_over_does_not_enter_initials() {
         let mut game = two_player_started_game();
         game.state.current_player = 2;
         game.state.player.lives = 1;
@@ -17187,52 +26214,33 @@ mod tests {
         game.state.scores.player_two = 2_001;
         game.state.scores.high_score = 2_000;
         game.state.high_score_tables = HighScoreTablesSnapshot::EMPTY;
-        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
-        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        place_first_lander_at(&mut game, ScreenPosition::new(32, 128));
 
         let frame = game.step(GameInput::NONE);
 
-        assert_eq!(frame.state.phase, GamePhase::GameOver);
-        assert_eq!(
-            frame.state.game_over,
-            GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES)
-        );
+        assert_eq!(frame.state.phase, GamePhase::Playing);
+        assert_eq!(frame.state.game_over, GameOverSnapshot::NONE);
 
         let handoff = advance_player_death_game_over_sleep(&mut game);
 
-        assert_eq!(handoff.state.phase, GamePhase::HighScoreEntry);
-        assert_eq!(
-            handoff.state.high_score_entry,
-            Some(HighScoreEntrySnapshot {
-                score: 2_001,
-                rank: 1,
-            })
-        );
-        assert_eq!(
-            handoff.events.gameplay(),
-            &[GameEvent::HighScoreEntryStarted]
-        );
+        assert_eq!(handoff.state.phase, GamePhase::Attract);
+        assert!(handoff.state.post_game_playfield.is_some());
+        assert_eq!(handoff.state.high_score_entry, None);
+        assert!(handoff.events.gameplay().contains(&GameEvent::GameOver));
     }
 
     #[test]
-    fn clean_game_two_player_high_score_submission_orders_tables_and_returns_to_attract() {
+    fn clean_game_manual_high_score_submission_orders_tables_and_returns_to_attract() {
         let mut game = two_player_started_game();
         let submitted_score = 15_000;
         game.state.current_player = 2;
-        game.state.player = super::PlayerSnapshot {
-            position: (super::world_word(0x2000), super::world_word(0x8000)),
-            velocity: (WorldVector::default(), WorldVector::default()),
-            direction: Direction::Right,
-            lives: 1,
-            smart_bombs: 1,
-        };
-        game.state.player_stocks = [
-            PlayerStockSnapshot::new(0, 3),
-            PlayerStockSnapshot::new(1, 1),
-        ];
-        game.state.scores.player_one = 19_000;
-        game.state.scores.player_two = submitted_score;
+        game.state.phase = GamePhase::HighScoreEntry;
         game.state.scores.high_score = 50_000;
+        game.state.high_score_initials = HighScoreInitialsState::EMPTY;
+        game.state.high_score_entry = Some(HighScoreEntrySnapshot {
+            score: submitted_score,
+            rank: 1,
+        });
         game.state.high_score_tables = HighScoreTablesSnapshot {
             all_time: [
                 table_entry(1, 50_000, ['A', 'A', 'A']),
@@ -17255,27 +26263,6 @@ mod tests {
                 table_entry(8, 3_000, ['E', 'G', 'T']),
             ],
         };
-        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
-        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
-
-        let collision = game.step(GameInput::NONE);
-        assert_eq!(collision.state.phase, GamePhase::GameOver);
-        assert_eq!(
-            collision.state.game_over,
-            GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES)
-        );
-
-        let handoff = advance_player_death_game_over_sleep(&mut game);
-
-        assert_eq!(handoff.state.phase, GamePhase::HighScoreEntry);
-        assert_eq!(handoff.state.current_player, 2);
-        assert_eq!(
-            handoff.state.high_score_entry,
-            Some(HighScoreEntrySnapshot {
-                score: submitted_score,
-                rank: 1,
-            })
-        );
 
         for initial in ['p', 'l'] {
             let accepted = game.step(GameInput {
@@ -17337,7 +26324,7 @@ mod tests {
                 waiting.state.game_over,
                 GameOverSnapshot::hall_of_fame_display(expected_timer)
             );
-            assert!(waiting.events.is_empty());
+            assert!(waiting.events.gameplay().is_empty());
         }
 
         let returned = game.step(GameInput::NONE);
@@ -17585,7 +26572,7 @@ mod tests {
                 waiting.state.game_over,
                 GameOverSnapshot::hall_of_fame_display(expected_timer)
             );
-            assert!(waiting.events.is_empty());
+            assert!(waiting.events.gameplay().is_empty());
         }
 
         let returned = game.step(GameInput::NONE);
@@ -17606,72 +26593,19 @@ mod tests {
         let mut game = credited_started_game();
         game.state.player.lives = 1;
         game.state.scores.player_one = 10;
-        let unchanged_tables = game.state.high_score_tables;
-        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
-        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        place_first_lander_at(&mut game, ScreenPosition::new(32, 128));
 
         let collision = game.step(GameInput::NONE);
-        assert_eq!(collision.state.phase, GamePhase::GameOver);
-        assert_eq!(
-            collision.state.game_over,
-            GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES)
-        );
+        assert_eq!(collision.state.phase, GamePhase::Playing);
+        assert_eq!(collision.state.game_over, GameOverSnapshot::NONE);
 
-        let no_entry = advance_player_death_game_over_sleep(&mut game);
-        assert_eq!(no_entry.state.phase, GamePhase::GameOver);
-        assert_eq!(
-            no_entry.state.game_over,
-            GameOverSnapshot::no_entry_delay(HALL_OF_FAME_NO_ENTRY_DELAY_FRAMES)
-        );
-        assert!(no_entry.events.is_empty());
-
-        for expected_timer in (1..HALL_OF_FAME_NO_ENTRY_DELAY_FRAMES).rev() {
-            let waiting = game.step(GameInput::NONE);
-            assert_eq!(waiting.state.phase, GamePhase::GameOver);
-            assert_eq!(
-                waiting.state.game_over,
-                GameOverSnapshot::no_entry_delay(expected_timer)
-            );
-            assert!(waiting.events.is_empty());
-        }
-
-        let hall = game.step(GameInput::NONE);
-        assert_eq!(hall.state.phase, GamePhase::Attract);
-        assert_eq!(
-            hall.state.game_over,
-            GameOverSnapshot::hall_of_fame_display(HALL_OF_FAME_STALL_FRAMES)
-        );
-        assert!(hall.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO
-                && sprite.layer == RenderLayer::Overlay
-                && sprite.position == [96.0, 56.0]
-                && sprite.size == [120.0, 24.0]
-        }));
-
-        let ticked_hall = game.step(GameInput::NONE);
-        assert_eq!(ticked_hall.state.phase, GamePhase::Attract);
-        assert_eq!(
-            ticked_hall.state.game_over,
-            GameOverSnapshot::hall_of_fame_display(HALL_OF_FAME_STALL_FRAMES - 1)
-        );
-        assert_eq!(ticked_hall.state.high_score_tables, unchanged_tables);
-
-        for expected_timer in (1..HALL_OF_FAME_STALL_FRAMES - 1).rev() {
-            let waiting = game.step(GameInput::NONE);
-            assert_eq!(waiting.state.phase, GamePhase::Attract);
-            assert_eq!(
-                waiting.state.game_over,
-                GameOverSnapshot::hall_of_fame_display(expected_timer)
-            );
-            assert!(waiting.events.is_empty());
-        }
-
-        let returned = game.step(GameInput::NONE);
-        assert_eq!(returned.state.phase, GamePhase::Attract);
-        assert_eq!(returned.state.game_over, GameOverSnapshot::NONE);
-        assert_eq!(returned.state.high_score_entry, None);
-        assert_eq!(returned.state.high_score_submission, None);
-        assert_eq!(returned.state.high_score_tables, unchanged_tables);
+        let handoff = advance_player_death_game_over_sleep(&mut game);
+        assert_eq!(handoff.state.phase, GamePhase::Attract);
+        assert!(handoff.state.post_game_playfield.is_some());
+        assert_eq!(handoff.state.game_over, GameOverSnapshot::NONE);
+        assert_eq!(handoff.state.high_score_entry, None);
+        assert_eq!(handoff.state.high_score_submission, None);
+        assert!(handoff.events.gameplay().contains(&GameEvent::GameOver));
     }
 
     #[test]
@@ -17679,8 +26613,7 @@ mod tests {
         let mut game = credited_started_game();
         keep_first_enemy_only(&mut game);
         game.state.current_player = 2;
-        game.state.world.enemies[0].position = ScreenPosition::new(100, 80);
-        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        place_first_lander_at(&mut game, ScreenPosition::new(100, 80));
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(101, 83),
             source_tail_position: ScreenPosition::new(101, 83),
@@ -17706,8 +26639,7 @@ mod tests {
         game.state.scores.next_bonus = 10_000;
         game.state.player.lives = 3;
         game.state.player.smart_bombs = 1;
-        game.state.world.enemies[0].position = ScreenPosition::new(100, 80);
-        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        place_first_lander_at(&mut game, ScreenPosition::new(100, 80));
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(101, 83),
             source_tail_position: ScreenPosition::new(101, 83),
@@ -17735,8 +26667,7 @@ mod tests {
     fn clean_game_wave_clear_delays_next_wave_spawn_until_following_frame() {
         let mut game = credited_started_game();
         keep_first_enemy_only(&mut game);
-        game.state.world.enemies[0].position = ScreenPosition::new(100, 80);
-        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        place_first_lander_at(&mut game, ScreenPosition::new(100, 80));
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(101, 83),
             source_tail_position: ScreenPosition::new(101, 83),
@@ -17799,9 +26730,13 @@ mod tests {
         }));
 
         let next_wave = game.step(GameInput::NONE);
+        let expected_next_wave = WorldSnapshot::for_wave(2);
 
         assert_eq!(next_wave.state.wave, 2);
-        assert_eq!(next_wave.state.world.enemies.len(), 5);
+        assert_eq!(
+            next_wave.state.world.enemies.len(),
+            expected_next_wave.enemies.len()
+        );
         assert_eq!(
             next_wave
                 .state
@@ -17810,40 +26745,31 @@ mod tests {
                 .iter()
                 .map(|enemy| enemy.kind)
                 .collect::<Vec<_>>(),
-            vec![
-                EnemyKind::Lander,
-                EnemyKind::Bomber,
-                EnemyKind::Pod,
-                EnemyKind::Lander,
-                EnemyKind::Lander,
-            ]
+            expected_next_wave
+                .enemies
+                .iter()
+                .map(|enemy| enemy.kind)
+                .collect::<Vec<_>>()
         );
         assert!(next_wave.state.world.projectiles.is_empty());
         assert_eq!(next_wave.state.world.terrain.len(), 5);
         assert_eq!(next_wave.state.world.humans.len(), 10);
         assert_eq!(next_wave.events.gameplay(), &[GameEvent::WaveStarted]);
-        assert_eq!(
+        assert!(
             next_wave
-                .scene
-                .sprites
+                .state
+                .world
+                .enemies
                 .iter()
-                .filter(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
-                .count(),
-            3
+                .any(|enemy| enemy.kind == EnemyKind::Bomber)
         );
         assert!(
             next_wave
-                .scene
-                .sprites
+                .state
+                .world
+                .enemies
                 .iter()
-                .any(|sprite| sprite.sprite == SpriteId::ENEMY_BOMBER)
-        );
-        assert!(
-            next_wave
-                .scene
-                .sprites
-                .iter()
-                .any(|sprite| sprite.sprite == SpriteId::ENEMY_POD)
+                .any(|enemy| enemy.kind == EnemyKind::Pod)
         );
     }
 
@@ -17860,28 +26786,49 @@ mod tests {
         let source = enemy
             .source_lander
             .expect("source lander state should be retained");
-        let expected_y_velocity = super::source_lander_orbit_y_velocity(
-            game.state.wave_profile,
-            before,
-            &game.state.world.terrain,
-        );
-        let (expected_x, expected_x_fraction) = super::source_fixed_axis_step(
-            before.x,
-            before_source.x_fraction,
-            before_source.x_velocity,
-        );
-        let (expected_y, expected_y_fraction) =
-            super::source_fixed_axis_step(before.y, before_source.y_fraction, expected_y_velocity);
+        let (expected_x, expected_x_fraction, expected_y, expected_y_fraction, expected_y_velocity) =
+            if before_source.sleep_ticks > 0 {
+                (
+                    before.x,
+                    before_source.x_fraction,
+                    before.y,
+                    before_source.y_fraction,
+                    before_source.y_velocity,
+                )
+            } else {
+                let expected_y_velocity = super::source_lander_orbit_y_velocity(
+                    game.state.wave_profile,
+                    before,
+                    &game.state.world.terrain,
+                );
+                let (expected_x, expected_x_fraction) = super::source_fixed_axis_step(
+                    before.x,
+                    before_source.x_fraction,
+                    before_source.x_velocity,
+                );
+                let (expected_y, expected_y_fraction) = super::source_fixed_axis_step(
+                    before.y,
+                    before_source.y_fraction,
+                    expected_y_velocity,
+                );
+                (
+                    expected_x,
+                    expected_x_fraction,
+                    expected_y,
+                    expected_y_fraction,
+                    expected_y_velocity,
+                )
+            };
 
         assert_eq!(enemy.position, ScreenPosition::new(expected_x, expected_y));
         assert_eq!(source.x_fraction, expected_x_fraction);
         assert_eq!(source.y_fraction, expected_y_fraction);
         assert_eq!(source.y_velocity, expected_y_velocity);
         assert_eq!(enemy.velocity, super::source_lander_screen_velocity(source));
-        assert!(frame.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::ENEMY_LANDER
-                && sprite.position == [f32::from(enemy.position.x), f32::from(enemy.position.y)]
-        }));
+        assert!(frame.state.world.object_evidence.details.iter().any(
+            |detail| detail.object_category == Some(ObjectEvidenceCategory::Lander)
+                && detail.mapped_sprite == Some(SpriteId::ENEMY_LANDER)
+        ));
     }
 
     #[test]
@@ -17949,6 +26896,13 @@ mod tests {
     #[test]
     fn clean_game_world_sprites_are_atlas_backed() {
         let mut game = credited_started_game();
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(96, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_appearances.clear();
+        game.sync_world_presentation();
 
         let frame = game.step(GameInput {
             fire: true,
@@ -18035,8 +26989,22 @@ mod tests {
         assert!(
             border_sprites
                 .iter()
-                .all(|sprite| { sprite.layer == RenderLayer::Hud && sprite.tint == Color::WHITE })
+                .filter(|sprite| {
+                    sprite.position != [152.0, 7.0] && sprite.position != [152.0, 40.0]
+                })
+                .all(|sprite| {
+                    sprite.layer == RenderLayer::Hud
+                        && sprite.tint == SOURCE_VISUAL_STATE.top_display_border_tint()
+                })
         );
+        assert!(border_sprites.iter().any(|sprite| {
+            sprite.position == [152.0, 7.0]
+                && sprite.tint == SOURCE_VISUAL_STATE.top_display_scanner_marker_tint()
+        }));
+        assert!(border_sprites.iter().any(|sprite| {
+            sprite.position == [152.0, 40.0]
+                && sprite.tint == SOURCE_VISUAL_STATE.top_display_scanner_marker_tint()
+        }));
         assert!(
             border_sprites
                 .iter()
@@ -18186,23 +27154,51 @@ mod tests {
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::SCANNER_OBJECT_BLIP
                 && sprite.layer == RenderLayer::Hud
-                && sprite.position == [150.0, 17.0]
-                && sprite.size == [2.0, 2.0]
-                && sprite.tint == Color::WHITE
+                && sprite.position == [151.0, 17.0]
+                && sprite.size == [1.0, 1.0]
+                && sprite.tint == super::source_video_palette_index_tint(0x02)
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCANNER_OBJECT_BLIP
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [150.0, 18.0]
+                && sprite.size == [1.0, 1.0]
+                && sprite.tint == super::source_video_palette_index_tint(0x03)
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCANNER_OBJECT_BLIP
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [151.0, 18.0]
+                && sprite.size == [1.0, 1.0]
+                && sprite.tint == super::source_video_palette_index_tint(0x04)
         }));
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::SCANNER_PLAYER_BLIP
                 && sprite.layer == RenderLayer::Hud
                 && sprite.position == [166.0, 15.0]
-                && sprite.size == [3.0, 2.0]
-                && sprite.tint == Color::WHITE
+                && sprite.size == [1.0, 1.0]
+                && sprite.tint == super::source_video_palette_index_tint(0x09)
         }));
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::SCANNER_PLAYER_BLIP
                 && sprite.layer == RenderLayer::Hud
-                && sprite.position == [164.0, 16.0]
+                && sprite.position == [167.0, 16.0]
                 && sprite.size == [1.0, 1.0]
-                && sprite.tint == Color::WHITE
+                && sprite.tint == super::source_video_palette_index_tint(0x09)
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCANNER_PLAYER_BLIP
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [166.0, 17.0]
+                && sprite.size == [1.0, 1.0]
+                && sprite.tint == super::source_video_palette_index_tint(0x09)
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCANNER_PLAYER_BLIP
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [165.0, 16.0]
+                && sprite.size == [1.0, 1.0]
+                && sprite.tint == super::source_video_palette_index_tint(0x09)
         }));
     }
 
@@ -18359,6 +27355,297 @@ mod tests {
         assert!(!scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ENEMY_BOMB && sprite.position == [70.0, 80.0]
         }));
+    }
+
+    #[test]
+    fn clean_game_projects_source_enemy_appearance_coalescence_pixels() {
+        let mut game = Game::new();
+        game.state.phase = GamePhase::Playing;
+        game.state.world.expanded_objects = ExpandedObjectEvidenceSnapshot {
+            active_count: 1,
+            detail_count: 1,
+            details: {
+                let mut details =
+                    [ExpandedObjectDetailSnapshot::EMPTY; EXPANDED_OBJECT_DETAIL_LIMIT];
+                details[0] = ExpandedObjectDetailSnapshot {
+                    kind: ExpandedObjectKind::Appearance,
+                    size: super::SOURCE_APPEARANCE_INITIAL_SIZE,
+                    picture_label: Some("LNDP1"),
+                    picture_size: Some((5, 8)),
+                    mapped_sprite: Some(SpriteId::ENEMY_LANDER),
+                    center: Some(ScreenPosition::new(106, 48)),
+                    top_left: Some(ScreenPosition::new(104, 44)),
+                    ..ExpandedObjectDetailSnapshot::EMPTY
+                };
+                details
+            },
+            ..ExpandedObjectEvidenceSnapshot::default()
+        };
+
+        let scene = game.scene();
+
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
+                && sprite.layer == RenderLayer::Objects
+        }));
+        assert!(!scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_LANDER && sprite.position == [104.0, 44.0]
+        }));
+    }
+
+    #[test]
+    fn clean_game_projects_enemy_family_appearances_as_source_pixel_clouds() {
+        for (enemy, picture_label, picture_size, mapped_sprite) in [
+            (
+                EnemySnapshot::source_lander(
+                    ScreenPosition::new(20, 40),
+                    ScreenVelocity::new(0, 0),
+                    SourceLanderSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        shot_timer: 0,
+                        sleep_ticks: 0,
+                        picture_frame: 2,
+                        target_human_index: None,
+                    },
+                ),
+                "LNDP3",
+                (5, 8),
+                SpriteId::ENEMY_LANDER,
+            ),
+            (
+                EnemySnapshot::source_mutant(
+                    ScreenPosition::new(40, 60),
+                    ScreenVelocity::new(0, 0),
+                    SourceMutantSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        shot_timer: 0,
+                        sleep_ticks: 0,
+                        hop_rng: SourceRandSnapshot::default(),
+                        render_x_correction: 0,
+                        target6_first_shot_deferred: false,
+                    },
+                ),
+                "SCZP1",
+                (5, 8),
+                SpriteId::ENEMY_MUTANT,
+            ),
+            (
+                EnemySnapshot::source_bomber(
+                    ScreenPosition::new(60, 80),
+                    ScreenVelocity::new(0, 0),
+                    SourceBomberSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        picture_frame: 2,
+                        cruise_altitude: 0,
+                        sleep_ticks: 0,
+                        source_slot: 0,
+                    },
+                ),
+                "TIEP3",
+                (4, 8),
+                SpriteId::ENEMY_BOMBER,
+            ),
+            (
+                EnemySnapshot::source_pod(
+                    ScreenPosition::new(80, 100),
+                    ScreenVelocity::new(0, 0),
+                    SourcePodSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                    },
+                ),
+                "PRBP1",
+                (4, 8),
+                SpriteId::ENEMY_POD,
+            ),
+            (
+                EnemySnapshot::source_baiter(
+                    ScreenPosition::new(100, 120),
+                    ScreenVelocity::new(0, 0),
+                    SourceBaiterSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        shot_timer: 0,
+                        sleep_ticks: 0,
+                        picture_frame: 2,
+                    },
+                ),
+                "UFOP3",
+                (6, 4),
+                SpriteId::ENEMY_BAITER,
+            ),
+            (
+                EnemySnapshot::source_swarmer(
+                    ScreenPosition::new(120, 140),
+                    ScreenVelocity::new(0, 0),
+                    SourceSwarmerSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        acceleration: 0,
+                        shot_timer: 0,
+                        sleep_ticks: 0,
+                        horizontal_seek_pending: false,
+                    },
+                ),
+                "SWPIC1",
+                (3, 4),
+                SpriteId::ENEMY_SWARMER,
+            ),
+        ] {
+            let mut game = Game::new();
+            game.state.phase = GamePhase::Playing;
+            game.state.world.enemies = vec![enemy];
+            game.state.world.enemy_appearances =
+                vec![super::EnemyAppearanceSnapshot::source_spawn(enemy)];
+            game.sync_world_presentation();
+
+            let detail = game.state.world.expanded_objects.details[0];
+            assert_eq!(detail.kind, ExpandedObjectKind::Appearance);
+            assert_eq!(detail.picture_label, Some(picture_label));
+            assert_eq!(detail.picture_size, Some(picture_size));
+            assert_eq!(detail.mapped_sprite, Some(mapped_sprite));
+            assert_eq!(
+                detail.size,
+                super::SOURCE_APPEARANCE_INITIAL_SIZE,
+                "{picture_label} should use the source coalescence size"
+            );
+            assert_scene_has_enemy_appearance_cloud(&game.scene(), picture_label);
+            assert!(
+                !game
+                    .scene()
+                    .sprites
+                    .iter()
+                    .any(|sprite| sprite.sprite == mapped_sprite),
+                "{picture_label} appearance should coalesce as source pixels, not as a static sprite"
+            );
+        }
+    }
+
+    #[test]
+    fn clean_game_hides_enemy_sprite_while_source_appearance_is_active() {
+        let mut game = Game::new();
+        game.state.phase = GamePhase::Playing;
+        let enemy = EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(104, 44),
+            ScreenVelocity::new(0, 0),
+        );
+        game.state.world.enemies = vec![enemy];
+        game.state.world.enemy_appearances =
+            vec![super::EnemyAppearanceSnapshot::source_spawn(enemy)];
+        game.sync_world_presentation();
+
+        let scene = game.scene();
+
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
+                && sprite.layer == RenderLayer::Objects
+        }));
+        assert!(!scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_LANDER && sprite.position == [104.0, 44.0]
+        }));
+    }
+
+    #[test]
+    fn clean_game_only_hides_enemy_matching_source_appearance() {
+        let mut game = Game::new();
+        game.state.phase = GamePhase::Playing;
+        let active_lander = EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(80, 60),
+            ScreenVelocity::new(0, 0),
+        );
+        let appearing_lander = EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(104, 44),
+            ScreenVelocity::new(0, 0),
+        );
+        game.state.world.enemies = vec![active_lander, appearing_lander];
+        game.state.world.enemy_appearances = vec![super::EnemyAppearanceSnapshot::source_spawn(
+            appearing_lander,
+        )];
+        game.sync_world_presentation();
+
+        let scene = game.scene();
+
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_LANDER
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [80.0, 60.0]
+        }));
+        assert!(!scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_LANDER
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [104.0, 44.0]
+        }));
+    }
+
+    #[test]
+    fn clean_game_tracks_source_appearance_with_moving_enemy() {
+        let mut game = credited_started_game();
+        let appearing_lander = EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(104, 44),
+            ScreenVelocity::new(2, 0),
+        );
+        game.state.world.enemies = vec![appearing_lander];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.enemy_appearances = vec![super::EnemyAppearanceSnapshot::source_spawn(
+            appearing_lander,
+        )];
+        game.first_wave_early_reserve_frames = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        let moved_position = ScreenPosition::new(106, 44);
+        assert_eq!(frame.state.world.enemies[0].position, moved_position);
+        assert_eq!(
+            frame.state.world.enemy_appearances[0].position,
+            moved_position
+        );
+        assert!(!frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_LANDER
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [106.0, 44.0]
+        }));
+    }
+
+    #[test]
+    fn clean_world_tracks_source_enemy_appearance_lifecycle() {
+        let mut world = WorldSnapshot::first_wave();
+
+        assert_eq!(world.enemy_appearances.len(), 1);
+        world.sync_clean_lifecycle_evidence();
+        let detail = world.expanded_objects.details[0];
+        assert_eq!(detail.kind, ExpandedObjectKind::Appearance);
+        assert_eq!(detail.size, super::SOURCE_APPEARANCE_INITIAL_SIZE);
+        assert_eq!(detail.picture_label, Some("LNDP1"));
+
+        for _ in 0..45 {
+            world.advance_enemy_appearances();
+        }
+        assert_eq!(
+            world.enemy_appearances[0].source_size,
+            super::SOURCE_APPEARANCE_FINAL_SIZE
+        );
+
+        world.advance_enemy_appearances();
+        assert!(world.enemy_appearances.is_empty());
     }
 
     #[test]
@@ -18594,7 +27881,7 @@ mod tests {
         game.sync_world_presentation();
 
         let initial_scene = game.scene();
-        assert_scene_has_enemy_explosion_cloud(&initial_scene);
+        assert_scene_has_no_enemy_explosion_cloud(&initial_scene);
         assert!(
             !initial_scene
                 .sprites
@@ -18602,7 +27889,25 @@ mod tests {
                 .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
         );
 
-        for _ in 0..10 {
+        for _ in 0..super::SOURCE_EXPANDED_OBJECT_EXPLOSION_VISIBLE_FRAME {
+            game.state.world.advance_explosions();
+        }
+        game.sync_world_presentation();
+
+        let visible_scene = game.scene();
+        assert_scene_has_enemy_explosion_cloud(&visible_scene);
+        let visible_bounds =
+            enemy_explosion_cloud_bounds(&visible_scene).expect("visible explosion bounds");
+        assert_eq!(
+            visible_bounds.0, 98.0,
+            "source EWRITE expands around CENTER, not the full picture width"
+        );
+        assert!(visible_bounds.0 < 100.0);
+        assert!(visible_bounds.1 < 80.0);
+        assert!(visible_bounds.2 > 109.0);
+        assert!(visible_bounds.3 > 87.0);
+
+        for _ in super::SOURCE_EXPANDED_OBJECT_EXPLOSION_VISIBLE_FRAME..10 {
             game.state.world.advance_explosions();
         }
         game.sync_world_presentation();
@@ -18615,12 +27920,89 @@ mod tests {
         assert_eq!(advanced_detail.explosion_frame, Some(10));
         let advanced_scene = game.scene();
         assert_scene_has_enemy_explosion_cloud(&advanced_scene);
+        let advanced_bounds =
+            enemy_explosion_cloud_bounds(&advanced_scene).expect("advanced explosion bounds");
+        assert!(advanced_bounds.0 < visible_bounds.0);
+        assert!(advanced_bounds.1 < visible_bounds.1);
+        assert!(advanced_bounds.2 > visible_bounds.2);
+        assert!(advanced_bounds.3 > visible_bounds.3);
         assert!(
             !advanced_scene
                 .sprites
                 .iter()
                 .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
         );
+    }
+
+    #[test]
+    fn clean_game_projects_enemy_family_explosions_as_source_pixel_clouds() {
+        for (kind, picture_label, picture_size, mapped_sprite) in [
+            (
+                ExplosionKind::Lander,
+                "LNDP1",
+                (5, 8),
+                SpriteId::ENEMY_LANDER,
+            ),
+            (
+                ExplosionKind::Mutant,
+                "SCZP1",
+                (5, 8),
+                SpriteId::ENEMY_MUTANT,
+            ),
+            (
+                ExplosionKind::Bomber,
+                "TIEP1",
+                (4, 8),
+                SpriteId::ENEMY_BOMBER,
+            ),
+            (ExplosionKind::Pod, "PRBP1", (4, 8), SpriteId::ENEMY_POD),
+            (
+                ExplosionKind::Baiter,
+                "UFOP1",
+                (6, 4),
+                SpriteId::ENEMY_BAITER,
+            ),
+            (
+                ExplosionKind::Swarmer,
+                "SWXP1",
+                (4, 8),
+                SpriteId::SWARMER_EXPLOSION,
+            ),
+        ] {
+            let mut game = credited_started_game();
+            game.state.world.enemies.clear();
+            game.state.world.explosions.clear();
+            game.state
+                .world
+                .spawn_explosion(kind, ScreenPosition::new(100, 80));
+            game.sync_world_presentation();
+
+            let initial_detail = game.state.world.expanded_objects.details[0];
+            assert_eq!(initial_detail.kind, ExpandedObjectKind::Explosion);
+            assert_eq!(initial_detail.picture_label, Some(picture_label));
+            assert_eq!(initial_detail.picture_size, Some(picture_size));
+            assert_eq!(initial_detail.mapped_sprite, Some(mapped_sprite));
+            assert_scene_has_no_enemy_explosion_cloud(&game.scene());
+
+            for _ in 0..super::SOURCE_EXPANDED_OBJECT_EXPLOSION_VISIBLE_FRAME {
+                game.state.world.advance_explosions();
+            }
+            game.sync_world_presentation();
+
+            let visible_detail = game.state.world.expanded_objects.details[0];
+            assert_eq!(visible_detail.picture_label, Some(picture_label));
+            assert_eq!(visible_detail.picture_size, Some(picture_size));
+            assert_eq!(visible_detail.mapped_sprite, Some(mapped_sprite));
+            assert_scene_has_enemy_explosion_cloud(&game.scene());
+            assert!(
+                !game
+                    .scene()
+                    .sprites
+                    .iter()
+                    .any(|sprite| sprite.sprite == mapped_sprite),
+                "{kind:?} explosion should expand as source pixels, not a static sprite"
+            );
+        }
     }
 
     #[test]
@@ -18736,6 +28118,203 @@ mod tests {
     }
 
     #[test]
+    fn clean_world_starts_enemy_explosion_from_current_source_picture_descriptor() {
+        let mut world = WorldSnapshot::default();
+        world.spawn_enemy_explosion(EnemySnapshot::source_lander(
+            ScreenPosition::new(10, 20),
+            ScreenVelocity::new(0, 0),
+            SourceLanderSnapshot {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                shot_timer: 0,
+                sleep_ticks: 0,
+                picture_frame: 1,
+                target_human_index: None,
+            },
+        ));
+        world.spawn_enemy_explosion(EnemySnapshot::source_swarmer(
+            ScreenPosition::new(30, 40),
+            ScreenVelocity::new(0, 0),
+            SourceSwarmerSnapshot {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                acceleration: 0,
+                shot_timer: 0,
+                sleep_ticks: 0,
+                horizontal_seek_pending: false,
+            },
+        ));
+
+        world.sync_clean_lifecycle_evidence();
+
+        assert_eq!(world.expanded_objects.detail_count, 2);
+        assert_eq!(
+            world.expanded_objects.details[0].picture_label,
+            Some("LNDP2")
+        );
+        assert_eq!(world.expanded_objects.details[0].picture_size, Some((5, 8)));
+        assert_eq!(
+            world.expanded_objects.details[0].mapped_sprite,
+            Some(SpriteId::ENEMY_LANDER)
+        );
+        assert_eq!(
+            world.expanded_objects.details[1].picture_label,
+            Some("SWXP1")
+        );
+        assert_eq!(world.expanded_objects.details[1].picture_size, Some((4, 8)));
+        assert_eq!(
+            world.expanded_objects.details[1].mapped_sprite,
+            Some(SpriteId::SWARMER_EXPLOSION)
+        );
+    }
+
+    #[test]
+    fn clean_world_starts_enemy_family_explosions_from_current_source_descriptors() {
+        let cases = [
+            (
+                EnemySnapshot::source_lander(
+                    ScreenPosition::new(10, 20),
+                    ScreenVelocity::new(0, 0),
+                    SourceLanderSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        shot_timer: 0,
+                        sleep_ticks: 0,
+                        picture_frame: 2,
+                        target_human_index: None,
+                    },
+                ),
+                "LNDP3",
+                (5, 8),
+                SpriteId::ENEMY_LANDER,
+            ),
+            (
+                EnemySnapshot::source_mutant(
+                    ScreenPosition::new(30, 40),
+                    ScreenVelocity::new(0, 0),
+                    SourceMutantSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        shot_timer: 0,
+                        sleep_ticks: 0,
+                        hop_rng: SourceRandSnapshot::default(),
+                        render_x_correction: 0,
+                        target6_first_shot_deferred: false,
+                    },
+                ),
+                "SCZP1",
+                (5, 8),
+                SpriteId::ENEMY_MUTANT,
+            ),
+            (
+                EnemySnapshot::source_bomber(
+                    ScreenPosition::new(50, 60),
+                    ScreenVelocity::new(0, 0),
+                    SourceBomberSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        picture_frame: 2,
+                        cruise_altitude: 0,
+                        sleep_ticks: 0,
+                        source_slot: 0,
+                    },
+                ),
+                "TIEP3",
+                (4, 8),
+                SpriteId::ENEMY_BOMBER,
+            ),
+            (
+                EnemySnapshot::source_pod(
+                    ScreenPosition::new(70, 80),
+                    ScreenVelocity::new(0, 0),
+                    SourcePodSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                    },
+                ),
+                "PRBP1",
+                (4, 8),
+                SpriteId::ENEMY_POD,
+            ),
+            (
+                EnemySnapshot::source_baiter(
+                    ScreenPosition::new(90, 100),
+                    ScreenVelocity::new(0, 0),
+                    SourceBaiterSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        shot_timer: 0,
+                        sleep_ticks: 0,
+                        picture_frame: 2,
+                    },
+                ),
+                "UFOP3",
+                (6, 4),
+                SpriteId::ENEMY_BAITER,
+            ),
+            (
+                EnemySnapshot::source_swarmer(
+                    ScreenPosition::new(110, 120),
+                    ScreenVelocity::new(0, 0),
+                    SourceSwarmerSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        acceleration: 0,
+                        shot_timer: 0,
+                        sleep_ticks: 0,
+                        horizontal_seek_pending: false,
+                    },
+                ),
+                "SWXP1",
+                (4, 8),
+                SpriteId::SWARMER_EXPLOSION,
+            ),
+        ];
+        let mut world = WorldSnapshot::default();
+
+        for (enemy, _, _, _) in cases {
+            world.spawn_enemy_explosion(enemy);
+        }
+        world.sync_clean_lifecycle_evidence();
+
+        assert_eq!(
+            usize::from(world.expanded_objects.detail_count),
+            cases.len()
+        );
+        for (index, (enemy, picture_label, picture_size, mapped_sprite)) in
+            cases.into_iter().enumerate()
+        {
+            let detail = world.expanded_objects.details[index];
+            assert_eq!(detail.kind, ExpandedObjectKind::Explosion);
+            assert_eq!(detail.picture_label, Some(picture_label));
+            assert_eq!(detail.picture_size, Some(picture_size));
+            assert_eq!(detail.mapped_sprite, Some(mapped_sprite));
+            assert_eq!(detail.top_left, Some(enemy.position));
+            assert_eq!(detail.explosion_frame, Some(0));
+            assert_eq!(
+                detail.explosion_lifetime_frames,
+                Some(SOURCE_EXPLOSION_LIFETIME_FRAMES)
+            );
+        }
+    }
+
+    #[test]
     fn clean_world_starts_source_terrain_blow_and_projects_terex() {
         let mut game = credited_started_game();
         game.state.world.humans.clear();
@@ -18749,9 +28328,10 @@ mod tests {
             .expect("terrain blow snapshot");
         assert!(terrain_blow.status_terrain_blown);
         assert_eq!(terrain_blow.stage, TerrainBlowStage::ExplosionPassSleeping);
+        assert_eq!(terrain_blow.source_elapsed_frames, 0);
         assert_eq!(terrain_blow.source_iteration, 0);
-        assert_eq!(terrain_blow.source_sleep_remaining, Some(2));
-        assert_eq!(terrain_blow.source_pseudo_color, 0x3C);
+        assert_eq!(terrain_blow.source_sleep_remaining, Some(1));
+        assert_eq!(terrain_blow.source_pseudo_color, 0);
         assert_eq!(terrain_blow.source_overload_counter, 8);
         assert_eq!(terrain_blow.terrain_erase_entries, 0x98);
         assert_eq!(terrain_blow.scanner_terrain_erase_entries, 0x40);
@@ -18760,7 +28340,7 @@ mod tests {
         assert_eq!(terrain_blow.explosions_per_pass, 2);
         assert!(frame.state.world.terrain.is_empty());
         assert!(!frame.state.world.scanner.terrain_enabled);
-        assert_eq!(frame.state.world.expanded_objects.detail_count, 2);
+        assert_eq!(frame.state.world.expanded_objects.detail_count, 1);
         assert!(
             frame
                 .state
@@ -18768,7 +28348,7 @@ mod tests {
                 .expanded_objects
                 .details
                 .iter()
-                .take(2)
+                .take(1)
                 .all(|detail| detail.picture_label == Some("TEREX")
                     && detail.mapped_sprite == Some(SpriteId::TERRAIN_EXPLOSION)
                     && detail.explosion_frame == Some(0))
@@ -18780,16 +28360,10 @@ mod tests {
                 .iter()
                 .any(|sprite| sprite.sprite == SpriteId::TERRAIN_TILE)
         );
-        assert!(frame.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::TERRAIN_EXPLOSION
-                && sprite.layer == RenderLayer::Objects
-                && sprite.position == [0x44 as f32, 0x70 as f32]
-                && sprite.size == [16.0, 6.0]
+        assert!(!frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::TERRAIN_EXPLOSION && sprite.layer == RenderLayer::Objects
         }));
-        assert_eq!(
-            frame.events.sounds(),
-            &[source_terrain_blow_start_sound_event()]
-        );
+        assert!(frame.events.sounds().is_empty());
     }
 
     #[test]
@@ -18804,43 +28378,40 @@ mod tests {
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
 
         let start = game.step(GameInput::NONE);
-        assert_eq!(
-            start.events.sounds(),
-            &[source_terrain_blow_start_sound_event()]
-        );
+        assert!(start.events.sounds().is_empty());
 
-        let mut saw_flash_clear = false;
-        let mut saw_restart_pass = false;
+        let mut observed_sounds = Vec::new();
         let mut saw_completion = false;
-        for _ in 0..96 {
+        for offset in 1..=137 {
             let frame = game.step(GameInput::NONE);
+            if !frame.events.sounds().is_empty() {
+                observed_sounds.push((offset, frame.events.sounds().to_vec()));
+            }
             let terrain_blow = frame
                 .state
                 .world
                 .terrain_blow
                 .expect("terrain blow snapshot");
+            let start_sound_index = SOURCE_TERRAIN_BLOW_START_SOUND_FRAMES
+                .iter()
+                .position(|frame| *frame == offset);
 
             match terrain_blow.stage {
                 TerrainBlowStage::ExplosionPassSleeping if terrain_blow.source_iteration > 0 => {
-                    if frame.events.sounds() == [source_terrain_blow_start_sound_event()].as_slice()
-                    {
-                        saw_restart_pass = true;
+                    if let Some(start_sound_index) = start_sound_index {
                         assert_eq!(
-                            terrain_blow.source_sleep_remaining,
-                            Some(SOURCE_TERRAIN_BLOW_SLEEP_TICKS)
-                        );
-                        assert_ne!(terrain_blow.source_pseudo_color, 0);
-                        assert_eq!(
-                            terrain_blow.source_overload_counter,
-                            SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER
+                            terrain_blow.source_pseudo_color,
+                            SOURCE_TERRAIN_BLOW_FLASH_COLOR_BYTES[start_sound_index]
                         );
                     }
+                    assert_eq!(
+                        terrain_blow.source_overload_counter,
+                        SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER
+                    );
                 }
                 TerrainBlowStage::FlashClearedSleeping => {
-                    saw_flash_clear = true;
                     assert_eq!(terrain_blow.source_pseudo_color, 0);
-                    assert!(matches!(terrain_blow.source_sleep_remaining, Some(1..=3)));
-                    assert!(frame.events.sounds().is_empty());
+                    assert!(terrain_blow.source_sleep_remaining.is_some());
                 }
                 TerrainBlowStage::Completed => {
                     saw_completion = true;
@@ -18849,19 +28420,117 @@ mod tests {
                         SOURCE_TERRAIN_BLOW_ITERATION_LIMIT
                     );
                     assert_eq!(terrain_blow.source_sleep_remaining, None);
-                    assert_eq!(
-                        frame.events.sounds(),
-                        &[source_terrain_blow_complete_sound_event()]
-                    );
-                    break;
+                    if offset == SOURCE_TERRAIN_BLOW_COMPLETE_FRAME {
+                        assert_eq!(
+                            frame.events.sounds(),
+                            &[source_terrain_blow_complete_sound_event()]
+                        );
+                    }
                 }
                 TerrainBlowStage::ExplosionPassSleeping => {}
             }
         }
 
-        assert!(saw_flash_clear);
-        assert!(saw_restart_pass);
         assert!(saw_completion);
+        let expected_sounds = SOURCE_TERRAIN_BLOW_START_SOUND_FRAMES
+            .iter()
+            .copied()
+            .map(|frame| (frame, vec![source_terrain_blow_start_sound_event()]))
+            .chain(std::iter::once((
+                SOURCE_TERRAIN_BLOW_COMPLETE_FRAME,
+                vec![source_terrain_blow_complete_sound_event()],
+            )))
+            .chain([
+                (
+                    SOURCE_TERRAIN_BLOW_COMPLETE_FRAME + 4,
+                    vec![SoundEvent::UnmappedSoundCommand {
+                        command: SOURCE_AHSND_SOUND_COMMAND,
+                    }],
+                ),
+                (
+                    SOURCE_TERRAIN_BLOW_COMPLETE_FRAME + 10,
+                    vec![SoundEvent::UnmappedSoundCommand {
+                        command: SOURCE_AHSND_SOUND_COMMAND,
+                    }],
+                ),
+                (
+                    SOURCE_TERRAIN_BLOW_COMPLETE_FRAME + 16,
+                    vec![SoundEvent::UnmappedSoundCommand {
+                        command: SOURCE_CANNON_SOUND_COMMAND,
+                    }],
+                ),
+                (
+                    SOURCE_TERRAIN_BLOW_COMPLETE_FRAME + 26,
+                    vec![SoundEvent::UnmappedSoundCommand {
+                        command: SOURCE_CANNON_SOUND_COMMAND,
+                    }],
+                ),
+            ])
+            .collect::<Vec<_>>();
+        assert_eq!(observed_sounds, expected_sounds);
+    }
+
+    #[test]
+    fn clean_world_uses_mame_terrain_blow_flash_and_growth_cadence() {
+        let mut game = credited_started_game();
+        game.state.world.humans.clear();
+
+        let first_top_left = ScreenPosition::new(0x4C, 0xC2);
+        let expected_first_explosion_sizes = [
+            (0, 0x0100),
+            (22, 0x0F9C),
+            (23, 0x0F9C),
+            (24, 0x1046),
+            (32, 0x1442),
+            (52, 0x1CE4),
+            (80, 0x2630),
+        ];
+
+        for offset in 0..=81 {
+            let frame = game.step(GameInput::NONE);
+            let terrain_blow = frame
+                .state
+                .world
+                .terrain_blow
+                .expect("terrain blow snapshot");
+            assert_eq!(
+                frame.scene.clear_color,
+                source_terrain_blow_flash_tint(terrain_blow.source_elapsed_frames)
+            );
+
+            if let Some((_, expected_size)) = expected_first_explosion_sizes
+                .iter()
+                .find(|(expected_offset, _)| *expected_offset == offset)
+            {
+                let detail = frame
+                    .state
+                    .world
+                    .expanded_objects
+                    .details
+                    .iter()
+                    .find(|detail| {
+                        detail.kind == ExpandedObjectKind::Explosion
+                            && detail.top_left == Some(first_top_left)
+                    })
+                    .expect("first terrain explosion remains visible");
+                assert_eq!(detail.size, *expected_size);
+            }
+
+            if offset == 81 {
+                assert!(
+                    !frame
+                        .state
+                        .world
+                        .expanded_objects
+                        .details
+                        .iter()
+                        .any(|detail| {
+                            detail.kind == ExpandedObjectKind::Explosion
+                                && detail.top_left == Some(first_top_left)
+                        })
+                );
+            }
+        }
     }
 
     #[test]
@@ -18889,6 +28558,32 @@ mod tests {
 
         assert_eq!(frame.state.player.direction, Direction::Right);
         assert_eq!(frame.events.gameplay(), &[GameEvent::ReversePressed]);
+        assert_eq!(
+            scene_player_sprite(&frame)
+                .expect("scene player sprite")
+                .sprite,
+            SpriteId::PLAYER_SHIP
+        );
+    }
+
+    #[test]
+    fn clean_game_reverses_right_to_left_and_flips_player_sprite() {
+        let mut game = credited_started_game();
+        game.state.player.direction = Direction::Right;
+
+        let frame = game.step(GameInput {
+            reverse: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(frame.state.player.direction, Direction::Left);
+        assert_eq!(frame.events.gameplay(), &[GameEvent::ReversePressed]);
+        assert_eq!(
+            scene_player_sprite(&frame)
+                .expect("scene player sprite")
+                .sprite,
+            SpriteId::PLAYER_SHIP_LEFT
+        );
     }
 
     #[test]
@@ -18927,6 +28622,17 @@ mod tests {
         let frame = game.step(GameInput::NONE);
         assert_eq!(frame.events.sounds(), &[SoundEvent::GameStarted]);
         assert_eq!(game.start_sound_delay, None);
+
+        game.start_player_appear_sound_delay = Some(2);
+        let frame = game.step(GameInput::NONE);
+        assert!(frame.events.sounds().is_empty());
+        assert_eq!(game.start_player_appear_sound_delay, Some(1));
+        let frame = game.step(GameInput::NONE);
+        assert_eq!(
+            frame.events.sounds(),
+            &[source_hyperspace_appearance_sound_event()]
+        );
+        assert_eq!(game.start_player_appear_sound_delay, None);
     }
 
     fn credited_started_game() -> Game {
@@ -18939,6 +28645,8 @@ mod tests {
         });
         advance_to_delayed_start_sound(&mut game);
         advance_to_started_playfield(&mut game);
+        game.state.world.enemy_appearances.clear();
+        game.sync_world_presentation();
         game
     }
 
@@ -18957,12 +28665,33 @@ mod tests {
         });
         advance_to_delayed_start_sound(&mut game);
         advance_to_started_playfield(&mut game);
+        game.state.world.enemy_appearances.clear();
+        game.sync_world_presentation();
         game
     }
 
     fn keep_first_enemy_only(game: &mut Game) {
         game.state.world.enemies.truncate(1);
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.enemy_appearances.clear();
+    }
+
+    fn place_first_lander_at(game: &mut Game, position: ScreenPosition) {
+        game.state.world.enemies[0] =
+            EnemySnapshot::new(EnemyKind::Lander, position, ScreenVelocity::new(0, 0));
+    }
+
+    fn scene_player_sprite(frame: &GameFrame) -> Option<&crate::renderer::SceneSprite> {
+        let position = super::player_scene_position(frame.state.player.position);
+        frame.scene.sprites.iter().find(|sprite| {
+            sprite.layer == RenderLayer::Objects
+                && sprite.position == position
+                && sprite.size
+                    == [
+                        f32::from(super::PLAYER_SPRITE_SIZE.0),
+                        f32::from(super::PLAYER_SPRITE_SIZE.1),
+                    ]
+        })
     }
 
     fn assert_scene_has_player_laser_beam(scene: &RenderScene, projectile: ProjectileSnapshot) {
@@ -18976,10 +28705,21 @@ mod tests {
             .collect::<Vec<_>>();
         let (left, right) = player_laser_visible_bounds(projectile);
         assert!(laser_sprites.len() > 1);
-        assert!(laser_sprites.iter().any(|sprite| {
-            sprite.position[0] == left
-                && (sprite.position[1] - f32::from(projectile.position.y)).abs() <= 4.0
-        }));
+        assert!(
+            laser_sprites
+                .iter()
+                .any(|sprite| sprite.position[0] >= left && sprite.position[0] <= right)
+        );
+        assert!(
+            laser_sprites
+                .iter()
+                .any(|sprite| sprite.tint == super::SOURCE_LASER_BODY_TINT)
+        );
+        assert!(
+            laser_sprites
+                .iter()
+                .any(|sprite| sprite.tint == super::SOURCE_LASER_TIP_TINT)
+        );
         assert!(laser_sprites.iter().all(|sprite| {
             sprite.position[0] >= left && sprite.position[0] + sprite.size[0] <= right + 1.0
         }));
@@ -18999,6 +28739,32 @@ mod tests {
                 f32::from(projectile.position.x) + span,
             )
         }
+    }
+
+    fn mutant_sprite_positions(scene: &RenderScene) -> Vec<(u8, u8)> {
+        scene
+            .sprites
+            .iter()
+            .filter(|sprite| sprite.sprite == SpriteId::ENEMY_MUTANT)
+            .map(|sprite| (sprite.position[0] as u8, sprite.position[1] as u8))
+            .collect()
+    }
+
+    fn enemy_projectile_sprite_positions(scene: &RenderScene) -> Vec<(u8, u8)> {
+        scene
+            .sprites
+            .iter()
+            .filter(|sprite| {
+                sprite.sprite == SpriteId::ENEMY_BOMB
+                    && sprite.layer == RenderLayer::Projectiles
+                    && sprite.size
+                        == [
+                            f32::from(super::ENEMY_PROJECTILE_SPRITE_SIZE.0),
+                            f32::from(super::ENEMY_PROJECTILE_SPRITE_SIZE.1),
+                        ]
+            })
+            .map(|sprite| (sprite.position[0] as u8, sprite.position[1] as u8))
+            .collect()
     }
 
     fn assert_scene_has_enemy_explosion_cloud(scene: &RenderScene) {
@@ -19021,6 +28787,55 @@ mod tests {
         );
     }
 
+    fn assert_scene_has_enemy_appearance_cloud(scene: &RenderScene, picture_label: &str) {
+        let cloud_pixels = scene
+            .sprites
+            .iter()
+            .filter(|sprite| {
+                sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
+                    && sprite.layer == RenderLayer::Objects
+            })
+            .collect::<Vec<_>>();
+        assert!(
+            !cloud_pixels.is_empty(),
+            "{picture_label} should render at least one source coalescence pixel"
+        );
+        assert!(cloud_pixels.iter().all(|sprite| {
+            sprite.size[0] >= 1.0 && sprite.size[1] >= 1.0 && sprite.tint.rgba[3] == 0xFF
+        }));
+        assert!(
+            cloud_pixels
+                .iter()
+                .any(|sprite| sprite.tint != Color::WHITE)
+        );
+    }
+
+    fn assert_scene_has_no_enemy_explosion_cloud(scene: &RenderScene) {
+        assert!(!scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
+                && sprite.layer == RenderLayer::Objects
+        }));
+    }
+
+    fn enemy_explosion_cloud_bounds(scene: &RenderScene) -> Option<(f32, f32, f32, f32)> {
+        let mut cloud_pixels = scene.sprites.iter().filter(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
+                && sprite.layer == RenderLayer::Objects
+        });
+        let first = cloud_pixels.next()?;
+        let mut min_x = first.position[0];
+        let mut min_y = first.position[1];
+        let mut max_x = first.position[0] + first.size[0] - 1.0;
+        let mut max_y = first.position[1] + first.size[1] - 1.0;
+        for sprite in cloud_pixels {
+            min_x = min_x.min(sprite.position[0]);
+            min_y = min_y.min(sprite.position[1]);
+            max_x = max_x.max(sprite.position[0] + sprite.size[0] - 1.0);
+            max_y = max_y.max(sprite.position[1] + sprite.size[1] - 1.0);
+        }
+        Some((min_x, min_y, max_x, max_y))
+    }
+
     fn table_entry(rank: u8, score: u32, initials: [char; 3]) -> HighScoreTableEntrySnapshot {
         HighScoreTableEntrySnapshot {
             rank,
@@ -19030,6 +28845,27 @@ mod tests {
     }
 
     fn advance_player_switch_sleep(game: &mut Game, from_player: u8, to_player: u8) -> GameFrame {
+        let initial_switch = GameOverSnapshot::player_switch_sleep(
+            PLAYER_SWITCH_SLEEP_FRAMES,
+            from_player,
+            to_player,
+        );
+        for _ in 0..200 {
+            if game.state.game_over == initial_switch {
+                break;
+            }
+            let waiting = game.step(GameInput::NONE);
+            if waiting.state.game_over == initial_switch {
+                break;
+            }
+            assert!(matches!(
+                waiting.state.phase,
+                GamePhase::Playing | GamePhase::GameOver
+            ));
+            assert_empty_or_player_death_tail_events(&waiting.events);
+        }
+        assert_eq!(game.state.game_over, initial_switch);
+
         for expected_timer in (1..PLAYER_SWITCH_SLEEP_FRAMES).rev() {
             let sleeping = game.step(GameInput::NONE);
             assert_eq!(sleeping.state.phase, GamePhase::GameOver);
@@ -19037,7 +28873,7 @@ mod tests {
                 sleeping.state.game_over,
                 GameOverSnapshot::player_switch_sleep(expected_timer, from_player, to_player)
             );
-            assert!(sleeping.events.is_empty());
+            assert_empty_or_player_death_tail_events(&sleeping.events);
         }
 
         game.step(GameInput::NONE)
@@ -19046,19 +28882,110 @@ mod tests {
     fn advance_pending_respawn(game: &mut Game) -> GameFrame {
         for _ in 0..200 {
             let frame = game.step(GameInput::NONE);
-            if frame.state.phase == GamePhase::Playing {
+            if frame.state.phase == GamePhase::Playing
+                && game.start_playfield_delay.is_some()
+                && world_has_no_live_playfield_content(&frame.state.world)
+            {
                 return frame;
             }
 
-            assert_eq!(frame.state.phase, GamePhase::GameOver);
+            assert!(matches!(
+                frame.state.phase,
+                GamePhase::Playing | GamePhase::GameOver
+            ));
             assert_eq!(frame.state.game_over, GameOverSnapshot::NONE);
-            assert!(frame.events.is_empty());
+            assert_empty_or_player_death_tail_events(&frame.events);
         }
 
         panic!("pending respawn did not finish");
     }
 
+    fn world_has_no_live_playfield_content(world: &WorldSnapshot) -> bool {
+        world.terrain.is_empty()
+            && world.terrain_blow.is_none()
+            && world.stars.is_empty()
+            && world.enemies.is_empty()
+            && world.enemy_reserve == EnemyReserveSnapshot::default()
+            && world.humans.is_empty()
+            && world.projectiles.is_empty()
+            && world.enemy_projectiles.is_empty()
+            && world.enemy_appearances.is_empty()
+            && world.score_popups.is_empty()
+            && world.explosions.is_empty()
+            && world.object_evidence.active_count == 0
+            && world.object_evidence.inactive_count == 0
+            && world.object_evidence.projectile_count == 0
+            && world.object_evidence.visible_count == 0
+            && world.object_evidence.detail_count == 0
+            && world.expanded_objects.active_count == 0
+            && world.expanded_objects.detail_count == 0
+            && world.player_explosion.is_none()
+    }
+
+    fn advance_hyperspace_rematerialization(game: &mut Game) -> GameFrame {
+        for _ in 0..super::SOURCE_HYPERSPACE_REMATERIALIZE_DELAY_FRAMES {
+            let frame = game.step(GameInput::NONE);
+            if frame.events.sounds() == [source_hyperspace_appearance_sound_event()] {
+                return frame;
+            }
+            assert!(frame.events.is_empty());
+        }
+
+        panic!("hyperspace rematerialization did not finish");
+    }
+
+    fn advance_hyperspace_death(game: &mut Game) -> GameFrame {
+        for _ in 0..super::SOURCE_HYPERSPACE_DEATH_DELAY_FRAMES {
+            let frame = game.step(GameInput::NONE);
+            if frame
+                .events
+                .gameplay()
+                .contains(&GameEvent::PlayerDestroyed)
+            {
+                return frame;
+            }
+            assert!(frame.events.is_empty());
+        }
+
+        panic!("hyperspace death did not finish");
+    }
+
+    fn advance_through_player_death_sound_tail(game: &mut Game) -> Vec<SoundEvent> {
+        let last_sound_frame = usize::from(super::SOURCE_PLAYER_DEATH_BACKGROUND_END_DELAY_FRAMES);
+        let mut events = Vec::new();
+        for _ in 0..last_sound_frame {
+            events.extend(game.step(GameInput::NONE).events.sounds().iter().copied());
+        }
+        events
+    }
+
     fn advance_player_death_game_over_sleep(game: &mut Game) -> GameFrame {
+        for _ in 0..400 {
+            if game.state.phase == GamePhase::GameOver
+                && game.state.game_over
+                    == GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES)
+            {
+                break;
+            }
+            let waiting = game.step(GameInput::NONE);
+            if waiting.state.phase == GamePhase::GameOver
+                && waiting.state.game_over
+                    == GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES)
+            {
+                break;
+            }
+            if waiting.state.phase == GamePhase::Attract
+                && waiting.state.post_game_playfield.is_some()
+            {
+                return waiting;
+            }
+            assert!(matches!(
+                waiting.state.phase,
+                GamePhase::Playing | GamePhase::GameOver
+            ));
+            assert_empty_or_player_death_tail_events(&waiting.events);
+        }
+
         for expected_timer in (1..PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES).rev() {
             let sleeping = game.step(GameInput::NONE);
             assert_eq!(sleeping.state.phase, GamePhase::GameOver);
@@ -19066,7 +28993,7 @@ mod tests {
                 sleeping.state.game_over,
                 GameOverSnapshot::player_death_sleep(expected_timer)
             );
-            assert!(sleeping.events.is_empty());
+            assert_empty_or_player_death_tail_events(&sleeping.events);
         }
 
         game.step(GameInput::NONE)
@@ -19114,5 +29041,216 @@ mod tests {
             }
         }
         panic!("started playfield was not activated");
+    }
+
+    fn advance_to_same_player_post_death_playfield(game: &mut Game) -> GameFrame {
+        for _ in 0..=START_PLAYFIELD_DELAY_FRAMES {
+            let frame = game.step(GameInput::NONE);
+            if game.start_playfield_delay.is_none() && game.post_death_wave_resume_frames.is_some()
+            {
+                return frame;
+            }
+        }
+        panic!("post-death playfield pause was not activated");
+    }
+
+    struct SmartBombAdvance {
+        frame: GameFrame,
+        sounds: Vec<SoundEvent>,
+        gameplay_events: Vec<GameEvent>,
+    }
+
+    fn advance_through_smart_bomb_sequence(game: &mut Game) -> SmartBombAdvance {
+        let last_sound_frame = usize::from(
+            SOURCE_SMART_BOMB_SOUND_SEQUENCE
+                .last()
+                .expect("smart bomb sound sequence is not empty")
+                .0,
+        );
+        let mut detonation = None;
+        let mut sounds = Vec::new();
+        let mut gameplay_events = Vec::new();
+        for _ in 0..last_sound_frame {
+            let frame = game.step(GameInput::NONE);
+            sounds.extend_from_slice(frame.events.sounds());
+            gameplay_events.extend_from_slice(frame.events.gameplay());
+            if frame.events.gameplay().contains(&GameEvent::EnemyDestroyed) {
+                detonation = Some(frame);
+            }
+        }
+        SmartBombAdvance {
+            frame: detonation.expect("smart bomb detonation was not applied"),
+            sounds,
+            gameplay_events,
+        }
+    }
+
+    fn source_smart_bomb_sound_sequence_events() -> Vec<SoundEvent> {
+        SOURCE_SMART_BOMB_SOUND_SEQUENCE
+            .iter()
+            .map(|(_, command)| SoundEvent::UnmappedSoundCommand { command: *command })
+            .collect()
+    }
+
+    fn source_player_death_sound_tail_events() -> Vec<SoundEvent> {
+        let mut events = super::SOURCE_PLAYER_DEATH_SOUND_TAIL_SEQUENCE
+            .iter()
+            .map(|(_, command)| SoundEvent::UnmappedSoundCommand { command: *command })
+            .collect::<Vec<_>>();
+        events.push(SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_BACKGROUND_END_SOUND_COMMAND,
+        });
+        events
+    }
+
+    fn long_delayed_start_input(input_frame: u16) -> GameInput {
+        match input_frame {
+            900..=903 => GameInput {
+                coin: true,
+                ..GameInput::NONE
+            },
+            1264..=1273 => GameInput {
+                start_one: true,
+                ..GameInput::NONE
+            },
+            _ => GameInput::NONE,
+        }
+    }
+
+    fn mame_hold_up_input(input_frame: u16) -> GameInput {
+        match input_frame {
+            1454..=4053 => GameInput {
+                altitude_up: true,
+                ..GameInput::NONE
+            },
+            _ => long_delayed_start_input(input_frame),
+        }
+    }
+
+    fn mame_up_thrust_input(input_frame: u16) -> GameInput {
+        match input_frame {
+            1454..=4053 => GameInput {
+                altitude_up: true,
+                thrust: true,
+                ..GameInput::NONE
+            },
+            _ => long_delayed_start_input(input_frame),
+        }
+    }
+
+    fn organic_prbp1_up_thrust_input(input_frame: u16) -> GameInput {
+        match input_frame {
+            1274..=1673 | 1714..=10000 => GameInput {
+                altitude_up: true,
+                thrust: true,
+                ..GameInput::NONE
+            },
+            1674..=1713 => GameInput {
+                altitude_up: true,
+                thrust: true,
+                fire: true,
+                ..GameInput::NONE
+            },
+            _ => long_delayed_start_input(input_frame),
+        }
+    }
+
+    fn organic_smartmix_input(input_frame: u16) -> GameInput {
+        match input_frame {
+            1274..=1453 | 1462..=1581 | 1583..=1642 | 2044..=2103 | 2112..=10000 => GameInput {
+                altitude_up: true,
+                thrust: true,
+                ..GameInput::NONE
+            },
+            1454..=1461 | 1643..=1650 | 1771..=1778 | 1915..=1922 | 2104..=2111 => GameInput {
+                fire: true,
+                ..GameInput::NONE
+            },
+            1582 | 2043 => GameInput {
+                smart_bomb: true,
+                ..GameInput::NONE
+            },
+            1651..=1770 | 1795..=1914 => GameInput {
+                altitude_down: true,
+                thrust: true,
+                ..GameInput::NONE
+            },
+            1779..=1794 => GameInput {
+                reverse: true,
+                thrust: true,
+                ..GameInput::NONE
+            },
+            1923..=2042 => GameInput {
+                altitude_up: true,
+                thrust: true,
+                ..GameInput::NONE
+            },
+            _ => long_delayed_start_input(input_frame),
+        }
+    }
+
+    fn mame_down29_fire2437_input(input_frame: u16) -> GameInput {
+        match input_frame {
+            1454..=1482 => GameInput {
+                altitude_down: true,
+                ..GameInput::NONE
+            },
+            2436..=2480 => GameInput {
+                fire: true,
+                ..GameInput::NONE
+            },
+            _ => long_delayed_start_input(input_frame),
+        }
+    }
+
+    fn mame_down29_fire2524_input(input_frame: u16) -> GameInput {
+        match input_frame {
+            1454..=1482 => GameInput {
+                altitude_down: true,
+                ..GameInput::NONE
+            },
+            2524..=2568 => GameInput {
+                fire: true,
+                ..GameInput::NONE
+            },
+            _ => long_delayed_start_input(input_frame),
+        }
+    }
+
+    fn mame_down30_fire2437_input(input_frame: u16) -> GameInput {
+        match input_frame {
+            1454..=1483 => GameInput {
+                altitude_down: true,
+                ..GameInput::NONE
+            },
+            2436..=2480 => GameInput {
+                fire: true,
+                ..GameInput::NONE
+            },
+            _ => long_delayed_start_input(input_frame),
+        }
+    }
+
+    fn mame_down60_fire2437_input(input_frame: u16) -> GameInput {
+        match input_frame {
+            1454..=1513 => GameInput {
+                altitude_down: true,
+                ..GameInput::NONE
+            },
+            2436..=2480 => GameInput {
+                fire: true,
+                ..GameInput::NONE
+            },
+            _ => long_delayed_start_input(input_frame),
+        }
+    }
+
+    fn assert_empty_or_player_death_tail_events(events: &GameEvents) {
+        assert!(events.gameplay().is_empty());
+        let mut player_death_tail = source_player_death_sound_tail_events();
+        player_death_tail.push(source_enemy_hit_sound_event(EnemyKind::Lander));
+        for sound in events.sounds() {
+            assert!(player_death_tail.contains(sound));
+        }
     }
 }

@@ -410,7 +410,7 @@ pub struct ProjectileMotionFrame {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ProjectileMotionSystem;
 
-const SOURCE_LASER_STEP_COLUMNS: i8 = 5;
+const SOURCE_LASER_STEP_COLUMNS: i8 = 4;
 const SOURCE_RIGHT_LASER_EDGE_X: u8 = u8::MAX;
 const SOURCE_LEFT_LASER_EDGE_X: u8 = 0x00;
 
@@ -1331,43 +1331,43 @@ mod tests {
     fn projectile_motion_system_advances_directional_velocity_and_culls_screen_exit() {
         assert_eq!(
             ProjectileMotionSystem::velocity_for_direction(Direction::Right),
-            ScreenVelocity::new(5, 0)
+            ScreenVelocity::new(4, 0)
         );
         assert_eq!(
             ProjectileMotionSystem::velocity_for_direction(Direction::Left),
-            ScreenVelocity::new(-5, 0)
+            ScreenVelocity::new(-4, 0)
         );
 
         let moved = ProjectileMotionSystem::step(
             ScreenPosition::new(0x40, 0x50),
-            ScreenVelocity::new(5, 0),
+            ScreenVelocity::new(4, 0),
         );
 
-        assert_eq!(moved.position, ScreenPosition::new(0x45, 0x50));
-        assert_eq!(moved.velocity, ScreenVelocity::new(5, 0));
+        assert_eq!(moved.position, ScreenPosition::new(0x44, 0x50));
+        assert_eq!(moved.velocity, ScreenVelocity::new(4, 0));
         assert!(moved.active);
 
         let right_edge = ProjectileMotionSystem::step(
-            ScreenPosition::new(0xFA, 0x50),
-            ScreenVelocity::new(5, 0),
+            ScreenPosition::new(0xFB, 0x50),
+            ScreenVelocity::new(4, 0),
         );
         assert_eq!(right_edge.position, ScreenPosition::new(0xFF, 0x50));
         assert!(right_edge.active);
 
         let left_edge = ProjectileMotionSystem::step(
-            ScreenPosition::new(0x06, 0x50),
-            ScreenVelocity::new(-5, 0),
+            ScreenPosition::new(0x04, 0x50),
+            ScreenVelocity::new(-4, 0),
         );
-        assert_eq!(left_edge.position, ScreenPosition::new(0x01, 0x50));
+        assert_eq!(left_edge.position, ScreenPosition::new(0x00, 0x50));
         assert!(left_edge.active);
 
         let off_right = ProjectileMotionSystem::step(
             ScreenPosition::new(0xFE, 0x50),
-            ScreenVelocity::new(5, 0),
+            ScreenVelocity::new(4, 0),
         );
         let off_left = ProjectileMotionSystem::step(
             ScreenPosition::new(0x01, 0x50),
-            ScreenVelocity::new(-5, 0),
+            ScreenVelocity::new(-4, 0),
         );
 
         assert!(!off_right.active);
@@ -1611,6 +1611,7 @@ mod tests {
                         next_bonus: 10_000,
                     },
                     attract: crate::game::AttractPresentationSnapshot::for_page_frame(0),
+                    post_game_playfield: None,
                     high_score_initials: HighScoreInitialsState::EMPTY,
                     high_score_entry: None,
                     high_score_submission: None,

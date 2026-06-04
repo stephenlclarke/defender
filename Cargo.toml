@@ -18,6 +18,11 @@ name = "generate_readme_media"
 path = "examples/generate_readme_media.rs"
 required-features = ["legacy-tools"]
 
+[[example]]
+name = "generate_reference_candidate_media"
+path = "examples/generate_reference_candidate_media.rs"
+required-features = ["legacy-tools"]
+
 [dependencies]
 anyhow = "1.0"
 bytemuck = { version = "1.25.0", features = ["derive"] }

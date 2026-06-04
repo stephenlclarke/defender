@@ -8,7 +8,8 @@ use super::*;
 use crate::game::{
     PLAYER_EXPLOSION_PIECE_LIMIT, PlayerExplosionCloudSnapshot, PlayerExplosionPieceSnapshot,
     SOURCE_EXPLOSION_LIFETIME_FRAMES, SOURCE_PLAYER_EXPLOSION_COLORS,
-    SOURCE_TERRAIN_BLOW_EXPLOSIONS_PER_PASS, SOURCE_TERRAIN_BLOW_ITERATION_LIMIT,
+    SOURCE_TERRAIN_BLOW_COMPLETE_FRAME, SOURCE_TERRAIN_BLOW_EXPLOSIONS_PER_PASS,
+    SOURCE_TERRAIN_BLOW_ITERATION_LIMIT, SOURCE_TERRAIN_BLOW_START_SOUND_FRAMES,
     SOURCE_TERRAIN_BLOW_STATUS_BIT, TerrainBlowSnapshot, TerrainBlowStage,
     source_explosion_frame_index, source_player_explosion_color_index_for_pointer,
 };
@@ -749,6 +750,10 @@ impl RedLabelRuntimeMemory {
         Ok(Some(TerrainBlowSnapshot {
             stage,
             status_terrain_blown: true,
+            source_elapsed_frames: source_terrain_blow_elapsed_frames(
+                source_iteration,
+                source_sleep_remaining,
+            ),
             source_iteration,
             source_iteration_limit: SOURCE_TERRAIN_BLOW_ITERATION_LIMIT,
             source_sleep_remaining,
@@ -21109,6 +21114,17 @@ impl RedLabelRuntimeMemory {
             .ok_or_else(|| format!("red-label RAM word write 0x{address:04X} overflows"))?;
         self.write_byte(low_address, low)
     }
+}
+
+fn source_terrain_blow_elapsed_frames(source_iteration: u8, sleep_remaining: Option<u8>) -> u16 {
+    let Some(sleep_remaining) = sleep_remaining else {
+        return SOURCE_TERRAIN_BLOW_COMPLETE_FRAME;
+    };
+    let next_frame = SOURCE_TERRAIN_BLOW_START_SOUND_FRAMES
+        .get(usize::from(source_iteration))
+        .copied()
+        .unwrap_or(SOURCE_TERRAIN_BLOW_COMPLETE_FRAME);
+    next_frame.saturating_sub(u16::from(sleep_remaining))
 }
 
 #[derive(Debug, Clone, Copy)]

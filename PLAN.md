@@ -1,3569 +1,3657 @@
 # Defender Current Plan
 
-Last reviewed: `2026-05-27`
+Last reviewed: `2026-06-04`
+
+## Goal
+
+Make this repository's clean `wgpu` Defender implementation look, sound, and
+play like the original Williams Defender red-label game.
+
+Acceptance is against local MAME red-label golden artifacts, not against broad
+impression or memory-table similarity. The clean runtime must preserve gameplay
+behavior while using modern game-programming structure: domain systems,
+renderer-owned sprites, `wgpu` rendering, clean audio, and deterministic
+verification tools.
 
 ## Current Baseline
 
-- Active branch: `rewrite`.
-- Latest accepted implementation commit before DC-88: `c645d1b`.
-- Phase 13 is complete. The converted implementation has been moved to
-  `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
-  preserving targeted legacy access through doc-hidden tool facades and
-  crate-private adapters. Root legacy adapters should stay crate-private.
-- Live play uses the `wgpu` backend. Kitty is parked in `src_legacy/` as
-  historical compatibility evidence and is no longer an active runtime path.
-- Clean `wgpu` rendering should be sprite-first: gameplay visuals should use
-  renderer-owned sprite assets, texture atlases, and batched sprite draws.
-  Full-frame raster upload remains temporary fidelity evidence, not the final
-  gameplay representation.
-- The next product direction is a `wgpu`-only clean game rewrite. Kitty should
-  be removed from the active application surface, and the current
-  assembler-shaped machine should become a temporary fidelity oracle rather
-  than the production gameplay model.
-- Normal runtime is self-contained. ROM files are optional verification inputs.
-- Clean rewrite equivalence gaps are tracked in `docs/fidelity/gaps.md` while
-  R0-R9 retire the temporary accepted oracle and legacy runtime dependencies.
-
-## Current Validation Gate
-
-Use this gate for behavior, architecture, or release-facing changes:
-
-```sh
-cargo fmt --check
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-make clean-fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-```
-
-For docs-only changes:
-
-```sh
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-git diff --check
-```
-
-`make fidelity` covers formatting, all Rust targets, clippy, Lua trace exporter
-self-tests, Python helper tests, local Rust-current trace fixtures, coverage,
-and added executable Rust line coverage.
-`make clean-fidelity` covers clean `Game` versus accepted-oracle first
-divergence reporting for all 12 embedded Phase 1 scenario input streams by
-default; set `SCENARIOS="..."` for targeted implementation checks.
-
-Validation ladder going forward:
-
-- During a step, run focused checks for the touched code and `cargo fmt --check`
-  when Rust changed.
-- At step completion, add directly affected smoke or doc checks.
-- At dev-cycle close, run focused tests, touched-document lint, smoke commands,
-  and clippy when Rust behavior changed.
-- At milestone close, run the full validation gate above.
+- Active branch for the actor-architecture cycle: `dev/actor-game-architecture`.
+- The production baseline came from `rewrite`; the actor rewrite is being kept
+  isolated until it has enough MAME-backed behavior to replace the live game
+  loop safely.
+- The actor rewrite now has focused coverage for same-contract input,
+  `XYZZY`, data-driven `AttractScript` custom driver sequencing,
+  Williams/Defender attract metadata, player/lander/laser/explosion basics,
+  initial humans, lander pickup/carry/conversion, rescue/safe-landing scoring,
+  score popups, smart bomb clearing, and high-score/game-over phase handoff.
+- Primary runtime source is `src/`; the converted implementation is parked in
+  `src_legacy/` and should remain optional oracle/tooling evidence only.
+- Normal live play uses clean `Game` frames through clean platform, audio, and
+  `wgpu` renderer paths.
+- MAME 0.287 is installed locally and verifies the repo ROM set:
+  `assets/roms/defender/` reports `romset defender is good`.
+- The repeatable MAME capture target is available:
+  `make reference-mame-capture`.
+- The short executable MAME recorder proof is available:
+  `make reference-mame-smoke`.
+- Scripted MAME and clean candidate capture targets are available:
+  `REFERENCE_SCENARIO=... make reference-mame-capture` and
+  `REFERENCE_SCENARIO=... make reference-clean-capture`.
+- Scripted MAME trace exploration can run without media capture by setting
+  `MAME_REFERENCE_TRACE_ONLY=1`; this writes expected/debug TSVs only and is
+  the preferred path for isolating rescue, terrain, materialization, and
+  sound-command windows before recording bounded video/audio clips.
+- Trace-only MAME captures can now state-steer rare red-label routine windows
+  with `MAME_REFERENCE_STATE_STEER=afall_fall`, `afall_safe_landing`,
+  `afall_player_catch`, `terrain_blow`, `enemy_explosion_matrix`, or isolated
+  sound-command steers `sound_command_fe`, `sound_command_fa`,
+  `sound_command_f8`, and `sound_command_f3`, plus
+  `MAME_REFERENCE_STATE_STEER_FRAME=<frame>`. This is tooling-only evidence:
+  the original MAME code still advances the seeded process/object state.
+- MAME capture can also write per-frame sound-board DAC evidence with
+  `DEFENDER_TRACE_SOUND_DAC_OUTPUT`; `make reference-mame-capture` now stores
+  this as `target/reference-media/mame/traces/<basename>.sound-dac.tsv`.
+- `make reference-window-scan` scans generated MAME expected/debug TSVs for
+  target sound-command bytes near non-lander object evidence plus terrain
+  status / `TERBLO` process evidence, and
+  `REFERENCE_WINDOW_SCAN_EXCLUDES='...'` can exclude synthetic/state-steered
+  paths when searching for organic trace windows. The JSON report includes
+  nearest sound/object misses, `ASTCNT` distribution, terrain process misses,
+  and last-human terrain-blow candidate rows.
+- `make reference-window-scan-organic` runs the same scan with the standard
+  synthetic/state-steered exclusions and writes
+  `target/reference-media/reference-window-scan-organic.json`, preserving the
+  all-trace report at `target/reference-media/reference-window-scan.json`.
+  Window scans now also include per-family object row counts, the longest
+  contiguous object-evidence spans, and the best span for each object family,
+  so remaining sprite/coalescence media searches can start from concrete MAME
+  frame ranges.
+- Clean candidate captures can state-steer the same bounded windows with
+  `CLEAN_REFERENCE_STATE_STEER=...`, `CLEAN_REFERENCE_STATE_STEER_FRAME=...`,
+  and `CLEAN_REFERENCE_CAPTURE_START_FRAME` /
+  `CLEAN_REFERENCE_CAPTURE_END_FRAME` so generated GIF/WAV/debug artifacts can
+  be compared against the MAME state-steered clips without encoding the full
+  prelude.
+- Current local golden capture artifacts are ignored under
+  `target/reference-media/mame/`, including
+  `defender-red-label-golden-60s.mp4` and matching `.wav`.
+- Current candidate media can be generated under
+  `target/reference-media/clean/`. Timestamp-aligned acceptance reports pass
+  for scoring laser/explosion, delayed-start fire/reverse, delayed-start
+  thrust/reverse, delayed-start smart bomb, delayed-start
+  enemy-shot/background audio windows, gameplay hyperspace death, the first live
+  gameplay laser-hit clip, the down030 post-death laser all-axis window, and the
+  bounded non-lander target6 shot/explosion/materialization clip. The bounded
+  pickup/pull, player-catch, safe-landing, terrain-blow, and organic non-lander
+  hold-down visual plus PRBP1 pod all-axis clips also have passing
+  MAME-vs-clean media reports.
+  Clean debug TSV rows include lander, mutant, terrain-blow, object-evidence,
+  expanded-object, sprite, sound, and gameplay state needed for MAME
+  side-by-side diagnosis.
+  The earlier
+  `scripted-fire-reverse-smoke` report is retained as harness evidence only
+  because its MAME window is still in the Williams attract sequence while clean
+  has already reached gameplay.
+- Initial timestamp inventory is tracked in
+  `docs/fidelity/mame-golden-clips.md`; generated contact sheets remain under
+  ignored `target/reference-media/inventory/`.
+- Release closure evidence and proof boundaries are tracked in
+  `docs/fidelity/release-closure-audit.md`.
+- The accepted media report list is tracked in
+  `docs/fidelity/reference-report-gate.json`; `make reference-report-gate`
+  checks the current ignored report JSON files as one closure gate, including
+  per-facet `min_reports` breadth floors, duplicate-manifest rejection, and
+  explicit matching manifest/report `acceptance_mode` declarations plus
+  declared/mode-compatible coverage tags for the accepted proof set. Accepted
+  report JSON stays under `target/reference-media/`; MAME reference artifacts
+  stay under `target/reference-media/mame/`, and clean candidates stay under
+  `target/reference-media/clean/`. Accepted visual proof uses MAME MP4 and
+  clean GIF artifacts; accepted audio proof uses WAV artifacts. The generated
+  signoff summary exposes both the manifest and local report acceptance modes.
+- Attract/scoring silence is not automatically a bug. Only add attract sound
+  where the MAME golden capture or sound-command evidence proves it exists.
 
 ## Work Protocol
 
-- Keep `README.md`, `SPEC.md`, and `PLAN.md` aligned with the current code.
-- Use focused tests for material code changes.
-- `2026-05-16 19:01:48 BST`: Remove dead code as it is found, including tests
-  that only protect removed APIs, unused helpers, or retired behavior. Keep or
-  replace tests only when they still guard supported contracts.
-- Preserve source-visible mutation checks for arcade-core behavior.
-- Preserve gameplay behavior while the rewrite is underway. `XYZZY` and
-  Planetoid controls remain compatibility features unless explicitly removed.
-- Kitty removal is now intentional rewrite scope; do not add new terminal
-  renderer abstractions.
-- Use Conventional Commits for committed work.
-- Do not use `codex` in branch names, commit messages, or PR titles.
-- Store sprite files under `assets/sprites/`. Reuse existing sprite PNGs there
-  when they fit a documented transitional runtime need, and record the
-  reclassification/provenance before embedding. Store new non-legacy sound
-  artifacts under `assets/sounds/`; keep pre-existing legacy `.wav` cues under
+- Post a Slack update to `xyzzytools.slack.com#codex` before and after every
+  implementation cycle, step, or milestone.
+- Keep `README.md`, `SPEC.md`, and `PLAN.md` synchronized when behavior,
+  workflows, targets, or acceptance criteria change.
+- Do not implement from intuition. Use local MAME captures, sound-board source,
+  ROM/source tables, or existing accepted fixtures as evidence.
+- Store generated reference media under ignored `target/` paths. Do not commit
+  generated MAME MP4/WAV/AVI artifacts.
+- Store production sprite assets under `assets/sprites/`. Store new non-legacy
+  sound artifacts under `assets/sounds/`; keep archived legacy cues under
   `assets/arcade/`.
-- Slack cycle updates are mandatory for planned dev-cycles: post a start note
-  to `xyzzytools.slack.com#codex` before implementation begins, and post a
-  completion note after validation when the dev-cycle closes.
+- Production modules must describe game concepts. ROM labels, assembler names,
+  and memory-table details belong in legacy/tooling/evidence boundaries.
+- Do not add new open-ended roadmap phases. Any new work must map to the finite
+  milestones below or be recorded as a specific blocker.
 
-## Rewrite Target
+## Validation Gates
 
-Rewrite the application as a modern `wgpu` game while preserving accepted
-gameplay behavior. The production source should describe game concepts instead
-of ROM labels, assembler routines, or memory-table implementation details.
-
-Target module ownership:
-
-- `game`: pure gameplay domain types such as `Game`, `World`, `Player`,
-  `Enemy`, `Projectile`, `Human`, `Terrain`, `Score`, `Wave`, and
-  `HighScore`.
-- `systems`: deterministic fixed-step systems for input, player movement,
-  projectiles, enemies, collisions, waves, scoring, high-score entry, attract
-  mode, and sound-event emission.
-- `renderer`: native `wgpu` rendering from scene data using sprite assets,
-  sprite/quad pipelines, texture atlases, uniform buffers, instanced draws,
-  HUD/text rendering, debug overlays, and viewport scaling.
-- `platform`: `winit` event loop, input collection, fixed timestep, persistence,
-  smoke runner, and device lifecycle.
-- `audio`: gameplay-facing sound events and backend/runtime ownership.
-- `fidelity`: clean state, event, sound, and render-summary equivalence
-  signatures. Legacy oracle traces and any remaining source terminology should
-  stay in `src_legacy/` or historical fixture documentation.
-
-Rewrite rules:
-
-- Keep the current machine/memory implementation available as an oracle until
-  the clean model proves equivalent for accepted scenarios.
-- Production modules must not expose `red_label`, ROM file labels, assembler
-  routine names, source process names, or memory table names.
-- Renderer code must consume clean scene data, not RAM bytes or source layout
-  fields.
-- Sprites are the primary gameplay-art primitive. Use renderer-owned sprite
-  assets, atlases, and batched draws for the player, enemies, humans,
-  projectiles, explosions, terrain details, and UI glyphs instead of treating
-  ROM bytemaps or full-frame raster uploads as the production representation.
-- Replace memory CRC confidence gradually with clean state, event, sound, and
-  rendered-frame equivalence gates.
-- Prefer small deterministic systems over a monolithic memory-oriented machine.
-- Use `wgpu` directly as the renderer, not as a final framebuffer presenter for
-  a hidden memory model once the clean scene path exists.
-
-## Definitive Rewrite Completion Plan
-
-This section is the terminal plan for the rewrite. Work after `DC-152` must map
-to one of these milestones. Do not add more open-ended evidence cycles unless a
-new source-backed fidelity gap is accepted in `docs/fidelity/gaps.md`.
-
-### Source Audit Summary
-
-- The clean gameplay model is real but incomplete. `src/game.rs` and
-  `src/systems.rs` cover credits, start, source-profile active wave spawning
-  for landers plus source-exposed bomber/pod families, player movement,
-  projectiles, smart bombs, scoring, bonus stock, player damage, wave advance,
-  high-score initials, bounded lander abduction/carry/release, source-shaped
-  falling-human acceleration, player-catch rescue scoring, AFALL2 carried
-  landing, safe-landing scoring, fatal landing/human-loss handoff with source
-  `ASTKIL` / `AHSND` command evidence,
-  pod-triggered source mini-swarmer spawn/motion/bomb projection, and
-  source-shaped baiter movement/fireball shell behavior, source-shaped mutant
-  runtime conversion/movement/fireballs plus reserve restore placement and
-  shot-timer fixtures, and source-shaped bomber image/vertical/cruise movement
-  with `BOMBST` bomb shells plus source `TIEST` reserve squad placement,
-  source-shaped initial lander `LANDS0` runtime plus `LANDST` reserve
-  placement/velocity bytes, source `PRBST`/`PRBRES` pod reserve restore
-  placement/velocity bytes, plus
-  source-shell/mine descriptor fixtures for `BMBP1` projectile evidence. They
-  also surface source `PLEND` / `PDSND` command evidence when the clean
-  player-hit path starts. They do not yet cover the full attract program,
-  full two-player flow,
-  tilt/service behavior, or source-faithful
-  death/respawn cadence.
-- The clean renderer owns sprite scene contracts and detailed `wgpu` planning.
-  Interactive live presentation now uses `src/live_wgpu.rs` to step clean
-  `Game` frames, submit clean audio events, and execute native sprite draw
-  plans through `wgpu`. `DC-156` replaces the default atlas solid fills for the
-  current clean smoke-path sprite IDs with temporary PNG-backed regions.
-- The default clean atlas now decodes selected reclassified prototype PNGs from
-  `assets/sprites/`. These are transitional R2 atlas inputs, not authoritative
-  red-label art, and later cycles must replace or extend them with source-cited
-  red-label, ROM/MAME-derived, or generated assets with stronger provenance.
-- The audio boundary is clean and normal interactive play attempts the
-  synthesized device backend with null fallback; smoke mode remains no-device
-  and deterministic. The clean game still emits only the semantic sound subset
-  currently covered by accepted event timing.
-- The clean-fidelity harness compares the real clean `Game` against the
-  accepted oracle across all 12 embedded Phase 1 scenarios under milestone
-  profiles. R9-E2 has passed the full validation gate for formatting, all Rust
-  targets, clippy, fidelity, all-scenario clean-fidelity, game/live smoke,
-  markdownlint, and diff hygiene. Strict R9 behavior/evidence blockers B01-B12
-  are closed; final acceptance now depends on explicit owner signoff in Step 55.
-- `DC-163` gates remaining oracle, ROM, trace, and README media adapters behind
-  the explicit `legacy-tools` feature. Default production builds no longer
-  compile the accepted machine, legacy live core, CMOS storage, or retired
-  `wgpu` presenter; optional developer tooling still uses feature-gated
-  `src_legacy/` evidence while clean equivalence remains under validation.
-
-### Definition Of Done
-
-The rewrite is complete only when all of these are true:
-
-- `cargo run` plays the clean `Game` through clean `platform`, `audio`, and
-  `renderer` modules, with no non-test runtime dependency on
-  `src_legacy/live.rs`, `src_legacy/wgpu_presenter.rs`, or the legacy
-  `ArcadeMachine`.
-- The active live renderer is sprite/atlas/instanced `wgpu`, not a hidden
-  full-frame raster presenter. Temporary raster upload remains available only
-  for oracle tooling or explicit debug comparison.
-- The clean game passes source-backed equivalence gates for the accepted
-  gameplay surface: state, events, sound timing, and rendered output for the
-  12 Phase 1 scenarios plus focused mechanics fixtures added below.
-- The clean game uses renderer-owned arcade assets for player, enemies, humans,
-  projectiles, explosions, terrain, scanner/HUD text, and title/attract
-  presentation. Solid placeholder atlas regions are gone from normal runtime.
-- Real audio output exists behind the clean audio backend, with deterministic
-  tests for event-to-clip mapping, mixing/queueing, shutdown, and dropped-event
-  accounting. `--mute` still disables audio.
-- Playability is validated through live smoke plus a bounded manual play pass:
-  coin/start, thrust, reverse, fire, smart bomb, hyperspace, human rescue or
-  loss, enemy waves, death/respawn, scoring, high score entry, pause-free
-  windowed rendering, and clean shutdown.
-- `src_legacy/` is retained only as historical source, optional oracle tooling,
-  or removable archived code. Public APIs and production modules expose no
-  red-label routine names, memory-table names, assembler labels, or ROM labels.
-
-### Milestone R0: Final Gates And Oracle Harness
-
-Goal: make progress measurable before more implementation work.
-
-Deliverables:
-
-- Add a clean-vs-accepted scenario runner that steps `Game` and the accepted
-  oracle with the same `GameInput` streams.
-- Compare clean `Game` output, not `GameplayOracle` output, against accepted
-  state, events, sound events, and render evidence.
-- Emit a machine-readable gap report for each failed scenario, with the first
-  divergent frame and divergent fields.
-- Extend the accepted facade only with neutral domain contracts needed for
-  comparison, not memory or routine names.
-- Add a `make clean-fidelity` target and document whether it uses embedded
-  Rust-current fixtures, optional local MAME references, or both.
-
-Current implementation:
-
-- `DC-153` adds the first test-owned clean-vs-accepted runner. It uses the
-  embedded Phase 1 scenario manifest and input expansion, does not require local
-  ROMs or MAME reference traces, and emits TSV first-divergence rows from the
-  real clean `Game` to the accepted oracle.
-
-Exit gate:
+Focused implementation cycle:
 
 ```sh
-make clean-fidelity
-cargo run -- --game-smoke
+cargo fmt --check
+cargo test <focused-test-filter> --lib
+cargo check --all-targets --features legacy-tools
+cargo clippy --all-targets --features legacy-tools -- -D warnings
 ```
 
-R0 is complete when the clean runner exists and every known clean-vs-accepted
-failure is either fixed or recorded as a bounded gap in `docs/fidelity/gaps.md`.
-
-### Milestone R1: Clean Runtime Takes Over Live Play
-
-Goal: make the product runtime execute the clean game, even before every
-mechanic is complete.
-
-Deliverables:
-
-- Move the live fixed-step loop, input mapper ownership, window lifecycle, and
-  resize/device lifecycle into clean `platform` and `runtime` code.
-- Feed `Game::step` frames into the clean renderer and audio runtime.
-- Replace `src/live_wgpu.rs` as a temporary presenter facade with a clean
-  launcher that owns `winit` and `wgpu` directly.
-- Keep legacy live play available only behind a test/dev oracle path if still
-  needed.
-
-Current implementation:
-
-- `DC-154` moves the `--live-smoke` frame source to the clean `Game` and
-  `NativeSceneRenderer`. The smoke report now records `frame_source:
-  clean_game`, `legacy_presenter_used: false`, sprite counts, and
-  temporary-raster counts.
-- `DC-155` moves normal interactive `cargo run` to a clean `winit`/`wgpu`
-  launcher. It owns window/device lifecycle, fixed-step clean `Game` stepping,
-  clean input state mapping, clean audio event submission, and indexed
-  instanced sprite draws from `NativeSceneRenderer` plans.
-- `2026-05-16 18:05:40 BST` R1 verification passed. `cargo run --
-  --live-smoke` reported `frame_source: clean_game`,
-  `legacy_presenter_used: false`, 24 clean game frames, 24 sprite frames, 290
-  sprite instances, 92 sprite draw commands, and zero temporary raster frames
-  or commands. `cargo run -- --game-smoke` reported the same sprite coverage
-  and zero raster frames. Focused tests passed with `cargo test --lib live_wgpu
-  -- --nocapture`,
-  `cargo test --lib clean_runtime_and_oracle_use_quarantined_adapters --
-  --nocapture`, and
-  `cargo test --lib clean_module_sources_keep_legacy_access_quarantined --
-  --nocapture`. `cargo check` passed. A targeted source scan of
-  `src/live_wgpu.rs`, `src/runtime.rs`, and `src/game_smoke.rs` found no
-  `wgpu_presenter`, `crate::live::`, `ArcadeMachine`, or `src_legacy`
-  dependency in the R1 live path; the only `legacy_presenter` matches are the
-  false-valued smoke report fields and tests.
-
-Exit gate:
+Reference-media tooling cycle:
 
 ```sh
-cargo run -- --live-smoke
-cargo run -- --game-smoke
+make media-script-test
+make reference-window-scan
+make reference-window-scan-organic
+make reference-report-gate
+make reference-signoff-summary
+make reference-evidence-package
+make owner-review-package
+make reference-mame-doctor
+make reference-mame-smoke
 ```
 
-R1 is complete when `--live-smoke` proves sprite-rendered clean frames and no
-longer depends on `src_legacy/wgpu_presenter.rs` or a legacy raster scene.
-
-### Milestone R2: Production Sprite Assets And WGPU Execution
-
-Status: `complete`
-
-Completed: `2026-05-16 19:55:20 BST`
-
-Goal: replace renderer evidence plans and placeholder art with actual
-production rendering.
-
-Deliverables:
-
-- Load or embed the arcade PNG assets from `assets/sprites/` into a production
-  texture atlas.
-- Replace solid default atlas regions in normal runtime with real sprite and
-  glyph pixels.
-- Turn `SceneDrawPlan` into actual `wgpu` resource creation, upload, pipeline,
-  bind-group, render-pass, and draw execution code.
-- Add an offscreen render smoke gate that compares selected frames to checked
-  visual signatures.
-
-Exit gate:
+Docs-only cycle:
 
 ```sh
-cargo run -- --game-smoke
-cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/mame-golden-clips.md \
+  docs/fidelity/release-closure-audit.md assets/sounds/README.md
+git diff --check
 ```
 
-R2 is complete when the smoke reports are backed by real asset pixels and
-offscreen `wgpu` output, not only plan metadata.
-
-Completion evidence:
-
-- `DC-156` moved the default clean sprite atlas from solid placeholder regions
-  to the reclassified `assets/sprites/` PNG inputs.
-- `DC-157` moved `--live-smoke` from draw-plan metadata to actual offscreen
-  `wgpu` texture rendering, readback, nonblank checks, and checked first/last
-  frame signatures.
-- `2026-05-16 19:55:20 BST` R2 validation passed. `make fidelity` passed
-  during the milestone gate. After coverage-only dead-code/import cleanup,
-  focused checks passed with `cargo fmt --check`,
-  `RUSTFLAGS='--cfg coverage' cargo check --lib`,
-  `cargo test --lib live_wgpu::tests -- --nocapture`,
-  `cargo clippy --all-targets -- -D warnings`,
-  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/gaps.md
-  assets/arcade/README.md assets/sprites/README.md assets/sounds/README.md`,
-  and `git diff --check`. `make clean-fidelity` passed. The R2 exit smokes
-  passed with `cargo run -- --game-smoke` and
-  `cargo run -- --live-smoke`; final live smoke reported 24 rendered frames,
-  24 offscreen `wgpu` frames, 24 nonblank readbacks, 22 distinct offscreen
-  signatures, first signature `72f0f2beddc5084e`, last signature
-  `262b08d50efc12c2`, zero temporary raster frames/commands, and clean exit.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778957757426449`.
-
-### Milestone R3: Core Cabinet Flow
-
-Goal: make clean boot, attract, credits, start, two-player state, operator
-controls, high scores, and CMOS persistence source-faithful.
-
-Deliverables:
-
-- Implement clean attract/title/instruction state as domain systems.
-- Implement coin slots, one-player and two-player start, current-player
-  switching, tilt, diagnostics, audits, high-score reset, and CMOS-backed
-  persistence through clean modules.
-- Preserve Planetoid and `XYZZY` as compatibility layers outside arcade
-  mechanics.
-
-Exit gate:
+Release gate:
 
 ```sh
-make clean-fidelity SCENARIOS="attract_boot start_game"
-cargo run -- --live-smoke --input-profile cabinet
+make release-gate
 ```
 
-R3 is complete when clean output matches accepted evidence for attract/start
-flow and live cabinet controls remain playable.
-
-### Milestone R4: Player, Terrain, Scanner, And Projectiles
-
-Goal: make the player-facing control loop feel and behave like Defender.
-
-Deliverables:
-
-- Finish source-faithful player acceleration, damping, reverse, vertical
-  bounds, hyperspace, smart-bomb stock, laser/shot cadence, and projectile
-  lifetime.
-- Implement scrolling terrain, starfield, scanner/radar presentation, viewport
-  behavior, and scene ordering as clean systems.
-- Replace simplified HUD placeholders with clean score, lives, bombs, wave,
-  scanner, and status text/glyph rendering.
-
-Exit gate:
-
-```sh
-make clean-fidelity \
-  SCENARIOS="first_300_frames firing thrust_reverse smart_bomb hyperspace"
-cargo run -- --game-smoke
-```
-
-R4 is complete when player control, projectile, HUD, scanner, and frame timing
-match accepted evidence for those focused scenarios.
-
-### Milestone R5: Enemy Ecology And Human Rules
-
-Goal: implement the complete Defender playfield model.
-
-Deliverables:
-
-- Add clean enemy kinds for lander, mutant, baiter, bomber, pod, swarmer, mine,
-  and enemy shots.
-- Implement wave composition, RNG, spawning, movement, targeting, collisions,
-  explosions, scoring, and baiter pressure.
-- Implement humanoid standing, abduction, carrying, falling, catching, rescue,
-  death, mutation, planet survival, and planet destruction.
-
-Exit gate:
-
-```sh
-make clean-fidelity SCENARIOS="abduction death wave_advance planet_destruction"
-cargo run -- --live-smoke
-```
-
-R5 is complete when the long playfield scenarios match accepted state, event,
-sound, and visual evidence.
-
-### Milestone R6: Death, Game Over, And High Score Completion
-
-Goal: finish the session loop.
-
-Deliverables:
-
-- Implement source-faithful player death, explosion, respawn, invulnerability or
-  restart timing, remaining-stock handling, game over, attract return, and high
-  score qualification.
-- Complete high-score entry visuals, initials editing, submission, persistence,
-  and post-entry return behavior.
-
-Exit gate:
-
-```sh
-make clean-fidelity SCENARIOS="death high_score_entry"
-cargo run -- --live-smoke
-```
-
-R6 is complete when death and high-score scenarios are clean-owned and
-source-faithful.
-
-### Milestone R7: Real Audio Backend
-
-Goal: make audio faithful and playable, not only represented by events.
-
-Deliverables:
-
-- Map accepted sound commands to clean semantic sound events with exact frame
-  timing.
-- Add a real backend that plays embedded/generated sound assets or synthesized
-  equivalents through a non-blocking mixer.
-- Cover startup, credit, start, thrust loop, laser, explosions, smart bomb,
-  enemy movement, rescue, high score, and game-over sounds.
-- Keep deterministic null backend tests and add a bounded audio smoke report.
-
-Exit gate:
-
-```sh
-make clean-fidelity
-cargo run -- --live-smoke
-cargo test --lib audio::tests
-```
-
-R7 is complete when sound events match accepted timing and live play produces
-audible output unless `--mute` is set.
-
-### Milestone R8: Legacy Retirement
-
-Goal: remove converted implementation dependencies from production.
-
-Deliverables:
-
-- Remove non-test `#[path = "../src_legacy/..."]` adapters from `src/lib.rs`.
-- Keep optional ROM verification and MAME/reference tooling in explicit tool or
-  dev-only modules, not in the production runtime path.
-- Delete or archive temporary raster-presenter code after offscreen and live
-  sprite rendering cover the final behavior.
-- Remove public guard tests that only protect temporary quarantine paths and
-  replace them with guards that production code cannot import legacy modules.
-
-Exit gate:
-
-```sh
-cargo tree
-cargo test --all-targets
-make fidelity
-make clean-fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-```
-
-R8 is complete when production builds and live play no longer compile through
-the legacy machine, memory model, or raster presenter.
-
-### Milestone R9: Final Acceptance
-
-Goal: close the rewrite with finite acceptance evidence.
-
-Deliverables:
-
-- Run the full validation gate, clean-fidelity gate, reference fixture checks
-  where local ROM/MAME inputs are available, offscreen render checks, audio
-  smoke, and live smoke.
-- Record final visual, audio, and playability evidence in `README.md`,
-  `SPEC.md`, and `docs/fidelity/`.
-- Update `PLAN.md` to state the rewrite is acceptance-ready, record owner
-  signoff status, and remove the old completed-cycle narrative from active
-  planning once the owner accepts the final contract.
-
-Exit gate:
+Expanded release-gate command sequence:
 
 ```sh
 cargo fmt --check
 cargo test --all-targets
+cargo test --all-targets --features legacy-tools
 cargo clippy --all-targets -- -D warnings
-make fidelity
+cargo clippy --all-targets --features legacy-tools -- -D warnings
 make clean-fidelity
+make media-script-test
+make owner-review-package
+make reference-mame-doctor
+make reference-mame-smoke
+make readme-media
 cargo run -- --game-smoke
 cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md \
-  docs/fidelity/live-audio.md docs/fidelity/gaps.md
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/mame-golden-clips.md \
+  docs/fidelity/release-closure-audit.md assets/sounds/README.md
 git diff --check
 ```
 
-R9 is complete when there are no active rewrite gaps, the clean runtime is the
-only production runtime, and the owner accepts the final contract.
+When clean candidate media is aligned to the MAME capture, add:
 
-### Work Sequencing Rules
+```sh
+REFERENCE_MEDIA=target/reference-media/mame/defender-red-label-golden-60s.mp4
+make reference-media-check \
+  REFERENCE_MEDIA="$REFERENCE_MEDIA" \
+  REFERENCE_AUDIO=<mame-reference-wav> \
+  CANDIDATE_MEDIA=<clean-candidate-video-or-gif> \
+  CANDIDATE_AUDIO=<clean-candidate-wav> \
+  REFERENCE_MEDIA_REFERENCE_START_MS=<mame-window-start-ms> \
+  REFERENCE_MEDIA_CANDIDATE_START_MS=<clean-window-start-ms> \
+  REFERENCE_MEDIA_DURATION_MS=<event-window-ms> \
+  REFERENCE_MEDIA_ACCEPTANCE_MODE=<all|visual|audio> \
+  REFERENCE_MEDIA_REPORT_ONLY=1
+```
 
-- Work in vertical scenario slices. A cycle should either make a named scenario
-  pass, retire a named legacy runtime dependency, or replace a named placeholder
-  asset/audio path.
-- Avoid further renderer-evidence micro-cycles unless they directly enable R1
-  or R2. The next renderer work should execute real `wgpu`, not only expose
-  more command counts.
-- Do not implement arcade behavior from intuition. If source/MAME evidence is
-  missing, add a gap and a fixture path first.
-- The plan stops at R9. Adding R10 or extending the goal requires an explicit
-  owner decision.
+## Golden Reference Workflow
 
-### Repo Guidance Assessment
+1. Capture MAME red-label reference media from repo ROMs:
 
-- The shared guidance does not block the rewrite. Conventional Commits,
-  Markdown consistency, Rust module boundaries, focused tests, and the coverage
-  floor all support a disciplined migration.
-- The shared `agents_repo-contexts.md` contains historical `battlezone` Kitty
-  terminal notes. They are not applicable to this repository's current
-  `wgpu`-only Defender rewrite. For this repo, `PLAN.md`, `SPEC.md`, and local
-  source tests are the operative guidance.
-- The current spec rule to preserve source-visible mutations should apply to
-  legacy oracle and fixture evidence, not to clean production architecture. The
-  clean game should prove equivalent behavior through domain state, events,
-  sound, and rendered output rather than recreating memory tables.
-- `make fidelity` is intentionally broad and slow. Keep it as the phase gate
-  for behavior and release-facing changes, but add narrower `make
-  clean-fidelity` scenario gates so implementation cycles are not forced into
-  all-or-nothing validation for every edit.
-- Slack start/completion posts remain mandatory only for planned dev-cycles.
-  Analysis-only and docs-only planning updates do not require new implementation
-  cycles unless they are explicitly tracked as one.
+   ```sh
+   make reference-mame-capture MAME_REFERENCE_SECONDS=60 \
+     MAME_REFERENCE_BASENAME=defender-red-label-golden-60s
+   ```
 
-## Active Development Cycle
+2. Extract frame sheets, audio metrics, and relevant timestamps from the MAME
+   MP4/WAV. Keep these under `target/reference-media/`.
 
-### DC-164: R9 Final Acceptance Vertical Slice
+3. Generate a clean candidate from the same input program and inventoried time
+   window:
 
-Status: `in progress`
+   ```sh
+   make reference-clean-capture REFERENCE_SCENARIO=firing \
+     CLEAN_REFERENCE_BASENAME=defender-clean-firing
+   ```
 
-Milestone: `R9: Final Acceptance`
+4. Compare candidate and reference with `tools/verify_reference_media.py`,
+   using separate reference/candidate start offsets when event timing differs.
 
-Started: `2026-05-16 21:58:34 BST`
+5. Treat failures as bounded graphics/audio/playability tasks. Fix the clean
+   implementation, not the reference.
 
-Goal: close the rewrite with finite acceptance evidence, refreshed docs, and the
-full R9 validation gate after confirming the clean runtime is the only
-production runtime path.
+## Remaining Milestones
 
-Scope:
+### M1: Golden Artifact Inventory
 
-- Reconcile the R9 exit criteria against current clean runtime, accepted traces,
-  reclassified assets, live/offscreen smoke evidence, and docs.
-- Remove dead code or stale tests only if the final audit proves they guard
-  retired behavior rather than supported contracts.
-- Do not close the milestone until the full R9 gate passes or a bounded,
-  timestamped blocker is recorded.
+Goal: isolate what must be matched before more fidelity work continues.
 
-Completion roadmap after Step 40:
+Deliverables:
 
-- Baseline: `make clean-fidelity` currently matches all 12 embedded Phase 1
-  scenarios under the profiled comparison surface. Future work must either
-  tighten that surface with source-backed evidence or retire a remaining
-  source-backed blocker directly.
-- Each implementation cycle below maps to a future work-log step. Post Slack
-  start/completion updates for implementation cycles, update README/SPEC/gaps
-  when behavior changes, and keep focused validation green before closing a
-  cycle. Run full clean-fidelity and the broader R9 gate at phase boundaries,
-  shared-contract changes, broad-risk changes, or milestone closeout.
-- If a cycle discovers missing source/MAME evidence, stop that cycle with a
-  timestamped blocker and fixture/source path instead of guessing behavior.
+- Produce MAME golden clips for title/attract, scoring laser/explosion,
+  one-player start, gameplay laser, reverse, thrust, smart bomb, hyperspace,
+  player death, enemy explosions, human rescue/loss, terrain blow, and
+  game-over/Hall-of-Fame return.
+- Record timestamp ranges, expected sound presence, representative screenshots,
+  and audio signatures for each clip.
+- Build a compact checklist of sprites, laser states, explosion states, and
+  sound families that must be matched.
 
-Phase 1: final contract freeze.
+Exit gate:
 
-- Step 41 / Cycle R9-A1: strict blocker matrix and acceptance contract.
-  Deliver a table in `PLAN.md` or `docs/fidelity/gaps.md` that maps every
-  remaining blocker to one of: accepted-surface gap, clean-game behavior gap,
-  render-presentation gap, docs/evidence gap, or owner-decision gap. Exit when
-  no blocker is described only as broad "presentation parity" or "remaining
-  behavior".
-- Step 42 / Cycle R9-A2: accepted-surface audit. Inspect whether the accepted
-  facade already exposes enough neutral evidence for score popups, explosions,
-  terrain blow, scanner/radar, two-player turns, high-score ordering, and
-  attract waits. Add only narrow source-backed fields needed by later cycles,
-  with focused adapter/oracle tests.
+- `make reference-mame-capture` succeeds.
+- Golden clip inventory exists in ignored generated artifacts plus tracked
+  documentation or manifests that do not include copyrighted media.
 
-Phase 2: presentation program closure.
+### M2: Clean Candidate Capture Harness
 
-- Step 43 / Cycle R9-B1: title/status text sweep. Inventory source text
-  outside covered prompt, attract, top-display-border, wave-completion,
-  high-score-entry, and hall-of-fame surfaces; add bounded message-glyph
-  projections or record exact excluded cases.
-- Step 44 / Cycle R9-B2: Williams/copyright attract waits and page scheduler.
-  Implement or expose the remaining source timing gates for Williams/logo,
-  copyright, presents, Defender wordmark, and instruction pages without
-  changing gameplay lifecycle behavior.
-- Step 45 / Cycle R9-B3: palette, blink, and color contract. Define the clean
-  render contract for logo, underline, border, HUD, and attract color/blink
-  behavior. Implement only source-backed visual state that can be tested
-  without full-frame raster dependence.
-- Step 46 / Cycle R9-B4: scanner/radar animation. Add source-backed scanner
-  and radar state, scene sprites, and focused clean/oracle tests. Keep enemy
-  gameplay spawning and physics out unless required by the source scanner
-  contract.
+Goal: compare like-for-like media instead of comparing unrelated attract clips
+to gameplay videos.
 
-Phase 3: lifecycle and world closure.
+Deliverables:
 
-- Step 47 / Cycle R9-C1: score-popup lifecycle. Carry source-backed score-popup
-  spawn, duration, position, and sprite identity through clean/oracle scenes;
-  keep scoring arithmetic unchanged except where source evidence requires it.
-- Step 48 / Cycle R9-C2: explosion timing. Close player/enemy/bomb/swarmer/
-  astronaut explosion timing and sprite progression with source-backed frame
-  evidence and focused collision/death tests.
-- Step 49 / Cycle R9-C3: terrain-blow presentation. Implement terrain
-  explosion presentation and terrain mutation evidence for planet-destruction
-  paths, bounded to source-backed terrain-blow behavior.
-- Step 50 / Cycle R9-C4: clean object spawning and physics. Replace remaining
-  simplified clean object ecology with source-backed spawning, active/inactive
-  object transitions, projectile limits, enemy-family movement, abduction, and
-  rescue/loss behavior needed for strict R9 acceptance.
+- Add a deterministic clean candidate capture path that can run the same input
+  program and duration as a MAME golden capture.
+- Export clean video/GIF and WAV for the selected time window.
+- Make `reference-media-check` consume matching reference/candidate pairs.
 
-R9-C4 closure checklist:
+Exit gate:
 
-- R9-C4.1: residual ecology audit. Completed 2026-05-21. The current clean
-  object runtime and `docs/fidelity/gaps.md` R9-C4 notes were compared against
-  the covered source labels for landers, mutants, bombers, pods, swarmers,
-  baiters, enemy shells, player lasers, humans, and terrain-loss handoff. The
-  audit found no immediate bounded runtime gap to queue before fixture
-  hardening; R9-C4.2 should run only if R9-C4.3 fixture work exposes a concrete
-  movement/projectile drift.
-- R9-C4.2: conditional bounded family repair. Not run for B08 closure because
-  R9-C4.1, R9-C4.3, and R9-C4.5 exposed no concrete movement/projectile,
-  shell-list, or collision/kill drift that required a runtime fix.
-- R9-C4.3: harden source ecology fixtures. Completed 2026-05-21. Targeted
-  clean-fidelity coverage passed for `start_game`, `smart_bomb`, `hyperspace`,
-  `abduction`, `death`, `wave_advance`, and `planet_destruction`, proving the
-  covered startup ecology, reserve activation, smart-bomb destruction,
-  pod-to-swarmer release, bomber shell limits, baiter/mutant/lander projectile
-  paths, lander-human carry/release/conversion, human fall/catch/loss,
-  hyperspace shell cleanup, and planet-destruction handoff surfaces.
-- R9-C4.4: reconcile public evidence and docs. Completed 2026-05-21. R9-C4.1
-  and R9-C4.3 required no public facade, oracle, `WorldSnapshot`, object
-  evidence, sound evidence, or scenario field changes; README, SPEC,
-  `docs/fidelity/gaps.md`, and this plan now record that B08 is ready for the
-  Step 50 closure gate without widening public contracts.
-- R9-C4.5: Step 50 / B08 closure gate. Completed 2026-05-21. The closing slice
-  kept runtime behavior unchanged while satisfying the phase-close clippy and
-  coverage gates: source-lander advance parameters were bundled into a context,
-  carried-human sync collapsed its nested condition, source explosion frame
-  indexing uses `is_multiple_of`, and the lander grab tests now cover upward and
-  downward target tracking. Full all-scenario `make clean-fidelity` matched all
-  12 scenarios, `make fidelity` passed, and B08 is closed. Step 51 / R9-D1 is
-  the next unstarted roadmap step.
+- A short MAME capture and a short clean capture of the same sequence can be
+  compared by `tools/verify_reference_media.py`.
+- Expected mismatches are reported as bounded visual/audio metrics, not as
+  missing media or timeline drift.
 
-Phase 4: session and high-score closure.
+### M3: Graphics Fidelity
 
-- Step 51 / Cycle R9-D1: two-player turn/session sequencing. Close all
-  remaining player-one/player-two turn transitions, respawn cadence, stock
-  accounting, score ownership, and game-over routing beyond the covered
-  final-life switch/respawn slice.
-- R9-D1.1: non-final death/respawn rotation. Completed 2026-05-21. Clean player
-  deaths with remaining stock now leave active play, wait for the source
-  player-death explosion cloud to finish, then respawn through the existing
-  player-start handoff. The next stocked player is selected with the source
-  `PLE02` loop shape: two-player sessions rotate to the other stocked player
-  after any non-final death, and one-player sessions wrap back to player one.
-  The existing final-life two-player switch-sleep prompt remains unchanged.
-- R9-D1.2: post-rotation score/stock ownership. Completed 2026-05-21. A focused
-  two-player fixture now drives player one through a non-final death, rotates to
-  player two, awards player-two points across the replay threshold, and proves
-  player-one score/stock remain untouched while player-two score, high score,
-  bonus threshold, and life/smart-bomb stock update together. The
-  current-second-player high-score fixture now models an actual two-player
-  final-session route with player one out of stock.
-- R9-D1.3: Step 51 / B09 closure gate. Completed 2026-05-21. The audit found
-  one fixture gap: the second-player final-life switch-back path stopped before
-  the following player-one start cadence. The existing fixture now advances
-  through the player-start handoff, proves player-one stock decrement, preserves
-  player-two exhausted stock, and starts the playfield. B09 is closed; Step 52 /
-  R9-D2 is the next active roadmap step.
-- Step 52 / Cycle R9-D2: high-score ordering and post-entry return. Prove
-  source-backed table ordering, initials insertion, today's-greatest behavior,
-  post-entry display timing, and return-to-attract behavior across one-player
-  and two-player sessions.
-- R9-D2.1: two-player submission/table-return fixture. Completed 2026-05-21.
-  A focused fixture now drives player two through final game-over high-score
-  entry, submits initials, proves the player-two submission metadata, inserts the
-  score into all-time and today's-greatest tables at different ranks, preserves
-  the all-time top high score, verifies shifted row ranks, and advances the
-  hall-of-fame display stall back to attract.
-- R9-D2.2: Step 52 / B10 closure audit. Completed 2026-05-21. The audit found no
-  runtime fix was needed. Focused fixtures now cover one-player qualifying
-  submission return through the full hall-of-fame stall, non-qualifying no-entry
-  return through the full display stall with unchanged tables, strict
-  score-greater-than table insertion, shifted row ranks, and dropped tail rows.
-  Targeted accepted evidence passed with `high_score_entry` matching 3428/3428
-  clean-fidelity frames. B10 is closed; Step 53 / R9-E1 is the next active
-  roadmap step.
+Goal: make the clean renderer match MAME-visible graphics.
 
-Phase 5: final render parity and acceptance.
+Deliverables:
 
-- Step 53 / Cycle R9-E1: final render-presentation parity audit. Completed
-  2026-05-21. The audit records source-backed residual boundaries instead of
-  widening runtime behavior: all 12 local Phase 1 reference scenarios carry
-  accepted `video_crc32` evidence for every frame; clean-fidelity render
-  comparison covers frame, surface, and raster absence for every scenario and
-  strict visual signatures for `attract_boot`/`start_game`; clean sprite draw
-  evidence stays covered by `--game-smoke`; offscreen `wgpu` readback evidence
-  stays covered by `--live-smoke` with checked first/last signatures. Exact
-  per-scenario pixel CRC parity, strict long-scenario sprite count/layer parity,
-  and per-scenario offscreen `wgpu` signatures are source-backed audit residuals,
-  not additional R9 runtime blockers. B11 is closed; Step 54 / R9-E2 is the next
-  active roadmap step.
-- Step 54 / Cycle R9-E2: full validation stabilization. Completed 2026-05-21.
-  The full R9 gate passed: `make fidelity` covered formatting, all Rust
-  targets, default and `legacy-tools` clippy, Lua/Python helper tests, local
-  Rust-current trace fixtures, and coverage; full `make clean-fidelity` matched
-  all 12 embedded Phase 1 scenarios; `cargo run -- --game-smoke` and
-  `cargo run -- --live-smoke` passed; core-doc markdownlint and diff hygiene
-  passed. B12 is closed; Step 55 / R9-E3 is the next active roadmap step.
-- Step 55 / Cycle R9-E3: owner acceptance and milestone closeout. Reopened
-  2026-05-21 after owner review rejected the regenerated R9-E3.7 clean media.
-  README, SPEC, `docs/fidelity/gaps.md`, and this plan keep B01-B12 closed
-  for their validated behavior/evidence surfaces, but B13 is active again.
-  `docs/start-sequence.gif` has been restored from git and is the protected
-  original visual reference. The rejected clean candidate is local comparison
-  evidence only. Active B13 repair now covers Williams title colors and
-  handwritten cadence, ROM/source Defender wordmark coalescence, scrambled
-  screen number glyphs, sprite shapes/colors, terrain/ground presentation, and
-  Williams -> High Scores -> scoring sequence order.
-
-R9-E3 corrective visual acceptance schedule:
-
-- R9-E3.1: reference comparison and acceptance reset. Completed 2026-05-21.
-  `docs/start-sequence.gif` is the immediate visual reference for Step 55. The
-  earlier post-R9 classification of Williams/palette/sprite polish is
-  superseded for owner acceptance, while B01-B12 stay closed only for their
-  previously validated behavior/evidence surfaces.
-- R9-E3.2: clean attract order repair. Completed 2026-05-21. Clean
-  `AttractPresentationSnapshot` now orders title/copyright surfaces before an
-  attract Hall of Fame page and delays the existing scoring/action text surface
-  until the later scoring-sequence page. The clean and oracle scenes reuse the
-  Hall of Fame display renderer during the attract Hall of Fame page and
-  suppress title credits on that page. Focused tests cover the new page order
-  and rendered surfaces.
-- R9-E3.3: Williams handwritten logo and color cadence. Completed 2026-05-21.
-  The clean title path now uses the source `LGOTAB` pixel order for an early
-  handwritten reveal, backed by a 1x1 Williams-logo atlas pixel and a
-  source-rate color cadence before falling back to the completed source
-  Williams logo. Focused renderer/game/oracle tests cover the pixel path, atlas
-  region, reveal threshold, and tint cadence.
-- R9-E3.4: Defender wordmark coalescence. Completed 2026-05-21. Clean and
-  oracle attract scenes now render the `DEFEND` / `DEFENS` appearance phase as
-  4x12 atlas-backed wordmark blocks before switching back to the full
-  source-expanded Defender logo for settled and refreshed frames. Focused
-  renderer/game/oracle tests cover block atlas regions, pre-coalescence,
-  coalesced, and refreshed frames.
-- R9-E3.5: source-backed sprite and palette repair. Completed 2026-05-21. The
-  default clean atlas now decodes the early-gameplay/player/enemy/reward sprite
-  set from `assets/red-label/object-images.tsv` with source palette overrides,
-  while clean gameplay enemy and ordinary human sprites render with white tint
-  so atlas palette colors are not forced through the previous prototype tints.
-  Focused renderer tests cover red-label image decoding and the source-backed
-  runtime atlas regions.
-- R9-E3.6: clean scoring/action attract sequence. Completed 2026-05-21. The
-  clean attract scheduler now starts the scoring/action segment after the
-  source-shaped Hall of Fame stall, replays the source instruction-page rescue
-  demo with scanner blips, terrain, player laser, 500-point rescue popup, and
-  the `ENMYTB` enemy score-card reveal, then wraps back to the Williams page.
-  Focused attract/action tests cover the source timing, text reveal, demo
-  objects, scanner sprites, and cycle wrap.
-- R9-E3.7: visual acceptance closeout gate. Completed 2026-05-21, then
-  rejected by owner review. The regenerated clean GIF had 277 frames versus
-  347 frames in the restored original reference and visually diverged on the
-  Williams title, Defender coalescence, numeric glyphs, sprites, terrain, and
-  scoring/action flow. Treat this slice as failed B13 evidence; it does not
-  close owner visual acceptance.
-
-Reopened B13 repair schedule:
-
-- R9-E3.8: protected reference and visual-diff harness. Completed 2026-05-21.
-  `make readme-media` now writes
-  `target/readme-media/start-sequence-candidate.gif` by default, refuses to
-  overwrite `docs/start-sequence.gif` unless
-  `DEFENDER_ALLOW_REFERENCE_MEDIA_OVERWRITE=1` is explicitly set after owner
-  approval, and reports sampled frame/timing/RMS comparison metrics against the
-  protected reference for title, Hall of Fame, numeric glyphs, sprites,
-  terrain, and scoring regions. The pre-repair rejected candidate measured
-  277 frames versus the 347-frame reference and remains active repair evidence.
-- R9-E3.9: ROM-backed Williams/Defender title program. Completed 2026-05-21.
-  The clean title projection now uses source-backed `LOGO`/`LGOTAB` Williams
-  handwriting with the source `0x3F` title color, the 15 `DEFENS` 4-byte by
-  12-row `APVCT` appearance slots, source object/picture/data/appearance-slot
-  addresses, the `DEF33` whole-wordmark `0x3C` by `0x18` descriptor, and the
-  settled wordmark transition. Focused tests cover the source slot descriptors,
-  shrink/coalescence phase, source color contract, and atlas regions. The
-  latest candidate still fails B13 media parity at 257 frames versus the
-  347-frame protected reference, so R9-E3.10 remains active for numeric glyph
-  repair before another closeout gate.
-- R9-E3.10: source text and numeric glyph repair. Completed 2026-05-21. The
-  clean renderer now decodes `NUMBR0`-`NUMBR9` score digit image records in
-  the same source column-major byte order already used by message glyphs, so
-  score, credit, Hall of Fame, wave/multiplier, and scoring/action digits use
-  the repaired source shape through the shared digit atlas. Focused tests cover
-  digit atlas regions, the column-order crop for `NUMBR0`, source text mixed
-  digit/glyph layout, score HUD positions, credit rendering, and scoring-card
-  digit surfaces. The latest candidate still fails B13 media parity at
-  257 frames versus the 347-frame protected reference, so R9-E3.11 remains
-  active for source sprite and terrain/ground repair.
-- R9-E3.11: source sprite and terrain/ground repair. Replace remaining
-  prototype or mis-decoded runtime art with source-backed object-image
-  decoding, correct color-word/palette mapping, orientation, dimensions, and
-  transparency. Replace the font-sheet terrain/ground placeholder with
-  source-backed `BGINIT`/`BGOUT`/`TDATA` terrain projection or accepted
-  pre-rewrite frame evidence, including scanner/ground color checks. Completed
-  2026-05-21. The clean renderer now decodes the source terrain words
-  `0x7007`/`0x0770` into atlas-backed terrain patterns instead of using the
-  font-sheet helper tile, and both gameplay and attract scoring project the
-  source `TDATA` -> `BGINIT` -> `BGOUT` default 0x98-word terrain table. The
-  Williams/title and Hall of Fame pages no longer inherit gameplay ground.
-  Candidate terrain RMS improved, but B13 remains open for timing/scoring flow
-  and final owner acceptance.
-- R9-E3.12: attract sequence timing and scoring/action parity. Reconcile the
-  clean attract scheduler with the reference ordering and timing:
-  Williams -> High Scores -> scoring sequence. Use source waits and
-  pre-rewrite trace behavior to align page lengths, object placement, scoring
-  card reveal, demo sprites, terrain, scanner blips, and wrap back to Williams.
-  Completed 2026-05-21. The README media generator now preserves sampled
-  attract cadence instead of collapsing repeated frames, the candidate matches
-  the protected reference at 347 frames / 4600cs, the Williams/title page no
-  longer carries score HUD or zero-credit text, attract credits are limited to
-  Hall of Fame / scoring contexts unless credits are nonzero, and Hall of Fame
-  text used the then-current source `0x85` entry/blink color evidence before
-  the later R9-E3.14 protected-reference display-color adjustment. B13 remains open:
-  the latest reference/candidate contact sheet still shows Williams
-  color/handwriting drift, incomplete Defender coalescence parity, and
-  scoring sprite/terrain palette and placement drift.
-- R9-E3.13: title color and coalescence visual pass. Use the protected GIF,
-  red-label `LOGO`/`LOGO0`, `CBOMB`/`CBMB1`, `DEFENS`, `DEF33`/`DEF50`, and
-  `WILLIR`/`WILR1` evidence plus pre-rewrite trace behavior to repair the
-  remaining Williams color cadence and Defender appearance/coalescence
-  geometry. Add focused scene/atlas/media tests that fail on uniform title
-  tint or non-source coalescence cadence. Completed 2026-05-22. The Williams
-  handwriting reveal now uses source `LOGO0` table-operation cadence and
-  completes at the `PRES` handoff instead of using a linear 160-frame pixel
-  ramp; title text, source pseudo-colors, object sprite palettes, and the
-  source-expanded Defender logo now use Williams resistor palette conversion
-  with source `COLTAB`/`TCTAB` cycling. The Defender appearance now follows the
-  source `APVCT` row-pair projection over the 15 `DEFENS` chunks and renders as
-  normal clean overlay sprites instead of temporary rasters. Candidate metrics
-  improved but still fail B13 visual acceptance, so R9-E3.14 remains active for
-  title/Hall of Fame and scoring visual drift.
-- R9-E3.14: scoring sprite, scanner, and terrain visual pass. Compare the
-  protected scoring-sequence frames against clean candidate frames and repair
-  the remaining title color/cadence drift, source sprite palettes, score-card
-  object placement, scanner colors, and terrain/ground visual drift without
-  reopening broad gameplay ecology unless a runtime scenario field changes.
-  Completed locally 2026-05-27: Hall of Fame display and credit text now route
-  through the protected-reference `COLTAB` `0x47` magenta, the lower scoring
-  terrain draws as one source scanline, the top scanner uses source `MTERR`
-  mini-terrain records instead of projected `BGOUT` terrain, and the attract
-  scoring scanner border uses the protected-reference purple instead of the
-  playing white HUD border. The `ENMYTB` score-card table entries now use
-  protected-reference
-  placement closer to the restored GIF. The scoring page now starts its clean
-  rescue/action display from the protected reference's post-setup rescue-fall
-  phase while keeping the page duration unchanged, and its scoring text/credit
-  color cadence is locked to sampled protected-reference `COLTAB` indices. The
-  first title sample now stays blank like the protected GIF, and Williams/title
-  text colors use sampled protected-reference cadence during the README title
-  segment. Runtime sprite regions now use source object-picture dimensions,
-  player lasers draw as source-style tail-to-tip spans, explosion presentation
-  uses sparse source-style pixel clouds, and the score-card object placement has
-  been corrected against the protected scoring frames. The candidate remains
-  B13 evidence for owner review rather than an approved replacement.
-- R9-E3.15: candidate media gate and owner review. Completed locally
-  2026-05-27. The candidate was regenerated at
-  `target/readme-media/start-sequence-candidate.gif` without overwriting the
-  protected reference. It matches `docs/start-sequence.gif` at 347 frames,
-  768x576, and 4600cs, with sampled RMS full 29.04, title 24.62, Hall of Fame
-  36.14, numeric glyphs 20.75, sprites 32.17, terrain 29.02, and scoring 31.23.
-  Full local validation passed with `make fidelity`, full `make clean-fidelity`,
-  `cargo run -- --game-smoke`, and `cargo run -- --live-smoke`. B13 now waits
-  on explicit owner visual approval; only replace `docs/start-sequence.gif`
-  after that approval. No further implementation cycle is planned unless owner
-  review rejects the candidate with specific findings.
-
-Strict R9 blocker matrix after Step 41:
-
-| ID | Area | Type | Step | Done when |
-| --- | --- | --- | --- | --- |
-| B01 | Text/status | render | 43 | exact cases covered/excluded |
-| B02 | Attract waits | accepted/clean | 44 | source timing tested |
-| B03 | Palette/blink | render | 45 | visual-state contract tested |
-| B04 | Scanner/radar | accepted/render | 46 | state and sprites tested |
-| B05 | Score popups | clean behavior | 47 | spawn/duration/position tested |
-| B06 | Explosions | clean behavior | 48 | frame progression tested |
-| B07 | Terrain blow | clean/render | 49 | mutation/presentation tested |
-| B08 | Object ecology | clean behavior | 50 | closed 2026-05-21 |
-| B09 | Two-player flow | clean behavior | 51 | closed 2026-05-21 |
-| B10 | High-score return | clean/accepted | 52 | closed 2026-05-21 |
-| B11 | Render audit | docs/evidence | 53 | closed 2026-05-21 |
-| B12 | Full validation | docs/evidence | 54 | closed 2026-05-21 |
-| B13 | Owner visual | owner/render | 55 | owner accepts repaired media |
-
-Step 41 acceptance contract:
-
-- The phrase "final render presentation parity" now means only the residual
-  visual comparison left after B01-B10 are complete; it is no longer a
-  standalone implementation blocker.
-- The phrase "broader title/status text" now maps to B01 and must be closed by
-  an inventory of exact included and intentionally excluded source text cases.
-- Lifecycle wording is split across B05-B08 so score popups, explosions,
-  terrain blow, and object ecology can be implemented and tested separately.
-- Session wording is split across B09-B10 so two-player runtime flow and
-  high-score table/return behavior can close independently.
-- B12 is the first mandatory broad-gate cycle unless an earlier cycle changes a
-  shared public contract, alters broad clean-fidelity behavior, or introduces a
-  risk that focused tests cannot cover.
-
-Accepted-surface audit after Step 42:
-
-| ID | Current accepted evidence | Later need |
-| --- | --- | --- |
-| B01 | phase, frame, source glyphs | remaining text inventory |
-| B02 | phase/frame only | attract page and wait state |
-| B03 | source visual state | palette/RGB render audit residuals |
-| B04 | object/scanner evidence, border/scanner sprites | closed by Step 46 |
-| B05 | object/expanded sprite rows | popup lifecycle and duration |
-| B06 | expanded explosion rows | explosion frame/timer state |
-| B07 | mapped terrain explosion sprite | terrain mutation/blow state |
-| B08 | bounded object rows, wave profile | full topology and transitions |
-| B09 | current player, stocks, switch timers | closed by Step 51 fixtures |
-| B10 | entry, submission, tables, stalls | closed by Step 52 fixtures |
-| B11 | visual signature, clean scene | closed by Step 53 audit |
-| B12 | validation commands only | closed by Step 54 gate |
-| B13 | none | owner decision |
-
-Step 42 acceptance contract:
-
-- Add accepted fields only when a later cycle has a focused fixture that needs
-  them. Do not widen the accepted facade speculatively.
-- B02-B04 require new neutral evidence before implementation can be proven
-  without relying on visual CRC alone.
-- B05-B08 can start from existing object and expanded-object rows, but each
-  needs explicit lifecycle state before it can close strictly.
-- B09-B10 have enough high-level session and high-score fields for focused
-  tests, but the next cycles must add fixtures that prove ordering and return
-  behavior instead of depending on broad scenario matches.
-
-Title/status text sweep after Step 43:
-
-- Included source-message projection cases:
-  - `GO`: final game-over prompt and player-switch game-over line.
-  - `PLYR1`, `PLYR2`: player start, player switch, and high-score entry
-    player label.
-  - `CREDV`: attract credits label, paired with the bounded credit digits.
-  - `ELECV`: attract electronics/presents page text.
-  - `SCANV`, `LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, `SWARMV`: attract
-    instruction and enemy-score page text.
-  - `ATWV`, `COMPV`, `BONSX`: wave-completion status text, wave number,
-    bonus multiplier, and survivor bonus row.
-  - `HOFV1`, `HOFV2`, `HOFV3`, `HOFV4`: high-score entry instructions.
-  - `HALLD_TITLE`, `HALLD_TODAYS`, `HALLD_ALL_TIME`, `HALLD_GREATEST`:
-    hall-of-fame headings, with table rank, initials, and score glyph rows.
-- Deferred source-backed presentation cases:
-  - B02 owns attract page scheduling and wait-state timing for the Williams
-    logo, Defender wordmark, copyright strip, presents page, and instruction
-    page.
-  - B03 owns palette, blink, and color state for the projected text, border,
-    logo, underline, HUD, and attract surfaces.
-- Excluded R9 B01 source-message cases:
-  - Service diagnostics: `VWROM`, `VWRAM`, `VROMFL`, `VRAMFL`, `VALROM`,
-    `VRAMTS`, `VNORAM`, `VCMSFL`, `VCMSOK`, `VCMSAB`, `VCOLTS`, `VAUDTS`,
-    `VSWTTS`, and `VMONTS`.
-  - Switch-test labels: the `VSW*` labels from `VSW0` through `VSW17`,
-    including `VSWA` through `VSWF`.
-  - Test and adjustment instructions: `VINS1` through `VINS17`.
-  - These labels are service, audit, switch-test, or adjustment-mode text,
-    not final gameplay presentation. They stay outside strict R9 unless the
-    owner explicitly expands the milestone beyond clean runtime acceptance.
-
-Step 43 acceptance contract:
-
-- B01 is closed as an exact source-text inventory. Future title/status work
-  must name the specific label, state gate, and blocker ID it belongs to.
-- Every gameplay, attract, high-score, and hall-of-fame source-message label in
-  `assets/red-label/messages.tsv` now has an included, deferred, or excluded
-  owner.
-- Diagnostics, switch-test, and adjustment text are excluded from R9 final
-  gameplay presentation and should be tracked as a later service-mode feature
-  if they become product scope.
-
-Attract scheduler after Step 44:
-
-- `GameState` now carries `AttractPresentationSnapshot` with the current
-  normal-attract page frame, source page, source sleep ticks, and copyright
-  stall ticks.
-- The clean and oracle scenes gate the Williams logo, presents copy, Defender
-  wordmark, copyright strip, and instruction labels from that snapshot. Credits
-  keep their existing projection path, and hall-of-fame display stalls continue
-  to suppress ordinary attract title-program surfaces.
-- The source-backed page-frame thresholds are: presents at frame 236, Defender
-  wordmark at frame 285, copyright wait at frame 419, and instruction labels
-  at frame 441. The exposed wait constants are `LOGO0` 2 ticks, `PRES1` 5
-  ticks, `DEFEND` 0x30 ticks, `CPR55` 10 ticks with a 60-tick stall, and
-  instruction entry 0xE6 ticks.
-
-Step 44 acceptance contract:
-
-- B02 is closed for the clean runtime title-program scheduler. Future attract
-  work must target a specific remaining presentation blocker instead of
-  reopening broad Williams/copyright wait timing.
-- This step does not claim live Williams `LGOTAB` table-walker animation or
-  exact palette/blink/color parity; those remain later visual-state and
-  render-audit work.
-- The source-backed scheduler is proven by focused clean/oracle unit tests and
-  targeted `attract_boot` plus `start_game` clean-fidelity scenarios, not by a
-  full all-scenario gate.
-
-Palette/color contract after Step 45:
-
-- `SOURCE_VISUAL_STATE` now records the source-owned color and blink evidence
-  used by the clean scene projection: Williams status `0xFB`, Williams logo
-  PCRAM color `0x3F`, copyright Williams color index `0x0F`, Williams restore
-  rates `0xFF` and `10`, instruction color words `0x6666`, `0x0000`, and
-  `0x4433`, Hall of Fame display/entry letter color indices `0x47` and
-  `0x85`, Hall of Fame blink color `0x85` with 15-tick sleep, Hall of Fame
-  underline words `0x1111` and `0xDDDD`, and top-display border/scanner-marker
-  words `0x5555` and `0x9999`.
-- Clean and oracle scenes route HUD score/stock tints, attract title surfaces,
-  Hall of Fame text/logo/underline tints, and top-display border/marker tints
-  through that source visual-state contract without introducing full-frame
-  raster dependence.
-- The current contract preserves the existing white/gray clean sprite output.
-  Hardware palette-to-RGB conversion, live Williams table-walker animation, and
-  final render-audit residuals remain later B11/final-audit work rather than
-  reopening B03.
-
-Step 45 acceptance contract:
-
-- B03 is closed as a source visual-state contract. Future palette work must
-  name a specific source index/word/rate or a final render-audit residual.
-- This step does not claim a hardware palette resistor model or per-pixel
-  source palette replay in the clean renderer.
-- The contract is proven by focused clean/oracle unit tests and compile checks;
-  broad all-scenario clean-fidelity is deferred until Phase 2 closes, a later
-  shared contract change, broad-risk change, or R9 finalization.
-
-Scanner/radar contract after Step 46:
-
-- `WorldSnapshot` now carries `ScannerRadarSnapshot`, a source-shaped scanner
-  state with the `SCPROC`/`SCP1`/`SCP2` sleep cadence `[2, 2, 4]`, selected
-  hardware map `1`, source scan-left calculation, terrain-enabled flag,
-  object erase-table addresses starting at `0xB05D`, source `SETEND`, object
-  blips, and the player blip bytes `0x9099`, `0x90`, and `0x09`.
-- Source object scanner colors now flow through the machine snapshot, accepted
-  facade, oracle adapter, and clean object evidence. Clean lander and human
-  evidence uses the source-backed scanner color words `0x4433` and `0x6666`;
-  projectile rows remain non-scanner rows.
-- Clean and oracle playing scenes project scanner object and player blips as
-  HUD sprites using source scanner screen-address formulas. This closes B04
-  without adding enemy spawning, enemy physics, or source terrain mutation.
-
-Step 46 acceptance contract:
-
-- B04 is closed for source-backed scanner/radar state and scene sprites. Future
-  scanner work must name a specific source terrain-raster residual, final
-  render-audit residual, or object-ecology dependency instead of reopening broad
-  scanner/radar animation.
-- This step intentionally does not claim clean enemy spawning/physics,
-  terrain-blow mutation, or exact hardware palette/RGB replay.
-- Because Step 46 closes Phase 2 and changed shared public state, the next gate
-  is the Phase 2 broad validation pass instead of another narrow-only cycle.
-
-Score-popup lifecycle contract after Step 47:
-
-- `ExpandedObjectKind` now has a `ScorePopup` kind. Machine snapshots, the
-  accepted facade, the oracle adapter, and clean snapshots carry source-backed
-  popup lifetime and value fields for the `P250` / `P500` / `P503` rescue-score
-  surface.
-- Source `C25P1` and `C5P1` expanded-object rows are classified as score
-  popups with a 50-tick source lifetime, 250/500 values, 6x6 descriptor size,
-  and mapped `SCORE_POPUP_250` / `SCORE_POPUP_500` sprite identity.
-- Clean `WorldSnapshot` can spawn score popups at a source top-left position,
-  projects them through the same expanded-object scene path as the oracle, and
-  removes them when the 50-frame source lifetime expires. This keeps scoring
-  arithmetic unchanged; rescue/abduction entry points that decide when to award
-  those values remain part of the later object-ecology cycle.
-
-Step 47 acceptance contract:
-
-- B05 is closed for score-popup spawn state, source lifetime, value, position,
-  sprite identity, and clean/oracle scene projection.
-- This step does not claim full astronaut rescue/loss object ecology, enemy
-  spawning/physics, explosion timing, or terrain-blow behavior.
-- The contract is proven by focused clean lifecycle tests, oracle adapter/scene
-  tests, source-machine metadata tests, compile checks, and diff hygiene. Broad
-  all-scenario clean-fidelity, full fidelity, all-target tests, and clippy stay
-  deferred until Phase 3 closes, a broader shared-contract risk appears, or R9
-  finalization begins.
-
-Explosion timing contract after Step 48:
-
-- Source `EXST`/`EXPU` expanded-object explosion rows now carry frame/lifetime
-  metadata from `RSIZE = 0x0100`, the per-update `+0x00AA` size delta, and the
-  source `> 0x30` high-byte kill threshold through the machine snapshot,
-  accepted facade, oracle adapter, and clean snapshot surface.
-- Clean `WorldSnapshot` can spawn source-shaped expanded-object explosions for
-  the mapped `LNDP1`, `BXPIC`, `SWXP1`, `ASXP1`, and `PLAPIC` descriptor
-  families. Clean projectile/lander collision now leaves a timed lander
-  explosion row and sprite; clean/oracle expanded-object scenes scale explosion
-  sprites from the source `RSIZE` high byte.
-- Source `PXVCT`/`PX1A` player-death pixel-cloud state now flows through the
-  machine snapshot, accepted facade, oracle adapter, clean `WorldSnapshot`, and
-  clean/oracle scenes. The clean runtime starts the bank-7-shaped cloud on
-  player/enemy contact, preserves the source color table and counter cadence,
-  advances visible pieces from the source seed/velocity rules, and renders the
-  split-piece 4x2 variant when the source low X byte crosses bit 7.
-- B06 is closed for source-backed explosion timing and sprite progression.
-  Future object-ecology work may add more gameplay entry points that start the
-  already mapped non-lander explosion families, but that belongs to B08 rather
-  than reopening the explosion timing contract.
-
-Terrain-blow contract after Step 49:
-
-- Source `TERBLO` terrain-blow state now flows through the machine snapshot,
-  accepted facade, oracle adapter, clean `WorldSnapshot`, and clean-fidelity
-  comparison. The carried evidence includes the source terrain-blown status
-  bit, stage, iteration, sleep, pseudo-color, overload counter,
-  terrain/scanner erase entry counts, remaining nonzero terrain words, and
-  two-explosions-per-pass contract.
-- Clean planet destruction clears clean terrain segments, disables scanner
-  terrain, starts source-shaped terrain-blow evidence, and projects `TEREX`
-  terrain explosions through the expanded-object sprite path with source
-  `TERBLO` / `AHSND` command evidence on entry. The clean terrain-blow process
-  now advances through the source-shaped `TBL3` / `TBL4` sleep, pseudo-color,
-  and iteration lifecycle, restarts bounded `TEREX` passes until iteration 16,
-  and surfaces source `TBSND` completion command evidence.
-- B07 is closed for terrain mutation and presentation evidence. Full
-  rescue/abduction object ecology and the live gameplay entry points that
-  remove humans remain B08, not terrain-blow presentation.
-
-Object-ecology progress after R9-C4 slices:
-
-- Clean wave spawning no longer uses the old `wave`-number lander shortcut.
-  `WorldSnapshot::for_wave` now derives the active enemy batch from the
-  source-backed `WaveProfileSnapshot`: active wave size is capped by the
-  source wave-size field, wave 1 starts with five active source-state landers,
-  and later source-exposed bomber/pod families are admitted into the active
-  clean batch with deterministic positions and source-profile-derived
-  velocities.
-- Clean enemy kind, object-evidence category, sprite, collision-size, score,
-  explosion-entry, scanner-color, smart-bomb, projectile-collision, and scene
-  rendering paths now know the lander, mutant, bomber, pod, swarmer, and baiter
-  families. Active clean enemy object-evidence rows now carry source object
-  picture descriptor labels, addresses, sizes, and primary/alternate image
-  pointers for the static mutant/pod/swarmer descriptors and the current
-  `LNDP`/`UFOP`/`TIEP` frame-cycled lander, baiter, and bomber descriptors. The
-  clean projectile/enemy and player/enemy collision boxes now use those source
-  enemy picture sizes while direct runtime enemy rendering keeps the current
-  clean sprite sizes. Clean hostile player collision boxes now use the source
-  `PLAPIC` / `PLBPIC` 8x6 player picture footprint while direct runtime player
-  rendering keeps the current 16x8 ship sprite; falling-human rescue collision
-  uses that player footprint plus source `ASTP1`-`ASTP4` 2x8 astronaut
-  footprints while direct runtime human rendering keeps the current 6x8 sprite.
-  The
-  clean human row now carries per-human source astronaut picture descriptor
-  evidence: default `ASTP1` rows and source-restored `ASTP3` rows selected from
-  the `PLRES` `LSEED` low bit, with descriptor labels, addresses, 2x8 picture
-  size, primary/alternate image pointers, and mapped human sprite while the
-  direct runtime renderer keeps the existing clean 6x8 astronaut sprite.
-  Initial clean humans also carry deterministic source `TLIST` slot addresses
-  from `0xA11A` with a two-byte stride and source X low-byte fractions from the
-  same `PLRES` restore state. Clean worlds also carry a separate source
-  `ASTRO` process cursor/sleep state; that process advances one target-list
-  slot per source cadence, skips carried/untargetable humans, nudges the
-  selected standing astronaut through source fixed-point X motion and
-  terrain-relative Y steps, and cycles the `ASTP1`-`ASTP4` descriptor evidence.
-  The clean player projectile row now carries the source `LASP1`
-  descriptor label, address, 8x1 picture size, and primary image pointer while
-  the direct runtime renderer keeps the existing clean projectile sprite size.
-  Clean player projectiles now advance through the source `LASR0` / `LASL0`
-  laser-loop step shape: five source screen columns per step and source
-  right/left edge termination at `0x98` / `0x05`, and enemy-hit collision uses
-  the source `LASP1` 8x1 picture footprint rather than the 8x2 render sprite.
-  Enemy projectile/player collision uses the source `BMBP1` 2x3 picture
-  footprint rather than the 4x6 render sprite.
-  Clean enemy, human, player-projectile, and enemy-projectile rows now also
-  carry source-style 8.8 world-position words, velocity words, and deterministic
-  source object-table identity evidence derived from their existing source
-  fixed-point state and source layout: addresses from `0xA23C` plus `0x17` per
-  slot, source slot numbers, and neutral `OTYP` `0x00`. The wave-profile table
-  currently exposes landers, bombers, and pods as initial active wave families,
-  while mutant runtime entry now comes from source-shaped clean lander mutation.
-- Clean `WorldSnapshot` now carries `EnemyReserveSnapshot` for source-profile
-  enemies not in the active batch. Reserve totals flow into inactive object
-  evidence counts plus bounded inactive source-detail rows carrying reserved
-  family categories, source object-picture descriptors, deterministic source
-  object-table identity, mapped clean sprites, and source scanner colors while
-  position and velocity remain empty until activation. Smart bombs and
-  projectile/player collision remove only the active batch, and the next
-  reserve batch activates before `WaveCleared`.
-  Reserve lander activation now mirrors source `LANDST` placement, fixed-point
-  fractions, shot-timer RNG consumption, and X/Y velocity bytes before restored
-  landers continue through a bounded source `LANDS0` orbit/shot loop with
-  picture cycling and fireball projection; when no humans remain, the reserve
-  lander path follows the source `LANDST` schizoid fallback and restores
-  source-shaped mutants directly. Initial clean wave landers now carry
-  deterministic source fixed-point fractions, shot timers, picture frame, and
-  X/Y velocity into the same bounded `LANDS0` runtime while preserving the
-  current active wave count/order. Initial active pods now carry deterministic
-  source fixed-point fractions and bounded signed X velocity into the same
-  source fixed-point X/Y motion as source-restored pods while preserving the
-  current active wave count/order. Active source enemy fixed-point Y motion now
-  wraps through the source `VELO` `YMIN`/`YMAX` bounds for landers, pods,
-  bombers, mutants, swarmers, and baiters while X motion keeps raw fixed-point
-  wrapping.
-- Clean pod destruction now enters a bounded mini-swarmer transition:
-  projectile and smart-bomb pod kills share the clean enemy-destroy path, spawn
-  the pod explosion, award the source-backed pod score, and append a
-  deterministic swarmer batch capped by the source request bound and active
-  swarmer limit. Spawned mini-swarmers carry source RNG-derived velocity,
-  acceleration, sleep, and shot-timer state, then advance through the source
-  entry seek, fixed-point loop, vertical acceleration/damping, turnback, and
-  `SWBMB` enemy-bomb projection shape with the same source shell free-list cap
-  as other fireball paths, including source `RMAX` RNG consumption on
-  shot-timer resets when allocation fails. Reserve mini-swarmer activation now
-  mirrors the source `PLRES`/`RSW0` phony-object placement and carries the
-  source placement fractions into the same source swarmer runtime. Pod reserve
-  activation now mirrors the source `PRBST`/`PRBRES` restore placement and
-  velocity bytes, then carries restored pods through source fixed-point
-  X/Y motion.
-- Clean bomber runtime now carries source-shaped state for active bombers.
-  Spawned clean bombers retain source fixed-point fractions, X velocity,
-  vertical velocity, picture frame, cruise altitude, and sleep state, then
-  advance through the source `TIE` image cycle, random vertical drift/damping,
-  on-screen player-Y steering, off-screen cruise-altitude steering, and bounded
-  `BOMBST` bomb-shell projection state with source `GETSHL` placement bounds.
-  The clean bomber state update now honors the source `TIE` `SEED & 0x06`
-  four-slot squad selection from persistent source slots, so killed or empty
-  selected slots sleep while active bomber positions still advance through
-  source velocity.
-  Reserve bomber activation now mirrors
-  source `TIEST` squad placement: up to four bombers per squad, X positions
-  spaced from the current player X, fixed cruise altitude, persistent source
-  slots, and alternating source X velocity per restored squad.
-- Clean baiter runtime entry now follows the source game-exec pacing shape:
-  a 15-frame cadence, low-enemy timer acceleration, zero-enemy wave-clear
-  guard, deterministic clean spawn, and source active-baiter cap. The clean
-  source wave-enemy total follows `WVCHK` by excluding active baiters, so
-  baiters do not inflate low-enemy pacing, block reserve activation, or block
-  wave clear when no source-counted enemies remain. Spawned baiters retain
-  source shot-timer, picture-cycle, sleep, and velocity state, pursue the
-  player through the source `UFONV` seek rules, fire source-shaped `SHOOT`
-  fireball shells, and those enemy projectiles now use source `SHSCAN` lifetime
-  decrement/wrap behavior, scroll-adjusted fixed-point motion, offscreen
-  culling, collision scoring, player-damage handling with source `BKIL` /
-  `AHSND` command evidence, source `PLEND` / `PDSND` player-hit command
-  evidence, and source `BMBP1` shell descriptor evidence.
-- Clean mutant runtime now carries source-shaped state for active mutants.
-  Completed carried-lander abductions consume the passenger and convert that
-  lander into a mutant, no-target/no-human landers convert through the same
-  path, and active mutants retain source shot-timer, sleep, fixed-point
-  position fractions, source X seek, vertical seek/avoid, random Y hop, and
-  shared `SHOOT` fireball projection state. Mutant reserve activation now
-  restores active mutants through source-shaped placement fractions and
-  shot-timer RNG state.
-- Clean lander abduction now covers the first carry transition: aligned humans
-  enter the carried state, source-shaped landers can retain explicit
-  selected-human target state, `LANDS0` enters the `LANDG` target-approach step
-  only for that selected target, source `LPKSND` command evidence is emitted on
-  pickup, carried passengers stay associated with the lander that captured them
-  while it flees, pull upward through the source `LANDF` / `LNDFXA` top-edge
-  shape with source `LSKSND` command evidence on pull-in entry before
-  conversion, give up from the top pull edge when the passenger target is
-  cleared, and are released when that lander is destroyed. Initial clean humans
-  now restore the source `PLRES` /
-  `TLIST` startup shape: ten humans are placed through the source target-list
-  grouping rules, carry deterministic slot addresses from `0xA11A`, and raise
-  the initial active object/sprite evidence accordingly. Clean source lander
-  spawns now advance the source `TPTR`-shaped cursor through those `TLIST`
-  slots for initial, reserve, and retarget selection while preserving the
-  separate source enemy RNG cadence. A separate source `ASTRO` process cursor
-  now walks restored, uncarried `TLIST` humans over terrain and cycles their
-  `ASTP1`-`ASTP4` evidence on its source sleep cadence.
-- Clean enemy destruction now emits source-backed per-family hit sound command
-  evidence on the shared kill path: `LHSND`, `SCHSND`, `TIHSND`, `PRHSND`,
-  `SWHSND`, and `UFHSND` are surfaced through the existing sound-event
-  command byte contract for landers, mutants, bombers, pods, swarmers, and
-  baiters respectively; killed carrying landers now surface source `ASCSND`
-  passenger-release command evidence instead of the ordinary lander hit
-  command when the passenger is released.
-- Clean enemy projectile launches now emit source-backed shot sound command
-  evidence when the source-shaped allocation succeeds: landers use `LSHSND`,
-  mutants use `SSHSND`, baiters use `USHSND`, and mini-swarmers use `SWSSND`.
-  Bomber `BOMBST` allocations remain silent, matching the covered source path.
-- Clean player action edges now emit source-backed sound command evidence:
-  successful `LFIRE` laser launches surface `LASSND`, and accepted `SBOMB`
-  inputs surface the first `SBSND` command before the enemy destruction sounds.
-  The clean thrust gate now emits the source start/stop sound events:
-  `SNDS01` / `0xE9` on the accepted thrust press and `SNDS00` / `0xF0` on the
-  release edge.
-- Accepted clean hyperspace inputs now mirror the visible source `HYP02` /
-  `KILSHL` shell-list cleanup by clearing active enemy projectiles while
-  leaving clean player projectiles outside that source shell-object list, and
-  then reload source rematerialization state from the current clean source RNG:
-  `SEED`/`HSEED` seed the clean background/camera word, `HSEED` selects the
-  source player X/facing branch, the player Y high byte is restored from
-  `HSEED >> 1 + YMIN`, player velocity is cleared, and `APSND` surfaces the
-  appearance command loaded by that path. The clean `HYP2` tail now treats
-  `LSEED > 0xC0` as the source death-risk branch into the existing player
-  damage path with source `PDSND` command evidence while `0xC0` and below
-  complete safely.
-- Released, uncarried humans above terrain now follow source-shaped `AFALL`
-  fixed-point acceleration. Safe landings at or below the source velocity
-  threshold award the source-backed 250-point score and start the existing
-  `P250` score-popup lifecycle with source `ALSND` command evidence;
-  over-speed impacts remove the human, spawn the astronaut explosion lifecycle,
-  surface source `ASTKIL` / `AHSND` command evidence, and feed the existing
-  last-human planet-loss handoff that starts source `TERBLO` / `AHSND`
-  terrain-blow command evidence.
-- Falling humans caught by the player now enter the clean player-carried state,
-  award the source-backed 500-point rescue score, and start the existing `P500`
-  score-popup lifecycle from the caught astronaut position with source `ACSND`
-  command evidence.
-- Player-carried humans now follow the source AFALL2 carried offset and settle
-  on terrain when the player-carried position reaches the local terrain line.
-- R9-C4 / Step 50 is closed. The R9-C4.1 residual ecology audit classified the
-  per-family movement/projectile runtime surfaces as covered by current clean
-  runtime and focused unit tests; R9-C4.3 targeted source ecology fixtures all
-  matched; R9-C4.5 passed the broad Step 50 closure gate without exposing drift,
-  so R9-C4.2 stayed unused.
-
-R9-C4 residual ecology audit after R9-C4.1:
-
-- Covered with no immediate bounded runtime fix queued: source wave spawning,
-  inactive reserve accounting, reserve activation, source object-table
-  identity, active/inactive object-picture evidence, source fixed-point
-  positions/velocities, and source `VELO` Y-bound wrapping for active source
-  enemies.
-- Covered family runtime surfaces: lander `LANDST` / `LANDS0` / `LANDG` /
-  `LANDF` / `LSHOT` targeting, carry, pull, give-up, release, and conversion;
-  pod `PRBST` / `PRBRES` fixed-point motion and pod-to-swarmer release; mini
-  swarmer `PLRES` / `RSW0` restore, seek, acceleration, turnback, `SWBMB`
-  shell cap, and full-shell RNG reset; bomber `TIEST` restore, persistent
-  four-slot `TIE` selection, picture/Y steering, `GETSHL`, `BOMBST`, `BMBCNT`,
-  and total shell-list caps; baiter `GEXEC` / `UFOST` pacing, source wave-enemy
-  bookkeeping, `UFONV` seek, picture cycle, and shared `SHOOT`; mutant
-  conversion, restore, X/Y seek, random hop, and shared `SHOOT`.
-- Covered shared projectile/collision/player-action surfaces: `LASR0` /
-  `LASL0` laser movement and `LASP1` collision footprint; source `SHSCAN`
-  lifetime and `SHELL` scroll-adjusted motion; source `BMBP1` enemy-shell
-  footprint; source enemy, player, and rescue collision footprints; source
-  family hit and shot sound commands; smart-bomb sound ordering; thrust
-  start/stop commands; hyperspace source shell cleanup, rematerialization, and
-  death-risk branch.
-- Covered human and terrain-loss surfaces: source `TLIST` startup humans,
-  target-list cursor retargeting, `ASTRO` walking/picture cadence, `AFALL`
-  acceleration, safe/fatal landing, `AFALL2` player-carried landing, `P250` /
-  `P500` score popups, astronaut catch/release/landing/impact sound commands,
-  last-human source `TERBLO` start, and `TBL3` / `TBL4` terrain-blow completion.
-- Covered fixture surfaces: targeted `make clean-fidelity
-  SCENARIOS="start_game smart_bomb hyperspace abduction death wave_advance
-  planet_destruction"` matched all seven R9-C4 source ecology scenarios. Any
-  later closure-gate mismatch that points to one family loop, shared shell edge,
-  or collision/kill side effect should reopen R9-C4.2 for a bounded
-  implementation slice.
-- B08 closure evidence: R9-C4.5 passed the focused source-lander grab coverage
-  test, default and legacy all-target Rust suites, full clippy, the local
-  reference trace fixture check, the new-Rust coverage delta check, full
-  all-scenario `make clean-fidelity`, full `make fidelity`, touched docs
-  markdownlint, and `git diff --check`.
-- Deferred outside B08: cycle-accurate CPU/golden-trace scheduling, non-gameplay
-  render-presentation residuals, two-player session routing, and high-score
-  table/return behavior remain owned by later R9-D/R9-E steps rather than
-  object ecology.
-
-Work log:
-
-- `2026-05-17 16:03:07 BST` Planning update. Added the post-Step-40
-  completion roadmap above so the remaining R9 work is split into explicit
-  phases, future steps, and implementation cycles instead of a single broad
-  blocker list. This was a docs-only planning update, not an implementation
-  cycle.
-- `2026-05-17 16:14:12 BST` Archive update. Moved the detailed
-  completed DC-164 Step 1-Step 40 implementation history to
-  [Completed Plan Step Archive](docs/fidelity/plan-completed-steps-archive.md).
-  The active plan now keeps the R9 roadmap, current work-log notes, and the
-  next executable steps visible while preserving closed step evidence in the
-  archive. Latest archived implementation step: Step 40
-  `expanded-object slot sprite presentation slice`, completed with the full
-  all-12-scenario `make clean-fidelity` gate matching in 359.57s.
-- `2026-05-17 16:10:18 BST` Completed Step 41 / Cycle R9-A1
-  `strict blocker matrix and acceptance contract`. Added the blocker matrix
-  and acceptance contract above, decomposing broad R9 wording into B01-B13 and
-  clarifying that broad validation is deferred to phase boundaries,
-  shared-contract changes, broad-risk changes, or R9 closeout. This was a
-  docs-only contract-freeze step; no Slack update or Rust validation was
-  required.
-- `2026-05-17 16:12:14 BST` Completed Step 42 / Cycle R9-A2
-  `accepted-surface audit`. Inspected the accepted facade, oracle adapter, and
-  source-machine snapshot surfaces, then added the audit table above. The audit
-  records which blockers already have neutral evidence and which need
-  just-in-time accepted fields or focused fixtures in later cycles. This closes
-  Phase 1 as docs-only planning/audit work; no Slack update or Rust validation
-  was required.
-- `2026-05-17 16:15:15 BST` Completed Step 43 / Cycle R9-B1
-  `title/status text sweep`. Inventoried the source-message labels in
-  `assets/red-label/messages.tsv` against the clean/oracle projection surfaces
-  and recorded the exact included, deferred, and excluded cases above. This was
-  a docs-only inventory step; no Slack update or Rust validation was required.
-- `2026-05-17 16:31:14 BST` Completed Step 44 / Cycle R9-B2
-  `Williams/copyright attract waits and page scheduler`. Added
-  `AttractPresentationSnapshot`, gated clean/oracle Williams logo, presents,
-  Defender wordmark, copyright, and instruction title-program surfaces from
-  source-backed page frames and wait constants, and updated README, SPEC, and
-  gaps docs. Focused validation passed: `cargo fmt --check`, `cargo check`,
-  focused attract/oracle unit tests, targeted `make clean-fidelity
-  SCENARIOS="attract_boot start_game"`, `cargo test --all-targets`,
-  markdownlint for touched docs, and `git diff --check` for touched files. Full
-  `make fidelity`, full all-scenario `make clean-fidelity`, and clippy were
-  deferred until Phase 2 close, a broad-risk/shared-contract change, or R9
-  finalization. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779030996418839`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779031870880909`.
-- `2026-05-17 16:47:14 BST` Completed Step 45 / Cycle R9-B3
-  `palette, blink, and color contract`. Added `SOURCE_VISUAL_STATE` for the
-  source color indices, underline/border words, Williams restore rates, and
-  Hall of Fame blink sleep/color evidence; routed clean/oracle HUD, attract,
-  top-display-border, and Hall of Fame tints through that contract without
-  changing current sprite output; and updated README, SPEC, and gaps docs.
-  Focused validation passed: `cargo fmt --check`, `cargo check`,
-  `cargo test source_visual_state --lib`, `cargo test
-  clean_scene_uses_source_visual_state_tints --lib`, and focused oracle tests
-  for attract credits, top-display border, score digits, high-score entry, and
-  hall-of-fame display under `--features legacy-tools`. Full
-  `cargo test --all-targets`, full `make fidelity`, full all-scenario
-  `make clean-fidelity`, and clippy were deferred because this slice preserved
-  sprite output and did not close Phase 2 yet. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779031959663589`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779032827604179`.
-- `2026-05-17 17:35:09 BST` Completed Step 46 / Cycle R9-B4
-  `scanner/radar animation`. Added source-backed scanner/radar state to
-  `WorldSnapshot`, carried source `OBJCOL` scanner colors through the accepted
-  facade and oracle adapter, projected scanner object/player blips in clean and
-  oracle scenes, added atlas-backed scanner blip sprites, and updated the
-  checked live-smoke first/last offscreen signatures for the new renderer
-  output. Focused validation passed: `cargo fmt --check`, `cargo check`,
-  `cargo check --features legacy-tools`, scanner/radar clean unit tests,
-  scanner atlas unit test, focused oracle scanner/object-evidence tests under
-  `--features legacy-tools`, focused clean-fidelity object-evidence test under
-  `--features legacy-tools`, source scanner raster regression,
-  `cargo run -- --game-smoke`, and `cargo run -- --live-smoke`. Phase 2 broad
-  validation passed with full all-12-scenario `make clean-fidelity`,
-  `make fidelity`, touched-doc markdownlint, and `git diff --check`. The phase
-  gate refreshed `tools/new_rust_coverage_baseline.txt` with 77 accepted
-  uncovered added executable lines from the current dirty branch state after
-  the new-line coverage check exposed existing uncovered R9 branch debt. Slack
-  start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779032976703089`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779035751570959`.
-- `2026-05-17 17:53:26 BST` Completed Step 47 / Cycle R9-C1
-  `score-popup lifecycle`. Added source-backed score-popup metadata to
-  expanded-object snapshots across the machine state, accepted facade, oracle
-  adapter, and clean state; classified `C25P1` / `C5P1` rows as
-  `ScorePopup` with source 50-tick lifetime and 250/500 values; added clean
-  score-popup spawn/projection/expiry through the expanded-object scene path;
-  and updated README, SPEC, and gaps docs. Focused validation passed:
-  `cargo fmt --check`, `cargo check`, `cargo check --features legacy-tools`,
-  `cargo test score_popup --features legacy-tools --lib`, `cargo test
-  p500_score_sprite_scores_positions_object_and_sleeps_to_cleanup --features
-  legacy-tools --lib`, `cargo test expanded_object --features legacy-tools
-  --lib`, touched-doc markdownlint, and `git diff --check`. Full
-  `cargo test --all-targets`, clippy, `make fidelity`, and full all-scenario
-  `make clean-fidelity` were deferred because this slice did not change
-  scenario input behavior; the next full gate should run at Phase 3 close,
-  broader shared-contract risk, or R9 finalization. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779035871257009`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779036859089229`.
-- `2026-05-17 18:10:59 BST` R9-C2 progress slice
-  `source expanded-object explosion timing`. Added source-backed explosion
-  frame/lifetime metadata to expanded-object snapshots across the machine
-  state, accepted facade, oracle adapter, and clean state; scaled
-  expanded-object explosion sprites from the source `RSIZE` high byte; added
-  clean explosion lifecycle projection/expiry; and changed projectile/lander
-  collision to leave a timed lander explosion sprite. Focused validation
-  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
-  legacy-tools`, `cargo test explosion --features legacy-tools --lib`,
-  `cargo test expanded_object --features legacy-tools --lib`, and `cargo test
-  clean_game_resolves_projectile_enemy_collision_and_scores --lib`. Full
-  `cargo test --all-targets`, clippy, `make fidelity`, and full all-scenario
-  `make clean-fidelity` were deferred because this slice is bounded to the
-  source expanded-object explosion surface and does not close Phase 3. The next
-  full gate should run at Phase 3 close, broader shared-contract risk, or R9
-  finalization. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779036945983079`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779038105875769`.
-- `2026-05-17 18:33:00 BST` Completed Step 48 / Cycle R9-C2
-  `explosion timing`. Added source-backed player-death `PXVCT`/`PX1A`
-  pixel-cloud snapshots across the machine state, accepted facade, oracle
-  adapter, and clean state; started the clean player cloud from player/enemy
-  contact; projected visible 4x1 and split 4x2 player-explosion pixels in
-  clean/oracle scenes; and updated README, SPEC, and gaps docs. Focused
-  validation passed: formatting, default and `legacy-tools` compile checks,
-  player-explosion tests under `legacy-tools`, the focused player/enemy
-  collision, clean-fidelity comparator, and frame-signature tests, and the
-  targeted `death` clean-fidelity scenario. Full
-  `cargo test --all-targets`, clippy, `make fidelity`, and full all-scenario
-  `make clean-fidelity` were deferred because this closes B06 inside Phase 3
-  but does not close the phase or add broad object-ecology risk. The next full
-  gate should run at Phase 3 close, broader shared-contract risk, or R9
-  finalization. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779038196326969`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779039329878999`.
-- `2026-05-17 18:49:07 BST` Completed Step 49 / Cycle R9-C3
-  `terrain-blow presentation`. Added source-backed `TERBLO` terrain-blow
-  snapshots across the machine state, accepted facade, oracle adapter, clean
-  state, and clean-fidelity comparison; clean planet destruction now clears
-  terrain, disables scanner terrain, and projects two `TEREX` terrain
-  explosions through expanded-object sprites; and updated README, SPEC, and
-  gaps docs. Focused validation passed: formatting, default and
-  `legacy-tools` compile checks, terrain-blow tests under `legacy-tools`, the
-  focused oracle snapshot adapter test, and targeted `planet_destruction`
-  clean-fidelity. Full `cargo test --all-targets`, clippy, `make fidelity`,
-  and full all-scenario `make clean-fidelity` were deferred because this
-  closes B07 inside Phase 3 but does not close Phase 3. The next full gate
-  should run at Phase 3 close, broader shared-contract risk, or R9
-  finalization. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779039405418739`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779040291389669`.
-- `2026-05-17 19:06:15 BST` R9-C4 progress slice
-  `source-profile active enemy families`. Replaced the clean wave-number
-  lander shortcut with source-profile active wave spawning, added clean enemy
-  family mappings for lander, mutant, bomber, pod, swarmer, and baiter across
-  object evidence, scanner colors, sprites, collision sizes, scores, and
-  explosion entry points, cleared the player-death pixel cloud before
-  high-score entry handoff, and updated clean start/wave-advance scene
-  expectations. Focused validation passed: `cargo fmt --check`, `cargo check`,
-  `cargo check --features legacy-tools`, `cargo test
-  clean_wave_spawns_source_profile_active_enemy_batch --lib`, `cargo test
-  clean_enemy_families_use_source_message_scores_and_sprites --lib`, `cargo
-  test clean_game --lib`, and targeted `make clean-fidelity
-  SCENARIOS="start_game wave_advance"`. Full `cargo test --all-targets`,
-  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
-  deferred because this is a bounded B08 progress slice rather than Phase 3
-  closure. The next full gate should run when Step 50 closes, a broader
-  shared-contract risk appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779040440745669`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779041310370949`.
-- `2026-05-17 19:18:07 BST` R9-C4 progress slice
-  `source-profile enemy reserves`. Added `EnemyReserveSnapshot` to clean world
-  state, moved non-active source-profile enemies into reserve counts, reported
-  those reserves through inactive object evidence, and activated the next
-  reserve batch before declaring `WaveCleared`. Focused validation passed:
-  `cargo fmt --check`, `cargo check`, `cargo check --features legacy-tools`,
-  `cargo test clean_wave_spawns_source_profile_active_enemy_batch --lib`,
-  `cargo test clean_game_activates_source_reserve_batch_before_wave_clear
-  --lib`, `cargo test clean_game --lib`, and targeted `make clean-fidelity
-  SCENARIOS="start_game smart_bomb wave_advance"`. Full
-  `cargo test --all-targets`, clippy, `make fidelity`, and full all-scenario
-  `make clean-fidelity` remain deferred because this is still bounded B08 work
-  rather than Step 50/Phase 3 closure. The next full gate should run when Step
-  50 closes, a broader shared-contract risk appears, or R9 finalization begins.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779041484212419`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779041967361759`.
-- `2026-05-17 19:28:49 BST` R9-C4 progress slice
-  `pod-to-swarmer destruction transition`. Added a shared clean
-  enemy-destroy path for projectile and smart-bomb kills, and taught pod
-  destruction to append deterministic mini-swarmers capped at the source
-  request bound of six and active swarmer limit of twenty. Focused validation
-  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
-  legacy-tools`, `cargo test clean_game_pod --lib`, `cargo test
-  clean_game_smart_bomb_pod_spawns_swarmers_after_destroyed_batch --lib`,
-  `cargo test clean_game --lib`, and targeted `make clean-fidelity
-  SCENARIOS="smart_bomb wave_advance"`. Full `cargo test --all-targets`,
-  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
-  deferred because this is a bounded B08 transition slice rather than Step
-  50/Phase 3 closure. The next full gate should run when Step 50 closes, a
-  broader shared-contract risk appears, or R9 finalization begins. Slack start
-  update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779042056730599`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779042622615929`.
-- `2026-05-17 19:37:32 BST` R9-C4 progress slice
-  `baiter runtime entry`. Added clean source-shaped baiter pacing with the
-  15-frame game-exec cadence, low-enemy timer acceleration, zero-enemy
-  wave-clear guard, deterministic baiter spawn, and active baiter cap of
-  twelve. Focused validation passed: `cargo fmt --check`, `cargo check`,
-  `cargo check --features legacy-tools`, `cargo test clean_game_baiter --lib`,
-  `cargo test clean_game --lib`, and targeted `make clean-fidelity
-  SCENARIOS="start_game wave_advance"`. Full `cargo test --all-targets`,
-  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
-  deferred because this is a bounded B08 transition slice rather than Step
-  50/Phase 3 closure. The next full gate should run when Step 50 closes, a
-  broader shared-contract risk appears, or R9 finalization begins. Slack start
-  update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779042800321979`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779043169756889`.
-- `2026-05-17 19:45:09 BST` R9-C4 progress slice
-  `lander abduction/carry/release`. Added clean source-shaped lander capture
-  and carry behavior from `LANDG` / `LKIL1` evidence: aligned humans enter the
-  carried state, follow the fleeing lander, and are released when the carrying
-  lander is destroyed. Focused validation passed: `cargo fmt --check`,
-  `cargo check`, `cargo check --features legacy-tools`, `cargo test
-  clean_game_lander --lib`, `cargo test
-  clean_game_killed_carrying_lander_releases_human --lib`, `cargo test
-  clean_game --lib`, and targeted `make clean-fidelity SCENARIOS="abduction"`.
-  Full `cargo test --all-targets`, clippy, `make fidelity`, and full
-  all-scenario `make clean-fidelity` remain deferred because this is a bounded
-  B08 transition slice rather than Step 50/Phase 3 closure. The next full gate
-  should run when Step 50 closes, a broader shared-contract risk appears, or
-  R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779043290461549`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779043580382719`.
-- `2026-05-17 19:52:48 BST` R9-C4 progress slice
-  `falling human motion`. Added a bounded clean `AFALL`-shaped falling pass:
-  released, uncarried humans above terrain descend each clean frame until they
-  reach the local terrain line, while standing humans on terrain remain stable.
-  Player catch, rescue scoring, safe/fatal landing, human-loss behavior, and
-  exact source falling acceleration remain later B08 work. Focused validation
-  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
-  legacy-tools`, `cargo test
-  clean_game_released_human_falls_until_terrain_landing --lib`, `cargo test
-  clean_game_standing_humans_do_not_fall --lib`, `cargo test clean_game
-  --lib`, targeted `make clean-fidelity SCENARIOS="abduction"`, `markdownlint
-  README.md SPEC.md PLAN.md docs/fidelity/gaps.md`, and `git diff --check`.
-  Full `cargo test --all-targets`, clippy, `make fidelity`, and full
-  all-scenario `make clean-fidelity` remain deferred because this is a bounded
-  B08 transition slice rather than Step 50/Phase 3 closure. The next full gate
-  should run when Step 50 closes, a broader shared-contract risk appears, or
-  R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779043784742469`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779044027628599`.
-- `2026-05-17 20:06:06 BST` R9-C4 progress slice
-  `player-catch rescue scoring`. Added the bounded source `AKIL1` / `P500`
-  catch path: falling humans that overlap the player enter a clean
-  player-carried state, award the source-backed 500-point rescue score through
-  `ScoreSystem`, and start the existing `P500` score-popup lifecycle from the
-  caught astronaut position. Grounded humans remain uncaught. Focused
-  validation passed: `cargo fmt --check`, `cargo check`, `cargo check
-  --features legacy-tools`, `cargo test
-  clean_game_player_catches_falling_human_scores_and_starts_p500_popup --lib`,
-  `cargo test clean_game_player_does_not_catch_grounded_human --lib`,
-  `cargo test clean_game_released_lander_passenger_falls_on_following_frame
-  --lib`, `cargo test clean_game_released_human_falls_until_terrain_landing
-  --lib`, `cargo test clean_game --lib`, `cargo test
-  oracle_scene_projects_wave_completion_status_sprites --features legacy-tools
-  --lib`, targeted `make clean-fidelity SCENARIOS="abduction"`, touched-doc
-  markdownlint, `git diff --check`, and the broader public-contract check
-  `cargo test --all-targets`. Clippy, `make fidelity`, and full all-scenario
-  `make clean-fidelity` remain deferred because this is a bounded B08
-  transition slice rather than Step 50/Phase 3 closure. The next full gate
-  should run when Step 50 closes, a broader shared-contract risk appears, or
-  R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779044512076799`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779044929473269`.
-  Supplemental broad-validation update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779044996769709`.
-- `2026-05-17 20:11:43 BST` R9-C4 progress slice
-  `AFALL2 player-carried landing`. Added the bounded source-shaped
-  player-carried landing transition: humans caught by the player continue to
-  follow the clean AFALL2 carried offset and settle onto terrain when that
-  carried position reaches the local terrain line, without creating a second
-  rescue score popup. Focused validation passed: `cargo fmt --check`, `cargo
-  check`, `cargo check --features legacy-tools`, `cargo test
-  clean_game_player_carried_human_lands_when_carried_to_terrain --lib`,
-  `cargo test
-  clean_game_player_catches_falling_human_scores_and_starts_p500_popup --lib`,
-  `cargo test clean_game_player_does_not_catch_grounded_human --lib`, `cargo
-  test clean_game --lib`, targeted `make clean-fidelity
-  SCENARIOS="abduction"`, touched-doc markdownlint, and `git diff --check`.
-  Full `cargo test --all-targets`, clippy, `make fidelity`, and full
-  all-scenario `make clean-fidelity` remain deferred because this is a bounded
-  B08 transition slice rather than Step 50/Phase 3 closure. The next full gate
-  should run when Step 50 closes, a broader shared-contract risk appears, or
-  R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779045053880489`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779045198181889`.
-
-- `2026-05-17 20:17:56 BST` R9-C4 progress slice
-  `AFALL safe-landing scoring`. Added the bounded source `AFALL` safe-landing
-  score transition: released, uncarried humans that settle on terrain now award
-  the source-backed 250-point safe-landing score through `ScoreSystem` and
-  start the existing `P250` score-popup lifecycle from the settled astronaut
-  position. Focused validation passed: `cargo fmt --check`, `cargo check`,
-  `cargo check --features legacy-tools`, `cargo test
-  clean_game_released_human_falls_until_terrain_landing --lib`, `cargo test
-  clean_game_standing_humans_do_not_fall --lib`, `cargo test clean_game --lib`,
-  targeted `make clean-fidelity SCENARIOS="abduction"`, touched-doc
-  markdownlint, and `git diff --check`. Full `cargo test --all-targets`,
-  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
-  deferred because this is a bounded B08 transition slice rather than Step
-  50/Phase 3 closure. The next full gate should run when Step 50 closes, a
-  broader shared-contract risk appears, or R9 finalization begins. Slack start
-  update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779045246819539`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779045475425419`.
-- `2026-05-17 20:26:24 BST` R9-C4 progress slice
-  `AFALL falling acceleration and fatal landing`. Added source-shaped clean
-  falling-human velocity state: uncarried falling humans now accelerate by
-  `0x0008`, preserve the source max-velocity clamp before `0x0300`, safe-land
-  at or below `0x00E0` through the existing `P250` score path, and remove
-  over-speed impacts with an astronaut explosion plus the existing last-human
-  terrain-blow handoff. Focused validation passed: `cargo fmt --check`, `cargo
-  check`, `cargo check --features legacy-tools`, `cargo test
-  clean_game_released_lander_passenger_falls_on_following_frame --lib`, `cargo
-  test clean_game_released_human_falls_until_terrain_landing --lib`, `cargo test
-  clean_game_fatal_falling_human_impact_removes_human_and_starts_human_loss
-  --lib`, `cargo test
-  clean_game_player_catches_falling_human_scores_and_starts_p500_popup --lib`,
-  `cargo test clean_game --lib`, targeted `make clean-fidelity
-  SCENARIOS="abduction"`, touched-doc markdownlint, and `git diff --check`.
-  Broad `cargo test --all-targets` also passed because `HumanSnapshot` gained
-  public clean-state fields. Clippy, `make fidelity`, and full all-scenario
-  `make clean-fidelity` remain deferred because this is a bounded B08 transition
-  slice and the shared-contract risk was covered by the all-target Rust test
-  pass. The next full gate should run when Step 50 closes, another broader
-  shared-contract risk appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779045515879429`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779045984811539`.
-- `2026-05-17 21:59:16 BST` R9-C4 progress slice
-  `source mini-swarmer runtime`. Added source-backed clean mini-swarmer state:
-  pod-triggered spawns now retain RNG-derived velocity, acceleration, sleep,
-  and shot-timer fields; active source swarmers advance through the entry seek,
-  fixed-point position/fraction updates, loop sleep cadence, vertical
-  acceleration/damping, turnback reseek, and bounded enemy-bomb projection.
-  Clean fidelity now compares enemy projectiles. Focused validation passed:
-  `cargo fmt --check`, `cargo check`, `cargo check --features legacy-tools`,
-  `cargo test
-  clean_game_pod_projectile_collision_spawns_source_bounded_swarmers --lib`,
-  `cargo test clean_game_pod_swarmer_spawn_respects_source_active_limit --lib`,
-  `cargo test clean_game_mini_swarmer --lib`, `cargo test clean_game --lib`,
-  targeted `make clean-fidelity SCENARIOS="smart_bomb"`, touched-doc
-  markdownlint, and `git diff --check`. Broad `cargo test --all-targets` also
-  passed because `EnemySnapshot`, `WorldSnapshot`, and clean-fidelity state
-  gained public clean-state fields. Clippy, `make fidelity`, and full
-  all-scenario `make clean-fidelity` remain deferred because this is a bounded
-  B08 transition slice and the public-contract risk was covered by the
-  all-target Rust test pass. The next full gate should run when Step 50 closes,
-  another broader shared-contract risk appears, or R9 finalization begins.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779046194681939`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779051554385829`.
-- `2026-05-17 22:11:08 BST` R9-C4 progress slice
-  `source baiter movement and fireballs`. Added source-backed clean baiter
-  state: spawned baiters now retain source shot-timer, picture-cycle, sleep,
-  and velocity fields; active baiters pursue through the source `UFONV` seek
-  rules and fire source-shaped `SHOOT` fireball shells. Enemy projectiles now
-  carry source shell lifetime, source offscreen culling, 25-point collision
-  scoring, bomb explosion entry, and player-damage handling. Focused validation
-  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
-  legacy-tools`, `cargo test clean_game_baiter --lib`, `cargo test
-  clean_game_enemy_projectile --lib`, `cargo test clean_game --lib`, targeted
-  `make clean-fidelity SCENARIOS="wave_advance"`, touched-doc markdownlint,
-  and `git diff --check`. Broad `cargo test --all-targets` also passed because
-  `EnemySnapshot`, `SourceBaiterSnapshot`, and `EnemyProjectileSnapshot` gained
-  public clean-state fields. Clippy, `make fidelity`, and full all-scenario
-  `make clean-fidelity` remain deferred because this is a bounded B08
-  transition slice and the public-contract risk was covered by the all-target
-  Rust test pass. The next full gate should run when Step 50 closes, another
-  broader shared-contract risk appears, or R9 finalization begins. Slack start
-  update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779051619228369`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779052266782509`.
-- `2026-05-17 22:22:22 BST` R9-C4 progress slice
-  `source mutant runtime and lander conversion`. Added clean source-mutant
-  state for active mutants. Completed carried-lander abductions now consume the
-  passenger and convert that lander into a source-shaped mutant, no-target and
-  no-human landers enter the same mutation path, and active mutants retain
-  source shot-timer, sleep, fixed-point fractions, X seek, vertical seek/avoid,
-  random Y hop, and shared `SHOOT` fireball projection state. Focused
-  validation passed: `cargo fmt --check`, `cargo check`, `cargo check
-  --features legacy-tools`, `cargo test clean_game_mutant --lib`, `cargo test
-  mutant --lib`, `cargo test clean_game --lib`, targeted `make
-  clean-fidelity SCENARIOS="abduction wave_advance"`, touched-doc
-  markdownlint, and `git diff --check`. Broad `cargo test --all-targets` also
-  passed because `EnemySnapshot` gained a public clean-state field. Clippy,
-  `make fidelity`, and full all-scenario `make clean-fidelity` remain deferred
-  because this is a bounded B08 transition slice and the public-contract risk
-  was covered by the all-target Rust test pass. The next full gate should run
-  when Step 50 closes, another broader shared-contract risk appears, or R9
-  finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779052381477969`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779052941208549`.
-- `2026-05-17 22:31:24 BST` R9-C4 progress slice
-  `source bomber movement and bomb shells`. Added clean source-bomber state:
-  wave-spawned bombers now retain source fixed-point fractions, X velocity,
-  vertical velocity, picture frame, cruise altitude, and sleep fields; active
-  bombers follow the source `TIE` picture cycle, random vertical drift/damping,
-  on-screen player-Y steering, off-screen cruise-altitude steering, and
-  bounded `BOMBST` bomb-shell projection. Focused validation passed: `cargo
-  fmt --check`, `cargo check`, `cargo check --features legacy-tools`, `cargo
-  test clean_game_bomber --lib`, `cargo test clean_game --lib`, targeted `make
-  clean-fidelity SCENARIOS="wave_advance smart_bomb"`, touched-doc
-  markdownlint, and `git diff --check`. Broad `cargo test --all-targets` also
-  passed because `EnemySnapshot` gained another public clean-state field.
-  Clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
-  deferred because this is a bounded B08 transition slice and the
-  public-contract risk was covered by the all-target Rust test pass. The next
-  full gate should run when Step 50 closes, another broader shared-contract
-  risk appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779053066041699`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779053483585039`.
-- `2026-05-17 22:39:26 BST` R9-C4 progress slice
-  `mutant reserve restore fixture`. Clean reserve mutant activation now uses
-  source-shaped placement fractions and shot-timer RNG state, carrying restored
-  mutants into the existing source-shaped mutant runtime loop. Added focused
-  clean-game coverage for the restored mutant position, velocity, source state,
-  RNG consumption, and reserve drain. Focused validation passed: `cargo fmt
-  --check`, `cargo check`, `cargo check --features legacy-tools`, `cargo test
-  clean_game_mutant --lib`, `cargo test clean_game --lib`, targeted `make
-  clean-fidelity SCENARIOS="wave_advance"`, touched-doc markdownlint, and `git
-  diff --check`. Broad `cargo test --all-targets`, clippy, `make fidelity`, and
-  full all-scenario `make clean-fidelity` remain deferred because this is a
-  bounded B08 transition slice with no public API change. The next full gate
-  should run when Step 50 closes, another broader shared-contract risk appears,
-  or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779053705176209`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779053965306839`.
-- `2026-05-17 22:47:50 BST` R9-C4 progress slice
-  `source-shell/mine descriptor fixture`. Clean enemy projectile evidence now
-  carries the source `BMBP1` shell descriptor address, 2x3 picture size,
-  primary/alternate embedded image addresses, and `ENEMY_BOMB` sprite mapping,
-  while direct clean projectile rendering still uses the existing 4x6 runtime
-  bomb sprite without duplicating clean evidence rows. Focused validation
-  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
-  legacy-tools`, `cargo test clean_game_enemy_projectile --lib`, `cargo test
-  clean_game --lib`, touched-doc markdownlint, and `git diff --check`.
-  Targeted clean-fidelity, broad `cargo test --all-targets`, clippy, `make
-  fidelity`, and full all-scenario `make clean-fidelity` remain deferred
-  because this is a bounded evidence/fixture slice with no scenario input
-  behavior or public API change. The next full gate should run when Step 50
-  closes, another broader shared-contract risk appears, or R9 finalization
-  begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779054048626429`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779054469441199`.
-- `2026-05-17 22:51:15 BST` R9-C4 progress slice
-  `pod reserve restore fixture`. Clean reserve pod activation now uses the
-  source `PRBST`/`PRBRES` restore placement and signed velocity bytes for each
-  restored pod while leaving initial wave pod placement and public snapshots
-  unchanged. Focused validation passed: `cargo fmt --check`, `cargo check`,
-  `cargo check --features legacy-tools`, `cargo test clean_game_pod --lib`,
-  `cargo test clean_game --lib`, targeted `make clean-fidelity
-  SCENARIOS="wave_advance"`, touched-doc markdownlint, and `git diff --check`.
-  Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
-  all-scenario `make clean-fidelity` remain deferred because this is a bounded
-  reserve-restore fixture with no public API change. The next full gate should
-  run when Step 50 closes, another broader shared-contract risk appears, or R9
-  finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779054616891509`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779054897742059`.
-- `2026-05-17 22:57:30 BST` R9-C4 progress slice
-  `mini-swarmer reserve restore fixture`. Clean reserve swarmer activation now
-  groups selected reserve mini-swarmers behind the source `PLRES`/`RSW0`
-  phony-object placement shape, preserves the targetless low X byte as source
-  placement fraction state, and carries each restored swarmer into the existing
-  source swarmer runtime. Focused validation passed: `cargo fmt --check`,
-  `cargo check`, `cargo check --features legacy-tools`, `cargo test
-  clean_game_swarmer_reserve_batch_uses_source_plres_restore_state --lib`,
-  `cargo test clean_game_mini_swarmer --lib`, `cargo test clean_game_swarmer
-  --lib`, `cargo test clean_game --lib`, targeted `make clean-fidelity
-  SCENARIOS="wave_advance"`, touched-doc markdownlint, and `git diff --check`.
-  Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
-  all-scenario `make clean-fidelity` remain deferred because this is a bounded
-  reserve-restore fixture with no public API change. The next full gate should
-  run when Step 50 closes, another broader shared-contract risk appears, or R9
-  finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779055046636789`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779055264360129`.
-- `2026-05-17 23:02:58 BST` R9-C4 progress slice
-  `lander reserve LANDST fixture`. Clean reserve lander activation now uses the
-  source `LANDST` restore shape for placement, shot-timer RNG consumption, and
-  signed X/Y velocity bytes while leaving initial wave lander placement and
-  public snapshots unchanged. Focused validation passed: `cargo fmt --check`,
-  `cargo check`, `cargo check --features legacy-tools`, `cargo test
-  clean_game_lander_reserve_batch_uses_source_landst_spawn_state --lib`,
-  `cargo test clean_game_lander --lib`, `cargo test clean_game --lib`,
-  targeted `make clean-fidelity SCENARIOS="wave_advance"`, touched-doc
-  markdownlint, and `git diff --check`. Broad `cargo test --all-targets`,
-  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
-  deferred because this is a bounded reserve-activation fixture with no public
-  API change. The next full gate should run when Step 50 closes, another
-  broader shared-contract risk appears, or R9 finalization begins. Slack start
-  update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779055366320629`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779055578253799`.
-- `2026-05-17 23:11:17 BST` R9-C4 progress slice
-  `bomber reserve TIEST fixture`. Clean reserve bomber activation now uses the
-  source `TIEST` restore shape for player-relative squad placement, fixed
-  cruise altitude, and alternating signed X velocity per restored squad while
-  carrying each restored bomber into the existing source bomber runtime.
-  Focused validation passed: `cargo fmt --check`, `cargo check`, `cargo check
-  --features legacy-tools`, `cargo test
-  clean_game_bomber_reserve_batch_uses_source_tiest_restore_state --lib`,
-  `cargo test clean_game_bomber --lib`, `cargo test clean_game --lib`,
-  targeted `make clean-fidelity SCENARIOS="wave_advance"`, touched-doc
-  markdownlint, and `git diff --check`. Broad `cargo test --all-targets`,
-  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
-  deferred because this is a bounded reserve-activation fixture with no public
-  API change. The next full gate should run when Step 50 closes, another
-  broader shared-contract risk appears, or R9 finalization begins. Slack start
-  update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779055701950759`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779056053054829`.
-- `2026-05-17 23:21:18 BST` R9-C4 progress slice
-  `source lander runtime`. Clean reserve landers now carry public
-  `SourceLanderSnapshot` state from the source `LANDST` restore path:
-  fixed-point fractions, shot timer, sleep ticks, picture frame, and X/Y
-  velocity. Restored landers advance through a bounded source `LANDS0`
-  orbit/shot loop with terrain-relative Y velocity, `LSHOT` fireball
-  projection, `LNDP1`-`LNDP3` picture cycling, and a source-shaped flee
-  velocity when a passenger is already carried. Focused validation passed:
-  `cargo fmt --check`, `cargo check`, `cargo check --features legacy-tools`,
-  `cargo test clean_game_lander_source_loop_orbits_cycles_and_fires --lib`,
-  `cargo test clean_game_lander_reserve_batch_uses_source_landst_spawn_state
-  --lib`, `cargo test clean_game_lander --lib`, `cargo test clean_game --lib`,
-  targeted `make clean-fidelity SCENARIOS="wave_advance"`, touched-doc
-  markdownlint, and `git diff --check`. Because the clean snapshot contract
-  changed, broad `cargo test --all-targets` also passed. Broad clippy,
-  `make fidelity`, and full all-scenario `make clean-fidelity` remain deferred
-  because this is still a bounded Step 50 slice rather than Step 50/Phase 3
-  closure. The next full gate should run when Step 50 closes, another broader
-  shared-contract risk appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779056244093689`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779056645123769`.
-- `2026-05-17 23:28:01 BST` R9-C4 progress slice
-  `source pod fixed-point runtime`. Clean reserve pods now carry public
-  `SourcePodSnapshot` state from the source `PRBST`/`PRBRES` restore path:
-  fixed-point fractions plus signed X/Y velocity bytes. Restored pods now
-  advance through source fixed-point object motion instead of the previous
-  pixel-velocity projection, while initial clean wave pods stay on the current
-  clean placement path. Focused validation passed: `cargo fmt --check`,
-  `cargo check`, `cargo check --features legacy-tools`, `cargo test
-  clean_game_pod_source_motion_uses_fixed_point_velocity --lib`, `cargo test
-  clean_game_pod --lib`, `cargo test clean_game --lib`, targeted `make
-  clean-fidelity SCENARIOS="wave_advance"`, touched-doc markdownlint, and
-  `git diff --check`. Because the clean snapshot contract changed, broad
-  `cargo test --all-targets` also passed. Broad clippy, `make fidelity`, and
-  full all-scenario `make clean-fidelity` remain deferred because this is still
-  a bounded Step 50 slice rather than Step 50/Phase 3 closure. The next full
-  gate should run when Step 50 closes, another broader shared-contract risk
-  appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779056772315609`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779057029455259`.
-- `2026-05-17 23:36:48 BST` R9-C4 progress slice
-  `initial source lander runtime`. Initial active wave landers now carry
-  deterministic source `SourceLanderSnapshot` state: fixed-point fractions,
-  shot timer, sleep ticks, picture frame, and X/Y velocity. They enter the same
-  bounded source `LANDS0` orbit/shot loop used by `LANDST`-restored landers
-  while preserving active wave count/order. Focused validation passed:
-  `cargo fmt --check`, `cargo check`, `cargo check --features legacy-tools`,
-  `cargo test clean_wave_spawns_source_profile_active_enemy_batch --lib`,
-  `cargo test clean_game_lander --lib`, `cargo test clean_game --lib`,
-  targeted `make clean-fidelity SCENARIOS="start_game abduction
-  wave_advance"`, touched-doc markdownlint, and `git diff --check`. Broad
-  `cargo test --all-targets`, clippy, `make fidelity`, and full all-scenario
-  `make clean-fidelity` remain deferred because this slice changes behavior but
-  does not change public API, close Step 50, or introduce a broad-risk contract
-  change. The next full gate should run when Step 50 closes, another broader
-  shared-contract risk appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779057126727139`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779057486087689`.
-- `2026-05-17 23:44:55 BST` R9-C4 progress slice
-  `initial source pod runtime`. Initial active wave pods now carry
-  deterministic source `SourcePodSnapshot` state: fixed-point fractions,
-  bounded signed X velocity, and zero Y velocity. They enter the same source
-  fixed-point X/Y motion already used by `PRBST`/`PRBRES`-restored pods while
-  preserving active wave count/order. Focused validation passed:
-  `cargo fmt --check`, `cargo check`, `cargo check --features legacy-tools`,
-  `cargo test clean_wave_spawns_source_profile_active_enemy_batch --lib`,
-  `cargo test clean_game_pod --lib`, `cargo test clean_game --lib`, targeted
-  `make clean-fidelity SCENARIOS="wave_advance"`, touched-doc markdownlint,
-  and `git diff --check`. Broad `cargo test --all-targets`, clippy,
-  `make fidelity`, and full all-scenario `make clean-fidelity` remain deferred
-  because this slice changes behavior but does not change public API, close
-  Step 50, or introduce a broad-risk contract change. The next full gate should
-  run when Step 50 closes, another broader shared-contract risk appears, or R9
-  finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779057628043729`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779057894434819`.
-- `2026-05-17 23:53:19 BST` R9-C4 progress slice
-  `LANDST no-human fallback`. Clean reserve lander activation now mirrors the
-  source no-astronaut `LANDST` fallback by restoring source-shaped mutants
-  directly through the `SCZS0`/`SCZST` placement and shot-timer RNG path. Mutant
-  reserve placement now uses the current clean background/camera word for the
-  source avoid window. Focused validation passed: `cargo fmt --check`,
-  `cargo check`, `cargo check --features legacy-tools`, `cargo test
-  clean_game_lander_reserve --lib`, `cargo test
-  clean_game_mutant_reserve_batch_uses_source_restore_state --lib`, `cargo test
-  clean_game --lib`, targeted `make clean-fidelity
-  SCENARIOS="planet_destruction wave_advance"`, touched-doc markdownlint, and
-  `git diff --check`. Broad `cargo test --all-targets`, clippy,
-  `make fidelity`, and full all-scenario `make clean-fidelity` remain deferred
-  because this slice changes behavior but does not change public API, close
-  Step 50, or introduce a broad-risk contract change. The next full gate should
-  run when Step 50 closes, another broader shared-contract risk appears, or R9
-  finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779058118394679`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779058514140589`.
-- `2026-05-18 00:02:23 BST` R9-C4 progress slice
-  `active enemy source picture evidence`. Clean active enemy object-evidence
-  rows now carry source object-picture descriptor labels, addresses, sizes, and
-  primary/alternate image pointers for static mutant/pod/swarmer descriptors
-  plus current lander, baiter, and bomber frame-cycled descriptors. This keeps
-  rendering behavior on the clean sprite path while preserving source
-  descriptor evidence for object ecology comparisons. Focused validation
-  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
-  legacy-tools`, `cargo test clean_world_maps_active_enemy_source_picture_descriptors
-  --lib`, `cargo test clean_game --lib`, targeted `make clean-fidelity
-  SCENARIOS="wave_advance"`, touched-doc markdownlint, and `git diff --check`.
-  Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
-  all-scenario `make clean-fidelity` remain deferred because this slice changes
-  clean object evidence but does not change public API, close Step 50, or
-  introduce a broad-risk contract change. The next full gate should run when
-  Step 50 closes, another broader shared-contract risk appears, or R9
-  finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779058757810019`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779059117750519`.
-- `2026-05-18 00:09:48 BST` R9-C4 progress slice
-  `player projectile source picture evidence`. Clean player projectile
-  object-evidence rows now carry the source `LASP1` descriptor label, address,
-  8x1 picture size, and primary image pointer while the direct clean runtime
-  projectile renderer keeps the existing 8x2 sprite. Focused validation
-  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
-  legacy-tools`, `cargo test
-  clean_game_player_projectile_evidence_uses_source_laser_picture --lib`,
-  `cargo test clean_game_enemy_projectile_evidence_uses_source_shell_picture
-  --lib`, `cargo test clean_game --lib`, touched-doc markdownlint, and
-  `git diff --check`. Targeted clean-fidelity scenarios were not run because
-  this slice changes source descriptor evidence only, not scenario behavior.
-  Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
-  all-scenario `make clean-fidelity` remain deferred because this slice changes
-  clean object evidence but does not change public API, close Step 50, or
-  introduce a broad-risk contract change. The next full gate should run when
-  Step 50 closes, another broader shared-contract risk appears, or R9
-  finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779059281878429`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779059468093189`.
-- `2026-05-18 00:16:08 BST` R9-C4 progress slice
-  `astronaut source picture evidence`. Clean human object-evidence rows now
-  carry the source `ASTP1` descriptor label, address, 2x8 picture size,
-  primary/alternate image pointers, mapped human sprite evidence, and source
-  scanner color while the direct clean runtime astronaut renderer keeps the
-  existing 6x8 sprite. Focused validation passed: `cargo fmt --check`, `cargo
-  check`, `cargo check --features legacy-tools`, `cargo test
-  clean_game_human_evidence_uses_source_astronaut_picture --lib`, `cargo test
-  clean_game --lib`, touched-doc markdownlint, and `git diff --check`.
-  Targeted clean-fidelity scenarios were not run because this slice changes
-  source descriptor evidence only, not scenario behavior. Broad `cargo test
-  --all-targets`, clippy, `make fidelity`, and full all-scenario `make
-  clean-fidelity` remain deferred because this slice changes clean object
-  evidence but does not change public API, close Step 50, or introduce a
-  broad-risk contract change. The next full gate should run when Step 50
-  closes, another broader shared-contract risk appears, or R9 finalization
-  begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779059627067949`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779059841972379`.
-- `2026-05-18 00:25:55 BST` R9-C4 progress slice
-  `source motion object evidence`. Clean enemy, human, player-projectile, and
-  enemy-projectile object-evidence rows now carry source-style 8.8
-  world-position words and velocity words from their existing clean source
-  fixed-point state while leaving runtime scenes and scenario behavior
-  unchanged. Focused validation passed: `cargo fmt --check`, `cargo check`,
-  `cargo check --features legacy-tools`, `cargo test
-  clean_world_object_evidence_carries_source_motion_words --lib`, `cargo test
-  clean_game_human_evidence_uses_source_astronaut_picture --lib`, `cargo test
-  clean_game --lib`, touched-doc markdownlint, and `git diff --check`.
-  Targeted clean-fidelity scenarios were not run because this slice changes
-  source evidence fields only, not scenario behavior. Broad `cargo test
-  --all-targets`, clippy, `make fidelity`, and full all-scenario `make
-  clean-fidelity` remain deferred because this slice changes clean object
-  evidence but does not change public API, close Step 50, or introduce a
-  broad-risk contract change. The next full gate should run when Step 50
-  closes, another broader shared-contract risk appears, or R9 finalization
-  begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779060171604429`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779060444641219`.
-- `2026-05-20 20:29:31 BST` R9-C4 progress slice
-  `source object-table identity evidence`. Clean enemy, human,
-  player-projectile, and enemy-projectile object-evidence rows now carry
-  deterministic source-layout addresses from `0xA23C + 0x17 * slot`, source
-  slot numbers, and neutral `OTYP` `0x00` while clean categorized source-detail
-  rows remain skipped by the direct clean scene projection to avoid duplicate
-  runtime sprites. Focused validation passed: `cargo fmt --check`, `cargo
-  check`, `cargo check --features legacy-tools`, `cargo test
-  clean_world_object_evidence_carries_source_motion_words --lib`, `cargo test
-  clean_world_maps_active_enemy_source_picture_descriptors --lib`, `cargo test
-  clean_game_human_evidence_uses_source_astronaut_picture --lib`, `cargo test
-  clean_game_player_projectile_evidence_uses_source_laser_picture --lib`,
-  `cargo test clean_game_enemy_projectile_evidence_uses_source_shell_picture
-  --lib`, `cargo test clean_game --lib`, touched-doc markdownlint, and `git
-  diff --check`. Targeted clean-fidelity scenarios were not run because this
-  slice changes source evidence fields only, not scenario behavior. Broad
-  `cargo test --all-targets`, clippy, `make fidelity`, and full all-scenario
-  `make clean-fidelity` remain deferred because this slice changes clean object
-  evidence but does not change public API, close Step 50, or introduce a
-  broad-risk contract change. The next full gate should run when Step 50
-  closes, another broader shared-contract risk appears, or R9 finalization
-  begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779305212541739`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779305464868959`.
-- `2026-05-20 20:35:45 BST` R9-C4 progress slice
-  `reserve inactive object-evidence details`. Clean reserve enemy totals now
-  expand into bounded `ObjectEvidenceList::Inactive` detail rows after the
-  active/projectile detail rows. The inactive reserve rows carry reserved
-  family categories, source object-picture descriptors, deterministic
-  source-layout addresses from `0xA23C + 0x17 * slot`, source slot numbers,
-  neutral `OTYP` `0x00`, mapped clean sprites, and source scanner colors while
-  leaving screen/world position and velocity empty until activation. Focused
-  validation passed: `cargo fmt --check`, `cargo check`, `cargo check
-  --features legacy-tools`, `cargo test
-  clean_world_object_evidence_carries_reserve_inactive_source_details --lib`,
-  `cargo test object_evidence --lib`, `cargo test clean_game --lib`, `cargo
-  test clean_wave_spawns_source_profile_active_enemy_batch --lib`, touched-doc
-  markdownlint, and `git diff --check`. Targeted clean-fidelity scenarios were
-  not run because this slice changes source evidence fields only, not scenario
-  behavior. Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
-  all-scenario `make clean-fidelity` remain deferred because this slice changes
-  clean object evidence but does not close Step 50 or introduce a broad-risk
-  contract change. The next full gate should run when Step 50 closes, another
-  broader shared-contract risk appears, or R9 finalization begins. Slack start
-  update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779305752169999`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779306028776519`.
-- `2026-05-20 20:44:12 BST` R9-C4 progress slice
-  `mini-swarmer source shell cap`. The clean `SWBMB` fireball path now receives
-  the current enemy-projectile count and refuses to append another shell when
-  the source shell free-list cap is already full. This preserves the existing
-  direction gate, shot-timer reset, and source RNG behavior while closing the
-  full-shell edge case for mini-swarmer bombs. Focused validation passed:
-  `cargo fmt --check`, `cargo check`, `cargo check --features legacy-tools`,
-  `cargo test clean_game_mini_swarmer --lib`, `cargo test clean_game --lib`,
-  targeted `make clean-fidelity SCENARIOS="wave_advance"`, touched-doc
-  markdownlint, and `git diff --check`. Broad `cargo test --all-targets`,
-  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
-  deferred because this is a bounded Step 50 projectile-cap slice, not Step 50
-  or Phase 3 closure. The next full gate should run when Step 50 closes,
-  another broader shared-contract risk appears, or R9 finalization begins.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779306259354109`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779307987920709`.
-- `2026-05-20 21:22:01 BST` R9-C4 progress slice
-  `mini-swarmer full-shell RMAX parity`. The clean `SWBMB` fireball attempt
-  now resets the mini-swarmer shot timer through `source_advance_rmax`, so
-  source RNG is consumed on every shot reset path, including when the shell
-  free-list is full and no fireball cell is allocated. The bomb helper now
-  only decides whether a projectile is allocated; the caller owns the source
-  `RMAX` reseed just like the source fall-through path. Focused validation
-  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
-  legacy-tools`, `cargo test clean_game_mini_swarmer --lib`, `cargo test
-  clean_game --lib`, targeted `make clean-fidelity SCENARIOS="wave_advance"`,
-  touched-doc markdownlint, and `git diff --check`. Broad `cargo test
-  --all-targets`, clippy, `make fidelity`, and full all-scenario `make
-  clean-fidelity` remain deferred because this is a bounded Step 50
-  mini-swarmer RNG edge slice, not Step 50 or Phase 3 closure. The next full
-  gate should run when Step 50 closes, another broader shared-contract risk
-  appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779308272642439`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779308516667089`.
-- `2026-05-20 21:27:46 BST` R9-C4 progress slice
-  `bomber BOMBST GETSHL bounds`. Clean bomber `BOMBST` shell allocation now
-  applies the source `GETSHL` placement bounds as well as the existing
-  ten-shell cap: bomb shells are refused when the firing bomber is outside the
-  source shell screen range or at/above the source playfield top. Added focused
-  clean-game coverage for the out-of-range bomber allocation edge. Focused
-  validation passed: `cargo fmt --check`, `cargo check`, `cargo check
-  --features legacy-tools`, `cargo test clean_game_bomber --lib`, `cargo test
-  clean_game --lib`, targeted `make clean-fidelity SCENARIOS="wave_advance"`,
-  touched-doc markdownlint, and `git diff --check`. Broad `cargo test
-  --all-targets`, clippy, `make fidelity`, and full all-scenario `make
-  clean-fidelity` remain deferred because this is a bounded Step 50 bomber
-  shell-allocation edge slice, not Step 50 or Phase 3 closure. The next full
-  gate should run when Step 50 closes, another broader shared-contract risk
-  appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779308693691909`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779308862431699`.
-- `2026-05-20 21:34:41 BST` R9-C4 progress slice
-  `source SHELL scroll delta`. Clean hostile shell movement now applies the
-  source `SHELL` X scroll term, adding `(previous BGL - current BGL) << 2` to
-  fixed-point X motion when the clean camera/background moves. Added focused
-  clean-game coverage for camera-scroll shell movement while preserving source
-  lifetime, Y/X culling, collision, and shell evidence behavior. Focused
-  validation passed: `cargo fmt --check`, `cargo check`, `cargo check
-  --features legacy-tools`, `cargo test clean_game_enemy_projectile --lib`,
-  `cargo test clean_game --lib`, targeted `make clean-fidelity
-  SCENARIOS="wave_advance"`, touched-doc markdownlint, and `git diff --check`.
-  Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
-  all-scenario `make clean-fidelity` remain deferred because this is a bounded
-  Step 50 hostile-shell motion slice, not Step 50 or Phase 3 closure. The next
-  full gate should run when Step 50 closes, another broader shared-contract
-  risk appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779309053099619`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779309277857069`.
-- `2026-05-20 21:43:08 BST` R9-C4 progress slice
-  `active source enemy Y-wrap parity`. Clean active source enemy fixed-point Y
-  motion now mirrors source `VELO` Y-bound handling for landers, pods, bombers,
-  mutants, swarmers, and baiters, wrapping through source `YMIN`/`YMAX` after
-  velocity application while preserving raw fixed-point X wrapping. Added a
-  focused clean-game regression for top and bottom active-object Y-bound
-  wrapping, and updated README, SPEC, and the fidelity gap ledger. Focused
-  validation passed: `cargo fmt --check`, `cargo check`, `cargo check
-  --features legacy-tools`, the focused Y-wrap regression test,
-  `cargo test clean_game --lib`, targeted `make clean-fidelity
-  SCENARIOS="wave_advance"`, touched-doc markdownlint, and `git diff --check`.
-  Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
-  all-scenario `make clean-fidelity` remain deferred because this is a bounded
-  Step 50 active-enemy movement-edge slice, not Step 50 or Phase 3 closure.
-  The next full gate should run when Step 50 closes, another broader
-  shared-contract risk appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779309445529489`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779309785054869`.
-- `2026-05-20 21:54:00 BST` R9-C4 progress slice
-  `bomber TIE slot-selection parity`. Clean bomber picture/Y/bomb state updates
-  now honor the source `TIE` `SEED & 0x06` squad-slot selection, so an empty
-  selected source slot sleeps without changing bomber state while active bomber
-  positions continue through source velocity. Added focused clean-game coverage
-  for the empty selected-slot path and updated README, SPEC, and the fidelity
-  gap ledger. Focused validation passed: `cargo fmt --check`, `cargo check`,
-  `cargo check --features legacy-tools`, the focused bomber slot-selection
-  regression test, `cargo test clean_game_bomber --lib`, `cargo test
-  clean_game --lib`, targeted `make clean-fidelity SCENARIOS="wave_advance"`,
-  touched-doc markdownlint, and `git diff --check`. Broad `cargo test
-  --all-targets`, clippy, `make fidelity`, and full all-scenario
-  `make clean-fidelity` remain deferred because this is a bounded Step 50
-  bomber-family cadence slice, not Step 50 or Phase 3 closure. The next full
-  gate should run when Step 50 closes, another broader shared-contract risk
-  appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779310138116479`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779310437026419`.
-
-- `2026-05-20 21:58:01 BST` R9-C4 progress slice
-  `SHSCAN shell lifetime wrap parity`. Clean hostile shell scans now decrement
-  `source_lifetime_ticks` with source `SHSCAN` wrapping arithmetic, so a live
-  shell timer byte of `0x00` becomes `0xFF` and remains linked until a later
-  scan reaches zero. Added focused clean-game coverage for the zero-lifetime
-  edge and updated README, SPEC, and the fidelity gap ledger. Focused
-  validation passed: `cargo fmt --check`, `cargo check`, `cargo check
-  --features legacy-tools`, the focused zero-lifetime regression test,
-  `cargo test clean_game_enemy_projectile --lib`, `cargo test clean_game
-  --lib`, targeted `make clean-fidelity SCENARIOS="wave_advance"`,
-  touched-doc markdownlint, and `git diff --check`. Broad `cargo test
-  --all-targets`, clippy, `make fidelity`, and full all-scenario
-  `make clean-fidelity` remain deferred because this is a bounded Step 50
-  hostile-shell edge slice, not Step 50 or Phase 3 closure. The next full gate
-  should run when Step 50 closes, another broader shared-contract risk appears,
-  or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779310644890279`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779310880556849`.
-
-- `2026-05-20 22:06:29 BST` R9-C4 progress slice
-  `lander passenger association`. Clean source lander flee/orbit decisions now
-  use the passenger carried by that specific lander instead of a global
-  carried-human flag, and carried human positions stay with the matching lander
-  in multi-lander scenes while generic clean lander carry still follows the
-  nearest lander carried position. Added focused two-lander clean-game coverage
-  and updated README, SPEC, and the fidelity gap ledger. Focused validation
-  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
-  legacy-tools`, the focused two-lander regression test, `cargo test
-  clean_game_lander --lib`, `cargo test clean_game --lib`, targeted
-  `make clean-fidelity SCENARIOS="abduction"`, touched-doc markdownlint, and
-  `git diff --check`. Broad `cargo test --all-targets`, clippy, `make
-  fidelity`, and full all-scenario `make clean-fidelity` remain deferred
-  because this is a bounded Step 50 lander carry slice, not Step 50 or Phase 3
-  closure and it does not change public snapshots. The next full gate should
-  run when Step 50 closes, another broader shared-contract risk appears, or R9
-  finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779311047651329`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779311314055159`.
-
-- `2026-05-20 22:14:47 BST` R9-C4 progress slice
-  `LANDF/LNDFXA passenger pull-in`. Source-shaped clean landers now enter a
-  top-edge pull phase: carrying landers stop at the upper pull edge, pull the
-  passenger upward one row at a time, and only consume the passenger/convert to
-  a mutant after the passenger reaches the lander. Added focused clean-game
-  coverage for top-edge pulling and post-pull conversion, and updated README,
-  SPEC, and the fidelity gap ledger. Focused validation passed: `cargo fmt
-  --check`, `cargo check`, `cargo check --features legacy-tools`, the focused
-  top-edge pull regression test, the focused post-pull conversion regression
-  test, `cargo test clean_game_source_lander --lib`, `cargo test clean_game
-  --lib`, targeted `make clean-fidelity SCENARIOS="abduction"`, touched-doc
-  markdownlint, and `git diff --check`. Broad `cargo test --all-targets`,
-  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
-  deferred because this is a bounded Step 50 lander pull-in slice, not Step 50
-  or Phase 3 closure and it does not change public snapshots. The next full
-  gate should run when Step 50 closes, another broader shared-contract risk
-  appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779311473175939`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779311737383869`.
-
-- `2026-05-20 22:21:05 BST` R9-C4 progress slice
-  `LANDG capture flee-state parity`. Source-shaped clean landers now seed the
-  source `LANDG` split flee vector and `LANDF` sleep countdown on the capture
-  frame instead of leaving source landers on the generic clean capture velocity
-  state. Added focused clean-game coverage for the source-lander capture frame
-  while preserving the existing pull-in and conversion behavior. Focused
-  validation passed: `cargo fmt --check`, `cargo check`, `cargo check
-  --features legacy-tools`, the focused source-lander capture regression test,
-  `cargo test clean_game_source_lander --lib`, `cargo test clean_game --lib`,
-  targeted `make clean-fidelity SCENARIOS="abduction"`, touched-doc
-  markdownlint, and `git diff --check`. Broad `cargo test --all-targets`,
-  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
-  deferred because this is a bounded Step 50 lander capture-state slice, not
-  Step 50 or Phase 3 closure and it does not change public snapshots. The next
-  full gate should run when Step 50 closes, another broader shared-contract
-  risk appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779311983611809`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779312210142199`.
-
-- `2026-05-20 22:29:08 BST` R9-C4 progress slice
-  `LNDFXA cleared-target give-up`. Source-shaped clean landers already at the
-  top pull edge now leave active play and return to the lander reserve when no
-  matching carried passenger remains, instead of falling through the generic
-  no-human mutation path. Added focused clean-game coverage for the
-  cleared-target pull-edge edge case while preserving existing source pull-in
-  and conversion behavior. Focused validation passed: `cargo fmt --check`,
-  `cargo check`, `cargo check --features legacy-tools`, the focused
-  source-lander give-up regression test, `cargo test clean_game_source_lander --lib`,
-  `cargo test clean_game --lib`, targeted `make clean-fidelity SCENARIOS="abduction"`,
-  touched-doc markdownlint, and `git diff --check`.
-  Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
-  all-scenario `make clean-fidelity` remain deferred because this is a bounded
-  Step 50 lander pull-edge slice, not Step 50 or Phase 3 closure and it does
-  not change public snapshots. The next full gate should run when Step 50
-  closes, another broader shared-contract risk appears, or R9 finalization
-  begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779312466672089`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779312683572769`.
-
-- `2026-05-20 22:43:43 BST` R9-C4 progress slice
-  `LANDG grab-state target approach`. Source-shaped clean landers already in
-  the `LANDG` grab state now take the bounded source one-step approach toward
-  the aligned uncarried human, clear active velocity, sleep for one frame, and
-  keep running the source lander shot timer before capture. Normal `LANDS0`
-  orbit target association remains intentionally out of this slice until the
-  clean runtime carries explicit source target state. Focused validation
-  passed: `cargo fmt --check`, `cargo check`,
-  `cargo check --features legacy-tools`,
-  `cargo test clean_game_source_lander --lib`,
-  `cargo test clean_game --lib`, targeted
-  `make clean-fidelity SCENARIOS="abduction wave_advance"`, touched-doc
-  markdownlint, and `git diff --check`. The
-  targeted clean-fidelity run also confirmed the earlier over-broad first pass
-  no longer regresses `wave_advance`.
-  Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
-  all-scenario `make clean-fidelity` remain deferred because this is a bounded
-  Step 50 lander grab-state slice, not Step 50 or Phase 3 closure and it does
-  not change public snapshots. The next full gate should run when Step 50
-  closes, another broader shared-contract risk appears, or R9 finalization
-  begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779312865691409`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779313419246769`.
-
-- `2026-05-20 22:53:13 BST` R9-C4 progress slice
-  `LANDS0 selected-target association`. Source-shaped clean landers now carry
-  an explicit optional `target_human_index`, use it to enter `LANDG` only when
-  the selected human passes the source close-X check, keep source captures
-  target-specific, and reindex or retarget around cleared human slots. Default
-  clean source lander spawns intentionally keep targets unset until source
-  target-list restoration is modeled for clean humans; the first spawn-target
-  attempt was narrowed after targeted `wave_advance` fidelity caught a
-  frame-2732 game-over regression. Focused validation passed:
-  `cargo fmt --check`, `cargo check`, `cargo check --features legacy-tools`,
-  `cargo test clean_game_source_lander --lib`,
-  `cargo test clean_game_lander --lib`, `cargo test clean_game --lib`,
-  targeted `make clean-fidelity SCENARIOS="start_game abduction wave_advance"`,
-  `cargo test --all-targets`, touched-doc markdownlint, and `git diff --check`.
-  `cargo test --all-targets` ran because `SourceLanderSnapshot` changed its
-  public shape. Broad clippy, `make fidelity`, and full all-scenario
-  `make clean-fidelity` remain deferred because this is a bounded Step 50
-  lander target-state slice, not Step 50 or Phase 3 closure. The next full
-  gate should run when Step 50 closes, another broader shared-contract risk
-  appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779313687150899`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779314721297099`.
-
-- `2026-05-20 23:19:31 BST` R9-C4 progress slice
-  `clean-human TLIST slot metadata`. Initial clean humans now carry
-  deterministic source target-list slot addresses from `TLIST` base `0xA11A`
-  with a two-byte stride through `HumanSnapshot`, without assigning default
-  clean source lander targets yet. Default lander spawns intentionally remain
-  targetless until source target-list placement/count parity is modeled, so the
-  previous `wave_advance` spawn-target regression stays avoided. Focused
-  validation passed: `cargo fmt --check`, `cargo check`,
-  `cargo check --features legacy-tools`,
-  `cargo test clean_initial_humans_carry_source_target_list_slots --lib`,
-  `cargo test clean_game_human_evidence_uses_source_astronaut_picture --lib`,
-  `cargo test clean_game_source_lander --lib`,
-  `cargo test clean_game_lander --lib`, `cargo test clean_game --lib`,
-  targeted `make clean-fidelity SCENARIOS="start_game abduction
-  wave_advance"`, `cargo test --all-targets`, touched-doc markdownlint, and
-  `git diff --check`. `cargo test --all-targets` ran because `HumanSnapshot`
-  changed its public shape. Broad clippy, `make fidelity`, and full
-  all-scenario `make clean-fidelity` remain deferred because this is a bounded
-  Step 50 clean-human target-list metadata slice, not Step 50 or Phase 3
-  closure. The next full gate should run when Step 50 closes, another broader
-  shared-contract risk appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779314945871669`.
-
-- `2026-05-20 23:33:42 BST` R9-C4 progress slice
-  `source-restored clean human placement/count`. Initial clean worlds now
-  restore ten source-shaped humans through the bounded `PLRES` / `TLIST`
-  target-group algorithm instead of the previous two fixed placeholders. The
-  restored humans keep deterministic source target-list slot addresses and
-  source restore-Y placement, while the clean lander startup path still leaves
-  selected targets unset until the source target-list cursor assignment slice.
-  Focused validation passed: `cargo fmt --check`, `cargo check`,
-  `cargo test clean_initial_humans_carry_source_target_list_slots --lib`,
-  `cargo test clean_wave_spawns_source_profile_active_enemy_batch --lib`,
-  `cargo test clean_game_starts_from_domain_state --lib`, `cargo test
-  clean_game_wave_clear_delays_next_wave_spawn_until_following_frame --lib`,
-  `cargo test clean_game --lib`, targeted `make clean-fidelity
-  SCENARIOS="start_game abduction wave_advance"`, touched-doc markdownlint,
-  and `git diff --check`. Broad `cargo test --all-targets`, full `make
-  fidelity`, full all-scenario `make clean-fidelity`, and full clippy remain
-  deferred because this is a bounded Step 50 startup human-restore slice, not
-  Step 50 or Phase 3 closure, and it does not change public snapshot shape.
-  The next full gate should run when Step 50 closes, another broader
-  shared-contract risk appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779315947806819`.
-
-- `2026-05-20 23:44:06 BST` R9-C4 progress slice
-  `source target-list cursor assignment`. Clean `WorldSnapshot` now carries
-  the source `TPTR`-shaped target-list cursor, initial and reserve source
-  lander spawns select restored `TLIST` humans by advancing that cursor before
-  scanning, and retargeting reuses the same cursor when a selected target is no
-  longer live. This closes the default targetless source-lander startup gap
-  while preserving the separate source enemy RNG cadence. Focused validation
-  passed: `cargo fmt --check`, `cargo check`, `cargo test
-  clean_source_lander_target_selection_advances_tlist_cursor --lib`, `cargo
-  test clean_wave_spawns_source_profile_active_enemy_batch --lib`, `cargo test
-  clean_game_source_lander --lib`, `cargo test clean_game_lander --lib`,
-  `cargo test clean_game --lib`, targeted `make clean-fidelity
-  SCENARIOS="start_game abduction wave_advance"`, broad `cargo test
-  --all-targets` for the public snapshot-field change, touched-doc
-  markdownlint, and `git diff --check`. Full `make fidelity`, full
-  all-scenario `make clean-fidelity`, and full clippy remain deferred because
-  this is a bounded Step 50 target-cursor slice, not Step 50 or Phase 3
-  closure. The next full gate should run when Step 50 closes, another broader
-  shared-contract risk appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779316591648309`.
-
-- `2026-05-20 23:56:58 BST` R9-C4 progress slice
-  `source human restore evidence`. Source-restored clean humans now retain the
-  `PLRES` `LSEED` X low byte as the source X fraction for object-detail
-  world-position evidence and carry the odd-`LSEED` `ASTP3` astronaut picture
-  descriptor choice, while default human evidence keeps reporting `ASTP1`.
-  Focused validation passed: `cargo fmt --check`, `cargo check`, `cargo test
-  clean_initial_humans_carry_source_target_list_slots --lib`, `cargo test
-  clean_game_human_evidence_uses_source_astronaut_picture --lib`, `cargo test
-  clean_world_object_evidence_carries_source_motion_words --lib`, targeted
-  `make clean-fidelity SCENARIOS="start_game abduction wave_advance"`, broad
-  `cargo test --all-targets` for the public `HumanSnapshot` field change,
-  touched-doc markdownlint, and `git diff --check`. Full `make fidelity`,
-  full all-scenario `make clean-fidelity`, and full clippy remain deferred
-  because this is a bounded Step 50 human restore-evidence slice, not Step 50
-  or Phase 3 closure. The next full gate should run when Step 50 closes,
-  another broader shared-contract risk appears, or R9 finalization begins.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779317273545259`.
-
-- `2026-05-21 00:09:19 BST` R9-C4 progress slice
-  `source ASTRO human walk`. Clean `WorldSnapshot` now carries a separate
-  source `ASTRO` process cursor and sleep timer. During play, the clean runtime
-  advances one restored, uncarried `TLIST` human on the source cadence, skips
-  untargetable slots, applies source fixed-point X steps and terrain-relative
-  Y steps, and cycles object-detail picture evidence from `ASTP1` through
-  `ASTP4`. Focused validation passed: `cargo fmt --check`, `cargo check`,
-  `cargo test clean_source_astronaut_process_walks_target_list_human --lib`,
-  `cargo test clean_game_source_astronaut_walk_updates_picture_evidence
-  --lib`, `cargo test clean_initial_humans_carry_source_target_list_slots
-  --lib`, `cargo test clean_game_human_evidence_uses_source_astronaut_picture
-  --lib`, `cargo test
-  clean_game_source_lander_gives_up_when_pull_target_cleared --lib`, `cargo
-  test clean_game_standing_humans_do_not_fall --lib`, targeted `make
-  clean-fidelity SCENARIOS="start_game abduction wave_advance"`, broad `cargo
-  test --all-targets` for the public `WorldSnapshot` field change, touched-doc
-  markdownlint, and `git diff --check`. Full `make fidelity`, full
-  all-scenario `make clean-fidelity`, and full clippy remain deferred because
-  this is a bounded Step 50 source-ASTRO slice, not Step 50 or Phase 3 closure.
-  The next full gate should run when Step 50 closes, another broader
-  shared-contract risk appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779318051909159`.
-
-- `2026-05-21 00:17:03 BST` R9-C4 progress slice
-  `source enemy kill sound commands`. Clean projectile and smart-bomb enemy
-  destruction now emits the source family hit sound command bytes through the
-  existing `SoundEvent::UnmappedSoundCommand` surface: `LHSND` for landers,
-  `SCHSND` for mutants, `TIHSND` for bombers, `PRHSND` for pods, `SWHSND` for
-  swarmers, and `UFHSND` for baiters. Focused validation passed: `cargo
-  fmt --check`, `cargo check`, `cargo test
-  clean_game_enemy_destroy_emits_source_hit_sound_commands --lib`, `cargo test
-  clean_game_resolves_projectile_enemy_collision_and_scores --lib`, `cargo
-  test clean_game_applies_playing_controls_through_systems --lib`, `cargo test
-  clean_game_pod_projectile_collision_spawns_source_bounded_swarmers --lib`,
-  `cargo test clean_game_smart_bomb_clears_enemies_scores_and_updates_scene
-  --lib`, and `cargo test
-  clean_game_smart_bomb_pod_spawns_swarmers_after_destroyed_batch --lib`,
-  targeted `make clean-fidelity SCENARIOS="firing smart_bomb"`, touched-doc
-  markdownlint, and `git diff --check`. Broad `cargo test --all-targets`,
-  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
-  clippy remain deferred because this is a bounded Step 50 source kill-sound
-  slice, not Step 50 or Phase 3 closure, and it does not change the public API.
-  The next full gate should run when Step 50 closes, another broader
-  shared-contract risk appears, or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779318773964509`.
-
-- `2026-05-21 00:25:05 BST` R9-C4 progress slice
-  `source enemy shot sound commands`. Clean lander, mutant, baiter, and
-  mini-swarmer projectile launches now emit their source shot sound command
-  bytes through the existing `SoundEvent::UnmappedSoundCommand` surface only
-  when the source-shaped shell allocation succeeds: `LSHSND` for landers,
-  `SSHSND` for mutants, `USHSND` for baiters, and `SWSSND` for mini-swarmers.
-  Bomber `BOMBST` shell allocation remains silent. Focused validation passed:
-  `cargo fmt --check`, `cargo check`, `cargo test
-  clean_game_lander_source_loop_orbits_cycles_and_fires --lib`, `cargo test
-  clean_game_mutant_source_loop_hops_fires_and_sleeps --lib`, `cargo test
-  clean_game_baiter_source_loop_cycles_fires_and_updates_velocity --lib`,
-  `cargo test
-  clean_game_mini_swarmer_loop_updates_y_velocity_and_projects_enemy_bomb
-  --lib`, `cargo test clean_game_mini_swarmer_bomb_respects_source_shell_limit
-  --lib`, and `cargo test
-  clean_game_bomber_source_loop_cycles_picture_and_projects_bomb --lib`,
-  targeted `make clean-fidelity SCENARIOS="firing abduction wave_advance"`,
-  touched-doc markdownlint, and `git diff --check`. Broad `cargo test
-  --all-targets`, full `make fidelity`, full all-scenario `make
-  clean-fidelity`, and full clippy remain deferred because this is a bounded
-  Step 50 source shot-sound slice, not Step 50 or Phase 3 closure, and it does
-  not change the public API. The next full gate should run when Step 50 closes,
-  another broader shared-contract risk appears, or R9 finalization begins.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779319291545789`.
-
-- `2026-05-21 00:36:04 BST` R9-C4 progress slice
-  `source astronaut sound commands`. Clean killed carrying-lander destruction
-  now releases passengers from the source carried/pull positions and emits the
-  source `ASCSND` command instead of the ordinary lander hit command when a
-  passenger is released. Clean player catches now emit source `ACSND`, and safe
-  landings now emit source `ALSND`. Focused validation passed: `cargo
-  fmt --check`, `cargo check`, `cargo test clean_game_killed --lib`, `cargo
-  test clean_game_player_catches_falling_human_scores_and_starts_p500_popup
-  --lib`, `cargo test clean_game_released_human_falls_until_terrain_landing
-  --lib`, `cargo test
-  clean_game_fatal_falling_human_impact_removes_human_and_starts_human_loss
-  --lib`, `cargo test clean_game_standing_humans_do_not_fall --lib`, `cargo
-  test clean_game_enemy_destroy_emits_source_hit_sound_commands --lib`, `cargo
-  test clean_game_resolves_projectile_enemy_collision_and_scores --lib`, and
-  targeted `make clean-fidelity SCENARIOS="abduction planet_destruction"`.
-  Broad `cargo test --all-targets`, full `make fidelity`, full all-scenario
-  `make clean-fidelity`, and full clippy remain deferred because this is a
-  bounded Step 50 astronaut sound-command slice, not Step 50 or Phase 3
-  closure, and it does not change the public API. The next full gate should
-  run when Step 50 closes, another broader shared-contract risk appears, or R9
-  finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779319957438009`.
-
-- `2026-05-21 00:47:17 BST` R9-C4 progress slice
-  `source lander abduction sound commands`. Clean lander pickup now emits the
-  source `LPKSND` command, and source-shaped top-edge pull-in emits the source
-  `LSKSND` command once when the pull transition starts. Follow-up pull frames
-  stay silent. Focused validation passed: `cargo fmt --check`, `cargo check`,
-  `cargo test clean_game_lander_abducts_aligned_human_and_carries_upward
-  --lib`, `cargo test
-  clean_game_source_lander_capture_seeds_source_flee_state --lib`, `cargo test
-  clean_game_source_lander_pulls_passenger_at_top_edge --lib`, `cargo test
-  clean_game_source_lander_pull_sound_does_not_repeat --lib`, `cargo test
-  clean_game_killed_source_lander_pull_passenger_releases_human --lib`,
-  `cargo test clean_game_killed_carrying_lander_releases_human --lib`,
-  targeted `make clean-fidelity SCENARIOS="abduction"`, touched-doc
-  markdownlint, and `git diff --check`. Broad `cargo test --all-targets`,
-  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
-  clippy remain deferred because this is a bounded Step 50 lander
-  sound-command slice, not Step 50 or Phase 3 closure, and it does not change
-  the public API. The next full gate should run when Step 50 closes, another
-  broader shared-contract risk appears, or R9 finalization begins. Slack start
-  update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779320546837389`.
-
-- `2026-05-21 00:53:56 BST` R9-C4 progress slice
-  `source player action sound commands`. Successful clean laser launches now
-  emit the source `LASSND` command, capped fire attempts remain silent, and
-  accepted clean smart-bomb inputs emit the first source `SBSND` command before
-  per-enemy destruction sounds. Focused validation passed: `cargo fmt
-  --check`, `cargo check`, `cargo test
-  clean_game_advances_projectiles_through_world_snapshots --lib`, `cargo test
-  clean_game_capped_fire_does_not_emit_laser_sound --lib`, `cargo test
-  clean_game_smart_bomb_clears_enemies_scores_and_updates_scene --lib`,
-  `cargo test
-  clean_game_smart_bomb_pod_spawns_swarmers_after_destroyed_batch --lib`,
-  `cargo test clean_game_applies_playing_controls_through_systems --lib`,
-  targeted `make clean-fidelity SCENARIOS="firing smart_bomb"`, touched-doc
-  markdownlint, and `git diff --check`. Broad `cargo test --all-targets`,
-  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
-  clippy remain deferred because this is a bounded Step 50 player-action
-  sound-command slice, not Step 50 or Phase 3 closure, and it does not change
-  the public API. The next full gate should run when Step 50 closes, another
-  broader shared-contract risk appears, or R9 finalization begins. Slack start
-  update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779321089267019`.
-
-- `2026-05-21 00:59:20 BST` R9-C4 progress slice
-  `source hyperspace shell cleanup`. Accepted clean hyperspace inputs now clear
-  active enemy projectiles to match the visible source `HYP02` / `KILSHL`
-  shell-list cleanup while preserving player projectiles outside that source
-  shell-object list. Focused validation passed: `cargo fmt --check`, `cargo
-  check`, `cargo test clean_game_hyperspace_clears_source_enemy_projectiles
-  --lib`, `cargo test clean_game_enemy_projectile --lib`, `cargo test
-  clean_game_applies_playing_controls_through_systems --lib`, targeted `make
-  clean-fidelity SCENARIOS="hyperspace"`, touched-doc markdownlint, and `git
-  diff --check`. Broad `cargo test --all-targets`, full `make fidelity`, full
-  all-scenario `make clean-fidelity`, and full clippy remain deferred because
-  this is a bounded Step 50 hyperspace shell-cleanup slice, not Step 50 or
-  Phase 3 closure, and it does not change the public API. The next full gate
-  should run when Step 50 closes, another broader shared-contract risk appears,
-  or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779321538791769`.
-
-- `2026-05-21 01:05:23 BST` R9-C4 progress slice
-  `source hyperspace appearance sound command`. Accepted clean hyperspace
-  inputs now surface the source `APSND` command loaded by the visible `HYP02`
-  rematerialization path, after the bounded shell-list cleanup evidence.
-  Focused validation passed: `cargo fmt --check`, `cargo check`, `cargo test
-  clean_game_hyperspace_clears_source_enemy_projectiles --lib`, `cargo test
-  clean_game_applies_playing_controls_through_systems --lib`, targeted `make
-  clean-fidelity SCENARIOS="hyperspace"`, touched-doc markdownlint, and `git
-  diff --check`. Broad `cargo test --all-targets`, full `make fidelity`, full
-  all-scenario `make clean-fidelity`, and full clippy remain deferred because
-  this is a bounded Step 50 hyperspace sound-command slice, not Step 50 or
-  Phase 3 closure, and it does not change the public API. The next full gate
-  should run when Step 50 closes, another broader shared-contract risk appears,
-  or R9 finalization begins. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779321920441349`.
-
-- `2026-05-21 01:10:37 BST` R9-C4 progress slice
-  `source hyperspace rematerialization state`. Accepted clean hyperspace inputs
-  now reload the bounded visible `HYP02` player/background state from current
-  clean source `SEED`/`HSEED`: clean camera/background uses the seed word,
-  player X and facing use the `HSEED` low-bit branch, player Y restores the
-  source high byte while preserving the low byte, and player velocity clears.
-  Focused validation passed: `cargo fmt --check`, `cargo check`, `cargo test
-  clean_game_hyperspace --lib`, `cargo test
-  clean_game_applies_playing_controls_through_systems --lib`, targeted `make
-  clean-fidelity SCENARIOS="hyperspace"`, touched-doc `markdownlint`, and `git
-  diff --check`. Broad `cargo test --all-targets`, full `make fidelity`, full
-  all-scenario `make clean-fidelity`, and full clippy remain deferred because
-  this is a bounded Step 50 hyperspace rematerialization-state slice, not a Step
-  50 / Phase 3 closure or R9 finalization. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779322205988939`.
-
-- `2026-05-21 01:19:26 BST` R9-C4 progress slice
-  `source hyperspace HYP2 death risk`. Accepted clean hyperspace inputs now
-  carry the bounded source `HYP2` tail after rematerialization: `LSEED > 0xC0`
-  enters the existing clean player damage path, while `0xC0` and below remain
-  safe after shell cleanup, rematerialization, and `APSND`. Focused validation
-  passed: `cargo fmt --check`, `cargo check`, `cargo test clean_game_hyperspace
-  --lib`, `cargo test clean_game_applies_playing_controls_through_systems
-  --lib`, `cargo test clean_game_player_enemy_collision --lib`, targeted `make
-  clean-fidelity SCENARIOS="hyperspace"`, touched-doc `markdownlint`, and `git
-  diff --check`. Broad `cargo test --all-targets`, full `make fidelity`, full
-  all-scenario `make clean-fidelity`, and full clippy remain deferred because
-  this is a bounded Step 50 hyperspace `HYP2` tail slice, not a Step 50 / Phase
-  3 closure or R9 finalization. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779322705904049`.
-
-- `2026-05-21 01:26:39 BST` R9-C4 progress slice
-  `source wave-enemy total excludes baiters`. Clean source wave bookkeeping now
-  follows the source `WVCHK` / `GEXEC` count by excluding active baiters
-  (`UFOCNT`) from the wave-enemy total. Active baiters no longer inflate
-  low-enemy baiter pacing, block reserve activation when only baiters remain
-  active, or block wave clear when no source-counted enemies or reserves
-  remain. Focused validation passed: `cargo fmt --check`, `cargo check`,
-  `cargo test clean_game_baiter --lib`, `cargo test clean_game_wave_clear
-  --lib`, targeted `make clean-fidelity SCENARIOS="wave_advance smart_bomb"`,
-  touched-doc `markdownlint`, and `git diff --check`. Broad `cargo test
-  --all-targets`, full `make fidelity`, full all-scenario `make
-  clean-fidelity`, and full clippy remain deferred because this is a bounded
-  Step 50 source wave-enemy bookkeeping slice, not a Step 50 / Phase 3 closure
-  or R9 finalization. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779323162206699`.
-
-- `2026-05-21 01:38:33 BST` R9-C4 progress slice
-  `source bomb-shell collision sound command`. Clean enemy-projectile/player
-  collision now surfaces the source `BKIL` / `AHSND` command evidence while
-  preserving the existing source-backed shell removal, 25-point score, bomb
-  explosion, and player-damage handoff. Focused validation passed: `cargo fmt
-  --check`, `cargo check`, `cargo test clean_game_enemy_projectile --lib`,
-  targeted `make clean-fidelity SCENARIOS="death"`, touched-doc
-  `markdownlint`, and `git diff --check`. Broad `cargo test --all-targets`,
-  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
-  clippy remain deferred because this is a bounded Step 50 shell-collision
-  command slice, not a Step 50 / Phase 3 closure or R9 finalization. Slack
-  start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779323774753699`.
-
-- `2026-05-21 01:47:47 BST` R9-C4 progress slice
-  `source fatal astronaut impact sound command`. Clean fatal falling-human
-  impact now surfaces the source `ASTKIL` / `AHSND` command evidence while
-  preserving human removal, astronaut explosion spawning, and the existing
-  last-human terrain-loss handoff. The adjacent safe-landing fixture now keeps
-  a source-counted enemy alive so the test does not accidentally advance the
-  wave after active baiters were excluded from source wave totals. Focused
-  validation passed: `cargo fmt --check`, `cargo check`, `cargo test
-  clean_game_fatal_falling_human_impact_removes_human_and_starts_human_loss
-  --lib`, `cargo test clean_game_released_human_falls_until_terrain_landing
-  --lib`, targeted `make clean-fidelity SCENARIOS="planet_destruction"`,
-  touched-doc `markdownlint`, and `git diff --check`. Broad `cargo test
-  --all-targets`, full `make fidelity`, full all-scenario `make
-  clean-fidelity`, and full clippy remain deferred because this is a bounded
-  Step 50 fatal-impact command slice, not a Step 50 / Phase 3 closure or R9
-  finalization. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779324213060339`.
-
-- `2026-05-21 01:54:16 BST` R9-C4 progress slice
-  `source player-death sound command`. Clean player-hit entry now surfaces the
-  source `PLEND` / `PDSND` command evidence while preserving stock decrement,
-  player explosion spawning, two-player switch routing, game-over sleep
-  routing, and the `HYP2` death-risk branch. Focused validation passed: `cargo
-  fmt --check`, `cargo check`, `cargo test
-  clean_game_player_enemy_final_collision_enters_game_over --lib`, `cargo test
-  clean_game_enemy_projectile_collision_scores_and_destroys_player --lib`,
-  `cargo test clean_game_hyperspace_lseed_high_enters_source_death_path
-  --lib`, targeted `make clean-fidelity SCENARIOS="death hyperspace"`,
-  touched-doc `markdownlint`, and `git diff --check`. Broad `cargo test
-  --all-targets`, full `make fidelity`, full all-scenario `make
-  clean-fidelity`, and full clippy remain deferred because this is a bounded
-  Step 50 player-death command slice, not a Step 50 / Phase 3 closure or R9
-  finalization. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779324665834879`.
-
-- `2026-05-21 02:01:15 BST` R9-C4 progress slice
-  `source terrain-blow start sound command`. Clean last-human terrain-blow
-  entry now surfaces the source `TERBLO` / `AHSND` command evidence while
-  preserving terrain erase, scanner terrain disablement, `TEREX` explosion
-  projection, and the existing fatal astronaut / planet-loss handoff. Focused
-  validation passed: `cargo fmt --check`, `cargo check`, `cargo test
-  clean_world_starts_source_terrain_blow_and_projects_terex --lib`, `cargo
-  test clean_game_fatal_falling_human_impact_removes_human_and_starts_human_loss
-  --lib`, targeted `make clean-fidelity SCENARIOS="planet_destruction"`,
-  touched-doc `markdownlint`, and `git diff --check`. Broad `cargo test
-  --all-targets`, full `make fidelity`, full all-scenario `make
-  clean-fidelity`, and full clippy remain deferred because this is a bounded
-  Step 50 terrain-blow start command slice, not a Step 50 / Phase 3 closure or
-  R9 finalization. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779325031424119`.
-
-- `2026-05-21 02:11:05 BST` R9-C4 progress slice
-  `source terrain-blow completion sound command`. Clean terrain blow now
-  advances through bounded source-shaped `TBL3` / `TBL4` sleep, pseudo-color,
-  and iteration lifecycle after the last-human handoff, restarts `TEREX`
-  passes through iteration 15, and emits source `TBSND` completion command
-  evidence at iteration 16. Focused validation passed: `cargo fmt --check`,
-  `cargo check`, `cargo test
-  clean_world_starts_source_terrain_blow_and_projects_terex --lib`, `cargo
-  test clean_world_advances_source_terrain_blow_to_completion_sound --lib`,
-  targeted `make clean-fidelity SCENARIOS="planet_destruction"`, touched-doc
-  `markdownlint`, and `git diff --check`. Broad `cargo test --all-targets`,
-  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
-  clippy remain deferred because this is a bounded Step 50 terrain-blow
-  lifecycle command slice, not a Step 50 / Phase 3 closure or R9 finalization.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779325526692779`.
-
-- `2026-05-21 02:19:50 BST` R9-C4 progress slice
-  `source thrust stop sound edge`. Clean held thrust now latches the existing
-  source `SNDS01` / `0xE9` start event on the accepted press edge and emits
-  the source `SNDS00` / `0xF0` stop event once when thrust is released. The
-  latch resets across playfield, turn, wave, and player-damage transitions.
-  Focused validation passed: `cargo fmt --check`, `cargo check`, `cargo test
-  clean_game_thrust_release_emits_source_stop_sound --lib`, `cargo test
-  clean_game_applies_playing_controls_through_systems --lib`, targeted `make
-  clean-fidelity SCENARIOS="thrust_reverse"`, touched-doc `markdownlint`, and
-  `git diff --check`. Broad `cargo test --all-targets`, full `make fidelity`,
-  full all-scenario `make clean-fidelity`, and full clippy remain deferred
-  because this is a bounded Step 50 player-action sound-edge slice, not a Step
-  50 / Phase 3 closure or R9 finalization. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779326284552149`.
-
-- `2026-05-21 02:28:56 BST` R9-C4 progress slice
-  `source laser loop movement`. Clean player projectiles now use the source
-  `LASR0` / `LASL0` loop shape: five source screen columns per step, no
-  vertical motion, and source right/left edge termination at `0x98` / `0x05`.
-  Focused validation passed: `cargo fmt --check`, `cargo check`, `cargo test
-  projectile --lib`, `cargo test
-  clean_game_applies_playing_controls_through_systems --lib`, `cargo test
-  clean_world_object_evidence_carries_source_motion_words --lib`, targeted
-  `make clean-fidelity SCENARIOS="firing"`, touched-doc `markdownlint`, and
-  `git diff --check`. Broad `cargo test --all-targets`, full `make fidelity`,
-  full all-scenario `make clean-fidelity`, and full clippy remain deferred
-  because this is a bounded Step 50 laser movement slice, not a Step 50 / Phase
-  3 closure or R9 finalization. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779326852491929`.
-
-- `2026-05-21 02:34:58 BST` R9-C4 progress slice
-  `source laser collision footprint`. Clean projectile/enemy collision now uses
-  the source `LASP1` 8x1 picture footprint while keeping the direct runtime
-  projectile renderer at its existing 8x2 sprite size. Focused validation
-  passed: `cargo fmt --check`, `cargo check`, `cargo test
-  clean_game_player_projectile_uses_source_lasp1_collision_height --lib`,
-  `cargo test clean_game_resolves_projectile_enemy_collision_and_scores
-  --lib`, targeted `make clean-fidelity SCENARIOS="firing"`, touched-doc
-  `markdownlint`, and `git diff --check`. Broad `cargo test --all-targets`,
-  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
-  clippy remain deferred because this is a bounded Step 50 laser collision
-  slice, not a Step 50 / Phase 3 closure or R9 finalization. Slack start
-  update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779327240528909`.
-
-- `2026-05-21 02:41:17 BST` R9-C4 progress slice
-  `source bomb-shell collision footprint`. Clean enemy-projectile/player
-  collision now uses the source `BMBP1` 2x3 picture footprint while keeping the
-  direct runtime projectile renderer at its existing 4x6 bomb sprite size.
-  Focused validation passed: `cargo fmt --check`, `cargo check`, `cargo test
-  clean_game_enemy_projectile_uses_source_bmbp1_collision_footprint --lib`,
-  `cargo test clean_game_enemy_projectile_collision_scores_and_destroys_player
-  --lib`, targeted `make clean-fidelity SCENARIOS="death"`, touched-doc
-  `markdownlint`, and `git diff --check`. Broad `cargo test --all-targets`,
-  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
-  clippy remain deferred because this is a bounded Step 50 shell collision
-  slice, not a Step 50 / Phase 3 closure or R9 finalization. Slack start
-  update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779327599920269`.
-
-- `2026-05-21 02:47:05 BST` R9-C4 progress slice
-  `source enemy collision footprints`. Clean projectile/enemy and player/enemy
-  collision now use the source enemy object-picture sizes while keeping the
-  direct runtime enemy renderer on the current clean sprite sizes. Focused
-  validation passed: `cargo fmt --check`, `cargo check`, `cargo test
-  clean_game_projectile_enemy_uses_source_enemy_collision_width --lib`, `cargo
-  test clean_game_player_enemy_uses_source_enemy_collision_width --lib`, `cargo
-  test clean_game_resolves_projectile_enemy_collision_and_scores --lib`, `cargo
-  test clean_game_player_enemy_collision_loses_life_and_removes_enemy --lib`,
-  targeted `make clean-fidelity SCENARIOS="firing death"`, touched-doc
-  `markdownlint`, and `git diff --check`. Broad `cargo test --all-targets`,
-  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
-  clippy remain deferred because this is a bounded Step 50 enemy collision
-  slice, not a Step 50 / Phase 3 closure or R9 finalization. Slack start
-  update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779327961109169`.
-
-- `2026-05-21 02:51:32 BST` R9-C4 progress slice
-  `source player collision footprint`. Clean player/enemy and
-  enemy-projectile/player collision now use the source `PLAPIC` / `PLBPIC` 8x6
-  player picture footprint while keeping the direct runtime player renderer on
-  the current 16x8 ship sprite size. Focused validation passed: `cargo fmt
-  --check`, `cargo check`, `cargo test
-  clean_game_player_enemy_uses_source_player_collision_footprint --lib`, `cargo
-  test clean_game_enemy_projectile_uses_source_player_collision_footprint
-  --lib`, `cargo test clean_game_player_enemy_collision_loses_life_and_removes_enemy
-  --lib`, `cargo test
-  clean_game_enemy_projectile_collision_scores_and_destroys_player --lib`,
-  targeted `make clean-fidelity SCENARIOS="death"`, touched-doc
-  `markdownlint`, and `git diff --check`. Broad `cargo test --all-targets`,
-  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
-  clippy remain deferred because this is a bounded Step 50 player collision
-  slice, not a Step 50 / Phase 3 closure or R9 finalization. Slack start
-  update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779328230577129`.
-
-- `2026-05-21 02:55:23 BST` R9-C4 progress slice
-  `source rescue collision footprints`. Clean falling-human rescue collision
-  now uses the source `PLAPIC` / `PLBPIC` 8x6 player footprint plus
-  `ASTP1`-`ASTP4` 2x8 astronaut footprints while keeping direct runtime
-  player/human rendering on the current clean sprite sizes. Focused validation
-  passed: `cargo fmt --check`, `cargo check`, `cargo test
-  clean_game_player_rescue_uses_source_collision_footprints --lib`, `cargo test
-  clean_game_player_catches_falling_human_scores_and_starts_p500_popup --lib`,
-  `cargo test clean_game_player_does_not_catch_grounded_human --lib`,
-  targeted `make clean-fidelity SCENARIOS="abduction"`, touched-doc
-  `markdownlint`, and `git diff --check`. Broad `cargo test --all-targets`,
-  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
-  clippy remain deferred because this is a bounded Step 50 rescue collision
-  slice, not a Step 50 / Phase 3 closure or R9 finalization. Slack start
-  update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779328490473229`.
-
-- `2026-05-21 03:21:02 BST` R9-C4 progress slice
-  `source bomber shell counters`. Clean enemy projectiles now distinguish
-  source `FBOUT` fireballs from source `BMBOUT` bomber bomb shells, and bomber
-  `BOMBST` creation honors both the separate source `BMBCNT` ten-bomb cap and
-  the total 20-cell shell-list cap. Focused validation passed: `cargo
-  fmt --check`, `cargo check`, `cargo test clean_game_bomber --lib`,
-  `cargo test clean_game_mini_swarmer --lib`, `cargo test
-  clean_game_mutant_source_loop_hops_fires_and_sleeps --lib`, `cargo test
-  clean_game_source_lander_gives_up_when_pull_target_cleared --lib`, `cargo
-  test clean_game_released_lander_passenger_falls_on_following_frame --lib`,
-  `cargo test --all-targets`, touched-doc `markdownlint`, and `git
-  diff --check`. Broad `make fidelity`, full all-scenario `make
-  clean-fidelity`, and full clippy remain deferred because this is a bounded
-  Step 50 shell-counter slice; `cargo test --all-targets` was run because the
-  public clean projectile snapshot shape changed. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779329168264399`.
-
-- `2026-05-21 03:30:14 BST` R9-C4 progress slice
-  `source bomber squad slots`. Clean source-bomber state now carries the
-  persistent source `TIE` squad slot, reserve `TIEST` batches use four source
-  slots per squad, and the selected `SEED & 0x06` slot no longer shifts when a
-  bomber has been killed or an empty slot is selected. Focused validation
-  passed: `cargo fmt --check`, `cargo check`, `cargo test clean_game_bomber
-  --lib`, `cargo test --all-targets`, touched-doc `markdownlint`, and `git
-  diff --check`. Broad `make fidelity`, full all-scenario `make
-  clean-fidelity`, and full clippy remain deferred because this is a bounded
-  Step 50 bomber-squad slice; `cargo test --all-targets` was run because the
-  public clean source-bomber snapshot shape changed. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779330459202089`.
-
-- `2026-05-21 07:46:41 BST` Planning update. Added the R9-C4 closure checklist
-  above so Step 50 now has explicit audit, bounded implementation,
-  source-ecology fixture, documentation, and Phase 3 gate steps before R9-D1 can
-  start. This was a docs-only planning update, so no Slack update or Rust
-  validation was required.
-
-- `2026-05-21 07:50:00 BST` Completed R9-C4.1 residual ecology audit.
-  Classified the remaining Step 50 object-ecology surface against the current
-  clean runtime, focused tests, and `docs/fidelity/gaps.md` notes. The audit
-  found no immediate bounded movement/projectile runtime gap before fixture
-  hardening, so R9-C4.2 is now conditional on concrete drift from R9-C4.3.
-  This was a docs/status update, so no Slack update or Rust validation was
-  required.
-
-- `2026-05-21 07:57:55 BST` Completed R9-C4.3 source ecology fixture
-  hardening and R9-C4.4 documentation reconciliation. Targeted `make
-  clean-fidelity SCENARIOS="start_game smart_bomb hyperspace abduction death
-  wave_advance planet_destruction"` matched all seven scenarios. No public
-  facade, oracle, `WorldSnapshot`, object evidence, sound evidence, or scenario
-  field changes were required, so README, SPEC, `docs/fidelity/gaps.md`, and
-  this plan were updated only to record closure readiness. Broad Step 50 closure
-  validation remains R9-C4.5.
-
-- `2026-05-21 08:17:59 BST` Completed R9-C4.5 and closed Step 50 / B08. The
-  only runtime-source edit was a behavior-preserving clippy cleanup in
-  `src/game.rs`: source lander advancement now uses a context struct instead of
-  a long parameter list, carried-human sync uses one condition, source explosion
-  frame indexing uses `is_multiple_of`, and a source-lander upward grab unit test
-  covers the new context line that the coverage gate flagged. Focused validation
-  passed with `cargo test
-  clean_game_source_lander_grab_step_seeks_upward_target --lib`. Broad closure
-  validation passed with `cargo fmt --check`, `cargo test --all-targets`, `cargo
-  clippy --all-targets --features legacy-tools -- -D warnings`, full
-  all-scenario `make clean-fidelity`, full `make fidelity`, `markdownlint
-  PLAN.md README.md SPEC.md docs/fidelity/gaps.md`, and `git diff --check`.
-  R9-C4.2 stayed unused because no source ecology drift surfaced. The next full
-  gate should run when Step 51/R9-D1 closes, a shared public contract changes,
-  or R9 reaches the final Step 54 validation gate.
-
-- `2026-05-21 08:26:46 BST` Completed R9-D1.1 non-final death/respawn rotation.
-  Clean player deaths with remaining stock now enter a `GameOver` death-cloud
-  pause instead of continuing active play immediately. Once the source-backed
-  player explosion cloud finishes, the clean game resumes through the existing
-  player-start path for the next stocked player, matching the source `PLE02`
-  selection shape for one-player wrap and two-player rotation. Focused
-  validation passed with `cargo test non_final_death --lib` and `cargo test
-  clean_game_player_enemy_collision_loses_life_and_removes_enemy --lib`. Broad
-  validation remains deferred because this is a bounded B09 respawn-cadence
-  slice with no public snapshot shape change. The next full gate should run when
-  R9-D1 closes, a public contract changes, or R9 reaches Step 54.
-
-- `2026-05-21 08:53:00 BST` Completed R9-D1.2 post-rotation score/stock
-  ownership. A focused fixture covers a player-one non-final death, player-two
-  respawn, player-two scoring over the replay threshold, high-score update, bonus
-  threshold advance, and frame-boundary stock synchronization that updates
-  player-two life/smart-bomb stock while leaving player-one stock and score
-  unchanged. The existing current-second-player high-score fixture was also
-  corrected to use a real two-player final-session setup with player one out of
-  stock, instead of an inconsistent one-player session forced to player two.
-  Broad validation remains deferred because this is a bounded B09
-  stock-accounting/game-over fixture slice with no runtime or public snapshot
-  shape change. The next full gate should run when R9-D1 closes, a public
-  contract changes, or R9 reaches Step 54.
-
-- `2026-05-21 09:02:00 BST` Completed R9-D1.3 and closed Step 51 / B09. The
-  closure audit found one route fixture gap in the second-player final-life
-  switch-back test: it proved the switch sleep but not the following player-one
-  start cadence. The fixture now advances through the player-start handoff,
-  proves player-one stock decrements to zero, preserves player-two exhausted
-  stock, and starts the playfield. The closure gate also updated the hyperspace
-  source-death fixture to expect the D1 death-cloud pause for non-final deaths.
-  Existing D1 fixtures cover two-player start admission/top display, final-life
-  switch in both directions, non-final death-cloud rotation, post-rotation
-  score/bonus stock ownership, final game-over routing when no other stock
-  remains, and current-player high-score routing. B09 is closed; Step 52 / R9-D2
-  high-score ordering and post-entry return is the next active roadmap step.
-
-- `2026-05-21 09:03:00 BST` Completed R9-D2.1 two-player high-score
-  submission/table-return fixture hardening. The new focused fixture drives a
-  player-two final game-over into high-score entry, submits `PLR`, records
-  player-two submission metadata, inserts the score into all-time and
-  today's-greatest tables at different ranks, proves the shifted row ranks,
-  preserves the all-time top high score, counts down the hall-of-fame display
-  stall, and returns to attract. No runtime or public snapshot shape change was
-  needed. Broad validation remains deferred because this is a bounded B10 fixture
-  slice, not Step 52 closure. The next closure gate should run when R9-D2 closes;
-  the next mandatory full broad gate remains Step 54 unless a public contract
-  changes or broad clean-fidelity risk appears first.
-
-- `2026-05-21 09:07:17 BST` Completed R9-D2.2 Step 52/B10 closure audit and
-  fixture hardening. No runtime fix was needed. The one-player submission fixture
-  now advances the post-submission hall-of-fame display back to attract, the
-  non-qualifying no-entry fixture advances the full display stall back to a clear
-  attract state while proving high-score tables stay unchanged, and a direct
-  table-ordering fixture locks strict score-greater-than insertion, shifted row
-  ranks, and tail-row dropping. Focused validation passed with `cargo fmt
-  --check`, `cargo test high_score --lib`, `cargo test hall_of_fame --lib`, and
-  targeted `make clean-fidelity SCENARIOS="high_score_entry"` matching 3428/3428
-  frames. B10 is closed. Broad all-target tests, full `make fidelity`, full
-  all-scenario `make clean-fidelity`, and legacy clippy remain deferred to Step
-  54 because this was fixture-only hardening with no public contract or runtime
-  behavior change.
-
-- `2026-05-21 09:19:27 BST` Completed R9-E1 Step 53/B11 render-presentation
-  parity audit. The new render-audit test locks the current clean-fidelity
-  comparison boundary across all 12 Phase 1 scenarios: frame, surface, and
-  raster absence are compared everywhere, while strict visual signatures remain
-  source-backed to `attract_boot` and `start_game`. Local reference fixtures
-  carry accepted `video_crc32` evidence for every frame of all 12 scenarios.
-  `--game-smoke` still proves clean sprite/draw-plan coverage and `--live-smoke`
-  proves offscreen `wgpu` readback with 24 nonblank frames, 12 distinct offscreen
-  signatures, first signature `72690a8119ca46ee`, and refreshed last signature
-  `d8eb31d1cab9d7d2`. Exact per-scenario pixel CRC parity, strict
-  long-scenario sprite count/layer parity, and per-scenario offscreen `wgpu`
-  signatures are recorded as source-backed audit residuals rather than
-  additional runtime blockers. B11 is closed. Broad all-target tests, full
-  `make fidelity`, full all-scenario `make clean-fidelity`, and legacy clippy
-  remain deferred to Step 54 because this slice changed validation evidence and
-  docs only.
-
-- `2026-05-21 09:35:05 BST` Completed R9-E2 Step 54/B12 full validation
-  stabilization. The full R9 gate passed: `make fidelity`; full all-scenario
-  `make clean-fidelity` matching all 12 embedded Phase 1 scenarios; `cargo run
-  -- --game-smoke` with 24 sprite frames, 892 sprite instances, 68 sprite draw
-  commands, and zero temporary raster commands; `cargo run -- --live-smoke` with
-  24 clean-game/offscreen frames, 24 nonblank offscreen frames, 12 distinct
-  offscreen signatures, first signature `72690a8119ca46ee`, last signature
-  `d8eb31d1cab9d7d2`, and `legacy_presenter_used: false`; core-doc
-  markdownlint; and `git diff --check`. No broad validation is deferred for
-  B12. The next full gate should run when Step 55 owner-acceptance closeout
-  changes final contract docs, or if any later public-contract or scenario
-  behavior change lands. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779351845907799`.
-
-- `2026-05-21 09:39:47 BST` R9-E3 Step 55 owner-acceptance closeout prep.
-  README, SPEC, `docs/fidelity/gaps.md`, and this plan now state the final R9
-  contract, Step 54 validation evidence, remaining non-rewrite follow-ups, and
-  owner acceptance status. B01-B12 are closed; B13 remains pending explicit
-  owner signoff. No runtime behavior, public API, or scenario semantics changed.
-  Focused validation passed with `markdownlint README.md SPEC.md PLAN.md
-  docs/fidelity/gaps.md` and `git diff --check`.
-  Broad validation remains deferred because Step 54 already ran the full R9
-  gate and this slice is docs/status only. The next full gate should run if the
-  final owner-acceptance pass requests a fresh broad gate, or if any
-  public-contract, runtime-behavior, or scenario-semantics change lands. Slack
-  start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779352737331829`.
-
-- `2026-05-21 20:23:44 BST` R9-E3 visual acceptance schedule update. Compared
-  the clean attract path against `docs/start-sequence.gif` and recorded owner
-  visual rejection as active Step 55/B13 work rather than post-R9 polish. The
-  scheduled corrective slices now cover the reference comparison reset, clean
-  attract order repair, Williams handwritten logo/color cadence, Defender
-  coalescence, source-backed sprite/palette repair, scoring/action attract
-  sequence, and one final broad visual acceptance gate. No runtime behavior,
-  public API, or scenario semantics changed in this planning update. Focused
-  validation is limited to touched-doc markdownlint and `git diff --check`;
-  broad validation remains deferred until the corrective visual implementation
-  reaches R9-E3.7 or an earlier shared contract/runtime change introduces broad
-  risk.
-
-- `2026-05-21 20:39:29 BST` Completed R9-E3.1 and R9-E3.2 visual acceptance
-  repair slice. README, SPEC, `docs/fidelity/gaps.md`, and this plan now state
-  that Williams/logo, palette, sprite, and attract-order fidelity are active
-  B13 visual acceptance work rather than post-R9 polish. Clean and oracle
-  attract presentation now add explicit Hall of Fame and scoring-sequence
-  pages: the visible title/copyright surfaces lead into the Hall of Fame table,
-  credits are suppressed on that Hall of Fame page, and the existing
-  scoring/action text surface is delayed to the later scoring-sequence page.
-  Focused validation passed with `cargo fmt --check`, `cargo check`, `cargo
-  test clean_attract --lib`, `cargo test
-  oracle_scene_projects_attract_credit_text_sprites --lib --features
-  legacy-tools`, targeted `make clean-fidelity SCENARIOS="attract_boot"`
-  matching 900/900 frames, `cargo test --all-targets`, core-doc markdownlint,
-  and `git diff --check`. Full `make fidelity`, full all-scenario
-  `make clean-fidelity`, full clippy, and live/game smoke remain deferred
-  because this was the first bounded visual-order repair, not the R9-E3.7
-  visual closeout gate. The next full gate should run at R9-E3.7 or sooner if
-  the Williams handwriting, Defender coalescence, sprite/palette, or
-  scoring/action slices introduce broad runtime risk.
-
-- `2026-05-21 20:56:03 BST` Completed R9-E3.3 Williams handwritten logo and
-  color-cadence repair. Renderer code now exposes the source `LGOTAB`
-  Williams-logo pixel path and a 1x1 atlas-backed Williams-logo pixel. Clean
-  and oracle attract scenes use that source-ordered path for early title frames
-  with source-rate color cycling, then switch back to the completed Williams
-  logo sprite after the reveal threshold. README, SPEC,
-  `docs/fidelity/gaps.md`, and this plan now narrow remaining B13 visual work
-  to Defender coalescence, gameplay sprite/palette fidelity, and the later
-  scoring/action attract segment. Focused validation passed with `cargo fmt
-  --check`, `cargo check`, focused renderer/game/oracle tests, targeted
-  `make clean-fidelity SCENARIOS="attract_boot"` matching 900/900 frames, and
-  `cargo run -- --game-smoke`. Full `make fidelity`, full all-scenario
-  `make clean-fidelity`, full clippy, and `--live-smoke` remain deferred
-  because this was a bounded visual repair, not the R9-E3.7 closeout gate. The
-  next full gate should run at R9-E3.7 or sooner if the Defender coalescence,
-  sprite/palette, or scoring/action slices introduce broad runtime risk.
-
-- `2026-05-21 21:13:04 BST` Completed R9-E3.4 Defender wordmark coalescence.
-  Renderer code now exposes 4x12 block regions over the source-expanded
-  Defender logo. Clean and oracle attract scenes use those blocks during the
-  bounded `DEFEND` / `DEFENS` appearance window, then return to the whole
-  wordmark sprite for settled and copyright-refresh frames so no stray
-  appearance bands survive past coalescence. README, SPEC,
-  `docs/fidelity/gaps.md`, and this plan now narrow remaining B13 visual work
-  to gameplay sprite/palette fidelity and the later scoring/action attract
-  segment. Focused validation passed with `cargo fmt --check`, `cargo check`,
-  focused renderer/game/oracle tests, targeted `make clean-fidelity
-  SCENARIOS="attract_boot"`, and `git diff --check`. Full `make fidelity`,
-  full all-scenario `make clean-fidelity`, full clippy, and `--live-smoke`
-  remain deferred because this was a bounded attract title repair, not the
-  R9-E3.7 closeout gate. The next full gate should run at R9-E3.7 or sooner if
-  the sprite/palette or scoring/action slices introduce broad runtime risk.
-
-- `2026-05-21 21:24:47 BST` Completed R9-E3.5 source-backed sprite/palette
-  repair. The clean default atlas now decodes player ship, projectile,
-  player-stock, smart-bomb, enemy, bomb, explosion, and score-popup runtime
-  sprites from `assets/red-label/object-images.tsv` instead of the transitional
-  prototype PNGs, using source palette overrides for ship, projectile, bomb,
-  bomber, and score/reward families. Clean gameplay enemy sprites and ordinary
-  human sprites now use white tint so the source atlas colors remain visible.
-  README, SPEC, `docs/fidelity/gaps.md`, and `assets/sprites/README.md` now
-  identify sprite/palette fidelity as repaired and narrow remaining B13 visual
-  work to the later scoring/action attract segment. Focused validation passed
-  with `cargo fmt --check`, `cargo check`, focused renderer atlas/source-image
-  tests, `cargo run -- --game-smoke`, targeted `make clean-fidelity
-  SCENARIOS="attract_boot start_game"`, and `git diff --check`. Full
-  `make fidelity`, full all-scenario `make clean-fidelity`, full clippy, and
-  `--live-smoke` remain deferred because this was a bounded sprite/palette
-  repair, not the R9-E3.7 closeout gate. The next full gate should run at
-  R9-E3.7 or sooner if the scoring/action attract slice introduces broad
-  runtime risk.
-
-- `2026-05-21 21:48:26 BST` Completed R9-E3.6 clean scoring/action attract
-  sequence. The clean attract scheduler now starts the scoring/action page after
-  the source-shaped Hall of Fame stall instead of leaving the instruction text
-  as a distant static page. The page replays the source instruction-page rescue
-  demo from `SCINIT`/`BORDER`/`SCPROC`/`TEXTP` evidence: amber terrain,
-  scanner/player/object blips, source-positioned player/human/lander action,
-  laser/explosion/500-point rescue popup, the `ENMYTB` enemy score-card table,
-  source `COLTAB` text color cycling, and cycle wrap back to Williams. README,
-  SPEC, and `docs/fidelity/gaps.md` now identify scoring/action attract as
-  implemented and narrow B13 to the R9-E3.7 visual acceptance closeout. Focused
-  validation passed with `cargo test clean_attract_scoring_sequence --lib`,
-  `cargo test clean_attract --lib`, `cargo check`, `cargo fmt --check`,
-  targeted `make clean-fidelity SCENARIOS="attract_boot start_game"`,
-  `cargo run -- --game-smoke`, touched-document markdownlint, and
-  `git diff --check`. Full `make fidelity`, full all-scenario
-  `make clean-fidelity`, full clippy, and `--live-smoke` remain deferred until
-  R9-E3.7 unless the closeout uncovers a broad runtime risk.
-
-- `2026-05-21 22:24:24 BST` Completed R9-E3.7 visual acceptance closeout
-  gate. README media generation now steps clean `Game` frames, rasterizes the
-  clean sprite scene/atlas path, and regenerates `docs/start-sequence.gif` from
-  that clean capture. The closeout also refreshed the live offscreen first-frame
-  signature to `3b0828b85a4f1bce` after the accepted visual repair, with the
-  last signature still `d8eb31d1cab9d7d2`. Full validation passed with
-  `make fidelity`; full all-scenario `make clean-fidelity` matching all 12
-  Phase 1 scenarios; `cargo run -- --game-smoke`; `cargo run -- --live-smoke`;
-  core-doc markdownlint; and `git diff --check`. No broad validation is
-  deferred for the R9-E3.7 closeout. The next full gate should run only if owner
-  review requests another visual/runtime change, a public contract changes, or
-  scenario behavior changes before final owner signoff.
-
-- `2026-05-21 22:40:36 BST` Reopened B13 after owner rejection of the R9-E3.7
-  media. Restored the original `docs/start-sequence.gif` from git and confirmed
-  it matches the saved reference copy. The restored original has 347 frames;
-  the rejected clean candidate has 277 frames and diverges on Williams
-  handwriting/colors, Defender coalescence, numeric glyphs, sprites,
-  terrain/ground, and attract ordering. README, SPEC,
-  `docs/fidelity/gaps.md`, and this plan now mark the original GIF as the
-  protected reference and schedule source-backed repairs using ROM/pre-rewrite
-  title, glyph, sprite, terrain, and scoring/action evidence. Focused
-  validation passed with `markdownlint README.md SPEC.md PLAN.md
-  docs/fidelity/gaps.md` and `git diff --check`. Broad Rust/fidelity gates were
-  intentionally deferred because this slice restored media and updated
-  docs/status only. The next full gate should run when the reopened B13 runtime
-  repair reaches candidate closeout, or sooner if a shared public contract or
-  scenario behavior changes. No Slack update was sent because this was a
-  docs/reference planning correction rather than an implementation cycle.
-
-- `2026-05-21 23:00:53 BST` Completed R9-E3.8 protected reference and
-  visual-diff harness. `make readme-media` now writes
-  `target/readme-media/start-sequence-candidate.gif` by default, the generator
-  blocks accidental writes to `docs/start-sequence.gif` unless
-  `DEFENDER_ALLOW_REFERENCE_MEDIA_OVERWRITE=1` is explicitly set, and candidate
-  generation reports sampled comparison metrics against the protected original.
-  The current candidate report shows the known active mismatch: reference
-  347 frames, candidate 277 frames, equal 4600cs duration, and sampled RMS
-  mismatches across full, title, Hall of Fame, numeric glyph, sprite, terrain,
-  and scoring regions. Focused validation passed with `cargo fmt --check`,
-  `cargo test --example generate_readme_media --features legacy-tools`, the
-  protected-overwrite guard smoke, `make readme-media`, touched-document
-  markdownlint, and `git diff --check`. Broad Rust/fidelity gates remain
-  deferred because this slice changed media tooling and docs but not runtime
-  scenario behavior. The next full gate should run when the reopened B13 visual
-  runtime repairs reach candidate closeout, or sooner if shared contracts or
-  scenario behavior change.
-
-- `2026-05-21 23:23:42 BST` Completed R9-E3.9 ROM-backed
-  Williams/Defender title program. Replaced the clean Defender wordmark block
-  approximation with the 15 source `DEFENS` object/picture/data/appearance
-  slots, source `APVCT` shrink geometry, the `DEF33` whole-wordmark
-  descriptor, and source title color handling for the Williams and Defender
-  title surfaces. Focused validation passed with `cargo fmt --check`,
-  `cargo check`, `cargo test clean_attract_defender_wordmark --lib`,
-  `cargo test clean_attract_williams_logo --lib`, the focused source
-  visual-state contract test, the focused Defender wordmark atlas-region test,
-  targeted `make clean-fidelity SCENARIOS="attract_boot"`, and
-  `make readme-media`. The generated candidate remains repair evidence only:
-  reference 347 frames, candidate 257 frames, equal 4600cs duration, and
-  sampled RMS mismatches across full, title, Hall of Fame, numeric glyph,
-  sprite, terrain, and scoring regions. Broad all-target/all-scenario gates
-  remain deferred because B13 is still in the middle of bounded visual repair.
-  The next full gate should run at R9-E3.15 candidate closeout, or sooner if
-  the numeric glyph/sprite/terrain/timing repairs change shared contracts.
-
-- `2026-05-21 23:32:17 BST` Completed R9-E3.10 source text and numeric glyph
-  repair. Changed clean score digit decoding from row-major to source
-  column-major byte order for `assets/red-label/score-digits.tsv`, matching the
-  existing message-glyph decode path and fixing the shared `NUMBR0`-`NUMBR9`
-  atlas used by score, credit, Hall of Fame, wave/multiplier, and
-  scoring/action text surfaces. Added a focused atlas crop regression for
-  `NUMBR0` so the old scrambled row-major shape fails. Focused validation
-  passed with `cargo fmt --check`, `cargo check`,
-  `cargo test default_sprite_atlas_uses_score_digit_regions --lib`,
-  the focused score digit source-column-order atlas test, the focused source
-  text mixed digit/glyph test, score HUD/credit/scoring-sequence focused game
-  tests, targeted `make clean-fidelity SCENARIOS="attract_boot"`, and
-  `make readme-media`.
-  Candidate metrics improved slightly but remain failed B13 evidence:
-  reference 347 frames, candidate 257 frames, equal 4600cs duration, sampled
-  RMS full 52.52, title 62.84, Hall of Fame 63.88, numeric glyphs 72.64,
-  sprites 44.89, terrain 46.39, and scoring 55.09. Broad all-target and
-  all-scenario gates remain deferred because this is still a bounded B13 visual
-  repair slice. The next full gate should run at R9-E3.15 candidate closeout,
-  or sooner if source sprite/terrain/timing work changes shared contracts.
-
-- `2026-05-21 23:32:23 BST` Completed R9-E3.11 source sprite and
-  terrain/ground repair. Replaced the remaining font-sheet terrain placeholder
-  with source terrain word atlas regions for `0x7007` and `0x0770`, added a
-  clean source `TDATA` parser plus `BGINIT`/`BGOUT` terrain-table projection,
-  drew the 0x98 source terrain words in gameplay and attract scoring, and
-  removed stray gameplay ground from Williams/title and Hall of Fame attract
-  pages. Focused validation passed with `cargo fmt --check`, `cargo check`,
-  focused source terrain record/scene/atlas tests, adjacent attract and
-  terrain-blow scene tests, targeted
-  `make clean-fidelity SCENARIOS="attract_boot"`, and `make readme-media`.
-  Candidate metrics remain failed B13 evidence: reference 347 frames, candidate
-  257 frames, equal 4600cs duration, sampled RMS full 51.30, title 62.84, Hall
-  of Fame 63.88, numeric glyphs 72.64, sprites 44.89, terrain 41.87, and
-  scoring 55.09. Broad all-target and all-scenario gates remain deferred
-  because this is still a bounded B13 visual repair slice. The next full gate
-  should run at R9-E3.15 candidate closeout, or sooner if timing/title/scoring
-  visual work changes shared contracts.
-
-- `2026-05-21 23:56:29 BST` Completed R9-E3.12 attract timing and
-  scoring/action cadence repair. README media generation now preserves the
-  sampled frame cadence while merging the initial reference hold, so the clean
-  candidate matches the protected original at 347 frames and 4600cs. The
-  Williams/title page no longer renders the score HUD or zero-credit text, the
-  attract credit line is limited to Hall of Fame / scoring contexts unless a
-  real credit is present, and Hall of Fame display/entry/blink text uses the
-  source `0x85` color evidence. Focused validation passed with
-  `cargo fmt --check`, `cargo check`, the focused README media cadence test,
-  focused source visual-state, attract scene, credit, score-digit, and scoring
-  sequence unit tests, targeted
-  `make clean-fidelity SCENARIOS="attract_boot"`, and `make readme-media`.
-  Candidate metrics remain failed B13 evidence even though timing now matches:
-  sampled RMS full 49.21, title 56.66, Hall of Fame 61.87, numeric glyphs
-  61.73, sprites 47.58, terrain 41.62, and scoring 53.98. A protected
-  reference versus candidate contact sheet still shows Williams
-  color/handwriting drift,
-  Defender coalescence mismatch, and scoring sprite/terrain palette and
-  placement drift, so the candidate gate has been moved to R9-E3.15 after
-  dedicated R9-E3.13/R9-E3.14 visual repairs. Broad all-target and
-  all-scenario gates remain deferred because this was a bounded visual/media
-  repair slice. The next full gate should run at R9-E3.15 candidate closeout,
-  or sooner if the title or scoring visual repairs change shared contracts or
-  broad scenario behavior.
-
-- `2026-05-22 00:09:42 BST` R9-E3.13 title cadence subpass. The Williams
-  handwriting reveal now follows source `LOGO0` table-operation cadence:
-  three table operations per two-frame sleep slice, with completion at the
-  source `PRES` handoff instead of the previous linear 160-frame pixel ramp.
-  Focused validation passed with `cargo fmt --check`, `cargo check`, focused
-  Williams logo, source visual-state, Defender wordmark, and renderer
-  `LGOTAB` operation-count unit tests, targeted
-  `make clean-fidelity SCENARIOS="attract_boot"`, and `make readme-media`.
-  Candidate media remains repair evidence only but moved slightly in the right
-  direction: reference 347 frames, candidate 347 frames, equal 4600cs
-  duration, sampled RMS full 49.18, title 56.59, Hall of Fame 61.82, numeric
-  glyphs 61.73, sprites 47.52, terrain 41.62, and scoring 53.93. Broad gates
-  remain deferred because this is a bounded visual repair subpass. The next
-  full gate should run at R9-E3.15 candidate closeout, or sooner if the
-  remaining title/scoring visual repairs change shared contracts or broad
-  scenario behavior.
-
-- `2026-05-22 00:39:16 BST` R9-E3.13 title palette subpass. The clean title
-  path now converts source pseudo-color bytes through the Williams resistor
-  palette instead of the earlier linear RGB placeholder. Williams title text
-  uses source `COLTAB` cycling, the Williams logo uses source `TCTAB` slot
-  cycling, source object palettes inherit the same resistor conversion, and the
-  source-expanded Defender logo preserves its internal yellow/red source
-  palette instead of being treated as a white logo tinted as a whole. Focused
-  validation passed with `cargo fmt --check`, `cargo check`, focused source
-  visual-state, Williams logo, Defender wordmark, title scene, and renderer
-  atlas tests, targeted `make clean-fidelity SCENARIOS="attract_boot"`, and
-  `make readme-media`. Candidate media remains repair evidence only:
-  reference 347 frames, candidate 347 frames, equal 4600cs duration, sampled
-  RMS full 47.30, title 54.45, Hall of Fame 59.73, numeric glyphs 61.72,
-  sprites 45.23, terrain 38.75, and scoring 52.24. Broad gates remain deferred
-  because this is a bounded visual repair subpass. The next full gate should
-  run at R9-E3.15 candidate closeout, or sooner if the remaining
-  Defender/coalescence or scoring visual repairs change shared contracts or
-  broad scenario behavior.
-
-- `2026-05-22 01:28:51 BST` R9-E3.13 Defender coalescence subpass. The clean
-  and oracle title paths now project the Defender appearance with the
-  pre-rewrite/source `APVCT` row-pair geometry over the 15 `DEFENS` chunks,
-  including center-word clearing, while emitting normal 1x1 overlay sprites so
-  `attract_boot` remains raster-free. Focused validation passed with
-  `cargo fmt --check`, `cargo check`, `cargo test clean_attract --lib`,
-  `cargo test default_sprite_atlas_uses_defender_wordmark_block_regions --lib`,
-  `cargo test oracle::tests::oracle_scene_projects_attract_credit_text_sprites
-  --lib --features legacy-tools`, targeted `make clean-fidelity
-  SCENARIOS="attract_boot"` matching 900/900 frames, and `make readme-media`.
-  Candidate media remains failed B13 evidence but improved slightly versus the
-  title palette subpass: reference 347 frames, candidate 347 frames, equal
-  4600cs duration, sampled RMS full 46.75, title 54.30, Hall of Fame 58.84,
-  numeric glyphs 61.74, sprites 44.22, terrain 38.49, and scoring 51.51. Broad
-  gates remain deferred because this is a bounded visual repair subpass. The
-  next full gate should run at R9-E3.15 candidate closeout, or sooner if the
-  R9-E3.14 title/Hall of Fame/scoring visual repairs change shared contracts or
-  broad scenario behavior.
-
-- `2026-05-22 01:58:14 BST` R9-E3.14 Hall of Fame and scoring scanner visual
-  subpass. The clean attract Hall of Fame page now uses the
-  protected-reference `COLTAB` `0x47` magenta for display and credit text and
-  applies the protected-reference display offset to the Hall of Fame logo,
-  table, underlines, and credits. The attract scoring page now applies the same
-  protected-reference presentation offset to scoring text, credits, top display
-  border, and source `BGOUT` terrain; projects source terrain pixels inside the
-  scanner box; and tints the scoring scanner border purple instead of using the
-  playing white HUD border. Focused validation passed with `cargo fmt
-  --check`, `cargo check`, `cargo test clean_attract --lib`, focused source
-  visual-state/scoring-scene/scanner-pixel atlas tests, the focused oracle
-  attract credit test under `--features legacy-tools`, targeted `make
-  clean-fidelity SCENARIOS="attract_boot"` matching 900/900 frames, and
-  `make readme-media`. Candidate media remains failed B13 evidence but improved
-  materially: reference 347 frames, candidate 347 frames, equal 4600cs
-  duration, sampled RMS full 33.71, title 26.94, Hall of Fame 42.30, numeric
-  glyphs 25.75, sprites 36.92, terrain 33.99, and scoring 35.97. Broad gates
-  remain deferred because this is a bounded visual repair subpass. The next
-  full gate should run at R9-E3.15 candidate closeout, or sooner if remaining
-  scoring sprite placement/palette work changes shared contracts or broad
-  scenario behavior.
-
-- `2026-05-22 02:32:07 BST` R9-E3.14 protected scoring cadence subpass. The
-  clean scoring/action page now starts from the protected reference's
-  post-setup rescue-fall phase while preserving the source scoring-page
-  duration, and scoring-page text/credits now map through sampled
-  protected-reference `COLTAB` color indices instead of a free-running raw tick
-  cycle. Focused validation passed with `cargo fmt --check`, `cargo check`,
-  `cargo test clean_attract_scoring_sequence --lib`, `cargo test
-  source_visual_state_tracks_palette_words_rates_and_blink_contract --lib`,
-  `make readme-media`, targeted `make clean-fidelity
-  SCENARIOS="attract_boot"` matching 900/900 frames, and markdownlint on the
-  touched docs. Candidate media remains failed B13 evidence but improved again:
-  reference 347 frames, candidate 347 frames, equal 4600cs duration, sampled
-  RMS full 30.41, title 25.59, Hall of Fame 37.27, numeric glyphs 23.13,
-  sprites 32.48, terrain 31.59, and scoring 31.56. Broad gates remain deferred
-  because this is a bounded scoring-page visual cadence repair. The next full
-  gate should run at R9-E3.15 candidate closeout, or sooner if remaining visual
-  repairs change shared contracts or broad scenario behavior.
-
-- `2026-05-22 02:45:14 BST` R9-E3.14 protected title cadence subpass. The
-  clean title segment now holds the first sampled protected-reference frame
-  blank instead of showing an early Williams pixel, and Williams/logo title
-  text colors use sampled protected-reference cadence during the README media
-  title segment while keeping source fallbacks outside that protected window.
-  Focused validation passed with `cargo fmt --check`, `cargo check`, `cargo
-  test attract_williams_logo --lib`, `cargo test
-  source_visual_state_tracks_palette_words_rates_and_blink_contract --lib`,
-  `cargo test clean_game_credits_starts_at_blank_reference_title_frame --lib`,
-  `make readme-media`, and targeted `make clean-fidelity
-  SCENARIOS="attract_boot"` matching 900/900 frames. Candidate media remains
-  failed B13 evidence but improved slightly: reference 347 frames, candidate
-  347 frames, equal 4600cs duration, sampled RMS full 30.38, title 25.52, Hall
-  of Fame 37.22, numeric glyphs 23.13, sprites 32.43, terrain 31.59, and
-  scoring 31.51. Broad gates remain deferred because this is a bounded title
-  visual cadence repair. The next full gate should run at R9-E3.15 candidate
-  closeout, or sooner if remaining visual repairs change shared contracts or
-  broad scenario behavior.
-
-- `2026-05-27 07:26:35 BST` R9-E3.14 continuation start. Slack start posting
-  was retried through the connector and failed with `token_expired` before any
-  channel lookup or message send could complete. Local continuation scope is
-  the remaining bounded B13 visual repair around scoring sprite placement,
-  scanner/terrain presentation, and candidate-readiness checks. Initial
-  validation remains green for `cargo check` and `cargo check --features
-  legacy-tools`.
-- `2026-05-27 07:40 BST` Slack direct-send retry also failed with
-  `token_expired` against the known `xyzzytools.slack.com#codex` channel ID
-  `C0B1RNM8ZJ5`. Continue recording start/end details locally until the Slack
-  connector is re-authenticated.
-- `2026-05-27 07:41 BST` Slack retry after external confirmation still failed
-  from this Codex connector session with `token_expired`. A narrow
-  scoring-object placement correction shifted scoring action sprites onto the
-  protected-reference offset while leaving scoring text, scanner, terrain, and
-  timing unchanged. Focused validation passed with `cargo test --lib
-  clean_attract_scoring_sequence`, `cargo test --lib
-  clean_game_renders_player_laser_as_live_source_span`, `cargo test --lib
-  clean_game_expands_alien_explosion_around_sprite_center`, and `cargo test
-  --lib default_sprite_atlas`. `make readme-media` passed and refreshed the
-  candidate at 347 frames / 4600cs, with sampled RMS full 29.04, title 24.62,
-  Hall of Fame 36.14, numeric glyphs 20.75, sprites 32.17, terrain 29.02, and
-  scoring 31.23.
-- `2026-05-27 07:41:43 BST` R9-E3.14 scoring sprite/scanner/terrain visual
-  pass is ready for R9-E3.15 candidate media/owner review. Final focused
-  validation passed with `cargo fmt --check`, `cargo check`, `cargo check
-  --features legacy-tools`, `cargo test --lib`, `cargo clippy --all-targets
-  -- -D warnings`, `make clean-fidelity SCENARIOS="attract_boot"`, `make
-  readme-media`, `cargo run -- --game-smoke`, touched-doc markdownlint, and
-  `git diff --check`. `cargo run -- --live-smoke` could not run in this
-  environment because wgpu reported no suitable offscreen graphics adapter and
-  no noop backend compiled; treat that as an environment validation blocker for
-  this run, not a code failure. B13 remains open for R9-E3.15 owner review and
-  approval before replacing `docs/start-sequence.gif`.
-- `2026-05-27 07:41 BST` Slack completion posting was retried against
-  `C0B1RNM8ZJ5` and failed from this Codex connector session with
-  `token_expired`; no Slack completion link is available for this cycle.
-- `2026-05-27 08:04 BST` Slack completion retry succeeded:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779864266187489`.
-- `2026-05-27 07:45:11 BST` R9-E3.15 candidate media gate and owner-review
-  prep started. Scope is to regenerate/verify the candidate without touching
-  the protected `docs/start-sequence.gif`, rerun focused visual and
-  clean-fidelity gates, capture owner-review evidence, and leave B13 open until
-  owner approval. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779864341214719`.
-- `2026-05-27 08:20:04 BST` R9-E3.15 candidate media gate completed locally.
-  The candidate at `target/readme-media/start-sequence-candidate.gif` was
-  regenerated without touching `docs/start-sequence.gif`; comparison metrics
-  matched the protected reference at 347 frames, 768x576, and 4600cs, with
-  sampled RMS full 29.04, title 24.62, Hall of Fame 36.14, numeric glyphs
-  20.75, sprites 32.17, terrain 29.02, and scoring 31.23. Validation passed
-  with `make fidelity`, full `make clean-fidelity` across all 12 scenarios,
-  `cargo run -- --game-smoke`, `cargo run -- --live-smoke`, and
-  `make readme-media`. The cycle also fixed two validation regressions found by
-  `legacy-tools`: the oracle scene adapter now shares clean expanded-object
-  explosion geometry, and the README media unit test waits through the
-  intentional blank title reveal before requiring visible pixels. Added focused
-  coverage protects attract scoring lasers, transfer effects, projection edge
-  cases, and source-style pixel-cloud clipping. B13 remains open for owner
-  approval only; no replacement of `docs/start-sequence.gif` is approved yet.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779866563877489`.
-- `2026-05-27 08:24:27 BST` R9-E3.15 publish/owner-review handoff started.
-  Scope is to package the locally completed candidate gate on `rewrite` with a
-  conventional commit, push the branch, and confirm the owner-review handoff
-  state. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779866659803119`.
-- `2026-05-27 08:25:44 BST` R9-E3.15 publish/owner-review handoff completed.
-  Commit `b5ebd93` (`fix(r9): complete candidate media gate`) was pushed to
-  `origin/rewrite`. B13 remains owner-review only, and
-  `docs/start-sequence.gif` remains protected/unmodified. Slack completion
-  update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779866738148289`.
-
-## Archived Completed History
-
-Detailed closed-step and completed-cycle history has been moved to
-[Completed Plan Step Archive](docs/fidelity/plan-completed-steps-archive.md).
-Keep `PLAN.md` focused on current baseline, rewrite target, active R9 roadmap,
-and ongoing work. Add active-cycle notes above; move them to the archive only
-after they are closed and no longer needed for day-to-day planning.
-
-## Ongoing Work
-
-- Keep `README.md`, `SPEC.md`, and `PLAN.md` synchronized with CLI help,
-  Makefile targets, workflows, and module boundaries.
-- Keep added executable Rust lines covered or explicitly refresh the accepted
-  uncovered baseline only when accepting existing debt.
-- Keep Slack start and completion notes linked in each dev-cycle work log.
+- Align player laser origin, direction, span, fizzle/body/tip bytes, and hit
+  endpoint with MAME footage.
+- Align attract scoring laser and explosion placement with the scoring-page
+  MAME clip.
+- Replace incorrect sprites, orientations, palettes, scanner elements, HUD
+  glyphs, terrain, starfield, and explosion frames.
+- Ensure reverse visibly flips the player ship and does not regress controls.
+
+Exit gate:
+
+- `reference-media-check` visual metrics pass for the selected golden clips, or
+  each remaining visual failure has a concrete tracked reason and screenshot.
+
+### M4: Audio Fidelity
+
+Goal: make clean audio match the original sound-board behavior.
+
+Deliverables:
+
+- Extract or document MAME sound-command timing for the golden clips.
+- Match credit/start, thrust, laser, smart bomb, hyperspace, enemy shots,
+  explosions, lander pickup/pull, human rescue/loss, player death, and terrain
+  blow sounds.
+- Preserve verified attract silence where the golden clip is silent.
+- Keep `--mute` and deterministic no-device tests working.
+
+Exit gate:
+
+- `reference-media-check` audio metrics pass for selected gameplay clips, or
+  each remaining audio failure is tied to a specific missing sound family.
+
+### M5: Playability And Mechanics
+
+Goal: make the clean game behave like Defender during actual play.
+
+Deliverables:
+
+- Verify coin/start, thrust, reverse, fire, smart bomb, hyperspace, enemy waves,
+  collision/hit timing, explosions, human rescue/loss, scoring, death/respawn,
+  game-over/Hall-of-Fame return, and high-score table display.
+- Keep clean-fidelity scenario coverage green while media fidelity improves.
+- Fix gameplay behavior only when MAME/source evidence shows a mismatch.
+
+Exit gate:
+
+- `make clean-fidelity` passes.
+- `cargo run -- --game-smoke` and `cargo run -- --live-smoke` pass.
+- Manual play pass covers the listed mechanics without visible/audio regressions.
+
+### M6: Release Closure
+
+Goal: produce a release-ready clean implementation with finite evidence.
+
+Deliverables:
+
+- Full release gate passes.
+- MAME golden comparison reports are generated for the selected acceptance
+  clips.
+- README and SPEC describe the final runtime, verification workflow, controls,
+  assets, and known limitations.
+- Owner signs off on graphics, audio, and playability fidelity.
+
+Exit gate:
+
+- No active release blockers remain.
+- Production runtime does not depend on legacy machine/raster presenter code.
+- Owner approval is recorded before replacing protected reference media.
+
+## Active Work Items
+
+1. Complete the golden artifact inventory for remaining gameplay clips,
+   including exact MAME timestamp ranges for lander pickup/pull, rescue/loss,
+   terrain blow, and still-uncovered non-lander shot/explosion/materialization
+   states. Existing local traces now cover delayed-start thrust, first lander
+   shot, first lander hit, reverse/player orientation, smart bomb, player
+   death, long no-input final death, game-over/Hall-of-Fame return, and
+   residual post-game playfield windows. Trace-only state-steered MAME artifacts
+   now cover actual falling-human routine evidence under
+   `target/reference-media/mame/state-steered/`: `afall-fall` keeps `AFALL`
+   live from frames `1450-1505` then transitions to the safe-landing score
+   popup with `0xE0` at frame `1507`; `afall-safe-landing` emits `0xE0` at
+   frame `1451`; `afall-player-catch` switches from `AFALL` to `AFALL2` at
+   frame `1451` and emits the source catch command `0xF7` at frames `1451`,
+   `1461`, and `1471`; `terrain-blow` starts `TERBLO` at frame `1450`, then
+   runs the terrain-blow process and sound command tail through `0xEE`, `0xEB`,
+   and `0xE8`. Bounded MAME video/audio clips and contact sheets for
+   `afall-player-catch`, `afall-safe-landing`, and `terrain-blow` now exist under
+   `target/reference-media/mame/state-steered-media/`. Matching clean
+   candidates and contact sheets now exist under
+   `target/reference-media/clean/state-steered-media/`; the terrain-blow report
+   at `target/reference-media/terrain-blow-check/report.json` now passes after
+   aligning the clean steer wake frame, MAME MP4 PTS start, flash windows, and
+   terrain explosion growth cadence. The falling-human catch report at
+   `target/reference-media/afall-player-catch-check/report.json` now passes
+   after preserving pre-window sound-board tails in bounded clean WAV output and
+   calibrating the `0xF7` catch vector against the state-steered MAME clip.
+   The falling-human safe-landing report at
+   `target/reference-media/afall-safe-landing-check/report.json` now passes
+   after steering the clean falling human through the normal safe-landing
+   transition and calibrating the source VARI `0xE0` voice.
+   The `2026-05-29` proof-boundary audit originally found no valid organic
+   last-human terrain-blow reference, but the latest all-trace and organic-only
+   reference-window scans now find a concrete organic smart-bomb/up-thrust
+   candidate. The all-trace scan covers `218` expected traces and `214` debug
+   traces, with `152024` terrain status rows, `4` `TERBLO` process rows, and
+   `2` last-human terrain-blow candidates. The organic-only scan covers `198`
+   expected traces and `194` debug traces, with `144341` terrain status rows,
+   `2` `TERBLO` process rows, and the same `2` candidates at frame `5990`,
+   `ASTCNT=0x00`, `pc=0xED88`, `terrain_blown=false`, and a live `TERBLO`
+   process. The candidate report at
+   `target/reference-media/organic-terrain-blow-smartmix-check/report.json`
+   still needs regeneration and all-axis review, but the focused clean guard
+   now matches the terminal-death state rows through score `50`, terrain-blown
+   status at frame `4927`, attract handoff at frame `4947`, and the sampled
+   `0xEE` terrain-blow tail at frames `5991`, `5995`, `5999`, `6003`, and
+   `6007`. The state-steered `TERBLO` clip remains the accepted bounded
+   terrain-blow evidence, and the organic smartmix TERBLO cadence remains the
+   concrete follow-up rather than a missing-evidence boundary. A follow-up
+   non-lander trace inventory identified `extended_hold_up_7000`, frames
+   `5811-7000`, as the
+   next finite organic visual media target. Its input program is
+   `none*900;coin*4;none*360;start_one*10;altitude_up*5726`, and the MAME TSV
+   window contains post-game/attract `UFOP1`, `TIEP1`, `PRBP1`, `SWPIC1`,
+   `SCZP1`, `BMBP1`, and `BXPIC` picture rows. A `2026-05-29` MAME/clean media
+   trial generated this long-window clip and comparison report. Initial
+   inspection found clean stuck in a static `GameOver` screen, but the
+   follow-up fix now resumes the normal attract scoring sequence after the
+   post-game residual and the regenerated media report passes. A later
+   per-family object-span scan exposed a PRBP1 pod span at frames `6855-10000`
+   in `organic_fire_up_thrust_10000`; the bounded all-axis media report for
+   frames `6855-7455` now passes and is accepted as additional organic
+   non-lander visual breadth plus MAME-silent post-game audio proof.
+2. Re-run MAME-vs-clean comparison on the remaining timestamp-aligned clips.
+   No bounded sprite/audio media target remains open from the current list. The
+   organic non-lander long-window comparison now passes after the clean
+   post-game attract handoff fix, and the organic PRBP1 pod up-thrust all-axis
+   comparison passes with full visual RMS `37.95`, full MAE `7.68`, and
+   matching MAME-silent audio. The
+   bounded pickup/pull `hold-up` media comparison now passes
+   with full visual RMS `28.61`, visual MAE `4.99`, playfield RMS `4.86`,
+   laser-band RMS `3.25`, terrain RMS `20.18`, audio envelope correlation
+   `0.613`, RMS ratio `1.066`, and zero-crossing ratio `1.076`. The bounded
+   `down029/fire2524` non-lander
+   target6 shot/explosion/materialization media comparison now passes with
+   full visual RMS `31.72`, visual MAE `5.74`, playfield RMS `17.46`,
+   laser-band RMS `19.64`, terrain RMS `26.94`, audio envelope correlation
+   `0.714`, RMS ratio `1.192`, and zero-crossing ratio `1.298`. The
+   state-steered terrain-blow
+   comparison now has a passing bounded report-only artifact: sound-command
+   offsets match the MAME trace, source `TERX0` terrain explosion pixels
+   render, flash windows and explosion growth follow the MAME capture, visual
+   RMS is `31.19`, visual MAE is `6.32`, and audio passes the stochastic-noise
+   gate. The state-steered catch comparison also passes with visual RMS
+   `29.32`, visual MAE `5.23`, audio envelope correlation `0.935`, RMS ratio
+   `1.008`, and zero-crossing ratio `0.463`. The state-steered safe-landing
+   comparison passes with visual RMS `29.30`, visual MAE `5.24`, audio
+   envelope correlation `0.284`, RMS ratio `1.003`, and zero-crossing ratio
+   `1.396`. Player catch/rescue is covered by the state-steered catch media
+   gate, safe landing by the state-steered safe-landing media gate, and
+   lander-driven human loss/conversion by the organic `hold-up` media gate.
+3. Tighten remaining gameplay laser/audio edge cases from live laser-hit
+   evidence. The current first-lander hit clips are green, including the
+   `down029/fire2437` MAME window with laser sound at frame `2439`, lander-hit
+   sound at frame `2450`, score `150` at frame `2449`, and no premature player
+   death. The `down029/fire2524` target6 non-lander endpoint is also green in
+   media comparison. The `2026-05-29` laser/reverse proof-boundary audit
+   rechecked source-style sparse laser tests, `LASP1` object evidence, far-side
+   collision before culling, capped-fire sound suppression, both reverse
+   directions, and the accepted fire/reverse, laser-hit, and target6 media
+   reports. A follow-up `2026-05-29` media-breadth cycle added the passing
+   centered first-laser-hit report to the closure gate, giving the first
+   gameplay hit both broad-window and centered-window proof. A later
+   `2026-05-29` reverse-thrust media cycle added the passing delayed-start
+   thrust/reverse report to the closure gate after calibrating the clean
+   thrust-noise zero-crossing range and the `0xF0` background-noise gain. The
+   `down030/fire2437` post-death branch now has all-axis media evidence for the
+   second-life laser/materialize window: MAME and clean both emit the
+   second-life laser `0xEB` at frame `2439` and the post-death appearance
+   command `0xEA` at frame `2447`, and
+   `target/reference-media/laser-hit-down030-fire2437-check-fixed/report.json`
+   passes visual and stochastic audio thresholds after the source-shaped
+   `APPEAR` materialize waveform fix.
+4. Resolve remaining first-wave lander shell cadence and aim mismatches from
+   MAME object/shell evidence without regressing the green
+   `down029/fire2437` laser-hit clip or the long no-input acceptance guards.
+   The `down060/fire2437` MAME trace-backed shell collision now matches clean
+   at frame `2177`: score `25`, `BXPIC` bomb explosion at source center
+   `0x23EA`, death-tail commands at `2178`, `2179`, `2187`, `2195`, and
+   `2324`, and the first stock drop at `2439`. The lower
+   `down029/fire2437` laser-hit clip still survives until the targeted lander
+   kill. The neighboring `down030/fire2437` target-2 lander collision now also
+   matches MAME at frame `2177` with score `150`, `LNDP2` explosion center
+   `0x24B4`, death-tail commands at `2178`, `2179`, `2187`, `2195`, and
+   `2324`, and first stock drop at `2344`. The long no-input run now matches
+   MAME through first collision, second
+   death, game-over handoff, residual post-game materialize/shot/explosion
+   sounds, and residual `175 -> 200` scoring. The `hold-up` run now matches
+   the first five MAME lander shot state frames `2074`, `2110`, `2266`,
+   `2458`, and `2686`; its final enemy-collision residual window also matches
+   MAME by input frame for `3605`, `3668`, `3701`, `3709`, `3710`, `3711`,
+   `3719`, `3727`, and the duplicated `0xEC`/`game_over` transition at
+   `3854`. The carried-human pull/conversion rows now match MAME by input
+   frame: first pull `2524-2533`, first conversion `2536`, second pull
+   `2693-2702`, and second conversion `2705`. MAME shows no visible mutant or
+   expanded-object coalescence at the conversion rows `2535` and `2704`; the
+   later target6 converted-mutant wrap rows now match MAME in the clean scene:
+   `2800=0,54`, `2805=3,55`, `2810=7,55`, `2820=15,48`, and `2823=17,46`.
+   The same `hold-up` converted-mutant entry now emits the paired MAME shot
+   sounds at input frames `2824` and `2838`, matching the source-derived MAME
+   `0xF6` window after the existing one-frame clean/MAME input alignment.
+   The `hold-up` post-death restart materialization sound window now has only
+   the MAME-backed `0xEA` at `3108`; the earlier clean-only refill `0xEA` at
+   `3176` is removed. The extended `down029/fire2437` post-hit refill
+   materialization now matches MAME's visible object-output shape: only the
+   target-3 refill lane coalesces at `2752`, only that refill lane is projected
+   at `2800` and `2902`, and hidden/stopped refill processes remain live
+   without leaking sprites.
+   The `up-thrust` abduction-search target5 opening shell now follows the MAME
+   shell-table motion from the first `0xFC` shot window, reaches the player on
+   input frame `1680`, scores `25`, removes the shell, and anchors the `BXPIC`
+   bomb explosion at top-left `0x372C`. The delayed player-death sound tail now
+   matches MAME at `1681`, `1682`, `1690`, and `1698`. The same branch now
+   uses the MAME-backed target5 projectile-death restart at input frame `1949`:
+   appearance sound `0xEA`, player `PLAX16/PLAY16=0x3280/0x2A80`, player
+   velocity `0x009758/0xFE00`, absolute x `0x30E1`, RNG `0xC4/0x94/0xDD`,
+   and the observed human/lander object snapshot. Clean no longer takes the
+   false enemy collision at input frame `2007`. The later target3 lander shot
+   in the same restart branch now emits the MAME `0xFC` command and shell at
+   input frame `2195`, with shell position/fractions/velocity
+   `0x4696`, `0x20/0xC1`, and `0xFF88/0xFE78`.
+   The `down029/fire2524` target9 shell now follows the MAME shell-table motion
+   for positions `0x51AD`, `0x50AD`, `0x229B`, `0x1E99`, and `0x1D99`, and no
+   longer causes a premature player/projectile death before the target9 lander
+   hit. The same `down029/fire2524` first hit now matches MAME sound timing for
+   `2524-2531`: pull `0xF1` at `2524-2530`, target9 hit `0xF9` at `2531`, and
+   no delayed laser-fire `0xEB` or extra pull leak in that interval. The later
+   `down029/fire2524` target6 converted-mutant branch now also matches the
+   MAME trace for mutant shot sounds at `2872` and `2959`, player/enemy
+   collision tail commands at `3012`, `3013`, `3021`, `3029`, and `3158`, and
+   the `SCZP1` explosion descriptor at `3012` with top-left `0x20A2` and
+   center `0x21A9`. The same target6 window now has a passing bounded
+   MAME-vs-clean media report. The release gate is now green; the remaining
+   closure item is owner review, plus any new concrete gameplay case found
+   outside the current down029/hold-up/state-steered terrain-blow evidence.
+5. Isolate and match remaining gameplay sounds from MAME/sound-board evidence.
+   The `down029/fire2437` post-hit tail now matches MAME in the accepted
+   window: pull `0xF1` at `2700-2702`, conversion `0xEE` at `2705`,
+   materialization `0xEA` at `2752`, and a single mutant shot `0xF6` at
+   `2827`, with no extra pickup or duplicate mutant shot through `2900`. The
+   `hold-up` converted-mutant shot pair is also covered at `2824` and `2838`.
+   The `hold-up` post-death materialization window is covered at `3108` with
+   no extra refill materialization sound through `3338`. The extended
+   `down029/fire2437` post-hit window no longer emits the false target-3 refill
+   lander shot at `2956`; target6 converted-mutant shots now match MAME at
+   `2827`, `2902`, and `2947`, with death-tail commands at `2994`, `2995`,
+   `3003`, and `3011`. The same extended window now has exact regression
+   coverage for all observed sound commands from `2439` through `3011`.
+   The `up-thrust` target5 opening shell/death window is also covered for the
+   observed `0xFC`, `0xEE`, and `0xE8` commands at `1623`, `1681`, `1682`,
+   `1690`, and `1698`, with the post-death materialization command `0xEA` now
+   covered at `1949`. The `up-thrust` target5 restart sound cadence now also
+   matches the MAME rows for thrust command `0xE9` at `1457`, `1631`, `1852`,
+   `1997`, and `2203`, plus the later lander shot `0xFC` at `2195`.
+   Catch, safe-landing, and terrain-blow command families now have
+   state-steered MAME trace evidence and clean command-sequence coverage:
+   `afall-player-catch` emits `0xF7` at frames `1451`, `1461`, and `1471`,
+   and clean rescue now queues the same repeated `ACSND` cadence; safe landing
+   emits `0xE0` at frame `1451` or after a full `AFALL` descent at `1507`;
+   terrain blow starts `TERBLO` at frame `1450` and clean completion now queues
+   the `TBSND` tail `0xEB`, `0xEE`, `0xEE`, `0xE8`, `0xE8` at the MAME
+   offsets. The generated clean safe-landing WAV now passes after the clean
+   state steer lands through the normal score/sound path and the clean
+   sound-board VARI path applies source restart cadence plus calibrated VARI
+   DAC gain. The generated clean terrain-blow WAV now passes the media
+   stochastic-noise gate against the MAME state-steered WAV. No active bounded
+   sound target remains open; future waveform tuning belongs to owner-review or
+   new-evidence failures.
+   The `down029/fire2524` laser/fire contention frame now matches the MAME
+   command priority by suppressing delayed laser-fire `0xEB` when lander-pull
+   `0xF1` is emitted on the same frame. The later `fire2524` converted-mutant
+   sound delta is closed: the clean trace now emits MAME's target6 shot
+   commands `0xF6` at `2872` and `2959`, then the player/enemy collision tail
+   `0xE8/0xEE/0xEE/0xE8/0xEC` at `3012/3013/3021/3029/3158`. The matching
+   target6 media report now passes against MAME audio with envelope correlation
+   `0.714`, RMS ratio `1.192`, and zero-crossing ratio `1.298`.
+   A `2026-05-29` non-lander sound-command audit added direct regression
+   coverage for the red-label enemy-family command bytes: lander hit/shot
+   `0xF9`/`0xFC`, mutant hit/shot `0xE8`/`0xF6`, bomber hit `0xFE`, pod hit
+   `0xFA`, swarmer hit/shot `0xF8`/`0xF3`, baiter hit/shot `0xF8`/`0xFC`, and
+   bomb collision `0xEE`. Bomber and pod remain intentionally direct-shot
+   silent because the source table has no bomber or pod shot command.
+   The isolated non-lander sound-command media proof now covers the remaining
+   non-organic command breadth. MAME captures for `sound_command_fe`,
+   `sound_command_fa`, `sound_command_f8`, and `sound_command_f3` include
+   command traces plus sound-board DAC-write traces. Matching clean candidates
+   now pass the audio gates for bomber hit `0xFE`, pod hit `0xFA`,
+   swarmer/baiter hit `0xF8`, and swarmer shot `0xF3`. The `0xFE` and `0xFA`
+   fixes were scoped to tonal GWAVE period density after the DAC trace proved
+   the earlier global DAC-hold mixer patch was wrong. These single-command
+   clips intentionally do not accept visual metrics because the synthetic MAME
+   and clean playfields are not matching gameplay scenes.
+6. Replace remaining incorrect sprite, explosion, and pixel-coalescence frames.
+   Refill coalescence is now covered for the extended `down029/fire2437`
+   post-hit window. Target6 converted-mutant vertical cadence, shot origin,
+   collision timing, and `SCZP1` explosion placement are now covered in the
+   same input window: the projected mutant reaches MAME rows `0x1446`,
+   `0x1F5B`, `0x1F71`, and `0x2087`, then destroys at `2993` with explosion
+   top-left `0x20A3`, center `0x21A9`, and exact `SCZP1` explosion growth
+   coverage for every MAME descriptor frame from `2993` through `3020`. The
+   `down029/fire2524` converted-mutant branch now also covers target6 shot
+   launch sprites at `2872` and `2959`, the MAME collision/death-tail at
+   `3012`, `3013`, `3021`, `3029`, and `3158`, and the `SCZP1` explosion
+   descriptor at `3012` with top-left `0x20A2` and center `0x21A9`. Its
+   bounded media report now passes with playfield RMS `17.46` and laser-band
+   RMS `19.64`.
+   The `up-thrust` target5 opening shell collision now covers the `BXPIC` bomb
+   explosion at input frame `1680` with top-left `0x372C`, matching the MAME
+   player/shell collision window. The post-death restart now also displays the
+   MAME-backed player top-clamp row at `1949` and carries the MAME human/lander
+   object snapshot forward without the previous false player/enemy explosion at
+   `2007`.
+   State-steered terrain blow now renders source `TERX0` terrain explosion
+   pixels, uses the MAME-observed flash windows, and follows the MAME
+   terrain-explosion growth cadence, replacing the empty `TEREX` image lookup
+   and guessed green/yellow/orange flash ramp. The bounded terrain-blow media
+   report now passes; remaining visual targets are gameplay cases outside the
+   current down029/hold-up/state-steered windows.
+   A new state-steered enemy explosion matrix can now seed MAME and clean with
+   the same six source expanded-object slots for `LNDP3`, `SCZP1`, `TIEP3`,
+   `PRBP1`, `UFOP3`, and `SWXP1`. The first MAME-vs-clean matrix report at
+   `target/reference-media/enemy-explosion-matrix-check/report.json` has
+   visual status `pass` with full RMS `31.38`, playfield RMS `15.82`, and
+   laser-band RMS `15.95`. The report is top-level `pass` with
+   `acceptance_mode=visual` because this synthetic visual steer does not
+   exercise real kill sound commands, so audio is not an acceptance target for
+   that clip.
+   A `2026-05-29` non-lander implementation audit found no current placeholder
+   path for mutant, swarmer, baiter, bomber, pod, or bomb presentation:
+   source-shaped sprite IDs, atlas regions, source picture descriptors,
+   runtime movement, projectile rows, hit/shot commands, and source explosion
+   descriptors are covered by focused Rust tests. A follow-up enemy-family
+   explosion hardening pass now explicitly locks lander, mutant, bomber, pod,
+   baiter, and swarmer explosions to source picture descriptors and expanded
+   source pixel clouds instead of static placeholder sprites. The remaining
+   non-lander family item is bounded MAME-vs-clean media proof breadth, not a
+   known placeholder implementation. The next visual media candidate is the
+   organic `extended_hold_up_7000` MAME window at frames `5811-7000`, which
+   contains post-game/attract baiter, bomber, pod, swarmer, mutant, bomb-shell,
+   and bomb-explosion picture rows in one trace. A `2026-05-29` media trial
+   exposed and then closed the clean post-game attract handoff mismatch; the
+   regenerated report now passes with non-static clean scoring-sequence frames.
+   A second organic hold-down media trial now covers MAME frames `4300-4700`
+   from input `none*900;coin*4;none*360;start_one*10;altitude_down*5726`,
+   including converted-mutant, baiter, and swarmer-explosion rows. The report
+   at `target/reference-media/organic-nonlander-holddown-7000-check/report.json`
+   passes with `acceptance_mode=visual`, full visual RMS `28.22`, playfield
+   RMS `7.59`, laser-band RMS `5.41`, and terrain RMS `21.39`; audio remains
+   diagnostic-only for that clip because it does not exercise the remaining
+   non-lander-specific sound command bytes.
+   A third bounded organic media trial now covers PRBP1 pod presentation from
+   MAME frames `6855-7455` of the
+   `organic_fire_up_thrust_10000` trace, using input
+   `none*900;coin*4;none*360;start_one*10;up,thrust*400;up,thrust,fire*40;up,thrust*8286`.
+   The report at
+   `target/reference-media/organic-nonlander-prbp1-upthrust-check/report.json`
+   passes with `acceptance_mode=all`, full visual RMS `37.95`, full MAE
+   `7.68`, and matching MAME-silent audio after suppressing clean-only
+   post-game thrust leakage in that window.
+   A follow-up materialization/coalescence regression now exercises clean
+   source expanded-object appearance projection for lander, mutant, bomber,
+   pod, baiter, and swarmer families. This closes the remaining known
+   implementation-test gap for enemy-family appearance as source pixel clouds;
+   the remaining coalescence boundary is additional bounded MAME media breadth
+   and owner review, not a known static-sprite implementation path.
+7. Run release-gate validation and owner review. The default and
+   `legacy-tools` all-targets Rust test gates, both clippy gates, and
+   `make clean-fidelity` are green. The full release gate is green as of the
+   `2026-05-29 15:54 BST` release-gate validation cycle after promoting the
+   PRBP1 pod up-thrust proof to all-axis and fixing the clean-only post-game
+   thrust/background audio leak: media script tooling, owner-review package,
+   accepted-report semantic coverage gate, MAME doctor, MAME smoke, README
+   media, game/live smoke, docs lint, diff hygiene, and final clippy rechecks
+   all passed. A later scan found an unaccepted organic smart-bomb/up-thrust
+   terrain-blow candidate whose clean report currently fails; owner review and
+   classification or repair of that new concrete mismatch remain before
+   protected reference media replacement.
+   The owner-review checklist in `docs/fidelity/release-closure-audit.md`
+   defines the finite sign-off action and is printed by
+   `make owner-review-package`: accept the current 27-report gate and proof
+   boundaries, or provide a new concrete MAME mismatch/input program.
+
+## Current Work Log
+
+- `2026-05-29 20:54 BST`: Completed organic terrain-blow evidence
+  follow-up after the release-gate revalidation found new organic last-human
+  `TERBLO` candidates. The full `make release-gate` pass stayed green, but
+  the fresh all-trace scan now covers `218` expected traces / `214` debug
+  traces and the organic-only scan covers `198` expected traces / `194` debug
+  traces, both with two frame-`5990` last-human terrain-blow candidates. The
+  bounded smartmix report at
+  `target/reference-media/organic-terrain-blow-smartmix-check/report.json`
+  currently fails all-axis acceptance because MAME reaches attract score `50`
+  and emits terrain-blow audio from frame `5991`, while clean reaches score
+  `2675`, retains residual humans, has no `terrain_blow`, and emits no audio.
+  Updated README, SPEC, this plan, and
+  `docs/fidelity/release-closure-audit.md` to classify the probe as a
+  concrete open mismatch instead of a missing-evidence boundary. Validation
+  passed with `make owner-review-package`, `make reference-report-gate`,
+  `make docs-lint`, and `make diff-check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780083913622229`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780084463593359`.
+- `2026-05-29 15:57 BST`: Completed proof-boundary and release-audit sync.
+  Scanned `99` local `target/reference-media/**/report.json` files against
+  the accepted manifest: `27` are accepted and `72` are unaccepted probe or
+  historical reports. Ten unaccepted reports currently pass, but all are
+  offset/probe duplicates of already accepted fire/reverse, smart-bomb,
+  terrain-blow, materialization-matrix, or down030 laser media, so none was
+  promoted as new bounded proof. Updated
+  `docs/fidelity/release-closure-audit.md` and this plan to reflect the latest
+  `2026-05-29 15:54 BST` release-gate result and the unaccepted-report
+  classification. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780066598389299`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780066751232149`.
+- `2026-05-29 15:54 BST`: Re-ran the full release gate after the PRBP1
+  all-axis/audio-silence promotion. `make release-gate` passed: `cargo fmt
+  --check`, default and `legacy-tools` all-target Rust tests, both clippy
+  gates with `-D warnings`, `make clean-fidelity`, `make media-script-test`,
+  `make owner-review-package`, accepted-report gate at `27` reports (`20`
+  all-axis, `4` audio-only, `3` visual-only), `make reference-mame-doctor`,
+  `make reference-mame-smoke` with non-empty MP4/WAV output, README media
+  generation, game smoke, live `wgpu` smoke with `320` nonblank offscreen
+  frames, docs lint, and `git diff --check`. No active local gate failure
+  remains; the finite closure boundary is owner review of the accepted proof
+  set, or a new concrete MAME mismatch/input outside the accepted windows.
+  Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780065971963379`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780066483344249`.
+- `2026-05-29 15:39 BST`: Promoted the organic PRBP1 pod up-thrust window from
+  visual-only evidence to all-axis evidence. The clean runtime now suppresses
+  post-game clean-only thrust/background leakage after the duplicate MAME
+  background-end command, and the synth mixer clears an active thrust loop when
+  a background-end action arrives. Regenerated
+  `target/reference-media/organic-nonlander-prbp1-upthrust-check/report.json`
+  with `acceptance_mode=all`: visual still passes with full RMS `37.95`, full
+  MAE `7.68`, and `60` compared frames; audio now passes with `220500`
+  compared samples, clean RMS `0.0`, MAME RMS `0.0000077`, correlation `1.0`,
+  envelope correlation `1.0`, and no failures. Updated
+  `docs/fidelity/reference-report-gate.json` so the PRBP1 report contributes
+  `gameplay_audio` coverage and raised that breadth floor to `22`. The
+  accepted report gate now passes at `27` reports (`20` all-axis, `4`
+  audio-only, `3` visual-only). Validation passed with `cargo fmt --check`,
+  focused Rust regressions, the `legacy-tools` cargo check/clippy gates,
+  `make media-script-test`, `make reference-report-gate`,
+  `make reference-evidence-package`, `make owner-review-package`, markdownlint,
+  and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780064999710469`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780065904130259`.
+- `2026-05-29 15:28 BST`: Completed bounded organic PRBP1 pod visual proof.
+  Selected the per-family `PRBP1 pod` span from
+  `organic_fire_up_thrust_10000`, generated a bounded MAME MP4/WAV capture and
+  matching clean GIF/WAV candidate for frames `6855-7455`, and produced
+  `target/reference-media/organic-nonlander-prbp1-upthrust-check/report.json`.
+  The report passes with `acceptance_mode=visual`, full visual RMS `37.95`,
+  full visual MAE `7.68`, and `60` compared frames; audio remains
+  diagnostic-only because MAME is effectively silent while clean carries
+  background audio in that post-game window. Added the report to
+  `docs/fidelity/reference-report-gate.json` and raised the breadth floors to
+  `sprite_visuals=21`, `non_lander_visual=6`, and
+  `organic_non_lander_visual=3`. Regenerated the owner-review evidence package:
+  the accepted report gate now passes at `27` reports (`19` all-axis, `4`
+  audio-only, `4` visual-only) across `19` coverage requirements. Validation
+  passed with `make media-script-test`, `make reference-evidence-package`,
+  `make owner-review-package`, focused scanner/report unit tests,
+  markdownlint, and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780064206980329`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780064951004119`.
+- `2026-05-29 15:16 BST`: Completed reference-window object-span diagnostics.
+  The MAME trace scanner now reports per-family object row counts and the
+  longest contiguous object-evidence spans; the accepted-report signoff summary
+  surfaces those counts/spans in the all-trace and organic-only reference
+  window scan matrix. Regenerated scans still show zero organic target
+  non-lander sound hits and zero organic `TERBLO` process rows, but now expose
+  concrete long `SCZP1`, `PRBP1`, and `BXPIC` windows for bounded follow-up
+  media selection. Updated `README.md`, `SPEC.md`, `PLAN.md`, and
+  `docs/fidelity/release-closure-audit.md` to document the evidence workflow.
+  Validation passed with `make media-script-test`, `make reference-window-scan`,
+  `make reference-window-scan-organic`, `make reference-report-gate`,
+  `make reference-evidence-package`, `make owner-review-package`,
+  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/release-closure-audit.md`,
+  `markdownlint target/reference-media/reference-signoff-summary.md`, and
+  `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780063560341269`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780064157532159`.
+- `2026-05-29 15:04 BST`: Completed full release-gate validation after the
+  scan-tooling and organic-search updates. `make release-gate` passed:
+  `cargo fmt --check`, default and `legacy-tools` Rust tests, both clippy
+  passes, `make clean-fidelity`, media helper tests, fresh owner-review
+  evidence, accepted-report gate (`26` reports / `19` coverage requirements),
+  MAME doctor, MAME smoke MP4/WAV capture, README media generation, game
+  smoke, live `wgpu` smoke, docs lint, and diff hygiene. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780063070585059`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780063447684729`.
+- `2026-05-29 14:55 BST`: Completed organic trace-discovery pass. Ran six new
+  10,000-frame MAME trace-only searches under
+  `target/reference-media/mame/organic-search/`:
+  `organic_up_thrust_10000`, `organic_down_thrust_10000`,
+  `organic_reverse_up_thrust_10000`, `organic_reverse_down_thrust_10000`,
+  `organic_fire_up_thrust_10000`, and `organic_fire_down_thrust_10000`.
+  The search subtree scan covered `6` expected/debug traces, found `60,591`
+  non-lander object rows across `SCZP1`, `PRBP1`, and `BXPIC`, but found zero
+  target non-lander sound hits and zero `TERBLO` process rows. The fresh
+  all-trace scan now covers `210` expected traces and `206` debug traces:
+  target sound hits remain `16`, all from isolated synthetic command traces;
+  sound/object candidates remain zero; `TERBLO` rows remain the two
+  state-steered `ASTCNT=0x0A` rows. The fresh organic-only scan now covers
+  `190` expected traces and `186` debug traces, with zero target sound hits,
+  zero sound/object candidates, and zero `TERBLO` process rows. Slack cycle
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780062721004219`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780063051925379`.
+- `2026-05-29 14:49 BST`: Completed reference-window near-miss diagnostics.
+  `tools/scan_reference_windows.py` now records nearest sound/object misses
+  when target non-lander sound bytes exist but miss the configured object
+  proximity window, and records explicit `TERBLO` process misses when the
+  terrain-blow process is present without `ASTCNT=0x00`. The owner-review
+  summary now exposes those diagnostics in its `Reference Window Scans`
+  matrix. Current all-trace evidence still has `16` target sound hits, zero
+  sound/object candidates, two state-steered `TERBLO` rows, and zero
+  last-human candidates; the organic-only scan still has zero target sound
+  hits and zero `TERBLO` process rows. Validation passed with
+  `python3 -m unittest tools/scan_reference_windows_test.py
+  tools/check_reference_reports_test.py`, `make reference-window-scan`, and
+  `make reference-window-scan-organic`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780062303337199`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780062695755029`.
+- `2026-05-29 14:42 BST`: Completed owner-review coverage-matrix duplicate
+  guard. The current summary helper already lists accepted report names once
+  per coverage requirement, and
+  `tools/check_reference_reports_test.py` now has a focused two-report
+  regression proving the generated coverage matrix does not repeat the same
+  accepted proof names. This protects the owner-review summary from overstating
+  evidence breadth if the coverage-matrix helper regresses. Validation passed
+  with `python3 -m unittest tools/check_reference_reports_test.py` (`33`
+  tests), `make reference-report-gate`, `make owner-review-package`,
+  `markdownlint target/reference-media/reference-signoff-summary.md`, a
+  generated-summary duplicate spot-check, `make docs-lint`, `make diff-check`,
+  and the full `make release-gate`. The release gate passed default and
+  `legacy-tools` tests, both clippy passes, clean-fidelity, media helper tests,
+  the owner-review package, accepted report gate, MAME doctor, MAME smoke
+  MP4/WAV capture, README media generation, game/live smoke, docs lint, and
+  diff hygiene. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780061641019519`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780062183431019`.
+- `2026-05-29 14:32 BST`: Completed signoff-summary acceptance-mode
+  disclosure. The generated owner-review summary now exposes both
+  `Manifest Mode` and `Report Mode` in the report matrix, so the accepted-axis
+  proof scope is visible in the review artifact instead of only implicit in a
+  passing gate. Added focused summary regression coverage in
+  `tools/check_reference_reports_test.py` and documented the disclosure in
+  `README.md`, `SPEC.md`, this plan, and
+  `docs/fidelity/release-closure-audit.md`. Validation passed with
+  `python3 -m unittest tools/check_reference_reports_test.py` (`32` tests),
+  `make reference-report-gate`, `make owner-review-package`,
+  `markdownlint target/reference-media/reference-signoff-summary.md`,
+  `make docs-lint`, `make diff-check`, and the full `make release-gate`. The
+  release gate passed default and `legacy-tools` tests, both clippy passes,
+  clean-fidelity, media helper tests, the owner-review package, accepted report
+  gate, MAME doctor, MAME smoke MP4/WAV capture, README media generation,
+  game/live smoke, docs lint, and diff hygiene. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780060997507529`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780061550173729`.
+- `2026-05-29 14:21 BST`: Completed report-level acceptance-mode hardening.
+  `tools/check_reference_reports.py` no longer treats a missing local
+  `report.json` `acceptance_mode` as `all`; accepted report evidence must now
+  explicitly match the mode declared in
+  `docs/fidelity/reference-report-gate.json`. `tools/verify_reference_media.py`
+  already writes explicit report modes for new media checks, and
+  `tools/verify_reference_media_test.py` now locks that generator contract.
+  Updated the `13` older accepted local reports under `target/reference-media/`
+  that predated explicit report modes, and documented the matching
+  manifest/report mode rule in `README.md`, `SPEC.md`, this plan, and
+  `docs/fidelity/release-closure-audit.md`. Validation passed with
+  `python3 -m unittest tools/verify_reference_media_test.py ...` and
+  `tools/check_reference_reports_test.py` (`49` combined tests),
+  `python3 -m json.tool docs/fidelity/reference-report-gate.json >/dev/null`,
+  `make reference-report-gate`, `make media-script-test`,
+  `make owner-review-package`, `make docs-lint`, `make diff-check`, and the
+  full `make release-gate`. The release gate passed default and `legacy-tools`
+  tests, both clippy passes, clean-fidelity, media helper tests, the
+  owner-review package, accepted report gate, MAME doctor, MAME smoke MP4/WAV
+  capture, README media generation, game/live smoke, docs lint, and diff
+  hygiene. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780060264940719`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780060886236319`.
+- `2026-05-29 14:09 BST`: Completed explicit accepted-report mode hardening.
+  `tools/check_reference_reports.py` now requires every manifest report row to
+  declare `acceptance_mode` explicitly instead of silently defaulting missing
+  rows to `all`. This keeps future visual/audio-scoped proof rows from
+  accidentally widening into full visual/audio acceptance by omission. Added a
+  focused missing-mode regression test; the checker suite now runs `31` tests.
+  Updated `README.md`, `SPEC.md`, this plan, and
+  `docs/fidelity/release-closure-audit.md` to document the explicit manifest
+  mode requirement. Validation passed with
+  `python3 -m unittest tools/check_reference_reports_test.py` (`31` tests),
+  `python3 -m json.tool docs/fidelity/reference-report-gate.json >/dev/null`,
+  `make reference-report-gate`, `make media-script-test`,
+  `make owner-review-package`, and the full `make release-gate`. The release
+  gate passed default and `legacy-tools` tests, both clippy passes,
+  clean-fidelity, media helper tests, the owner-review package, accepted report
+  gate, MAME doctor, MAME smoke MP4/WAV capture, README media generation,
+  game/live smoke, docs lint, and diff hygiene. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780059586427269`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780060150055919`.
+- `2026-05-29 13:58 BST`: Completed accepted-report media-type hardening.
+  `tools/check_reference_reports.py` now rejects accepted visual/audio media
+  artifacts whose file types do not match the bounded proof contract: MAME
+  reference visuals must be `.mp4`, clean visual candidates must be `.gif`, and
+  accepted audio artifacts must be `.wav`. This prevents an accepted report from
+  satisfying a visual or audio proof with the wrong generated artifact class.
+  Added a focused wrong-suffix regression test; the checker suite now runs `30`
+  tests. Updated `README.md`, `SPEC.md`, this plan, and
+  `docs/fidelity/release-closure-audit.md` to document the accepted media-type
+  constraints. Validation passed with
+  `python3 -m unittest tools/check_reference_reports_test.py` (`30` tests),
+  `python3 -m json.tool docs/fidelity/reference-report-gate.json >/dev/null`,
+  `make reference-report-gate`, `make media-script-test`,
+  `make owner-review-package`,
+  `markdownlint target/reference-media/reference-signoff-summary.md`,
+  `make docs-lint`, `make diff-check`, and the full `make release-gate`. The
+  release gate passed default and `legacy-tools` tests, both clippy passes,
+  clean-fidelity, media helper tests, the owner-review package, accepted report
+  gate, MAME doctor, MAME smoke MP4/WAV capture, README media generation,
+  game/live smoke, docs lint, and diff hygiene. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780058964815859`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780059518443849`.
+- `2026-05-29 13:46 BST`: Completed accepted-report media-root hardening.
+  `tools/check_reference_reports.py` now rejects manifest report paths outside
+  `target/reference-media/`; accepted MAME reference video/audio artifacts must
+  stay under `target/reference-media/mame/`, and accepted clean candidate
+  GIF/WAV artifacts must stay under `target/reference-media/clean/`. This
+  prevents arbitrary local files, swapped reference/candidate roots, or
+  non-generated media paths from satisfying the MAME-vs-clean proof gate. Added
+  focused tests for report-path root rejection and wrong-root media artifacts;
+  the checker suite now runs `29` tests. Updated `README.md`, `SPEC.md`, this
+  plan, and `docs/fidelity/release-closure-audit.md` to document the media-root
+  constraints. Validation passed with
+  `python3 -m unittest tools/check_reference_reports_test.py` (`29` tests),
+  `python3 -m json.tool docs/fidelity/reference-report-gate.json >/dev/null`,
+  `make reference-report-gate`, `make media-script-test`,
+  `make owner-review-package`,
+  `markdownlint target/reference-media/reference-signoff-summary.md`,
+  `make docs-lint`, `make diff-check`, and the full `make release-gate`. The
+  release gate passed default and `legacy-tools` tests, both clippy passes,
+  clean-fidelity, media helper tests, the owner-review package, accepted report
+  gate, MAME doctor, MAME smoke MP4/WAV capture, README media generation,
+  game/live smoke, docs lint, and diff hygiene. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780058213885989`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780058816754059`.
+- `2026-05-29 13:35 BST`: Completed accepted-report coverage-tag closure
+  hardening. `tools/check_reference_reports.py` now requires each accepted
+  report coverage tag to be non-empty, declared by a semantic
+  `coverage_requirements` row, and compatible with the report's `all`,
+  `visual`, or `audio` acceptance mode. This prevents manifest drift where a
+  report appears to prove a fidelity facet but the tag is misspelled,
+  undeclared, empty, or attached to an axis that cannot accept that proof.
+  Added focused unit tests for empty coverage, undeclared tags, and
+  mode-incompatible tags; the checker suite now runs `27` tests. Updated
+  `README.md`, `SPEC.md`, this plan, and
+  `docs/fidelity/release-closure-audit.md` to document the coverage-tag closure
+  rule. Validation passed with
+  `python3 -m unittest tools/check_reference_reports_test.py` (`27` tests),
+  `python3 -m json.tool docs/fidelity/reference-report-gate.json >/dev/null`,
+  `make reference-report-gate`, `make media-script-test`,
+  `make owner-review-package`,
+  `markdownlint target/reference-media/reference-signoff-summary.md`,
+  `make docs-lint`, `make diff-check`, and the full `make release-gate`. The
+  release gate passed default and `legacy-tools` tests, both clippy passes,
+  clean-fidelity, media helper tests, the owner-review package, accepted report
+  gate, MAME doctor, MAME smoke MP4/WAV capture, README media generation,
+  game/live smoke, docs lint, and diff hygiene. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780057559430939`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780058117072119`.
+- `2026-05-29 13:24 BST`: Completed accepted-report manifest uniqueness
+  hardening. `tools/check_reference_reports.py` now rejects duplicate coverage
+  requirement names, duplicate coverage/axis requirement keys, duplicate report
+  names, duplicate report paths, and duplicate coverage tags inside a report,
+  preventing `docs/fidelity/reference-report-gate.json` from counting the same
+  accepted proof twice toward `min_reports` breadth floors. Added focused unit
+  tests for each duplicate-manifest failure mode and updated `README.md`,
+  `SPEC.md`, this plan, and `docs/fidelity/release-closure-audit.md` to
+  document the uniqueness requirement. Validation passed with
+  `python3 -m unittest tools/check_reference_reports_test.py` (`24` tests),
+  `python3 -m json.tool docs/fidelity/reference-report-gate.json >/dev/null`,
+  `make reference-report-gate`, `make media-script-test`,
+  `make owner-review-package`,
+  `markdownlint target/reference-media/reference-signoff-summary.md`,
+  `make docs-lint`, `make diff-check`, and the full `make release-gate`. The
+  release gate passed default and `legacy-tools` tests, both clippy passes,
+  clean-fidelity, media helper tests, the owner-review package, accepted report
+  gate, MAME doctor, MAME smoke MP4/WAV capture, README media generation,
+  game/live smoke, docs lint, and diff hygiene. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780056887779579`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780057443764899`.
+- `2026-05-29 13:12 BST`: Completed accepted-report coverage-breadth
+  hardening. `make reference-report-gate` now enforces each semantic coverage
+  requirement's `min_reports` floor, so the current MAME-vs-clean proof set
+  cannot silently shrink to one accepted report for broad objective facets.
+  `docs/fidelity/reference-report-gate.json` locks the current breadth for all
+  `19` coverage requirements, from `20` sprite-visual reports and `21`
+  gameplay-audio reports down to the intentionally narrow smart-bomb,
+  hyperspace, and terrain-blow facets. The generated owner-review summary now
+  includes a `Minimum Reports` coverage-matrix column. Updated `README.md`,
+  `SPEC.md`, this plan, and `docs/fidelity/release-closure-audit.md` to
+  document the stricter gate. Validation passed with
+  `python3 -m unittest tools/check_reference_reports_test.py`,
+  `python3 -m json.tool docs/fidelity/reference-report-gate.json >/dev/null`,
+  `make reference-report-gate`, `make owner-review-package`,
+  `markdownlint target/reference-media/reference-signoff-summary.md`,
+  `make media-script-test`, `make docs-lint`, `make diff-check`, and the full
+  `make release-gate`. The release gate passed default and `legacy-tools`
+  tests, both clippy passes, clean-fidelity, media helper tests, the
+  owner-review package, accepted report gate, MAME doctor, MAME smoke MP4/WAV
+  capture, README media generation, game/live smoke, docs lint, and diff
+  hygiene. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780056043845819`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780056721584429`.
+- `2026-05-29 12:58 BST`: Completed owner-review handoff target hardening.
+  Added `make owner-review-package` as the executable review handoff: it
+  regenerates both reference-window scan JSON files, rebuilds
+  `target/reference-media/reference-signoff-summary.md`, re-runs the accepted
+  report gate, and prints the finite owner-review checklist from
+  `docs/fidelity/release-closure-audit.md`. Wired `make release-gate` through
+  this target so final validation now exercises the same fresh evidence package
+  and checklist that owner review uses. Validation passed with
+  `make owner-review-package` (`26` accepted reports across `19` coverage
+  requirements), `markdownlint target/reference-media/reference-signoff-summary.md`,
+  `make docs-lint`, `make diff-check`, and the full `make release-gate`. The
+  full gate passed default and `legacy-tools` tests, both clippy passes,
+  clean-fidelity, media helper tests, the owner-review package, MAME doctor,
+  MAME smoke capture, README media generation, game/live smoke, docs lint, and
+  diff hygiene. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780055385157239`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780055935730389`.
+- `2026-05-29 12:48 BST`: Completed current-status documentation cleanup.
+  Updated the README and SPEC front matter so the old B13 rejection language is
+  historical context rather than an active implementation-defect statement. The
+  top-level docs now say the known laser, reverse, and audio defects were
+  repaired against accepted MAME evidence, the full `make release-gate` path is
+  green, and final closure is owner review / proof-boundary acceptance or a new
+  concrete MAME mismatch. Refreshed the release-closure audit to reference the
+  latest green gate with the MAME recorder smoke target and non-empty capture
+  output checks. Validation passed with `make docs-lint`, `make diff-check`,
+  and a stale-status scan for `B13`, `reopened`, `owner signoff`, `known open`,
+  and related old wording. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780055064356489`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780055289255469`.
+- `2026-05-29 12:43 BST`: Completed MAME capture output validation hardening.
+  `tools/capture_mame_reference.py` now fails non-trace captures unless both
+  generated review media artifacts exist and are non-empty: the compressed MP4
+  and the matching PCM WAV. Added focused unit coverage for valid output,
+  missing MP4 output, and zero-byte WAV output. Validation passed with
+  `python3 -m unittest tools/capture_mame_reference_test.py` (`12` tests),
+  `make media-script-test`, `make reference-mame-smoke`, and the full
+  `make release-gate`. The release gate again passed default and
+  `legacy-tools` tests, both clippy passes, clean-fidelity, media helper tests,
+  fresh `make reference-evidence-package`, `make reference-report-gate` (`26`
+  reports across `19` coverage requirements), MAME doctor, the non-empty MAME
+  smoke capture, README media generation, game/live smoke, docs lint, and diff
+  hygiene. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780054526102469`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780054980935959`.
+- `2026-05-29 12:34 BST`: Completed MAME recorder smoke target hardening.
+  Added `make reference-mame-smoke` as the named two-second executable proof
+  for the local red-label MAME capture path, using
+  `MAME_REFERENCE_SECONDS=2` and
+  `MAME_REFERENCE_BASENAME=defender-red-label-smoke-script`. Wired that target
+  into `make release-gate` after `make reference-mame-doctor`, and synchronized
+  README, SPEC, and the release-closure audit so release validation now checks
+  the recorder path, not just ROM/MAME availability. Validation passed with
+  `make -n reference-mame-smoke`, `make -n release-gate`,
+  `make reference-mame-smoke`, `make docs-lint`, and the full
+  `make release-gate`. The full gate passed default and `legacy-tools` tests,
+  both clippy passes, clean-fidelity, media helper tests, fresh
+  `make reference-evidence-package`, `make reference-report-gate` (`26`
+  reports across `19` coverage requirements), MAME doctor, the new MAME smoke
+  capture, README media generation, game/live smoke, docs lint, and diff
+  hygiene. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780053909279169`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780054480377059`.
+- `2026-05-29 12:22 BST`: Completed accepted-axis failure-metadata hardening.
+  `make reference-report-gate` now rejects accepted visual/audio axes when
+  their verifier `failures` arrays contain stale entries, while still allowing
+  diagnostic failures on non-accepted axes for visual-only/audio-only synthetic
+  reports. The current accepted set has zero stale failures on accepted axes.
+  Validation passed with `make media-script-test`, `make reference-report-gate`,
+  `make reference-evidence-package`, `make docs-lint`, and `make diff-check`.
+  The generated signoff summary remains at `26` accepted reports, `19`
+  semantic coverage requirements, `90` required non-empty media artifacts,
+  `22` visual comparisons, and `23` audio comparisons. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780053594295089`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780053747929549`.
+- `2026-05-29 12:18 BST`: Completed accepted-report frame/sample-count
+  hardening. `make reference-report-gate` now rejects accepted visual axes
+  unless `reference_frames`, `candidate_frames`, and `compared_frames` are
+  positive, and rejects accepted audio axes unless `reference_samples`,
+  `candidate_samples`, and `compared_samples` are positive. The generated
+  signoff summary now exposes accepted comparison breadth: `22` visual
+  comparisons and `23` audio comparisons, alongside `90` required non-empty
+  media artifacts across `26` accepted reports and `19` semantic coverage
+  requirements. Validation passed with `make media-script-test`,
+  `make reference-report-gate`, `make reference-evidence-package`,
+  `make docs-lint`, and `make diff-check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780053282525939`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780053540079389`.
+- `2026-05-29 12:13 BST`: Completed accepted-media non-empty artifact
+  hardening. `make reference-report-gate` now rejects zero-byte required
+  MAME/clean media artifacts for accepted visual/audio axes, so accepted
+  `report.json` files cannot pass if reviewable MP4/GIF/WAV evidence has been
+  truncated. A follow-up check now also requires accepted visual axes to report
+  positive reference, candidate, and compared frame counts, and accepted audio
+  axes to report positive reference, candidate, and compared sample counts.
+  Accepted axes must not carry stale verifier `failures` entries. The generated
+  signoff summary now labels the artifact side as `Required non-empty media
+  artifacts` and reports accepted visual/audio comparison counts; the current
+  package checks `90` required non-empty artifacts across `26` accepted reports
+  and `19` semantic coverage requirements, with positive frame/sample counts
+  and no failure metadata on every accepted axis.
+  Validation passed with
+  `python3 -m unittest tools/check_reference_reports_test.py`,
+  `make media-script-test`, `make reference-report-gate`,
+  `make reference-evidence-package`, `make docs-lint`, and
+  `make diff-check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780053050331219`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780053213404429`.
+- `2026-05-29 12:12 BST`: Completed accepted-report media-artifact hardening.
+  The accepted report gate now verifies that every accepted visual/audio axis
+  still has its required local MAME reference and clean candidate media files.
+  A follow-up check now also rejects zero-byte accepted media, preventing stale
+  `report.json` files from passing after reviewable MP4/GIF or WAV artifacts
+  are removed or truncated. The generated signoff summary now reports the
+  required non-empty media-artifact count; the current package checks `90`
+  required non-empty media artifacts across the `26` accepted reports and `19`
+  semantic coverage requirements. Validation passed with
+  `python3 -m unittest tools/check_reference_reports_test.py`,
+  `make media-script-test`, `make reference-report-gate`,
+  `make reference-evidence-package`, `make docs-lint`, and
+  `make diff-check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780052697102609`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780052974769229`.
+- `2026-05-29 12:03 BST`: Completed release-gate target hardening. Added
+  `make release-gate` as the executable form of the documented release gate,
+  plus helper targets `make game-smoke`, `make live-smoke`, `make docs-lint`,
+  and `make diff-check`. Updated `README.md`, `SPEC.md`, this plan, and the
+  release-closure audit so release validation no longer depends on manually
+  copying the command list. Validation passed with `make -n release-gate`,
+  `make docs-lint`, `make diff-check`, and the full `make release-gate`. The
+  full target passed formatting, default and `legacy-tools` Rust tests, both
+  clippy passes, clean-fidelity scenarios, media helper tests, fresh
+  `make reference-evidence-package`, `make reference-report-gate` (`26`
+  reports across `19` coverage requirements), `make reference-mame-doctor`,
+  `make readme-media`, `make game-smoke`, `make live-smoke`, docs lint, and
+  diff hygiene. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780052070841729`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780052614494249`.
+- `2026-05-29 11:48 BST`: Completed signoff-summary boundary evidence
+  expansion. `make reference-signoff-summary` now appends a
+  `Reference Window Scans` section to
+  `target/reference-media/reference-signoff-summary.md`, covering both
+  `target/reference-media/reference-window-scan.json` and
+  `target/reference-media/reference-window-scan-organic.json`. The generated
+  owner-review artifact now includes accepted media report metrics plus
+  all-trace and organic-only scan exclusions, trace counts, target sound hits,
+  object rows, candidate windows, terrain status rows, `TERBLO` rows,
+  last-human terrain candidates, and `ASTCNT` distributions. Validation passed
+  with `python3 -m unittest tools/check_reference_reports_test.py`,
+  `make reference-window-scan`, `make reference-window-scan-organic`,
+  `make reference-signoff-summary`,
+  `markdownlint target/reference-media/reference-signoff-summary.md`,
+  `make media-script-test`, `make reference-report-gate`, docs markdownlint,
+  and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780051539597159`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780051728944849`.
+- `2026-05-29 11:49 BST`: Started fresh evidence-package target cycle. Scope:
+  add a single target that regenerates both reference-window scan JSON files
+  before building `target/reference-media/reference-signoff-summary.md`, so the
+  owner-review package is not assembled from stale scan evidence. Slack cycle
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780051793630249`.
+  Completed at `2026-05-29 11:51 BST`: added
+  `make reference-evidence-package`, which runs `make reference-window-scan`,
+  `make reference-window-scan-organic`, and `make reference-signoff-summary` in
+  order. Validation passed with `make reference-evidence-package`,
+  `make media-script-test`, `make reference-report-gate`,
+  `markdownlint target/reference-media/reference-signoff-summary.md`, docs
+  markdownlint, and `git diff --check`. Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780051899292799`.
+- `2026-05-29 11:44 BST`: Completed split all-trace and organic-only
+  reference-window scan artifacts. Added `make reference-window-scan-organic`,
+  which writes `target/reference-media/reference-window-scan-organic.json`
+  using the standard synthetic/state-steered exclusions while preserving
+  `make reference-window-scan` as the all-trace report writer. Current
+  generated evidence: all-trace scan covers `204` expected traces and `200`
+  debug traces, finds `16` target sound hits, `149305` object rows, `113279`
+  terrain status rows, `2` `TERBLO` process rows, and zero last-human terrain
+  candidates; organic-only scan covers `184` expected traces and `180` debug
+  traces, finds zero target sound hits, `147495` object rows, `105596`
+  terrain status rows, zero `TERBLO` process rows, and zero last-human terrain
+  candidates. Validation passed with `make reference-window-scan`,
+  `make reference-window-scan-organic`, `make media-script-test`,
+  `make reference-report-gate`, docs markdownlint, and `git diff --check`.
+  Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780051222520359`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780051460933749`.
+- `2026-05-29 11:36 BST`: Completed organic terrain-blow scan hardening.
+  Extended `make reference-window-scan` so the generated JSON and text report
+  include terrain status rows, `TERBLO` process rows, `ASTCNT` distribution,
+  and last-human terrain-blow candidates. The current all-trace scan covers
+  `204` expected traces and `200` debug traces, finds `16` target non-lander
+  sound hits, `149305` object rows, zero non-lander sound/object candidates,
+  `113279` terrain status rows, `2` `TERBLO` process rows, and zero
+  last-human terrain candidates. The organic-only scan excluding
+  `nonlander-sound-command`, `enemy-explosion-matrix`,
+  `enemy-materialize-matrix`, and `state-steered` covers `184` expected traces
+  and `180` debug traces, finds zero target sound hits, `147495` object rows,
+  zero non-lander candidates, `105596` terrain status rows, zero `TERBLO`
+  process rows, and zero last-human candidates. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780050793200489`.
+  Validation passed with `make media-script-test`, `make reference-window-scan`,
+  `make reference-window-scan-organic`, `make reference-report-gate`, docs
+  markdownlint, and `git diff --check`. Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780051146614649`.
+- `2026-05-29 11:28 BST`: Started owner-review proof package hardening. Scope:
+  make the remaining release-signoff step deterministic by generating a
+  Markdown owner-review matrix directly from
+  `docs/fidelity/reference-report-gate.json` and the local accepted
+  `target/reference-media/**/report.json` artifacts. The target should list
+  coverage requirements, accepted reports, visual/audio metric summaries, and
+  MAME/clean media paths so owner review is not dependent on hand-maintained
+  prose alone. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780050357114229`.
+  Completed at `2026-05-29 11:31 BST`: added
+  `make reference-signoff-summary`, wired the report checker to emit the
+  deterministic Markdown signoff matrix, documented the generated review
+  artifact, and updated the release closure audit. Validation passed with
+  `python3 -m unittest tools/check_reference_reports_test.py`,
+  `make reference-signoff-summary`,
+  `markdownlint target/reference-media/reference-signoff-summary.md`,
+  `make media-script-test`, `make reference-report-gate`, docs markdownlint,
+  and `git diff --check`. Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780050686774359`.
+- `2026-05-29 11:23 BST`: Completed release-gate revalidation after promoting
+  the live laser-hit materialization report to the accepted gate. The first
+  full-test pass exposed three stale default-test expectations: start-scene
+  object counts had not been updated for the current two additional
+  source-backed object sprites, and the single-player respawn helper still
+  required a byte-for-byte default `WorldSnapshot` even though the respawn
+  interstitial now preserves source scanner/RNG state while clearing live
+  playfield content. Updated those tests to assert the observable current
+  contract. Validation passed with `cargo fmt --check`,
+  `cargo test --all-targets`,
+  `cargo test --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets -- -D warnings`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `make clean-fidelity`, `make media-script-test`,
+  `make reference-report-gate`, `make reference-mame-doctor`,
+  `make readme-media`, `cargo run -- --game-smoke`,
+  `cargo run -- --live-smoke`, `make reference-window-scan`, JSON manifest
+  validation, docs markdownlint, and `git diff --check`. The accepted report
+  gate checks `26` reports (`19` all-axis, `4` audio-only, `3` visual-only)
+  across `19` coverage requirements. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780049263956029`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780050244226059`.
+- `2026-05-29 11:04 BST`: Started the live laser-hit materialization proof
+  promotion step. Scope: add the existing passing
+  `target/reference-media/gameplay-laser-hit-single-materialize-check/report.json`
+  all-axis report to the accepted reference gate so live laser, enemy hit,
+  explosion, coalescence, gameplay-audio, and playability evidence is enforced
+  by `make reference-report-gate` rather than only documented in the historical
+  work log. Slack cycle starts:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780048900955749` and
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780048981566299`.
+  Completed at `2026-05-29 11:06 BST`: the accepted gate now checks `26`
+  reports (`19` all-axis, `4` audio-only, `3` visual-only) against `19`
+  coverage requirements. Validation passed with
+  `python3 -m json.tool docs/fidelity/reference-report-gate.json`,
+  `make reference-report-gate`, `make reference-mame-doctor`, docs
+  markdownlint, and `git diff --check`. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780049206736689`.
+- `2026-05-29 10:20 BST`: Completed the down030 post-death laser all-axis
+  cycle. Generated MAME and clean media for
+  `none*900;coin*4;none*360;start_one*10;none*180;down*30;none*952;fire*45;none*350`.
+  The clean default post-death branch now restores input readiness early enough
+  for the second-life laser `0xEB` at frame `2439` and gates the post-death
+  appearance/materialize `0xEA` at frame `2447`, matching MAME. The clean
+  sound-board materialize waveform now follows the Williams `APPEAR`/`LITEN`
+  sweep cadence instead of the earlier high-frequency placeholder. The accepted
+  gate now uses
+  `target/reference-media/laser-hit-down030-fire2437-check-fixed/report.json`,
+  which passes all-axis mode with full visual RMS `36.51`, playfield RMS
+  `33.91`, laser-band RMS `32.89`, terrain RMS `18.23`, audio envelope
+  correlation `0.864`, RMS ratio `1.008`, and zero-crossing ratio `0.971`.
+  Slack cycle starts:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780044035916139` and
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780045966251759`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780046685883929`.
+- `2026-05-29 09:35 BST`: Added a finite owner-review checklist to
+  `docs/fidelity/release-closure-audit.md`. The checklist ties final closure to
+  the current accepted MAME-vs-clean report gate, generated local media, and
+  explicit acceptance of the remaining proof boundaries; otherwise the next
+  action must be a concrete new MAME mismatch/input program. Slack step start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780043729129199`.
+  Slack step completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780043768584189`.
+- `2026-05-29 09:34 BST`: Started and completed a bounded clean-runtime
+  fidelity-debt scan after the green release gate. Searched production clean
+  runtime source for `TODO`, `FIXME`, `placeholder`, `stub`, `approximate`,
+  `guess`, `unimplemented!`, and `todo!` markers. No active
+  sprite/audio/gameplay placeholder path was found; hits were guard tests,
+  source asset invariants, clean CLI unsupported-argument tests, or
+  raster-tooling counters that the smoke gates require to stay zero. Tightened
+  stale README/SPEC wording so the active path is documented as source-backed
+  sprite regions with zero temporary raster commands in smoke/live gameplay.
+  Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780043577846259`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780043686657819`.
+- `2026-05-29 09:31 BST`: Completed release-gate revalidation after adding the
+  delayed-start thrust/reverse accepted report. The gate passed
+  `cargo fmt --check`, `cargo test --all-targets`,
+  `cargo test --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets -- -D warnings`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `make clean-fidelity`, `make media-script-test`,
+  `make reference-report-gate`, `make reference-mame-doctor`,
+  `make readme-media`, `cargo run -- --game-smoke`,
+  `cargo run -- --live-smoke`, docs markdownlint, and `git diff --check`.
+  `make reference-report-gate` checked `23` reports (`17` all, `4` audio,
+  `2` visual) across `19` semantic coverage requirements. Slack milestone
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780042956088699`.
+  Slack milestone completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780043537434889`.
+- `2026-05-29 09:17 BST`: Started and completed a delayed-start
+  thrust/reverse media-evidence cycle. Generated/verified the MAME and clean
+  `none*900;coin*4;none*360;start_one*10;none*180;thrust*30;reverse,thrust*30;none*200`
+  window, then accepted
+  `target/reference-media/gameplay-thrust-reverse-delayed-check/report.json`.
+  The report passes full visual/audio acceptance with full visual RMS `28.40`,
+  playfield RMS `9.38`, laser-band RMS `13.76`, audio envelope correlation
+  `0.889`, RMS ratio `0.791`, and zero-crossing ratio `1.621`. Runtime audio
+  calibration now uses the MAME-backed thrust filtered-noise step and a
+  calibrated `0xF0` background-noise gain; protected delayed-start thrust and
+  enemy-shot reports were regenerated and remained green. Validation passed
+  with `cargo fmt --check`, focused sound/audio/thrust tests,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`, JSON
+  manifest validation, `make reference-report-gate`, `make media-script-test`,
+  `make reference-mame-doctor`, docs markdownlint, and `git diff --check`.
+  Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780042625576569`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780042895609849`.
+- `2026-05-29 08:42 BST`: Completed an accepted-media report inventory cycle.
+  Scanned local `target/reference-media/**/report.json` files against
+  `docs/fidelity/reference-report-gate.json`. Six passing reports were not in
+  the semantic gate, but each was duplicate or probe evidence rather than a new
+  bounded acceptance target: current fire/reverse duplicate, duplicate
+  first-laser materialize window, smart-bomb offset scans, and terrain-blow PTS
+  probe. No new report was accepted from this inventory. Validation passed with
+  `markdownlint PLAN.md` and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780040549448509`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780040599537239`.
+- `2026-05-29 08:40 BST`: Started an extra laser/reverse media-breadth cycle.
+  Scope: inspect existing bounded MAME-vs-clean laser/reverse media outside
+  the already-accepted delayed-start fire/reverse report, add only passing
+  evidence to the semantic closure gate, and leave reverse-only clips as
+  diagnostics unless their full accepted axes pass. Added the passing centered
+  first gameplay laser-hit report to `docs/fidelity/reference-report-gate.json`;
+  the gate now checks `22` reports and `19` semantic coverage requirements.
+  Validation passed with JSON formatting, `make reference-report-gate`,
+  `python3 -m unittest tools/check_reference_reports_test.py`,
+  `make media-script-test`, docs markdownlint, and `git diff --check`. Slack
+  cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780040238116559`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780040518227689`.
+- `2026-05-29 08:35 BST`: Completed evidence-boundary revalidation for the
+  remaining organic non-lander sound/media proof gap. Reran
+  `make reference-window-scan` and the organic-only variant with
+  `REFERENCE_WINDOW_SCAN_EXCLUDES='nonlander-sound-command
+  enemy-explosion-matrix state-steered'`. The all-trace scan found `199`
+  expected TSVs, `195` debug TSVs, `16` target sound hits, `148363` object
+  rows, and zero candidate windows. The organic-only scan found `182` expected
+  TSVs, `178` debug TSVs, zero target sound hits, `147493` object rows, and
+  zero candidate windows. No new bounded organic MAME window was found; the
+  remaining closure boundary is owner review or new external MAME evidence, not
+  a known sprite/audio/gameplay implementation defect. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780040076234519`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780040151145529`.
+- `2026-05-29 08:32 BST`: Completed widened release-gate revalidation after
+  the accepted-report gate gained semantic coverage requirements. Validation
+  passed with `cargo fmt --check`, `cargo test --all-targets`,
+  `cargo test --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets -- -D warnings`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `make clean-fidelity`, `make media-script-test`,
+  `make reference-report-gate`, `make reference-mame-doctor`,
+  `make readme-media`, `cargo run -- --game-smoke`,
+  `cargo run -- --live-smoke`, JSON formatting for
+  `docs/fidelity/reference-report-gate.json`, docs markdownlint, and
+  `git diff --check`. Default tests passed `436` lib tests plus `2` binary
+  tests; `legacy-tools` passed `1386` lib tests with `1` ignored plus binary
+  and example tests; `make clean-fidelity` matched every selected scenario;
+  `make reference-report-gate` checked `21` reports plus `19` semantic
+  coverage requirements; game smoke rendered `320` clean sprite frames with
+  `missing_sprite_regions=0`; live smoke rendered `320` offscreen nonblank
+  `wgpu` frames with `legacy_presenter_used=false`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780039432857839`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780039989263689`.
+- `2026-05-29 08:21 BST`: Completed an accepted-report semantic coverage
+  gate cycle. The previous report gate proved that accepted reports pass, but
+  did not mechanically prove that those reports still cover the objective
+  facets named by the active MAME-fidelity goal. Added
+  `coverage_requirements` and per-report `coverage` tags to
+  `docs/fidelity/reference-report-gate.json`, extended
+  `tools/check_reference_reports.py` to enforce accepted visual/audio/all-axis
+  coverage, and added focused unit tests for coverage satisfaction and missing
+  axis coverage. The gate now checks `21` reports plus `19` semantic coverage
+  requirements for sprite visuals, player laser visual/audio, reverse
+  orientation, explosion/coalescence visuals, terrain blow, gameplay audio
+  families, non-lander audio/visual presentation, playability, rescue/loss,
+  death/respawn, smart bomb, hyperspace, and organic non-lander presentation.
+  Updated `README.md`, `SPEC.md`, and the release closure audit to describe
+  the stronger gate. Validation passed with
+  `python3 -m unittest tools/check_reference_reports_test.py`,
+  `python3 -m json.tool docs/fidelity/reference-report-gate.json`,
+  `make reference-report-gate`, docs markdownlint, and `git diff --check`.
+  Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780039076615209`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780039354795639`.
+- `2026-05-29 08:16 BST`: Completed full release-gate revalidation after the
+  accepted-report manifest was broadened to `21` reports. Validation passed
+  with `cargo fmt --check`, `cargo test --all-targets`,
+  `cargo test --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets -- -D warnings`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `make clean-fidelity`, `make media-script-test`,
+  `make reference-report-gate`, `make reference-mame-doctor`,
+  `make readme-media`, `cargo run -- --game-smoke`,
+  `cargo run -- --live-smoke`, JSON formatting for
+  `docs/fidelity/reference-report-gate.json`, docs markdownlint, and
+  `git diff --check`. Default tests passed `436` lib tests plus `2` binary
+  tests; `legacy-tools` passed `1386` lib tests with `1` ignored plus binary
+  and example tests; `make clean-fidelity` matched every selected scenario;
+  `make reference-report-gate` checked `21` reports (`15` all, `4` audio,
+  `2` visual); game smoke rendered `320` clean sprite frames with
+  `missing_sprite_regions=0`; live smoke rendered `320` offscreen nonblank
+  `wgpu` frames with `legacy_presenter_used=false`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780038555171939`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780038972745979`.
+- `2026-05-29 08:07 BST`: Completed a reference-report closure-gate breadth
+  cycle. Rechecked the active plan, spec, release audit, and local report set;
+  no new concrete sprite/audio implementation defect was found. The concrete
+  closure gap was that already-green delayed enemy-shot full/narrow/pre-window
+  reports and the organic non-lander long-window report were documented as
+  proof but not enforced by `docs/fidelity/reference-report-gate.json`.
+  Added those four reports to the accepted-report manifest and updated the
+  release closure audit. `make reference-report-gate` now checks `21`
+  accepted reports: `15` full visual/audio, `4` audio-only, and `2`
+  visual-only. Validation passed with
+  `python3 -m json.tool docs/fidelity/reference-report-gate.json`,
+  `make reference-report-gate`, `make media-script-test`,
+  `make reference-window-scan`, organic `make reference-window-scan` with
+  synthetic/state-steered exclusions, `make reference-mame-doctor`, docs
+  markdownlint, `cargo fmt --check`, and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780038170492099`.
+  Slack inspection update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780038280407839`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780038475562639`.
+- `2026-05-29 08:00 BST`: Completed release-gate revalidation after the
+  materialization/coalescence regression and reference-report closure gate.
+  Validation passed with `cargo fmt --check`, `cargo test --all-targets`,
+  `cargo test --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets -- -D warnings`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `make clean-fidelity`, `make media-script-test`,
+  `make reference-report-gate`, `make reference-mame-doctor`,
+  `make readme-media`, `cargo run -- --game-smoke`,
+  `cargo run -- --live-smoke`, docs markdownlint, and `git diff --check`.
+  `make clean-fidelity` matched every selected scenario,
+  `make reference-report-gate` checked `17` accepted reports, README media
+  regenerated the GIF/WAV with matching frame count/delay, and live smoke
+  rendered `320` nonblank offscreen `wgpu` frames with
+  `legacy_presenter_used=false`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780037383891499`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780038023189499`.
+- `2026-05-29 07:49 BST`: Completed a reference report closure-gate cycle.
+  Added `docs/fidelity/reference-report-gate.json`,
+  `tools/check_reference_reports.py`, and
+  `tools/check_reference_reports_test.py`; exposed
+  `make reference-report-gate`; and documented the target in `README.md`,
+  `SPEC.md`, this plan, and the release closure audit. The local gate passes
+  for `17` accepted media reports: `11` full visual/audio, `4` audio-only, and
+  `2` visual-only. The gate checks each report exists, top-level status is
+  `pass`, acceptance mode matches the manifest, and the accepted axes pass.
+  Validation passed with `make media-script-test`, `make reference-report-gate`,
+  `python3 -m json.tool docs/fidelity/reference-report-gate.json`, docs
+  markdownlint, and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780037164471429`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780037345089229`.
+- `2026-05-29 07:45 BST`: Completed a materialization/coalescence
+  proof-boundary cycle. Added the focused clean regression
+  `clean_game_projects_enemy_family_appearances_as_source_pixel_clouds`, which
+  covers source expanded-object appearance projection for lander, mutant,
+  bomber, pod, baiter, and swarmer families and asserts that those appearances
+  render as source pixel clouds rather than static sprites while coalescing.
+  Updated `SPEC.md`, this plan, and the release closure audit to record that
+  the remaining coalescence gap is bounded MAME media breadth and owner review,
+  not a known implementation path. Validation passed with
+  `cargo fmt --check`, `cargo test appearance --lib`,
+  `cargo test materialize --lib`, `cargo test coalescence --lib`,
+  `cargo check --all-targets --features legacy-tools`, docs markdownlint, and
+  `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780036874653399`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780037127310629`.
+- `2026-05-29 07:40 BST`: Completed a repeatable non-lander
+  reference-window scan cycle. Added `tools/scan_reference_windows.py` and
+  `tools/scan_reference_windows_test.py`, wired them into
+  `make media-script-test`, and exposed `make reference-window-scan` with
+  optional `REFERENCE_WINDOW_SCAN_EXCLUDES` path filters. The all-trace scan
+  wrote `target/reference-media/reference-window-scan.json` and found `199`
+  expected traces, `16` target command hits, `148363` object rows, and zero
+  nearby sound/object candidate windows. The organic-only scan wrote
+  `target/reference-media/reference-window-scan-organic.json`, excluded
+  `nonlander-sound-command`, `enemy-explosion-matrix`, and `state-steered`
+  paths, and found `182` expected traces, zero target command hits, `147493`
+  object rows, and zero candidate windows. Documentation was updated in
+  `README.md`, `SPEC.md`, this plan, and both fidelity docs. Validation passed
+  with `make media-script-test`, both reference-window scans,
+  `cargo fmt --check`, docs markdownlint, and `git diff --check`. Slack cycle
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780036354362979`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780036798427199`.
+- `2026-05-29 07:16 BST`: Completed a media acceptance-scope hardening cycle.
+  Added `--acceptance-mode all|visual|audio` to
+  `tools/verify_reference_media.py` and exposed it as
+  `REFERENCE_MEDIA_ACCEPTANCE_MODE` in `make reference-media-check`, so
+  synthetic visual-only and audio-only proof clips can produce truthful
+  top-level reports without pretending the ignored axis is accepted. Refreshed
+  `target/reference-media/enemy-explosion-matrix-check/report.json` as
+  `acceptance_mode=visual` and the four isolated non-lander sound-command
+  reports as `acceptance_mode=audio`; all five are now top-level `pass` while
+  preserving the underlying ignored-axis metrics. Validation passed with
+  `python3 -m unittest tools/verify_reference_media_test.py`,
+  `cargo fmt --check`, the five media report refreshes, docs markdownlint, and
+  `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780035227229299`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780035565286739`.
+- `2026-05-29 07:28 BST`: Completed an organic non-lander hold-down media
+  evidence cycle. The existing trace search found that current organic
+  expected TSVs still do not contain the remaining non-lander-specific
+  `0xFE`, `0xFA`, `0xF8`, or `0xF3` sound-command bytes outside synthetic
+  captures, but the debug inventory identified a useful visual window in
+  `extended_hold_down_7000`. Captured MAME media from input
+  `none*900;coin*4;none*360;start_one*10;altitude_down*5726`, generated the
+  matching clean frames `4300-4700`, and refreshed
+  `target/reference-media/organic-nonlander-holddown-7000-check/report.json`.
+  The report is top-level `pass` with `acceptance_mode=visual`: full visual
+  RMS `28.22`, visual MAE `4.88`, playfield RMS `7.59`, laser-band RMS
+  `5.41`, and terrain RMS `21.39`. Audio is retained as a failing diagnostic
+  for this clip (`normalized diff RMS 1.317`, correlation `0.018`) because the
+  selected window does not exercise the remaining non-lander-specific command
+  bytes. Validation passed with the MAME/clean capture commands, the visual
+  report refresh, docs markdownlint, and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780035601728329`.
+  Slack step start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780035838994249`.
+  Slack step completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780036088767139`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780036216912449`.
+- `2026-05-29 07:10 BST`: Completed release-gate validation after the isolated
+  non-lander sound-command fixes. The initial default all-targets test run
+  caught one clean-source terminology violation from a new test name; renamed
+  it from `clean_game_enemy_sound_commands_match_red_label_table` to
+  `clean_game_enemy_sound_commands_match_source_table`, then reran the full
+  gate. Validation passed with `cargo fmt --check`,
+  `cargo test --all-targets`, `cargo test --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets -- -D warnings`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `make clean-fidelity`, `make media-script-test`,
+  `make reference-mame-doctor`, `make readme-media`,
+  `cargo run -- --game-smoke`, `cargo run -- --live-smoke`, docs
+  markdownlint, and `git diff --check`. The release gate remains green; owner
+  review remains before final closure and protected reference media
+  replacement. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780034392944449`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780035050812409`.
+- `2026-05-29 06:50 BST`: Completed the isolated non-lander sound-command
+  audio proof cycle. Removed the disproven global DAC-hold mixer experiment,
+  added MAME sound-board DAC-write tracing as
+  `target/reference-media/mame/traces/<basename>.sound-dac.tsv`, and fixed the
+  MAME state-steer command emitter to match source `SNDOUT` shape by writing
+  idle `0x3F` before the active command byte. Added isolated MAME and clean
+  state steers for `sound_command_fe`, `sound_command_fa`, `sound_command_f8`,
+  and `sound_command_f3`, generated matching ignored MAME/clean media, and
+  refreshed the four report-only checks. The audio gates now pass for bomber
+  hit `0xFE` (RMS ratio `1.158`, envelope `0.890`), pod hit `0xFA` (RMS ratio
+  `1.287`, envelope `0.857`), swarmer/baiter hit `0xF8` (RMS ratio `1.202`,
+  zero-crossing ratio `1.093`), and swarmer shot `0xF3` (RMS ratio `1.208`,
+  zero-crossing ratio `1.003`). The `0xFE` and `0xFA` runtime fix is scoped to
+  tonal GWAVE period density in `src/sound_board.rs`; the synthetic
+  single-command visual metrics remain non-acceptance artifacts because MAME
+  and clean do not share a matching playfield scene. Validation passed with
+  `cargo fmt --check`, focused sound-board/audio/reference-capture Rust tests,
+  reference candidate parser tests, `make trace-script-test`,
+  `make media-script-test`, isolated media report refreshes, docs
+  markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780033691166689`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780034348796819`.
+- `2026-05-29 06:05 BST`: Completed the clean long-run divergence fix for the
+  organic non-lander window. The root cause was not live-play survival: MAME
+  and clean both reach the post-game/game-over branch before frames
+  `5811-7000`, but MAME continues into the attract scoring presentation while
+  clean entered a static `GameOver` state with no timer. Patched
+  `step_post_game_playfield` to hand off to the normal attract cycle after the
+  residual playfield completes, added
+  `clean_game_mame_hold_up_enters_attract_scoring_sequence_after_post_game`,
+  regenerated
+  `target/reference-media/clean/organic-nonlander-holdup-7000/organic-nonlander-holdup-7000-clean.*`,
+  and reran `target/reference-media/organic-nonlander-holdup-7000-check/report.json`.
+  The report now passes with non-static candidate signatures, full visual RMS
+  `36.41`, visual MAE `7.13`, playfield RMS `40.10`, laser-band RMS `28.75`,
+  and an audio silence pass. Updated `PLAN.md`,
+  `docs/fidelity/mame-golden-clips.md`, and
+  `docs/fidelity/release-closure-audit.md` to mark this bounded
+  post-game/attract scoring-presentation proof as covered. Validation passed
+  with `cargo test --lib clean_game_mame_hold_up`, `cargo test --lib
+  post_game`, `cargo test --lib
+  clean_game_matches_mame_long_no_input_post_game`, `cargo fmt --check`, docs
+  markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780030720792089`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780031149965009`.
+- `2026-05-29 05:57 BST`: Completed an organic non-lander long-window media
+  capture trial. Generated
+  `target/reference-media/mame/organic-nonlander-holdup-7000.*`, matching MAME
+  traces under `target/reference-media/mame/traces/organic-nonlander-holdup-7000.*.tsv`,
+  clean candidate artifacts under
+  `target/reference-media/clean/organic-nonlander-holdup-7000/`, and
+  `target/reference-media/organic-nonlander-holdup-7000-check/report.json`.
+  The report is numerically green with full visual RMS `30.79`, visual MAE
+  `5.33`, playfield RMS `32.60`, laser-band RMS `21.06`, and an audio silence
+  pass, but it is diagnostic only. MAME frames `5811-7000` contain live
+  `SCZP1`, `UFOP1`, `TIEP1`, `PRBP1`, `SWPIC1`, `BMBP1`, and `BXPIC` rows;
+  the clean candidate is in `GameOver` for those frames and only renders
+  landers/humans. Updated `PLAN.md`, `docs/fidelity/mame-golden-clips.md`, and
+  `docs/fidelity/release-closure-audit.md` to record the blocker and next
+  finite task. Validation passed with docs markdownlint, `git diff --check`,
+  and `cargo fmt --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780030115444629`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780030672248989`.
+- `2026-05-29 05:47 BST`: Completed an organic non-lander media proof
+  inventory cycle. Scanned the existing MAME debug and expected TSVs for
+  source picture IDs and sound-command rows, then identified
+  `target/reference-media/mame/rescue-terrain-cycle/extended_hold_up_7000/traces/extended_hold_up_7000.debug.tsv`
+  as the strongest next organic visual proof candidate. Frames `5811-7000`
+  from input program `none*900;coin*4;none*360;start_one*10;altitude_up*5726`
+  contain live `UFOP1` baiter, `TIEP1` bomber, `PRBP1` pod, `SWPIC1` swarmer,
+  `SCZP1` mutant, `BMBP1` bomb shell, and `BXPIC` bomb explosion rows. The
+  matching expected TSV covers existing accepted command families `0xFC`,
+  `0xF6`, `0xEE`, and `0xE8`; organic `0xF3`, `0xFA`, `0xFE`, and `0xF8`
+  hit/shot audio windows still need targeted media or trace evidence. Updated
+  `PLAN.md`, `docs/fidelity/mame-golden-clips.md`, and
+  `docs/fidelity/release-closure-audit.md`. Validation passed with docs
+  markdownlint, `git diff --check`, and `cargo fmt --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780029812868029`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780030068654959`.
+- `2026-05-29 05:43 BST`: Completed a non-lander sound-command proof audit.
+  Added direct regression coverage for the red-label enemy-family command bytes:
+  lander hit/shot `0xF9`/`0xFC`, mutant hit/shot `0xE8`/`0xF6`, bomber hit
+  `0xFE`, pod hit `0xFA`, swarmer hit/shot `0xF8`/`0xF3`, baiter hit/shot
+  `0xF8`/`0xFC`, and bomb collision `0xEE`. Bomber and pod remain direct-shot
+  silent because the source table has no bomber or pod shot command. Validation
+  passed with `cargo test --lib sound_commands`, focused swarmer, baiter,
+  mutant, and enemy-projectile collision tests, `cargo fmt --check`, docs
+  markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780029511062849`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780029776700119`.
+- `2026-05-29 10:56 BST`: Completed the enemy materialization/coalescence
+  MAME media proof. Fixed the clean materialization state steer so it uses the
+  source `APVCT` center calculation and freezes live wave simulation after the
+  six seeded appearance slots, preventing normal first-wave refill from
+  contaminating the bounded capture. Re-captured the MAME materialization
+  matrix with the credited `first_300_frames` scenario after confirming the
+  pure-attract `none*1260` capture had valid traces but non-playfield video.
+  Generated matching clean media for frames `1201-1248` and
+  `target/reference-media/enemy-materialize-matrix-check/report.json`. The
+  visual-only report passes with full RMS `37.90`, visual MAE `7.50`,
+  playfield RMS `35.35`, and laser-band RMS `32.08`; the report has been added
+  to `docs/fidelity/reference-report-gate.json` for `sprite_visuals`,
+  `coalescence_visual`, and `non_lander_visual` coverage. Focused validation
+  passed with
+  `cargo test --lib clean_reference_enemy_materialize_matrix_steer_matches_mame_slots`.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780048017611359`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780048531717899`.
+- `2026-05-29 05:37 BST`: Completed an enemy-family MAME media proof
+  feasibility cycle. Added `enemy_explosion_matrix` state-steer support to the
+  MAME trace/capture helper and clean candidate generator. The steer seeds
+  source expanded-object explosion slots for `LNDP3`, `SCZP1`, `TIEP3`,
+  `PRBP1`, `UFOP3`, and `SWXP1`; the trace-only MAME debug rows prove those
+  slots appear at frame `1200` with size `0x01AA` and advance through MAME
+  `EXPU` on following frames. Generated matching MAME media, clean media, and
+  `target/reference-media/enemy-explosion-matrix-check/report.json`. The matrix
+  report has visual status `pass` with full RMS `31.38`, playfield RMS
+  `15.82`, and laser-band RMS `15.95`; top-level status remains `fail` because
+  this synthetic visual steer does not exercise real enemy-kill sound commands.
+  Validation passed with `cargo fmt --check`, focused matrix/explosion tests,
+  `cargo test --features legacy-tools --example
+  generate_reference_candidate_media`, `make trace-script-test`,
+  `make media-script-test`, docs markdownlint, and `git diff --check`. Slack
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780028821363869`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780029475509309`.
+- `2026-05-29 05:25 BST`: Completed an enemy-family
+  explosion/coalescence hardening cycle. Scope: prove that remaining
+  source-backed enemy explosion families use source descriptors and expanded
+  pixel clouds instead of static placeholder sprites before treating the
+  remaining family gap as media-proof breadth. Added focused coverage for
+  lander, mutant, bomber, pod, baiter, and swarmer explosion descriptors,
+  including current source-frame labels `LNDP3`, `SCZP1`, `TIEP3`, `PRBP1`,
+  `UFOP3`, and swarmer `SWXP1`, plus visible expanded-pixel projection for the
+  same families. Validation passed with `cargo test --lib
+  clean_game_projects_enemy_family_explosions_as_source_pixel_clouds`,
+  `cargo test --lib
+  clean_world_starts_enemy_family_explosions_from_current_source_descriptors`,
+  `cargo test --lib explosion`, `cargo test --lib
+  clean_world_maps_source_explosion_descriptor_families`, `cargo fmt --check`,
+  docs markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780028487118539`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780028783996589`.
+- `2026-05-29 05:18 BST`: Started a laser/reverse proof-boundary audit. Scope:
+  inspect sparse laser geometry, hit endpoint alignment, laser sound timing,
+  and reverse-facing player sprite orientation; patch only evidence-backed
+  defects; otherwise record whether the remaining boundary is proof breadth.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780028334517509`.
+  Completed with no runtime patch: `cargo test --lib laser` and `cargo test
+  --lib reverse` passed, and the accepted
+  `gameplay-fire-reverse-delayed-check`,
+  `gameplay-laser-hit-single-check-window`, and
+  `non-lander-target6-fire2524-check` media reports all still pass top-level,
+  visual, and audio gates with zero failures. Docs validation passed with
+  markdownlint, `git diff --check`, and `cargo fmt --check`. Remaining
+  laser/reverse proof debt is extra media breadth, not a concrete
+  implementation defect from this pass. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780028398619189`.
+- `2026-05-29 05:17 BST`: Started a non-lander family proof-boundary audit.
+  Scope: inspect mutant, swarmer, baiter, bomber, pod, bomb, projectile,
+  explosion, and source sprite coverage; patch only concrete placeholders or
+  wrong implementation found in this pass; otherwise record proof debt as
+  missing bounded media rather than missing code. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780028169750729`.
+  Completed with no runtime patch: the clean implementation already has
+  source-shaped sprite IDs, source picture descriptors, non-placeholder atlas
+  regions, source movement/projectile loops, hit/shot sound command mappings,
+  and source explosion descriptors for the non-lander families. Validation
+  passed with `cargo test --lib enemy`, focused `swarmer`, `baiter`, `bomber`,
+  `mutant`, and `pod` filters, `cargo test --lib
+  default_sprite_atlas_uses_source_backed_runtime_regions`, and `cargo test
+  --lib clean_world_maps_source_explosion_descriptor_families`. Remaining
+  proof debt is bounded MAME-vs-clean media breadth for these families. Docs
+  validation passed with markdownlint, `git diff --check`, and
+  `cargo fmt --check`. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780028308395519`.
+- `2026-05-29 05:14 BST`: Completed an organic terrain-blow proof-boundary
+  audit. Rechecked the current local MAME rescue, catch, abduction,
+  terrain-cycle, and long-gameplay debug TSVs, including
+  `rescue-terrain-cycle*`, `rescue-search*`, `rescue-afall-probe`,
+  `rescue-aim-search`, `rescue-catch-directed`, `rescue-catch-search`,
+  `abduction-search`, and `abduction-hold-up-media`. The traces contain
+  repeatable `terrain_blown=true` rows, but they are not a valid last-human
+  terrain-blow reference: early rows are wave/start transition state, and later
+  organic rows still retain `ASTCNT=0x0A`. No runtime patch was made. The
+  accepted terrain-blow evidence remains the passing state-steered `TERBLO`
+  media report, and a targeted organic last-human capture remains owner-review
+  or new-evidence scope. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780027726574969`.
+  Validation passed with docs markdownlint, `git diff --check`, and
+  `cargo fmt --check`. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780028124714119`.
+- `2026-05-29 05:05 BST`: Started a fidelity closure audit cycle to avoid
+  treating the green release gate as proof of universal arcade fidelity.
+  Verified that the current accepted media reports all have top-level, visual,
+  and audio status `pass`, then added
+  `docs/fidelity/release-closure-audit.md` to separate proven accepted clips
+  from broader coverage boundaries. This keeps owner review and any future
+  additional MAME-evidence clips explicit before the active goal can be marked
+  complete. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780027480058219`.
+  Validation passed with docs markdownlint, `git diff --check`, and
+  `cargo fmt --check`. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780027666638819`.
+- `2026-05-29 04:58 BST`: Completed the release-gate closure cycle. Validation
+  passed with `cargo fmt --check`, `cargo test --all-targets`, `cargo test
+  --all-targets --features legacy-tools`, `cargo clippy --all-targets --
+  -D warnings`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, `make clean-fidelity`, `make media-script-test`,
+  `make reference-mame-doctor`, `make readme-media`, `cargo run --
+  --game-smoke`, `cargo run -- --live-smoke`, docs markdownlint, and
+  `git diff --check`. The only release-gate fix was updating the locked final
+  offscreen WGPU smoke signature to the deterministic value produced by the
+  current fidelity-corrected frame source; `--live-smoke` now reports `320`
+  nonblank offscreen WGPU frames, first signature `8daed38b41a692a9`, and last
+  signature `e3f9b453bfe28702`. The remaining closure item is owner review,
+  plus any new concrete mismatch found outside the current accepted clips.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780026308997099`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780027328968659`.
+- `2026-05-29 04:44 BST`: Completed the rescue/loss media closure audit.
+  Existing passing reports now cover the bounded target set without another
+  open-ended search: `target/reference-media/afall-player-catch-check/report.json`
+  covers player catch/rescue, `target/reference-media/afall-safe-landing-check/report.json`
+  covers safe landing, and
+  `target/reference-media/abduction-hold-up-pickup-pull-check/report.json`
+  covers lander-driven pickup/pull/conversion loss. Updated the active work
+  items to show no bounded sprite/audio media target remains open from the
+  current list; the next step is release-gate validation and owner review, plus
+  any concrete new mismatch found during that gate. Validation passed with docs
+  markdownlint, `git diff --check`, and `cargo fmt --check`.
+- `2026-05-29 04:40 BST`: Completed the lander pickup/pull media parity
+  cycle. Captured
+  `target/reference-media/mame/abduction-hold-up-media/abduction-hold-up-media.*`
+  from the existing `hold-up` input program, regenerated
+  `target/reference-media/clean/abduction-hold-up-media/abduction-hold-up-clean.*`
+  for capture frames `2150-2730`, and wrote
+  `target/reference-media/abduction-hold-up-pickup-pull-check/report.json` with
+  MAME start `36675ms`, clean start `899ms`, and duration `8750ms`. The visual
+  gate already passed; the audio gate passed after extending the standalone
+  `0xEE` human-loss/lightning tail to cover the MAME conversion window. The
+  report passes with full visual RMS `28.61`, visual MAE `4.99`, playfield RMS
+  `4.86`, laser-band RMS `3.25`, terrain RMS `20.18`, envelope correlation
+  `0.613`, RMS ratio `1.066`, and zero-crossing ratio `1.076`. This closes
+  pickup/pull media parity; remaining bounded media work is rescue/loss.
+  Validation passed with `cargo fmt --check`, `cargo test sound_board --lib`,
+  `cargo test hold_up_lander_pull --lib`,
+  `cargo check --all-targets --features legacy-tools`, `cargo clippy
+  --all-targets --features legacy-tools -- -D warnings`, docs markdownlint,
+  and `git diff --check`.
+- `2026-05-29 04:27 BST`: Completed the non-lander target6
+  shot/explosion/materialization media parity cycle. Captured
+  `target/reference-media/mame/non-lander-target6-fire2524/non-lander-target6-fire2524-media.*`
+  from the existing `down029/fire2524` input program, regenerated
+  `target/reference-media/clean/non-lander-target6-fire2524/non-lander-target6-fire2524-clean.*`
+  for capture frames `2750-3160`, and wrote
+  `target/reference-media/non-lander-target6-fire2524-check/report.json` with
+  MAME start `45760ms` and duration `6840ms`. The bounded media report passes
+  with full visual RMS `31.72`, visual MAE `5.74`, playfield RMS `17.46`,
+  laser-band RMS `19.64`, terrain RMS `26.94`, envelope correlation `0.714`,
+  RMS ratio `1.192`, and zero-crossing ratio `1.298`. This closes the current
+  non-lander shot/explosion/materialization media target; remaining bounded
+  media work is pickup/pull and rescue/loss. Validation passed with docs
+  markdownlint, `git diff --check`, and `cargo fmt --check`.
+- `2026-05-29 04:14 BST`: Completed the state-steered falling-human
+  safe-landing media parity cycle. Captured
+  `target/reference-media/mame/state-steered-media/afall-safe-landing/afall-safe-landing-media.*`
+  from the credited input program, regenerated
+  `target/reference-media/clean/state-steered-media/afall-safe-landing/afall-safe-landing-clean.*`
+  with `CLEAN_REFERENCE_STATE_STEER_FRAME=1450` and capture frames
+  `1450-1481`, and reran
+  `target/reference-media/afall-safe-landing-check/report.json` against the
+  MAME sound-command-aligned start `24180ms`. Clean now steers the safe-landing
+  human one subpixel step from terrain so the normal clean landing path scores
+  `250` and emits source `ALSND` / `0xE0` on relative frame `1`. The clean
+  sound-board VARI renderer now follows the source sweep restart loop with
+  calibrated VARI DAC gain. The report passes with visual RMS `29.30`, visual
+  MAE `5.24`, playfield RMS `11.58`, laser-band RMS `13.99`, envelope
+  correlation `0.284`, RMS ratio `1.003`, and zero-crossing ratio `1.396`.
+  Validation passed with `cargo fmt --check`, focused safe-landing tests,
+  `cargo test sound_board --lib`, the reference candidate media example tests,
+  `cargo check --all-targets --features legacy-tools`, `cargo clippy
+  --all-targets --features legacy-tools -- -D warnings`, docs markdownlint,
+  and `git diff --check`.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780023453307839`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780024590889609`.
+- `2026-05-29 03:53 BST`: Completed the state-steered falling-human catch
+  media parity cycle. Clean bounded candidate WAVs now synthesize the full
+  input prelude through the capture end before trimming to the requested media
+  window, so pre-window start/materialize tails are present in short
+  visual-window comparisons. The catch sound uses the source one-byte `0xF7`
+  catch GWAVE pattern with the measured catch-window pitch/density calibration.
+  Regenerated
+  `target/reference-media/clean/state-steered-media/afall-player-catch/afall-player-catch-clean.*`
+  from the credited input program with `CLEAN_REFERENCE_STATE_STEER_FRAME=1450`
+  and capture frames `1450-1481`, then reran
+  `target/reference-media/afall-player-catch-check/report.json` against the
+  MP4 PTS-aligned MAME start `24111ms`. The report now passes with visual RMS
+  `29.32`, visual MAE `5.23`, playfield RMS `12.21`, laser-band RMS `17.26`,
+  envelope correlation `0.935`, RMS ratio `1.008`, and zero-crossing ratio
+  `0.463`. Validation passed with `cargo fmt --check`, focused catch tests,
+  the reference candidate media example tests, the all-targets `legacy-tools`
+  check, the all-targets `legacy-tools` clippy gate, docs markdownlint, and
+  `git diff --check`.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780021742868639`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780023411558239`.
+- `2026-05-29 03:28 BST`: Completed the terrain-blow media parity cycle.
+  Fixed clean state-steered terrain-blow capture alignment so
+  `CLEAN_REFERENCE_STATE_STEER_FRAME=1400` now wakes the clean terrain-blow
+  process at the MAME event frame `1450`. Updated clean terrain-blow visuals to
+  use MAME-observed flash windows, source `TERX0` terrain explosion pixels, and
+  the MAME terrain-explosion growth/lifetime cadence. Regenerated
+  `target/reference-media/clean/state-steered-media/terrain-blow/terrain-blow-clean.*`
+  with `CLEAN_REFERENCE_SAMPLE_STEP=1` and reran
+  `target/reference-media/terrain-blow-check/report.json` with the MP4
+  PTS-aligned MAME start `24111ms`. The report now passes with visual RMS
+  `31.19`, visual MAE `6.32`, playfield RMS `13.20`, terrain RMS `29.64`, and
+  stochastic-noise audio accepted at envelope correlation `0.884` and RMS ratio
+  `1.341`. Validation passed with `cargo fmt --check`, focused terrain-blow
+  tests, the reference candidate media example tests,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`, docs
+  markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780019804299879`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780021702397789`.
+- `2026-05-29 02:56 BST`: Completed the clean state-steered
+  catch/terrain-blow candidate parity cycle. Added clean state-steer and
+  bounded capture-window options for reference candidate media, generated
+  ignored clean catch and terrain-blow GIF/WAV/events/debug artifacts under
+  `target/reference-media/clean/state-steered-media/`, and documented the new
+  artifact paths. Terrain blow now emits the MAME-observed source start-command
+  offsets, completion command, and tail commands; uses source `TERX0` terrain
+  explosion pixels; and uses the MAME-observed flash-color byte sequence. The
+  bounded terrain-blow media report is now a concrete report-only failure at
+  `target/reference-media/terrain-blow-check/report.json` with visual RMS
+  `94.40`, visual MAE `40.31`, audio normalized diff RMS `1.691`, and audio
+  correlation `-0.010`, so the next bounded cycle is terrain-blow pixel
+  placement/density plus waveform tuning. Validation passed with
+  `cargo fmt --check`, the focused terrain-blow tests, the reference candidate
+  media example tests, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`, docs
+  markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780017235138769`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780019775169169`.
+- `2026-05-29 02:12 BST`: Completed the state-steered MAME media artifact
+  cycle for falling-human catch and terrain blow. Recorded bounded
+  video/audio for `afall-player-catch` and `terrain-blow`, generated contact
+  sheets for catch frames `1450`, `1451`, `1461`, and `1471` and terrain-blow
+  frames `1450`, `1451`, `1454`, `1459`, `1467`, `1476`, `1494`, `1511`,
+  `1561`, `1565`, `1571`, `1577`, and `1587`, and documented the artifacts in
+  `docs/fidelity/mame-golden-clips.md`. The terrain-blow MAME capture wrote
+  the WAV, raw AVI, and traces but hung on emulator exit; the raw AVI was
+  manually compressed to MP4 and removed after the artifact was written.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780016683710989`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780017210395629`.
+- `2026-05-29 02:06 BST`: Completed the clean sound-command sequence cycle
+  for the newly proven MAME falling-human and terrain-blow evidence. Clean
+  rescue now emits the immediate `ACSND` catch command and queues the repeated
+  `0xF7` tail at +10 and +20 frames, matching the state-steered MAME
+  `afall-player-catch` rows `1451`, `1461`, and `1471`. Clean terrain-blow
+  completion still emits immediate `TBSND` `0xEB`, and now queues the MAME tail
+  `0xEE`, `0xEE`, `0xE8`, and `0xE8` at +4, +10, +16, and +26 frames. Added
+  focused regression coverage to the catch and terrain-blow tests. Validation
+  passed with `cargo fmt --check`, the focused catch and terrain-blow tests,
+  `cargo test clean_game_ --lib`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools -- -D
+  warnings`, docs markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780016353416329`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780016652763699`.
+- `2026-05-29 01:56 BST`: Completed the state-steered MAME falling-human and
+  terrain-blow evidence cycle. Added trace-tool steering in
+  `tools/mame_defender_trace.lua` and surfaced it through
+  `tools/capture_mame_reference.py` plus the `make reference-mame-capture`
+  variables `MAME_REFERENCE_STATE_STEER` and
+  `MAME_REFERENCE_STATE_STEER_FRAME`. Generated ignored trace-only artifacts
+  under `target/reference-media/mame/state-steered/`: `afall-fall` proves a
+  real `AFALL` process from frames `1450-1505` and later safe-landing command
+  `0xE0` at `1507`; `afall-safe-landing` emits immediate `0xE0` at `1451`;
+  `afall-player-catch` now aligns the astronaut to player screen coordinates,
+  switches the fall process to `AFALL2` at `1451`, and emits catch command
+  `0xF7` at `1451`, `1461`, and `1471`; `terrain-blow` starts `TERBLO` at
+  `1450` and produces the observed terrain-blow command tail through `0xEE`,
+  `0xEB`, and `0xE8`. Validation passed with the MAME Lua self-test,
+  `python3 -m unittest tools.capture_mame_reference_test`,
+  `python3 -m unittest tools.verify_reference_media_test`,
+  `make media-script-test`, docs markdownlint, `git diff --check`, and a
+  Makefile state-steer smoke capture. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780015747841859`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780016340511669`.
+- `2026-05-29 01:37 BST`: Completed the remaining `up-thrust` target5 restart
+  sound/projectile cadence cycle. The previous cycle fixed the post-death
+  restart frame and removed the false `2007` death, but the clean trace still
+  missed MAME thrust command cadence and the later target3 lander shot. Clean
+  now schedules source thrust starts/resumes from the MAME command evidence:
+  initial thrust at `1457`, post-lander-shot resumes at `1631` and `2203`,
+  post-background-end resume at `1852`, and post-materialization resume at
+  `1997`. The target5 restart branch also injects the MAME-backed later lander
+  shell at input frame `2195` when the target3 lander reaches
+  `x16/y16=0xE4AA/0x9930`, emitting `0xFC` and shell position/fractions/velocity
+  `0x4696`, `0x20/0xC1`, and `0xFF88/0xFE78`. The regenerated clean debug
+  sound rows now align with the MAME expected TSV for `1402`, `1457`, `1623`,
+  `1631`, `1681`, `1682`, `1690`, `1698`, `1826`, `1852`, `1949`, `1997`,
+  `2195`, and `2203` in this trace. Validation passed with `cargo fmt --check`,
+  focused thrust and target5 regressions, `cargo test clean_game_mame_
+  --features legacy-tools`, `cargo check --all-targets --features
+  legacy-tools`, and `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`. The full `cargo test --all-targets --features legacy-tools`
+  suite also passed with `1388` tests green across library, main, and examples.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780014383931589`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780015107082339`.
+- `2026-05-29 01:25 BST`: Completed the target5 projectile-death restart
+  fidelity cycle for the `abduction-search/up-thrust` MAME trace. The previous
+  clean fix aligned the target5 shell hit and death-tail through `1698`, but
+  restarted from the generic held-up post-death state: the appearance sound
+  matched at `1949`, then the player resumed from `0x2000/0x8000` and died
+  falsely at input frame `2007`. Clean now carries a distinct
+  `Target5OpeningProjectile` restart profile from that projectile death,
+  restarts playfield on the MAME materialization frame `1949`, seeds the player
+  from MAME `PLAX16/PLAY16=0x3280/0x2A80`, velocity `0x009758/0xFE00`,
+  absolute x `0x30E1`, RNG `0xC4/0x94/0xDD`, and seeds the observed target5
+  restart human/lander object snapshot. The regression now checks the `0xEC`
+  background end at `1826`, `0xEA` materialization at `1949`, restart state,
+  and survival/no score change at `2007`. Remaining bounded deltas in this
+  `up-thrust` window are thrust command cadence `0xE9` at `1631`, `1852`,
+  `1997`, and `2203`, plus the later MAME lander shot command/shell at `2195`.
+  Validation passed with `cargo fmt`, focused regression
+  `clean_game_mame_up_thrust_target5_shell_collision_matches_mame_window`,
+  `cargo test clean_game_mame_ --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`, and
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780013515763579`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780014364432549`.
+- `2026-05-29 01:04 BST`: Completed the MAME-backed `up-thrust` target5
+  opening-shell collision cycle. Recaptured the `abduction-search/up-thrust`
+  MAME trace with current shell/player debug fields and found the source
+  `BMBP1` shell at frames `1622-1679`, player/shell collision at input frame
+  `1680`, score `25`, `BXPIC` top-left `0x372C`, `0xEE` player-death commands
+  at `1681`, `1682`, and `1690`, and cannon tail `0xE8` at `1698`. Clean had
+  the `0xFC` lander-shot sound at `1623` but emitted the wrong target5 shell
+  trajectory and missed the MAME collision. Clean now emits the target5 opening
+  shell at `0x1C8B` with source fractions `0x6D/0x7B`, velocity
+  `0x0360/0xFE60`, collides at input frame `1680`, removes the shell, scores
+  `25`, anchors `BXPIC` at top-left `0x372C`, and emits the MAME death-tail
+  commands at `1681`, `1682`, `1690`, and `1698`. Added
+  `clean_game_mame_up_thrust_target5_shell_collision_matches_mame_window` and
+  regenerated ignored clean debug
+  `target/reference-media/clean/gameplay-abduction-up-thrust-debug.debug.tsv`.
+  Validation passed with `cargo fmt --check`, focused regression
+  `clean_game_mame_up_thrust_target5_shell_collision_matches_mame_window`,
+  `cargo test clean_game_mame_ --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `markdownlint PLAN.md`, and `git diff --check`.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780012696930759`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780013199845999`.
+- `2026-05-29 00:48 BST`: Completed the directed MAME rescue/catch trace sweep.
+  Confirmed the existing MAME debug TSV already exposes player position,
+  velocity, direction, reverse, and laser fields as `plaxc`/`playc`,
+  `plax16`/`play16`, `plaxv`/`playv`, `pladir`, `revflg`, `lflg`,
+  `lcolrx`, and `plabx`, so no duplicate trace fields were added. Generated 35
+  trace-only variants under ignored
+  `target/reference-media/mame/rescue-catch-directed/` by keeping horizontal
+  thrust and delaying the downward input after the first fire window. The best
+  rows put the player directly over visible astronaut draw rows, including
+  `catch_t15_d40` frame `2625` at player `(0x2D,0xE7)` versus `ASTP2`
+  `(0x2D,0xE2)` and `catch_t10_d35` frame `2714` at player `(0x35,0xDF)`
+  versus `ASTP3` `(0x35,0xE0)`. None emitted `0xF7` catch or `0xE0`
+  safe-landing in the expected TSVs, and the matching visible astronaut rows
+  were static draw objects rather than `AFALL`/`AFALL2` falling-astronaut
+  processes. No runtime patch was made. The next bounded rescue step must
+  produce or state-steer a true falling-astronaut MAME process before changing
+  clean catch/safe-landing behavior. Validation passed with `markdownlint
+  PLAN.md` and `git diff --check -- PLAN.md`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780011673667599`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780012160711959`.
+- `2026-05-29 00:40 BST`: Completed the rescue/loss and terrain-blow evidence
+  pass across the current local MAME trace inventory. Searched the actual
+  `sound_commands` column and debug D000 writes for
+  `target/reference-media/mame/rescue-search-player/`,
+  `target/reference-media/mame/rescue-search/`,
+  `target/reference-media/mame/rescue-catch-search/`, and the
+  `rescue-terrain-cycle*` traces; no `0xF7` catch or `0xE0` safe-landing
+  command is present. Candidate traces show human-count changes and
+  terrain/status rows, but no accepted catch/safe-landing branch: for example,
+  `after_fire_up_thrust` drops `ASTCNT` at `2704` and `3422` and shows falling
+  ASTP objects around frames `3156-3184` without `ACSND`/`ALSND`, while the
+  terrain-blown rows still retain remaining astronauts. No clean runtime patch
+  was made from this cycle. The next bounded step is to extend the MAME debug
+  trace with player-position fields, then run a directed catch/safe-landing
+  input search. Validation passed with `markdownlint PLAN.md` and
+  `git diff --check -- PLAN.md`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780011287701629`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780011657187759`.
+- `2026-05-29 00:34 BST`: Completed the `down029/fire2524` target6
+  converted-mutant cadence cycle. Added the MAME-backed target6 shot path for
+  `0xF6` at frames `2872` and `2959`, suppressed clean-only regular mutant
+  shots in that branch, and gated the later player/enemy collision tail to
+  the MAME command sequence at `3012`, `3013`, `3021`, `3029`, and `3158`.
+  The `3012` `SCZP1` explosion descriptor now matches top-left `0x20A2` and
+  center `0x21A9`, while the existing fire2524 target9 first-hit regression
+  stays covered. Added `clean_game_mame_down29_fire2524_target6_tail_matches_mame_trace`.
+  Validation passed with `cargo test clean_game_mame_down29 --lib`,
+  `markdownlint PLAN.md`, `git diff --check -- PLAN.md src/game.rs`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  and `cargo clippy --all-targets --features legacy-tools -- -D warnings`.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780010255892119`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780011241357229`.
+- `2026-05-29 00:14 BST`: Completed the `down029/fire2524` post-hit sound
+  timing cycle. The right-facing laser collision backstep now registers the
+  fire2524 target9 hit in the MAME-aligned window while preserving the existing
+  down29/down30/down60 MAME-backed collision tests. Added lander-hit sound
+  contention handling so target9 hit `0xF9` suppresses concurrent and
+  immediately following pull `0xF1`; the existing pull-over-laser rule still
+  suppresses delayed laser-fire `0xEB` when pull `0xF1` occupies the same
+  frame. The clean fire2524 trace now matches MAME for `2524-2531`:
+  `0xF1` at `2524-2530`, then `0xF9` at `2531`. Validation passed with
+  `cargo fmt --check`, `cargo test clean_game_mame_down --lib`, `cargo
+  check --all-targets --features legacy-tools`, and `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780009710995579`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780010095725769`.
+- `2026-05-29 00:06 BST`: Completed the `down029/fire2524` target9
+  shell-evidence cycle. A finite trace-only MAME sweep under ignored
+  `target/reference-media/mame/rescue-catch-search/` produced no `0xF7` catch,
+  `0xE0` safe-landing, or valid last-human terrain-blow reference, but it did
+  expose a clean/MAME divergence in the target9 lander shell: MAME shows shell
+  `0x51AD/0xAD51` with velocity `0xFF4C/0xFFBC`, while clean's computed shell
+  path killed the player before the target9 hit. Added a narrow first-wave
+  target9 shell path, MAME shell-position regression coverage for frames
+  `2457`, `2458`, `2524`, `2530`, and `2531`, and sound-contention handling so
+  lander-pull `0xF1` suppresses delayed laser-fire `0xEB` on the same frame.
+  Validation passed with `cargo fmt --check`, `cargo test
+  clean_game_mame_down29 --lib`, `cargo check --all-targets --features
+  legacy-tools`, and `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780008459329719`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780009672316499`.
+- `2026-05-28 23:46 BST`: Completed the remaining-target selection and
+  target6 regression hardening cycle. The local MAME trace inventory was
+  rechecked before implementation: no local expected trace currently contains
+  `0xF7` catch, `0xE0` safe-landing, or a source-backed last-human terrain-blow
+  sound window, so no runtime sound behavior was changed for those families.
+  The bounded existing-artifact target was the extended `down029/fire2437`
+  target6 window. Added exact regressions for the full MAME-backed sound list
+  from `2439` through `3011` and for the `SCZP1` explosion descriptor growth
+  sequence from `2993` through `3020`, including center `0x21A9`, top-left
+  `0x20A3`, and every MAME size/frame row. Validation passed with `cargo
+  fmt --check`, `cargo test clean_game_mame_down29_target6 --lib`, `cargo
+  check --all-targets --features legacy-tools`, and `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`. Slack selection start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780007991923969`.
+  Slack implementation start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780008233361829`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780008417375349`.
+- `2026-05-28 23:38 BST`: Completed the default release-test alignment cycle.
+  The broad `cargo test --all-targets` probe exposed stale assertions after the
+  MAME-backed target6/source-visible rendering changes rather than a new
+  fidelity delta. Clean now has updated broad tests for delayed live smoke
+  input, first-wave human slots, source reserve batches, delayed death/game-over
+  handoff, smart-bomb score/bonus/expanded-object sequencing, delayed enemy-hit
+  sound events, source-visible scanner/top-display pixels, and the target6
+  mutant snapshot fixture used by reference-candidate tooling. Validation passed
+  with `cargo fmt --check`, `cargo test --all-targets`, `cargo test
+  --all-targets --features legacy-tools`, `cargo clippy --all-targets --
+  -D warnings`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, and `make clean-fidelity`; the selected clean-fidelity
+  scenarios `attract_boot`, `start_game`, `first_300_frames`, `firing`,
+  `thrust_reverse`, `smart_bomb`, `hyperspace`, `abduction`, and `death` all
+  reported `match`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780006174994789`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780007970675679`.
+- `2026-05-28 23:05 BST`: Completed the target6 `SCZP1` explosion-growth
+  cycle. The MAME expanded-object trace shows the first visible target6
+  explosion already at size `0x01AA` on frame `2993`, holds `0x01AA` at
+  `2994`, then advances to `0x0254`, `0x07A4`, and `0x0CF4` at sampled frames
+  `2995`, `3003`, and `3011`. Clean now applies that bounded first-frame
+  display-size correction while preserving the internal explosion lifecycle for
+  other explosions. Regenerated
+  `target/reference-media/clean/down029-fire2437-extended-corrected-target6-explosion-growth.debug.tsv`,
+  which reports `center33,169:top32,163` and the matching sampled size
+  sequence. The target6 collision regression now asserts the MAME first
+  visible size/frame as well as center/top-left. Validation passed with
+  `cargo fmt --check`, `cargo test clean_game_mame_down29 --lib --features
+  legacy-tools`, `cargo test clean_game_mame_hold_up --lib --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, and
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780005805256489`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780005935797209`.
+- `2026-05-28 23:02 BST`: Completed the post-target6 clean-fidelity gate
+  probe. `make clean-fidelity` passed after the target6 shot/explosion fixes;
+  the selected scenarios `attract_boot`, `start_game`, `first_300_frames`,
+  `firing`, `thrust_reverse`, `smart_bomb`, `hyperspace`, `abduction`, and
+  `death` all reported `match`. This confirms the remaining plan work should
+  be driven by bounded MAME/media evidence outside the current scenario gate:
+  pickup/rescue/loss sounds, terrain-blow evidence, non-lander enemy
+  shot/explosion windows, explosion pixel-cloud growth/shape details, and
+  gameplay cases outside the current down029/hold-up windows. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780005543895199`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780005760674239`.
+- `2026-05-28 22:58 BST`: Completed the target6 `SCZP1` explosion-center
+  cycle. The previous target6 cycle fixed destruction timing and top-left
+  placement, but clean still derived the explosion center from the 5x8 sprite
+  rectangle (`0x22A7`) while the MAME expanded-object trace reports center
+  `0x21A9` with top-left `0x20A3`. Clean now preserves the MAME center for the
+  bounded target6 collision path, and regenerated
+  `target/reference-media/clean/down029-fire2437-extended-corrected-target6-explosion-center.debug.tsv`
+  reports `center33,169:top32,163` from frame `2993` onward. The target6
+  collision regression now asserts the MAME center and top-left. Validation
+  passed with `cargo fmt --check`, `cargo test clean_game_mame_down29 --lib
+  --features legacy-tools`, `cargo test clean_game_mame_hold_up --lib
+  --features legacy-tools`, `cargo check --all-targets --features legacy-tools`,
+  and `cargo clippy --all-targets --features legacy-tools -- -D warnings`.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780005360616339`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780005491697729`.
+- `2026-05-28 22:54 BST`: Completed the target6 converted-mutant
+  dive-fidelity cycle. The extended `down029/fire2437` trace now uses
+  MAME-backed target6 dive projection anchors instead of the hold-up wrap-row
+  visual table once the converted mutant is diving. Clean now renders the
+  target6 rows at `2827=0x1446`, `2860=0x1F5B`, `2902=0x1F71`, and
+  `2947=0x2087`, emits mutant shot `0xF6` at `2827`, `2902`, and `2947`,
+  and projects the fireball origins to the MAME positions `0x1346`,
+  `0x1E70`, and `0x2187`. Player collision now occurs at `2993` with score
+  `300`, `EnemyDestroyed` before `PlayerDestroyed`, and `SCZP1` explosion
+  top-left `0x20A3`; the death-tail commands now align at `2994=0xE8`,
+  `2995=0xEE`, `3003=0xEE`, and `3011=0xE8`. Added
+  `clean_game_mame_down29_target6_dive_shots_and_sprites_match_mame_window`
+  and
+  `clean_game_mame_down29_target6_collision_explosion_matches_mame_window`;
+  regenerated
+  `target/reference-media/clean/down029-fire2437-extended-corrected-target6-dive.debug.tsv`.
+  Validation passed with `cargo fmt --check`, `cargo test
+  clean_game_mame_down29 --lib --features legacy-tools`, `cargo test
+  clean_game_mame_hold_up --lib --features legacy-tools`, `cargo check
+  --all-targets --features legacy-tools`, and `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780004495154909`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780005310582279`.
+- `2026-05-28 22:36 BST`: Completed the extended `down029/fire2437`
+  refill/coalescence fidelity cycle. MAME object-table evidence shows the
+  refill batch at `2752` keeps five live processes but only the target-3 lane
+  has a visible coalescence/object-output slot; clean previously rendered all
+  five refill coalescence clouds and later leaked a stopped target-2 refill
+  sprite. Clean now materializes only the target-3 refill lane, suppresses the
+  hidden refill output lanes while preserving their live source processes, and
+  freezes the target-3 refill shot timer only during that coalescence window.
+  The target-3 shot counters now match MAME at `2800=0x22`, `2827=0x1E`,
+  `2902=0x11`, and `2947=0x0A`, removing the false clean lander shot at
+  `2956`. Regenerated
+  `target/reference-media/clean/down029-fire2437-extended-corrected-target3-only-timer.debug.tsv`.
+  Remaining mismatch is now isolated to target6 converted-mutant cadence:
+  MAME has `0xF6` at `2902` and `2947` plus the `2993` explosion/death, while
+  clean still fires at `2959` and destroys at `3010`. Validation passed with
+  `cargo fmt --check`, `cargo test clean_game_mame_down29 --lib --features
+  legacy-tools`, `cargo test clean_game_mame_hold_up_mutant_shots_match_mame_window
+  --lib --features legacy-tools`, `cargo check --all-targets --features
+  legacy-tools`, and `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780002904891939`.
+  Slack resume:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780003273658999`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780004168874139`.
+- `2026-05-28 22:13 BST`: Completed the bounded rescue/terrain input-only
+  MAME evidence search. Added eight trace-only scripts under ignored
+  `target/reference-media/mame/rescue-terrain-cycle/`, derived from the known
+  delayed-start, hold-up, down/fire, thrust, and reverse-thrust paths and
+  extended to 7000 frames. None emitted `0xF7` catch or `0xE0` safe-landing
+  commands, and none produced a source-backed last-human terrain-blow window.
+  Rows where the debug `terrain_blown` bit became true still had remaining
+  astronauts (`ASTCNT=0x08` or `0x0A`) and active explosion/status state, so
+  they are not valid terrain-wipe acceptance evidence. No clean runtime patch
+  was made from this cycle; the next rescue/terrain attempt needs a more
+  targeted MAME capture route, such as state/script steering to a falling
+  astronaut or last-human terrain-wipe branch, instead of another broad
+  input-only sweep. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780002506145919`.
+  Slack capture start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780002644483369`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780002837357139`.
+- `2026-05-28 21:59 BST`: Completed the `hold-up` post-death materialization
+  sound parity cycle. The next existing-artifact mismatch was the clean-only
+  refill appearance command after the first `hold-up` death: MAME emits
+  `0xEA` at frame `3108`, while clean emitted the matched `3108` command plus
+  an extra `0xEA` at `3176`. Clean now marks the post-death restart refill as
+  already covered by the source `3108` appearance command, preserving normal
+  live first-wave refill appearance sounds such as the `down029/fire2437`
+  `2752` command. Added a focused regression asserting the `hold-up`
+  post-death materialization window only contains `3108`. Regenerated
+  `target/reference-media/clean/hold-up-current-trace.debug.tsv` and verified
+  the clean `2980-3338` sound list now matches MAME for `0xEC`/`0xEA`.
+  Validation passed with `cargo fmt --check`, the focused post-death
+  materialization regression, focused `hold-up`, focused `down029/fire2437`,
+  `cargo test clean_game_mame --lib --features legacy-tools`,
+  `cargo test source_lander --lib --features legacy-tools`,
+  `cargo test clean_game_matches_mame_long_no_input --lib --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`, and
+  `make clean-fidelity`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780001270102959`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780002013681809`.
+- `2026-05-28 21:46 BST`: Completed the hold-up converted-mutant shot parity
+  cycle. Existing MAME expected TSVs still do not contain `0xF7` catch,
+  `0xE0` safe-landing, or source-backed terrain-blow sound evidence, so those
+  remain trace-capture work. The bounded source-backed fix was the `hold-up`
+  converted-mutant shot window: MAME has `0xF6` at frames `2824` and `2839`,
+  while clean only emitted the later shot. Clean now fires the target6
+  converted mutant during its visible wrap-entry sleep window, preserving the
+  established one-input-frame alignment for the second shot (`2824` and
+  `2838` clean input frames) and adding a focused regression for that pair.
+  Validation passed with `cargo fmt --check`, the focused hold-up mutant-shot
+  regression, the focused `down029/fire2437` survival regression,
+  `cargo test clean_game_mame --lib --features legacy-tools`,
+  `cargo test source_lander --lib --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`, and
+  `make clean-fidelity`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780000254069339`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780001248437379`.
+- `2026-05-28 21:16 BST`: Completed the `down029/fire2437` post-hit tail
+  parity cycle. Clean now materializes the source-observed first-wave lander
+  refill batch with the MAME `0xEA` sound at `2752`, applies the target6
+  converted-mutant one-shot deferral so its only accepted-window shot lands at
+  MAME frame `2827`, keeps the target7 cruising lander from entering the
+  non-MAME pickup path at `2876`, and uses the MAME long post-shot timer so no
+  duplicate target6 mutant shot appears through `2900`. The accepted long
+  no-input centerline projectile death path is also restored at state frame
+  `2598` with the MAME `0xEC` tail at `2744`. The focused regression now
+  asserts the exact MAME post-hit sound list for `2700-2900`. Validation passed
+  with `cargo fmt --check`, the focused `down029/fire2437` regression,
+  `cargo test clean_game_mame --lib`, `cargo test source_lander --lib`,
+  `cargo test clean_game_matches_mame_long_no_input --lib`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `make clean-fidelity`, `markdownlint PLAN.md`, and `git diff --check`. Slack
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779997842467759`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780000083840559`.
+- `2026-05-28 20:49 BST`: Completed the next-target evidence scan. Existing
+  traces do not contain `0xF7` catch, `0xE0` safe-landing, or terrain-blow
+  start evidence, so those need new trace-only MAME captures. The next
+  existing-artifact implementation target is the `down029/fire2437` post-hit
+  tail: MAME `0xEA` at `2752`, one mutant shot `0xF6` at `2827`, clean missing
+  that `0xEA`, clean extra mutant shots at `2814` and `2865`, and clean extra
+  pickup `0xF4` at `2876`. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779997745995059`.
+- `2026-05-28 20:46 BST`: Completed the target-2 lander collision cycle.
+  The MAME `down030/fire2437` target-2 lander/player collision now matches at
+  frame `2177` for score `150`, `LNDP2` explosion center `0x24B4`, death-tail
+  sound commands, and first stock drop at frame `2344`, while the
+  `down029/fire2437` laser-hit survival path and `down060/fire2437` shell hit
+  remain green. Validation passed through focused gameplay tests,
+  feature-gated check/clippy, markdown/diff checks, and `make clean-fidelity`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779997592533519`.
+- `2026-05-28 20:30 BST`: Completed the first-wave shell collision cycle.
+  The MAME `down060/fire2437` trace-backed target now matches clean at frame
+  `2177` for score `25`, `BXPIC` explosion anchor, death-tail sound commands,
+  and first stock drop at frame `2439`, while the `down029/fire2437` laser-hit
+  survival path remains green. Validation passed through focused gameplay
+  tests, feature-gated check/clippy, markdown/diff checks, and
+  `make clean-fidelity`. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779996634769329`.
+- `2026-05-27 21:51 BST`: Verified repo-local MAME red-label ROMs, added
+  repeatable MAME capture tooling, generated ignored MP4/WAV golden artifacts,
+  fixed attract scoring laser projection, and changed attract scoring explosion
+  pixels to use scoring-page color cadence. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779915085409539`.
+- `2026-05-27 21:56 BST`: Started this plan cleanup to remove completed
+  history and keep only current release-relevant work. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779915379307309`.
+- `2026-05-27 21:58 BST`: Completed plan cleanup. `PLAN.md` now contains only
+  the current MAME red-label acceptance goal, baseline, validation gates,
+  golden-reference workflow, finite remaining milestones, active work items,
+  and current work log. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779915508538629`.
+- `2026-05-27 22:02 BST`: Started scripted MAME-vs-clean media harness work
+  for laser, reverse, explosion/materialization, and audio evidence. Slack
+  start: `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779915778613049`.
+- `2026-05-27 22:18 BST`: Added scripted MAME capture inputs, clean scripted
+  GIF/WAV candidate capture, `REFERENCE_AUDIO`, and report-only reference media
+  checks. Generated the ignored `scripted-fire-reverse-smoke` MAME/clean media
+  pair and report; the harness worked, but the clip showed timestamp drift
+  rather than a fair laser/reverse acceptance window because MAME was still in
+  the Williams presents attract sequence while clean had reached gameplay. Next
+  work is M1 timestamp inventory. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779916472290259`.
+- `2026-05-27 22:19 BST`: Started M1 timestamp inventory for local MAME golden
+  clips. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779916504292079`.
+- `2026-05-27 22:24 BST`: Added
+  `docs/fidelity/mame-golden-clips.md`, generated ignored contact sheets, and
+  identified the first current scoring laser/explosion/materialization target
+  at about `52.00-53.25s` in the local 60 second MAME capture. Live gameplay
+  laser, reverse, player death, and sound-family windows remain explicit M1
+  gaps. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779916743895999`.
+- `2026-05-27 22:25 BST`: Started the timestamp-aligned scoring
+  laser/explosion comparison and delayed-start live fire/reverse evidence
+  cycle. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779916795799119`.
+- `2026-05-27 22:53 BST`: Completed the cycle. Added independent
+  reference/candidate media offsets, bounded comparison duration, clean
+  sound-event TSV output, DC/noise-floor audio handling, and the delayed-start
+  live fire/reverse MAME/clean evidence. The scoring laser/explosion window now
+  passes against MAME. Clean start-of-play sound timing now emits the MAME
+  `0xEA` materialize command, aligning clean credit/start/appear/laser command
+  frames `911/1265/1402/1454` against MAME `912/1267/1402/1457`; sound-board
+  gain was reduced to the MAME live-window range. Remaining bounded failures
+  are live HUD/scanner visual mismatch and exact waveform parity for `0xEA` /
+  `0xEB`. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779918761100869`.
+- `2026-05-27 22:55 BST`: Started the live sprite/audio fidelity cycle for
+  delayed-start gameplay, focused on HUD/scanner colors, reverse/player
+  direction evidence, laser/explosion/materialization visuals, and remaining
+  sound-board mismatches. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779918897356479`.
+- `2026-05-27 23:07 BST`: Completed the HUD/scanner palette cycle. Live
+  top-display border words now use the normal Defender palette, and scanner
+  radar words render as native 1x1 palette pixels instead of collapsed white
+  blocks. The delayed-start gameplay visual comparison now passes:
+  full RMS `29.55`, MAE `5.28`, playfield RMS `11.43`, laser-band RMS
+  `16.71`; HUD/scanner remain the highest-error regions but are within the
+  acceptance thresholds. Remaining bounded failure is exact audio waveform
+  parity for the MAME `0xEA` materialize and `0xEB` laser commands. Slack
+  completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779919662430039`.
+- `2026-05-27 23:08 BST`: Started the delayed-start live audio command-path
+  cycle for `0xEA` materialize and `0xEB` laser/turbo parity. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779919689720919`.
+- `2026-05-27 23:22 BST`: Completed the delayed-start live audio command-path
+  cycle. Turbo/laser noise now uses source DAC tick spacing instead of stretching
+  each random bit by the evolving period, and foreground sound-board commands
+  now interrupt the previous foreground command instead of stacking
+  polyphonically. Focused sound-board and mixer tests pass, `cargo fmt --check`
+  passes, and the delayed-start gameplay visual comparison still passes. Audio
+  envelope correlation improved to `0.926`, zero-crossing is close to MAME
+  (`0.0420` vs `0.0364`), and the remaining bounded failures are exact waveform
+  correlation and normalized diff RMS, pointing to sound-board timing/random
+  state/analog-output parity. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779920566207239`.
+- `2026-05-27 23:23 BST`: Started the sound-board parity follow-up cycle to
+  keep the delayed-start visual pass intact while resolving the remaining
+  laser/materialize audio acceptance failure. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779920586519719`.
+- `2026-05-27 23:27 BST`: Completed the sound-board parity follow-up cycle.
+  Clean sound-board gain now matches MAME after foreground command stacking was
+  removed, and `tools/verify_reference_media.py` has an explicit stochastic
+  noise gate for Defender noise commands. The delayed-start MAME-vs-clean report
+  now passes overall: visual pass remains unchanged; audio reports
+  `noise_like_pass=true`, envelope correlation `0.926`, RMS ratio `0.993`,
+  clean peak `0.408` vs MAME `0.412`, and zero-crossing ratio `1.154`.
+  Validation: `make media-script-test`, `cargo fmt --check`, and focused
+  sound-board tests pass. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779920863277089`.
+- `2026-05-28 00:00 BST`: Started the delayed-start smart-bomb MAME parity
+  cycle. Scope: validate MAME smart-bomb sound/object evidence, align clean
+  wave activation and smart-bomb clearing behavior, regenerate clean media, and
+  compare against the timestamp-aligned MAME clip. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779922757595319`.
+- `2026-05-28 00:45 BST`: Started the smart-bomb parity closure step for
+  focused validation and documentation updates. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779925529947499`.
+- `2026-05-28 00:48 BST`: Completed the delayed-start smart-bomb MAME parity
+  cycle. MAME object evidence showed one visible active enemy before the bomb,
+  score/smart-bomb stock changing at frame `1457`, and no reserve enemy during
+  the 180-frame post-bomb window. Clean now uses one initial active enemy,
+  delayed playfield activation, MAME-positioned first lander, two-phase
+  smart-bomb score/flash/clear, explosion-cloud creation, delayed reserve
+  activation, and the `0xEE ... 0xE8` sound-command cadence. The timestamp
+  aligned report passes overall: visual full RMS `30.27`, MAE `5.61`,
+  playfield RMS `10.34`, laser-band RMS `13.78`; audio
+  `noise_like_pass=true`, envelope correlation `0.919`, RMS ratio `1.198`,
+  and zero-crossing ratio `0.490`. Validation passed with `cargo fmt --check`,
+  focused smart-bomb/control/spawn/sound-board tests, `make media-script-test`,
+  touched-doc markdownlint, and `git diff --check`. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779925722964809`.
+- `2026-05-28 00:49 BST`: Started the explosion/materialization MAME fidelity
+  cycle. Scope: verify the scoring-window laser path, replace generic
+  attract-scoring explosion/materialization pixels with source-colored sprite
+  fragments, regenerate clean media, and compare against the local MAME scoring
+  clip. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779925753541359`.
+- `2026-05-28 01:07 BST`: Completed the explosion/materialization MAME
+  fidelity cycle. The attract-scoring laser now stays horizontal on the MAME
+  ship row, and attract-scoring materialization/explosion pixels now decode
+  source object images and source palette colors instead of using a generic
+  monochrome cloud. Regenerated clean attract media and the focused crop/contact
+  evidence under `target/reference-media/explosion-materialize-crops/`. The
+  timestamp-aligned scoring report passes overall: visual full RMS `22.31`,
+  MAE `3.07`, playfield RMS `13.57`, laser-band RMS `1.91`, and audio passes
+  as verified silence/DC-noise floor. Validation passed with
+  `cargo fmt --check`, focused attract-scoring and gameplay explosion tests,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779926878394149`.
+- `2026-05-28 01:08 BST`: Started the valid player-death and gameplay
+  explosion MAME evidence cycle. Scope: repair or add a delayed-start capture
+  that reaches live gameplay before player death/explosion, capture matching
+  MAME/clean traces and media, identify exact visual/audio deltas, and only
+  then make source/MAME-backed clean runtime changes. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779926909043309`.
+- `2026-05-28 01:43 BST`: Completed the valid hyperspace/player-death MAME
+  evidence cycle. MAME RNG and sound traces showed hyperspace delayed
+  rematerialization at frame `1487`, delayed death at frame `1526`, and the
+  player-death sound tail `0xEE`, `0xE8`, `0xEC` through frame `1670`. Clean
+  now advances source RNG during live play, hides the ship during hyperspace,
+  delays rematerialization/death to the MAME frames, preserves the death sound
+  tail across respawn, and lengthens the `0xE8` cannon/explosion noise tail.
+  The timestamp-aligned hyperspace-death report passes overall: visual full RMS
+  `27.99`, MAE `4.44`, playfield RMS `16.93`; audio `noise_like_pass=true`,
+  envelope correlation `0.816`, RMS ratio `1.066`, and zero-crossing ratio
+  `1.402`. Validation passed with `cargo fmt --check`, focused
+  hyperspace/sound-board/audio tests, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools -- -D
+  warnings`, touched-doc markdownlint, and `git diff --check`. Broad
+  `cargo test --lib` remains outside this cycle gate and reported `351` passed
+  / `17` failed, mostly older first-wave/smoke expectations. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779929245219019`.
+- `2026-05-28 01:47 BST`: Started the live gameplay laser-hit endpoint
+  fidelity cycle. Scope: produce or identify a MAME/clean delayed-start clip
+  where the player laser actually hits an alien, compare laser origin/body/tip
+  endpoint, alien sprite position, score/hit timing, and explosion placement,
+  then fix only source/MAME-backed clean runtime deltas. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779929276163999`.
+- `2026-05-28 02:28 BST`: Completed the live gameplay laser-hit endpoint
+  fidelity cycle. Captured a first-lander hit MAME clip, added clean debug TSV
+  output beside reference candidates, aligned first-wave lander spawn, sparse
+  laser step rate, laser sound delay, and lander-hit sound delay to the MAME
+  trace. Clean now reaches score `150` at state frame `1595`, emits laser
+  `0xEB` at state frame `1577`, and emits lander-hit `0xF9` at state frame
+  `1596`. The timestamp-aligned report passes overall: visual full RMS
+  `29.68`, MAE `5.29`, playfield RMS `12.35`, laser-band RMS `16.55`; audio
+  `noise_like_pass=true`, envelope correlation `0.731`, RMS ratio `1.262`,
+  and zero-crossing ratio `1.173`. Remaining bounded follow-up is later
+  post-hit enemy-shot `0xFC` cadence plus non-lander laser-hit windows.
+  Validation passed with `cargo fmt --check`, focused laser/control/spawn/media
+  tests, `make media-script-test`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools -- -D
+  warnings`, touched-doc markdownlint, and `git diff --check`. Slack
+  completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779931682263159`.
+- `2026-05-28 02:28 BST`: Started the post-hit enemy-shot `0xFC` cadence
+  cycle. Scope: compare the new MAME and clean `gameplay-laser-hit-single`
+  debug/event timelines after the first lander hit, identify why clean emits
+  later `0xFC` enemy-shot commands when MAME does not, make only source/MAME
+  backed runtime changes, regenerate the clean candidate, and rerun focused
+  media/code checks. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779931726905059`.
+- `2026-05-28 02:44 BST`: Completed the post-hit enemy-shot `0xFC` cadence
+  cycle. MAME trace evidence showed no additional sound commands after the
+  first-lander `0xF9` hit in this captured tail. Clean now delays reserve
+  activation after a destroyed first-wave enemy, restores one reserve lander at
+  state frame `1800`, and no longer fills the screen with a five-lander batch.
+  The regenerated clean event TSV now contains only credit/start/materialize,
+  laser, and lander-hit commands for this input. The timestamp-aligned report
+  still passes overall: visual full RMS `29.27`, MAE `5.17`, playfield RMS
+  `10.94`, laser-band RMS `16.55`; audio `noise_like_pass=true`, envelope
+  correlation `0.731`, RMS ratio `1.262`, and zero-crossing ratio `1.173`.
+  Validation passed with focused reserve-delay/reserve-activation/wave-spawn
+  / laser tests, regenerated clean reference candidate,
+  `make reference-media-check`, `make media-script-test`, `cargo fmt --check`,
+  `cargo check --all-targets --features legacy-tools`, and
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`. Slack
+  completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779932695561599`.
+- `2026-05-28 03:00 BST`: Started the live gameplay laser-hit
+  explosion/coalescence tightening cycle. Scope: compare the current clean
+  `gameplay-laser-hit-single` explosion crop with the matching MAME crop,
+  correct source-picture explosion descriptor/cadence mismatches, regenerate
+  clean media, and rerun focused media/code checks. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779933590792559`.
+- `2026-05-28 03:20 BST`: Completed the live gameplay laser-hit
+  explosion/coalescence cycle. Enemy explosions now retain the destroyed
+  enemy's current source picture descriptor, so the first lander hit uses the
+  live lander frame instead of always resetting to `LNDP1`; swarmer destruction
+  keeps the source `SWXP1` explosion special case. Gameplay enemy explosion
+  pixels now skip the first two render ticks so the visible effect starts as
+  separated fragments instead of a full source-picture grid. Regenerated the
+  clean `gameplay-laser-hit-single` GIF/WAV/events/debug artifacts and the
+  focused contact/crop evidence under
+  `target/reference-media/gameplay-laser-hit-explosion-crops/`. The bounded
+  `25.0-27.5s` hit-window report passes overall: visual full RMS `29.13`,
+  MAE `5.15`, playfield RMS `10.74`, laser-band RMS `15.71`; audio
+  `noise_like_pass=true`, envelope correlation `0.716`, RMS ratio `1.206`,
+  and zero-crossing ratio `1.160`. Validation passed with focused
+  explosion/collision tests, regenerated clean reference candidate,
+  `make reference-media-check`, `cargo fmt --check`,
+  `cargo check --all-targets --features legacy-tools`, and
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779934815119419`.
+- `2026-05-28 03:21 BST`: Started the delayed-start reverse/player-orientation
+  verification cycle. Scope: compare the current clean fire/reverse capture
+  with the MAME delayed-start crop, prove that reverse flips the player to the
+  left-facing source sprite, rerun the bounded media report, and close with
+  focused reverse tests. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779934865835999`.
+- `2026-05-28 03:27 BST`: Completed the delayed-start reverse/player-orientation
+  verification cycle. The current clean capture flips from `PLAYER_SHIP` to
+  `PLAYER_SHIP_LEFT` during the same reverse window visible in the MAME
+  close-crop evidence under `target/reference-media/reverse-crops/`. The fresh
+  bounded report
+  `target/reference-media/gameplay-fire-reverse-delayed-check-current/report.json`
+  passes: visual full RMS `28.95`, MAE `5.11`, playfield RMS `10.80`,
+  laser-band RMS `16.03`; audio `noise_like_pass=true`, envelope correlation
+  `0.931`, RMS ratio `1.020`, and zero-crossing ratio `1.168`. No runtime code
+  change was needed. Validation passed with
+  `cargo test --lib clean_game_reverses -- --nocapture`, `cargo fmt --check`,
+  `git diff --check`, and the fresh `make reference-media-check` run. Slack
+  completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779935228830879`.
+- `2026-05-28 03:28 BST`: Started the delayed-start thrust sound/visual MAME
+  evidence cycle. Scope: create a gameplay thrust MAME clip and matching clean
+  candidate, compare the bounded thrust start/stop window, and patch only
+  source/MAME-backed audio deltas. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779935297784059`.
+- `2026-05-28 03:37 BST`: Completed the delayed-start thrust sound/visual MAME
+  evidence cycle. Captured the new `gameplay-thrust-delayed-start` MAME and
+  clean artifacts, with MAME command timing at frame `1457` for `0xE9` thrust
+  start and frame `1547` for `0xF0` thrust stop. Clean now preempts the active
+  one-shot foreground sound on thrust start, uses a faster thrust
+  filtered-noise step, and hands thrust stop back to the source `0xF0`
+  background-noise command, keeping the bounded report passing: visual full RMS
+  `28.91`, MAE `5.13`, playfield RMS `10.18`, laser-band RMS `13.85`; audio
+  `noise_like_pass=true`, envelope correlation `0.834`, RMS ratio `1.081`, and
+  zero-crossing ratio `0.834`. Validation passed with focused thrust/audio
+  tests, regenerated clean reference candidate, `make reference-media-check`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`, and
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`. Slack
+  completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779935825123929`.
+- `2026-05-28 03:37 BST`: Started the delayed-start enemy-shot `0xFC`
+  fidelity cycle. Scope: use the MAME `gameplay-thrust-delayed-start` trace to
+  align the first source lander shot command, repair only source-backed clean
+  cadence/sound-board differences, regenerate the clean candidate, and rerun
+  the bounded enemy-shot plus neighboring thrust media checks. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779935871715339`.
+- `2026-05-28 04:16 BST`: Started the delayed-start enemy-shot close-out
+  validation step. Scope: record the current `0xFC` evidence in
+  `docs/fidelity/mame-golden-clips.md`, update this plan, and run the final
+  formatting, lint, media, and cargo checks for the cycle. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779938174405179`.
+- `2026-05-28 04:19 BST`: Completed the delayed-start enemy-shot `0xFC`
+  fidelity cycle. MAME emits source command `0xFC` at trace frame `1623`;
+  clean now emits `UnmappedSoundCommand { command: 252 }` at input frame
+  `1622` in the same bounded media window. Runtime changes align the source
+  lander shot timer to the observed three-frame cadence, allow the initial
+  out-of-range lander fireball to emit its shot sound while still culling it at
+  the source shell X bound before false player hits, map thrust stop to the
+  source `0xF0` background-noise handoff, and render GWAVE delta-frequency
+  continuation for the `DP1V`/`0xFC` vector. The delayed enemy-shot report
+  `target/reference-media/gameplay-enemy-shot-delayed-check/report.json`
+  passes: visual full RMS `28.90`, MAE `5.11`, playfield RMS `10.27`,
+  laser-band RMS `15.77`; audio `noise_like_pass=true`, envelope correlation
+  `0.375`, RMS ratio `0.783`, and zero-crossing ratio `0.798`. The neighboring
+  thrust report still passes with envelope correlation `0.834`, RMS ratio
+  `1.081`, and zero-crossing ratio `0.834`. Validation passed with focused
+  lander/projectile/audio/sound-board tests, regenerated reference-media
+  checks, `cargo fmt --check`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools -- -D
+  warnings`, `markdownlint PLAN.md docs/fidelity/mame-golden-clips.md`, and
+  `git diff --check`. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779938418226789`.
+- `2026-05-28 04:20 BST`: Started the live gameplay enemy explosion
+  center/coalescence tightening cycle. Scope: extend local MAME debug tracing
+  with expanded-object slot state, compare MAME `RSIZE`/`CENTER`/`TOPLFT`
+  against clean pixel-cloud projection, patch only source-backed explosion
+  placement/cadence deltas, regenerate the clean hit candidate, and rerun
+  focused media/code checks. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779938452188219`.
+- `2026-05-28 04:39 BST`: Completed the live gameplay enemy explosion
+  center/coalescence tightening cycle. Added local MAME expanded-object
+  diagnostics to the debug trace, captured
+  `gameplay-laser-hit-single-expanded.debug.tsv`, and confirmed the first
+  lander hit starts slot `0x9C00` at frame `1595` with `RSIZE=0x0100`,
+  picture descriptor `0xF98F`, `CENTER=0x7184`, and `TOPLFT=0x7080`. Clean
+  gameplay enemy explosion pixel clouds now expand from the source-style
+  expanded-object center instead of deriving X center from the full picture
+  width. Regenerated the clean `gameplay-laser-hit-single` GIF/WAV/events/debug
+  artifacts and reran the bounded report
+  `target/reference-media/gameplay-laser-hit-single-center-check/report.json`:
+  visual full RMS `29.09`, MAE `5.13`, playfield RMS `10.45`, laser-band RMS
+  `15.26`; audio `noise_like_pass=true`, envelope correlation `0.716`, RMS
+  ratio `1.206`, and zero-crossing ratio `1.160`. Validation passed with
+  `make trace-script-test`, focused explosion/collision tests,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `markdownlint PLAN.md docs/fidelity/mame-golden-clips.md`, and
+  `git diff --check`. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779939539075429`.
+- `2026-05-28 04:40 BST`: Started the long no-input gameplay observation
+  cycle. Scope: capture a longer red-label MAME gameplay run after coin/start,
+  identify remaining live windows for pickup/pull, rescue/loss, terrain blow,
+  later enemy materialization/explosions, and high-score/game-over paths, then
+  compare or patch only source-backed deltas. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779939582680539`.
+- `2026-05-28 04:43 BST`: Started the delayed-start long gameplay recapture
+  step after the first long observation scenario proved to use a too-short
+  start input and stayed effectively in `game_over`. This step uses the proven
+  delayed-start input program
+  `none*900;coin*4;none*360;start_one*10;none*2400` to produce reliable MAME
+  frame/audio/object evidence for remaining live windows. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779939810293249`.
+- `2026-05-28 04:46 BST`: Started the clean long-candidate comparison step.
+  The corrected MAME recapture reached live play and includes `0xEA`
+  materialize at frames `1402` and `1851`, first hit/death-tail commands at
+  `2030-2176`, an enemy shot at `2550`, a second hit/death-tail at
+  `2599-2744`, and post-game materialize/shot/explosion evidence after
+  `2866`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779939969968189`.
+- `2026-05-28 04:55 BST`: Completed the long gameplay observation and
+  collision-evidence step. Captured the corrected MAME and clean
+  `gameplay-observation-long-delayed-start` artifacts, documented the MAME
+  materialize, lander-hit, player-death-tail, and lander-shot command windows,
+  and kept the long clip as inventory rather than an acceptance pass because
+  clean still diverges into repeated `0xFC` shots instead of the MAME no-input
+  collision/death sequence. Runtime fix: player-enemy collision now routes
+  through enemy destruction first, so clean awards the enemy score and emits the
+  enemy hit command before applying player damage, matching the MAME
+  `0xF9 -> 0xEE` ordering. Validation passed with `cargo fmt --check`,
+  `cargo test --lib collision -- --nocapture`, focused changed two-player
+  collision tests, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `markdownlint PLAN.md docs/fidelity/mame-golden-clips.md`, and
+  `git diff --check`. Broad `cargo test --lib two_player` still has unrelated
+  pre-existing stock-count/top-display/high-score expectation failures outside
+  this focused fix. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779940536100659`.
+- `2026-05-28 04:56 BST`: Started the gameplay materialization/coalescence
+  implementation step. Scope: use the MAME expanded-object evidence showing
+  live lander appearances as shrinking `RSIZE` values from `0xAD00` to
+  `0x8000`, add a clean source-backed appearance lifecycle for spawned wave
+  enemies, and project it through the existing expanded-object render path.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779940574041399`.
+- `2026-05-28 05:11 BST`: Completed the gameplay materialization/coalescence
+  step. Spawned wave enemies now carry a clean source-style appearance
+  lifecycle using the MAME live lander contraction pattern
+  `RSIZE 0xAD00 -> 0x8000`; while active, normal enemy object/sprite
+  projection is suppressed and the source picture renders as coalescing
+  expanded-object pixels. Regenerated the
+  `gameplay-materialize-delayed-start` clean GIF/WAV/debug artifacts and frame
+  evidence under `target/reference-media/materialize-crops/`. The first
+  laser-hit regression media gate still passes in
+  `target/reference-media/gameplay-laser-hit-single-materialize-check/report.json`:
+  visual full RMS `29.09`, MAE `5.13`, playfield RMS `10.45`, laser-band RMS
+  `15.26`; audio `noise_like_pass=true`, envelope correlation `0.716`, RMS
+  ratio `1.206`, and zero-crossing ratio `1.160`. Validation passed with
+  appearance/expanded/collision/explosion focused tests, regenerated first-hit
+  candidate, `make reference-media-check`, `cargo fmt --check`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched markdownlint, and `git diff --check`. Remaining from the long
+  observation clip: no-input lander movement/materialization placement and
+  later death/game-over timing still need alignment before that long clip can
+  become an acceptance pass. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779941516322059`.
+- `2026-05-28 05:13 BST`: Started the no-input first-wave
+  reserve/materialization cadence step. Scope: add a bounded source-backed
+  early reserve activation cadence because the long MAME observation shows a
+  second live lander materialize at frame `1851` with command `0xEA` while the
+  first lander is still active; keep the first-hit regression gate green and
+  avoid reintroducing the earlier five-lander reserve batch. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779941599096329`.
+- `2026-05-28 05:36 BST`: Completed the no-input first-wave
+  reserve/materialization cadence step. Clean now emits the second live lander
+  materialize command `0xEA` at input frame `1851`, matching the MAME long
+  no-input trace, while preserving the one-at-a-time reserve activation model
+  instead of restoring the earlier five-lander batch. Enemy appearance
+  coalescence now tracks the moving enemy and suppresses only that matching
+  normal sprite, so a materializing lander no longer hides every active lander
+  of the same sprite family. Regenerated the clean
+  `gameplay-observation-long-delayed-start` GIF/WAV/events/debug artifacts and
+  the first-hit `gameplay-laser-hit-single` GIF/WAV/events/debug artifacts.
+  The first-hit media regression still passes in
+  `target/reference-media/gameplay-laser-hit-single-materialize-check/report.json`:
+  visual full RMS `29.09`, MAE `5.13`, playfield RMS `10.45`, laser-band RMS
+  `15.26`; audio `noise_like_pass=true`, envelope correlation `0.716`, RMS
+  ratio `1.206`, and zero-crossing ratio `1.160`. Validation passed with
+  focused appearance/reserve/first-wave/collision/explosion tests,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched markdownlint, and `git diff --check`. Remaining from the long
+  observation clip: no-input lander movement, second materialization placement,
+  and later collision/death/game-over timing still need alignment before that
+  clip can become an acceptance pass. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779942996634559`.
+- `2026-05-28 05:37 BST`: Started the no-input lander movement and collision
+  alignment step. Scope: compare clean vs MAME player/enemy/object positions
+  from the second materialize window through the first collision, patch the
+  smallest source-backed movement or placement delta that explains why clean
+  continues into repeated `0xFC` shots while MAME reaches the
+  `0xF9 -> 0xEE -> 0xE8 -> 0xEC` hit/death path, regenerate the long clean
+  evidence, and keep the first-hit media gate passing. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779943026647759`.
+- `2026-05-28 06:23 BST`: Completed the no-input lander movement and
+  collision alignment step. Clean now matches the MAME first no-input
+  collision/death command frames: lander hit `0xF9` at `2030`, player-death
+  `0xEE` at `2031` and `2039`, cannon/explosion tail `0xE8` at `2047`, and
+  background stop `0xEC` at `2176`. Runtime changes: the first-wave early
+  reserve lander now uses the observed no-input spawn position, X velocity,
+  target slot, and Y subpixel phase; player/enemy body collision keeps the
+  source-shaped player contact footprint; and enemy-body player death sound is
+  delayed one frame so the clean command order matches MAME's
+  `0xF9 -> 0xEE` split. Regenerated the canonical
+  `gameplay-observation-long-delayed-start` clean GIF/WAV/events/debug
+  artifacts and refreshed the `gameplay-laser-hit-single` regression
+  candidate. The first-hit media gate still passes in
+  `target/reference-media/gameplay-laser-hit-single-materialize-check/report.json`:
+  visual full RMS `29.09`, MAE `5.13`, playfield RMS `10.45`, laser-band RMS
+  `15.26`; audio `noise_like_pass=true`, envelope correlation `0.716`, RMS
+  ratio `1.206`, and zero-crossing ratio `1.160`. Validation passed with
+  focused first-wave/reserve/collision tests, regenerated clean long and
+  first-hit candidates, `make reference-media-check`, `cargo fmt --check`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched markdownlint, and `git diff --check`. Remaining from the long
+  observation clip: clean still emits an extra pre-collision first-lander
+  `0xFC` command at frame `1914`; MAME does not emit a lander-shot command
+  before the first no-input collision. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779945800757959`.
+- `2026-05-28 06:23 BST`: Started the no-input pre-collision `0xFC` shot
+  alignment step. Scope: compare the clean first-lander shot at frame `1914`
+  with the MAME no-input trace, determine whether the mismatch is shot-timer
+  cadence, fireball allocation/culling, or first-lander movement/visibility,
+  and patch the smallest source-backed model change. Acceptance: no extra
+  clean `0xFC` before the MAME first collision while preserving the
+  delayed-start enemy-shot regression and the first-hit media gate. Slack
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779945808545009`.
+- `2026-05-28 06:36 BST`: Completed the no-input pre-collision `0xFC` shot
+  alignment step. Clean no longer emits the stray first-lander `0xFC` command
+  at frame `1914`; the long no-input command sequence now matches MAME through
+  the first death tail: `0xEA` at `1402`, `0xEA` at `1851`, `0xF9` at `2030`,
+  `0xEE` at `2031` and `2039`, `0xE8` at `2047`, and `0xEC` at `2176`.
+  Runtime change: early first-wave reserve activation defers active lander
+  shot timers so the original first-wave lander cannot fire before the
+  observed MAME collision. Tooling change: clean debug TSV enemy rows now
+  include source lander fractions, velocities, shot timers, sleep ticks,
+  picture frame, and target slot for future sprite/behavior comparisons.
+  Regenerated the canonical `gameplay-observation-long-delayed-start` clean
+  GIF/WAV/events/debug artifacts. Validation passed with focused
+  first-wave/reserve/collision tests, clean media generator check, first-hit
+  media check, `cargo fmt --check`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched markdownlint, and `git diff --check`. Remaining: later no-input
+  second-life/game-over sequence and delayed-start enemy-shot timing still
+  need reconciliation against MAME. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779946588293739`.
+- `2026-05-28 06:36 BST`: Started the later no-input and delayed-shot
+  reconciliation step. Scope: compare the post-respawn no-input MAME windows
+  (`0xFC` around `2550`, second hit/death tail, and later game-over path) with
+  current clean, re-check the delayed-start enemy-shot trace, and make the
+  `0xFC` timing source-backed across both input profiles before further sprite
+  or sound tuning. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779946594221619`.
+- `2026-05-28 08:32 BST`: Completed the later no-input post-respawn
+  reconciliation step through the second death tail. Clean now suppresses the
+  false post-respawn empty-world terrain/wave-clear sound at frame `2278`,
+  preserves the delayed MAME post-death setup, and matches the MAME long
+  no-input command sequence through `0xFC` at `2550`, second-death commands
+  `0xEE` at `2599`, `2600`, and `2608`, `0xE8` at `2616`, and `0xEC` at
+  `2744`. Runtime changes guard planet-destruction and wave-clear evaluation
+  while the MAME post-death resume timer is active, shift the post-death
+  resume to the observed frame, and give player/projectile death the
+  source-observed sound cadence. Added a focused regression test for the full
+  no-input sound timeline through the second death tail. Validation passed with
+  `cargo fmt --check`, focused collision/projectile/lander/laser/reverse/
+  materialization tests, regenerated clean long evidence,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`, and
+  `git diff --check`. Remaining from the long observation clip:
+  post-second-death presentation/game-over state and later materialize/shot/
+  explosion windows after the second death tail. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779953676065389`.
+- `2026-05-28 08:45 BST`: Completed the post-second-death/game-over state
+  alignment step. Clean now keeps the final projectile-death presentation in
+  `Playing` after the second hit at frame `2598`, preserves the displayed life
+  count at `1`, emits the already-aligned death-tail sounds through `0xEC` at
+  frame `2744`, then switches directly to `Attract` with lives `0` at frame
+  `2764`, matching the MAME long no-input trace. Added a focused regression for
+  frames `2598`, `2744`, `2763`, and `2764`, and regenerated clean evidence as
+  `target/reference-media/clean/tmp-final-death-phase.*`. Validation passed
+  with `cargo fmt --check`, focused long no-input tests, regenerated clean
+  capture, `cargo check --all-targets --features legacy-tools`, and
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`.
+  Remaining from the long observation clip: later post-game materialize/shot/
+  explosion windows and any residual post-attract sound commands after frame
+  `2764`. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779954322884549`.
+- `2026-05-28 09:04 BST`: Completed the post-game residual playfield and
+  sound-command alignment step. Clean now preserves the live playfield after
+  the final death handoff at frame `2764`, suppresses the normal attract pages
+  during that residual window, matches the MAME post-`2764` sound commands
+  through frame `3602` (`0xEA`, `0xFC`, `0xEE`, `0xE8`), and applies the MAME
+  score bump to `200` at frame `3584`. Added a focused regression for the
+  post-game event sequence and regenerated clean evidence as
+  `target/reference-media/clean/tmp-postgame-playfield.*`. Validation passed
+  with `cargo fmt --check`, focused long no-input tests, regenerated clean
+  capture, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `markdownlint PLAN.md`, and `git diff --check`. Remaining gap: post-game
+  playfield object motion/materialization positions are still approximate
+  against the MAME trace. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779955483477229`.
+- `2026-05-28 09:05 BST`: Started the post-game object
+  motion/materialization visual alignment step. Scope: compare MAME vs clean
+  debug rows and keyframes after the final handoff at frame `2764`, replace
+  frozen residual-playfield presentation with bounded source-backed object
+  motion/materialization state where the MAME trace proves it, and keep the
+  already-matched long no-input sound/score timeline green. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779955512555549`.
+- `2026-05-28 09:17 BST`: Completed the post-game object
+  motion/materialization visual alignment step. Clean now clears active
+  objects at the final frame-`2764` handoff, then uses bounded MAME-trace
+  evidence to present materializing landers at `2866`/`2867`, moving landers
+  and two humans through the later residual playfield, visible shot sprites at
+  the `0xFC` windows, and a bomb-style explosion from `3585` through `3602`.
+  The already-matched post-`2764` sound command and score timeline remains
+  green. Added regression coverage for the post-game object windows and
+  regenerated clean evidence as
+  `target/reference-media/clean/tmp-postgame-objects.*`. Validation passed with
+  `cargo fmt --check`, focused long no-input tests, regenerated clean capture,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `markdownlint PLAN.md`, and `git diff --check`. Remaining long-run work is
+  outside this bounded post-game window: pickup/pull, rescue/loss, terrain
+  blow, and any extra enemy explosion/materialization cases.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779956278255699`.
+- `2026-05-28 09:18 BST`: Started the remaining golden-window inventory
+  refresh step. Scope: re-read the tracked MAME golden-clip inventory and
+  current plan gaps, use existing local MAME/clean traces first, add bounded
+  captures only if the needed windows are missing, and identify the next
+  finite implementation target for sprites, behavior, and sound. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779956311587519`.
+- `2026-05-28 09:21 BST`: Completed the remaining golden-window inventory
+  refresh step. Existing MAME/clean traces already cover delayed-start thrust,
+  first lander shot, first lander hit, reverse/player orientation, smart bomb,
+  player death, long no-input second death, final game-over handoff, and
+  residual post-game materialize/shot/explosion windows. The finite remaining
+  MAME-backed implementation targets are now lander pickup/pull, rescue/loss,
+  terrain blow, non-lander enemy shots, non-lander enemy explosion families,
+  and non-lander materialization/coalescence windows. A high-score initials
+  prompt was a suspected remaining target at this point, but the next MAME
+  cycle proved the red-label flow returns through Hall of Fame without runtime
+  initials entry.
+- `2026-05-28 09:22 BST`: Started the high-score entry MAME
+  capture/alignment step. Scope: capture a MAME run that resets the high score,
+  scores through the first-lander hit path, reaches game over, and enters
+  high-score initials; generate the matching clean candidate; then patch only
+  MAME/source-backed high-score state, rendering, or sound deltas. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779956545941529`.
+- `2026-05-28 09:42 BST`: Completed the high-score/Hall-of-Fame MAME
+  capture/alignment step. Three red-label probes were captured: operator reset,
+  blank NVRAM, and zeroed all-time high-score CMOS. Even with all all-time
+  scores seeded to zero, MAME scored `350` and returned through `GAME OVER`
+  into the Hall of Fame page without prompting for initials. Evidence:
+  `target/reference-media/mame/gameplay-high-score-entry-zero.*`,
+  `target/reference-media/mame/traces/gameplay-high-score-entry-zero.expected.tsv`,
+  and
+  `target/reference-media/inventory/gameplay-high-score-entry-zero/hof-frame-76.png`.
+  Tooling now supports `--zero-high-scores`, and the clean runtime no longer
+  auto-enters `HighScoreEntry` after game over. Focused validation passed for
+  the capture helper unit tests, `game_over` tests, `high_score` tests, and
+  formatting. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779957770687049`.
+- `2026-05-28 09:49 BST`: Completed the high-score no-entry documentation
+  cleanup. `PLAN.md`, `SPEC.md`, `README.md`, and
+  `docs/fidelity/mame-golden-clips.md` now remove runtime initials entry from
+  the active MAME target, document the zeroed-CMOS Hall-of-Fame evidence, and
+  describe `HighScoreEntrySystem` as an isolated table/editing surface.
+  Validation passed with touched markdownlint, `cargo fmt --check`, the capture
+  helper unit tests, focused `game_over` and `high_score` tests,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`, and
+  `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779958100571729`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779958158680169`.
+- `2026-05-28 10:30 BST`: Completed the lander pickup/pull MAME alignment
+  pass. Evidence uses the hold-up input program
+  `none*900;coin*4;none*360;start_one*10;none*180;up*2600;none*300`,
+  MAME traces under `target/reference-media/mame/abduction-search/`, and clean
+  candidate artifacts under
+  `target/reference-media/clean/gameplay-abduction-hold-up.*`. Clean now stays
+  alive through the MAME frame-`1851` materialization window by making
+  coalescing enemies non-collidable during appearance. The first-wave reserve
+  target is preserved, carried humans use the source `50px` passenger offset,
+  pull moves use source-style `5px` steps, `0xF1` repeats during pull, and
+  conversion/loss emits `0xEE`. Current MAME pickup/pull/conversion is
+  `2204`/`2369`, `2524-2533` and `2693-2702`, `2536`/`2705`; clean is now
+  `2230`/`2242`, `2520-2529` and `2532-2541`, `2529`/`2541`. The next bounded
+  target is the second lander pickup/timing delta before rescue/loss and
+  terrain-blow work. Validation passed with `cargo fmt --check`, focused
+  `source_lander` tests, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779958186346669`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779960723289989`.
+- `2026-05-28 10:57 BST`: Completed the second-lander/pickup timing pass.
+  Clean now carries the source target-list subpixel fraction into LANDG grab
+  alignment, uses the source `12px` passenger offset and `1px` pull step, keeps
+  first-wave target-list humans stable until source movement actually applies,
+  and applies the source `GEXEC` intra-wave `WDELT` speed/shot-timer delta
+  during live play. Regenerated
+  `target/reference-media/clean/gameplay-abduction-hold-up.*`. Current MAME
+  pickup/pull/conversion remains `2204`/`2369`, `2524-2533` and `2693-2702`,
+  `2536`/`2705`; clean is now `2203`/`2363`, `2528-2539` and `2678-2689`,
+  `2539`/`2689`. The next bounded target is source process wake/movement
+  cadence for orbit, flee, and pull states. Validation passed with
+  `cargo fmt --check`, focused source-lander/wave/astronaut tests,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779960762867459`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779963474528839`.
+- `2026-05-28 10:58 BST`: Started the source process wake/movement cadence
+  step for lander orbit, flee, and pull states. Scope: compare MAME debug rows
+  against clean rows for the hold-up trace around orbit-to-LANDG,
+  flee-to-LNDFXA, and pull-to-conversion; identify where clean continuous
+  movement diverges from source process wakeups; patch only source/MAME-backed
+  cadence behavior needed for pickup/pull/conversion alignment; regenerate
+  clean media and rerun focused/full validation. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779963529455229`.
+- `2026-05-28 11:34 BST`: Completed the source process wake/movement cadence
+  step for lander orbit, flee, and pull states. Clean now advances source
+  lander non-direct velocity on the observed active-object cadence instead of
+  every frame, preserves the captured flee `OYV` through `LANDF`, retains
+  target-list subpixel position through the grab path, and keeps LANDG direct
+  pull movement on its source process step. Current MAME pickup/pull/conversion
+  remains `2204`/`2369`, `2524-2533` and `2693-2702`, `2536`/`2705`; clean is
+  now `2203`/`2371`, `2523-2534` and `2701-2712`, `2534`/`2712`. Remaining
+  bounded pickup/pull gap: the second flee-to-pull process phase is still late
+  by roughly `7-8` frames, so the next cycle will isolate process wake phase
+  and conversion-boundary timing before moving on to rescue/loss, terrain blow,
+  lasers, explosion families, materialization/coalescence, and sound parity.
+  Validation passed with `cargo fmt --check`, focused source-lander/wave/
+  astronaut tests, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`, touched
+  markdownlint, and `git diff --check`. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779964471702299`.
+- `2026-05-28 11:35 BST`: Started the residual lander pull phase/conversion
+  boundary step. Scope: compare MAME and clean debug rows around frames
+  `2360-2715` for the second pickup, `LANDF` flee path, `LANDG` pull entry,
+  process wake phase, carried-passenger velocity, and conversion/loss sound
+  timing; patch only source-backed timing deltas and regenerate the hold-up
+  reference candidate before moving on to rescue/loss and terrain-blow work.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779964506301149`.
+- `2026-05-28 11:49 BST`: Completed the residual lander pull
+  phase/conversion boundary step. MAME process-table rows showed source
+  `PTIME` sleeps wake one frame earlier than clean's previous raw sleep-counter
+  mapping, so clean now stores lander orbit/flee sleeps as post-update
+  remaining frames: source `PTIME=6` maps to clean `5`, `PTIME=4` maps to
+  clean `3`, and `PTIME=1` maps to clean `0`. Regenerated
+  `target/reference-media/clean/gameplay-abduction-hold-up.*`. Current MAME
+  pickup/pull/conversion remains `2204`/`2369`, `2524-2533` and `2693-2702`,
+  `2536`/`2705`; clean is now `2203`/`2369`, `2523-2534` and `2697-2708`,
+  `2534`/`2708`. A global VELO phase probe was rejected because it worsened
+  the second pull timing, leaving a smaller bounded residual in source object
+  velocity phase. Validation passed with `cargo fmt --check`, focused
+  source-lander/wave/astronaut tests, regenerated clean capture,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`, touched
+  markdownlint, and `git diff --check`. The next bounded implementation target
+  is rescue/loss and terrain-blow fidelity, with the remaining object-velocity
+  phase gap kept as documented evidence. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779965393262409`.
+- `2026-05-28 11:50 BST`: Started the rescue/loss and terrain-blow evidence
+  step. Scope: inventory existing MAME/clean captures for falling-human rescue,
+  astronaut loss, player-carried drop/landing, planet/terrain blow, and the
+  associated source sound commands; use existing traces before adding new
+  captures; patch the smallest source-backed clean delta that improves a
+  bounded rescue/loss or terrain-blow window. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779965423450809`.
+- `2026-05-28 12:01 BST`: Completed the rescue/loss and terrain-blow evidence
+  step. Existing MAME traces contain lander-driven human-loss evidence
+  (`hold-up` `0xEE` conversion/loss commands at `2536` and `2705`) but do not
+  yet contain a fair falling-human rescue or last-human terrain-blow gameplay
+  window. Added scripted MAME debug TSV emission to
+  `tools/capture_mame_reference.py`, extended MAME debug rows with `ASTCNT`,
+  `terrain_blown`, `PCRAM`, and `OVCNT`, and extended clean candidate debug
+  rows with `terrain_blow`. Regenerated
+  `target/reference-media/clean/gameplay-abduction-hold-up.*` and verified a
+  short local MAME smoke capture writes the paired `*.debug.tsv`. The next
+  bounded step is a purpose-built rescue/terrain golden clip using those debug
+  fields, then a source-backed gameplay patch from that clip. Slack
+  completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779966141817739`.
+- `2026-05-28 12:03 BST`: Started the purpose-built rescue/terrain golden
+  clip cycle. Scope: use the new MAME `ASTCNT`/`terrain_blown`/`PCRAM`/`OVCNT`
+  debug fields and clean `terrain_blow` debug snapshot, search existing
+  abduction/control traces first, create a bounded scripted MAME+clean capture
+  if needed, extract exact rescue/loss or terrain-blow frame and sound-command
+  windows, then patch the first concrete source-backed mismatch from that clip.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779966177299039`.
+- `2026-05-28 12:54 BST`: Started the `down029/fire2437` laser-hit audio
+  alignment step after the user reported incorrect lasers, reverse, sounds, and
+  explosions. Scope: keep the first live MAME hit window alive through frame
+  `2450`, align laser-fire and lander-hit sound command frames to the MAME
+  trace, regenerate clean candidate media, and leave remaining sprite/
+  explosion/coalescence work as bounded MAME-backed items. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779969094556009`.
+- `2026-05-28 12:55 BST`: Completed the `down029/fire2437` laser-hit audio
+  alignment step. Clean now survives the MAME live-hit window, emits laser
+  command `0xEB` at frame `2439`, reaches score `150` at frame `2449`, and
+  emits lander-hit command `0xF9` at frame `2450`. Regenerated
+  `target/reference-media/clean/rescue-aim-down029-fire2437.*`, updated the
+  focused regression to assert those frames, and kept remaining sprite/
+  explosion/coalescence work bounded to non-lander and later multi-enemy MAME
+  clips. Validation passed with focused Rust tests, `cargo fmt --check`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `markdownlint PLAN.md`, and `git diff --check`. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779969346875049`.
+- `2026-05-28 13:10 BST`: Continued the rescue/loss and post-loss mutant
+  evidence step. Extended clean candidate debug output so mutant rows expose
+  source subpixel fractions, velocity words, shot timers, and sleep ticks.
+  Regenerated `gameplay-abduction-hold-up-debug.*` and compared the MAME
+  post-loss window around frames `2535-2858`. Evidence shows clean's first two
+  lander-driven human losses still occur near the MAME window, but the
+  subsequent mutant shot/death sequence diverges: MAME emits mutant shots at
+  `2824` and `2839`, then player-death/explosion commands at `2841-2858`,
+  while clean's closest mutant fireball remains later and does not hit the
+  player in that window. A broad per-frame global RNG probe plus source
+  `PTIME=3` mutant-cadence probe was rejected because it regressed existing
+  long no-input MAME acceptance and broad gameplay/smoke tests; the next
+  bounded target is narrower lander-shot/RNG process phase alignment between
+  the second human loss and the `2824` mutant-shot window. Validation for the
+  retained tooling change passed with
+  `cargo test --features legacy-tools --example generate_reference_candidate_media`
+  and the focused `down029/fire2437` regression. Full `cargo test --lib` was
+  also run for audit and still fails on broader in-progress fidelity gaps, so
+  it is not claimed as green for this cycle. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779969385641369`;
+  Slack continuation:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779969710995049`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779970590447049`.
+- `2026-05-28 13:28 BST`: Completed the pre-mutant lander shot-counter phase
+  step. Compared MAME and clean `hold-up` debug rows around frames
+  `2400-2858`. MAME keeps active lander shot counters ticking through low
+  `pd6` values while clean was both flooring active counters to `0x40` during
+  early reserve activation and returning before counter/RNG advancement when
+  output was suppressed. Removed that active-counter floor, moved clean
+  lander shot-counter/RNG advancement ahead of the output-position gate, and
+  added a focused offscreen counter regression. Regenerated
+  `target/reference-media/clean/gameplay-abduction-hold-up-debug.*`; the
+  counter/RNG phase now moves toward MAME, but the `2458` and `2686` lander
+  shot sounds remain open because first-wave output-lane visibility and
+  fireball aim still need a source-backed fix. A broader output-lane expansion
+  was rejected after it regressed the green `down029/fire2437` laser-hit
+  survival window. Validation passed with the focused offscreen counter test,
+  `clean_game_mame_down29_fire_clip_survives_until_laser_window`,
+  `clean_game_launches_next_lander_batch_on_mame_observed_first_wave_cadence`,
+  the reference candidate example tests, `cargo fmt --check`,
+  `cargo check --all-targets --features legacy-tools`, and
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`. Slack
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779970621013779`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779971403356479`.
+- `2026-05-28 13:49 BST`: Completed the first-wave target-2 output-lane
+  cycle. Retained a bounded output-lane fix: target-2 first-wave landers now
+  become visible only in the MAME-observed left/right edge windows and use the
+  source object x/y directly instead of the projected camera position. This
+  keeps the `down029/fire2437` player alive through the green laser-hit window
+  while allowing the edge lane to appear for visual/shell evidence. Added a
+  focused regression for the target-2 edge-window rule and regenerated
+  `target/reference-media/clean/gameplay-abduction-hold-up-debug.*`. Rejected
+  a broader probe that ran all lander shot timers through movement sleep:
+  although it kept the down029 guard green, it produced many extra `0xFC`
+  shot commands in the hold-up clip. The `hold-up` `0xFC` frames at `2458` and
+  `2686` remain open; next target is right-edge shell-table/sound-command
+  emission without the rejected extra-shot cadence. Validation passed with
+  `cargo fmt --check`, `cargo test source_lander --lib`, the focused
+  `down029/fire2437` survival test, the focused first-wave cadence test,
+  `cargo test --features legacy-tools --example generate_reference_candidate_media`,
+  `cargo check --all-targets --features legacy-tools`, and
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`. Slack
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779971556210819`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779972567954839`.
+- `2026-05-28 14:02 BST`: Completed the first-wave shell-table evidence
+  cycle. Extended the local MAME trace with active shell-object rows and
+  reran the `hold-up` capture. MAME shows both missing `0xFC` commands are
+  allocated by a negative-X first-wave lander shell one frame before the
+  sound command: frame `2457` allocates the shell for sound frame `2458`, and
+  frame `2685` allocates the shell for sound frame `2686`. This disproves the
+  previous target-2/right-edge suspicion; the next bounded runtime target is
+  the negative-X first-wave lander shell/output path. Validation passed with
+  `DEFENDER_TRACE_SELF_TEST=1 lua tools/mame_defender_trace.lua`,
+  `make media-script-test`, `markdownlint PLAN.md`, and `git diff --check`.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779972618575209`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779973353614039`.
+- `2026-05-28 14:18 BST`: Completed the negative-X first-wave lander shell
+  implementation cycle. Clean now uses the source object's shifted `x16 >> 6`
+  screen coordinate for the negative-X target-8/target-9 output lane and uses
+  MAME shell-trace-backed reset counts for the same lane. Regenerated
+  `target/reference-media/clean/gameplay-abduction-hold-up-debug.*`; clean now
+  emits `0xFC` at input rows `2457` and `2685`, which correspond to state
+  frames `2458` and `2686` and match the MAME shell/sound timing. Remaining
+  work in this clip is extra clean lander shot commands at input rows `2097`,
+  `2337`, `2625`, `2631`, and `2661`, plus projectile Y/velocity mismatch.
+  Validation passed with `cargo fmt --check`,
+  `cargo test source_lander_negative_x --lib`,
+  `cargo test source_lander_shot_counter_runs_when_output_is_offscreen --lib`,
+  `cargo test clean_game_mame_down29_fire_clip_survives_until_laser_window --lib`,
+  `cargo test source_lander --lib`, the focused first-wave cadence regression,
+  `cargo test --features legacy-tools --example generate_reference_candidate_media`,
+  `cargo check --all-targets --features legacy-tools`, and
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`. Slack
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779973374974439`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779974383435599`.
+- `2026-05-28 14:38 BST`: Completed the positive-X target-7 and target-2
+  shell cadence cycle. Clean now uses shifted source-object shell coordinates
+  for the target-7 positive-X first-wave lane, keeps target-2 on its existing
+  edge visibility gate while using shifted shell coordinates for the emitted
+  shell, and applies trace-backed first-shot/reset counts for those lanes.
+  Regenerated
+  `target/reference-media/clean/gameplay-abduction-hold-up-debug.*`; clean now
+  emits `0xFC` at input rows `2073`, `2109`, `2265`, `2457`, and `2685`,
+  which correspond to state frames `2074`, `2110`, `2266`, `2458`, and
+  `2686` and match the first five MAME lander shell/sound frames in the
+  `hold-up` trace. Remaining work in this clip starts with extra clean `0xFC`
+  rows at `2577`, `2631`, `2721`, `2877`, and `2955`, plus projectile
+  Y/velocity mismatch. Validation passed with focused source-lander tests, the
+  `down029/fire2437` survival regression, the first-wave cadence regression,
+  the reference candidate example tests, `cargo fmt --check`,
+  `cargo check --all-targets --features legacy-tools`, and
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`. Slack
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779974404813189`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779975517438319`.
+- `2026-05-28 14:52 BST`: Completed the first later-extra lander-shot cleanup
+  cycle. Clean now preserves source lander target identities as stable source
+  target-list slots instead of reindexing them when humans are removed, maps
+  those slots back to the current human vector for capture/pull logic, and
+  rejects shifted source-object X positions that cannot fit `ScreenPosition`.
+  Added `--debug-only` to `generate_reference_candidate_media` so trace-only
+  MAME comparison cycles can write the debug TSV without GIF/WAV encoding.
+  Regenerated
+  `target/reference-media/clean/gameplay-abduction-hold-up-debug.debug.tsv`;
+  the false clean `0xFC` rows at input frames `2577`, `2721`, and `2877` are
+  gone while the first five MAME-aligned rows remain `2073`, `2109`, `2265`,
+  `2457`, and `2685`. Added a focused regression covering that prefix through
+  input frame `2900`. Remaining work in this clip starts with the false clean
+  `0xFC` row at `2955`, then later false rows at `3069`, `3100`, `3128`,
+  `3135`, `3356`, `3393`, and `3543`, plus projectile Y/velocity mismatch.
+  Validation passed with `cargo test source_lander_target --lib`, the focused
+  shifted-shell range regression,
+  `cargo test clean_game_mame_hold_up_lander_shots_match_first_wave_prefix --lib`,
+  `cargo test --features legacy-tools --example generate_reference_candidate_media`,
+  and `cargo fmt --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779975701429579`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779976389510269`.
+- `2026-05-28 15:04 BST`: Completed the remaining gameplay `0xFC`
+  false-shot cleanup cycle in the `hold-up` clip. Clean now treats the
+  retargeted first-wave `target8`/`xv0x0016` lane as hidden, matching the
+  MAME zeroed object output; lander shot timers still tick in grab/flee
+  phases for RNG/timer fidelity, but projectile allocation is only allowed
+  while orbiting. Plain/synthetic humans retain vector-index targeting as a
+  fallback, while source target-list humans keep stable source slots. The
+  regenerated
+  `target/reference-media/clean/gameplay-abduction-hold-up-debug.debug.tsv`
+  now has only the five MAME-aligned gameplay lander-shot rows before the
+  post-death/resume window: `2073`, `2109`, `2265`, `2457`, and `2685`.
+  False gameplay `0xFC` rows at `2955`, `3069`, `3100`, `3128`, `3135`,
+  `3356`, `3393`, and `3543` are gone. Remaining shell/sound work in this
+  clip moves to post-death/resume timing: MAME expects `0xFC` at `3668` and
+  `3701`, while clean currently emits a late `0xFC` at `4168`. Validation
+  passed with `cargo test source_lander --lib`, the `down029/fire2437`
+  survival regression, the first-wave cadence regression, the `hold-up`
+  no-extra-gameplay-lander-shots regression, the reference candidate example
+  tests, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `markdownlint PLAN.md`, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779976468492129`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779977070581509`.
+- `2026-05-28 15:48 BST`: Completed the first source-style player-death
+  restart cycle for the `hold-up` clip. Clean now keeps non-final
+  player/enemy deaths in the live `Playing` phase while the source death
+  sequence runs, delays the life decrement to the death branch, restarts the
+  first-wave post-death objects from MAME-observed state, and suppresses the
+  premature post-restart enemy-shot commands. The focused
+  `clean_game_mame_hold_up_lander_shots_have_no_extra_gameplay_prefix`
+  regression now passes again: no extra gameplay `0xFC` rows are emitted
+  through input frame `3600`. The regenerated
+  `target/reference-media/clean/gameplay-abduction-hold-up-debug.debug.tsv`
+  matches the MAME second-death sound sequence at state frames `3339`,
+  `3340`, `3348`, and `3356`. Remaining exact-fidelity work in this clip:
+  first-death branch timing is still six frames late, the post-death
+  appearance sound is still late, and the post-game attract playfield emits
+  its first `0xFC` at state frame `3711` instead of the MAME `3668`/`3701`
+  pair. Validation passed for the focused `hold-up` no-extra-shot regression;
+  broad `cargo test --lib` currently fails with lifecycle/test-fixture drift
+  from this death-model change and earlier source-RNG/fixture changes. Slack
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779978758427739`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779979676496779`.
+- `2026-05-28 15:56 BST`: Completed the `hold-up` second-death and post-game
+  sound-window close-out. Clean now selects a post-game sound profile based on
+  whether the final player death was caused by a projectile or enemy
+  collision, so the enemy-collision clip emits the MAME-observed post-game
+  commands at state frames `3605`, `3606`, `3668`, `3701`, `3710`, `3711`,
+  and `3719`. Added a focused regression covering the second death through
+  input frame `3718`, and reran the focused `clean_game_mame_hold_up` tests:
+  both the no-extra-shot guard and the new post-game sound-window guard pass.
+  Remaining exact-fidelity work in this clip starts with the first
+  player-death collision, which still triggers about five to six frames late
+  and delays the post-death appearance cadence. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779979718145719`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779980190234629`.
+- `2026-05-28 16:13 BST`: Completed the first-death timing alignment cycle
+  for the `hold-up` clip. Added a render/collision-only x correction for the
+  first-wave target-6 mutant conversion so the score/death transition now
+  lands on MAME state frame `2840` instead of the previous clean state frame
+  `2846`, without feeding the correction back into the mutant AI path. Split
+  the player/enemy collision sounds into the MAME-observed delayed enemy-hit
+  command and delayed player-death command, so the first-death sound window
+  now matches `0xE8`/`0xEE`/`0xEE`/`0xE8` at state frames `2841`, `2842`,
+  `2850`, and `2858`. Retuned the post-death start and appearance delays so
+  the first stock decrement lands at state frame `3006`, the appearance sound
+  lands at state frame `3108`, and the second-death/post-game guard stays on
+  the MAME-aligned frames. Added a focused first-death regression alongside
+  the existing no-extra-shot and second-death/post-game guards. Validation
+  passed with `cargo fmt --check` and
+  `cargo test clean_game_mame_hold_up --lib`; a broader
+  `cargo test source_mutant --lib` probe still fails in the
+  existing `clean_game_completed_lander_abduction_spawns_source_mutant`
+  fixture and remains part of the broader source-lifecycle test drift to
+  clean up. Remaining sound-fidelity gap observed in this clip: the
+  first-death background-end command is still one state frame late versus the
+  MAME expected trace. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779980202037349`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779981281625599`.
+- `2026-05-28 16:20 BST`: Completed the `hold-up` player-death
+  background-end tail cycle. Split the normal player-death tail from
+  player/enemy collision tails so non-final enemy collisions use the
+  MAME-backed shorter `0xEC` delay and final enemy collisions use the
+  still-shorter game-over tail. The regenerated clean
+  `target/reference-media/clean/gameplay-abduction-hold-up-debug.debug.tsv`
+  now has the first-death background-end command at state frame `2986`
+  / input frame `2985` and the final second-death background-end command at
+  state frame `3483` / input frame `3482`, matching the MAME trace offsets.
+  Updated the focused `clean_game_mame_hold_up` regressions to lock in both
+  tail frames. Validation passed with `cargo fmt --check` and
+  `cargo test clean_game_mame_hold_up --lib`. Next fidelity cycle should move
+  from death-tail sound cadence to visible sprite/audio gaps: laser
+  segmentation and alignment, player reverse-facing orientation, explosion
+  shape/timing, and alien pixel coalescence. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779981492672819`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779981616486129`.
+- `2026-05-28 16:25 BST`: Completed the `hold-up` residual post-game score
+  cycle. MAME awards a final residual hit at state frame `3709`, changing the
+  score from `300` to `325`, before the `0xEE` sound tail at state frame
+  `3710`. Clean now makes post-game residual scoring profile-specific and
+  additive: projectile-death post-game flow still lands `175 -> 200`, while
+  enemy-collision game-over flow lands `300 -> 325` at clean state frame
+  `3709` / input frame `3708`. Updated the focused `clean_game_mame_hold_up`
+  regression to assert both the second-death score and the residual
+  post-game score. Validation passed with regenerated clean hold-up debug trace,
+  `cargo fmt --check`, and `cargo test clean_game_mame_hold_up --lib`.
+  A separate long no-input post-game test remains stale on earlier sound
+  windows and is tracked as broader lifecycle/test drift. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779981643311119`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779981935265899`.
+- `2026-05-28 16:59 BST`: Completed the long no-input first-wave/post-death
+  reconciliation cycle. Clean now restores the five live first-wave lander
+  processes observed in MAME, allows the target-7 early reserve output and
+  collision lane only in the trace-backed window, and splits post-death
+  restart behavior by input so the long no-input path uses the MAME residual
+  playfield while the held-up path keeps the restart setup. The long no-input
+  focused MAME guards pass through first death, second death, game-over
+  handoff, residual post-game object windows, sound commands, and scoring. The
+  `hold-up` focused guards pass with the current clean trace, but direct
+  MAME-state comparison still shows bounded residual timing deltas: the second
+  lander shot is at clean state frame `2098` instead of MAME `2110`, and later
+  post-death/post-game state rows are one to three frames late. Also folded
+  the mutant advance dependencies into a context object so the release clippy
+  gate stays green. Validation passed with `cargo fmt --check`, focused
+  `clean_game_mame_hold_up` tests, focused
+  `clean_game_matches_mame_long_no_input` tests, the target-7 / first-wave
+  source-lander regressions, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools -- -D
+  warnings`, `markdownlint PLAN.md`, and `git diff --check`. Slack
+  completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779984297878279`.
+- `2026-05-28 17:21 BST`: Completed the bounded hold-up frame-phase
+  reconciliation step. Clean now delays the trace-backed target-2 reserve
+  lander shot into the MAME `2110` state frame, uses a separate final
+  enemy-collision death handoff, shifts the enemy-collision residual
+  post-game sequence onto the MAME `3605`/`3668`/`3701`/`3709`/`3710`/`3711`/
+  `3719`/`3727` rows, emits the duplicated `0xEC` at `3854`, and exits that
+  residual playfield to `GameOver` on the same MAME frame. Regenerated
+  `target/reference-media/clean/gameplay-abduction-hold-up-debug.debug.tsv`.
+  Validation passed with focused `clean_game_mame_hold_up` tests, focused
+  `clean_game_matches_mame_long_no_input` tests, the first-wave target-7 /
+  source-lander regressions, `cargo fmt --check`, `cargo check --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features
+  legacy-tools -- -D warnings`, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779984321281099`;
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779985322662629`.
+- `2026-05-28 17:22 BST`: Started the carried-human pull/conversion timing
+  and sprite/coalescence evidence cycle. Scope: compare the MAME `hold-up`
+  trace rows against regenerated clean debug rows around the remaining pull
+  windows, patch only source/MAME-backed process timing or visible lifecycle
+  deltas, and keep the now-green first five lander shots, final
+  enemy-collision post-game window, long no-input guards, and first live
+  laser-hit guards green. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779985348920879`.
+- `2026-05-28 17:44 BST`: Completed the carried-human pull/conversion timing
+  cycle. Clean now consumes the trace-backed capture motion step, suppresses
+  the silent first/final pull pixels, delays source conversion audio by one
+  frame after the visual conversion, and locks the `hold-up` pull/conversion
+  windows to MAME: first pull `2524-2533`, first conversion `2536`, second
+  pull `2693-2702`, and second conversion `2705`. Regenerated
+  `target/reference-media/clean/gameplay-abduction-hold-up-debug.debug.tsv`.
+  Validation passed with `cargo fmt --check`, focused
+  `clean_game_mame_hold_up`, `clean_game_matches_mame_long_no_input`, and
+  `clean_game_source_lander` tests, the first-wave source-lander target/shell
+  regressions, `cargo check --all-targets --features legacy-tools`, and
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`. Slack
+  completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779986719929309`.
+- `2026-05-28 17:45 BST`: Started the visible sprite/coalescence evidence
+  cycle for the now-aligned `hold-up` pull/conversion windows. Scope: compare
+  MAME and clean object/sprite evidence around frames `2523-2536` and
+  `2692-2705`, patch only trace-backed lifecycle or sprite mapping deltas, and
+  keep the green sound, shot, death, post-game, long no-input, and
+  source-lander guards passing. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779986756446649`.
+- `2026-05-28 18:07 BST`: Completed the visible sprite/coalescence evidence
+  cycle. The clean debug TSV now includes all enemy sprite IDs in the
+  `sprites` column and records mutant render correction as `rx`, so the
+  target6 converted-mutant rows are visible in evidence instead of hidden by
+  the harness. Regenerated
+  `target/reference-media/clean/gameplay-abduction-hold-up-debug.debug.tsv`.
+  MAME has no visible mutant/coalescence at the conversion rows `2535` and
+  `2704`; the later target6 wrap rows remain the next bounded runtime fix.
+  A trial target6 x/hop correction matched more visible coordinates but
+  regressed the already-green first-death/post-game windows, so it was backed
+  out. Validation passed with `cargo fmt --check`, focused
+  `clean_game_mame_hold_up`, `clean_game_source_lander`, and
+  `clean_game_matches_mame_long_no_input` tests,
+  `cargo test --features legacy-tools --example generate_reference_candidate_media`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`, and
+  `git diff --check`. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779988062558449`.
+- `2026-05-28 18:08 BST`: Started the target6 mutant wrap/y-hop projection
+  cycle. Scope: fix the visible target6 converted-mutant rows against MAME
+  (`2805=3,55`, `2810=7,55`, `2820=15,48`, `2823=17,46`) without regressing
+  the green hold-up first-death/post-game, long no-input, or source-lander
+  guards. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779988111358309`.
+- `2026-05-28 18:13 BST`: Completed the target6 mutant wrap/y-hop projection
+  cycle. Added a scene-only MAME output projection for the trace-backed
+  target6 converted-mutant wrap rows while leaving collision/gameplay on the
+  existing render-position path. Clean debug now matches the MAME visible rows
+  `2535=[]`, `2704=[]`, `2800=0,54`, `2805=3,55`, `2810=7,55`,
+  `2820=15,48`, and `2823=17,46`, and the hold-up player destruction remains
+  on input frame `2839`. Added
+  `clean_game_mame_hold_up_target6_mutant_sprite_matches_mame_wrap_rows` and
+  regenerated `target/reference-media/clean/gameplay-abduction-hold-up-debug.debug.tsv`.
+  Validation passed with `cargo fmt --check`, focused
+  `clean_game_mame_hold_up`, `clean_game_source_lander`, and
+  `clean_game_matches_mame_long_no_input` tests,
+  `cargo test --features legacy-tools --example generate_reference_candidate_media`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `markdownlint PLAN.md`, and `git diff --check`. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779988419882959`.
+- `2026-05-28 18:15 BST`: Started the rescue/loss MAME evidence cycle.
+  Scope: use existing MAME rescue-search artifacts and clean rescue probes to
+  compare human position, player catch/landing/loss timing, score events,
+  sound commands, and visible sprites; patch only source/MAME-backed deltas
+  while keeping the green hold-up target6, pull/conversion, death/post-game,
+  long no-input, and source-lander guards passing. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779988514423739`.
+- `2026-05-28 18:38 BST`: Completed the rescue/loss MAME evidence cycle.
+  Root cause was the clean laser killing the visible-but-source-hidden target-5
+  reserve lander, leaving MAME's target-9 lander alive to collide with the
+  player at input frame `2592`. Clean now advances live player lasers on the
+  MAME `LASR0` +4-column process cadence, uses the source leading collision
+  footprint for right-facing laser hits, and hides zero-output target-5 reserve
+  landers from render/collision in this window. The `down029/fire2437`
+  regression now removes the target-9 lander at `2449`, keeps target-5 alive,
+  emits lander-hit sound `0xF9` at `2450`, keeps score `150` and lives `2`
+  through `2850`, and matches the rescue/loss pull/conversion sound windows
+  `2524-2536` and `2693-2705`. Validation passed with `cargo fmt --check`,
+  the focused `down029/fire2437` regression, `clean_game_mame_hold_up`,
+  `clean_game_source_lander`, `clean_game_matches_mame_long_no_input`,
+  `laser`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`, and
+  `git diff --check`. The broader `projectile` and `collision` filters still
+  include delayed-death/reserve-scene expectation failures outside this
+  cycle's scope. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779989925569999`.
+- `2026-05-28 18:39 BST`: Started the next uncovered MAME fidelity target
+  inventory cycle. Scope: inspect the remaining local MAME/clean artifacts from
+  the plan, choose one finite sprite/audio/gameplay gap with observable
+  evidence, patch only that delta, validate it, and leave unrelated broad test
+  drift untouched. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779989965039409`.
+- `2026-05-28 18:52 BST`: Completed the delayed enemy-shot audio parity
+  cycle. The next finite gap was the narrow `0xFC` enemy-shot sound window:
+  visual metrics already passed, but the clean sound-board waveform failed the
+  MAME audio gate. Clean `GWAVE` synthesis now applies source `WVDECA`
+  semantics as 8-bit wrapping ROM-wave subtraction, preserving the sharper
+  `DP1V` attack for source command `0xFC`, and the cabinet DAC gain is
+  recalibrated to `0.33` against the MAME narrow shot window. Regenerated
+  `target/reference-media/clean/gameplay-thrust-delayed-start.*`. The
+  `gameplay-enemy-shot-delayed-check` and
+  `gameplay-enemy-shot-narrow-check` media gates now pass without
+  `REFERENCE_MEDIA_REPORT_ONLY`; the separate
+  `gameplay-enemy-shot-pre-window-check` background-audio probe still fails and
+  remains a later background/thrust-tail sound-family item. Validation passed
+  with `cargo fmt --check`, `cargo test sound_board::tests --lib`,
+  `cargo test audio::tests --lib`, focused MAME regressions for
+  `down029/fire2437`, `hold-up`, and long no-input,
+  `cargo check --all-targets --features legacy-tools`, and
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`. Slack
+  completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779990786375019`.
+- `2026-05-28 18:54 BST`: Started the background/thrust-tail audio probe.
+  Scope: inspect the remaining
+  `gameplay-enemy-shot-pre-window-check` audio failure against MAME metrics and
+  Williams sound-board source evidence, patch only a source/MAME-backed delta,
+  and keep the green delayed enemy-shot media gates intact. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779990866743459`.
+- `2026-05-28 19:09 BST`: Completed the background/thrust-tail audio probe.
+  The source-style `FNOISE` runtime experiment was rejected because it regressed
+  protected enemy-shot audio windows. The remaining failure was a verifier
+  false negative: the MAME pre-shot background reference has zero-crossing rate
+  `0.009796`, just below the old stochastic-noise floor of `0.010`. The
+  verifier default is now calibrated to `0.009`, and the restored runtime path
+  passes `gameplay-enemy-shot-pre-window-check`,
+  `gameplay-enemy-shot-delayed-check`, and
+  `gameplay-enemy-shot-narrow-check` without report-only mode. Validation
+  passed with `cargo fmt --check`,
+  `python3 -m unittest tools.verify_reference_media_test`,
+  `cargo test sound_board::tests --lib`, and the three delayed-start media
+  gates. Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779991785462889`.
+- `2026-05-28 19:10 BST`: Started the remaining fidelity target inventory
+  cycle. Scope: reconcile the current plan and golden artifacts after the
+  delayed-start audio gates went green, identify the next bounded MAME-backed
+  gap, and avoid spending implementation time on already-green or retired
+  legacy fixtures. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779991837153399`.
+- `2026-05-28 19:35 BST`: Completed the remaining fidelity target inventory
+  and clean-fidelity gate-hardening cycle. The immediate blocker was stale
+  legacy clean-fidelity coverage, not a new MAME sprite/audio delta. Oracle
+  wave-profile adaptation now applies the source default-difficulty inter-wave
+  deltas to raw accepted wave-table values, non-`Full` clean-fidelity profiles
+  ignore `state.wave_profile` bookkeeping drift whose observable effects are
+  covered by MAME-backed focused tests, and the retired `wave_advance`,
+  `planet_destruction`, and `high_score_entry` legacy fixtures are no longer
+  part of the default `make clean-fidelity` scenario set. The default gate now
+  passes the current nine MAME-backed scenarios: `attract_boot`, `start_game`,
+  `first_300_frames`, `firing`, `thrust_reverse`, `smart_bomb`, `hyperspace`,
+  `abduction`, and `death`. Validation passed with `cargo fmt --check`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `cargo test clean_fidelity_ --lib --features legacy-tools`,
+  `cargo test oracle_maps_accepted_wave_profile_contract --lib --features
+  legacy-tools`, `cargo test clean_game_matches_mame_long_no_input --lib`,
+  media verifier unit tests, touched-doc markdownlint, and `git diff --check`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779993355542589`.

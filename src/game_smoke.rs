@@ -13,7 +13,7 @@ use crate::{
     SpriteResourceBindingPlan, SurfaceSize,
 };
 
-const SMOKE_FRAMES: u32 = 24;
+const SMOKE_FRAMES: u32 = 320;
 const SMOKE_VISUAL_WARMUP_FRAMES: u32 = 16;
 const REQUIRED_INPUTS: [&str; 9] = [
     "coin",
@@ -729,6 +729,7 @@ fn buffer_address_len(byte_len: u64) -> usize {
 fn required_sprite_label(sprite: SpriteId) -> Option<&'static str> {
     match sprite {
         SpriteId::PLAYER_SHIP => Some("player_ship"),
+        SpriteId::PLAYER_SHIP_LEFT => Some("player_ship_left"),
         SpriteId::ENEMY_LANDER => Some("enemy_lander"),
         SpriteId::HUMAN => Some("human"),
         SpriteId::PLAYER_PROJECTILE => Some("player_projectile"),
@@ -852,49 +853,49 @@ fn smoke_input(frame_index: u32) -> ScriptedInput {
             },
             Some("start_one"),
         ),
-        15 => (
+        154 => (
             GameInput {
                 altitude_up: true,
                 ..GameInput::NONE
             },
             Some("altitude_up"),
         ),
-        16 => (
+        156 => (
             GameInput {
                 thrust: true,
                 ..GameInput::NONE
             },
             Some("thrust"),
         ),
-        17 => (
+        158 => (
             GameInput {
                 fire: true,
                 ..GameInput::NONE
             },
             Some("fire"),
         ),
-        18 => (
+        160 => (
             GameInput {
                 reverse: true,
                 ..GameInput::NONE
             },
             Some("reverse"),
         ),
-        19 => (
+        300 => (
             GameInput {
                 smart_bomb: true,
                 ..GameInput::NONE
             },
             Some("smart_bomb"),
         ),
-        20 => (
+        302 => (
             GameInput {
                 hyperspace: true,
                 ..GameInput::NONE
             },
             Some("hyperspace"),
         ),
-        21 => (
+        304 => (
             GameInput {
                 altitude_down: true,
                 ..GameInput::NONE
@@ -916,8 +917,8 @@ fn record_unique_label(labels: &mut Vec<String>, label: &str) {
 #[cfg(test)]
 mod tests {
     use super::{
-        GameSmokeReport, record_draw_command, required_pipeline_label, required_sprite_label,
-        smoke_input, smoke_report,
+        GameSmokeReport, SMOKE_FRAMES, record_draw_command, required_pipeline_label,
+        required_sprite_label, smoke_input, smoke_report,
     };
     use crate::{
         SpritePipelineLayoutPlan, SpriteRenderPassEncoderPlan, SpriteRenderPipelineDescriptorPlan,
@@ -926,9 +927,9 @@ mod tests {
 
     #[test]
     fn smoke_report_exercises_clean_game_and_native_draw_plans() {
-        let report = smoke_report(24).expect("clean game smoke report");
+        let report = smoke_report(SMOKE_FRAMES).expect("clean game smoke report");
 
-        assert_eq!(report.frames, 24);
+        assert_eq!(report.frames, SMOKE_FRAMES);
         assert_eq!(report.first_frame_size, Some((292, 240)));
         assert!(report.distinct_scene_signatures >= 3);
         assert!(report.saw_attract);
@@ -952,9 +953,10 @@ mod tests {
                 "score_digit_0",
                 "player_ship",
                 "star",
-                "enemy_lander",
                 "human",
                 "player_projectile",
+                "player_ship_left",
+                "enemy_lander",
             ]
         );
         assert!(report.terrain_draw_commands > 0);
@@ -2051,6 +2053,19 @@ mod tests {
         assert_eq!(smoke_input(12).value, crate::GameInput::NONE);
         assert!(smoke_input(13).value.start_one);
         assert_eq!(smoke_input(14).value, crate::GameInput::NONE);
+        assert!(smoke_input(154).value.altitude_up);
+        assert_eq!(smoke_input(155).value, crate::GameInput::NONE);
+        assert!(smoke_input(156).value.thrust);
+        assert_eq!(smoke_input(157).value, crate::GameInput::NONE);
+        assert!(smoke_input(158).value.fire);
+        assert_eq!(smoke_input(159).value, crate::GameInput::NONE);
+        assert!(smoke_input(160).value.reverse);
+        assert_eq!(smoke_input(161).value, crate::GameInput::NONE);
+        assert!(smoke_input(300).value.smart_bomb);
+        assert_eq!(smoke_input(301).value, crate::GameInput::NONE);
+        assert!(smoke_input(302).value.hyperspace);
+        assert_eq!(smoke_input(303).value, crate::GameInput::NONE);
+        assert!(smoke_input(304).value.altitude_down);
     }
 
     #[test]

@@ -74,6 +74,7 @@ mod tests {
                 next_bonus: 10_000,
             },
             attract: crate::AttractPresentationSnapshot::INACTIVE,
+            post_game_playfield: None,
             high_score_initials: crate::systems::HighScoreInitialsState::EMPTY,
             high_score_entry: None,
             high_score_submission: None,

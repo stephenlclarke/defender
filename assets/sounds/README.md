@@ -16,6 +16,62 @@ That backend does not introduce new sound artifacts and does not reclassify the
 archived prototype `.wav` cues. Missing host output falls back to the no-device
 null backend; `--mute` disables audio delivery entirely.
 
+R9-E3.16 replaces the previous guessed live cue mapping with command-decoded
+Williams sound-board synthesis. Clean `SoundEvent` values now route through
+translated source command families for source GWAVE vectors, VARI sweeps,
+lightning/materialize/turbo/cannon/radio/hyper/scream routines, thrust looping,
+and coin/start/laser/smart-bomb/hyperspace command playback. This still creates
+no new tracked sound artifacts; reference-video audio comparison is handled by
+the local media harness when captured media is available. `ffmpeg` is available
+locally at `/opt/homebrew/bin/ffmpeg` for the harness extraction step.
+`make reference-media-check` accepts the separate MAME capture WAV through
+`REFERENCE_AUDIO`, so clean candidate WAV output can be compared without relying
+on container audio.
+`make reference-clean-capture` writes an ignored sound-event TSV beside each
+candidate GIF/WAV, which lets clean `SoundEvent` command timing be compared
+against MAME trace `sound_commands` before judging waveform differences.
+MAME captures can also write ignored per-frame sound-board DAC traces as
+`target/reference-media/mame/traces/<basename>.sound-dac.tsv`; the isolated
+`0xFE`, `0xFA`, `0xF8`, and `0xF3` non-lander command clips use those traces
+to separate command timing failures from waveform-density failures.
+Bounded clean candidate WAV output is rendered from the start of the input
+program and trimmed after synthesis, preserving materialize/start/catch sound
+tails that begin before the encoded visual window.
+Foreground Williams sound-board commands are treated as one DAC stream in the
+clean mixer, so a new foreground command interrupts the previous foreground
+command instead of stacking another independent voice. The reference-media
+checker uses a stochastic-noise gate for Defender noise commands, comparing
+envelope, RMS ratio, peak level, and zero-crossing behavior when exact random
+sample phase is not stable evidence. The default zero-crossing floor is set to
+cover the measured low-frequency MAME pre-shot background window.
+The GWAVE path models the source `WVDECA` routine as 8-bit wrapping
+ROM-waveform subtraction, and clean cabinet DAC gain is calibrated against the
+local MAME narrow `DP1V` / `0xFC` enemy-shot window. The `0xF7`
+falling-human catch vector uses the source one-byte catch pattern with the
+measured catch-window pitch/density calibration from the state-steered MAME
+clip. The VARI path now follows the source sweep restart loop and uses a
+separate VARI DAC gain calibrated against the state-steered safe-landing
+`ALSND` / `0xE0` MAME window. The bounded `down029/fire2524` target6
+non-lander shot/explosion/materialization media report now passes MAME audio
+with envelope correlation `0.714`, RMS ratio `1.192`, and zero-crossing ratio
+`1.298`. The standalone `0xEE` human-loss/lightning command now carries a
+longer source-shaped tail so the `hold-up` pickup/pull media report passes the
+MAME conversion/loss window with envelope correlation `0.613`, RMS ratio
+`1.066`, and zero-crossing ratio `1.076`.
+The tonal non-lander hit commands `0xFE` and `0xFA` use the same source GWAVE
+vectors as the sound ROM, but their clean period density is calibrated against
+isolated local MAME DAC/audio captures so the bomber-hit and pod-hit reports
+pass without adding a global DAC-hold mixer.
+The `0xEA` materialize command uses the source `APPEAR` / `LITEN` frequency
+sweep cadence instead of a high-frequency placeholder; the down030
+laser-plus-materialize all-axis report now passes with envelope correlation
+`0.864`, RMS ratio `1.008`, and zero-crossing ratio `0.971`.
+`make readme-media` also writes an ignored candidate WAV from the clean
+`SoundEvent` timeline so `make reference-media-check` can compare real
+candidate audio rather than a silent GIF container. The current README attract
+candidate has no emitted sound events, so that WAV is correctly silent until a
+gameplay-aligned candidate clip is generated.
+
 Exact audio must be implemented from raw main-board sound command writes and
 translated Williams sound-board routines from `VSNDRM1.SRC`. The clean-slate
 runtime now has a source-cited sound-board RAM/PIA/ROM address surface and the

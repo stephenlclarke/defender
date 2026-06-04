@@ -1,6 +1,6 @@
 # Defender Current Specification
 
-Last reviewed: `2026-05-27`
+Last reviewed: `2026-05-29`
 
 ## Purpose
 
@@ -26,75 +26,75 @@ Use these references when behavior is unclear:
 Current Rust behavior is not authoritative unless it is backed by one of those
 sources or by an accepted fixture.
 
-## R9 Acceptance Contract
+## Current Fidelity Contract
 
-As of 2026-05-21, R9 behavior and evidence blockers B01-B12 are closed. B13
-visual acceptance is reopened after owner review rejected the regenerated
-R9-E3.7 clean media:
+The clean runtime is the production runtime. Normal play uses clean `Game`
+frames through clean platform, audio, and `wgpu` renderer modules; the converted
+machine remains feature-gated behind `legacy-tools` for developer evidence and
+comparison tooling. Current Rust behavior is accepted only when backed by
+red-label source/MAME evidence or by the accepted fixture/report gates.
 
-- Normal runtime uses clean `Game` frames through clean platform, audio, and
-  renderer modules; the accepted machine remains feature-gated behind
-  `legacy-tools` for developer evidence.
-- Clean fidelity compares the real clean `Game` with the accepted oracle across
-  all 12 embedded Phase 1 scenario input programs.
-- The last full R9 validation gate passed with `make fidelity`, full
-  all-scenario
-  `make clean-fidelity`, `cargo run -- --game-smoke`,
-  `cargo run -- --live-smoke`, core-document markdownlint, and
-  `git diff --check`.
-- Owner signoff remains pending as B13. `docs/start-sequence.gif` has been
-  restored from git and is the protected original visual reference until an
-  owner-approved replacement exists. The rejected clean media differs in frame
-  count and presentation: Williams color/handwriting cadence, Defender
-  wordmark coalescence, numeric glyphs, sprite colors/shapes, terrain/ground,
-  and Williams -> High Scores -> scoring sequence ordering must be repaired
-  from source-backed ROM/pre-rewrite evidence before a new candidate can
-  replace the protected reference. Media generation must write candidate files
-  outside `docs/` and compare them against the protected reference unless the
-  owner has explicitly approved replacing the reference. R9-E3.9 now sources
-  the Williams/Defender title surface from `LGOTAB`, `DEFENS`, `DEF33`,
-  `DEF50`, `APVCT`, and `WILLIR`/`WILR1` descriptor evidence; the remaining
-  B13 work is title color/coalescence polish, scoring sprite/terrain visual
-  repair, candidate comparison, and owner acceptance. R9-E3.10 now decodes the
-  source `NUMBR0`-`NUMBR9` numeric
-  glyph records in source column-major order for score, credit, Hall of Fame,
-  and scoring/action text surfaces. R9-E3.11 now draws terrain/ground from the
-  source `TDATA` terrain stream and source `BGINIT`/`BGOUT` 0x98-word output
-  table instead of the font-sheet terrain helper; gameplay and attract scoring
-  use the source terrain projection, while Williams/title and Hall of Fame pages
-  do not inherit gameplay ground. R9-E3.12 aligns candidate media cadence with
-  the protected reference at 347 frames / 4600cs and suppresses stray
-  Williams-title score HUD / zero-credit text. R9-E3.13 has started title
-  repair by switching the Williams handwriting reveal from a linear pixel ramp
-  to source `LOGO0` table-operation cadence through the `PRES` handoff, then
-  by moving source pseudo-colors, title text, object sprites, and Defender logo
-  decoding onto the Williams resistor palette with source `COLTAB`/`TCTAB`
-  title color cycling. R9-E3.13 also projects the Defender `APVCT` appearance
-  as source row-pair coalescence over the 15 `DEFENS` chunks without using
-  temporary scene rasters. R9-E3.14 completed scoring/Hall of Fame visual
-  repair by routing Hall of Fame display/credits through the
-  protected-reference `COLTAB` `0x47` magenta, applying the
-  protected-reference display offset to Hall of Fame and scoring presentation
-  surfaces, drawing lower scoring terrain as one source scanline, projecting
-  source `MTERR` mini-terrain records inside the attract scanner, and applying
-  the protected-reference purple scanner border on the scoring page. It also
-  moves the `ENMYTB` score-card table entries toward protected-reference
-  placement, shifts the scoring/action display to the protected reference's
-  post-setup rescue-fall phase while preserving page duration, and maps scoring
-  text/credits through sampled protected-reference `COLTAB` cadence. The title
-  segment now keeps the first sampled protected frame blank and maps
-  Williams/logo title colors through sampled protected-reference cadence.
-  R9-E3.15 regenerated
-  `target/readme-media/start-sequence-candidate.gif` without overwriting the
-  protected reference. It matches the protected GIF at 347 frames, 768x576, and
-  4600cs, with sampled RMS full 29.04, title 24.62, Hall of Fame 36.14,
-  numeric glyphs 20.75, sprites 32.17, terrain 29.02, and scoring 31.23. Full
-  local validation passed, including `make fidelity`, full
-  `make clean-fidelity`, `cargo run -- --game-smoke`, and
-  `cargo run -- --live-smoke`. Final B13 visual acceptance is now an owner
-  decision; until signoff, changes that alter public contracts, scenario
-  semantics, runtime behavior, or final acceptance evidence must trigger
-  focused checks and, when broad risk is introduced, a renewed full gate.
+Earlier owner review rejected the clean media for concrete gameplay-facing
+fidelity defects: player laser shape, reverse-facing player orientation, and
+live sounds. Those known defects have since been repaired against local MAME
+red-label evidence. The clean runtime now renders player lasers as sparse
+source-byte body/tip/fizzle pixels, projects a distinct left-facing player ship
+on reverse, and decodes live-audio events through translated Williams
+sound-board command families.
+
+The local reference workflow is the acceptance path:
+
+- `make reference-mame-capture` records local red-label MAME MP4/WAV artifacts
+  and trace TSVs under ignored `target/reference-media/` paths.
+- `make reference-mame-smoke` runs the short two-second MAME recorder proof
+  used by the release gate.
+- `make reference-clean-capture` renders clean GIF/WAV/debug candidates from
+  the same input-program grammar as the MAME capture path.
+- `make reference-media-check` compares bounded MAME and clean windows with
+  explicit visual, audio, or all-axis acceptance modes.
+- `make reference-report-gate` validates the accepted report manifest,
+  semantic coverage requirements including per-facet `min_reports` breadth
+  floors, manifest uniqueness for report names/paths and coverage keys,
+  explicit matching manifest/report `acceptance_mode` declarations, non-empty
+  declared coverage tags compatible with each report's acceptance mode,
+  report/media artifact roots under generated `target/reference-media` paths,
+  accepted MP4/GIF/WAV media types, non-empty media artifacts, positive
+  frame/sample counts, and absence of stale verifier failures on accepted axes.
+- `make reference-evidence-package` regenerates the reference-window scan JSON
+  files and the deterministic owner-review summary, including each accepted
+  report's manifest and local `report.json` acceptance modes plus
+  sound/object near-miss diagnostics, per-family object counts, longest
+  object-evidence spans, best spans per object family, and terrain-process
+  near-miss diagnostics from the current MAME trace corpus.
+- `make owner-review-package` regenerates the evidence package, re-runs the
+  accepted-report gate, and prints the finite owner-review checklist.
+
+The accepted report gate covers sprite visuals, player laser visual/audio,
+reverse orientation, explosion and coalescence visuals, terrain blow,
+gameplay audio families, non-lander audio and visual presentation,
+playability, rescue/loss, death/respawn, smart bomb, hyperspace, and organic
+non-lander presentation. Each coverage facet locks the current accepted report
+breadth so future manifest edits cannot reduce broad MAME-vs-clean proof to a
+single passing clip without tripping the gate, and duplicate manifest entries
+cannot count the same report or coverage row twice. Report coverage tags must
+also map to declared objective facets and to an explicitly declared
+visual/audio/all acceptance mode that can prove that facet; the local accepted
+`report.json` file must declare the same mode. Accepted report JSON stays under
+`target/reference-media/`, MAME reference artifacts stay under
+`target/reference-media/mame/`, and clean candidate artifacts stay under
+`target/reference-media/clean/`. Accepted visual proof uses MP4 MAME reference
+clips and clean GIF candidates; accepted audio proof uses WAV reference and
+candidate files. The full `make release-gate` path is green as of 2026-05-29
+and includes the owner-review package, accepted report gate, MAME doctor, MAME
+smoke recorder, README media generation, game/live smoke, docs lint, and diff
+hygiene.
+
+The accepted gate is still green, but final closure is no longer only an
+owner-review decision. A fresh organic smart-bomb/up-thrust search found a
+concrete last-human terrain-blow MAME candidate outside the accepted evidence
+windows; the current clean candidate is silent and visually divergent. The
+probe and review checklist are tracked in
+`docs/fidelity/release-closure-audit.md`.
 
 Post-R9 non-rewrite follow-ups are evidence and polish items, not active R9
 blockers: exact per-scenario pixel CRC parity, strict long-scenario sprite
@@ -152,9 +152,10 @@ tree:
   by fidelity checks and bounded sprite projection.
 - `src/game.rs`: gameplay-facing `Game`, `GameState`, `GameInput`,
   `GameFrame`, `GameEvents`, world, terrain, starfield, enemy, human, score,
-  source-backed wave profile, high-score entry/session/table, game-over return
-  timing, neutral object evidence, clean object categories, mapped clean sprite
-  evidence, source-backed human/enemy/projectile object-picture descriptors,
+  source-backed wave profile, high-score table/session state, isolated
+  initials-entry surfaces, game-over return timing, neutral object evidence,
+  clean object categories, mapped clean sprite evidence, source-backed
+  human/enemy/projectile object-picture descriptors,
   expanded-object lifecycle/presentation evidence, source-backed score-popup
   lifecycle snapshots, source-backed expanded-object explosion lifecycle
   snapshots, source-backed terrain-blow snapshots, projectile, player,
@@ -168,8 +169,7 @@ tree:
   copyright wait, and instruction surfaces, attract credit/presents/instruction
   message-glyph scene sprites with source message row-feed/horizontal-cursor
   controls, wave-completion status message-glyph and survivor bonus icon scene
-  sprites, high-score entry prompt
-  message-glyph scene sprites,
+  sprites, isolated high-score-entry prompt message-glyph scene sprites,
   hall-of-fame display heading/table scene sprites, and sound-event contracts,
   including source-backed per-family enemy hit command bytes surfaced through
   `UnmappedSoundCommand`.
@@ -186,7 +186,7 @@ tree:
   player-motion, enemy-motion, projectile launch/capacity/motion systems,
   projectile/enemy collision detection, player/enemy damage resolution,
   smart-bomb resolution, wave-completion evaluation, score/bonus awards,
-  high-score entry qualification and initials handling, and the
+  high-score table helpers, isolated initials-entry handling, and the
   `GameSimulation` trait used by the clean game and internal oracle
   implementations.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
@@ -214,6 +214,9 @@ tree:
 - `src/audio.rs`: gameplay-facing `SoundEvent` batches, the live audio worker
   boundary, disabled/null no-device modes, and runtime diagnostics. It consumes
   clean `GameFrame` and `SoundEvent` contracts, not legacy frame outputs.
+- `src/sound_board.rs`: translated Williams sound-board synthesis and command
+  decoding for source GWAVE vectors, VARI sweeps, special routines, organ
+  routines, and thrust-loop playback.
 - `src/fidelity.rs`: clean frame-equivalence signatures for gameplay state,
   gameplay events, sound events, and render summaries. Clean fidelity tests use
   oracle-owned reference probes instead of importing accepted facade types
@@ -437,12 +440,12 @@ remain on the direct clean render path.
 The R9-C4 residual ecology audit now classifies the per-family
 movement/projectile runtime surfaces as covered by the current clean runtime
 and focused unit tests, and targeted source ecology fixture hardening matches
-the `start_game`, `smart_bomb`, `hyperspace`, `abduction`, `death`,
-`wave_advance`, and `planet_destruction` clean-fidelity scenarios. The R9-C4.5
+the current `start_game`, `smart_bomb`, `hyperspace`, `abduction`, and `death`
+clean-fidelity scenarios. The R9-C4.5
 closure gate closes Step 50/B08 without exposing drift, so R9-C4.2 stayed
 unused. Step 51/R9-D1 closes B09 two-player flow with final-life switch,
 non-final death-rotation, stock/score ownership, and current-player final
-game-over/high-score routing fixtures.
+game-over/Hall-of-Fame routing fixtures.
 Clean
 smart bombs consume player stock, clear active enemies through
 `SmartBombSystem`, route score through the same scoring system, and leave
@@ -480,7 +483,11 @@ state; abduction/rescue transitions and object lifecycle timing remain separate
 work. Bounded source expanded-object
 appearance/explosion/score-popup detail rows that carry `top_left`, descriptor
 size, and a mapped clean sprite are projected onto the object layer;
-missing-size and transparent null-object rows stay evidence-only. Score-popup
+missing-size and transparent null-object rows stay evidence-only. Live spawned
+enemy appearance rows can render as source-picture coalescence pixels while the
+appearance size contracts from the MAME-observed high-bit `RSIZE` range toward
+the final sprite size, and the normal enemy sprite is hidden during that active
+appearance window. Score-popup
 rows additionally carry source 50-tick lifetime and 250/500 value metadata;
 enemy-family explosion rows carry source `EXST`/`EXPU` frame/lifetime metadata
 and draw as sparse source-style pixel clouds around their mapped sprite center
@@ -490,10 +497,11 @@ from `PXVCT`/`PX1A` state, carrying source color/counter metadata and visible
 piece positions into clean/oracle scenes. Planet destruction starts a
 source-backed terrain-blow snapshot: terrain rows are removed from the clean
 scene, scanner terrain is disabled, `TEREX` explosions are projected through
-expanded-object evidence, and the source status bit, iteration, erase-table
-counts, pseudo color, overload counter, source `TERBLO` / `AHSND` entry
-command evidence, and source `TBSND` completion command evidence are carried
-for fidelity checks.
+expanded-object evidence with the MAME-observed terrain flash windows and
+terrain-explosion growth cadence, and the source status bit, iteration,
+erase-table counts, pseudo color, overload counter, source `TERBLO` / `AHSND`
+entry command evidence, and source `TBSND` completion command evidence are
+carried for fidelity checks.
 Enemy contact with the player is
 resolved through clean collision and
 `PlayerDamageSystem`,
@@ -512,20 +520,22 @@ rotation, score and replay bonus awards sync the active player's public stock
 snapshot, so player-one and player-two scores, lives, and smart-bomb stocks stay
 owned by the active player. The second-player final-life switch-back path follows
 the same player-start cadence for player one, and final two-player game-over
-routes high-score entry from the current player's score when no other player has
-stock. During
-that final game-over sleep, scenes draw
+uses the same no-entry game-over/Hall-of-Fame return when no other player has
+stock. During that final game-over sleep, scenes draw
 source-backed `GO` message glyphs at the translated `PLE2` screen address
-`0x3E80`. The player-death pixel cloud is cleared before high-score entry
-handoff so high-score scenes remain prompt/table-only.
-Qualifying final scores are routed through `HighScoreEntrySystem` into
-`HighScoreEntry` with `HighScoreEntryStarted` output. High-score entry accepts
-alphabetic initials through clean input, normalizes them to uppercase, supports
-backspace, emits `HighScoreInitialAccepted`, and emits `HighScoreSubmitted`
-when the third initial enters the source-shaped hall-of-fame display stall
-before the clean game returns to attract. Submitted initials insert into both
-all-time and today's-greatest tables by score rank while preserving the
-current-player submission metadata. Normal attract scenes draw the
+`0x3E80`. The player-death pixel cloud is cleared before the final attract
+handoff so Hall of Fame scenes remain table-only.
+MAME red-label evidence does not show automatic initials entry after a
+qualifying final score, even when all all-time high-score slots are seeded to
+zero. The clean runtime therefore returns through the no-entry
+Hall-of-Fame/game-over path after final death. `HighScoreEntrySystem` remains
+covered as an isolated table/editing surface: it accepts alphabetic initials,
+normalizes them to uppercase, supports backspace, emits
+`HighScoreInitialAccepted`, and emits `HighScoreSubmitted` when the third
+initial enters the source-shaped hall-of-fame display stall before returning
+to attract. Manual submissions insert into both all-time and
+today's-greatest tables by score rank while preserving the current-player
+submission metadata. Normal attract scenes draw the
 source-backed `CREDV` credits label at `0x28E5` and the visible credit count
 digits at `0x48E5` during Hall of Fame / scoring contexts and whenever a real
 credit exists; the zero-credit line is suppressed on the Williams title pages.
@@ -564,8 +574,8 @@ Williams/logo title colors. Runtime sprite regions now use source
 object-picture dimensions, player lasers render as source-style tail-to-tip
 spans, explosion presentation uses sparse source-style pixel clouds, and
 score-card object placement has been corrected against the protected scoring
-frames. B13 now requires owner acceptance of the candidate media before
-replacement of `docs/start-sequence.gif`.
+frames. Replacement of `docs/start-sequence.gif` still requires owner
+acceptance of the candidate media.
 During a pending two-player start handoff, scenes draw the source-backed
 `PLYR1`/`PLYR2` player label at `0x3C80`. On the
 existing clean wave-cleared frame, scenes draw source-backed `ATWV`, `COMPV`,
@@ -574,7 +584,7 @@ number at `0x6550` and multiplier digit at `0x5890`; source numeric glyphs
 use the `NUMBR0`-`NUMBR9` column-major image records for score, credit,
 Hall of Fame, wave, multiplier, and scoring/action digits; surviving humans are
 also projected as source `ASTP3` bonus icons from `0x3CA0` with the source
-`+0x0400` step. While `HighScoreEntry` is active,
+`+0x0400` step. While the isolated `HighScoreEntry` surface is active,
 scenes draw the source-backed `PLYR1`/`PLYR2` player label at `0x3E38`,
 `HOFV1`-`HOFV4` instruction message lines from `0x1458` with source vertical
 offsets, entered initials from `0x46AC` with source horizontal offsets, and
@@ -616,9 +626,10 @@ target texture format. Sprite resource binding plans describe the
 scene-projection uniform upload, projection bind group layout, atlas texture
 binding, atlas sampler binding, atlas texture upload metadata, and expected
 bind-group and binding-entry totals used by that shader. The default clean
-sprite atlas decodes the reclassified temporary R2 PNG inputs into nonblank
-renderer-owned regions plus the `wgpu` texture format, usage, extent, and copy
-layout needed to populate it. Sprite pipeline layout plans then order those
+sprite atlas decodes source-backed runtime regions, source table pixels, and
+reclassified PNG inputs into nonblank renderer-owned regions plus the `wgpu`
+texture format, usage, extent, and copy layout needed to populate it. Sprite
+pipeline layout plans then order those
 projection and atlas bind groups for `wgpu` `PipelineLayoutDescriptor` creation
 and expose the expected bind-group and binding-entry totals carried into that
 layout. Sprite
@@ -632,10 +643,10 @@ the set-pipeline, set-bind-group, set-vertex-buffer, and set-index-buffer
 command totals carried into the encoder. Frame-level GPU command plans combine
 begin-pass clear state, viewport command presence, scene-projection upload
 presence, optional sprite execution with command, draw, and instance totals,
-and an ordered sprite-only stream predicate plus temporary raster evidence into
-one ordered scene command stream, while the current live
-path still carries a temporary raster payload for visual
-equivalence. Kitty graphics and terminal-session code remain
+and an ordered sprite-only stream predicate plus separate raster-tooling
+evidence into one ordered scene command stream. The clean smoke and live smoke
+gates require zero temporary raster commands for the active gameplay path.
+Kitty graphics and terminal-session code remain
 parked there as historical compatibility evidence, but they are not part of the
 active runtime or compatibility API surface. The legacy video renderer owns its
 remaining `TerminalGeometry` value type directly instead of importing terminal
@@ -671,6 +682,14 @@ reintroduce legacy implementation terminology.
 - README media is generated from clean `Game` frames and the clean sprite
   scene/atlas media path with `make readme-media`, which still uses the
   explicit `legacy-tools` tooling path.
+- `src/actor_game.rs` is an isolated actor-oriented rewrite slice. It exposes a
+  driver-owned prompt/reply model, thread-backed asset actors, same-contract
+  keyboard profiles, `XYZZY` overlay state, data-driven `AttractScript` support
+  for custom attract drivers, Williams title reveal metadata, and Defender
+  wordmark coalescence metadata. The slice now also models initial humans,
+  lander pickup/carry/conversion, falling-human rescue and safe landing scoring,
+  score popups, smart-bomb hostile clearing, and mutant spawn handoff, but it
+  has not replaced the live `Game` runtime yet.
 
 ## Compatibility Features
 
@@ -686,28 +705,28 @@ Defender cabinet actions, not Planetoid-specific semantics.
 Required local gates for behavior or architecture changes:
 
 ```sh
-cargo fmt --check
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-make clean-fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
+make release-gate
 ```
 
 Docs-only changes should at least run:
 
 ```sh
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-git diff --check
+make docs-lint
+make diff-check
 ```
+
+`make release-gate` runs the full local release validation path in order:
+formatting, default and `legacy-tools` Rust tests, both clippy passes,
+clean-fidelity, reference-media helper tests, fresh owner-review evidence
+package, accepted report gate, MAME doctor, short MAME recorder smoke, README
+media generation, game/live smoke, docs lint, and diff hygiene.
 
 `make fidelity` runs the broad gate: formatting, default Rust targets, default
 clippy, explicit `legacy-tools` Rust targets, `legacy-tools` clippy, trace
 exporter self-tests, Python helper tests, local trace fixture comparison,
 coverage, and added-line coverage.
 `make clean-fidelity` builds with `legacy-tools`, runs the clean rewrite
-equivalence gate against all 12 embedded Phase 1 scenario input programs by
+equivalence gate against the current MAME-backed embedded scenario set by
 default, and prints TSV first-divergence reports from the real clean `Game` to
 the accepted oracle. It does not require local ROMs or MAME reference traces.
 Set `SCENARIOS="..."` to narrow the gate during focused implementation steps.
@@ -724,11 +743,13 @@ explicit `make coverage-new-code-baseline NEW_CODE_COVERAGE_BASE=...` command.
   them to a bounded non-blocking backend trait. Legacy frame-output sound
   timing is adapted before it reaches `src/audio.rs`. Normal interactive play
   attempts a synthesized device backend and falls back to the no-device null
-  backend if host output is unavailable; smoke mode stays no-device and
-  deterministic. The accepted implementation contract is documented in
-  `docs/fidelity/live-audio.md`.
-- Local MAME reference generation is intentionally local tooling; generated
-  reference traces are not part of the normal runtime.
+  backend if host output is unavailable; foreground sound-board commands
+  interrupt the previous foreground command to match the single-DAC Williams
+  board behavior; smoke mode stays no-device and deterministic. The accepted
+  implementation contract is documented in `docs/fidelity/live-audio.md`.
+- Local MAME and clean candidate reference generation is intentionally local
+  tooling; generated media and reference traces are not part of the normal
+  runtime.
 - New clean production callers must avoid direct legacy module imports. Code
   that still needs accepted-behavior evidence should use the crate-private
   `accepted` facade under `legacy-tools` until the clean system replaces that

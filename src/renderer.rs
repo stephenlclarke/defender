@@ -308,6 +308,7 @@ impl SpriteId {
     pub const ATTRACT_DEFENDER_WORDMARK_BLOCK_BASE: Self = Self(74);
     pub const TERRAIN_TILE_ALT: Self = Self(89);
     pub const ATTRACT_SCANNER_TERRAIN_PIXEL: Self = Self(90);
+    pub const PLAYER_SHIP_LEFT: Self = Self(91);
     pub const SCORE_DIGITS: [Self; 10] = [
         Self::SCORE_DIGIT_0,
         Self::SCORE_DIGIT_1,
@@ -419,7 +420,8 @@ impl SpriteId {
 
     pub fn for_object_picture_label(label: &str) -> Option<Self> {
         match label {
-            "PLAPIC" | "PLBPIC" => Some(Self::PLAYER_SHIP),
+            "PLAPIC" => Some(Self::PLAYER_SHIP),
+            "PLBPIC" => Some(Self::PLAYER_SHIP_LEFT),
             "LNDP1" | "LNDP2" | "LNDP3" => Some(Self::ENEMY_LANDER),
             "ASTP1" | "ASTP2" | "ASTP3" | "ASTP4" => Some(Self::HUMAN),
             "LASP1" => Some(Self::PLAYER_PROJECTILE),
@@ -1163,6 +1165,11 @@ impl TextureAtlas {
                 size: [16, 6],
             },
             AtlasRegion {
+                sprite: SpriteId::PLAYER_SHIP_LEFT,
+                origin: [16, 0],
+                size: [16, 6],
+            },
+            AtlasRegion {
                 sprite: SpriteId::SCORE_TEXT,
                 origin: [0, 16],
                 size: [80, 8],
@@ -1459,6 +1466,8 @@ fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) ->
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
 
     let player_ship = decode_source_object_image_rgba("PLD10", 6, 8, ObjectPicturePalette::ship());
+    let player_ship_left =
+        decode_source_object_image_rgba("PLD20", 6, 8, ObjectPicturePalette::ship());
     let player_projectile =
         decode_source_object_image_rgba("LASD10", 1, 8, ObjectPicturePalette::player_shot());
     let enemy_lander =
@@ -1505,6 +1514,13 @@ fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) ->
         regions,
         SpriteId::PLAYER_SHIP,
         &player_ship,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::PLAYER_SHIP_LEFT,
+        &player_ship_left,
     );
     blit_default_region(
         &mut pixels,
@@ -6044,6 +6060,7 @@ mod tests {
 
         for (sprite, size) in [
             (SpriteId::PLAYER_SHIP, [16, 6]),
+            (SpriteId::PLAYER_SHIP_LEFT, [16, 6]),
             (SpriteId::PLAYER_PROJECTILE, [16, 1]),
             (SpriteId::ENEMY_LANDER, [10, 8]),
             (SpriteId::HUMAN, [4, 8]),
@@ -6069,6 +6086,8 @@ mod tests {
     #[test]
     fn source_object_images_decode_arcade_bytes_and_palettes() {
         let ship = decode_source_object_image_rgba("PLD10", 6, 8, ObjectPicturePalette::ship());
+        let ship_left =
+            decode_source_object_image_rgba("PLD20", 6, 8, ObjectPicturePalette::ship());
         let shot =
             decode_source_object_image_rgba("LASD10", 1, 8, ObjectPicturePalette::player_shot());
         let human = decode_source_object_image_rgba("ASTD10", 8, 2, ObjectPicturePalette::white());
@@ -6085,6 +6104,19 @@ mod tests {
                 "..######........",
             ]
         );
+        assert_eq!(ship_left.surface, SurfaceSize::new(16, 6));
+        assert_eq!(
+            sprite_alpha_rows(&ship_left),
+            vec![
+                "...........##...",
+                "..........####..",
+                ".........######.",
+                "...###########..",
+                "###############.",
+                ".......######...",
+            ]
+        );
+        assert_ne!(sprite_alpha_rows(&ship), sprite_alpha_rows(&ship_left));
         assert!(
             ship.pixels
                 .chunks_exact(4)
@@ -6471,12 +6503,14 @@ mod tests {
 
     #[test]
     fn object_picture_labels_map_reclassified_clean_sprite_assets() {
-        for label in ["PLAPIC", "PLBPIC"] {
-            assert_eq!(
-                SpriteId::for_object_picture_label(label),
-                Some(SpriteId::PLAYER_SHIP)
-            );
-        }
+        assert_eq!(
+            SpriteId::for_object_picture_label("PLAPIC"),
+            Some(SpriteId::PLAYER_SHIP)
+        );
+        assert_eq!(
+            SpriteId::for_object_picture_label("PLBPIC"),
+            Some(SpriteId::PLAYER_SHIP_LEFT)
+        );
         for label in ["LNDP1", "LNDP2", "LNDP3"] {
             assert_eq!(
                 SpriteId::for_object_picture_label(label),

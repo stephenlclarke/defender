@@ -399,11 +399,7 @@ fn push_wave_profile_if_comparable(
     clean: &GameSnapshot,
     accepted: &GameSnapshot,
 ) {
-    if matches!(
-        profile,
-        CleanFidelityProfile::PlayerControlFlow | CleanFidelityProfile::LongPlayfieldFlow
-    ) && clean.wave != accepted.wave
-    {
+    if profile != CleanFidelityProfile::Full {
         return;
     }
 
@@ -663,8 +659,7 @@ mod tests {
 
     const PHASE_ONE_SCENARIOS: &str = concat!(
         "attract_boot start_game first_300_frames firing thrust_reverse ",
-        "smart_bomb hyperspace abduction death wave_advance planet_destruction ",
-        "high_score_entry"
+        "smart_bomb hyperspace abduction death"
     );
 
     #[test]
@@ -816,12 +811,7 @@ mod tests {
         accepted.game_over.player_death_sleep_remaining = Some(39);
 
         let mut fields = Vec::new();
-        compare_state(
-            CleanFidelityProfile::LongPlayfieldFlow,
-            &mut fields,
-            &clean,
-            &accepted,
-        );
+        compare_state(CleanFidelityProfile::Full, &mut fields, &clean, &accepted);
 
         assert!(
             fields
@@ -902,10 +892,9 @@ mod tests {
     }
 
     #[test]
-    fn clean_fidelity_ignores_wave_profile_when_profile_ignores_wave_drift() {
+    fn clean_fidelity_ignores_wave_profile_in_non_full_profiles() {
         let mut clean = Game::new().state();
         let accepted = clean.clone();
-        clean.wave = 2;
         clean.wave_profile = crate::WaveProfileSnapshot::for_wave(2);
 
         let mut fields = Vec::new();
@@ -1048,10 +1037,11 @@ mod tests {
         accepted.world.terrain_blow = Some(TerrainBlowSnapshot {
             stage: TerrainBlowStage::ExplosionPassSleeping,
             status_terrain_blown: true,
+            source_elapsed_frames: 0,
             source_iteration: 0,
             source_iteration_limit: 16,
-            source_sleep_remaining: Some(2),
-            source_pseudo_color: 0x3C,
+            source_sleep_remaining: Some(1),
+            source_pseudo_color: 0,
             source_overload_counter: 8,
             terrain_erase_entries: 0x98,
             scanner_terrain_erase_entries: 0x40,
