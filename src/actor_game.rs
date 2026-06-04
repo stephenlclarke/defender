@@ -46,6 +46,88 @@ const ACTOR_SOURCE_WAVE_TABLE_HEADER: &str =
 const ACTOR_SOURCE_DEFAULT_DIFFICULTY_INITIAL: u8 = 5;
 const ACTOR_SOURCE_DEFAULT_DIFFICULTY_CEILING: u8 = 15;
 const ACTOR_SOURCE_BACKED_WAVES: u16 = 16;
+const ACTOR_SOURCE_FIRST_WAVE_HUMAN_SPAWNS: [ActorHumanSpawn; 10] = [
+    ActorHumanSpawn::source_first_wave(
+        0,
+        ActorSourceFirstWaveHumanStart {
+            x16: 0x18C3,
+            y16: 0xE000,
+            picture_frame: 2,
+        },
+    ),
+    ActorHumanSpawn::source_first_wave(
+        1,
+        ActorSourceFirstWaveHumanStart {
+            x16: 0x1C81,
+            y16: 0xE100,
+            picture_frame: 3,
+        },
+    ),
+    ActorHumanSpawn::source_first_wave(
+        2,
+        ActorSourceFirstWaveHumanStart {
+            x16: 0x4E30,
+            y16: 0xE000,
+            picture_frame: 0,
+        },
+    ),
+    ActorHumanSpawn::source_first_wave(
+        3,
+        ActorSourceFirstWaveHumanStart {
+            x16: 0x5718,
+            y16: 0xE000,
+            picture_frame: 0,
+        },
+    ),
+    ActorHumanSpawn::source_first_wave(
+        4,
+        ActorSourceFirstWaveHumanStart {
+            x16: 0x9B8C,
+            y16: 0xE000,
+            picture_frame: 0,
+        },
+    ),
+    ActorHumanSpawn::source_first_wave(
+        5,
+        ActorSourceFirstWaveHumanStart {
+            x16: 0x9DC6,
+            y16: 0xE000,
+            picture_frame: 0,
+        },
+    ),
+    ActorHumanSpawn::source_first_wave(
+        6,
+        ActorSourceFirstWaveHumanStart {
+            x16: 0xCEE3,
+            y16: 0xE000,
+            picture_frame: 2,
+        },
+    ),
+    ActorHumanSpawn::source_first_wave(
+        7,
+        ActorSourceFirstWaveHumanStart {
+            x16: 0xD771,
+            y16: 0xE000,
+            picture_frame: 2,
+        },
+    ),
+    ActorHumanSpawn::source_first_wave(
+        8,
+        ActorSourceFirstWaveHumanStart {
+            x16: 0xD2B8,
+            y16: 0xE000,
+            picture_frame: 0,
+        },
+    ),
+    ActorHumanSpawn::source_first_wave(
+        9,
+        ActorSourceFirstWaveHumanStart {
+            x16: 0xE8DC,
+            y16: 0xE000,
+            picture_frame: 0,
+        },
+    ),
+];
 const ACTOR_SOURCE_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
     ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
         x16: 0xFB33,
@@ -105,19 +187,6 @@ const ACTOR_WAVE_LANDER_SPAWN_SLOTS: [Point; 5] = [
     Point::new(198, 48),
     Point::new(244, 170),
 ];
-const INITIAL_HUMAN_POSITIONS: [Point; 10] = [
-    Point::new(28, HUMAN_GROUND_Y),
-    Point::new(52, HUMAN_GROUND_Y),
-    Point::new(76, HUMAN_GROUND_Y),
-    Point::new(104, HUMAN_GROUND_Y),
-    Point::new(128, HUMAN_GROUND_Y),
-    Point::new(152, HUMAN_GROUND_Y),
-    Point::new(176, HUMAN_GROUND_Y),
-    Point::new(200, HUMAN_GROUND_Y),
-    Point::new(224, HUMAN_GROUND_Y),
-    Point::new(244, HUMAN_GROUND_Y),
-];
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ActorId(u64);
 
@@ -832,6 +901,21 @@ pub struct ActorLanderSpawn {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceHumanMetadata {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub picture_frame: u8,
+    pub target_slot_index: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorHumanSpawn {
+    pub position: Point,
+    pub mode: HumanMode,
+    pub source: Option<ActorSourceHumanMetadata>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ActorSourceFirstWaveLanderStart {
     x16: u16,
     y16: u16,
@@ -841,6 +925,13 @@ struct ActorSourceFirstWaveLanderStart {
     sleep_ticks: u8,
     picture_frame: u8,
     target_human_index: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ActorSourceFirstWaveHumanStart {
+    x16: u16,
+    y16: u16,
+    picture_frame: u8,
 }
 
 impl ActorLanderSpawn {
@@ -863,6 +954,32 @@ impl ActorLanderSpawn {
                 sleep_ticks: start.sleep_ticks,
                 picture_frame: start.picture_frame,
                 target_human_index: start.target_human_index,
+            }),
+        }
+    }
+}
+
+impl ActorHumanSpawn {
+    pub const fn new(position: Point, mode: HumanMode) -> Self {
+        Self {
+            position,
+            mode,
+            source: None,
+        }
+    }
+
+    const fn source_first_wave(
+        target_slot_index: usize,
+        start: ActorSourceFirstWaveHumanStart,
+    ) -> Self {
+        Self {
+            position: Point::new((start.x16 >> 8) as i16, (start.y16 >> 8) as i16),
+            mode: HumanMode::Grounded,
+            source: Some(ActorSourceHumanMetadata {
+                x_fraction: (start.x16 & 0x00FF) as u8,
+                y_fraction: (start.y16 & 0x00FF) as u8,
+                picture_frame: start.picture_frame,
+                target_slot_index,
             }),
         }
     }
@@ -1115,6 +1232,9 @@ pub enum VisualEffect {
     SourceLanderFrame {
         frame: u8,
     },
+    SourceHumanFrame {
+        frame: u8,
+    },
     ExplosionCloud {
         age: u16,
     },
@@ -1351,6 +1471,7 @@ pub struct ActorSnapshot {
     pub bounds: Option<Rect>,
     pub alive: bool,
     pub source_lander: Option<ActorSourceLanderMetadata>,
+    pub source_human: Option<ActorSourceHumanMetadata>,
 }
 
 impl ActorSnapshot {
@@ -1503,6 +1624,17 @@ impl StepPrompt {
             .iter()
             .filter(|snapshot| snapshot.kind == ActorKind::Human && snapshot.alive)
             .min_by_key(|snapshot| manhattan_distance(position, snapshot.position))
+    }
+
+    fn source_target_human(&self, target_slot_index: usize) -> Option<&ActorSnapshot> {
+        self.snapshots.iter().find(|snapshot| {
+            snapshot.kind == ActorKind::Human
+                && snapshot.alive
+                && snapshot.bounds.is_some()
+                && snapshot
+                    .source_human
+                    .is_some_and(|source| source.target_slot_index == target_slot_index)
+        })
     }
 }
 
@@ -1802,6 +1934,12 @@ impl ActorGameDriver {
         id
     }
 
+    fn spawn_human_from_spawn(&mut self, spawn: ActorHumanSpawn) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(Human::from_spawn(id, spawn));
+        id
+    }
+
     fn spawn_laser(&mut self, position: Point, direction: Direction, owner: ActorId) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(LaserShot::new(id, position, direction, owner));
@@ -1929,9 +2067,18 @@ impl ActorGameDriver {
                     human,
                     position,
                 } => {
+                    let source = self
+                        .snapshots
+                        .get(&human)
+                        .and_then(|snapshot| snapshot.source_human);
                     self.snapshots.remove(&human);
                     self.actors.remove(&human);
-                    self.spawn_actor(Human::new(human, position, HumanMode::CarriedBy(lander)));
+                    self.spawn_actor(Human::with_source(
+                        human,
+                        position,
+                        HumanMode::CarriedBy(lander),
+                        source,
+                    ));
                 }
                 GameCommand::SmartBomb => {
                     self.detonate_smart_bomb(&mut sounds);
@@ -2015,8 +2162,8 @@ impl ActorGameDriver {
     }
 
     fn spawn_initial_humans(&mut self) {
-        for position in INITIAL_HUMAN_POSITIONS {
-            self.spawn_human(position, HumanMode::Grounded);
+        for spawn in ACTOR_SOURCE_FIRST_WAVE_HUMAN_SPAWNS {
+            self.spawn_human_from_spawn(spawn);
         }
     }
 
@@ -2158,6 +2305,7 @@ impl AssetActor for AttractDirector {
                 bounds: None,
                 alive: true,
                 source_lander: None,
+                source_human: None,
             },
             commands,
             draws,
@@ -2205,6 +2353,7 @@ impl AssetActor for ScriptedAttractProgram {
                 bounds: None,
                 alive: true,
                 source_lander: None,
+                source_human: None,
             },
             commands: Vec::new(),
             draws,
@@ -2298,6 +2447,7 @@ impl AssetActor for PlayerShip {
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
                 source_lander: None,
+                source_human: None,
             },
             commands,
             draws,
@@ -2384,6 +2534,7 @@ impl AssetActor for Lander {
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
                 source_lander: self.source,
+                source_human: None,
             },
             commands,
             draws,
@@ -2419,7 +2570,11 @@ impl Lander {
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) {
-        if let Some(target) = prompt.nearest_human(self.position) {
+        let target = self
+            .source_target_human(prompt)
+            .or_else(|| prompt.nearest_human(self.position));
+
+        if let Some(target) = target {
             if pickup_distance(self.position, target.position, behavior) {
                 self.mode = LanderMode::Carrying {
                     human_id: target.id,
@@ -2441,6 +2596,12 @@ impl Lander {
             self.drift = if player.x < self.position.x { -1 } else { 1 };
         }
         self.drift(behavior);
+    }
+
+    fn source_target_human<'a>(&self, prompt: &'a StepPrompt) -> Option<&'a ActorSnapshot> {
+        self.source
+            .and_then(|source| source.target_human_index)
+            .and_then(|target_slot_index| prompt.source_target_human(target_slot_index))
     }
 
     fn drift(&mut self, behavior: ActorBehaviorProfile) {
@@ -2604,6 +2765,7 @@ impl AssetActor for Mutant {
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
                 source_lander: None,
+                source_human: None,
             },
             commands: Vec::new(),
             draws,
@@ -2617,15 +2779,30 @@ struct Human {
     position: Point,
     mode: HumanMode,
     safe_landing_awarded: bool,
+    source: Option<ActorSourceHumanMetadata>,
 }
 
 impl Human {
     fn new(id: ActorId, position: Point, mode: HumanMode) -> Self {
+        Self::with_source(id, position, mode, None)
+    }
+
+    fn from_spawn(id: ActorId, spawn: ActorHumanSpawn) -> Self {
+        Self::with_source(id, spawn.position, spawn.mode, spawn.source)
+    }
+
+    fn with_source(
+        id: ActorId,
+        position: Point,
+        mode: HumanMode,
+        source: Option<ActorSourceHumanMetadata>,
+    ) -> Self {
         Self {
             id,
             position,
             mode,
             safe_landing_awarded: false,
+            source,
         }
     }
 
@@ -2721,10 +2898,11 @@ impl AssetActor for Human {
                 HumanMode::Falling { velocity } => self.update_falling(velocity, prompt, behavior),
                 HumanMode::CarriedBy(carrier) => self.update_carried(carrier, prompt, behavior),
             });
-            draws.push(DrawCommand::sprite(
+            draws.push(DrawCommand::sprite_with_effect(
                 self.id,
                 self.mode.sprite(),
                 self.position,
+                self.draw_effect(),
             ));
         }
 
@@ -2737,10 +2915,21 @@ impl AssetActor for Human {
                 bounds: human_collision_bounds(self.mode, self.position),
                 alive: prompt.phase == Phase::Playing,
                 source_lander: None,
+                source_human: self.source,
             },
             commands,
             draws,
         }
+    }
+}
+
+impl Human {
+    fn draw_effect(&self) -> VisualEffect {
+        self.source
+            .map(|source| VisualEffect::SourceHumanFrame {
+                frame: source.picture_frame,
+            })
+            .unwrap_or(VisualEffect::Static)
     }
 }
 
@@ -2807,6 +2996,7 @@ impl AssetActor for ScorePopup {
                 bounds: None,
                 alive: self.age < behavior.score_popup_lifetime_steps,
                 source_lander: None,
+                source_human: None,
             },
             commands,
             draws,
@@ -2871,6 +3061,7 @@ impl AssetActor for LaserShot {
                 bounds: Some(self.bounds()),
                 alive: self.age < behavior.laser_lifetime_steps,
                 source_lander: None,
+                source_human: None,
             },
             commands,
             draws,
@@ -2925,6 +3116,7 @@ impl AssetActor for Explosion {
                 bounds: None,
                 alive: self.age < behavior.explosion_lifetime_steps,
                 source_lander: None,
+                source_human: None,
             },
             commands,
             draws,
@@ -3432,6 +3624,89 @@ mod tests {
         }
 
         assert_eq!(first_laser_step, Some(39));
+    }
+
+    #[test]
+    fn first_wave_humans_publish_source_metadata_and_picture_frames() {
+        let mut driver = ActorGameDriver::new();
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+
+        let live = driver.step(GameInput::NONE);
+        let human = live
+            .snapshots
+            .iter()
+            .find(|snapshot| {
+                snapshot.kind == ActorKind::Human && snapshot.position == Point::new(0x1C, 0xE1)
+            })
+            .expect("source first-wave human should publish its restore position");
+
+        assert_eq!(
+            human.source_human,
+            Some(ActorSourceHumanMetadata {
+                x_fraction: 0x81,
+                y_fraction: 0x00,
+                picture_frame: 3,
+                target_slot_index: 1,
+            })
+        );
+        assert!(live.draws.iter().any(|draw| {
+            draw.actor == human.id
+                && draw.sprite == SpriteKey::Human
+                && matches!(draw.effect, VisualEffect::SourceHumanFrame { frame: 3 })
+        }));
+    }
+
+    #[test]
+    fn source_lander_prefers_configured_target_human_slot() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.set_kind_behavior(
+            ActorKind::Lander,
+            ActorBehaviorProfile {
+                lander_seek_speed: 4,
+                lander_fire_period_steps: u64::MAX,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        let lander_id = driver.spawn_lander_from_spawn(ActorLanderSpawn {
+            position: Point::new(100, 100),
+            source: Some(ActorSourceLanderMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                shot_timer: u8::MAX,
+                sleep_ticks: 0,
+                picture_frame: 0,
+                target_human_index: Some(7),
+            }),
+        });
+        driver.spawn_human_for_test(Point::new(90, 100));
+        driver.spawn_human_from_spawn(ActorHumanSpawn {
+            position: Point::new(160, 100),
+            mode: HumanMode::Grounded,
+            source: Some(ActorSourceHumanMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                picture_frame: 0,
+                target_slot_index: 7,
+            }),
+        });
+
+        driver.step(GameInput::NONE);
+        let targeted = driver.step(GameInput::NONE);
+
+        assert_eq!(
+            snapshot_for(&targeted, lander_id).position,
+            Point::new(104, 100)
+        );
     }
 
     #[test]

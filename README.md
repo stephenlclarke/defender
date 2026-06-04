@@ -75,8 +75,9 @@ active wave size, lander movement speed, and lander fire cadence, plus source
 first-wave lander restore metadata: fixed-point fractions, velocities, shot
 timer, sleep ticks, picture frame, and target-human index. It also includes
 Williams title animation metadata, the coalescing Defender wordmark surface,
-human actors, lander
-pickup/carry/conversion, falling-human rescue and safe landing scores, score
+source first-wave human restore metadata with target-list slots, lander
+target-slot seeking, pickup/carry/conversion, falling-human rescue and safe
+landing scores, score
 popups, and smart-bomb hostile clearing. `XYZZY` invincibility is applied as
 the same driver-controlled behavior override used by scripts. See
 `docs/actor-architecture.md` for the C++-to-Rust mapping and migration shape.

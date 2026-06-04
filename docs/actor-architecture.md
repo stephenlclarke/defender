@@ -113,6 +113,11 @@ including fixed-point fractions, velocities, shot timer, sleep ticks, picture
 frame, and target-human index. Later waves still use deterministic actor slots
 until a later slice ports the remaining source restore positions.
 
+Initial humans are source-backed for wave `1` as well. Their actor spawns carry
+fixed-point fractions, picture frame, and source target-list slot metadata.
+Source-backed landers ask the prompt for their configured target slot first and
+only fall back to nearest-human seeking when that target is unavailable.
+
 ## Attract Graphics
 
 The attract screen is data-driven. `AttractScript` contains ordered
@@ -142,11 +147,13 @@ actor ownership.
 
 The actor driver now owns a first Defender gameplay loop:
 
-- Starts seed the playfield with ten human actors in target-list-like ground
-  positions.
+- Starts seed the playfield with ten source first-wave human actors carrying
+  target-list slot and picture-frame metadata.
 - Landers seek the nearest grounded human, attach it through an
   `AttachHuman` command, carry it upward, and convert into a mutant when the
-  carried human reaches the upper conversion band.
+  carried human reaches the upper conversion band. Source-backed landers prefer
+  their configured target-human slot before falling back to nearest-human
+  seeking.
 - Carried humans follow their lander. If the carrier disappears, the human
   falls under a simple acceleration model and emits the release sound cue.
 - Falling humans caught by the player award 500 points, emit the rescue sound

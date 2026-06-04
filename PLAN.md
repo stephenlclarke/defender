@@ -36,7 +36,9 @@ verification tools.
   `assets/red-label/wave-table.tsv` for active wave size, lander speed, and
   lander fire cadence, and uses source first-wave lander restore metadata for
   fixed-point fractions, velocities, shot timer, sleep ticks, picture frame,
-  and target-human index.
+  and target-human index. Initial humans now use source first-wave restore
+  metadata with target-list slots, and source landers prefer those configured
+  target slots before falling back to nearest-human seeking.
 - Primary runtime source is `src/`; the converted implementation is parked in
   `src_legacy/` and should remain optional oracle/tooling evidence only.
 - Normal live play uses clean `Game` frames through clean platform, audio, and
