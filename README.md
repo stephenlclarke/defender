@@ -69,12 +69,12 @@ the latest report at whatever cadence they own.
 The current slice includes same-contract keyboard profiles, `XYZZY` overlay
 state, thread-backed actors, a data-driven `AttractScript` for custom attract
 drivers, `ActorBehaviorScript` profiles for level-wide and per-actor movement
-and behavior tuning, Williams title animation metadata, the coalescing Defender
-wordmark surface, human actors, lander pickup/carry/conversion, falling-human
-rescue and safe landing scores, score popups, and smart-bomb hostile clearing.
-`XYZZY` invincibility is applied as the same driver-controlled behavior
-override used by scripts. See `docs/actor-architecture.md` for the C++-to-Rust
-mapping and migration shape.
+and behavior tuning, script-selectable lander behavior modes, Williams title
+animation metadata, the coalescing Defender wordmark surface, human actors,
+lander pickup/carry/conversion, falling-human rescue and safe landing scores,
+score popups, and smart-bomb hostile clearing. `XYZZY` invincibility is applied
+as the same driver-controlled behavior override used by scripts. See
+`docs/actor-architecture.md` for the C++-to-Rust mapping and migration shape.
 
 ![Defender gameplay frame](docs/defender.png)
 

@@ -583,6 +583,13 @@ pub enum ActorKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LanderBehaviorMode {
+    SeekNearestHuman,
+    ChasePlayer,
+    Drift,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorBehaviorProfile {
     pub player_speed: i16,
     pub player_laser_cooldown_steps: u8,
@@ -596,6 +603,7 @@ pub struct ActorBehaviorProfile {
     pub lander_pickup_radius_y: i16,
     pub lander_conversion_y: i16,
     pub lander_fire_period_steps: u64,
+    pub lander_mode: LanderBehaviorMode,
     pub mutant_seek_speed: i16,
     pub human_ground_y: i16,
     pub human_fall_acceleration: i16,
@@ -620,6 +628,7 @@ impl ActorBehaviorProfile {
         lander_pickup_radius_y: LANDER_PICKUP_RADIUS_Y,
         lander_conversion_y: LANDER_CONVERSION_Y,
         lander_fire_period_steps: LANDER_FIRE_PERIOD,
+        lander_mode: LanderBehaviorMode::SeekNearestHuman,
         mutant_seek_speed: MUTANT_SEEK_SPEED,
         human_ground_y: HUMAN_GROUND_Y,
         human_fall_acceleration: HUMAN_FALL_ACCELERATION,
@@ -1949,6 +1958,27 @@ impl Lander {
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) {
+        match behavior.lander_mode {
+            LanderBehaviorMode::SeekNearestHuman => {
+                self.seek_nearest_human(prompt, behavior, commands);
+            }
+            LanderBehaviorMode::ChasePlayer => {
+                if let Some(player) = prompt.player_position() {
+                    self.position = step_toward(self.position, player, behavior.lander_seek_speed);
+                } else {
+                    self.drift(behavior);
+                }
+            }
+            LanderBehaviorMode::Drift => self.drift(behavior),
+        }
+    }
+
+    fn seek_nearest_human(
+        &mut self,
+        prompt: &StepPrompt,
+        behavior: ActorBehaviorProfile,
+        commands: &mut Vec<GameCommand>,
+    ) {
         if let Some(target) = prompt.nearest_human(self.position) {
             if pickup_distance(self.position, target.position, behavior) {
                 self.mode = LanderMode::Carrying {
@@ -1970,9 +2000,14 @@ impl Lander {
         if let Some(player) = prompt.player_position() {
             self.drift = if player.x < self.position.x { -1 } else { 1 };
         }
-        self.position = self
-            .position
-            .offset(Velocity::new(self.drift * behavior.lander_drift_speed, 0));
+        self.drift(behavior);
+    }
+
+    fn drift(&mut self, behavior: ActorBehaviorProfile) {
+        self.position = self.position.offset(Velocity::new(
+            self.drift * behavior.lander_drift_speed.max(0),
+            0,
+        ));
     }
 
     fn update_carrying(
@@ -2727,6 +2762,27 @@ mod tests {
 
         let seeking = driver.step(GameInput::NONE);
         assert_eq!(snapshot_for(&seeking, lander_id).position.x, 83);
+    }
+
+    #[test]
+    fn behavior_script_can_choose_lander_targeting_mode() {
+        let lander_behavior = ActorBehaviorProfile {
+            lander_seek_speed: 4,
+            lander_fire_period_steps: u64::MAX,
+            lander_mode: LanderBehaviorMode::ChasePlayer,
+            ..ActorBehaviorProfile::default()
+        };
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.set_kind_behavior(ActorKind::Lander, lander_behavior);
+        driver.spawn_player();
+        let lander_id = driver.spawn_lander_for_test(Point::new(80, HUMAN_GROUND_Y));
+        driver.spawn_human_for_test(Point::new(100, HUMAN_GROUND_Y));
+        driver.step(GameInput::NONE);
+
+        let chasing = driver.step(GameInput::NONE);
+
+        assert_eq!(snapshot_for(&chasing, lander_id).position.x, 75);
     }
 
     #[test]

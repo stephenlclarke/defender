@@ -29,7 +29,8 @@ verification tools.
   steps so custom drivers can own sequencing without MAME frame scripts.
   Actor movement and behavior are now scriptable through
   `ActorBehaviorScript`, with default, actor-kind, and actor-id behavior
-  profiles for level difficulty and `XYZZY` damage overrides.
+  profiles plus script-selectable behavior modes for level difficulty and
+  `XYZZY` damage overrides.
 - Primary runtime source is `src/`; the converted implementation is parked in
   `src_legacy/` and should remain optional oracle/tooling evidence only.
 - Normal live play uses clean `Game` frames through clean platform, audio, and

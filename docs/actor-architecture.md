@@ -70,7 +70,9 @@ numbers.
 Actor movement and behavior are configurable data owned by the driver.
 `ActorBehaviorProfile` holds tunable attributes for player movement and laser
 cooldown, laser speed and lifetime, lander seek/carry/fire behavior, mutant
-pursuit, human fall/landing behavior, and timed effect lifetimes.
+pursuit, human fall/landing behavior, and timed effect lifetimes. It also holds
+behavior modes such as `LanderBehaviorMode`, allowing scripts to choose whether
+a lander seeks humans, chases the player, or simply drifts.
 
 `ActorBehaviorScript` resolves those profiles in this order:
 
@@ -84,7 +86,9 @@ that code uses. `ActorGameDriver::set_default_behavior`,
 `ActorGameDriver::set_kind_behavior`, and `ActorGameDriver::set_actor_behavior`
 are the current script API. A level script can use those calls to make later
 waves faster, shorten laser cooldowns, change human fall gravity, or alter one
-specific actor without changing the actor struct.
+specific actor without changing the actor struct. Scripts can also choose
+movement behavior modes, for example making a later-wave lander ignore humans
+and chase the player.
 
 `XYZZY` invincibility uses the same mechanism. When invincibility is active,
 the driver applies a temporary player behavior override that disables enemy
