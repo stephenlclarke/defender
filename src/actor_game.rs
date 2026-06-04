@@ -40,17 +40,18 @@ const LANDER_SCORE: u32 = 150;
 const MUTANT_SCORE: u32 = 150;
 const HUMAN_RESCUE_SCORE: u32 = 500;
 const HUMAN_SAFE_LANDING_SCORE: u32 = 250;
-const DEFAULT_WAVE_ONE_LANDERS: [Point; 2] = [Point::new(180, 88), Point::new(218, 150)];
-const DEFAULT_WAVE_TWO_LANDERS: [Point; 3] = [
+const ACTOR_SOURCE_WAVE_TABLE_TSV: &str = include_str!("../assets/red-label/wave-table.tsv");
+const ACTOR_SOURCE_WAVE_TABLE_HEADER: &str =
+    "key\tceiling\tfloor\tintra_delta\tinter_delta\twave1\twave2\twave3\twave4";
+const ACTOR_SOURCE_DEFAULT_DIFFICULTY_INITIAL: u8 = 5;
+const ACTOR_SOURCE_DEFAULT_DIFFICULTY_CEILING: u8 = 15;
+const ACTOR_SOURCE_BACKED_WAVES: u16 = 16;
+const ACTOR_WAVE_LANDER_SPAWN_SLOTS: [Point; 5] = [
     Point::new(176, 80),
     Point::new(210, 132),
     Point::new(236, 184),
-];
-const DEFAULT_WAVE_THREE_LANDERS: [Point; 4] = [
-    Point::new(168, 72),
-    Point::new(198, 120),
-    Point::new(224, 168),
-    Point::new(244, 206),
+    Point::new(198, 48),
+    Point::new(244, 170),
 ];
 const INITIAL_HUMAN_POSITIONS: [Point; 10] = [
     Point::new(28, HUMAN_GROUND_Y),
@@ -752,6 +753,112 @@ impl Default for ActorBehaviorScript {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceWaveProfile {
+    pub landers: u8,
+    pub wave_size: u8,
+    pub lander_x_velocity: u8,
+    pub lander_shot_time: u32,
+}
+
+impl ActorSourceWaveProfile {
+    pub fn for_wave(wave: u16) -> Self {
+        let wave = u8::try_from(wave.min(u16::from(u8::MAX))).unwrap_or(u8::MAX);
+        Self {
+            landers: actor_source_wave_u8("landers", wave),
+            wave_size: actor_source_wave_u8("wave_size", wave),
+            lander_x_velocity: actor_source_wave_u8("lander_x_velocity", wave),
+            lander_shot_time: actor_source_wave_u32("lander_shot_time", wave),
+        }
+    }
+
+    fn lander_behavior(self) -> ActorBehaviorProfile {
+        ActorBehaviorProfile {
+            lander_seek_speed: actor_lander_speed_from_source(self.lander_x_velocity),
+            lander_drift_speed: actor_lander_speed_from_source(self.lander_x_velocity),
+            lander_fire_period_steps: u64::from(self.lander_shot_time.max(1)),
+            ..ActorBehaviorProfile::default()
+        }
+    }
+
+    fn lander_spawns(self) -> Vec<Point> {
+        let active_landers = self
+            .wave_size
+            .min(self.landers)
+            .min(ACTOR_WAVE_LANDER_SPAWN_SLOTS.len() as u8);
+        ACTOR_WAVE_LANDER_SPAWN_SLOTS
+            .iter()
+            .copied()
+            .take(usize::from(active_landers))
+            .collect()
+    }
+}
+
+fn actor_lander_speed_from_source(velocity: u8) -> i16 {
+    i16::from((velocity / 16).max(1))
+}
+
+fn actor_source_wave_u8(key: &str, wave: u8) -> u8 {
+    u8::try_from(actor_source_wave_value(key, wave))
+        .unwrap_or_else(|_| panic!("actor source wave table {key} should fit u8"))
+}
+
+fn actor_source_wave_u32(key: &str, wave: u8) -> u32 {
+    u32::try_from(actor_source_wave_value(key, wave))
+        .unwrap_or_else(|_| panic!("actor source wave table {key} should be non-negative"))
+}
+
+fn actor_source_wave_value(key: &str, wave: u8) -> i32 {
+    let mut lines = ACTOR_SOURCE_WAVE_TABLE_TSV.lines();
+    let header = lines
+        .next()
+        .expect("actor source wave table should have a header");
+    assert_eq!(header, ACTOR_SOURCE_WAVE_TABLE_HEADER);
+
+    for row in lines.map(str::trim).filter(|row| !row.is_empty()) {
+        let fields = row.split('\t').collect::<Vec<_>>();
+        assert_eq!(fields.len(), 9, "actor source wave table row width changed");
+        if fields[0] != key {
+            continue;
+        }
+
+        let ceiling = parse_actor_wave_i32(fields[1], key, "ceiling");
+        let floor = parse_actor_wave_i32(fields[2], key, "floor");
+        let inter_delta = parse_actor_wave_i32(fields[4], key, "inter_delta");
+        let wave = wave.max(1);
+        let wave_index = usize::from(wave.min(4));
+        let mut value = parse_actor_wave_i32(fields[4 + wave_index], key, "wave");
+        for _ in 0..actor_wave_inter_delta_iterations(wave) {
+            value = apply_actor_wave_delta(value, inter_delta, floor, ceiling);
+        }
+        return value;
+    }
+
+    panic!("missing actor source wave table key {key}");
+}
+
+fn actor_wave_inter_delta_iterations(wave: u8) -> u16 {
+    let wave_delta = wave.saturating_sub(4);
+    let pre_ceiling = ACTOR_SOURCE_DEFAULT_DIFFICULTY_INITIAL.saturating_add(wave_delta);
+    u16::from(pre_ceiling.min(ACTOR_SOURCE_DEFAULT_DIFFICULTY_CEILING))
+}
+
+fn parse_actor_wave_i32(value: &str, key: &str, field: &str) -> i32 {
+    value
+        .parse()
+        .unwrap_or_else(|_| panic!("actor source wave table {key}.{field} is not an integer"))
+}
+
+fn apply_actor_wave_delta(value: i32, delta: i32, floor: i32, ceiling: i32) -> i32 {
+    if delta > 0 {
+        (value + delta).min(ceiling)
+    } else if delta < 0 {
+        (value + delta).max(floor)
+    } else {
+        value
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorWaveProfile {
     pub wave: u16,
@@ -778,11 +885,7 @@ pub struct ActorWaveScript {
 impl ActorWaveScript {
     pub fn new(name: impl Into<String>, mut waves: Vec<ActorWaveProfile>) -> Self {
         if waves.is_empty() {
-            waves.push(ActorWaveProfile::new(
-                1,
-                ActorBehaviorScript::default(),
-                DEFAULT_WAVE_ONE_LANDERS.to_vec(),
-            ));
+            waves.push(Self::source_backed_profile(1));
         }
         waves.sort_by_key(|profile| profile.wave);
         Self {
@@ -803,38 +906,19 @@ impl ActorWaveScript {
     }
 
     pub fn default_progression() -> Self {
-        let wave_two_lander = ActorBehaviorProfile {
-            lander_seek_speed: 2,
-            lander_fire_period_steps: 72,
-            ..ActorBehaviorProfile::default()
-        };
-        let wave_three_lander = ActorBehaviorProfile {
-            lander_seek_speed: 2,
-            lander_fire_period_steps: 60,
-            lander_mode: LanderBehaviorMode::ChasePlayer,
-            ..ActorBehaviorProfile::default()
-        };
-        Self::new(
-            "actor-default-progression",
-            vec![
-                ActorWaveProfile::new(
-                    1,
-                    ActorBehaviorScript::default(),
-                    DEFAULT_WAVE_ONE_LANDERS.to_vec(),
-                ),
-                ActorWaveProfile::new(
-                    2,
-                    ActorBehaviorScript::default()
-                        .with_kind_behavior(ActorKind::Lander, wave_two_lander),
-                    DEFAULT_WAVE_TWO_LANDERS.to_vec(),
-                ),
-                ActorWaveProfile::new(
-                    3,
-                    ActorBehaviorScript::default()
-                        .with_kind_behavior(ActorKind::Lander, wave_three_lander),
-                    DEFAULT_WAVE_THREE_LANDERS.to_vec(),
-                ),
-            ],
+        let waves = (1..=ACTOR_SOURCE_BACKED_WAVES)
+            .map(Self::source_backed_profile)
+            .collect::<Vec<_>>();
+        Self::new("actor-source-wave-table", waves)
+    }
+
+    fn source_backed_profile(wave: u16) -> ActorWaveProfile {
+        let source = ActorSourceWaveProfile::for_wave(wave);
+        ActorWaveProfile::new(
+            wave,
+            ActorBehaviorScript::default()
+                .with_kind_behavior(ActorKind::Lander, source.lander_behavior()),
+            source.lander_spawns(),
         )
     }
 
@@ -1654,14 +1738,14 @@ impl ActorGameDriver {
                 GameCommand::StartOnePlayer => {
                     if self.phase == Phase::Attract && self.credits > 0 {
                         self.credits = self.credits.saturating_sub(1);
-                        self.start_play(1);
+                        self.start_play();
                         sounds.push(SoundCue::Start);
                     }
                 }
                 GameCommand::StartTwoPlayer => {
                     if self.phase == Phase::Attract && self.credits > 1 {
                         self.credits = self.credits.saturating_sub(2);
-                        self.start_play(2);
+                        self.start_play();
                         sounds.push(SoundCue::Start);
                     }
                 }
@@ -1730,7 +1814,7 @@ impl ActorGameDriver {
         sounds
     }
 
-    fn start_play(&mut self, players: u8) {
+    fn start_play(&mut self) {
         self.phase = Phase::Playing;
         self.wave = 1;
         self.score = 0;
@@ -1738,9 +1822,6 @@ impl ActorGameDriver {
         self.apply_wave_profile();
         self.spawn_player();
         self.spawn_wave_hostiles();
-        if players > 1 {
-            self.spawn_lander(Point::new(198, 48));
-        }
         self.spawn_initial_humans();
     }
 
@@ -2661,7 +2742,7 @@ mod tests {
         let settled = driver.step(GameInput::NONE);
         assert_eq!(settled.phase, Phase::Playing);
         assert_eq!(driver.snapshot_count(ActorKind::Player), 1);
-        assert_eq!(driver.snapshot_count(ActorKind::Lander), 2);
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 5);
         assert_eq!(driver.snapshot_count(ActorKind::Human), 10);
     }
 
@@ -2934,11 +3015,40 @@ mod tests {
             ..GameInput::NONE
         });
 
-        assert_eq!(report.score, LANDER_SCORE * 2);
+        assert_eq!(report.score, LANDER_SCORE * 5);
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
         assert_eq!(driver.snapshot_count(ActorKind::Human), 10);
         assert!(report.sounds.contains(&SoundCue::SmartBomb));
         assert!(report.sounds.contains(&SoundCue::Explosion));
+    }
+
+    #[test]
+    fn default_wave_script_uses_source_wave_table_values() {
+        let script = ActorWaveScript::default_progression();
+        assert_eq!(script.name(), "actor-source-wave-table");
+
+        let first = script.profile_for_wave(1);
+        let first_lander = first
+            .behavior_script
+            .behavior_for(ActorId::new(1), ActorKind::Lander);
+        assert_eq!(first.lander_spawns.len(), 5);
+        assert_eq!(first_lander.lander_seek_speed, 2);
+        assert_eq!(first_lander.lander_fire_period_steps, 64);
+
+        let second = script.profile_for_wave(2);
+        let second_lander = second
+            .behavior_script
+            .behavior_for(ActorId::new(1), ActorKind::Lander);
+        assert_eq!(second.lander_spawns.len(), 5);
+        assert_eq!(second_lander.lander_seek_speed, 2);
+        assert_eq!(second_lander.lander_fire_period_steps, 48);
+
+        let fifth = script.profile_for_wave(5);
+        let fifth_lander = fifth
+            .behavior_script
+            .behavior_for(ActorId::new(1), ActorKind::Lander);
+        assert_eq!(fifth_lander.lander_seek_speed, 3);
+        assert_eq!(fifth_lander.lander_fire_period_steps, 30);
     }
 
     #[test]

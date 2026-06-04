@@ -696,9 +696,12 @@ reintroduce legacy implementation terminology.
   seeking versus player chasing without rewriting actor structs.
   `ActorWaveScript` names a driver-owned progression script whose wave profiles
   apply behavior scripts and hostile spawn positions when play starts and when
-  hostile snapshots are cleared. `XYZZY` invincibility is represented as the
-  same temporary player behavior override. The slice now also models initial
-  humans, lander
+  hostile snapshots are cleared. The default actor wave progression reads
+  `assets/red-label/wave-table.tsv` for active wave size, lander movement
+  speed, and lander fire cadence while deterministic actor spawn slots remain
+  a known replacement target. `XYZZY` invincibility is represented as the same
+  temporary player behavior override. The slice now also models initial humans,
+  lander
   pickup/carry/conversion, falling-human rescue and safe landing scoring, score
   popups, smart-bomb hostile clearing, and mutant spawn handoff, but it has not
   replaced the live `Game` runtime yet.

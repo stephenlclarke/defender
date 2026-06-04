@@ -104,11 +104,12 @@ wave. The driver applies wave `1` when play starts, carries the wave number in
 `StepPrompt` and `StepReport`, and advances to the next configured profile when
 the current hostile snapshots are cleared.
 
-The default actor progression is provisional structure, not a final red-label
-table. It keeps wave `1` at baseline behavior, makes wave `2` faster, and uses
-the scripted chase-player lander mode from wave `3` onward. Future fidelity
-slices should replace those profile values and spawn positions with MAME-backed
-wave table data.
+The default actor progression reads `assets/red-label/wave-table.tsv` through
+an actor-owned adapter. The current actor mapping uses source-backed
+`wave_size`, `lander_x_velocity`, and `lander_shot_time` to set active lander
+count, lander movement speed, and lander fire cadence. Spawn positions still
+use deterministic actor slots until a later slice ports the source restore
+positions.
 
 ## Attract Graphics
 
@@ -157,6 +158,5 @@ The actor driver now owns a first Defender gameplay loop:
   driver-owned data.
 
 These mechanics are still intentionally compact. The next fidelity slices
-should replace the baseline behavior profiles with MAME-backed tables and bind
-the draw/sound descriptions to the source sprite and Williams sound-board
-assets.
+should port the source restore positions and bind the draw/sound descriptions
+to the source sprite and Williams sound-board assets.
