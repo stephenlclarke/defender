@@ -12,6 +12,7 @@ use std::{
 };
 
 const PLAYER_SPEED: i16 = 2;
+const PLAYER_LASER_COOLDOWN_STEPS: u8 = 8;
 const PLAYER_BOUNDS: Rect = Rect::new(0, 18, 255, 220);
 const LASER_SPEED: i16 = 8;
 const LASER_LIFETIME: u16 = 34;
@@ -25,11 +26,16 @@ const DEFENDER_WORDMARK_SLOTS: u16 = 15;
 const DEFENDER_WORDMARK_ROW_PAIRS: u16 = 6;
 const HUMAN_GROUND_Y: i16 = 214;
 const HUMAN_FALL_ACCELERATION: i16 = 1;
+const HUMAN_MAX_FALL_SPEED: i16 = 8;
 const HUMAN_SAFE_LANDING_SPEED: i16 = 3;
+const HUMAN_CARRIED_OFFSET_Y: i16 = 8;
+const LANDER_SEEK_SPEED: i16 = 1;
+const LANDER_DRIFT_SPEED: i16 = 1;
 const LANDER_CARRY_SPEED: i16 = 2;
 const LANDER_PICKUP_RADIUS_X: i16 = 6;
 const LANDER_PICKUP_RADIUS_Y: i16 = 8;
 const LANDER_CONVERSION_Y: i16 = 24;
+const MUTANT_SEEK_SPEED: i16 = 1;
 const LANDER_SCORE: u32 = 150;
 const MUTANT_SCORE: u32 = 150;
 const HUMAN_RESCUE_SCORE: u32 = 500;
@@ -560,7 +566,7 @@ pub enum Phase {
     HighScoreEntry,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ActorKind {
     AttractDirector,
     AttractScript,
@@ -574,6 +580,155 @@ pub enum ActorKind {
     Explosion,
     ScorePopup,
     Text,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorBehaviorProfile {
+    pub player_speed: i16,
+    pub player_laser_cooldown_steps: u8,
+    pub player_takes_enemy_collision_damage: bool,
+    pub laser_speed: i16,
+    pub laser_lifetime_steps: u16,
+    pub lander_seek_speed: i16,
+    pub lander_drift_speed: i16,
+    pub lander_carry_speed: i16,
+    pub lander_pickup_radius_x: i16,
+    pub lander_pickup_radius_y: i16,
+    pub lander_conversion_y: i16,
+    pub lander_fire_period_steps: u64,
+    pub mutant_seek_speed: i16,
+    pub human_ground_y: i16,
+    pub human_fall_acceleration: i16,
+    pub human_max_fall_speed: i16,
+    pub human_safe_landing_speed: i16,
+    pub human_carried_offset_y: i16,
+    pub explosion_lifetime_steps: u16,
+    pub score_popup_lifetime_steps: u16,
+}
+
+impl ActorBehaviorProfile {
+    pub const DEFAULT: Self = Self {
+        player_speed: PLAYER_SPEED,
+        player_laser_cooldown_steps: PLAYER_LASER_COOLDOWN_STEPS,
+        player_takes_enemy_collision_damage: true,
+        laser_speed: LASER_SPEED,
+        laser_lifetime_steps: LASER_LIFETIME,
+        lander_seek_speed: LANDER_SEEK_SPEED,
+        lander_drift_speed: LANDER_DRIFT_SPEED,
+        lander_carry_speed: LANDER_CARRY_SPEED,
+        lander_pickup_radius_x: LANDER_PICKUP_RADIUS_X,
+        lander_pickup_radius_y: LANDER_PICKUP_RADIUS_Y,
+        lander_conversion_y: LANDER_CONVERSION_Y,
+        lander_fire_period_steps: LANDER_FIRE_PERIOD,
+        mutant_seek_speed: MUTANT_SEEK_SPEED,
+        human_ground_y: HUMAN_GROUND_Y,
+        human_fall_acceleration: HUMAN_FALL_ACCELERATION,
+        human_max_fall_speed: HUMAN_MAX_FALL_SPEED,
+        human_safe_landing_speed: HUMAN_SAFE_LANDING_SPEED,
+        human_carried_offset_y: HUMAN_CARRIED_OFFSET_Y,
+        explosion_lifetime_steps: EXPLOSION_LIFETIME,
+        score_popup_lifetime_steps: SCORE_POPUP_LIFETIME,
+    };
+
+    pub const fn arcade_default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl Default for ActorBehaviorProfile {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorBehaviorScript {
+    default_profile: ActorBehaviorProfile,
+    kind_profiles: BTreeMap<ActorKind, ActorBehaviorProfile>,
+    actor_profiles: BTreeMap<ActorId, ActorBehaviorProfile>,
+}
+
+impl ActorBehaviorScript {
+    pub fn new(default_profile: ActorBehaviorProfile) -> Self {
+        Self {
+            default_profile,
+            kind_profiles: BTreeMap::new(),
+            actor_profiles: BTreeMap::new(),
+        }
+    }
+
+    pub fn default_profile(&self) -> ActorBehaviorProfile {
+        self.default_profile
+    }
+
+    pub fn set_default_profile(&mut self, profile: ActorBehaviorProfile) {
+        self.default_profile = profile;
+    }
+
+    pub fn set_kind_behavior(&mut self, kind: ActorKind, profile: ActorBehaviorProfile) {
+        self.kind_profiles.insert(kind, profile);
+    }
+
+    pub fn set_actor_behavior(&mut self, actor: ActorId, profile: ActorBehaviorProfile) {
+        self.actor_profiles.insert(actor, profile);
+    }
+
+    pub fn remove_actor_behavior(&mut self, actor: ActorId) {
+        self.actor_profiles.remove(&actor);
+    }
+
+    pub fn with_kind_behavior(mut self, kind: ActorKind, profile: ActorBehaviorProfile) -> Self {
+        self.set_kind_behavior(kind, profile);
+        self
+    }
+
+    pub fn with_actor_behavior(mut self, actor: ActorId, profile: ActorBehaviorProfile) -> Self {
+        self.set_actor_behavior(actor, profile);
+        self
+    }
+
+    pub fn behavior_for(&self, actor: ActorId, kind: ActorKind) -> ActorBehaviorProfile {
+        self.actor_profiles
+            .get(&actor)
+            .copied()
+            .or_else(|| self.kind_profiles.get(&kind).copied())
+            .unwrap_or(self.default_profile)
+    }
+
+    fn with_input_overrides(
+        &self,
+        input: GameInput,
+        snapshots: impl Iterator<Item = ActorSnapshot>,
+    ) -> Self {
+        let mut script = self.clone();
+        if input.xyzzy.invincible {
+            let mut player_kind_behavior = script.behavior_for(ActorId::new(0), ActorKind::Player);
+            player_kind_behavior.player_takes_enemy_collision_damage = false;
+            script.set_kind_behavior(ActorKind::Player, player_kind_behavior);
+
+            let actor_ids = script.actor_profiles.keys().copied().collect::<Vec<_>>();
+            for actor in actor_ids {
+                let mut behavior = script.behavior_for(actor, ActorKind::Player);
+                behavior.player_takes_enemy_collision_damage = false;
+                script.set_actor_behavior(actor, behavior);
+            }
+
+            for snapshot in
+                snapshots.filter(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive)
+            {
+                let mut behavior = script.behavior_for(snapshot.id, ActorKind::Player);
+                behavior.player_takes_enemy_collision_damage = false;
+                script.set_actor_behavior(snapshot.id, behavior);
+            }
+        }
+        script
+    }
+}
+
+impl Default for ActorBehaviorScript {
+    fn default() -> Self {
+        Self::new(ActorBehaviorProfile::DEFAULT)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -966,9 +1121,14 @@ pub struct StepPrompt {
     pub score: u32,
     pub credits: u8,
     pub snapshots: Vec<ActorSnapshot>,
+    pub behavior_script: ActorBehaviorScript,
 }
 
 impl StepPrompt {
+    pub fn behavior_for(&self, actor: ActorId, kind: ActorKind) -> ActorBehaviorProfile {
+        self.behavior_script.behavior_for(actor, kind)
+    }
+
     pub fn player_position(&self) -> Option<Point> {
         self.snapshots
             .iter()
@@ -1082,6 +1242,7 @@ pub struct ActorGameDriver {
     actors: BTreeMap<ActorId, ThreadedAsset>,
     snapshots: BTreeMap<ActorId, ActorSnapshot>,
     high_scores: HighScoreTable,
+    behavior_script: ActorBehaviorScript,
 }
 
 impl ActorGameDriver {
@@ -1090,6 +1251,13 @@ impl ActorGameDriver {
     }
 
     pub fn with_attract_script(attract_script: AttractScript) -> Self {
+        Self::with_scripts(attract_script, ActorBehaviorScript::default())
+    }
+
+    pub fn with_scripts(
+        attract_script: AttractScript,
+        behavior_script: ActorBehaviorScript,
+    ) -> Self {
         let mut driver = Self {
             step: 0,
             phase: Phase::Attract,
@@ -1100,6 +1268,7 @@ impl ActorGameDriver {
             actors: BTreeMap::new(),
             snapshots: BTreeMap::new(),
             high_scores: HighScoreTable::default(),
+            behavior_script,
         };
         let attract_id = driver.allocate_actor_id();
         let script_id = driver.allocate_actor_id();
@@ -1110,6 +1279,9 @@ impl ActorGameDriver {
 
     pub fn step(&mut self, input: GameInput) -> StepReport {
         self.step = self.step.saturating_add(1);
+        let behavior_script = self
+            .behavior_script
+            .with_input_overrides(input, self.snapshots.values().cloned());
         let base_prompt = StepPrompt {
             step: self.step,
             phase: self.phase,
@@ -1117,6 +1289,7 @@ impl ActorGameDriver {
             score: self.score,
             credits: self.credits,
             snapshots: self.snapshots.values().cloned().collect(),
+            behavior_script: behavior_script.clone(),
         };
 
         let mut replies = Vec::new();
@@ -1141,7 +1314,7 @@ impl ActorGameDriver {
             commands.extend(reply.commands);
         }
 
-        self.resolve_collisions(input, &mut commands);
+        self.resolve_collisions(&behavior_script, &mut commands);
         let sounds = self.apply_commands(&commands);
         self.remove_dead_actors(&dead_actor_ids);
 
@@ -1164,6 +1337,26 @@ impl ActorGameDriver {
 
     pub fn actor_count(&self) -> usize {
         self.actors.len()
+    }
+
+    pub fn behavior_script(&self) -> &ActorBehaviorScript {
+        &self.behavior_script
+    }
+
+    pub fn behavior_script_mut(&mut self) -> &mut ActorBehaviorScript {
+        &mut self.behavior_script
+    }
+
+    pub fn set_default_behavior(&mut self, profile: ActorBehaviorProfile) {
+        self.behavior_script.set_default_profile(profile);
+    }
+
+    pub fn set_kind_behavior(&mut self, kind: ActorKind, profile: ActorBehaviorProfile) {
+        self.behavior_script.set_kind_behavior(kind, profile);
+    }
+
+    pub fn set_actor_behavior(&mut self, actor: ActorId, profile: ActorBehaviorProfile) {
+        self.behavior_script.set_actor_behavior(actor, profile);
     }
 
     pub fn snapshot_count(&self, kind: ActorKind) -> usize {
@@ -1242,7 +1435,11 @@ impl ActorGameDriver {
         id
     }
 
-    fn resolve_collisions(&self, input: GameInput, commands: &mut Vec<GameCommand>) {
+    fn resolve_collisions(
+        &self,
+        behavior_script: &ActorBehaviorScript,
+        commands: &mut Vec<GameCommand>,
+    ) {
         if self.phase != Phase::Playing {
             return;
         }
@@ -1273,7 +1470,8 @@ impl ActorGameDriver {
         let Some(player) = bodies.iter().find(|body| body.kind == ActorKind::Player) else {
             return;
         };
-        if input.xyzzy.invincible {
+        let player_behavior = behavior_script.behavior_for(player.owner, ActorKind::Player);
+        if !player_behavior.player_takes_enemy_collision_damage {
             return;
         }
         for enemy in bodies.iter().filter(|body| is_hostile(body.kind)) {
@@ -1352,6 +1550,7 @@ impl ActorGameDriver {
                 GameCommand::Destroy(id) => {
                     self.snapshots.remove(&id);
                     self.actors.remove(&id);
+                    self.behavior_script.remove_actor_behavior(id);
                 }
                 GameCommand::AttachHuman {
                     lander,
@@ -1368,6 +1567,7 @@ impl ActorGameDriver {
                 GameCommand::HumanLost(id) => {
                     self.snapshots.remove(&id);
                     self.actors.remove(&id);
+                    self.behavior_script.remove_actor_behavior(id);
                 }
                 GameCommand::AddScore(points) => {
                     self.score = self.score.saturating_add(points);
@@ -1404,6 +1604,7 @@ impl ActorGameDriver {
         for (id, kind, position) in targets {
             self.snapshots.remove(&id);
             self.actors.remove(&id);
+            self.behavior_script.remove_actor_behavior(id);
             self.spawn_explosion(position);
             self.score = self.score.saturating_add(score_for_hostile(kind));
             sounds.push(SoundCue::Explosion);
@@ -1414,6 +1615,7 @@ impl ActorGameDriver {
         for id in dead_actor_ids {
             self.snapshots.remove(id);
             self.actors.remove(id);
+            self.behavior_script.remove_actor_behavior(*id);
         }
     }
 }
@@ -1604,15 +1806,16 @@ impl AssetActor for PlayerShip {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
+            let behavior = prompt.behavior_for(self.id, ActorKind::Player);
             let mut velocity = Velocity::default();
             if prompt.input.altitude_up {
-                velocity.dy -= PLAYER_SPEED;
+                velocity.dy -= behavior.player_speed;
             }
             if prompt.input.altitude_down {
-                velocity.dy += PLAYER_SPEED;
+                velocity.dy += behavior.player_speed;
             }
             if prompt.input.thrust {
-                velocity.dx += self.direction.sign() * PLAYER_SPEED;
+                velocity.dx += self.direction.sign() * behavior.player_speed;
                 commands.push(GameCommand::PlaySound(SoundCue::Thrust));
             }
             if prompt.input.reverse {
@@ -1624,7 +1827,7 @@ impl AssetActor for PlayerShip {
             self.position = PLAYER_BOUNDS.clamp_point(self.position.offset(velocity));
             self.laser_cooldown = self.laser_cooldown.saturating_sub(1);
             if prompt.input.wants_fire() && self.laser_cooldown == 0 {
-                self.laser_cooldown = 8;
+                self.laser_cooldown = behavior.player_laser_cooldown_steps;
                 let muzzle = self
                     .position
                     .offset(Velocity::new(self.direction.sign() * 12, 0));
@@ -1704,16 +1907,18 @@ impl AssetActor for Lander {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
+            let behavior = prompt.behavior_for(self.id, ActorKind::Lander);
             match self.mode {
-                LanderMode::Seeking => self.update_seeking(prompt, &mut commands),
+                LanderMode::Seeking => self.update_seeking(prompt, behavior, &mut commands),
                 LanderMode::Carrying {
                     human_id,
                     pull_sound_sent,
                 } => {
-                    self.update_carrying(human_id, pull_sound_sent, &mut commands);
+                    self.update_carrying(human_id, pull_sound_sent, behavior, &mut commands);
                 }
             }
-            if prompt.step % LANDER_FIRE_PERIOD == self.id.value() % LANDER_FIRE_PERIOD {
+            let fire_period = behavior.lander_fire_period_steps.max(1);
+            if prompt.step % fire_period == self.id.value() % fire_period {
                 commands.push(GameCommand::PlaySound(SoundCue::Laser));
             }
             draws.push(DrawCommand::sprite(
@@ -1738,9 +1943,14 @@ impl AssetActor for Lander {
 }
 
 impl Lander {
-    fn update_seeking(&mut self, prompt: &StepPrompt, commands: &mut Vec<GameCommand>) {
+    fn update_seeking(
+        &mut self,
+        prompt: &StepPrompt,
+        behavior: ActorBehaviorProfile,
+        commands: &mut Vec<GameCommand>,
+    ) {
         if let Some(target) = prompt.nearest_human(self.position) {
-            if pickup_distance(self.position, target.position) {
+            if pickup_distance(self.position, target.position, behavior) {
                 self.mode = LanderMode::Carrying {
                     human_id: target.id,
                     pull_sound_sent: false,
@@ -1753,23 +1963,28 @@ impl Lander {
                 commands.push(GameCommand::PlaySound(SoundCue::LanderPickup));
                 return;
             }
-            self.position = step_toward(self.position, target.position, 1);
+            self.position = step_toward(self.position, target.position, behavior.lander_seek_speed);
             return;
         }
 
         if let Some(player) = prompt.player_position() {
             self.drift = if player.x < self.position.x { -1 } else { 1 };
         }
-        self.position = self.position.offset(Velocity::new(self.drift, 0));
+        self.position = self
+            .position
+            .offset(Velocity::new(self.drift * behavior.lander_drift_speed, 0));
     }
 
     fn update_carrying(
         &mut self,
         human_id: ActorId,
         pull_sound_sent: bool,
+        behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) {
-        self.position = self.position.offset(Velocity::new(0, -LANDER_CARRY_SPEED));
+        self.position = self
+            .position
+            .offset(Velocity::new(0, -behavior.lander_carry_speed));
         if !pull_sound_sent {
             self.mode = LanderMode::Carrying {
                 human_id,
@@ -1777,7 +1992,7 @@ impl Lander {
             };
             commands.push(GameCommand::PlaySound(SoundCue::HumanPulled));
         }
-        if self.position.y <= LANDER_CONVERSION_Y {
+        if self.position.y <= behavior.lander_conversion_y {
             commands.push(GameCommand::Destroy(self.id));
             commands.push(GameCommand::Destroy(human_id));
             commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
@@ -1788,9 +2003,9 @@ impl Lander {
     }
 }
 
-fn pickup_distance(lander: Point, human: Point) -> bool {
-    (lander.x - human.x).abs() <= LANDER_PICKUP_RADIUS_X
-        && (lander.y - human.y).abs() <= LANDER_PICKUP_RADIUS_Y
+fn pickup_distance(lander: Point, human: Point, behavior: ActorBehaviorProfile) -> bool {
+    (lander.x - human.x).abs() <= behavior.lander_pickup_radius_x
+        && (lander.y - human.y).abs() <= behavior.lander_pickup_radius_y
 }
 
 fn step_toward(position: Point, target: Point, speed: i16) -> Point {
@@ -1801,6 +2016,7 @@ fn step_toward(position: Point, target: Point, speed: i16) -> Point {
 }
 
 fn axis_step(delta: i16, speed: i16) -> i16 {
+    let speed = speed.max(0);
     if delta == 0 {
         0
     } else if delta > 0 {
@@ -1834,8 +2050,9 @@ impl AssetActor for Mutant {
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
+            let behavior = prompt.behavior_for(self.id, ActorKind::Mutant);
             if let Some(player) = prompt.player_position() {
-                self.position = step_toward(self.position, player, 1);
+                self.position = step_toward(self.position, player, behavior.mutant_seek_speed);
             }
             draws.push(DrawCommand::sprite(
                 self.id,
@@ -1881,9 +2098,15 @@ impl Human {
         Rect::from_center(self.position, 4, 8)
     }
 
-    fn update_falling(&mut self, velocity: i16, prompt: &StepPrompt) -> Vec<GameCommand> {
+    fn update_falling(
+        &mut self,
+        velocity: i16,
+        prompt: &StepPrompt,
+        behavior: ActorBehaviorProfile,
+    ) -> Vec<GameCommand> {
         let mut commands = Vec::new();
-        let next_velocity = (velocity + HUMAN_FALL_ACCELERATION).min(8);
+        let next_velocity =
+            (velocity + behavior.human_fall_acceleration).min(behavior.human_max_fall_speed);
         self.position = self.position.offset(Velocity::new(0, next_velocity));
 
         if prompt.snapshots.iter().any(|snapshot| {
@@ -1899,9 +2122,9 @@ impl Human {
             return commands;
         }
 
-        if self.position.y >= HUMAN_GROUND_Y {
-            self.position.y = HUMAN_GROUND_Y;
-            if next_velocity <= HUMAN_SAFE_LANDING_SPEED {
+        if self.position.y >= behavior.human_ground_y {
+            self.position.y = behavior.human_ground_y;
+            if next_velocity <= behavior.human_safe_landing_speed {
                 self.mode = HumanMode::Grounded;
                 if !self.safe_landing_awarded {
                     self.safe_landing_awarded = true;
@@ -1929,10 +2152,17 @@ impl Human {
         commands
     }
 
-    fn update_carried(&mut self, carrier: ActorId, prompt: &StepPrompt) -> Vec<GameCommand> {
+    fn update_carried(
+        &mut self,
+        carrier: ActorId,
+        prompt: &StepPrompt,
+        behavior: ActorBehaviorProfile,
+    ) -> Vec<GameCommand> {
         let mut commands = Vec::new();
         if let Some(carrier_snapshot) = prompt.snapshot(carrier) {
-            self.position = carrier_snapshot.position.offset(Velocity::new(0, 8));
+            self.position = carrier_snapshot
+                .position
+                .offset(Velocity::new(0, behavior.human_carried_offset_y));
         } else {
             self.mode = HumanMode::Falling { velocity: 0 };
             commands.push(GameCommand::PlaySound(SoundCue::HumanReleased));
@@ -1950,10 +2180,11 @@ impl AssetActor for Human {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
+            let behavior = prompt.behavior_for(self.id, ActorKind::Human);
             commands.extend(match self.mode {
                 HumanMode::Grounded => Vec::new(),
-                HumanMode::Falling { velocity } => self.update_falling(velocity, prompt),
-                HumanMode::CarriedBy(carrier) => self.update_carried(carrier, prompt),
+                HumanMode::Falling { velocity } => self.update_falling(velocity, prompt, behavior),
+                HumanMode::CarriedBy(carrier) => self.update_carried(carrier, prompt, behavior),
             });
             draws.push(DrawCommand::sprite(
                 self.id,
@@ -1995,7 +2226,7 @@ struct ScorePopup {
     id: ActorId,
     position: Point,
     points: u32,
-    remaining: u16,
+    age: u16,
 }
 
 impl ScorePopup {
@@ -2004,7 +2235,7 @@ impl ScorePopup {
             id,
             position,
             points,
-            remaining: SCORE_POPUP_LIFETIME,
+            age: 0,
         }
     }
 }
@@ -2014,19 +2245,20 @@ impl AssetActor for ScorePopup {
         self.id
     }
 
-    fn update(&mut self, _prompt: &StepPrompt) -> ActorReply {
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
-        if self.remaining > 0 {
+        let behavior = prompt.behavior_for(self.id, ActorKind::ScorePopup);
+        if self.age < behavior.score_popup_lifetime_steps {
             let sprite = match self.points {
                 HUMAN_RESCUE_SCORE => SpriteKey::Score500,
                 HUMAN_SAFE_LANDING_SCORE => SpriteKey::Score250,
                 _ => SpriteKey::Text,
             };
             draws.push(DrawCommand::sprite(self.id, sprite, self.position));
-            self.remaining = self.remaining.saturating_sub(1);
+            self.age = self.age.saturating_add(1);
         }
-        if self.remaining == 0 {
+        if self.age >= behavior.score_popup_lifetime_steps {
             commands.push(GameCommand::Destroy(self.id));
         }
 
@@ -2037,7 +2269,7 @@ impl AssetActor for ScorePopup {
                 kind: ActorKind::ScorePopup,
                 position: self.position,
                 bounds: None,
-                alive: self.remaining > 0,
+                alive: self.age < behavior.score_popup_lifetime_steps,
             },
             commands,
             draws,
@@ -2049,8 +2281,8 @@ impl AssetActor for ScorePopup {
 struct LaserShot {
     id: ActorId,
     position: Point,
-    velocity: Velocity,
-    remaining: u16,
+    direction: Direction,
+    age: u16,
 }
 
 impl LaserShot {
@@ -2058,8 +2290,8 @@ impl LaserShot {
         Self {
             id,
             position,
-            velocity: Velocity::new(direction.sign() * LASER_SPEED, 0),
-            remaining: LASER_LIFETIME,
+            direction,
+            age: 0,
         }
     }
 
@@ -2076,16 +2308,21 @@ impl AssetActor for LaserShot {
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
-        if prompt.phase == Phase::Playing && self.remaining > 0 {
-            self.position = self.position.offset(self.velocity);
-            self.remaining = self.remaining.saturating_sub(1);
+        let behavior = prompt.behavior_for(self.id, ActorKind::Laser);
+        if prompt.phase == Phase::Playing && self.age < behavior.laser_lifetime_steps {
+            self.position = self.position.offset(Velocity::new(
+                self.direction.sign() * behavior.laser_speed,
+                0,
+            ));
+            self.age = self.age.saturating_add(1);
             draws.push(DrawCommand::sprite(
                 self.id,
                 SpriteKey::Laser,
                 self.position,
             ));
         }
-        if self.remaining == 0 || self.position.x < 0 || self.position.x > 255 {
+        if self.age >= behavior.laser_lifetime_steps || self.position.x < 0 || self.position.x > 255
+        {
             commands.push(GameCommand::Destroy(self.id));
         }
         ActorReply {
@@ -2095,7 +2332,7 @@ impl AssetActor for LaserShot {
                 kind: ActorKind::Laser,
                 position: self.position,
                 bounds: Some(self.bounds()),
-                alive: self.remaining > 0,
+                alive: self.age < behavior.laser_lifetime_steps,
             },
             commands,
             draws,
@@ -2107,7 +2344,7 @@ impl AssetActor for LaserShot {
 struct Explosion {
     id: ActorId,
     position: Point,
-    remaining: u16,
+    age: u16,
 }
 
 impl Explosion {
@@ -2115,7 +2352,7 @@ impl Explosion {
         Self {
             id,
             position,
-            remaining: EXPLOSION_LIFETIME,
+            age: 0,
         }
     }
 }
@@ -2125,20 +2362,20 @@ impl AssetActor for Explosion {
         self.id
     }
 
-    fn update(&mut self, _prompt: &StepPrompt) -> ActorReply {
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
-        if self.remaining > 0 {
-            let age = EXPLOSION_LIFETIME.saturating_sub(self.remaining);
+        let behavior = prompt.behavior_for(self.id, ActorKind::Explosion);
+        if self.age < behavior.explosion_lifetime_steps {
             draws.push(DrawCommand::sprite_with_effect(
                 self.id,
                 SpriteKey::Explosion,
                 self.position,
-                VisualEffect::ExplosionCloud { age },
+                VisualEffect::ExplosionCloud { age: self.age },
             ));
-            self.remaining = self.remaining.saturating_sub(1);
+            self.age = self.age.saturating_add(1);
         }
-        if self.remaining == 0 {
+        if self.age >= behavior.explosion_lifetime_steps {
             commands.push(GameCommand::Destroy(self.id));
         }
         ActorReply {
@@ -2148,7 +2385,7 @@ impl AssetActor for Explosion {
                 kind: ActorKind::Explosion,
                 position: self.position,
                 bounds: None,
-                alive: self.remaining > 0,
+                alive: self.age < behavior.explosion_lifetime_steps,
             },
             commands,
             draws,
@@ -2472,6 +2709,99 @@ mod tests {
     }
 
     #[test]
+    fn behavior_script_can_define_level_wide_actor_motion() {
+        let lander_behavior = ActorBehaviorProfile {
+            lander_seek_speed: 4,
+            lander_fire_period_steps: u64::MAX,
+            ..ActorBehaviorProfile::default()
+        };
+        let script =
+            ActorBehaviorScript::default().with_kind_behavior(ActorKind::Lander, lander_behavior);
+        let mut driver = ActorGameDriver::with_scripts(AttractScript::default(), script);
+        driver.phase = Phase::Playing;
+        let lander_id = driver.spawn_lander_for_test(Point::new(80, HUMAN_GROUND_Y));
+        driver.spawn_human_for_test(Point::new(100, HUMAN_GROUND_Y));
+
+        let first = driver.step(GameInput::NONE);
+        assert_eq!(snapshot_for(&first, lander_id).position.x, 79);
+
+        let seeking = driver.step(GameInput::NONE);
+        assert_eq!(snapshot_for(&seeking, lander_id).position.x, 83);
+    }
+
+    #[test]
+    fn actor_specific_behavior_override_changes_one_actor() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let fast_lander = driver.spawn_lander_for_test(Point::new(80, 100));
+        let normal_lander = driver.spawn_lander_for_test(Point::new(100, 100));
+        let fast_behavior = ActorBehaviorProfile {
+            lander_drift_speed: 4,
+            lander_fire_period_steps: u64::MAX,
+            ..ActorBehaviorProfile::default()
+        };
+        driver.set_actor_behavior(fast_lander, fast_behavior);
+
+        let report = driver.step(GameInput::NONE);
+
+        assert_eq!(snapshot_for(&report, fast_lander).position.x, 76);
+        assert_eq!(snapshot_for(&report, normal_lander).position.x, 99);
+    }
+
+    #[test]
+    fn script_can_tune_player_and_laser_behavior() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let player = driver.spawn_player();
+        let player_behavior = ActorBehaviorProfile {
+            player_speed: 5,
+            player_laser_cooldown_steps: 1,
+            ..ActorBehaviorProfile::default()
+        };
+        driver.set_actor_behavior(player, player_behavior);
+
+        let moved = driver.step(GameInput {
+            thrust: true,
+            fire: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(snapshot_for(&moved, player).position.x, 47);
+
+        let laser_behavior = ActorBehaviorProfile {
+            laser_speed: 2,
+            laser_lifetime_steps: 4,
+            ..ActorBehaviorProfile::default()
+        };
+        driver.set_kind_behavior(ActorKind::Laser, laser_behavior);
+
+        let laser_step = driver.step(GameInput::NONE);
+        let laser = laser_step
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Laser)
+            .expect("configured laser should stay alive");
+        assert_eq!(laser.position.x, 61);
+    }
+
+    #[test]
+    fn scripted_player_damage_override_matches_xyzzy_invincibility() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_player();
+        driver.spawn_lander_for_test(Point::new(42, 120));
+        let player_behavior = ActorBehaviorProfile {
+            player_takes_enemy_collision_damage: false,
+            ..ActorBehaviorProfile::default()
+        };
+        driver.set_kind_behavior(ActorKind::Player, player_behavior);
+
+        let report = driver.step(GameInput::NONE);
+
+        assert_eq!(report.phase, Phase::Playing);
+        assert_ne!(report.lives, 0);
+    }
+
+    #[test]
     fn lander_picks_up_and_carries_a_grounded_human() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
@@ -2691,5 +3021,13 @@ mod tests {
         });
         driver.step(GameInput::NONE);
         driver
+    }
+
+    fn snapshot_for(report: &StepReport, id: ActorId) -> &ActorSnapshot {
+        report
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.id == id)
+            .expect("actor snapshot should be present")
     }
 }

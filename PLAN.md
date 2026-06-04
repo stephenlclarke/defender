@@ -27,6 +27,9 @@ verification tools.
   The actor API is simulation-step driven through `StepPrompt`/`StepReport`,
   not display-frame driven; attract scripts advance on actor-local elapsed
   steps so custom drivers can own sequencing without MAME frame scripts.
+  Actor movement and behavior are now scriptable through
+  `ActorBehaviorScript`, with default, actor-kind, and actor-id behavior
+  profiles for level difficulty and `XYZZY` damage overrides.
 - Primary runtime source is `src/`; the converted implementation is parked in
   `src_legacy/` and should remain optional oracle/tooling evidence only.
 - Normal live play uses clean `Game` frames through clean platform, audio, and

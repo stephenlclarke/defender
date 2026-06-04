@@ -689,10 +689,15 @@ reintroduce legacy implementation terminology.
   metadata, and Defender wordmark coalescence metadata. The actor slice is
   simulation-step driven rather than display-frame driven: render cadence is
   outside actor behavior, and attract scripts use actor-local elapsed steps.
-  The slice now also models initial humans, lander pickup/carry/conversion,
-  falling-human rescue and safe landing scoring, score popups, smart-bomb
-  hostile clearing, and mutant spawn handoff, but it has not replaced the live
-  `Game` runtime yet.
+  Actor movement and behavior are scriptable through `ActorBehaviorScript`,
+  which resolves default, actor-kind, and actor-id profiles into each prompt;
+  level scripts can tune speeds, fire cadence, pickup/conversion bands,
+  gravity, timed effects, and damage policy without rewriting actor structs.
+  `XYZZY` invincibility is represented as the same temporary player behavior
+  override. The slice now also models initial humans, lander
+  pickup/carry/conversion, falling-human rescue and safe landing scoring, score
+  popups, smart-bomb hostile clearing, and mutant spawn handoff, but it has not
+  replaced the live `Game` runtime yet.
 
 ## Compatibility Features
 

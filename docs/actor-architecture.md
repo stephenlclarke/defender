@@ -65,6 +65,32 @@ elapsed script step and evaluates relative `AttractScriptEvent` durations. It
 does not branch on the global driver step or on protected-reference frame
 numbers.
 
+## Behavior Scripts
+
+Actor movement and behavior are configurable data owned by the driver.
+`ActorBehaviorProfile` holds tunable attributes for player movement and laser
+cooldown, laser speed and lifetime, lander seek/carry/fire behavior, mutant
+pursuit, human fall/landing behavior, and timed effect lifetimes.
+
+`ActorBehaviorScript` resolves those profiles in this order:
+
+- Actor-id profile, for one specific asset instance.
+- Actor-kind profile, for a level-wide group such as all landers.
+- Default profile, for the baseline arcade behavior.
+
+The resolved script is carried in every `StepPrompt`, so each actor still owns
+its state and movement code while the game/world/driver can tune the attributes
+that code uses. `ActorGameDriver::set_default_behavior`,
+`ActorGameDriver::set_kind_behavior`, and `ActorGameDriver::set_actor_behavior`
+are the current script API. A level script can use those calls to make later
+waves faster, shorten laser cooldowns, change human fall gravity, or alter one
+specific actor without changing the actor struct.
+
+`XYZZY` invincibility uses the same mechanism. When invincibility is active,
+the driver applies a temporary player behavior override that disables enemy
+collision damage for that simulation step; collision handling reads that
+profile rather than branching on a separate god-mode flag.
+
 ## Attract Graphics
 
 The attract screen is data-driven. `AttractScript` contains ordered
@@ -109,6 +135,6 @@ The actor driver now owns a first Defender gameplay loop:
   awards enemy scores, and spawns explosions while preserving human actors.
 
 These mechanics are still intentionally compact. The next fidelity slices
-should replace the placeholder motion constants with MAME-backed tables and
-bind the draw/sound descriptions to the source sprite and Williams sound-board
+should replace the baseline behavior profiles with MAME-backed tables and bind
+the draw/sound descriptions to the source sprite and Williams sound-board
 assets.
