@@ -17,6 +17,8 @@ const PLAYER_BOUNDS: Rect = Rect::new(0, 18, 255, 220);
 const LASER_SPEED: i16 = 8;
 const LASER_LIFETIME: u16 = 34;
 const LANDER_FIRE_PERIOD: u64 = 96;
+const LANDER_SHOT_SPEED: i16 = 3;
+const LANDER_SHOT_LIFETIME: u16 = 90;
 const EXPLOSION_LIFETIME: u16 = 20;
 const SCORE_POPUP_LIFETIME: u16 = 50;
 const WILLIAMS_REVEAL_STEPS: u16 = 36;
@@ -711,6 +713,7 @@ pub enum ActorKind {
     Mutant,
     Human,
     Laser,
+    EnemyLaser,
     Explosion,
     ScorePopup,
     Text,
@@ -737,6 +740,8 @@ pub struct ActorBehaviorProfile {
     pub lander_pickup_radius_y: i16,
     pub lander_conversion_y: i16,
     pub lander_fire_period_steps: u64,
+    pub lander_shot_speed: i16,
+    pub lander_shot_lifetime_steps: u16,
     pub lander_mode: LanderBehaviorMode,
     pub mutant_seek_speed: i16,
     pub human_ground_y: i16,
@@ -762,6 +767,8 @@ impl ActorBehaviorProfile {
         lander_pickup_radius_y: LANDER_PICKUP_RADIUS_Y,
         lander_conversion_y: LANDER_CONVERSION_Y,
         lander_fire_period_steps: LANDER_FIRE_PERIOD,
+        lander_shot_speed: LANDER_SHOT_SPEED,
+        lander_shot_lifetime_steps: LANDER_SHOT_LIFETIME,
         lander_mode: LanderBehaviorMode::SeekNearestHuman,
         mutant_seek_speed: MUTANT_SEEK_SPEED,
         human_ground_y: HUMAN_GROUND_Y,
@@ -1211,6 +1218,7 @@ pub enum SpriteKey {
     HumanFalling,
     HumanCarried,
     Laser,
+    EnemyLaser,
     Explosion,
     Score250,
     Score500,
@@ -1547,6 +1555,10 @@ pub enum SpawnRequest {
         position: Point,
         direction: Direction,
         owner: ActorId,
+    },
+    EnemyLaser {
+        position: Point,
+        velocity: Velocity,
     },
     Lander {
         position: Point,
@@ -1946,6 +1958,12 @@ impl ActorGameDriver {
         id
     }
 
+    fn spawn_enemy_laser(&mut self, position: Point, velocity: Velocity) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(EnemyLaserShot::new(id, position, velocity));
+        id
+    }
+
     fn spawn_explosion(&mut self, position: Point) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(Explosion::new(id, position));
@@ -1974,7 +1992,10 @@ impl ActorGameDriver {
             .collect::<Vec<_>>();
         let mut destroyed = BTreeSet::new();
         for laser in bodies.iter().filter(|body| body.kind == ActorKind::Laser) {
-            for enemy in bodies.iter().filter(|body| is_hostile(body.kind)) {
+            for enemy in bodies
+                .iter()
+                .filter(|body| is_player_laser_target(body.kind))
+            {
                 if laser.bounds.intersects(enemy.bounds) {
                     destroyed.insert(laser.owner);
                     destroyed.insert(enemy.owner);
@@ -1997,7 +2018,7 @@ impl ActorGameDriver {
         if !player_behavior.player_takes_enemy_collision_damage {
             return;
         }
-        for enemy in bodies.iter().filter(|body| is_hostile(body.kind)) {
+        for enemy in bodies.iter().filter(|body| is_player_hazard(body.kind)) {
             if destroyed.contains(&enemy.owner) {
                 continue;
             }
@@ -2041,6 +2062,9 @@ impl ActorGameDriver {
                     owner,
                 }) => {
                     self.spawn_laser(position, direction, owner);
+                }
+                GameCommand::Spawn(SpawnRequest::EnemyLaser { position, velocity }) => {
+                    self.spawn_enemy_laser(position, velocity);
                 }
                 GameCommand::Spawn(SpawnRequest::Lander { position }) => {
                     self.spawn_lander(position);
@@ -2171,7 +2195,7 @@ impl ActorGameDriver {
         let targets = self
             .snapshots
             .values()
-            .filter(|snapshot| is_hostile(snapshot.kind))
+            .filter(|snapshot| is_smart_bomb_target(snapshot.kind))
             .map(|snapshot| (snapshot.id, snapshot.kind, snapshot.position))
             .collect::<Vec<_>>();
         for (id, kind, position) in targets {
@@ -2212,6 +2236,27 @@ fn manhattan_distance(left: Point, right: Point) -> i16 {
 
 fn is_hostile(kind: ActorKind) -> bool {
     matches!(kind, ActorKind::Lander | ActorKind::Mutant)
+}
+
+fn is_player_laser_target(kind: ActorKind) -> bool {
+    matches!(
+        kind,
+        ActorKind::Lander | ActorKind::Mutant | ActorKind::EnemyLaser
+    )
+}
+
+fn is_player_hazard(kind: ActorKind) -> bool {
+    matches!(
+        kind,
+        ActorKind::Lander | ActorKind::Mutant | ActorKind::EnemyLaser
+    )
+}
+
+fn is_smart_bomb_target(kind: ActorKind) -> bool {
+    matches!(
+        kind,
+        ActorKind::Lander | ActorKind::Mutant | ActorKind::EnemyLaser
+    )
 }
 
 fn commands_spawn_hostiles(commands: &[GameCommand]) -> bool {
@@ -2654,21 +2699,57 @@ impl Lander {
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) {
+        let mut source_fired = false;
         if let Some(source) = &mut self.source {
             if source.shot_timer > 0 {
                 source.shot_timer = source.shot_timer.saturating_sub(1);
             }
             if source.shot_timer == 0 {
-                commands.push(GameCommand::PlaySound(SoundCue::Laser));
                 source.shot_timer = clamped_source_lander_shot_reset(behavior);
+                source_fired = true;
             }
+        }
+        if source_fired {
+            self.fire_lander_shot(prompt, behavior, commands);
+            return;
+        }
+        if self.source.is_some() {
             return;
         }
 
         let fire_period = behavior.lander_fire_period_steps.max(1);
         if prompt.step % fire_period == self.id.value() % fire_period {
-            commands.push(GameCommand::PlaySound(SoundCue::Laser));
+            self.fire_lander_shot(prompt, behavior, commands);
         }
+    }
+
+    fn fire_lander_shot(
+        &self,
+        prompt: &StepPrompt,
+        behavior: ActorBehaviorProfile,
+        commands: &mut Vec<GameCommand>,
+    ) {
+        commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
+            position: self.position,
+            velocity: self.lander_shot_velocity(prompt, behavior),
+        }));
+        commands.push(GameCommand::PlaySound(SoundCue::Laser));
+    }
+
+    fn lander_shot_velocity(
+        &self,
+        prompt: &StepPrompt,
+        behavior: ActorBehaviorProfile,
+    ) -> Velocity {
+        let speed = behavior.lander_shot_speed.max(1);
+        if let Some(player) = prompt.player_position() {
+            return Velocity::new(
+                axis_step(player.x - self.position.x, speed),
+                axis_step(player.y - self.position.y, speed),
+            );
+        }
+
+        Velocity::new(self.drift.signum() * speed, 0)
     }
 
     fn draw_effect(&self) -> VisualEffect {
@@ -3060,6 +3141,72 @@ impl AssetActor for LaserShot {
                 position: self.position,
                 bounds: Some(self.bounds()),
                 alive: self.age < behavior.laser_lifetime_steps,
+                source_lander: None,
+                source_human: None,
+            },
+            commands,
+            draws,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct EnemyLaserShot {
+    id: ActorId,
+    position: Point,
+    velocity: Velocity,
+    age: u16,
+}
+
+impl EnemyLaserShot {
+    fn new(id: ActorId, position: Point, velocity: Velocity) -> Self {
+        Self {
+            id,
+            position,
+            velocity,
+            age: 0,
+        }
+    }
+
+    fn bounds(&self) -> Rect {
+        Rect::from_center(self.position, 4, 4)
+    }
+}
+
+impl AssetActor for EnemyLaserShot {
+    fn id(&self) -> ActorId {
+        self.id
+    }
+
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
+        let mut commands = Vec::new();
+        let mut draws = Vec::new();
+        let behavior = prompt.behavior_for(self.id, ActorKind::EnemyLaser);
+        if prompt.phase == Phase::Playing && self.age < behavior.lander_shot_lifetime_steps {
+            self.position = self.position.offset(self.velocity);
+            self.age = self.age.saturating_add(1);
+            draws.push(DrawCommand::sprite(
+                self.id,
+                SpriteKey::EnemyLaser,
+                self.position,
+            ));
+        }
+        if self.age >= behavior.lander_shot_lifetime_steps
+            || self.position.x < 0
+            || self.position.x > 255
+            || self.position.y < 0
+            || self.position.y > 255
+        {
+            commands.push(GameCommand::Destroy(self.id));
+        }
+        ActorReply {
+            id: self.id,
+            snapshot: ActorSnapshot {
+                id: self.id,
+                kind: ActorKind::EnemyLaser,
+                position: self.position,
+                bounds: Some(self.bounds()),
+                alive: self.age < behavior.lander_shot_lifetime_steps,
                 source_lander: None,
                 source_human: None,
             },
@@ -3624,6 +3771,95 @@ mod tests {
         }
 
         assert_eq!(first_laser_step, Some(39));
+    }
+
+    #[test]
+    fn source_lander_shot_timer_spawns_hostile_projectile() {
+        let mut driver = ActorGameDriver::new();
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+
+        let mut shot_report = None;
+        for _ in 1..=50 {
+            let report = driver.step(GameInput {
+                xyzzy: XyzzyMode {
+                    active: true,
+                    invincible: true,
+                    ..XyzzyMode::INACTIVE
+                },
+                ..GameInput::NONE
+            });
+            if report.commands.iter().any(|command| {
+                matches!(command, GameCommand::Spawn(SpawnRequest::EnemyLaser { .. }))
+            }) {
+                shot_report = Some(report);
+                break;
+            }
+        }
+        let shot_report = shot_report.expect("source lander should spawn a hostile shot");
+
+        assert!(shot_report.sounds.contains(&SoundCue::Laser));
+        let settled = driver.step(GameInput {
+            xyzzy: XyzzyMode {
+                active: true,
+                invincible: true,
+                ..XyzzyMode::INACTIVE
+            },
+            ..GameInput::NONE
+        });
+        assert!(
+            settled
+                .snapshots
+                .iter()
+                .any(|snapshot| snapshot.kind == ActorKind::EnemyLaser)
+        );
+        assert!(
+            settled
+                .draws
+                .iter()
+                .any(|draw| draw.sprite == SpriteKey::EnemyLaser)
+        );
+    }
+
+    #[test]
+    fn enemy_laser_collision_enters_game_over() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_player();
+        driver.spawn_enemy_laser(Point::new(42, 120), Velocity::new(0, 0));
+
+        let report = driver.step(GameInput::NONE);
+
+        assert_eq!(report.phase, Phase::GameOver);
+        assert_eq!(report.lives, 0);
+        assert!(report.sounds.contains(&SoundCue::Explosion));
+        assert!(report.sounds.contains(&SoundCue::GameOver));
+    }
+
+    #[test]
+    fn xyzzy_invincibility_keeps_player_alive_on_enemy_laser_contact() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_player();
+        driver.spawn_enemy_laser(Point::new(42, 120), Velocity::new(0, 0));
+
+        let report = driver.step(GameInput {
+            xyzzy: XyzzyMode {
+                active: true,
+                invincible: true,
+                ..XyzzyMode::INACTIVE
+            },
+            ..GameInput::NONE
+        });
+
+        assert_eq!(report.phase, Phase::Playing);
+        assert_ne!(report.lives, 0);
     }
 
     #[test]

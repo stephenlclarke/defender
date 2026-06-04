@@ -706,8 +706,9 @@ reintroduce legacy implementation terminology.
   also models source first-wave human restore metadata with target-list slots,
   source landers preferring their configured human target slot, lander
   pickup/carry/conversion, falling-human rescue and safe landing scoring, score
-  popups, smart-bomb hostile clearing, and mutant spawn handoff, but it has not
-  replaced the live `Game` runtime yet.
+  popups, hostile projectile actors for lander shots, smart-bomb hostile
+  clearing, and mutant spawn handoff, but it has not replaced the live `Game`
+  runtime yet.
 
 ## Compatibility Features
 

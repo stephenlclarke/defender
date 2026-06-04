@@ -154,6 +154,9 @@ The actor driver now owns a first Defender gameplay loop:
   carried human reaches the upper conversion band. Source-backed landers prefer
   their configured target-human slot before falling back to nearest-human
   seeking.
+- Lander shot timers emit both the laser sound cue and an `EnemyLaser` actor.
+  Enemy lasers are player hazards, smart-bomb targets with no score value, and
+  respect the same player damage behavior profile used by `XYZZY` invincibility.
 - Carried humans follow their lander. If the carrier disappears, the human
   falls under a simple acceleration model and emits the release sound cue.
 - Falling humans caught by the player award 500 points, emit the rescue sound
