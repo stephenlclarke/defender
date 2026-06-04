@@ -693,9 +693,12 @@ reintroduce legacy implementation terminology.
   which resolves default, actor-kind, and actor-id profiles into each prompt;
   level scripts can tune speeds, fire cadence, pickup/conversion bands,
   gravity, timed effects, damage policy, and behavior modes such as human
-  seeking versus player chasing without rewriting actor structs. `XYZZY`
-  invincibility is represented as the same temporary player behavior override.
-  The slice now also models initial humans, lander
+  seeking versus player chasing without rewriting actor structs.
+  `ActorWaveScript` names a driver-owned progression script whose wave profiles
+  apply behavior scripts and hostile spawn positions when play starts and when
+  hostile snapshots are cleared. `XYZZY` invincibility is represented as the
+  same temporary player behavior override. The slice now also models initial
+  humans, lander
   pickup/carry/conversion, falling-human rescue and safe landing scoring, score
   popups, smart-bomb hostile clearing, and mutant spawn handoff, but it has not
   replaced the live `Game` runtime yet.

@@ -30,7 +30,9 @@ verification tools.
   Actor movement and behavior are now scriptable through
   `ActorBehaviorScript`, with default, actor-kind, and actor-id behavior
   profiles plus script-selectable behavior modes for level difficulty and
-  `XYZZY` damage overrides.
+  `XYZZY` damage overrides. `ActorWaveScript` now names per-wave progression
+  data and applies behavior scripts plus hostile spawn positions as play starts
+  and waves are cleared.
 - Primary runtime source is `src/`; the converted implementation is parked in
   `src_legacy/` and should remain optional oracle/tooling evidence only.
 - Normal live play uses clean `Game` frames through clean platform, audio, and

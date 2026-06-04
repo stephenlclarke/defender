@@ -95,6 +95,21 @@ the driver applies a temporary player behavior override that disables enemy
 collision damage for that simulation step; collision handling reads that
 profile rather than branching on a separate god-mode flag.
 
+## Wave Progression
+
+`ActorWaveScript` is the driver-owned level progression script. It has a stable
+name plus ordered `ActorWaveProfile` records. Each wave profile supplies the
+`ActorBehaviorScript` for that wave and the hostile spawn positions for the
+wave. The driver applies wave `1` when play starts, carries the wave number in
+`StepPrompt` and `StepReport`, and advances to the next configured profile when
+the current hostile snapshots are cleared.
+
+The default actor progression is provisional structure, not a final red-label
+table. It keeps wave `1` at baseline behavior, makes wave `2` faster, and uses
+the scripted chase-player lander mode from wave `3` onward. Future fidelity
+slices should replace those profile values and spawn positions with MAME-backed
+wave table data.
+
 ## Attract Graphics
 
 The attract screen is data-driven. `AttractScript` contains ordered
@@ -137,6 +152,9 @@ The actor driver now owns a first Defender gameplay loop:
   250-point popup. Fast impacts destroy the human and spawn an explosion.
 - Smart bomb is now a real driver command: it removes active hostile actors,
   awards enemy scores, and spawns explosions while preserving human actors.
+- Wave scripts now apply behavior profiles when play starts and when all
+  hostile snapshots are cleared, allowing level difficulty to progress through
+  driver-owned data.
 
 These mechanics are still intentionally compact. The next fidelity slices
 should replace the baseline behavior profiles with MAME-backed tables and bind

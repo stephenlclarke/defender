@@ -40,6 +40,18 @@ const LANDER_SCORE: u32 = 150;
 const MUTANT_SCORE: u32 = 150;
 const HUMAN_RESCUE_SCORE: u32 = 500;
 const HUMAN_SAFE_LANDING_SCORE: u32 = 250;
+const DEFAULT_WAVE_ONE_LANDERS: [Point; 2] = [Point::new(180, 88), Point::new(218, 150)];
+const DEFAULT_WAVE_TWO_LANDERS: [Point; 3] = [
+    Point::new(176, 80),
+    Point::new(210, 132),
+    Point::new(236, 184),
+];
+const DEFAULT_WAVE_THREE_LANDERS: [Point; 4] = [
+    Point::new(168, 72),
+    Point::new(198, 120),
+    Point::new(224, 168),
+    Point::new(244, 206),
+];
 const INITIAL_HUMAN_POSITIONS: [Point; 10] = [
     Point::new(28, HUMAN_GROUND_Y),
     Point::new(52, HUMAN_GROUND_Y),
@@ -740,6 +752,111 @@ impl Default for ActorBehaviorScript {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorWaveProfile {
+    pub wave: u16,
+    pub behavior_script: ActorBehaviorScript,
+    pub lander_spawns: Vec<Point>,
+}
+
+impl ActorWaveProfile {
+    pub fn new(wave: u16, behavior_script: ActorBehaviorScript, lander_spawns: Vec<Point>) -> Self {
+        Self {
+            wave: wave.max(1),
+            behavior_script,
+            lander_spawns,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorWaveScript {
+    name: String,
+    waves: Vec<ActorWaveProfile>,
+}
+
+impl ActorWaveScript {
+    pub fn new(name: impl Into<String>, mut waves: Vec<ActorWaveProfile>) -> Self {
+        if waves.is_empty() {
+            waves.push(ActorWaveProfile::new(
+                1,
+                ActorBehaviorScript::default(),
+                DEFAULT_WAVE_ONE_LANDERS.to_vec(),
+            ));
+        }
+        waves.sort_by_key(|profile| profile.wave);
+        Self {
+            name: name.into(),
+            waves,
+        }
+    }
+
+    pub fn single_wave(
+        name: impl Into<String>,
+        behavior_script: ActorBehaviorScript,
+        lander_spawns: Vec<Point>,
+    ) -> Self {
+        Self::new(
+            name,
+            vec![ActorWaveProfile::new(1, behavior_script, lander_spawns)],
+        )
+    }
+
+    pub fn default_progression() -> Self {
+        let wave_two_lander = ActorBehaviorProfile {
+            lander_seek_speed: 2,
+            lander_fire_period_steps: 72,
+            ..ActorBehaviorProfile::default()
+        };
+        let wave_three_lander = ActorBehaviorProfile {
+            lander_seek_speed: 2,
+            lander_fire_period_steps: 60,
+            lander_mode: LanderBehaviorMode::ChasePlayer,
+            ..ActorBehaviorProfile::default()
+        };
+        Self::new(
+            "actor-default-progression",
+            vec![
+                ActorWaveProfile::new(
+                    1,
+                    ActorBehaviorScript::default(),
+                    DEFAULT_WAVE_ONE_LANDERS.to_vec(),
+                ),
+                ActorWaveProfile::new(
+                    2,
+                    ActorBehaviorScript::default()
+                        .with_kind_behavior(ActorKind::Lander, wave_two_lander),
+                    DEFAULT_WAVE_TWO_LANDERS.to_vec(),
+                ),
+                ActorWaveProfile::new(
+                    3,
+                    ActorBehaviorScript::default()
+                        .with_kind_behavior(ActorKind::Lander, wave_three_lander),
+                    DEFAULT_WAVE_THREE_LANDERS.to_vec(),
+                ),
+            ],
+        )
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn profile_for_wave(&self, wave: u16) -> &ActorWaveProfile {
+        self.waves
+            .iter()
+            .rev()
+            .find(|profile| wave >= profile.wave)
+            .unwrap_or(&self.waves[0])
+    }
+}
+
+impl Default for ActorWaveScript {
+    fn default() -> Self {
+        Self::default_progression()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpriteKey {
     WilliamsLogo,
@@ -1119,6 +1236,9 @@ pub enum GameCommand {
     HumanLost(ActorId),
     AddScore(u32),
     PlaySound(SoundCue),
+    AdvanceWave {
+        wave: u16,
+    },
     EnterGameOver,
 }
 
@@ -1127,6 +1247,7 @@ pub struct StepPrompt {
     pub step: u64,
     pub phase: Phase,
     pub input: GameInput,
+    pub wave: u16,
     pub score: u32,
     pub credits: u8,
     pub snapshots: Vec<ActorSnapshot>,
@@ -1232,6 +1353,7 @@ fn run_actor_thread(
 pub struct StepReport {
     pub step: u64,
     pub phase: Phase,
+    pub wave: u16,
     pub score: u32,
     pub credits: u8,
     pub lives: u8,
@@ -1244,6 +1366,7 @@ pub struct StepReport {
 pub struct ActorGameDriver {
     step: u64,
     phase: Phase,
+    wave: u16,
     score: u32,
     credits: u8,
     lives: u8,
@@ -1252,6 +1375,7 @@ pub struct ActorGameDriver {
     snapshots: BTreeMap<ActorId, ActorSnapshot>,
     high_scores: HighScoreTable,
     behavior_script: ActorBehaviorScript,
+    wave_script: ActorWaveScript,
 }
 
 impl ActorGameDriver {
@@ -1260,16 +1384,21 @@ impl ActorGameDriver {
     }
 
     pub fn with_attract_script(attract_script: AttractScript) -> Self {
-        Self::with_scripts(attract_script, ActorBehaviorScript::default())
+        Self::with_attract_and_wave_scripts(attract_script, ActorWaveScript::default())
     }
 
-    pub fn with_scripts(
+    pub fn with_wave_script(wave_script: ActorWaveScript) -> Self {
+        Self::with_attract_and_wave_scripts(AttractScript::red_label_title(), wave_script)
+    }
+
+    pub fn with_attract_and_wave_scripts(
         attract_script: AttractScript,
-        behavior_script: ActorBehaviorScript,
+        wave_script: ActorWaveScript,
     ) -> Self {
         let mut driver = Self {
             step: 0,
             phase: Phase::Attract,
+            wave: 0,
             score: 0,
             credits: 0,
             lives: 3,
@@ -1277,7 +1406,8 @@ impl ActorGameDriver {
             actors: BTreeMap::new(),
             snapshots: BTreeMap::new(),
             high_scores: HighScoreTable::default(),
-            behavior_script,
+            behavior_script: ActorBehaviorScript::default(),
+            wave_script,
         };
         let attract_id = driver.allocate_actor_id();
         let script_id = driver.allocate_actor_id();
@@ -1288,6 +1418,7 @@ impl ActorGameDriver {
 
     pub fn step(&mut self, input: GameInput) -> StepReport {
         self.step = self.step.saturating_add(1);
+        let was_playing = self.phase == Phase::Playing;
         let behavior_script = self
             .behavior_script
             .with_input_overrides(input, self.snapshots.values().cloned());
@@ -1295,6 +1426,7 @@ impl ActorGameDriver {
             step: self.step,
             phase: self.phase,
             input,
+            wave: self.wave,
             score: self.score,
             credits: self.credits,
             snapshots: self.snapshots.values().cloned().collect(),
@@ -1326,10 +1458,14 @@ impl ActorGameDriver {
         self.resolve_collisions(&behavior_script, &mut commands);
         let sounds = self.apply_commands(&commands);
         self.remove_dead_actors(&dead_actor_ids);
+        if self.advance_wave_if_cleared(was_playing, &commands) {
+            commands.push(GameCommand::AdvanceWave { wave: self.wave });
+        }
 
         StepReport {
             step: self.step,
             phase: self.phase,
+            wave: self.wave,
             score: self.score,
             credits: self.credits,
             lives: self.lives,
@@ -1344,8 +1480,16 @@ impl ActorGameDriver {
         self.phase
     }
 
+    pub fn wave(&self) -> u16 {
+        self.wave
+    }
+
     pub fn actor_count(&self) -> usize {
         self.actors.len()
+    }
+
+    pub fn wave_script_name(&self) -> &str {
+        self.wave_script.name()
     }
 
     pub fn behavior_script(&self) -> &ActorBehaviorScript {
@@ -1510,27 +1654,14 @@ impl ActorGameDriver {
                 GameCommand::StartOnePlayer => {
                     if self.phase == Phase::Attract && self.credits > 0 {
                         self.credits = self.credits.saturating_sub(1);
-                        self.phase = Phase::Playing;
-                        self.score = 0;
-                        self.lives = 3;
-                        self.spawn_player();
-                        self.spawn_lander(Point::new(180, 88));
-                        self.spawn_lander(Point::new(218, 150));
-                        self.spawn_initial_humans();
+                        self.start_play(1);
                         sounds.push(SoundCue::Start);
                     }
                 }
                 GameCommand::StartTwoPlayer => {
                     if self.phase == Phase::Attract && self.credits > 1 {
                         self.credits = self.credits.saturating_sub(2);
-                        self.phase = Phase::Playing;
-                        self.score = 0;
-                        self.lives = 3;
-                        self.spawn_player();
-                        self.spawn_lander(Point::new(180, 88));
-                        self.spawn_lander(Point::new(218, 150));
-                        self.spawn_lander(Point::new(198, 48));
-                        self.spawn_initial_humans();
+                        self.start_play(2);
                         sounds.push(SoundCue::Start);
                     }
                 }
@@ -1582,8 +1713,10 @@ impl ActorGameDriver {
                     self.score = self.score.saturating_add(points);
                 }
                 GameCommand::PlaySound(sound) => sounds.push(sound),
+                GameCommand::AdvanceWave { .. } => {}
                 GameCommand::EnterGameOver => {
                     self.lives = 0;
+                    self.wave = 0;
                     self.high_scores.record(self.score);
                     self.phase = if self.high_scores.qualifies(self.score) {
                         Phase::HighScoreEntry
@@ -1595,6 +1728,61 @@ impl ActorGameDriver {
             }
         }
         sounds
+    }
+
+    fn start_play(&mut self, players: u8) {
+        self.phase = Phase::Playing;
+        self.wave = 1;
+        self.score = 0;
+        self.lives = 3;
+        self.apply_wave_profile();
+        self.spawn_player();
+        self.spawn_wave_hostiles();
+        if players > 1 {
+            self.spawn_lander(Point::new(198, 48));
+        }
+        self.spawn_initial_humans();
+    }
+
+    fn apply_wave_profile(&mut self) {
+        self.behavior_script = self
+            .wave_script
+            .profile_for_wave(self.wave)
+            .behavior_script
+            .clone();
+    }
+
+    fn spawn_wave_hostiles(&mut self) {
+        let lander_spawns = self
+            .wave_script
+            .profile_for_wave(self.wave)
+            .lander_spawns
+            .clone();
+        for position in lander_spawns {
+            self.spawn_lander(position);
+        }
+    }
+
+    fn advance_wave_if_cleared(&mut self, was_playing: bool, commands: &[GameCommand]) -> bool {
+        if !was_playing
+            || self.phase != Phase::Playing
+            || self.wave == 0
+            || self.has_hostile_snapshots()
+            || commands_spawn_hostiles(commands)
+        {
+            return false;
+        }
+
+        self.wave = self.wave.saturating_add(1);
+        self.apply_wave_profile();
+        self.spawn_wave_hostiles();
+        true
+    }
+
+    fn has_hostile_snapshots(&self) -> bool {
+        self.snapshots
+            .values()
+            .any(|snapshot| is_hostile(snapshot.kind))
     }
 
     fn spawn_initial_humans(&mut self) {
@@ -1648,6 +1836,16 @@ fn manhattan_distance(left: Point, right: Point) -> i16 {
 
 fn is_hostile(kind: ActorKind) -> bool {
     matches!(kind, ActorKind::Lander | ActorKind::Mutant)
+}
+
+fn commands_spawn_hostiles(commands: &[GameCommand]) -> bool {
+    commands.iter().any(|command| {
+        matches!(
+            command,
+            GameCommand::Spawn(SpawnRequest::Lander { .. })
+                | GameCommand::Spawn(SpawnRequest::Mutant { .. })
+        )
+    })
 }
 
 fn score_for_hostile(kind: ActorKind) -> u32 {
@@ -2750,10 +2948,9 @@ mod tests {
             lander_fire_period_steps: u64::MAX,
             ..ActorBehaviorProfile::default()
         };
-        let script =
-            ActorBehaviorScript::default().with_kind_behavior(ActorKind::Lander, lander_behavior);
-        let mut driver = ActorGameDriver::with_scripts(AttractScript::default(), script);
+        let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
+        driver.set_kind_behavior(ActorKind::Lander, lander_behavior);
         let lander_id = driver.spawn_lander_for_test(Point::new(80, HUMAN_GROUND_Y));
         driver.spawn_human_for_test(Point::new(100, HUMAN_GROUND_Y));
 
@@ -2762,6 +2959,94 @@ mod tests {
 
         let seeking = driver.step(GameInput::NONE);
         assert_eq!(snapshot_for(&seeking, lander_id).position.x, 83);
+    }
+
+    #[test]
+    fn wave_script_applies_behavior_when_play_starts() {
+        let lander_behavior = ActorBehaviorProfile {
+            lander_seek_speed: 5,
+            lander_fire_period_steps: u64::MAX,
+            lander_mode: LanderBehaviorMode::ChasePlayer,
+            ..ActorBehaviorProfile::default()
+        };
+        let wave_script = ActorWaveScript::single_wave(
+            "opening-chasers",
+            ActorBehaviorScript::default().with_kind_behavior(ActorKind::Lander, lander_behavior),
+            vec![Point::new(80, HUMAN_GROUND_Y)],
+        );
+        let mut driver = ActorGameDriver::with_wave_script(wave_script);
+
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        let started = driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(started.wave, 1);
+        assert_eq!(driver.wave(), 1);
+        assert_eq!(driver.wave_script_name(), "opening-chasers");
+
+        driver.step(GameInput::NONE);
+        let chasing = driver.step(GameInput::NONE);
+        let lander = chasing
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Lander)
+            .expect("wave script should spawn a lander");
+        assert_eq!(lander.position, Point::new(74, HUMAN_GROUND_Y - 5));
+    }
+
+    #[test]
+    fn cleared_wave_advances_to_next_behavior_script() {
+        let wave_two_lander = ActorBehaviorProfile {
+            lander_drift_speed: 5,
+            lander_fire_period_steps: u64::MAX,
+            lander_mode: LanderBehaviorMode::Drift,
+            ..ActorBehaviorProfile::default()
+        };
+        let wave_script = ActorWaveScript::new(
+            "two-wave-test",
+            vec![
+                ActorWaveProfile::new(1, ActorBehaviorScript::default(), vec![Point::new(180, 88)]),
+                ActorWaveProfile::new(
+                    2,
+                    ActorBehaviorScript::default()
+                        .with_kind_behavior(ActorKind::Lander, wave_two_lander),
+                    vec![Point::new(100, 100)],
+                ),
+            ],
+        );
+        let mut driver = ActorGameDriver::with_wave_script(wave_script);
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput::NONE);
+
+        let cleared = driver.step(GameInput {
+            smart_bomb: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(cleared.wave, 2);
+        assert!(
+            cleared
+                .commands
+                .contains(&GameCommand::AdvanceWave { wave: 2 })
+        );
+
+        let next_wave = driver.step(GameInput::NONE);
+        let lander = next_wave
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Lander)
+            .expect("next wave should spawn a scripted lander");
+        assert_eq!(lander.position, Point::new(95, 100));
     }
 
     #[test]
