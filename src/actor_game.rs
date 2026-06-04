@@ -2633,7 +2633,11 @@ impl Lander {
                     self.drift(behavior);
                 }
             }
-            LanderBehaviorMode::Drift => self.drift(behavior),
+            LanderBehaviorMode::Drift => {
+                if !self.advance_source_fixed_point_motion() {
+                    self.drift(behavior);
+                }
+            }
         }
     }
 
@@ -2661,6 +2665,9 @@ impl Lander {
                 commands.push(GameCommand::PlaySound(SoundCue::LanderPickup));
                 return;
             }
+            if self.advance_source_fixed_point_motion() {
+                return;
+            }
             self.position = step_toward(self.position, target.position, behavior.lander_seek_speed);
             return;
         }
@@ -2668,7 +2675,9 @@ impl Lander {
         if let Some(player) = prompt.player_position() {
             self.drift = if player.x < self.position.x { -1 } else { 1 };
         }
-        self.drift(behavior);
+        if !self.advance_source_fixed_point_motion() {
+            self.drift(behavior);
+        }
     }
 
     fn source_target_human<'a>(&self, prompt: &'a StepPrompt) -> Option<&'a ActorSnapshot> {
@@ -2682,6 +2691,25 @@ impl Lander {
             self.drift * behavior.lander_drift_speed.max(0),
             0,
         ));
+    }
+
+    fn advance_source_fixed_point_motion(&mut self) -> bool {
+        let Some(source) = &mut self.source else {
+            return false;
+        };
+        if source.x_velocity == 0 && source.y_velocity == 0 {
+            return false;
+        }
+
+        let (x, x_fraction) =
+            actor_source_axis_step(self.position.x, source.x_fraction, source.x_velocity);
+        let (y, y_fraction) =
+            actor_source_axis_step(self.position.y, source.y_fraction, source.y_velocity);
+        self.position = Point::new(x, y);
+        source.x_fraction = x_fraction;
+        source.y_fraction = y_fraction;
+        self.drift = source_lander_drift_from_velocity(source.x_velocity);
+        true
     }
 
     fn update_carrying(
@@ -2805,6 +2833,13 @@ fn clamped_source_lander_shot_reset(behavior: ActorBehaviorProfile) -> u8 {
         .max(1)
         .min(u64::from(u8::MAX));
     u8::try_from(clamped).unwrap_or(u8::MAX)
+}
+
+fn actor_source_axis_step(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
+    let [position, fraction] = u16::from_be_bytes([position as u8, fraction])
+        .wrapping_add(velocity)
+        .to_be_bytes();
+    (i16::from(position), fraction)
 }
 
 fn pickup_distance(lander: Point, human: Point, behavior: ActorBehaviorProfile) -> bool {
@@ -3788,7 +3823,13 @@ mod tests {
 
         let awake = driver.step(GameInput::NONE);
         let lander = snapshot_for(&awake, lander_id.expect("source lander id should be known"));
-        assert_ne!(lander.position, initial);
+        assert_eq!(lander.position, Point::new(0xFB, 0x2D));
+        assert_eq!(
+            lander
+                .source_lander
+                .map(|source| (source.x_fraction, source.y_fraction)),
+            Some((0x11, 0x50))
+        );
         assert_eq!(
             lander.source_lander.map(|source| source.sleep_ticks),
             Some(0)

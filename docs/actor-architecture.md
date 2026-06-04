@@ -110,8 +110,10 @@ an actor-owned adapter. The current actor mapping uses source-backed
 count, lander movement speed, and lander fire cadence. Wave `1` uses the
 source first-wave lander restore metadata from the existing clean evidence,
 including fixed-point fractions, velocities, shot timer, sleep ticks, picture
-frame, and target-human index. Later waves still use deterministic actor slots
-until a later slice ports the remaining source restore positions.
+frame, and target-human index. Source-backed landers advance active motion by
+updating that fixed-point position/fraction state. Later waves still use
+deterministic actor slots until a later slice ports the remaining source
+restore positions.
 
 Initial humans are source-backed for wave `1` as well. Their actor spawns carry
 fixed-point fractions, picture frame, and source target-list slot metadata.

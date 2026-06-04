@@ -74,7 +74,8 @@ and behavior tuning, script-selectable lander behavior modes, and named
 active wave size, lander movement speed, lander fire cadence, and scripted
 hostile/human spawn records, plus source first-wave lander restore metadata:
 fixed-point fractions, velocities, shot timer, sleep ticks, picture frame, and
-target-human index. It also includes
+target-human index. Source-backed landers now advance that fixed-point
+position/fraction state during active motion. It also includes
 Williams title animation metadata, the coalescing Defender wordmark surface,
 source first-wave human restore metadata with target-list slots, lander
 target-slot seeking, pickup/carry/conversion, falling-human rescue and safe
