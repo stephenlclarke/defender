@@ -31,6 +31,9 @@ const HUMAN_FALL_ACCELERATION: i16 = 1;
 const HUMAN_MAX_FALL_SPEED: i16 = 8;
 const HUMAN_SAFE_LANDING_SPEED: i16 = 3;
 const HUMAN_CARRIED_OFFSET_Y: i16 = 8;
+const SOURCE_HUMAN_WALK_SLEEP_TICKS: u8 = 2;
+const SOURCE_HUMAN_LEFT_X_VELOCITY: u16 = 0xFFE0;
+const SOURCE_HUMAN_RIGHT_X_VELOCITY: u16 = 0x0020;
 const LANDER_SEEK_SPEED: i16 = 1;
 const LANDER_DRIFT_SPEED: i16 = 1;
 const LANDER_CARRY_SPEED: i16 = 2;
@@ -2923,6 +2926,7 @@ struct Human {
     position: Point,
     mode: HumanMode,
     safe_landing_awarded: bool,
+    source_walk_sleep_ticks: u8,
     source: Option<ActorSourceHumanMetadata>,
 }
 
@@ -2946,12 +2950,48 @@ impl Human {
             position,
             mode,
             safe_landing_awarded: false,
+            source_walk_sleep_ticks: if source.is_some() {
+                SOURCE_HUMAN_WALK_SLEEP_TICKS
+            } else {
+                0
+            },
             source,
         }
     }
 
     fn bounds(&self) -> Rect {
         Rect::from_center(self.position, 4, 8)
+    }
+
+    fn update_grounded(&mut self) {
+        if self.source.is_none() {
+            return;
+        }
+        if self.source_walk_sleep_ticks > 0 {
+            self.source_walk_sleep_ticks = self.source_walk_sleep_ticks.saturating_sub(1);
+            return;
+        }
+
+        self.advance_source_walk();
+        self.source_walk_sleep_ticks = SOURCE_HUMAN_WALK_SLEEP_TICKS;
+    }
+
+    fn advance_source_walk(&mut self) {
+        if let Some(source) = &mut self.source {
+            let frame = source.picture_frame % 4;
+            let (next_frame, velocity) = if frame <= 1 {
+                (1 - frame, SOURCE_HUMAN_LEFT_X_VELOCITY)
+            } else if frame == 2 {
+                (3, SOURCE_HUMAN_RIGHT_X_VELOCITY)
+            } else {
+                (2, SOURCE_HUMAN_RIGHT_X_VELOCITY)
+            };
+            let (x, x_fraction) =
+                actor_source_axis_step(self.position.x, source.x_fraction, velocity);
+            self.position.x = x;
+            source.x_fraction = x_fraction;
+            source.picture_frame = next_frame;
+        }
     }
 
     fn update_falling(
@@ -3038,7 +3078,10 @@ impl AssetActor for Human {
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Human);
             commands.extend(match self.mode {
-                HumanMode::Grounded => Vec::new(),
+                HumanMode::Grounded => {
+                    self.update_grounded();
+                    Vec::new()
+                }
                 HumanMode::Falling { velocity } => self.update_falling(velocity, prompt, behavior),
                 HumanMode::CarriedBy(carrier) => self.update_carried(carrier, prompt, behavior),
             });
@@ -3991,6 +4034,50 @@ mod tests {
                 && draw.sprite == SpriteKey::Human
                 && matches!(draw.effect, VisualEffect::SourceHumanFrame { frame: 3 })
         }));
+    }
+
+    #[test]
+    fn source_human_walk_cadence_advances_fraction_and_picture_frame() {
+        let mut driver = ActorGameDriver::new();
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+
+        let first_live = driver.step(GameInput::NONE);
+        let human = first_live
+            .snapshots
+            .iter()
+            .find(|snapshot| {
+                snapshot
+                    .source_human
+                    .is_some_and(|source| source.target_slot_index == 1)
+            })
+            .expect("source target-slot human should be visible");
+        let human_id = human.id;
+        assert_eq!(human.position, Point::new(0x1C, 0xE1));
+        assert_eq!(
+            human
+                .source_human
+                .map(|source| (source.x_fraction, source.picture_frame)),
+            Some((0x81, 3))
+        );
+
+        driver.step(GameInput::NONE);
+        let walked = driver.step(GameInput::NONE);
+        let human = snapshot_for(&walked, human_id);
+
+        assert_eq!(human.position, Point::new(0x1C, 0xE1));
+        assert_eq!(
+            human
+                .source_human
+                .map(|source| (source.x_fraction, source.picture_frame)),
+            Some((0xA1, 2))
+        );
     }
 
     #[test]

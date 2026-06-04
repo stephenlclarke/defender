@@ -117,6 +117,8 @@ restore positions.
 
 Initial humans are source-backed for wave `1` as well. Their actor spawns carry
 fixed-point fractions, picture frame, and source target-list slot metadata.
+Grounded source humans advance their own walk cadence, picture frame, and
+fixed-point X fraction after the initial source sleep ticks.
 Source-backed landers ask the prompt for their configured target slot first and
 only fall back to nearest-human seeking when that target is unavailable.
 
@@ -150,7 +152,8 @@ actor ownership.
 The actor driver now owns a first Defender gameplay loop:
 
 - Starts seed the playfield with ten source first-wave human actors carrying
-  target-list slot and picture-frame metadata.
+  target-list slot and picture-frame metadata. Source-backed grounded humans
+  update their own walk frame and fixed-point X fraction.
 - Landers seek the nearest grounded human, attach it through an
   `AttachHuman` command, carry it upward, and convert into a mutant when the
   carried human reaches the upper conversion band. Source-backed landers prefer

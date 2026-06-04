@@ -39,10 +39,11 @@ verification tools.
   fixed-point fractions, velocities, shot timer, sleep ticks, picture frame,
   and target-human index. Source-backed landers now advance active motion
   through that fixed-point state. Initial humans now use source first-wave
-  restore metadata with target-list slots, and source landers prefer those
-  configured target slots before falling back to nearest-human seeking. Lander
-  shot timers now spawn hostile projectile actors that use the same player
-  damage policy as other hazards, including `XYZZY` invincibility overrides.
+  restore metadata with target-list slots and actor-owned walk frame/fraction
+  updates, and source landers prefer those configured target slots before
+  falling back to nearest-human seeking. Lander shot timers now spawn hostile
+  projectile actors that use the same player damage policy as other hazards,
+  including `XYZZY` invincibility overrides.
 - Primary runtime source is `src/`; the converted implementation is parked in
   `src_legacy/` and should remain optional oracle/tooling evidence only.
 - Normal live play uses clean `Game` frames through clean platform, audio, and

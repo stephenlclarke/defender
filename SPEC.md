@@ -706,11 +706,11 @@ reintroduce legacy implementation terminology.
   later-wave restore positions remain a known replacement target. `XYZZY`
   invincibility is represented as the same temporary player behavior override.
   The slice now also models source first-wave human restore metadata with
-  target-list slots, source landers preferring their configured human target
-  slot, lander pickup/carry/conversion, falling-human rescue and safe landing
-  scoring, score popups, hostile projectile actors for lander shots, smart-bomb
-  hostile clearing, and mutant spawn handoff, but it has not replaced the live
-  `Game` runtime yet.
+  target-list slots and actor-owned walk frame/fraction updates, source landers
+  preferring their configured human target slot, lander pickup/carry/conversion,
+  falling-human rescue and safe landing scoring, score popups, hostile
+  projectile actors for lander shots, smart-bomb hostile clearing, and mutant
+  spawn handoff, but it has not replaced the live `Game` runtime yet.
 
 ## Compatibility Features
 
