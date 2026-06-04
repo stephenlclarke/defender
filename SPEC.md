@@ -683,13 +683,16 @@ reintroduce legacy implementation terminology.
   scene/atlas media path with `make readme-media`, which still uses the
   explicit `legacy-tools` tooling path.
 - `src/actor_game.rs` is an isolated actor-oriented rewrite slice. It exposes a
-  driver-owned prompt/reply model, thread-backed asset actors, same-contract
-  keyboard profiles, `XYZZY` overlay state, data-driven `AttractScript` support
-  for custom attract drivers, Williams title reveal metadata, and Defender
-  wordmark coalescence metadata. The slice now also models initial humans,
-  lander pickup/carry/conversion, falling-human rescue and safe landing scoring,
-  score popups, smart-bomb hostile clearing, and mutant spawn handoff, but it
-  has not replaced the live `Game` runtime yet.
+  driver-owned `StepPrompt`/`StepReport` model, thread-backed asset actors,
+  same-contract keyboard profiles, `XYZZY` overlay state, data-driven
+  `AttractScript` support for custom attract drivers, Williams title reveal
+  metadata, and Defender wordmark coalescence metadata. The actor slice is
+  simulation-step driven rather than display-frame driven: render cadence is
+  outside actor behavior, and attract scripts use actor-local elapsed steps.
+  The slice now also models initial humans, lander pickup/carry/conversion,
+  falling-human rescue and safe landing scoring, score popups, smart-bomb
+  hostile clearing, and mutant spawn handoff, but it has not replaced the live
+  `Game` runtime yet.
 
 ## Compatibility Features
 

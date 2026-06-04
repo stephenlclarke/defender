@@ -63,6 +63,9 @@ probe and the owner-review checklist are tracked in
 `dev/actor-game-architecture` branch. It keeps the current runtime available
 for fidelity evidence while introducing a driver-owned prompt/reply model where
 each asset owns its motion, draw description, sound cues, and interactions.
+This branch is not display-frame driven: `ActorGameDriver::step` advances a
+simulation turn and emits a `StepReport`, while renderers are expected to draw
+the latest report at whatever cadence they own.
 The current slice includes same-contract keyboard profiles, `XYZZY` overlay
 state, thread-backed actors, a data-driven `AttractScript` for custom attract
 drivers, Williams title animation metadata, the coalescing Defender wordmark

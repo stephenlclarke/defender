@@ -24,6 +24,9 @@ verification tools.
   Williams/Defender attract metadata, player/lander/laser/explosion basics,
   initial humans, lander pickup/carry/conversion, rescue/safe-landing scoring,
   score popups, smart bomb clearing, and high-score/game-over phase handoff.
+  The actor API is simulation-step driven through `StepPrompt`/`StepReport`,
+  not display-frame driven; attract scripts advance on actor-local elapsed
+  steps so custom drivers can own sequencing without MAME frame scripts.
 - Primary runtime source is `src/`; the converted implementation is parked in
   `src_legacy/` and should remain optional oracle/tooling evidence only.
 - Normal live play uses clean `Game` frames through clean platform, audio, and

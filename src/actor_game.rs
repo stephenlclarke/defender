@@ -2,8 +2,8 @@
 //!
 //! This module is intentionally independent from the current MAME-shaped
 //! `Game` implementation. It models the game as driver-owned actor threads:
-//! the driver prompts every asset once per frame, gathers commands, resolves
-//! world rules in a stable order, and publishes a frame description.
+//! the driver prompts every asset once per step, gathers commands, resolves
+//! world rules in a stable order, and publishes a step description.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -20,7 +20,7 @@ const EXPLOSION_LIFETIME: u16 = 20;
 const SCORE_POPUP_LIFETIME: u16 = 50;
 const WILLIAMS_REVEAL_STEPS: u16 = 36;
 const WILLIAMS_COLOR_PERIOD: u16 = 8;
-const DEFENDER_WORDMARK_START_FRAME: u64 = 72;
+const DEFENDER_WORDMARK_START_STEP: u64 = 72;
 const DEFENDER_WORDMARK_SLOTS: u16 = 15;
 const DEFENDER_WORDMARK_ROW_PAIRS: u16 = 6;
 const HUMAN_GROUND_Y: i16 = 214;
@@ -206,7 +206,7 @@ impl KeyboardEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct KeyboardFrame {
+pub struct KeyboardPoll {
     pub input: GameInput,
     pub typed_chars: Vec<char>,
     pub quit_requested: bool,
@@ -244,131 +244,131 @@ impl KeyboardMapper {
         self.xyzzy.mode(false)
     }
 
-    pub fn map_event(&mut self, event: KeyboardEvent, frame: &mut KeyboardFrame) {
+    pub fn map_event(&mut self, event: KeyboardEvent, step: &mut KeyboardPoll) {
         let active = event.transition.contributes_input();
         if event.transition == KeyTransition::Press {
             match event.key {
                 KeyboardKey::Character(character) => {
                     let typed = character.to_ascii_lowercase();
-                    frame.typed_chars.push(typed);
+                    step.typed_chars.push(typed);
                     self.xyzzy.ingest(typed);
                 }
-                KeyboardKey::Backspace => frame.typed_chars.push('\u{8}'),
+                KeyboardKey::Backspace => step.typed_chars.push('\u{8}'),
                 _ => {}
             }
         }
 
         match event.key {
-            KeyboardKey::Escape if active => frame.quit_requested = true,
-            KeyboardKey::Character('q' | 'Q') if active => frame.quit_requested = true,
-            _ => self.map_profile_event(event, frame),
+            KeyboardKey::Escape if active => step.quit_requested = true,
+            KeyboardKey::Character('q' | 'Q') if active => step.quit_requested = true,
+            _ => self.map_profile_event(event, step),
         }
 
         if self.xyzzy.active() && active {
             match event.key {
                 KeyboardKey::Character('f' | 'F') => self.xyzzy.toggle_auto_fire(),
                 KeyboardKey::Character('g' | 'G') => self.xyzzy.toggle_invincible(),
-                KeyboardKey::Tab => frame.input.xyzzy.overlay_smart_bomb = true,
+                KeyboardKey::Tab => step.input.xyzzy.overlay_smart_bomb = true,
                 _ => {}
             }
         }
     }
 
-    pub fn finish_frame(&self, frame: &mut KeyboardFrame) {
-        frame.input.altitude_up |= self.held.altitude_up;
-        frame.input.altitude_down |= self.held.altitude_down;
-        frame.input.thrust |= self.held.thrust;
-        frame.input.auto_up_manual_down |= self.held.auto_up_manual_down;
-        let overlay_smart_bomb = frame.input.xyzzy.overlay_smart_bomb;
-        frame.input.xyzzy = self.xyzzy.mode(overlay_smart_bomb);
-        if frame.input.xyzzy.auto_fire {
-            frame.input.fire = true;
+    pub fn finish_poll(&self, step: &mut KeyboardPoll) {
+        step.input.altitude_up |= self.held.altitude_up;
+        step.input.altitude_down |= self.held.altitude_down;
+        step.input.thrust |= self.held.thrust;
+        step.input.auto_up_manual_down |= self.held.auto_up_manual_down;
+        let overlay_smart_bomb = step.input.xyzzy.overlay_smart_bomb;
+        step.input.xyzzy = self.xyzzy.mode(overlay_smart_bomb);
+        if step.input.xyzzy.auto_fire {
+            step.input.fire = true;
         }
     }
 
-    fn map_profile_event(&mut self, event: KeyboardEvent, frame: &mut KeyboardFrame) {
+    fn map_profile_event(&mut self, event: KeyboardEvent, step: &mut KeyboardPoll) {
         match self.profile {
-            KeyboardProfile::Planetoid => self.map_planetoid_event(event, frame),
-            KeyboardProfile::Cabinet => self.map_cabinet_event(event, frame),
+            KeyboardProfile::Planetoid => self.map_planetoid_event(event, step),
+            KeyboardProfile::Cabinet => self.map_cabinet_event(event, step),
         }
     }
 
-    fn map_planetoid_event(&mut self, event: KeyboardEvent, frame: &mut KeyboardFrame) {
+    fn map_planetoid_event(&mut self, event: KeyboardEvent, step: &mut KeyboardPoll) {
         let active = event.transition.contributes_input();
         match event.key {
             KeyboardKey::Enter if active => {
-                frame.input.start_one = true;
-                frame.input.fire = true;
+                step.input.start_one = true;
+                step.input.fire = true;
             }
-            KeyboardKey::Character('1') if active => frame.input.start_one = true,
-            KeyboardKey::Character('5') if active => frame.input.coin = true,
-            KeyboardKey::Character('6') if active => frame.input.coin_two = true,
-            KeyboardKey::Character('7') if active => frame.input.coin_three = true,
+            KeyboardKey::Character('1') if active => step.input.start_one = true,
+            KeyboardKey::Character('5') if active => step.input.coin = true,
+            KeyboardKey::Character('6') if active => step.input.coin_two = true,
+            KeyboardKey::Character('7') if active => step.input.coin_three = true,
             KeyboardKey::Character('a' | 'A') => set_held_control(
                 &mut self.held.altitude_up,
                 event.transition,
-                &mut frame.input.altitude_up,
+                &mut step.input.altitude_up,
             ),
             KeyboardKey::Character('z' | 'Z') => set_held_control(
                 &mut self.held.altitude_down,
                 event.transition,
-                &mut frame.input.altitude_down,
+                &mut step.input.altitude_down,
             ),
             KeyboardKey::LeftShift | KeyboardKey::RightShift => set_held_control(
                 &mut self.held.thrust,
                 event.transition,
-                &mut frame.input.thrust,
+                &mut step.input.thrust,
             ),
-            KeyboardKey::Character(' ') if active => frame.input.reverse = true,
-            KeyboardKey::Tab if active => frame.input.smart_bomb = true,
-            KeyboardKey::Character('h' | 'H') if active => frame.input.hyperspace = true,
-            KeyboardKey::Function(2) if active => frame.input.service_advance = true,
-            KeyboardKey::Function(3) if active => frame.input.high_score_reset = true,
+            KeyboardKey::Character(' ') if active => step.input.reverse = true,
+            KeyboardKey::Tab if active => step.input.smart_bomb = true,
+            KeyboardKey::Character('h' | 'H') if active => step.input.hyperspace = true,
+            KeyboardKey::Function(2) if active => step.input.service_advance = true,
+            KeyboardKey::Function(3) if active => step.input.high_score_reset = true,
             KeyboardKey::Function(4) => set_held_control(
                 &mut self.held.auto_up_manual_down,
                 event.transition,
-                &mut frame.input.auto_up_manual_down,
+                &mut step.input.auto_up_manual_down,
             ),
-            KeyboardKey::Function(5) if active => frame.input.tilt = true,
+            KeyboardKey::Function(5) if active => step.input.tilt = true,
             _ => {}
         }
     }
 
-    fn map_cabinet_event(&mut self, event: KeyboardEvent, frame: &mut KeyboardFrame) {
+    fn map_cabinet_event(&mut self, event: KeyboardEvent, step: &mut KeyboardPoll) {
         let active = event.transition.contributes_input();
         match event.key {
-            KeyboardKey::Character('5') if active => frame.input.coin = true,
-            KeyboardKey::Character('6') if active => frame.input.coin_two = true,
-            KeyboardKey::Character('7') if active => frame.input.coin_three = true,
-            KeyboardKey::Character('1') if active => frame.input.start_one = true,
-            KeyboardKey::Character('2') if active => frame.input.start_two = true,
+            KeyboardKey::Character('5') if active => step.input.coin = true,
+            KeyboardKey::Character('6') if active => step.input.coin_two = true,
+            KeyboardKey::Character('7') if active => step.input.coin_three = true,
+            KeyboardKey::Character('1') if active => step.input.start_one = true,
+            KeyboardKey::Character('2') if active => step.input.start_two = true,
             KeyboardKey::ArrowUp => set_held_control(
                 &mut self.held.altitude_up,
                 event.transition,
-                &mut frame.input.altitude_up,
+                &mut step.input.altitude_up,
             ),
             KeyboardKey::ArrowDown => set_held_control(
                 &mut self.held.altitude_down,
                 event.transition,
-                &mut frame.input.altitude_down,
+                &mut step.input.altitude_down,
             ),
-            KeyboardKey::Character('r' | 'R') if active => frame.input.reverse = true,
+            KeyboardKey::Character('r' | 'R') if active => step.input.reverse = true,
             KeyboardKey::Character('t' | 'T') => set_held_control(
                 &mut self.held.thrust,
                 event.transition,
-                &mut frame.input.thrust,
+                &mut step.input.thrust,
             ),
-            KeyboardKey::Character('f' | 'F') if active => frame.input.fire = true,
-            KeyboardKey::Character('b' | 'B') if active => frame.input.smart_bomb = true,
-            KeyboardKey::Character('h' | 'H') if active => frame.input.hyperspace = true,
-            KeyboardKey::Function(2) if active => frame.input.service_advance = true,
-            KeyboardKey::Function(3) if active => frame.input.high_score_reset = true,
+            KeyboardKey::Character('f' | 'F') if active => step.input.fire = true,
+            KeyboardKey::Character('b' | 'B') if active => step.input.smart_bomb = true,
+            KeyboardKey::Character('h' | 'H') if active => step.input.hyperspace = true,
+            KeyboardKey::Function(2) if active => step.input.service_advance = true,
+            KeyboardKey::Function(3) if active => step.input.high_score_reset = true,
             KeyboardKey::Function(4) => set_held_control(
                 &mut self.held.auto_up_manual_down,
                 event.transition,
-                &mut frame.input.auto_up_manual_down,
+                &mut step.input.auto_up_manual_down,
             ),
-            KeyboardKey::Function(5) if active => frame.input.tilt = true,
+            KeyboardKey::Function(5) if active => step.input.tilt = true,
             _ => {}
         }
     }
@@ -640,7 +640,7 @@ pub struct AttractScript {
 
 impl AttractScript {
     pub fn new(mut events: Vec<AttractScriptEvent>) -> Self {
-        events.sort_by_key(|event| event.start_frame);
+        events.sort_by_key(|event| event.start_after_steps);
         Self { events }
     }
 
@@ -648,7 +648,7 @@ impl AttractScript {
         Self::new(vec![
             AttractScriptEvent::williams_logo(1, None, Point::new(94, 34)),
             AttractScriptEvent::defender_wordmark(
-                DEFENDER_WORDMARK_START_FRAME,
+                DEFENDER_WORDMARK_START_STEP,
                 None,
                 Point::new(88, 78),
             ),
@@ -656,11 +656,11 @@ impl AttractScript {
         ])
     }
 
-    fn draws_for(&self, actor: ActorId, frame: u64) -> Vec<DrawCommand> {
+    fn draws_for(&self, actor: ActorId, step: u64) -> Vec<DrawCommand> {
         self.events
             .iter()
-            .filter(|event| event.active_at(frame))
-            .map(|event| event.draw(actor, frame))
+            .filter(|event| event.active_at(step))
+            .map(|event| event.draw(actor, step))
             .collect()
     }
 }
@@ -673,21 +673,21 @@ impl Default for AttractScript {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttractScriptEvent {
-    pub start_frame: u64,
-    pub end_frame: Option<u64>,
+    pub start_after_steps: u64,
+    pub duration_steps: Option<u64>,
     pub action: AttractScriptAction,
 }
 
 impl AttractScriptEvent {
     pub fn text(
-        start_frame: u64,
-        end_frame: Option<u64>,
+        start_after_steps: u64,
+        duration_steps: Option<u64>,
         position: Point,
         value: impl Into<String>,
     ) -> Self {
         Self {
-            start_frame,
-            end_frame,
+            start_after_steps,
+            duration_steps,
             action: AttractScriptAction::Text {
                 position,
                 value: value.into(),
@@ -696,22 +696,26 @@ impl AttractScriptEvent {
     }
 
     pub fn sprite(
-        start_frame: u64,
-        end_frame: Option<u64>,
+        start_after_steps: u64,
+        duration_steps: Option<u64>,
         sprite: SpriteKey,
         position: Point,
     ) -> Self {
         Self {
-            start_frame,
-            end_frame,
+            start_after_steps,
+            duration_steps,
             action: AttractScriptAction::Sprite { sprite, position },
         }
     }
 
-    pub fn williams_logo(start_frame: u64, end_frame: Option<u64>, position: Point) -> Self {
+    pub fn williams_logo(
+        start_after_steps: u64,
+        duration_steps: Option<u64>,
+        position: Point,
+    ) -> Self {
         Self {
-            start_frame,
-            end_frame,
+            start_after_steps,
+            duration_steps,
             action: AttractScriptAction::WilliamsLogo {
                 position,
                 reveal_steps: WILLIAMS_REVEAL_STEPS,
@@ -720,10 +724,14 @@ impl AttractScriptEvent {
         }
     }
 
-    pub fn defender_wordmark(start_frame: u64, end_frame: Option<u64>, position: Point) -> Self {
+    pub fn defender_wordmark(
+        start_after_steps: u64,
+        duration_steps: Option<u64>,
+        position: Point,
+    ) -> Self {
         Self {
-            start_frame,
-            end_frame,
+            start_after_steps,
+            duration_steps,
             action: AttractScriptAction::DefenderWordmark {
                 position,
                 slots: DEFENDER_WORDMARK_SLOTS,
@@ -732,22 +740,23 @@ impl AttractScriptEvent {
         }
     }
 
-    fn active_at(&self, frame: u64) -> bool {
-        if frame < self.start_frame {
+    fn active_at(&self, step: u64) -> bool {
+        if step < self.start_after_steps {
             return false;
         }
-        match self.end_frame {
-            Some(end_frame) => frame < end_frame,
+        match self.duration_steps {
+            Some(duration_steps) => step < self.start_after_steps.saturating_add(duration_steps),
             None => true,
         }
     }
 
-    fn draw(&self, actor: ActorId, frame: u64) -> DrawCommand {
-        self.action.draw(actor, self.age(frame))
+    fn draw(&self, actor: ActorId, step: u64) -> DrawCommand {
+        self.action.draw(actor, self.age(step))
     }
 
-    fn age(&self, frame: u64) -> u64 {
-        frame.saturating_sub(self.start_frame).saturating_add(1)
+    fn age(&self, step: u64) -> u64 {
+        step.saturating_sub(self.start_after_steps)
+            .saturating_add(1)
     }
 }
 
@@ -950,8 +959,8 @@ pub enum GameCommand {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FramePrompt {
-    pub frame: u64,
+pub struct StepPrompt {
+    pub step: u64,
     pub phase: Phase,
     pub input: GameInput,
     pub score: u32,
@@ -959,7 +968,7 @@ pub struct FramePrompt {
     pub snapshots: Vec<ActorSnapshot>,
 }
 
-impl FramePrompt {
+impl StepPrompt {
     pub fn player_position(&self) -> Option<Point> {
         self.snapshots
             .iter()
@@ -992,11 +1001,11 @@ pub struct ActorReply {
 pub trait AssetActor: Send + 'static {
     fn id(&self) -> ActorId;
 
-    fn update(&mut self, prompt: &FramePrompt) -> ActorReply;
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply;
 }
 
 enum ActorRequest {
-    Prompt(FramePrompt),
+    Prompt(StepPrompt),
     Stop,
 }
 
@@ -1018,7 +1027,7 @@ impl ThreadedAsset {
         }
     }
 
-    fn prompt(&self, prompt: FramePrompt) -> Option<ActorReply> {
+    fn prompt(&self, prompt: StepPrompt) -> Option<ActorReply> {
         self.sender.send(ActorRequest::Prompt(prompt)).ok()?;
         self.receiver.recv().ok()
     }
@@ -1051,8 +1060,8 @@ fn run_actor_thread(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FrameReport {
-    pub frame: u64,
+pub struct StepReport {
+    pub step: u64,
     pub phase: Phase,
     pub score: u32,
     pub credits: u8,
@@ -1064,7 +1073,7 @@ pub struct FrameReport {
 }
 
 pub struct ActorGameDriver {
-    frame: u64,
+    step: u64,
     phase: Phase,
     score: u32,
     credits: u8,
@@ -1082,7 +1091,7 @@ impl ActorGameDriver {
 
     pub fn with_attract_script(attract_script: AttractScript) -> Self {
         let mut driver = Self {
-            frame: 0,
+            step: 0,
             phase: Phase::Attract,
             score: 0,
             credits: 0,
@@ -1099,10 +1108,10 @@ impl ActorGameDriver {
         driver
     }
 
-    pub fn step(&mut self, input: GameInput) -> FrameReport {
-        self.frame = self.frame.saturating_add(1);
-        let base_prompt = FramePrompt {
-            frame: self.frame,
+    pub fn step(&mut self, input: GameInput) -> StepReport {
+        self.step = self.step.saturating_add(1);
+        let base_prompt = StepPrompt {
+            step: self.step,
             phase: self.phase,
             input,
             score: self.score,
@@ -1136,8 +1145,8 @@ impl ActorGameDriver {
         let sounds = self.apply_commands(&commands);
         self.remove_dead_actors(&dead_actor_ids);
 
-        FrameReport {
-            frame: self.frame,
+        StepReport {
+            step: self.step,
             phase: self.phase,
             score: self.score,
             credits: self.credits,
@@ -1483,7 +1492,7 @@ impl AssetActor for AttractDirector {
         self.id
     }
 
-    fn update(&mut self, prompt: &FramePrompt) -> ActorReply {
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
         for _ in 0..prompt.input.coin_insertions() {
@@ -1521,11 +1530,16 @@ impl AssetActor for AttractDirector {
 struct ScriptedAttractProgram {
     id: ActorId,
     script: AttractScript,
+    elapsed_steps: u64,
 }
 
 impl ScriptedAttractProgram {
     fn new(id: ActorId, script: AttractScript) -> Self {
-        Self { id, script }
+        Self {
+            id,
+            script,
+            elapsed_steps: 0,
+        }
     }
 }
 
@@ -1534,10 +1548,12 @@ impl AssetActor for ScriptedAttractProgram {
         self.id
     }
 
-    fn update(&mut self, prompt: &FramePrompt) -> ActorReply {
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let draws = if matches!(prompt.phase, Phase::Attract | Phase::GameOver) {
-            self.script.draws_for(self.id, prompt.frame)
+            self.elapsed_steps = self.elapsed_steps.saturating_add(1);
+            self.script.draws_for(self.id, self.elapsed_steps)
         } else {
+            self.elapsed_steps = 0;
             Vec::new()
         };
 
@@ -1584,7 +1600,7 @@ impl AssetActor for PlayerShip {
         self.id
     }
 
-    fn update(&mut self, prompt: &FramePrompt) -> ActorReply {
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
@@ -1684,7 +1700,7 @@ impl AssetActor for Lander {
         self.id
     }
 
-    fn update(&mut self, prompt: &FramePrompt) -> ActorReply {
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
@@ -1697,7 +1713,7 @@ impl AssetActor for Lander {
                     self.update_carrying(human_id, pull_sound_sent, &mut commands);
                 }
             }
-            if prompt.frame % LANDER_FIRE_PERIOD == self.id.value() % LANDER_FIRE_PERIOD {
+            if prompt.step % LANDER_FIRE_PERIOD == self.id.value() % LANDER_FIRE_PERIOD {
                 commands.push(GameCommand::PlaySound(SoundCue::Laser));
             }
             draws.push(DrawCommand::sprite(
@@ -1722,7 +1738,7 @@ impl AssetActor for Lander {
 }
 
 impl Lander {
-    fn update_seeking(&mut self, prompt: &FramePrompt, commands: &mut Vec<GameCommand>) {
+    fn update_seeking(&mut self, prompt: &StepPrompt, commands: &mut Vec<GameCommand>) {
         if let Some(target) = prompt.nearest_human(self.position) {
             if pickup_distance(self.position, target.position) {
                 self.mode = LanderMode::Carrying {
@@ -1815,7 +1831,7 @@ impl AssetActor for Mutant {
         self.id
     }
 
-    fn update(&mut self, prompt: &FramePrompt) -> ActorReply {
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
             if let Some(player) = prompt.player_position() {
@@ -1865,7 +1881,7 @@ impl Human {
         Rect::from_center(self.position, 4, 8)
     }
 
-    fn update_falling(&mut self, velocity: i16, prompt: &FramePrompt) -> Vec<GameCommand> {
+    fn update_falling(&mut self, velocity: i16, prompt: &StepPrompt) -> Vec<GameCommand> {
         let mut commands = Vec::new();
         let next_velocity = (velocity + HUMAN_FALL_ACCELERATION).min(8);
         self.position = self.position.offset(Velocity::new(0, next_velocity));
@@ -1913,7 +1929,7 @@ impl Human {
         commands
     }
 
-    fn update_carried(&mut self, carrier: ActorId, prompt: &FramePrompt) -> Vec<GameCommand> {
+    fn update_carried(&mut self, carrier: ActorId, prompt: &StepPrompt) -> Vec<GameCommand> {
         let mut commands = Vec::new();
         if let Some(carrier_snapshot) = prompt.snapshot(carrier) {
             self.position = carrier_snapshot.position.offset(Velocity::new(0, 8));
@@ -1930,7 +1946,7 @@ impl AssetActor for Human {
         self.id
     }
 
-    fn update(&mut self, prompt: &FramePrompt) -> ActorReply {
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
@@ -1998,7 +2014,7 @@ impl AssetActor for ScorePopup {
         self.id
     }
 
-    fn update(&mut self, _prompt: &FramePrompt) -> ActorReply {
+    fn update(&mut self, _prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
         if self.remaining > 0 {
@@ -2057,7 +2073,7 @@ impl AssetActor for LaserShot {
         self.id
     }
 
-    fn update(&mut self, prompt: &FramePrompt) -> ActorReply {
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing && self.remaining > 0 {
@@ -2109,7 +2125,7 @@ impl AssetActor for Explosion {
         self.id
     }
 
-    fn update(&mut self, _prompt: &FramePrompt) -> ActorReply {
+    fn update(&mut self, _prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
         if self.remaining > 0 {
@@ -2196,14 +2212,14 @@ mod tests {
         }));
 
         let mut coalescing = None;
-        for _ in 0..DEFENDER_WORDMARK_START_FRAME {
-            let frame = driver.step(GameInput::NONE);
-            if frame
+        for _ in 0..DEFENDER_WORDMARK_START_STEP {
+            let step = driver.step(GameInput::NONE);
+            if step
                 .draws
                 .iter()
                 .any(|draw| draw.sprite == SpriteKey::DefenderCoalescence)
             {
-                coalescing = Some(frame);
+                coalescing = Some(step);
                 break;
             }
         }
@@ -2221,13 +2237,13 @@ mod tests {
 
         let mut settled = None;
         for _ in 0..(DEFENDER_WORDMARK_SLOTS * DEFENDER_WORDMARK_ROW_PAIRS + 1) {
-            let frame = driver.step(GameInput::NONE);
-            if frame
+            let step = driver.step(GameInput::NONE);
+            if step
                 .draws
                 .iter()
                 .any(|draw| draw.sprite == SpriteKey::DefenderWordmark)
             {
-                settled = Some(frame);
+                settled = Some(step);
                 break;
             }
         }
@@ -2312,7 +2328,7 @@ mod tests {
     #[test]
     fn planetoid_mapper_matches_current_live_key_contract() {
         let mut mapper = KeyboardMapper::new(KeyboardProfile::Planetoid);
-        let mut frame = KeyboardFrame::default();
+        let mut step = KeyboardPoll::default();
 
         for key in [
             KeyboardKey::Character('5'),
@@ -2330,100 +2346,82 @@ mod tests {
             KeyboardKey::Function(4),
             KeyboardKey::Function(5),
         ] {
-            mapper.map_event(KeyboardEvent::press(key), &mut frame);
+            mapper.map_event(KeyboardEvent::press(key), &mut step);
         }
-        mapper.finish_frame(&mut frame);
+        mapper.finish_poll(&mut step);
 
-        assert!(frame.input.coin);
-        assert!(frame.input.coin_two);
-        assert!(frame.input.coin_three);
-        assert!(frame.input.start_one);
-        assert!(frame.input.fire);
-        assert!(frame.input.altitude_up);
-        assert!(frame.input.altitude_down);
-        assert!(frame.input.thrust);
-        assert!(frame.input.reverse);
-        assert!(frame.input.smart_bomb);
-        assert!(frame.input.hyperspace);
-        assert!(frame.input.service_advance);
-        assert!(frame.input.high_score_reset);
-        assert!(frame.input.auto_up_manual_down);
-        assert!(frame.input.tilt);
+        assert!(step.input.coin);
+        assert!(step.input.coin_two);
+        assert!(step.input.coin_three);
+        assert!(step.input.start_one);
+        assert!(step.input.fire);
+        assert!(step.input.altitude_up);
+        assert!(step.input.altitude_down);
+        assert!(step.input.thrust);
+        assert!(step.input.reverse);
+        assert!(step.input.smart_bomb);
+        assert!(step.input.hyperspace);
+        assert!(step.input.service_advance);
+        assert!(step.input.high_score_reset);
+        assert!(step.input.auto_up_manual_down);
+        assert!(step.input.tilt);
     }
 
     #[test]
     fn cabinet_mapper_keeps_enter_out_of_the_start_binding() {
         let mut mapper = KeyboardMapper::new(KeyboardProfile::Cabinet);
-        let mut enter_frame = KeyboardFrame::default();
+        let mut enter_poll = KeyboardPoll::default();
 
-        mapper.map_event(KeyboardEvent::press(KeyboardKey::Enter), &mut enter_frame);
-        mapper.finish_frame(&mut enter_frame);
-        assert!(!enter_frame.input.start_one);
-        assert!(!enter_frame.input.fire);
+        mapper.map_event(KeyboardEvent::press(KeyboardKey::Enter), &mut enter_poll);
+        mapper.finish_poll(&mut enter_poll);
+        assert!(!enter_poll.input.start_one);
+        assert!(!enter_poll.input.fire);
 
-        let mut frame = KeyboardFrame::default();
-        mapper.map_event(
-            KeyboardEvent::press(KeyboardKey::Character('1')),
-            &mut frame,
-        );
-        mapper.map_event(
-            KeyboardEvent::press(KeyboardKey::Character('2')),
-            &mut frame,
-        );
-        mapper.map_event(KeyboardEvent::press(KeyboardKey::ArrowUp), &mut frame);
-        mapper.map_event(KeyboardEvent::press(KeyboardKey::ArrowDown), &mut frame);
-        mapper.map_event(
-            KeyboardEvent::press(KeyboardKey::Character('R')),
-            &mut frame,
-        );
-        mapper.map_event(
-            KeyboardEvent::press(KeyboardKey::Character('T')),
-            &mut frame,
-        );
-        mapper.map_event(
-            KeyboardEvent::press(KeyboardKey::Character('F')),
-            &mut frame,
-        );
-        mapper.map_event(
-            KeyboardEvent::press(KeyboardKey::Character('B')),
-            &mut frame,
-        );
-        mapper.finish_frame(&mut frame);
+        let mut step = KeyboardPoll::default();
+        mapper.map_event(KeyboardEvent::press(KeyboardKey::Character('1')), &mut step);
+        mapper.map_event(KeyboardEvent::press(KeyboardKey::Character('2')), &mut step);
+        mapper.map_event(KeyboardEvent::press(KeyboardKey::ArrowUp), &mut step);
+        mapper.map_event(KeyboardEvent::press(KeyboardKey::ArrowDown), &mut step);
+        mapper.map_event(KeyboardEvent::press(KeyboardKey::Character('R')), &mut step);
+        mapper.map_event(KeyboardEvent::press(KeyboardKey::Character('T')), &mut step);
+        mapper.map_event(KeyboardEvent::press(KeyboardKey::Character('F')), &mut step);
+        mapper.map_event(KeyboardEvent::press(KeyboardKey::Character('B')), &mut step);
+        mapper.finish_poll(&mut step);
 
-        assert!(frame.input.start_one);
-        assert!(frame.input.start_two);
-        assert!(frame.input.altitude_up);
-        assert!(frame.input.altitude_down);
-        assert!(frame.input.reverse);
-        assert!(frame.input.thrust);
-        assert!(frame.input.fire);
-        assert!(frame.input.smart_bomb);
+        assert!(step.input.start_one);
+        assert!(step.input.start_two);
+        assert!(step.input.altitude_up);
+        assert!(step.input.altitude_down);
+        assert!(step.input.reverse);
+        assert!(step.input.thrust);
+        assert!(step.input.fire);
+        assert!(step.input.smart_bomb);
     }
 
     #[test]
     fn xyzzy_overlay_toggles_auto_fire_invincibility_and_overlay_bomb() {
         let mut mapper = KeyboardMapper::default();
-        let mut frame = KeyboardFrame::default();
+        let mut step = KeyboardPoll::default();
 
         for character in ['x', 'y', 'z', 'z', 'y', 'f', 'g'] {
             mapper.map_event(
                 KeyboardEvent::press(KeyboardKey::Character(character)),
-                &mut frame,
+                &mut step,
             );
         }
-        mapper.map_event(KeyboardEvent::press(KeyboardKey::Tab), &mut frame);
-        mapper.finish_frame(&mut frame);
+        mapper.map_event(KeyboardEvent::press(KeyboardKey::Tab), &mut step);
+        mapper.finish_poll(&mut step);
 
-        assert!(frame.input.xyzzy.active);
-        assert!(frame.input.xyzzy.auto_fire);
-        assert!(frame.input.xyzzy.invincible);
-        assert!(frame.input.xyzzy.overlay_smart_bomb);
-        assert!(frame.input.fire);
+        assert!(step.input.xyzzy.active);
+        assert!(step.input.xyzzy.auto_fire);
+        assert!(step.input.xyzzy.invincible);
+        assert!(step.input.xyzzy.overlay_smart_bomb);
+        assert!(step.input.fire);
 
         for character in ['x', 'y', 'z', 'z', 'y'] {
             mapper.map_event(
                 KeyboardEvent::press(KeyboardKey::Character(character)),
-                &mut KeyboardFrame::default(),
+                &mut KeyboardPoll::default(),
             );
         }
         assert_eq!(mapper.xyzzy_mode(), XyzzyMode::INACTIVE);
@@ -2586,9 +2584,9 @@ mod tests {
 
         let mut converted = None;
         for _ in 0..120 {
-            let frame = driver.step(GameInput::NONE);
-            if frame.sounds.contains(&SoundCue::MutantSpawn) {
-                converted = Some(frame);
+            let step = driver.step(GameInput::NONE);
+            if step.sounds.contains(&SoundCue::MutantSpawn) {
+                converted = Some(step);
                 break;
             }
         }
@@ -2631,7 +2629,7 @@ mod tests {
     }
 
     #[test]
-    fn high_score_entry_is_a_phase_not_a_legacy_frame_script() {
+    fn high_score_entry_is_a_phase_not_a_legacy_timeline_script() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.score = 12_000;
@@ -2666,13 +2664,13 @@ mod tests {
     }
 
     #[test]
-    fn threaded_asset_is_prompted_once_per_driver_frame() {
+    fn threaded_asset_is_prompted_once_per_driver_step() {
         let mut driver = ActorGameDriver::new();
         let first = driver.step(GameInput::NONE);
         let second = driver.step(GameInput::NONE);
 
-        assert_eq!(first.frame, 1);
-        assert_eq!(second.frame, 2);
+        assert_eq!(first.step, 1);
+        assert_eq!(second.step, 2);
         assert!(
             second
                 .snapshots

@@ -13,8 +13,9 @@ verified.
   `AttractDirector`, `ScriptedAttractProgram`, `PlayerShip`, `Lander`,
   `Mutant`, `Human`, `LaserShot`, `Explosion`, and `ScorePopup`.
 - `ThreadedAsset` runs one actor on one Rust thread. The driver sends one
-  `FramePrompt` per frame and waits for one `ActorReply`, keeping behavior
-  deterministic while still matching the requested thread-per-asset shape.
+  `StepPrompt` per simulation step and waits for one `ActorReply`, keeping
+  behavior deterministic while still matching the requested thread-per-asset
+  shape.
 - Actors do not mutate the world directly. They return snapshots, draw
   commands, sound cues, and gameplay commands. The driver resolves collisions
   and applies world rules in stable actor-id order.
@@ -30,7 +31,7 @@ verified.
 | Base sprite class with virtual methods | `AssetActor` trait |
 | Sprite subclasses | concrete actor structs |
 | Game/world driver class | `ActorGameDriver` |
-| Per-object update method | `AssetActor::update(&FramePrompt)` |
+| Per-object update method | `AssetActor::update(&StepPrompt)` |
 | Draw and sound side effects | `DrawCommand` and `SoundCue` replies |
 | Direct object pointers | stable `ActorId` plus snapshots |
 | Thread per object | `ThreadedAsset` prompt/reply channel |
@@ -52,11 +53,23 @@ existing runtime mapper. `KeyboardMapper` supports the current `planetoid` and
   auto-fire, `G` toggles invincibility, and `Tab` can mark an overlay smart
   bomb request.
 
+## Not Frame Driven
+
+The actor rewrite is not a MAME frame-script runner. `ActorGameDriver::step`
+advances the simulation once, prompts each actor once, and lets actor-owned
+state decide what changes. A renderer may draw the latest `StepReport` at any
+display cadence, but rendering cadence is not the source of gameplay behavior.
+
+Attract scripting follows the same rule. `ScriptedAttractProgram` keeps its own
+elapsed script step and evaluates relative `AttractScriptEvent` durations. It
+does not branch on the global driver step or on protected-reference frame
+numbers.
+
 ## Attract Graphics
 
 The attract screen is data-driven. `AttractScript` contains ordered
 `AttractScriptEvent` records, and `ScriptedAttractProgram` turns the active
-events for the current frame into draw commands. The default
+events for its own current script step into draw commands. The default
 `AttractScript::red_label_title()` recreates the current Williams/logo/high
 score opening sequence, while `ActorGameDriver::with_attract_script(...)` lets
 a custom driver provide its own sequence without replacing coin/start control
