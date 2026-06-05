@@ -108,6 +108,7 @@ const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_FINAL_DEATH_DELAY_FRAMES: u16 
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_TERRAIN_BLOW_STATE_FRAME: u64 = 4927;
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_POST_GAME_DURATION_FRAMES: u16 = 1200;
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_TERRAIN_BLOW_POST_GAME_FRAME: u16 = 1044;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECT_SAMPLE_ALIGNMENT_FRAMES: u16 = 1;
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_PROJECTILE_DEATH_SOUND_SEQUENCE: [(u16, u8); 5] = [
     (2, SOURCE_PDSND_SOUND_COMMAND),
     (3, SOURCE_AHSND_SOUND_COMMAND),
@@ -6499,17 +6500,19 @@ fn source_post_game_landers(frame: u16) -> Vec<EnemySnapshot> {
 }
 
 fn source_target4_smartmix_terminal_post_game_enemies(frame: u16) -> Vec<EnemySnapshot> {
+    let object_frame = frame
+        .saturating_add(SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECT_SAMPLE_ALIGNMENT_FRAMES);
     SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECT_TRACKS
         .iter()
         .filter_map(|track| {
-            let position = interpolate_source_post_game_position(&track.samples, frame)?;
+            let position = interpolate_source_post_game_position(&track.samples, object_frame)?;
             Some(match track.kind {
                 SourceTerminalObjectKind::FixedLander => {
                     source_terminal_post_game_lander(position, 0, ScreenVelocity::new(0, 0))
                 }
                 SourceTerminalObjectKind::CyclingLander => source_terminal_post_game_lander(
                     position,
-                    source_target4_smartmix_terminal_lander_picture_frame(frame),
+                    source_target4_smartmix_terminal_lander_picture_frame(object_frame),
                     ScreenVelocity::new(0, 0),
                 ),
                 SourceTerminalObjectKind::Mutant => {
@@ -25752,7 +25755,7 @@ mod tests {
         for input_frame in 0..=6006u16 {
             let frame = game.step(organic_smartmix_input(input_frame));
             let state_frame = frame.state.frame;
-            if matches!(state_frame, 5981 | 5991) {
+            if matches!(state_frame, 5960 | 5981 | 5990 | 5991) {
                 let lander_count = frame
                     .state
                     .world
@@ -25840,7 +25843,9 @@ mod tests {
         assert_eq!(
             terminal_object_samples,
             vec![
+                (5960, 6, 9, Some(ScreenPosition::new(48, 54))),
                 (5981, 6, 9, Some(ScreenPosition::new(44, 51))),
+                (5990, 6, 9, Some(ScreenPosition::new(41, 49))),
                 (5991, 6, 9, Some(ScreenPosition::new(41, 49))),
             ]
         );

@@ -6353,3 +6353,26 @@ Exit gate:
   regression tests, Cargo check/clippy, touched-doc `markdownlint`, and
   `git diff --check`. Slack start:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780697229173389`.
+- `2026-06-05 23:22 BST`: Completed the organic smartmix residual-object
+  sample alignment cycle. The target4 terminal post-game object projection now
+  samples the source residual track table one clean post-game tick earlier, so
+  the first compared clean frame at state frame `5960` already carries the
+  six-lander/nine-mutant residual formation instead of an empty playfield.
+  The focused organic regression now asserts the residual mix and first-mutant
+  positions at state frames `5960`, `5981`, `5990`, and `5991`; `5990` reaches
+  the terminal `41,49` mutant position before terrain flips at `5991`.
+  Regenerated ignored media confirms the first candidate comparison frame now
+  has visible residual objects plus terrain. The all-axis report still fails
+  with visual RMS `90.85`, visual MAE `42.72`, `normalized_diff_rms=1.726`,
+  audio correlation `-0.005`, and audio envelope correlation `0.137`, so the
+  remaining organic smartmix gap is residual-object placement/HUD/scanner/audio
+  parity rather than object absence. No protected media was committed or
+  accepted, and no legacy code, tests, or scaffolding were safe to remove
+  because this proof boundary still depends on clean-vs-MAME reference
+  tooling. Evidence runs included the `reference-clean-capture` and
+  `reference-media-check` targets, with the media check expectedly failing on
+  the current all-axis metrics. Validation passed with `cargo fmt --check`, the
+  focused organic regression, terrain-blow regression tests, Cargo
+  check/clippy, touched-doc `markdownlint`, and `git diff --check`. Slack
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780697836698829`.
