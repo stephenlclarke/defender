@@ -114,6 +114,9 @@ const ACTOR_BAITER_TIMER_PACING_STEPS: u8 = 15;
 const SOURCE_BOMBER_LOOP_SLEEP_TICKS: u8 = 1;
 const SOURCE_BOMBER_PICTURE_FRAME_COUNT: u8 = 4;
 const SOURCE_BOMBER_CRUISE_ALTITUDE: i16 = 0x50;
+const SOURCE_BOMBER_MIN_CRUISE_ALTITUDE: i16 = 0x40;
+const SOURCE_BOMBER_MAX_CRUISE_ALTITUDE: i16 = 0x68;
+const SOURCE_BOMBER_CRUISE_WINDOW_HALF_PIXELS: i16 = 0x10;
 const SOURCE_ACTIVE_BOMBER_BOMB_LIMIT: usize = 10;
 const SOURCE_MAX_ACTIVE_WAVE_ENEMIES: usize = 5;
 const SOURCE_START_HUMAN_COUNT: u8 = 10;
@@ -5829,13 +5832,30 @@ impl Bomber {
         Rect::from_center(self.position, 8, 8)
     }
 
-    fn advance_source_motion(&mut self) -> bool {
+    fn advance_source_motion(&mut self, prompt: &StepPrompt) -> bool {
         let Some(source) = &mut self.source else {
             return false;
         };
         if source.sleep_ticks > 0 {
             source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
             return true;
+        }
+
+        let seed = actor_source_motion_seed(prompt.step, self.id);
+        source.picture_frame = actor_source_bomber_picture_frame(seed, source.picture_frame);
+        source.y_velocity = actor_source_bomber_random_y_velocity(source.y_velocity, seed);
+        if self.position.y == 0 {
+            source.y_velocity = actor_source_bomber_cruise_y_velocity(
+                source.y_velocity,
+                &mut source.cruise_altitude,
+                self.position.y,
+                seed,
+            );
+        } else if let Some(player) = prompt.player_position()
+            && let Some(delta) =
+                actor_source_bomber_onscreen_y_velocity_delta(self.position.y, player.y)
+        {
+            source.y_velocity = source.y_velocity.wrapping_add(delta);
         }
 
         let (x, x_fraction) =
@@ -5845,8 +5865,6 @@ impl Bomber {
         self.position = Point::new(x, y);
         source.x_fraction = x_fraction;
         source.y_fraction = y_fraction;
-        source.picture_frame =
-            source.picture_frame.saturating_add(1) % SOURCE_BOMBER_PICTURE_FRAME_COUNT;
         source.sleep_ticks = SOURCE_BOMBER_LOOP_SLEEP_TICKS;
         self.drift = actor_source_drift_from_velocity(source.x_velocity);
         true
@@ -5900,6 +5918,66 @@ impl Bomber {
     }
 }
 
+fn actor_source_bomber_picture_frame(seed: u8, current: u8) -> u8 {
+    let step = (seed & 0x3F).wrapping_sub(0x20);
+    if step & 0x80 != 0 {
+        current
+            .saturating_add(1)
+            .min(SOURCE_BOMBER_PICTURE_FRAME_COUNT - 1)
+    } else {
+        current.saturating_sub(1)
+    }
+}
+
+fn actor_source_bomber_random_y_velocity(previous: u16, seed: u8) -> u16 {
+    let random_delta = actor_sign_extend_u8_to_u16((seed & 0x3F).wrapping_sub(0x20));
+    let mut velocity = previous.wrapping_add(random_delta);
+    let damping_byte = 0u8.wrapping_sub(velocity.wrapping_shl(3).to_be_bytes()[0]);
+    velocity = velocity.wrapping_add(actor_sign_extend_u8_to_u16(damping_byte));
+    velocity
+}
+
+fn actor_source_bomber_cruise_y_velocity(
+    mut velocity: u16,
+    cruise_altitude: &mut i16,
+    object_y: i16,
+    seed: u8,
+) -> u16 {
+    if seed <= 0x40 {
+        let nudge = i16::from((seed & 0x03).wrapping_sub(2) as i8);
+        *cruise_altitude = (*cruise_altitude + nudge).clamp(
+            SOURCE_BOMBER_MIN_CRUISE_ALTITUDE,
+            SOURCE_BOMBER_MAX_CRUISE_ALTITUDE,
+        );
+    }
+
+    let distance = *cruise_altitude - object_y;
+    if distance.abs() > SOURCE_BOMBER_CRUISE_WINDOW_HALF_PIXELS {
+        let correction = if distance >= 0 { 0xFFF0 } else { 0x0010 };
+        velocity = velocity.wrapping_add(correction);
+    }
+    velocity
+}
+
+fn actor_source_bomber_onscreen_y_velocity_delta(object_y: i16, player_y: i16) -> Option<u16> {
+    let delta = object_y - player_y;
+    if delta >= 0 {
+        if delta >= 0x20 {
+            Some(0xFFF0)
+        } else if delta > 0x10 {
+            None
+        } else {
+            Some(0x0010)
+        }
+    } else if delta <= -0x20 {
+        Some(0x0010)
+    } else if delta < -0x10 {
+        None
+    } else {
+        Some(0xFFF0)
+    }
+}
+
 impl AssetActor for Bomber {
     fn id(&self) -> ActorId {
         self.id
@@ -5911,7 +5989,7 @@ impl AssetActor for Bomber {
         let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Bomber);
-            if !self.advance_source_motion()
+            if !self.advance_source_motion(prompt)
                 && let Some(position) = move_by_hostile_mode(
                     self.position,
                     behavior.bomber_mode,
@@ -8402,6 +8480,31 @@ mod tests {
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 3);
         assert_eq!(driver.snapshot_count(ActorKind::Bomber), 1);
         assert_eq!(driver.snapshot_count(ActorKind::Pod), 1);
+        let bomber_snapshot = live
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Bomber)
+            .expect("second wave should publish source bomber snapshot");
+        let (expected_bomber_position, expected_bomber_source) =
+            expected_source_bomber_after_motion(
+                Point::new(228, 104),
+                ActorSourceBomberMetadata {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0xFFD8,
+                    y_velocity: 0,
+                    picture_frame: 0,
+                    cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
+                    sleep_ticks: 0,
+                    source_slot: 1,
+                },
+                live.step,
+                bomber_snapshot.id,
+                live.snapshots
+                    .iter()
+                    .find(|snapshot| snapshot.kind == ActorKind::Player)
+                    .map(|snapshot| snapshot.position),
+            );
         assert!(live.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Lander
                 && snapshot.position == Point::new(0xD2, 0x2C)
@@ -8417,20 +8520,8 @@ mod tests {
                         target_human_index: Some(1),
                     })
         }));
-        assert!(live.snapshots.iter().any(|snapshot| {
-            snapshot.kind == ActorKind::Bomber
-                && snapshot.source_bomber
-                    == Some(ActorSourceBomberMetadata {
-                        x_fraction: 0xD8,
-                        y_fraction: 0,
-                        x_velocity: 0xFFD8,
-                        y_velocity: 0,
-                        picture_frame: 1,
-                        cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
-                        sleep_ticks: SOURCE_BOMBER_LOOP_SLEEP_TICKS,
-                        source_slot: 1,
-                    })
-        }));
+        assert_eq!(bomber_snapshot.position, expected_bomber_position);
+        assert_eq!(bomber_snapshot.source_bomber, Some(expected_bomber_source));
         assert!(live.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Pod
                 && snapshot.source_pod
@@ -8445,7 +8536,11 @@ mod tests {
             live.draws
                 .iter()
                 .any(|draw| draw.sprite == SpriteKey::Bomber
-                    && matches!(draw.effect, VisualEffect::SourceBomberFrame { frame: 1 }))
+                    && matches!(
+                        draw.effect,
+                        VisualEffect::SourceBomberFrame { frame }
+                            if frame == expected_bomber_source.picture_frame
+                    ))
         );
         assert!(
             live.draws.iter().any(|draw| draw.sprite == SpriteKey::Pod
@@ -9408,35 +9503,45 @@ mod tests {
                 ..ActorBehaviorProfile::default()
             },
         );
-        driver.spawn_bomber_from_spawn(ActorBomberSpawn {
+        let initial_source = ActorSourceBomberMetadata {
+            x_fraction: 0x6D,
+            y_fraction: 0x7B,
+            x_velocity: 0,
+            y_velocity: 0,
+            picture_frame: 0,
+            cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
+            sleep_ticks: 0,
+            source_slot: 0,
+        };
+        let bomber = driver.spawn_bomber_from_spawn(ActorBomberSpawn {
             position: Point::new(100, 80),
-            source: Some(ActorSourceBomberMetadata {
-                x_fraction: 0x6D,
-                y_fraction: 0x7B,
-                x_velocity: 0,
-                y_velocity: 0,
-                picture_frame: 0,
-                cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
-                sleep_ticks: 0,
-                source_slot: 0,
-            }),
+            source: Some(initial_source),
         });
 
         let report = driver.step(GameInput::NONE);
+        let (expected_position, expected_source) = expected_source_bomber_after_motion(
+            Point::new(100, 80),
+            initial_source,
+            report.step,
+            bomber,
+            None,
+        );
 
         assert!(report.commands.iter().any(|command| {
             matches!(
                 command,
                 GameCommand::Spawn(SpawnRequest::Bomb {
-                    position: Point { x: 100, y: 80 },
+                    position,
                     source: Some(ActorSourceEnemyProjectileMetadata {
-                        x_fraction: 0x6D,
-                        y_fraction: 0x7B,
+                        x_fraction,
+                        y_fraction,
                         x_velocity: 0,
                         y_velocity: 0,
                         lifetime_ticks: 0,
                     }),
-                })
+                }) if *position == expected_position
+                    && *x_fraction == expected_source.x_fraction
+                    && *y_fraction == expected_source.y_fraction
             )
         }));
 
@@ -9445,17 +9550,18 @@ mod tests {
             .snapshots
             .iter()
             .find(|snapshot| {
-                snapshot
-                    .source_enemy_projectile
-                    .is_some_and(|source| source.x_fraction == 0x6D && source.y_fraction == 0x7B)
+                snapshot.source_enemy_projectile.is_some_and(|source| {
+                    source.x_fraction == expected_source.x_fraction
+                        && source.y_fraction == expected_source.y_fraction
+                })
             })
             .expect("source-backed bomber bomb should publish source shell fractions");
 
         assert_eq!(
             bomb.source_enemy_projectile,
             Some(ActorSourceEnemyProjectileMetadata {
-                x_fraction: 0x6D,
-                y_fraction: 0x7B,
+                x_fraction: expected_source.x_fraction,
+                y_fraction: expected_source.y_fraction,
                 x_velocity: 0,
                 y_velocity: 0,
                 lifetime_ticks: 5,
@@ -9511,6 +9617,115 @@ mod tests {
         );
         let live = driver.step(GameInput::NONE);
         assert_eq!(bomb_shell_snapshot_count(&live), 0);
+    }
+
+    #[test]
+    fn source_bomber_motion_uses_seeded_picture_and_y_velocity() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.set_kind_behavior(
+            ActorKind::Bomber,
+            ActorBehaviorProfile {
+                bomber_bomb_period_steps: u64::MAX,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        driver.spawn_player();
+        let player_report = driver.step(GameInput::NONE);
+        let player_position = player_report
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Player)
+            .map(|snapshot| snapshot.position)
+            .expect("player should publish a prompt snapshot");
+        let initial_source = ActorSourceBomberMetadata {
+            x_fraction: 0x10,
+            y_fraction: 0x20,
+            x_velocity: 0x0100,
+            y_velocity: 0,
+            picture_frame: 2,
+            cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
+            sleep_ticks: 0,
+            source_slot: 3,
+        };
+        let bomber_position = Point::new(96, player_position.y - 8);
+        let bomber = driver.spawn_bomber_from_spawn(ActorBomberSpawn {
+            position: bomber_position,
+            source: Some(initial_source),
+        });
+
+        let report = driver.step(GameInput::NONE);
+        let (expected_position, expected_source) = expected_source_bomber_after_motion(
+            bomber_position,
+            initial_source,
+            report.step,
+            bomber,
+            Some(player_position),
+        );
+        let snapshot = snapshot_for(&report, bomber);
+
+        assert_eq!(snapshot.position, expected_position);
+        assert_eq!(snapshot.source_bomber, Some(expected_source));
+        assert_ne!(expected_source.y_velocity, 0);
+        assert!(report.draws.iter().any(|draw| {
+            draw.actor == bomber
+                && matches!(
+                    draw.effect,
+                    VisualEffect::SourceBomberFrame { frame }
+                        if frame == expected_source.picture_frame
+                )
+        }));
+        assert!(
+            !report.commands.iter().any(|command| {
+                matches!(command, GameCommand::Spawn(SpawnRequest::Bomb { .. }))
+            })
+        );
+    }
+
+    #[test]
+    fn source_bomber_offscreen_motion_adjusts_cruise_altitude() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.set_kind_behavior(
+            ActorKind::Bomber,
+            ActorBehaviorProfile {
+                bomber_bomb_period_steps: u64::MAX,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        let initial_source = ActorSourceBomberMetadata {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            picture_frame: 1,
+            cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
+            sleep_ticks: 0,
+            source_slot: 3,
+        };
+        let bomber_position = Point::new(100, 0);
+        let bomber = driver.spawn_bomber_from_spawn(ActorBomberSpawn {
+            position: bomber_position,
+            source: Some(initial_source),
+        });
+
+        let report = driver.step(GameInput::NONE);
+        let (expected_position, expected_source) = expected_source_bomber_after_motion(
+            bomber_position,
+            initial_source,
+            report.step,
+            bomber,
+            None,
+        );
+        let snapshot = snapshot_for(&report, bomber);
+
+        assert_eq!(snapshot.position, expected_position);
+        assert_eq!(snapshot.source_bomber, Some(expected_source));
+        assert_ne!(
+            expected_source.cruise_altitude,
+            SOURCE_BOMBER_CRUISE_ALTITUDE
+        );
+        assert_ne!(expected_source.y_velocity, 0);
     }
 
     #[test]
@@ -10881,6 +11096,44 @@ mod tests {
             .iter()
             .find(|snapshot| snapshot.id == id)
             .expect("actor snapshot should be present")
+    }
+
+    fn expected_source_bomber_after_motion(
+        position: Point,
+        mut source: ActorSourceBomberMetadata,
+        step: u64,
+        id: ActorId,
+        player_position: Option<Point>,
+    ) -> (Point, ActorSourceBomberMetadata) {
+        if source.sleep_ticks > 0 {
+            source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
+            return (position, source);
+        }
+
+        let seed = actor_source_motion_seed(step, id);
+        source.picture_frame = actor_source_bomber_picture_frame(seed, source.picture_frame);
+        source.y_velocity = actor_source_bomber_random_y_velocity(source.y_velocity, seed);
+        if position.y == 0 {
+            source.y_velocity = actor_source_bomber_cruise_y_velocity(
+                source.y_velocity,
+                &mut source.cruise_altitude,
+                position.y,
+                seed,
+            );
+        } else if let Some(player) = player_position
+            && let Some(delta) = actor_source_bomber_onscreen_y_velocity_delta(position.y, player.y)
+        {
+            source.y_velocity = source.y_velocity.wrapping_add(delta);
+        }
+
+        let (x, x_fraction) =
+            actor_source_axis_step(position.x, source.x_fraction, source.x_velocity);
+        let (y, y_fraction) =
+            actor_source_axis_step(position.y, source.y_fraction, source.y_velocity);
+        source.x_fraction = x_fraction;
+        source.y_fraction = y_fraction;
+        source.sleep_ticks = SOURCE_BOMBER_LOOP_SLEEP_TICKS;
+        (Point::new(x, y), source)
     }
 
     fn actor_snapshot(id: u64, kind: ActorKind, position: Point) -> ActorSnapshot {

@@ -4595,3 +4595,30 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780641377152289`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780641802044359`.
+- `2026-06-05 07:55 BST`: Completed the actor source bomber motion metadata
+  cycle. Source-backed bomber actors now use actor-owned source motion seeds to
+  update picture-frame metadata, damp/randomize Y velocity, correct
+  cruise-altitude motion while offscreen, and apply player-relative onscreen
+  Y-velocity adjustment before advancing fixed-point position/fractions.
+  Bomber bomb spawn commands now inherit the bomber's updated source fractions
+  after that motion step instead of the earlier compact static-Y loop state.
+  Added a focused source bomber motion regression and updated second-wave plus
+  bomb-fraction regressions for the new source-shaped state. README, SPEC, and
+  the actor architecture notes now document seeded source bomber Y-motion
+  metadata. No legacy code, tests, or scaffolding were safe to remove in this
+  slice because clean smoke/fidelity/oracle evidence still depends on clean
+  runtime boundaries outside the actor path. Validation passed with `cargo fmt
+  --check`, focused source bomber tests,
+  `cargo test second_source_wave_spawns_bomber_and_pod_actor_families --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite was not rerun in this cycle; the previously isolated
+  clean-game MAME window/post-game audio failures remain outside this slice.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780641968857339`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780642500339539`.
