@@ -127,6 +127,64 @@ const SOURCE_TOP_DISPLAY_BORDER_SEGMENTS: [(u16, [f32; 2]); 6] = [
 const ATTRACT_SCORING_SCANNER_TERRAIN_PIXEL_SIZE: [f32; 2] = [1.0, 1.0];
 const ATTRACT_SCORING_SCANNER_TERRAIN_TINT: Color = Color::from_rgba(174, 81, 0, 255);
 const ATTRACT_SCORING_SCANNER_BORDER_TINT: Color = Color::from_rgba(38, 0, 160, 255);
+const ATTRACT_SCORING_RESCUE_DESCENT_STEPS: u16 = 0xE6;
+const ATTRACT_SCORING_RESCUE_ASCENT_STEPS: u16 = 0xA0;
+const ATTRACT_SCORING_RESCUE_LASER_STEPS: u16 = 0x15;
+const ATTRACT_SCORING_RESCUE_FALL_STEPS: u16 = 0x2D * 2;
+const ATTRACT_SCORING_RESCUE_SCORE_STEPS: u16 = 0x50;
+const ATTRACT_SCORING_RESCUE_RETURN_STEPS: u16 = 0x60;
+const ATTRACT_SCORING_LEGEND_APPROACH_STEPS: u16 = 0x5F;
+const ATTRACT_SCORING_LEGEND_LASER_STEPS: u16 = 0x17;
+const ATTRACT_SCORING_LEGEND_TRANSFER_STEPS: u16 = 0x20;
+const ATTRACT_SCORING_LEGEND_REVEAL_STEPS: u16 = 0x20;
+const ATTRACT_SCORING_LEGEND_ENTRY_STEPS: u16 = ATTRACT_SCORING_LEGEND_APPROACH_STEPS
+    + ATTRACT_SCORING_LEGEND_LASER_STEPS
+    + ATTRACT_SCORING_LEGEND_TRANSFER_STEPS
+    + ATTRACT_SCORING_LEGEND_REVEAL_STEPS;
+const ATTRACT_SCORING_LEGEND_HOLD_STEPS: u16 = 0xFF + 0xFF;
+const ATTRACT_SCORING_LEGEND_ENTRIES: u16 = 6;
+const ATTRACT_SCORING_RESCUE_SEQUENCE_STEPS: u16 = ATTRACT_SCORING_RESCUE_DESCENT_STEPS
+    + ATTRACT_SCORING_RESCUE_ASCENT_STEPS
+    + ATTRACT_SCORING_RESCUE_LASER_STEPS
+    + ATTRACT_SCORING_RESCUE_FALL_STEPS
+    + ATTRACT_SCORING_RESCUE_SCORE_STEPS
+    + ATTRACT_SCORING_RESCUE_RETURN_STEPS;
+const ATTRACT_SCORING_DEMO_TOTAL_STEPS: u16 = ATTRACT_SCORING_RESCUE_SEQUENCE_STEPS
+    + ATTRACT_SCORING_LEGEND_ENTRY_STEPS * ATTRACT_SCORING_LEGEND_ENTRIES
+    + ATTRACT_SCORING_LEGEND_HOLD_STEPS;
+const ATTRACT_SCORING_PROTECTED_DEMO_STEP_OFFSET: u16 = ATTRACT_SCORING_RESCUE_DESCENT_STEPS
+    + ATTRACT_SCORING_RESCUE_ASCENT_STEPS
+    + ATTRACT_SCORING_RESCUE_LASER_STEPS;
+const ATTRACT_SCORING_PLAYER_X16: i32 = 0x0800;
+const ATTRACT_SCORING_PLAYER_Y16: i32 = 0x5000;
+const ATTRACT_SCORING_HUMAN_X16: i32 = 0x1E00;
+const ATTRACT_SCORING_HUMAN_Y16: i32 = 0xDB00;
+const ATTRACT_SCORING_LANDER_X16: i32 = 0x1DA0;
+const ATTRACT_SCORING_LANDER_Y16: i32 = 0x4000;
+const ATTRACT_SCORING_SCORE_500_X16: i32 = 0x1DFF;
+const ATTRACT_SCORING_SCORE_500_Y16: i32 = 0x9000;
+const ATTRACT_SCORING_SCORE_500_DROP_X16: i32 = 0x1C00;
+const ATTRACT_SCORING_SCORE_500_DROP_Y16: i32 = 0xE000;
+const ATTRACT_SCORING_CAUGHT_HUMAN_X16: i32 = 0x1E80;
+const ATTRACT_SCORING_CAUGHT_HUMAN_Y16: i32 = 0xA2E0;
+const ATTRACT_SCORING_GROUNDED_HUMAN_Y16: i32 = 0xDEE0;
+const ATTRACT_SCORING_RESCUE_SHIP_XV16: i32 = 0x0040;
+const ATTRACT_SCORING_RESCUE_SHIP_YV16: i32 = 0x00D4;
+const ATTRACT_SCORING_RESCUE_HUMAN_ACCEL16: i32 = 0x0008;
+const ATTRACT_SCORING_RESCUE_DROP_YV16: i32 = 0x00C0;
+const ATTRACT_SCORING_RESCUE_RETURN_XV16: i32 = -0x0040;
+const ATTRACT_SCORING_RESCUE_RETURN_YV16: i32 = -0x0180;
+const ATTRACT_SCORING_OBJECT_REFERENCE_OFFSET: [f32; 2] = [-15.0, -10.0];
+const ATTRACT_SCORING_PLAYFIELD_SIZE: [f32; 2] = [320.0, 256.0];
+const ATTRACT_SCORING_SCANNER_ORIGIN: [f32; 2] = [84.0, 0.0];
+const ATTRACT_SCORING_SCANNER_SIZE: [f32; 2] = [128.0, 32.0];
+const ATTRACT_SCORING_PLAYER_SCANNER_SIZE: [f32; 2] = [3.0, 2.0];
+const ATTRACT_SCORING_OBJECT_SCANNER_SIZE: [f32; 2] = [2.0, 2.0];
+const ATTRACT_SCORING_PLAYER_SCANNER_COLOR_WORD: u16 = 0x9099;
+const ATTRACT_SCORING_HUMAN_SCANNER_COLOR_WORD: u16 = 0x6666;
+const ATTRACT_SCORING_LANDER_SCANNER_COLOR_WORD: u16 = 0x4433;
+const SOURCE_WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255];
+const SOURCE_WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255];
 const SOURCE_TERRAIN_DATA_TSV: &str = include_str!("../assets/red-label/terrain-data.tsv");
 const SOURCE_TERRAIN_MTERR_LABEL: &str = "MTERR";
 const SOURCE_TERRAIN_MTERR_ADDRESS: u16 = 0xCD67;
@@ -5708,9 +5766,10 @@ impl ActorRenderSceneBridge {
         }
     }
 
-    fn push_attract_scoring_surface(&self, scene: &mut RenderScene, _scoring_tick: u16) {
+    fn push_attract_scoring_surface(&self, scene: &mut RenderScene, scoring_tick: u16) {
         push_attract_scoring_top_display_border(scene);
         push_attract_scoring_scanner_terrain(scene);
+        push_attract_scoring_demo_scene(scene, scoring_tick);
     }
 
     fn push_explosion_sprite(
@@ -5827,6 +5886,423 @@ fn push_attract_scoring_scanner_terrain(scene: &mut RenderScene) {
             }
         }
     }
+}
+
+fn push_attract_scoring_demo_scene(scene: &mut RenderScene, scoring_tick: u16) {
+    let frame = actor_attract_scoring_frame(scoring_tick);
+    for object in frame.scanner_objects.into_iter().flatten() {
+        push_attract_scoring_scanner_object(scene, object);
+    }
+    for object in frame.scene_objects.into_iter().flatten() {
+        push_attract_scoring_scene_object(scene, object);
+    }
+    if let Some(bonus) = frame.bonus {
+        scene.push_sprite(SceneSprite {
+            sprite: bonus.sprite,
+            layer: RenderLayer::Objects,
+            position: actor_attract_scoring_scene_position(bonus.x16, bonus.y16),
+            size: SCORE_POPUP_SCENE_SIZE,
+            tint: Color::WHITE,
+        });
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ActorAttractScoringFrame {
+    scene_objects: [Option<ActorAttractScoringObject>; 4],
+    scanner_objects: [Option<ActorAttractScoringObject>; 4],
+    bonus: Option<ActorAttractScoringBonus>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ActorAttractScoringBonus {
+    sprite: SpriteId,
+    x16: i32,
+    y16: i32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ActorAttractScoringObject {
+    kind: ActorAttractScoringObjectKind,
+    x16: i32,
+    y16: i32,
+    scene_visible: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ActorAttractScoringObjectKind {
+    PlayerShip,
+    Human,
+    Lander,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ActorAttractScoringRescuePhase {
+    Descend,
+    Ascend,
+    Laser,
+    Fall,
+    Score,
+    Return,
+}
+
+fn actor_attract_scoring_frame(scoring_tick: u16) -> ActorAttractScoringFrame {
+    let display_step = actor_attract_scoring_display_step(scoring_tick);
+    let scanner_display_step = display_step - (display_step % 4);
+    ActorAttractScoringFrame {
+        scene_objects: actor_attract_scoring_objects(display_step),
+        scanner_objects: actor_attract_scoring_objects(scanner_display_step),
+        bonus: actor_attract_scoring_bonus(display_step),
+    }
+}
+
+fn actor_attract_scoring_display_step(scoring_tick: u16) -> u16 {
+    (scoring_tick % ATTRACT_SCORING_DEMO_TOTAL_STEPS + ATTRACT_SCORING_PROTECTED_DEMO_STEP_OFFSET)
+        % ATTRACT_SCORING_DEMO_TOTAL_STEPS
+}
+
+#[cfg(test)]
+fn actor_attract_scoring_tick_for_display_step(display_step: u16) -> u16 {
+    (display_step % ATTRACT_SCORING_DEMO_TOTAL_STEPS + ATTRACT_SCORING_DEMO_TOTAL_STEPS
+        - ATTRACT_SCORING_PROTECTED_DEMO_STEP_OFFSET)
+        % ATTRACT_SCORING_DEMO_TOTAL_STEPS
+}
+
+fn actor_attract_scoring_objects(display_step: u16) -> [Option<ActorAttractScoringObject>; 4] {
+    let Some((phase, local_step)) = actor_attract_scoring_rescue_phase(display_step) else {
+        return [None; 4];
+    };
+    let mut objects = [None; 4];
+    let mut cursor = 0;
+    match phase {
+        ActorAttractScoringRescuePhase::Descend => {
+            push_actor_attract_scoring_object(
+                &mut objects,
+                &mut cursor,
+                ActorAttractScoringObjectKind::Lander,
+                ATTRACT_SCORING_LANDER_X16,
+                ATTRACT_SCORING_LANDER_Y16 + i32::from(local_step) * 0x00A0,
+                true,
+            );
+            push_actor_attract_scoring_object(
+                &mut objects,
+                &mut cursor,
+                ActorAttractScoringObjectKind::Human,
+                ATTRACT_SCORING_HUMAN_X16,
+                ATTRACT_SCORING_HUMAN_Y16,
+                true,
+            );
+            push_actor_attract_scoring_object(
+                &mut objects,
+                &mut cursor,
+                ActorAttractScoringObjectKind::PlayerShip,
+                ATTRACT_SCORING_PLAYER_X16,
+                ATTRACT_SCORING_PLAYER_Y16,
+                true,
+            );
+        }
+        ActorAttractScoringRescuePhase::Ascend | ActorAttractScoringRescuePhase::Laser => {
+            let rise_step = if matches!(phase, ActorAttractScoringRescuePhase::Ascend) {
+                local_step
+            } else {
+                ATTRACT_SCORING_RESCUE_ASCENT_STEPS + local_step
+            };
+            let lander_y = ATTRACT_SCORING_LANDER_Y16
+                + i32::from(ATTRACT_SCORING_RESCUE_DESCENT_STEPS) * 0x00A0
+                - i32::from(rise_step) * 0x00B0;
+            let human_y = ATTRACT_SCORING_HUMAN_Y16 - i32::from(rise_step) * 0x00B0;
+            push_actor_attract_scoring_object(
+                &mut objects,
+                &mut cursor,
+                ActorAttractScoringObjectKind::Lander,
+                ATTRACT_SCORING_LANDER_X16,
+                lander_y,
+                true,
+            );
+            push_actor_attract_scoring_object(
+                &mut objects,
+                &mut cursor,
+                ActorAttractScoringObjectKind::Human,
+                ATTRACT_SCORING_HUMAN_X16,
+                human_y,
+                true,
+            );
+            push_actor_attract_scoring_object(
+                &mut objects,
+                &mut cursor,
+                ActorAttractScoringObjectKind::PlayerShip,
+                ATTRACT_SCORING_PLAYER_X16,
+                ATTRACT_SCORING_PLAYER_Y16,
+                true,
+            );
+        }
+        ActorAttractScoringRescuePhase::Fall => {
+            let (ship_x, ship_y, human_y) = actor_attract_scoring_intercept_state(local_step);
+            if local_step < 12 {
+                let lander_y = ATTRACT_SCORING_LANDER_Y16
+                    + i32::from(ATTRACT_SCORING_RESCUE_DESCENT_STEPS) * 0x00A0
+                    - i32::from(
+                        ATTRACT_SCORING_RESCUE_ASCENT_STEPS + ATTRACT_SCORING_RESCUE_LASER_STEPS,
+                    ) * 0x00B0;
+                push_actor_attract_scoring_object(
+                    &mut objects,
+                    &mut cursor,
+                    ActorAttractScoringObjectKind::Lander,
+                    ATTRACT_SCORING_LANDER_X16,
+                    lander_y,
+                    false,
+                );
+            }
+            push_actor_attract_scoring_object(
+                &mut objects,
+                &mut cursor,
+                ActorAttractScoringObjectKind::PlayerShip,
+                ship_x,
+                ship_y,
+                true,
+            );
+            push_actor_attract_scoring_object(
+                &mut objects,
+                &mut cursor,
+                ActorAttractScoringObjectKind::Human,
+                ATTRACT_SCORING_HUMAN_X16,
+                human_y,
+                true,
+            );
+        }
+        ActorAttractScoringRescuePhase::Score => {
+            let (ship_x, ship_y, human_y) = actor_attract_scoring_drop_state(local_step);
+            push_actor_attract_scoring_object(
+                &mut objects,
+                &mut cursor,
+                ActorAttractScoringObjectKind::PlayerShip,
+                ship_x,
+                ship_y,
+                true,
+            );
+            push_actor_attract_scoring_object(
+                &mut objects,
+                &mut cursor,
+                ActorAttractScoringObjectKind::Human,
+                ATTRACT_SCORING_CAUGHT_HUMAN_X16,
+                human_y,
+                true,
+            );
+        }
+        ActorAttractScoringRescuePhase::Return => {
+            let (ship_x, ship_y, _) =
+                actor_attract_scoring_drop_state(ATTRACT_SCORING_RESCUE_SCORE_STEPS);
+            push_actor_attract_scoring_object(
+                &mut objects,
+                &mut cursor,
+                ActorAttractScoringObjectKind::PlayerShip,
+                ship_x + i32::from(local_step) * ATTRACT_SCORING_RESCUE_RETURN_XV16,
+                ship_y + i32::from(local_step) * ATTRACT_SCORING_RESCUE_RETURN_YV16,
+                true,
+            );
+            push_actor_attract_scoring_object(
+                &mut objects,
+                &mut cursor,
+                ActorAttractScoringObjectKind::Human,
+                ATTRACT_SCORING_CAUGHT_HUMAN_X16,
+                ATTRACT_SCORING_GROUNDED_HUMAN_Y16,
+                true,
+            );
+        }
+    }
+    objects
+}
+
+fn push_actor_attract_scoring_object(
+    objects: &mut [Option<ActorAttractScoringObject>; 4],
+    cursor: &mut usize,
+    kind: ActorAttractScoringObjectKind,
+    x16: i32,
+    y16: i32,
+    scene_visible: bool,
+) {
+    if let Some(slot) = objects.get_mut(*cursor) {
+        *slot = Some(ActorAttractScoringObject {
+            kind,
+            x16,
+            y16,
+            scene_visible,
+        });
+        *cursor += 1;
+    }
+}
+
+fn actor_attract_scoring_rescue_phase(
+    mut display_step: u16,
+) -> Option<(ActorAttractScoringRescuePhase, u16)> {
+    for (phase, duration) in [
+        (
+            ActorAttractScoringRescuePhase::Descend,
+            ATTRACT_SCORING_RESCUE_DESCENT_STEPS,
+        ),
+        (
+            ActorAttractScoringRescuePhase::Ascend,
+            ATTRACT_SCORING_RESCUE_ASCENT_STEPS,
+        ),
+        (
+            ActorAttractScoringRescuePhase::Laser,
+            ATTRACT_SCORING_RESCUE_LASER_STEPS,
+        ),
+        (
+            ActorAttractScoringRescuePhase::Fall,
+            ATTRACT_SCORING_RESCUE_FALL_STEPS,
+        ),
+        (
+            ActorAttractScoringRescuePhase::Score,
+            ATTRACT_SCORING_RESCUE_SCORE_STEPS,
+        ),
+        (
+            ActorAttractScoringRescuePhase::Return,
+            ATTRACT_SCORING_RESCUE_RETURN_STEPS,
+        ),
+    ] {
+        if display_step < duration {
+            return Some((phase, display_step));
+        }
+        display_step -= duration;
+    }
+    None
+}
+
+fn actor_attract_scoring_intercept_state(fall_step: u16) -> (i32, i32, i32) {
+    let mut ship_x = ATTRACT_SCORING_PLAYER_X16;
+    let mut ship_y = ATTRACT_SCORING_PLAYER_Y16;
+    let mut human_y = ATTRACT_SCORING_HUMAN_Y16
+        - i32::from(ATTRACT_SCORING_RESCUE_ASCENT_STEPS + ATTRACT_SCORING_RESCUE_LASER_STEPS)
+            * 0x00B0;
+    let mut elapsed = 0;
+    let mut human_velocity = 0;
+    for _ in 0..(ATTRACT_SCORING_RESCUE_FALL_STEPS / 2) {
+        human_velocity += ATTRACT_SCORING_RESCUE_HUMAN_ACCEL16;
+        for _ in 0..2 {
+            if elapsed >= fall_step {
+                return (ship_x, ship_y, human_y);
+            }
+            ship_x += ATTRACT_SCORING_RESCUE_SHIP_XV16;
+            ship_y += ATTRACT_SCORING_RESCUE_SHIP_YV16;
+            human_y += human_velocity;
+            elapsed += 1;
+        }
+    }
+    (ship_x, ship_y, human_y)
+}
+
+fn actor_attract_scoring_drop_state(score_step: u16) -> (i32, i32, i32) {
+    let (ship_x, ship_y, _) =
+        actor_attract_scoring_intercept_state(ATTRACT_SCORING_RESCUE_FALL_STEPS);
+    (
+        ship_x,
+        ship_y + i32::from(score_step) * ATTRACT_SCORING_RESCUE_DROP_YV16,
+        ATTRACT_SCORING_CAUGHT_HUMAN_Y16 + i32::from(score_step) * ATTRACT_SCORING_RESCUE_DROP_YV16,
+    )
+}
+
+fn actor_attract_scoring_bonus(display_step: u16) -> Option<ActorAttractScoringBonus> {
+    let (phase, local_step) = actor_attract_scoring_rescue_phase(display_step)?;
+    match phase {
+        ActorAttractScoringRescuePhase::Score => Some(ActorAttractScoringBonus {
+            sprite: SpriteId::SCORE_POPUP_500,
+            x16: ATTRACT_SCORING_SCORE_500_X16,
+            y16: ATTRACT_SCORING_SCORE_500_Y16,
+        }),
+        ActorAttractScoringRescuePhase::Return => Some(ActorAttractScoringBonus {
+            sprite: SpriteId::SCORE_POPUP_500,
+            x16: ATTRACT_SCORING_SCORE_500_DROP_X16,
+            y16: ATTRACT_SCORING_SCORE_500_DROP_Y16 + i32::from(local_step / 2) * 0x0010,
+        }),
+        _ => None,
+    }
+}
+
+fn push_attract_scoring_scene_object(scene: &mut RenderScene, object: ActorAttractScoringObject) {
+    if !object.scene_visible {
+        return;
+    }
+    let (sprite, size) = match object.kind {
+        ActorAttractScoringObjectKind::PlayerShip => {
+            (SpriteId::PLAYER_SHIP, PLAYER_SHIP_SCENE_SIZE)
+        }
+        ActorAttractScoringObjectKind::Human => (SpriteId::HUMAN, HUMAN_SCENE_SIZE),
+        ActorAttractScoringObjectKind::Lander => (SpriteId::ENEMY_LANDER, LANDER_SCENE_SIZE),
+    };
+    scene.push_sprite(SceneSprite {
+        sprite,
+        layer: RenderLayer::Objects,
+        position: actor_attract_scoring_scene_position(object.x16, object.y16),
+        size,
+        tint: Color::WHITE,
+    });
+}
+
+fn push_attract_scoring_scanner_object(scene: &mut RenderScene, object: ActorAttractScoringObject) {
+    let (sprite, size, color_word) = match object.kind {
+        ActorAttractScoringObjectKind::PlayerShip => (
+            SpriteId::SCANNER_PLAYER_BLIP,
+            ATTRACT_SCORING_PLAYER_SCANNER_SIZE,
+            ATTRACT_SCORING_PLAYER_SCANNER_COLOR_WORD,
+        ),
+        ActorAttractScoringObjectKind::Human => (
+            SpriteId::SCANNER_OBJECT_BLIP,
+            ATTRACT_SCORING_OBJECT_SCANNER_SIZE,
+            ATTRACT_SCORING_HUMAN_SCANNER_COLOR_WORD,
+        ),
+        ActorAttractScoringObjectKind::Lander => (
+            SpriteId::SCANNER_OBJECT_BLIP,
+            ATTRACT_SCORING_OBJECT_SCANNER_SIZE,
+            ATTRACT_SCORING_LANDER_SCANNER_COLOR_WORD,
+        ),
+    };
+    scene.push_sprite(SceneSprite {
+        sprite,
+        layer: RenderLayer::Hud,
+        position: actor_attract_scoring_scanner_position(object),
+        size,
+        tint: source_pseudo_color_tint((color_word & 0x00FF) as u8),
+    });
+}
+
+fn actor_attract_scoring_scene_position(x16: i32, y16: i32) -> [f32; 2] {
+    offset_f32_position(
+        actor_attract_scoring_native_position(x16, y16),
+        ATTRACT_SCORING_OBJECT_REFERENCE_OFFSET,
+    )
+}
+
+fn actor_attract_scoring_scanner_position(object: ActorAttractScoringObject) -> [f32; 2] {
+    let [native_x, native_y] = actor_attract_scoring_native_position(object.x16, object.y16);
+    offset_f32_position(
+        [
+            ATTRACT_SCORING_SCANNER_ORIGIN[0]
+                + native_x * ATTRACT_SCORING_SCANNER_SIZE[0] / ATTRACT_SCORING_PLAYFIELD_SIZE[0],
+            ATTRACT_SCORING_SCANNER_ORIGIN[1]
+                + native_y * ATTRACT_SCORING_SCANNER_SIZE[1] / ATTRACT_SCORING_PLAYFIELD_SIZE[1],
+        ],
+        point_position(SOURCE_ATTRACT_SCORING_VISUAL_OFFSET),
+    )
+}
+
+fn actor_attract_scoring_native_position(x16: i32, y16: i32) -> [f32; 2] {
+    [
+        ((x16 + 0x10) >> 5).clamp(0, 319) as f32,
+        ((y16 + 0x80) >> 8).clamp(0, 255) as f32,
+    ]
+}
+
+fn source_pseudo_color_tint(value: u8) -> Color {
+    if value == 0 {
+        return Color::from_rgba(0, 0, 0, 0);
+    }
+    Color::from_rgba(
+        SOURCE_WILLIAMS_RED_GREEN_LEVELS[usize::from(value & 0x07)],
+        SOURCE_WILLIAMS_RED_GREEN_LEVELS[usize::from((value >> 3) & 0x07)],
+        SOURCE_WILLIAMS_BLUE_LEVELS[usize::from((value >> 6) & 0x03)],
+        0xFF,
+    )
 }
 
 fn source_scanner_mini_terrain_records()
@@ -11934,6 +12410,49 @@ mod tests {
                 && sprite.position == [85.0, 30.0]
                 && sprite.size == ATTRACT_SCORING_SCANNER_TERRAIN_PIXEL_SIZE
                 && sprite.tint == ATTRACT_SCORING_SCANNER_TERRAIN_TINT
+        }));
+        assert!(scoring_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_SHIP
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [49.0, 70.0]
+                && sprite.size == PLAYER_SHIP_SCENE_SIZE
+        }));
+        assert!(scoring_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HUMAN
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [225.0, 85.0]
+                && sprite.size == HUMAN_SCENE_SIZE
+        }));
+        assert!(scoring_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCANNER_PLAYER_BLIP
+                && sprite.layer == RenderLayer::Hud
+                && (sprite.position[0] - 98.6).abs() < 0.01
+                && (sprite.position[1] - 3.0).abs() < 0.01
+                && sprite.size == ATTRACT_SCORING_PLAYER_SCANNER_SIZE
+                && sprite.tint == source_pseudo_color_tint(0x99)
+        }));
+        assert_eq!(
+            scoring_scene
+                .sprites
+                .iter()
+                .filter(|sprite| sprite.sprite == SpriteId::SCANNER_OBJECT_BLIP)
+                .count(),
+            2
+        );
+        let mut rescue_score = scoring;
+        let rescue_score_tick = actor_attract_scoring_tick_for_display_step(
+            ATTRACT_SCORING_PROTECTED_DEMO_STEP_OFFSET + ATTRACT_SCORING_RESCUE_FALL_STEPS,
+        );
+        for _ in 0..rescue_score_tick {
+            rescue_score = driver.step(GameInput::NONE);
+        }
+        let rescue_score_scene =
+            ActorRenderSceneBridge::new().render_scene_for_report(&rescue_score);
+        assert!(rescue_score_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_POPUP_500
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [225.0, 134.0]
+                && sprite.size == SCORE_POPUP_SCENE_SIZE
         }));
         assert!(!scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO

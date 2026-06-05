@@ -32,10 +32,12 @@ Current files:
   red-label seed initials. The scoring/instruction page draws `SCANV`, `LANDV`,
   `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` from checked `messages.tsv`
   rows and source screen addresses, while `scoring_surface` draws the source top
-  scanner frame/marker bars and `MTERR` mini-terrain records. It also uses the
-  driver-owned high-score table and credit count carried in `StepPrompt`.
-  Custom attract scripts can also use checked `messages.tsv` labels through the
-  script parser's `message` action with optional visual offsets.
+  scanner frame/marker bars, `MTERR` mini-terrain records, source-shaped
+  rescue-demo player/human/lander object sprites, scanner blips, and the
+  500-point rescue popup. It also uses the driver-owned high-score table and
+  credit count carried in `StepPrompt`. Custom attract scripts can also use
+  checked `messages.tsv` labels through the script parser's `message` action
+  with optional visual offsets.
 - `actor-behavior.script`: embedded actor-runtime baseline behavior profile
   parsed by `ActorBehaviorScript`, including player, laser, hostile, human,
   explosion, and score-popup timing/tuning defaults.

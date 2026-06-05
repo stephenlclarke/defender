@@ -332,8 +332,12 @@ stall window. After that bounded Hall window, the script starts
 `SCANV`, `LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` message
 rows. The scoring surface draws the source top scanner frame/marker bars and
 the source `MTERR` mini-terrain records through an actor-local visual effect.
-The older Rust event constructor remains available as a fallback. Custom
-drivers can pass their own parsed or
+It also projects the source-shaped rescue-demo player, human, and lander object
+sprites, matching scanner blips, and the 500-point rescue popup from the
+surface's actor-local `scoring_tick`. Laser beams, explosion fragments, and
+enemy legend materialization remain later scoring-surface slices. The older
+Rust event constructor remains available as a fallback. Custom drivers can pass
+their own parsed or
 constructed sequence through
 `ActorGameDriver::with_attract_script(...)` without replacing coin/start
 control handling.

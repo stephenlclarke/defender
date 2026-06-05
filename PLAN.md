@@ -57,10 +57,11 @@ verification tools.
   red-label seed initials. The scoring/instruction page draws `SCANV`, `LANDV`,
   `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` from checked `messages.tsv`
   rows and source screen addresses, while `scoring_surface` draws the source top
-  scanner frame/marker bars and `MTERR` mini-terrain records. Custom attract
-  scripts can draw checked `messages.tsv` labels through source cursor controls
-  with optional visual offsets, and the older one-column `high_scores` action
-  remains available for custom screens.
+  scanner frame/marker bars, `MTERR` mini-terrain records, source-shaped
+  rescue-demo player/human/lander object sprites, scanner blips, and the
+  500-point rescue popup. Custom attract scripts can draw checked `messages.tsv`
+  labels through source cursor controls with optional visual offsets, and the
+  older one-column `high_scores` action remains available for custom screens.
   `ActorWaveScript` now names per-wave progression data and applies behavior
   scripts plus hostile and initial-human spawn records as play starts and waves
   are cleared. Wave scripts can now attach spawn-index behavior profiles that
@@ -772,6 +773,24 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 14:17 BST`: Completed the actor attract scoring-demo object
+  projection slice. `VisualEffect::AttractScoringSurface` now uses actor-local
+  `scoring_tick` to project the source-shaped rescue-demo player, human, and
+  lander objects, matching scanner blips, and the 500-point rescue popup on top
+  of the scripted scoring labels, scanner frame, and `MTERR` terrain. The slice
+  deliberately leaves laser beams, explosion fragments, and enemy legend
+  materialization for later scoring-surface cycles while keeping the current
+  projection script-driven rather than display-frame driven. Focused attract
+  regressions now prove the start-of-scoring object/blip scene and later
+  rescue-score popup. Validation passed with `cargo test actor_game
+  --all-targets --features legacy-tools`, `cargo test actor_smoke --all-targets
+  --features legacy-tools`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, `cargo fmt --check`, touched-doc markdownlint, and `git diff
+  --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780664718166739`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780665412945699`.
 - `2026-06-05 14:02 BST`: Completed the actor attract scoring-scanner
   surface slice. The embedded actor attract script and Rust fallback now install
   a scriptable `scoring_surface` action at step `1088`, and source-message
