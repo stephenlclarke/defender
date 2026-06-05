@@ -10,9 +10,9 @@ verified.
 - `ActorGameDriver` owns game phase, score, credits, lives, high scores, actor
   ids, actor threads, and the latest snapshots.
 - Each asset is a Rust struct implementing `AssetActor`. The current slice has
-  `AttractDirector`, `ScriptedAttractProgram`, `PlayerShip`, `Lander`,
-  `Mutant`, `Bomber`, `Bomb`, `Pod`, `Swarmer`, `Baiter`, `Human`, `LaserShot`,
-  `EnemyLaserShot`, `Explosion`, and `ScorePopup`.
+  `AttractDirector`, `ScriptedAttractProgram`, `StatusDisplay`, `PlayerShip`,
+  `Lander`, `Mutant`, `Bomber`, `Bomb`, `Pod`, `Swarmer`, `Baiter`, `Human`,
+  `LaserShot`, `EnemyLaserShot`, `Explosion`, and `ScorePopup`.
 - `ThreadedAsset` runs one actor on one Rust thread. The driver sends one
   `StepPrompt` per simulation step and waits for one `ActorReply`, keeping
   behavior deterministic while still matching the requested thread-per-asset
@@ -21,8 +21,10 @@ verified.
   commands, sound cues, and gameplay commands. The driver resolves collisions
   and applies world rules in stable actor-id order.
 - Rendering is described by `DrawCommand`, `SpriteKey`, and `VisualEffect`
-  values. Explosion draws carry `ExplosionKind` metadata so bomb, enemy, player,
-  and human explosions can map to separate source sprite families later. Audio is
+  values. The status display is also an actor: it draws score, high score, wave,
+  lives, credits, and high-score-entry rows from `StepPrompt` state. Explosion
+  draws carry `ExplosionKind` metadata so bomb, enemy, player, and human
+  explosions can map to separate source sprite families later. Audio is
   described by `SoundCue`. The future renderer/audio bridge can translate those
   descriptions into `wgpu` sprites and Williams sound-board commands.
 
@@ -161,6 +163,10 @@ The actor driver now owns a first Defender gameplay loop:
 - Starts seed the playfield with ten source first-wave human actors carrying
   target-list slot and picture-frame metadata. Source-backed grounded humans
   update their own walk frame and fixed-point X fraction.
+- A persistent `StatusDisplay` actor emits play-state text for score, high
+  score, wave, lives, credits, and high-score-entry rows from the same
+  simulation prompt as every other actor. It stays inert during attract so a
+  custom attract script can own that screen.
 - Landers seek the nearest grounded human, attach it through an
   `AttachHuman` command, carry it upward, and convert into a mutant when the
   carried human reaches the upper conversion band. Source-backed landers prefer

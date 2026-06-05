@@ -40,7 +40,11 @@ verification tools.
   bomber and pod actors beside landers. Source-backed landers, bombers, pods,
   swarmers, and initial humans publish fixed-point metadata and advance
   actor-owned fraction state during active motion, and source landers prefer
-  configured target slots before falling back to nearest-human seeking. Lander
+  configured target slots before falling back to nearest-human seeking. The
+  actor rewrite now has a persistent `StatusDisplay` actor that draws
+  score, high score, wave, lives, credits, and high-score-entry rows from the
+  same `StepPrompt` state as gameplay actors while staying inert during attract
+  so custom attract scripts retain control of that screen. Lander
   shot timers now spawn hostile projectile actors that use the same player
   damage policy as other hazards, including `XYZZY` invincibility overrides;
   bomber, pod, swarmer, and baiter laser hits award source scores and emit
@@ -3775,3 +3779,19 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780620461056999`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780620763255829`.
+- `2026-06-05 02:06 BST`: Completed the actor status display cycle. Added a
+  persistent `StatusDisplay` actor that draws score, high score, wave, lives,
+  credits, and high-score-entry rows from `StepPrompt` state; extended the
+  prompt contract with lives and high-score rows; boxed prompt messages on the
+  actor channel to keep the request enum small; and added regressions for
+  playing-status and high-score-entry draws. No legacy code, tests, or
+  scaffolding were safe to remove because the actor runtime remains isolated
+  from the live clean runtime. Validation passed with
+  `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780620981457319`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780621603216479`.

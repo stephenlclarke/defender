@@ -52,6 +52,15 @@ const SOURCE_BOMBER_PICTURE_FRAME_COUNT: u8 = 4;
 const SOURCE_BOMBER_CRUISE_ALTITUDE: i16 = 0x50;
 const SOURCE_ACTIVE_BOMBER_BOMB_LIMIT: usize = 10;
 const SOURCE_MAX_ACTIVE_WAVE_ENEMIES: usize = 5;
+const STATUS_SCORE_POSITION: Point = Point::new(8, 6);
+const STATUS_HIGH_SCORE_POSITION: Point = Point::new(94, 6);
+const STATUS_WAVE_POSITION: Point = Point::new(8, 18);
+const STATUS_LIVES_POSITION: Point = Point::new(86, 18);
+const STATUS_CREDITS_POSITION: Point = Point::new(176, 226);
+const STATUS_FINAL_SCORE_POSITION: Point = Point::new(56, 92);
+const STATUS_HIGH_SCORE_TABLE_TITLE_POSITION: Point = Point::new(78, 112);
+const STATUS_HIGH_SCORE_TABLE_START_Y: i16 = 128;
+const STATUS_HIGH_SCORE_TABLE_ROW_HEIGHT: i16 = 12;
 const LANDER_SEEK_SPEED: i16 = 1;
 const LANDER_DRIFT_SPEED: i16 = 1;
 const LANDER_CARRY_SPEED: i16 = 2;
@@ -741,6 +750,7 @@ pub enum Phase {
 pub enum ActorKind {
     AttractDirector,
     AttractScript,
+    StatusDisplay,
     WilliamsLogo,
     DefenderWordmark,
     Player,
@@ -2141,6 +2151,8 @@ pub struct StepPrompt {
     pub wave: u16,
     pub score: u32,
     pub credits: u8,
+    pub lives: u8,
+    pub high_scores: [u32; 5],
     pub snapshots: Vec<ActorSnapshot>,
     pub behavior_script: ActorBehaviorScript,
 }
@@ -2197,7 +2209,7 @@ pub trait AssetActor: Send + 'static {
 }
 
 enum ActorRequest {
-    Prompt(StepPrompt),
+    Prompt(Box<StepPrompt>),
     Stop,
 }
 
@@ -2220,7 +2232,9 @@ impl ThreadedAsset {
     }
 
     fn prompt(&self, prompt: StepPrompt) -> Option<ActorReply> {
-        self.sender.send(ActorRequest::Prompt(prompt)).ok()?;
+        self.sender
+            .send(ActorRequest::Prompt(Box::new(prompt)))
+            .ok()?;
         self.receiver.recv().ok()
     }
 }
@@ -2242,7 +2256,7 @@ fn run_actor_thread(
     while let Ok(request) = receiver.recv() {
         match request {
             ActorRequest::Prompt(prompt) => {
-                if sender.send(actor.update(&prompt)).is_err() {
+                if sender.send(actor.update(prompt.as_ref())).is_err() {
                     break;
                 }
             }
@@ -2317,8 +2331,10 @@ impl ActorGameDriver {
         };
         let attract_id = driver.allocate_actor_id();
         let script_id = driver.allocate_actor_id();
+        let status_id = driver.allocate_actor_id();
         driver.spawn_actor(AttractDirector::new(attract_id));
         driver.spawn_actor(ScriptedAttractProgram::new(script_id, attract_script));
+        driver.spawn_actor(StatusDisplay::new(status_id));
         driver
     }
 
@@ -2335,6 +2351,8 @@ impl ActorGameDriver {
             wave: self.wave,
             score: self.score,
             credits: self.credits,
+            lives: self.lives,
+            high_scores: self.high_scores.entries(),
             snapshots: self.snapshots.values().cloned().collect(),
             behavior_script: behavior_script.clone(),
         };
@@ -3122,6 +3140,10 @@ struct HighScoreTable {
 }
 
 impl HighScoreTable {
+    fn entries(&self) -> [u32; 5] {
+        self.entries
+    }
+
     fn qualifies(&self, score: u32) -> bool {
         self.entries.iter().any(|entry| score > *entry)
     }
@@ -3251,6 +3273,116 @@ impl AssetActor for ScriptedAttractProgram {
             draws,
         }
     }
+}
+
+#[derive(Debug)]
+struct StatusDisplay {
+    id: ActorId,
+}
+
+impl StatusDisplay {
+    fn new(id: ActorId) -> Self {
+        Self { id }
+    }
+
+    fn playing_draws(&self, prompt: &StepPrompt) -> Vec<DrawCommand> {
+        vec![
+            DrawCommand::text(
+                self.id,
+                STATUS_SCORE_POSITION,
+                format!("1UP {}", format_status_score(prompt.score)),
+            ),
+            DrawCommand::text(
+                self.id,
+                STATUS_HIGH_SCORE_POSITION,
+                format!("HIGH {}", format_status_score(prompt.high_scores[0])),
+            ),
+            DrawCommand::text(
+                self.id,
+                STATUS_WAVE_POSITION,
+                format!("WAVE {:02}", prompt.wave.min(99)),
+            ),
+            DrawCommand::text(
+                self.id,
+                STATUS_LIVES_POSITION,
+                format!("LIVES {:02}", prompt.lives.min(99)),
+            ),
+            DrawCommand::text(
+                self.id,
+                STATUS_CREDITS_POSITION,
+                format!("CREDIT {:02}", prompt.credits.min(99)),
+            ),
+        ]
+    }
+
+    fn high_score_entry_draws(&self, prompt: &StepPrompt) -> Vec<DrawCommand> {
+        let mut draws = vec![
+            DrawCommand::text(
+                self.id,
+                STATUS_FINAL_SCORE_POSITION,
+                format!("FINAL SCORE {}", format_status_score(prompt.score)),
+            ),
+            DrawCommand::text(
+                self.id,
+                STATUS_HIGH_SCORE_TABLE_TITLE_POSITION,
+                "HIGH SCORES",
+            ),
+        ];
+
+        for (index, score) in prompt.high_scores.iter().enumerate() {
+            draws.push(DrawCommand::text(
+                self.id,
+                Point::new(
+                    82,
+                    STATUS_HIGH_SCORE_TABLE_START_Y
+                        + i16::try_from(index).unwrap_or(0) * STATUS_HIGH_SCORE_TABLE_ROW_HEIGHT,
+                ),
+                format!("{}. {}", index + 1, format_status_score(*score)),
+            ));
+        }
+        draws
+    }
+
+    fn snapshot(&self) -> ActorSnapshot {
+        ActorSnapshot {
+            id: self.id,
+            kind: ActorKind::StatusDisplay,
+            position: Point::new(0, 0),
+            bounds: None,
+            alive: true,
+            source_lander: None,
+            source_bomber: None,
+            source_pod: None,
+            source_swarmer: None,
+            source_baiter: None,
+            source_human: None,
+        }
+    }
+}
+
+impl AssetActor for StatusDisplay {
+    fn id(&self) -> ActorId {
+        self.id
+    }
+
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
+        let draws = match prompt.phase {
+            Phase::Playing => self.playing_draws(prompt),
+            Phase::HighScoreEntry => self.high_score_entry_draws(prompt),
+            Phase::Attract | Phase::GameOver => Vec::new(),
+        };
+
+        ActorReply {
+            id: self.id,
+            snapshot: self.snapshot(),
+            commands: Vec::new(),
+            draws,
+        }
+    }
+}
+
+fn format_status_score(score: u32) -> String {
+    format!("{:06}", score.min(999_999))
 }
 
 #[derive(Debug)]
@@ -5049,6 +5181,48 @@ mod tests {
     }
 
     #[test]
+    fn status_display_actor_draws_play_state_from_prompt() {
+        let mut driver = started_driver();
+        driver.score = 9_875;
+        driver.wave = 7;
+        driver.lives = 2;
+        driver.credits = 3;
+
+        let report = driver.step(GameInput::NONE);
+
+        assert!(
+            report
+                .snapshots
+                .iter()
+                .any(|snapshot| snapshot.kind == ActorKind::StatusDisplay)
+        );
+        assert_text(&report, "1UP 009875");
+        assert_text(&report, "HIGH 010000");
+        assert_text(&report, "WAVE 07");
+        assert_text(&report, "LIVES 02");
+        assert_text(&report, "CREDIT 03");
+    }
+
+    #[test]
+    fn status_display_actor_draws_high_score_entry_state() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.score = 12_000;
+        driver.spawn_player();
+        driver.spawn_lander_for_test(Point::new(42, 120));
+
+        let game_over = driver.step(GameInput::NONE);
+        assert_eq!(game_over.phase, Phase::HighScoreEntry);
+
+        let entry = driver.step(GameInput::NONE);
+        assert_text(&entry, "FINAL SCORE 012000");
+        assert_text(&entry, "HIGH SCORES");
+        assert_text(&entry, "1. 012000");
+        assert_text(&entry, "2. 010000");
+        assert_text(&entry, "ENTER INITIALS");
+    }
+
+    #[test]
     fn planetoid_mapper_matches_current_live_key_contract() {
         let mut mapper = KeyboardMapper::new(KeyboardProfile::Planetoid);
         let mut step = KeyboardPoll::default();
@@ -6637,5 +6811,15 @@ mod tests {
             .iter()
             .find(|snapshot| snapshot.id == id)
             .expect("actor snapshot should be present")
+    }
+
+    fn assert_text(report: &StepReport, value: &str) {
+        assert!(
+            report
+                .draws
+                .iter()
+                .any(|draw| draw.text.as_deref() == Some(value)),
+            "expected draw text {value:?}"
+        );
     }
 }

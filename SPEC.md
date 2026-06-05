@@ -703,6 +703,9 @@ reintroduce legacy implementation terminology.
   source bomber/pod counts. The actor allocator follows the source active-family
   shape, so wave `1` remains lander-only while later waves can seed bomber and
   pod actors beside landers.
+  A persistent `StatusDisplay` actor draws score, high score, wave, lives,
+  credits, and high-score-entry rows from `StepPrompt` state while staying
+  inert during attract so custom attract scripts remain in control.
   Source-backed landers, bombers, pods, swarmers, baiters, and first-wave humans
   publish fixed-point metadata in snapshots and advance their actor-owned
   fraction state during active motion. `XYZZY` invincibility is represented as
