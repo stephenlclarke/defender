@@ -235,7 +235,12 @@ mutant actor snapshot and clean `SourceMutantSnapshot` bridge. Source-backed
 mutant actors use that state as their movement source: they select X/Y velocity
 from the wave table and player position, advance their own hop RNG and
 fixed-point fractions, decrement shot timers, and emit source-shaped hostile
-projectile metadata with the red-label `0xF6` mutant-shot cue.
+projectile metadata with the red-label `0xF6` mutant-shot cue. First-wave
+target6 converted mutants also carry the source conversion X correction through
+actor metadata, use source-backed dive/visual projection anchors for
+draw/collision positions, preserve the deferred first-shot flag, and emit the
+exact source-shaped fire2524 projectile metadata for the forced target6 shot
+rows.
 
 ## Attract Graphics
 
@@ -295,7 +300,10 @@ The actor driver now owns a first Defender gameplay loop:
 - Source-backed mutant actors advance through actor-owned source velocity,
   random-hop, sleep, and shot-timer state. Mutant shots emit source-shaped enemy
   projectile metadata and the red-label `0xF6` cue through the same driver
-  command boundary as other hostile shots.
+  command boundary as other hostile shots. The first-wave target6 branch now
+  applies the MAME-backed conversion correction, projected draw/collision
+  anchors, deferred visible-entry shot, dive-shot anchor overrides, and exact
+  fire2524 projectile fractions/velocities inside the actor source path.
 - Lander shot timers emit the source `0xFC` lander-shot cue and an `EnemyLaser`
   actor.
   Enemy lasers are player hazards, smart-bomb targets with no score value, and

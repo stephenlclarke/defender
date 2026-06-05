@@ -52,7 +52,11 @@ verification tools.
   `0xF6` hostile projectile commands from their shot timers. The
   actor rewrite now has source-RNG-restored later-wave lander placement, shot
   timers, X/Y velocity metadata, and later-wave human target-list restores. It
-  also has a persistent `StatusDisplay` actor that draws
+  also carries first-wave target6 converted-mutant source correction metadata,
+  target6 dive/visual projection anchors, deferred visible-entry shot state,
+  source-shaped target6 dive shot-position overrides, and exact fire2524
+  projectile fractions/velocities through the actor source-mutant command path.
+  It also has a persistent `StatusDisplay` actor that draws
   score, high score, wave, lives, smart-bomb stock, credits, and
   high-score-entry rows from the same `StepPrompt` state as gameplay actors
   while staying inert during attract so custom attract scripts retain control of
@@ -728,6 +732,32 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 10:01 BST`: Completed the actor target6
+  converted-mutant source path slice. Source-backed first-wave target6 lander
+  conversions now carry the source X-correction into actor mutant metadata;
+  target6 mutants use source-backed dive/visual projection anchors for actor
+  draw/collision positions; the actor source path preserves the deferred
+  visible-entry shot state, target6 dive shot-position overrides, the fire2524
+  pending-shot timer, and exact forced fire2524 projectile fractions,
+  velocities, lifetime metadata, and `0xF6` mutant-shot cue. Added focused
+  actor regressions for target6 conversion correction, deferred first-entry
+  shots, visible-entry projection, exact fire2524 projectile metadata, and
+  dive shot anchor overrides. Validation passed with `cargo fmt --check`,
+  `cargo test actor_game::tests::target6 --lib`, `cargo test source_mutant
+  --lib`, `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`, `cargo test
+  actor_smoke --all-targets --features legacy-tools`, `cargo check
+  --all-targets --features legacy-tools`, and `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`. A broad `cargo test target6 --lib`
+  filter still picks up unrelated clean-runtime MAME target6 tests; those
+  clean-runtime tests fail standalone without any `src/game.rs` diff, so they
+  remain a pre-existing clean-runtime validation caveat rather than evidence
+  against this actor slice. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780648821951209`.
+  Slack continuation:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780649199976299`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780650124969389`.
 - `2026-05-29 20:54 BST`: Completed organic terrain-blow evidence
   follow-up after the release-gate revalidation found new organic last-human
   `TERBLO` candidates. The full `make release-gate` pass stayed green, but

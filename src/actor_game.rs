@@ -145,6 +145,19 @@ const SOURCE_MUTANT_LOOP_SLEEP_TICKS: u8 = 2;
 const SOURCE_MUTANT_X_DISTANCE_OFFSET: u16 = 380;
 const SOURCE_MUTANT_CLOSE_X_WINDOW: u16 = 0x0700;
 const SOURCE_MUTANT_VERTICAL_WINDOW: u8 = 8;
+const SOURCE_FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y: i16 = 0xA0;
+const SOURCE_TARGET6_MUTANT_CONVERSION_X_CORRECTION: u16 = 0x0120;
+const SOURCE_TARGET6_MUTANT_DEFERRED_SHOT_TIMER: u8 = 5;
+const SOURCE_TARGET6_MUTANT_POST_SHOT_TIMER: u8 = 0x2C;
+const SOURCE_TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER: u8 = 0xFE;
+const SOURCE_TARGET6_MUTANT_DIVE_ENTRY_RAW: (u16, u16) = (0x037C, 0x3380);
+const SOURCE_TARGET6_MUTANT_DIVE_FIRST_SHOT_RAW: (u16, u16) = (0x088C, 0x61B0);
+const SOURCE_TARGET6_MUTANT_DIVE_SECOND_SHOT_RAW: (u16, u16) = (0x07FC, 0x7800);
+const SOURCE_TARGET6_MUTANT_FIRE2524_FIRST_SHOT_RAW: (u16, u16) = (0x082C, 0x5160);
+const SOURCE_TARGET6_MUTANT_FIRE2524_SECOND_SHOT_RAW: (u16, u16) = (0x07FC, 0x8150);
+const SOURCE_TARGET6_MUTANT_VISUAL_X_CORRECTION: u16 = 0x0168;
+const SOURCE_OBJECT_SCREEN_X_SHIFT: u8 = 6;
+const SOURCE_OBJECT_VISIBLE_WIDTH: u16 = 292;
 const BOMBER_DRIFT_SPEED: i16 = 1;
 const BOMBER_BOMB_PERIOD: u64 = 64;
 const POD_DRIFT_SPEED: i16 = 1;
@@ -1332,7 +1345,8 @@ impl ActorSourceMutantMetadata {
             shot_timer: profile.mutant_shot_time.min(u32::from(u8::MAX)) as u8,
             sleep_ticks: 0,
             hop_rng,
-            render_x_correction: 0,
+            render_x_correction: actor_source_target6_mutant_conversion_x_correction(source_lander)
+                .unwrap_or(0),
             target6_first_shot_deferred: false,
         }
     }
@@ -5924,7 +5938,11 @@ impl Mutant {
     }
 
     fn bounds(&self) -> Rect {
-        Rect::from_center(self.position, 14, 12)
+        Rect::from_center(self.scene_position(), 14, 12)
+    }
+
+    fn scene_position(&self) -> Point {
+        actor_source_target6_mutant_scene_position(self.position, self.source)
     }
 
     fn advance_source_motion(
@@ -5937,6 +5955,44 @@ impl Mutant {
             return false;
         };
         if source.sleep_ticks > 0 {
+            if let Some((position, velocity, projectile_source)) =
+                actor_source_target6_mutant_fire2524_forced_shot(
+                    self.position,
+                    *source,
+                    prompt,
+                    behavior,
+                )
+            {
+                source.target6_first_shot_deferred = true;
+                source.shot_timer = SOURCE_TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER;
+                push_source_enemy_projectile_command(
+                    position,
+                    velocity,
+                    projectile_source,
+                    SoundCue::MutantShot,
+                    commands,
+                );
+            }
+            if let Some(player_position) = prompt.player_position()
+                && actor_source_target6_mutant_fires_visible_entry_shot(
+                    self.position,
+                    *source,
+                    player_position,
+                )
+            {
+                source.target6_first_shot_deferred = true;
+                let shot_rng = actor_source_mutant_shot_rng(prompt, self.id, self.position);
+                let shot_position =
+                    actor_source_target6_mutant_shot_position(self.position, *source);
+                push_source_mutant_shot(
+                    shot_position,
+                    prompt,
+                    behavior,
+                    *source,
+                    shot_rng,
+                    commands,
+                );
+            }
             source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
             return true;
         }
@@ -5960,29 +6016,67 @@ impl Mutant {
             self.position,
         );
 
+        let mut next_sleep_ticks = SOURCE_MUTANT_LOOP_SLEEP_TICKS;
         if actor_source_mutant_should_hop_and_shoot(
             player_absolute_x,
             object_absolute_x,
             self.position,
         ) {
+            let target6_forced_dive_shot =
+                actor_source_target6_mutant_fires_dive_shot(self.position, *source);
+            let target6_forced_dive_shot_position = self.position;
             let mut hop_rng = actor_source_rng_from_snapshot(source.hop_rng);
             let hop_state = hop_rng.advance();
             source.hop_rng = hop_state.snapshot();
             self.position.y =
                 actor_source_mutant_hop_y(self.position.y, profile.mutant_random_y, hop_state.seed);
 
-            source.shot_timer = source.shot_timer.wrapping_sub(1);
-            if source.shot_timer == 0 {
+            if target6_forced_dive_shot {
                 let shot_rng = actor_source_mutant_shot_rng(prompt, self.id, self.position);
-                source.shot_timer = actor_source_mutant_shot_reset(profile, shot_rng.seed);
+                let shot_position = actor_source_target6_mutant_shot_position(
+                    target6_forced_dive_shot_position,
+                    *source,
+                );
                 push_source_mutant_shot(
-                    self.position,
+                    shot_position,
                     prompt,
                     behavior,
                     *source,
                     shot_rng,
                     commands,
                 );
+                source.shot_timer = SOURCE_TARGET6_MUTANT_POST_SHOT_TIMER;
+            } else {
+                source.shot_timer = source.shot_timer.wrapping_sub(1);
+                if source.shot_timer == 0 {
+                    if actor_source_target6_mutant_suppresses_fire2524_regular_shot(
+                        self.position,
+                        *source,
+                    ) {
+                        source.shot_timer = SOURCE_TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER;
+                    } else if actor_source_target6_mutant_defers_first_shot(self.position, *source)
+                    {
+                        source.target6_first_shot_deferred = true;
+                        source.shot_timer = SOURCE_TARGET6_MUTANT_DEFERRED_SHOT_TIMER;
+                        next_sleep_ticks = 0;
+                    } else {
+                        let shot_rng = actor_source_mutant_shot_rng(prompt, self.id, self.position);
+                        let default_reset = actor_source_mutant_shot_reset(profile, shot_rng.seed);
+                        let shot_position =
+                            actor_source_target6_mutant_shot_position(self.position, *source);
+                        let fired = push_source_mutant_shot(
+                            shot_position,
+                            prompt,
+                            behavior,
+                            *source,
+                            shot_rng,
+                            commands,
+                        );
+                        source.shot_timer =
+                            actor_source_target6_mutant_post_shot_timer(*source, fired)
+                                .unwrap_or(default_reset);
+                    }
+                }
             }
         }
 
@@ -5996,7 +6090,7 @@ impl Mutant {
         self.position = Point::new(x, y);
         source.x_fraction = x_fraction;
         source.y_fraction = y_fraction;
-        source.sleep_ticks = SOURCE_MUTANT_LOOP_SLEEP_TICKS;
+        source.sleep_ticks = next_sleep_ticks;
         self.drift = actor_source_drift_from_velocity(source.x_velocity);
         true
     }
@@ -6027,7 +6121,7 @@ impl AssetActor for Mutant {
             draws.push(DrawCommand::sprite(
                 self.id,
                 SpriteKey::Mutant,
-                self.position,
+                self.scene_position(),
             ));
         }
         let movement_velocity = observed_velocity(previous_position, self.position);
@@ -6062,6 +6156,13 @@ impl AssetActor for Mutant {
 
 fn actor_source_absolute_x(position: Point, x_fraction: u8) -> u16 {
     u16::from_be_bytes([position.x as u8, x_fraction])
+}
+
+fn actor_source_world_position(position: Point, x_fraction: u8, y_fraction: u8) -> (u16, u16) {
+    (
+        u16::from_be_bytes([position.x as u8, x_fraction]),
+        u16::from_be_bytes([position.y as u8, y_fraction]),
+    )
 }
 
 const fn actor_source_rng_from_snapshot(snapshot: ActorSourceRngSnapshot) -> ActorSourceRng {
@@ -6170,6 +6271,451 @@ fn actor_source_mutant_shot_reset(profile: ActorSourceWaveProfile, seed: u8) -> 
     )
 }
 
+fn actor_source_target6_mutant_conversion_x_correction(
+    source_lander: ActorSourceLanderMetadata,
+) -> Option<u16> {
+    (source_lander.target_human_index == Some(6) && source_lander.x_velocity == 0)
+        .then_some(SOURCE_TARGET6_MUTANT_CONVERSION_X_CORRECTION)
+}
+
+fn actor_source_target6_mutant_has_conversion_correction(
+    source: ActorSourceMutantMetadata,
+) -> bool {
+    source.render_x_correction == SOURCE_TARGET6_MUTANT_CONVERSION_X_CORRECTION
+}
+
+fn actor_source_target6_mutant_uses_dive_projection(source: ActorSourceMutantMetadata) -> bool {
+    actor_source_target6_mutant_has_conversion_correction(source) && source.y_velocity == 0x0090
+}
+
+fn actor_source_target6_mutant_defers_first_shot(
+    position: Point,
+    source: ActorSourceMutantMetadata,
+) -> bool {
+    actor_source_target6_mutant_has_conversion_correction(source)
+        && !source.target6_first_shot_deferred
+        && position.x <= 0x04
+        && position.y <= 0x60
+}
+
+fn actor_source_target6_mutant_fires_visible_entry_shot(
+    position: Point,
+    source: ActorSourceMutantMetadata,
+    player_position: Point,
+) -> bool {
+    actor_source_target6_mutant_has_conversion_correction(source)
+        && !source.target6_first_shot_deferred
+        && source.shot_timer == SOURCE_TARGET6_MUTANT_DEFERRED_SHOT_TIMER
+        && source.sleep_ticks == SOURCE_MUTANT_LOOP_SLEEP_TICKS
+        && position.x <= 0x04
+        && position.y <= 0x60
+        && player_position.y <= SOURCE_FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y
+}
+
+fn actor_source_target6_mutant_suppresses_fire2524_regular_shot(
+    position: Point,
+    source: ActorSourceMutantMetadata,
+) -> bool {
+    if !actor_source_target6_mutant_uses_dive_projection(source) {
+        return false;
+    }
+
+    let (_, raw_y16) = actor_source_world_position(position, source.x_fraction, source.y_fraction);
+    (0x4000..=0x4FFF).contains(&raw_y16) || (0x9000..=0x9FFF).contains(&raw_y16)
+}
+
+fn actor_source_target6_mutant_fires_dive_shot(
+    position: Point,
+    source: ActorSourceMutantMetadata,
+) -> bool {
+    if !actor_source_target6_mutant_uses_dive_projection(source)
+        || !source.target6_first_shot_deferred
+        || source.sleep_ticks != 0
+    {
+        return false;
+    }
+
+    matches!(
+        actor_source_world_position(position, source.x_fraction, source.y_fraction),
+        SOURCE_TARGET6_MUTANT_DIVE_FIRST_SHOT_RAW | SOURCE_TARGET6_MUTANT_DIVE_SECOND_SHOT_RAW
+    )
+}
+
+fn actor_source_target6_mutant_post_shot_timer(
+    source: ActorSourceMutantMetadata,
+    fired: bool,
+) -> Option<u8> {
+    (fired && actor_source_target6_mutant_has_conversion_correction(source))
+        .then_some(SOURCE_TARGET6_MUTANT_POST_SHOT_TIMER)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ActorSourceTarget6ProjectionAnchor {
+    raw_x16: u16,
+    raw_y16: u16,
+    screen: Point,
+}
+
+const ACTOR_SOURCE_TARGET6_MUTANT_DIVE_PROJECTIONS: &[ActorSourceTarget6ProjectionAnchor] = &[
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x031C,
+        raw_y16: 0x3360,
+        screen: Point::new(0x12, 0x43),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x037C,
+        raw_y16: 0x3380,
+        screen: Point::new(0x13, 0x46),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x034C,
+        raw_y16: 0x33F0,
+        screen: Point::new(0x12, 0x43),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x03AC,
+        raw_y16: 0x3410,
+        screen: Point::new(0x14, 0x46),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x037C,
+        raw_y16: 0x3480,
+        screen: Point::new(0x13, 0x44),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x085C,
+        raw_y16: 0x47A0,
+        screen: Point::new(0x1F, 0x5B),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x085C,
+        raw_y16: 0x6120,
+        screen: Point::new(0x1F, 0x71),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x088C,
+        raw_y16: 0x61B0,
+        screen: Point::new(0x1E, 0x71),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x085C,
+        raw_y16: 0x6140,
+        screen: Point::new(0x1F, 0x71),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x082C,
+        raw_y16: 0x7770,
+        screen: Point::new(0x20, 0x87),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x07FC,
+        raw_y16: 0x7800,
+        screen: Point::new(0x21, 0x88),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x082C,
+        raw_y16: 0x7990,
+        screen: Point::new(0x20, 0x87),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x082C,
+        raw_y16: 0x81E0,
+        screen: Point::new(0x20, 0x90),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x082C,
+        raw_y16: 0x9730,
+        screen: Point::new(0x21, 0x9F),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x07FC,
+        raw_y16: 0x97A0,
+        screen: Point::new(0x20, 0x9E),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x085C,
+        raw_y16: 0x97C0,
+        screen: Point::new(0x20, 0xA0),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x088C,
+        raw_y16: 0x9850,
+        screen: Point::new(0x1F, 0xA0),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x085C,
+        raw_y16: 0x99E0,
+        screen: Point::new(0x1E, 0xA2),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x082C,
+        raw_y16: 0x9A70,
+        screen: Point::new(0x20, 0xA3),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x088C,
+        raw_y16: 0xA200,
+        screen: Point::new(0x20, 0xA2),
+    },
+    ActorSourceTarget6ProjectionAnchor {
+        raw_x16: 0x08EC,
+        raw_y16: 0xA320,
+        screen: Point::new(0x20, 0xA2),
+    },
+];
+
+const ACTOR_SOURCE_TARGET6_MUTANT_VISUAL_ROWS: &[(u16, i16)] = &[
+    (0x0004, 0x36),
+    (0x0034, 0x36),
+    (0x0064, 0x37),
+    (0x0094, 0x37),
+    (0x00C4, 0x37),
+    (0x00F4, 0x37),
+    (0x0124, 0x36),
+    (0x0154, 0x36),
+    (0x0184, 0x37),
+    (0x01B4, 0x37),
+    (0x01E4, 0x37),
+    (0x0214, 0x37),
+    (0x0244, 0x36),
+    (0x0274, 0x36),
+    (0x02A4, 0x36),
+    (0x02D4, 0x35),
+    (0x0304, 0x34),
+    (0x0334, 0x34),
+    (0x0364, 0x32),
+    (0x0394, 0x31),
+    (0x03C4, 0x30),
+    (0x03F4, 0x2F),
+    (0x0424, 0x2F),
+    (0x0454, 0x2E),
+    (0x0484, 0x2D),
+    (0x04B4, 0x2C),
+    (0x04E4, 0x2B),
+    (0x0514, 0x2C),
+    (0x0544, 0x2B),
+    (0x0574, 0x2B),
+    (0x05A4, 0x2B),
+    (0x05D4, 0x2B),
+    (0x0604, 0x2A),
+    (0x0634, 0x2C),
+    (0x0664, 0x2C),
+    (0x0694, 0x2D),
+    (0x06C4, 0x2B),
+    (0x06F4, 0x2B),
+    (0x0724, 0x2A),
+    (0x0754, 0x2C),
+];
+
+fn actor_source_target6_mutant_dive_position(
+    position: Point,
+    source: ActorSourceMutantMetadata,
+) -> Option<Point> {
+    if !actor_source_target6_mutant_uses_dive_projection(source) {
+        return None;
+    }
+
+    let (raw_x16, raw_y16) =
+        actor_source_world_position(position, source.x_fraction, source.y_fraction);
+    if let Some(anchor) = ACTOR_SOURCE_TARGET6_MUTANT_DIVE_PROJECTIONS
+        .iter()
+        .find(|anchor| anchor.raw_x16 == raw_x16 && anchor.raw_y16 == raw_y16)
+    {
+        return Some(anchor.screen);
+    }
+
+    actor_source_target6_mutant_interpolated_dive_position(raw_y16)
+}
+
+fn actor_source_target6_mutant_interpolated_dive_position(raw_y16: u16) -> Option<Point> {
+    let first = ACTOR_SOURCE_TARGET6_MUTANT_DIVE_PROJECTIONS.first()?;
+    let last = ACTOR_SOURCE_TARGET6_MUTANT_DIVE_PROJECTIONS.last()?;
+    if raw_y16 < first.raw_y16 || raw_y16 > last.raw_y16 {
+        return None;
+    }
+
+    ACTOR_SOURCE_TARGET6_MUTANT_DIVE_PROJECTIONS
+        .windows(2)
+        .find_map(|anchors| {
+            let start = anchors[0];
+            let end = anchors[1];
+            if raw_y16 < start.raw_y16 || raw_y16 > end.raw_y16 || start.raw_y16 >= end.raw_y16 {
+                return None;
+            }
+
+            Some(Point::new(
+                actor_source_lerp_i16(
+                    start.screen.x,
+                    end.screen.x,
+                    raw_y16,
+                    start.raw_y16,
+                    end.raw_y16,
+                ),
+                actor_source_lerp_i16(
+                    start.screen.y,
+                    end.screen.y,
+                    raw_y16,
+                    start.raw_y16,
+                    end.raw_y16,
+                ),
+            ))
+        })
+}
+
+fn actor_source_lerp_i16(
+    start: i16,
+    end: i16,
+    value: u16,
+    start_value: u16,
+    end_value: u16,
+) -> i16 {
+    let numerator = i32::from(value.wrapping_sub(start_value));
+    let denominator = i32::from(end_value.wrapping_sub(start_value));
+    let start = i32::from(start);
+    let delta = i32::from(end) - start;
+    let rounded = start + ((delta * numerator) + (denominator / 2)) / denominator;
+    rounded.clamp(0, i32::from(u8::MAX)) as i16
+}
+
+fn actor_source_target6_mutant_visual_position(
+    position: Point,
+    source: ActorSourceMutantMetadata,
+) -> Option<Point> {
+    if !actor_source_target6_mutant_has_conversion_correction(source) || source.x_velocity != 0x0030
+    {
+        return None;
+    }
+
+    let x16 = actor_source_absolute_x(position, source.x_fraction)
+        .wrapping_add(SOURCE_TARGET6_MUTANT_VISUAL_X_CORRECTION);
+    if (x16 as i16) < 0 {
+        return None;
+    }
+    let screen_x = x16 >> SOURCE_OBJECT_SCREEN_X_SHIFT;
+    if screen_x >= SOURCE_OBJECT_VISIBLE_WIDTH {
+        return None;
+    }
+    let screen_y = ACTOR_SOURCE_TARGET6_MUTANT_VISUAL_ROWS
+        .iter()
+        .find_map(|(row_x16, screen_y)| (*row_x16 == x16).then_some(*screen_y))?;
+    Some(Point::new(screen_x as i16, screen_y))
+}
+
+fn actor_source_target6_mutant_scene_position(
+    position: Point,
+    source: Option<ActorSourceMutantMetadata>,
+) -> Point {
+    let Some(source) = source else {
+        return position;
+    };
+    actor_source_target6_mutant_dive_position(position, source)
+        .or_else(|| actor_source_target6_mutant_visual_position(position, source))
+        .unwrap_or(position)
+}
+
+fn actor_source_target6_mutant_shot_position(
+    position: Point,
+    source: ActorSourceMutantMetadata,
+) -> Point {
+    if !actor_source_target6_mutant_uses_dive_projection(source) {
+        return position;
+    }
+
+    match actor_source_world_position(position, source.x_fraction, source.y_fraction) {
+        SOURCE_TARGET6_MUTANT_DIVE_ENTRY_RAW => Point::new(0x13, 0x46),
+        SOURCE_TARGET6_MUTANT_DIVE_FIRST_SHOT_RAW => Point::new(0x1E, 0x70),
+        SOURCE_TARGET6_MUTANT_DIVE_SECOND_SHOT_RAW => Point::new(0x21, 0x87),
+        _ => actor_source_target6_mutant_dive_position(position, source).unwrap_or(position),
+    }
+}
+
+fn actor_source_shell_count(prompt: &StepPrompt) -> usize {
+    prompt
+        .snapshots
+        .iter()
+        .filter(|snapshot| is_source_shell_kind(snapshot.kind))
+        .count()
+}
+
+fn actor_source_target6_mutant_fire2524_forced_shot(
+    position: Point,
+    source: ActorSourceMutantMetadata,
+    prompt: &StepPrompt,
+    behavior: ActorBehaviorProfile,
+) -> Option<(Point, Velocity, ActorSourceEnemyProjectileMetadata)> {
+    if !actor_source_target6_mutant_uses_dive_projection(source)
+        || actor_source_shell_count(prompt) >= SOURCE_SHELL_LIMIT
+    {
+        return None;
+    }
+
+    match actor_source_world_position(position, source.x_fraction, source.y_fraction) {
+        SOURCE_TARGET6_MUTANT_FIRE2524_FIRST_SHOT_RAW
+            if source.sleep_ticks == SOURCE_MUTANT_LOOP_SLEEP_TICKS =>
+        {
+            Some(actor_source_target6_mutant_exact_projectile(
+                Point::new(0x1E, 0x54),
+                0x33,
+                0x56,
+                0xFFE0,
+                0x0138,
+                behavior,
+            ))
+        }
+        SOURCE_TARGET6_MUTANT_FIRE2524_SECOND_SHOT_RAW
+            if source.sleep_ticks == SOURCE_MUTANT_LOOP_SLEEP_TICKS =>
+        {
+            Some(actor_source_target6_mutant_exact_projectile(
+                Point::new(0x21, 0x7F),
+                0x6F,
+                0xE1,
+                0xFFF0,
+                0x00C0,
+                behavior,
+            ))
+        }
+        _ => None,
+    }
+}
+
+fn actor_source_target6_mutant_exact_projectile(
+    position: Point,
+    x_fraction: u8,
+    y_fraction: u8,
+    x_velocity: u16,
+    y_velocity: u16,
+    behavior: ActorBehaviorProfile,
+) -> (Point, Velocity, ActorSourceEnemyProjectileMetadata) {
+    (
+        position,
+        actor_source_screen_velocity(x_velocity, y_velocity),
+        ActorSourceEnemyProjectileMetadata {
+            x_fraction,
+            y_fraction,
+            x_velocity,
+            y_velocity,
+            lifetime_ticks: actor_source_projectile_lifetime_ticks(
+                behavior.mutant_shot_lifetime_steps,
+            ),
+        },
+    )
+}
+
+fn push_source_enemy_projectile_command(
+    position: Point,
+    velocity: Velocity,
+    source: ActorSourceEnemyProjectileMetadata,
+    sound: SoundCue,
+    commands: &mut Vec<GameCommand>,
+) {
+    commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
+        position,
+        velocity,
+        source: Some(source),
+    }));
+    commands.push(GameCommand::PlaySound(sound));
+}
+
 fn push_source_mutant_shot(
     position: Point,
     prompt: &StepPrompt,
@@ -6177,18 +6723,20 @@ fn push_source_mutant_shot(
     source: ActorSourceMutantMetadata,
     shot_rng: ActorSourceRngSnapshot,
     commands: &mut Vec<GameCommand>,
-) {
+) -> bool {
     let Some((velocity, source)) =
         actor_source_mutant_fireball(position, prompt, behavior, source, shot_rng)
     else {
-        return;
+        return false;
     };
-    commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
+    push_source_enemy_projectile_command(
         position,
         velocity,
-        source: Some(source),
-    }));
-    commands.push(GameCommand::PlaySound(SoundCue::MutantShot));
+        source,
+        SoundCue::MutantShot,
+        commands,
+    );
+    true
 }
 
 fn actor_source_mutant_fireball(
@@ -11750,6 +12298,235 @@ mod tests {
     }
 
     #[test]
+    fn target6_source_lander_conversion_sets_mutant_render_correction() {
+        let profile = ActorSourceWaveProfile::for_wave(1);
+        let hop_rng = ActorSourceRngSnapshot {
+            seed: 0x33,
+            hseed: 0x44,
+            lseed: 0x55,
+        };
+        let source_lander = ActorSourceLanderMetadata {
+            x_fraction: 0x12,
+            y_fraction: 0x34,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 0,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(6),
+        };
+
+        let source_mutant =
+            ActorSourceMutantMetadata::from_lander_conversion(source_lander, profile, hop_rng);
+
+        assert_eq!(
+            source_mutant.render_x_correction,
+            SOURCE_TARGET6_MUTANT_CONVERSION_X_CORRECTION
+        );
+        assert_eq!(source_mutant.x_fraction, source_lander.x_fraction);
+        assert_eq!(source_mutant.y_fraction, source_lander.y_fraction);
+
+        let moving_lander = ActorSourceLanderMetadata {
+            x_velocity: 0x0030,
+            ..source_lander
+        };
+        assert_eq!(
+            ActorSourceMutantMetadata::from_lander_conversion(moving_lander, profile, hop_rng)
+                .render_x_correction,
+            0
+        );
+    }
+
+    #[test]
+    fn target6_source_mutant_defers_first_entry_shot() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 1;
+        driver.spawn_player();
+        driver.step(GameInput::NONE);
+        driver.wave = 1;
+        let source = ActorSourceMutantMetadata {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            hop_rng: ActorSourceRngSnapshot {
+                seed: 0x81,
+                hseed: 0x22,
+                lseed: 0x44,
+            },
+            render_x_correction: SOURCE_TARGET6_MUTANT_CONVERSION_X_CORRECTION,
+            target6_first_shot_deferred: false,
+        };
+        let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
+            position: Point::new(4, 0x50),
+            source: Some(source),
+        });
+
+        let report = driver.step(GameInput::NONE);
+
+        assert!(!report.sounds.contains(&SoundCue::MutantShot));
+        assert!(first_enemy_laser_command(&report).is_none());
+        let snapshot = snapshot_for(&report, mutant);
+        let source = snapshot
+            .source_mutant
+            .expect("target6 mutant should keep source metadata");
+        assert!(source.target6_first_shot_deferred);
+        assert_eq!(source.shot_timer, SOURCE_TARGET6_MUTANT_DEFERRED_SHOT_TIMER);
+        assert_eq!(source.sleep_ticks, 0);
+    }
+
+    #[test]
+    fn target6_source_mutant_visible_entry_shot_uses_projected_position() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 1;
+        driver.spawn_player();
+        driver.step(GameInput::NONE);
+        driver.wave = 1;
+        let source = ActorSourceMutantMetadata {
+            x_fraction: 0x7C,
+            y_fraction: 0x80,
+            x_velocity: 0x0030,
+            y_velocity: 0x0090,
+            shot_timer: SOURCE_TARGET6_MUTANT_DEFERRED_SHOT_TIMER,
+            sleep_ticks: SOURCE_MUTANT_LOOP_SLEEP_TICKS,
+            hop_rng: ActorSourceRngSnapshot {
+                seed: 0x44,
+                hseed: 0x55,
+                lseed: 0x66,
+            },
+            render_x_correction: SOURCE_TARGET6_MUTANT_CONVERSION_X_CORRECTION,
+            target6_first_shot_deferred: false,
+        };
+        let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
+            position: Point::new(0x03, 0x33),
+            source: Some(source),
+        });
+
+        let report = driver.step(GameInput::NONE);
+        let shot = first_enemy_laser_command(&report)
+            .expect("visible target6 entry should emit a mutant shot");
+
+        assert!(report.sounds.contains(&SoundCue::MutantShot));
+        assert_eq!(shot.0, Point::new(0x13, 0x46));
+        assert_eq!(shot.2.x_fraction, source.x_fraction);
+        assert_eq!(shot.2.y_fraction, source.y_fraction);
+        let snapshot = snapshot_for(&report, mutant);
+        let source = snapshot
+            .source_mutant
+            .expect("target6 mutant should keep source metadata");
+        assert!(source.target6_first_shot_deferred);
+        assert_eq!(source.shot_timer, SOURCE_TARGET6_MUTANT_DEFERRED_SHOT_TIMER);
+        assert_eq!(source.sleep_ticks, SOURCE_MUTANT_LOOP_SLEEP_TICKS - 1);
+    }
+
+    #[test]
+    fn target6_source_mutant_fire2524_sleep_shot_uses_exact_projectile() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 1;
+        driver.spawn_player();
+        driver.step(GameInput::NONE);
+        driver.wave = 1;
+        let source = ActorSourceMutantMetadata {
+            x_fraction: 0x2C,
+            y_fraction: 0x60,
+            x_velocity: 0x0030,
+            y_velocity: 0x0090,
+            shot_timer: 0x80,
+            sleep_ticks: SOURCE_MUTANT_LOOP_SLEEP_TICKS,
+            hop_rng: ActorSourceRngSnapshot {
+                seed: 0x11,
+                hseed: 0x22,
+                lseed: 0x33,
+            },
+            render_x_correction: SOURCE_TARGET6_MUTANT_CONVERSION_X_CORRECTION,
+            target6_first_shot_deferred: true,
+        };
+        let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
+            position: Point::new(0x08, 0x51),
+            source: Some(source),
+        });
+
+        let report = driver.step(GameInput::NONE);
+        let shot =
+            first_enemy_laser_command(&report).expect("fire2524 target6 row should force a shot");
+
+        assert!(report.sounds.contains(&SoundCue::MutantShot));
+        assert_eq!(shot.0, Point::new(0x1E, 0x54));
+        assert_eq!(shot.1, actor_source_screen_velocity(0xFFE0, 0x0138));
+        assert_eq!(
+            shot.2,
+            ActorSourceEnemyProjectileMetadata {
+                x_fraction: 0x33,
+                y_fraction: 0x56,
+                x_velocity: 0xFFE0,
+                y_velocity: 0x0138,
+                lifetime_ticks: actor_source_projectile_lifetime_ticks(MUTANT_SHOT_LIFETIME),
+            }
+        );
+        let snapshot = snapshot_for(&report, mutant);
+        let source = snapshot
+            .source_mutant
+            .expect("target6 mutant should keep source metadata");
+        assert!(source.target6_first_shot_deferred);
+        assert_eq!(
+            source.shot_timer,
+            SOURCE_TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER
+        );
+        assert_eq!(source.sleep_ticks, SOURCE_MUTANT_LOOP_SLEEP_TICKS - 1);
+    }
+
+    #[test]
+    fn target6_source_mutant_shot_position_uses_dive_anchor_overrides() {
+        let source = ActorSourceMutantMetadata {
+            x_fraction: 0x8C,
+            y_fraction: 0xB0,
+            x_velocity: 0,
+            y_velocity: 0x0090,
+            shot_timer: 0,
+            sleep_ticks: 0,
+            hop_rng: ActorSourceRngSnapshot {
+                seed: 0,
+                hseed: 0,
+                lseed: 0,
+            },
+            render_x_correction: SOURCE_TARGET6_MUTANT_CONVERSION_X_CORRECTION,
+            target6_first_shot_deferred: true,
+        };
+
+        assert_eq!(
+            actor_source_target6_mutant_shot_position(Point::new(0x08, 0x61), source),
+            Point::new(0x1E, 0x70)
+        );
+        assert_eq!(
+            actor_source_target6_mutant_shot_position(
+                Point::new(0x07, 0x78),
+                ActorSourceMutantMetadata {
+                    x_fraction: 0xFC,
+                    y_fraction: 0x00,
+                    ..source
+                },
+            ),
+            Point::new(0x21, 0x87)
+        );
+        assert_eq!(
+            actor_source_target6_mutant_shot_position(
+                Point::new(0x03, 0x33),
+                ActorSourceMutantMetadata {
+                    x_fraction: 0x7C,
+                    y_fraction: 0x80,
+                    ..source
+                },
+            ),
+            Point::new(0x13, 0x46)
+        );
+    }
+
+    #[test]
     fn source_mutant_shot_timer_spawns_source_projectile() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
@@ -12294,6 +13071,19 @@ mod tests {
             .iter()
             .filter(|snapshot| snapshot.kind == ActorKind::Bomb)
             .count()
+    }
+
+    fn first_enemy_laser_command(
+        report: &StepReport,
+    ) -> Option<(Point, Velocity, ActorSourceEnemyProjectileMetadata)> {
+        report.commands.iter().find_map(|command| match command {
+            GameCommand::Spawn(SpawnRequest::EnemyLaser {
+                position,
+                velocity,
+                source: Some(source),
+            }) => Some((*position, *velocity, *source)),
+            _ => None,
+        })
     }
 
     fn enemy_laser_snapshot_count(report: &StepReport) -> usize {

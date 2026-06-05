@@ -133,7 +133,12 @@ bounds. Source-backed lander/human conversions now spawn mutant actors with
 source-shaped mutant fractions, shot timer, hop RNG, and clean-state bridge
 metadata. Source-backed mutant actors now read the red-label mutant wave
 motion rows, advance actor-owned fixed-point velocity and hop state, and emit
-source-shaped `0xF6` hostile shots. It also includes Williams title animation
+source-shaped `0xF6` hostile shots. First-wave target6 conversions carry the
+source X-correction into actor metadata, project target6 mutant draw/collision
+positions through source-backed dive/visual anchors, defer the visible entry
+shot when MAME does, and emit the exact source-shaped target6 fire2524
+projectile metadata for the forced converted-mutant shots. It also includes
+Williams title animation
 metadata, the coalescing Defender wordmark surface, lander target-slot seeking,
 an actor-owned
 status display for score, high score, wave, lives, smart-bomb stock, credits,
