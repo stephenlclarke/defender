@@ -773,9 +773,10 @@ reintroduce legacy implementation terminology.
   `assets/red-label/actor-waves.script`. The attract script can draw
   the source `ELECV` presents message, prompt-backed high-score table rows, and
   source `CREDV` credits label/count in addition to Williams reveal and
-  Defender wordmark coalescence, and custom attract scripts can draw checked
-  `messages.tsv` labels through source cursor controls. The default actor wave
-  progression expands
+  Defender wordmark coalescence using source title page-start steps: Williams
+  from step 1, `ELECV` from step 236, and the Defender wordmark from step 365.
+  Custom attract scripts can draw checked `messages.tsv` labels through source
+  cursor controls. The default actor wave progression expands
   that wave script through `assets/red-label/wave-table.tsv` for active
   wave size, lander and bomber movement speed, lander fire cadence, baiter
   entry/shot/seek timing, and source bomber/pod counts. The actor allocator

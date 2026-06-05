@@ -72,11 +72,13 @@ const LANDER_SHOT_SPEED: i16 = 3;
 const LANDER_SHOT_LIFETIME: u16 = 90;
 const EXPLOSION_LIFETIME: u16 = 20;
 const SCORE_POPUP_LIFETIME: u16 = 50;
-const WILLIAMS_REVEAL_STEPS: u16 = 36;
+const SOURCE_ATTRACT_PRESENTS_START_STEP: u64 = 236;
+const SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP: u64 = 365;
+const WILLIAMS_REVEAL_STEPS: u16 = SOURCE_ATTRACT_PRESENTS_START_STEP as u16;
 const WILLIAMS_COLOR_PERIOD: u16 = 8;
 const SOURCE_ATTRACT_WILLIAMS_LOGO_POSITION: Point = Point::new(108, 60);
 const SOURCE_ATTRACT_DEFENDER_WORDMARK_POSITION: Point = Point::new(96, 144);
-const DEFENDER_WORDMARK_START_STEP: u64 = 72;
+const DEFENDER_WORDMARK_START_STEP: u64 = SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP;
 const DEFENDER_WORDMARK_SLOTS: u16 = 15;
 const DEFENDER_WORDMARK_ROW_PAIRS: u16 = 6;
 const SOURCE_ATTRACT_DEFENDER_APPEARANCE_FINAL_TICK: u8 = 0x2E;
@@ -3535,7 +3537,7 @@ impl AttractScript {
         Self::new(vec![
             AttractScriptEvent::williams_logo(1, None, SOURCE_ATTRACT_WILLIAMS_LOGO_POSITION),
             AttractScriptEvent::source_message(
-                1,
+                SOURCE_ATTRACT_PRESENTS_START_STEP,
                 None,
                 SOURCE_PRESENTS_MESSAGE_LABEL,
                 SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
@@ -11042,7 +11044,25 @@ mod tests {
         );
         let presents_text =
             source_message_text(SOURCE_PRESENTS_MESSAGE_LABEL).expect("ELECV source message");
-        assert!(williams.draws.iter().any(|draw| {
+        assert!(
+            !williams
+                .draws
+                .iter()
+                .any(|draw| draw.text.as_deref() == Some(presents_text))
+        );
+        assert!(
+            !williams
+                .draws
+                .iter()
+                .any(|draw| draw.sprite == SpriteKey::DefenderCoalescence)
+        );
+
+        let mut presents = None;
+        for _ in 1..SOURCE_ATTRACT_PRESENTS_START_STEP {
+            presents = Some(driver.step(GameInput::NONE));
+        }
+        let presents = presents.expect("presents page should be reached");
+        assert!(presents.draws.iter().any(|draw| {
             draw.text.as_deref() == Some(presents_text)
                 && matches!(
                     draw.effect,
@@ -11051,15 +11071,15 @@ mod tests {
                     }
                 )
         }));
-        let williams_scene = ActorRenderSceneBridge::new().render_scene_for_report(&williams);
-        assert!(williams_scene.sprites.iter().any(|sprite| {
+        let presents_scene = ActorRenderSceneBridge::new().render_scene_for_report(&presents);
+        assert!(presents_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_E
                 && sprite.position == [100.0, 88.0]
                 && sprite.layer == RenderLayer::Overlay
         }));
 
         let mut coalescing = None;
-        for _ in 0..DEFENDER_WORDMARK_START_STEP {
+        for _ in SOURCE_ATTRACT_PRESENTS_START_STEP..DEFENDER_WORDMARK_START_STEP {
             let step = driver.step(GameInput::NONE);
             if step
                 .draws
@@ -11119,7 +11139,8 @@ mod tests {
             AttractScriptActionManifest::SourceMessage {
                 ref label,
                 top_left_screen_address: SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
-            } if label == SOURCE_PRESENTS_MESSAGE_LABEL
+            } if event.start_after_steps == SOURCE_ATTRACT_PRESENTS_START_STEP
+                && label == SOURCE_PRESENTS_MESSAGE_LABEL
         )));
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,

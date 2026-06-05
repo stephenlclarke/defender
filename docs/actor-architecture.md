@@ -317,8 +317,12 @@ events for its own current script step into draw commands. The default
 `AttractScript::red_label_title()` parses
 `assets/red-label/actor-attract.script`, recreating the current Williams/logo,
 source `ELECV` presents, high-score, and credits opening sequence from checked
-text while the older Rust event constructor remains available as a fallback.
-Custom drivers can pass their own parsed or constructed sequence through
+text. The default Williams reveal, `ELECV`, and Defender wordmark events use
+the same source page-start steps as the clean attract scheduler: Williams from
+step 1, `ELECV` from step 236 at screen address `0x3258`, and the Defender
+wordmark from step 365. The older Rust event constructor remains available as a
+fallback. Custom drivers can pass their own parsed or constructed sequence
+through
 `ActorGameDriver::with_attract_script(...)` without replacing coin/start
 control handling.
 `ActorGameDriver::script_manifest()` includes the immutable attract-event

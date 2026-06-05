@@ -112,9 +112,10 @@ behavior, and wave scripts are embedded from
 share the same checked script parser path. The attract script now includes
 the source `ELECV` presents message, prompt-backed high-score table rows, and
 source `CREDV` credits label/count alongside Williams reveal and Defender
-wordmark coalescence, and custom attract scripts can draw checked
-`messages.tsv` labels through source cursor controls. The default actor wave
-allocator now
+wordmark coalescence using source title page-start steps: Williams from step 1,
+`ELECV` from step 236, and the Defender wordmark from step 365. Custom attract
+scripts can draw checked `messages.tsv` labels through source cursor controls.
+The default actor wave allocator now
 uses the source active-family
 shape, so later waves can introduce bomber and pod actor families alongside
 landers instead of remaining lander-only. Later-wave
