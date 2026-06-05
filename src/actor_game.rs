@@ -1241,6 +1241,530 @@ impl ActorBehaviorScript {
     }
 }
 
+impl FromStr for ActorBehaviorScript {
+    type Err = ActorBehaviorScriptParseError;
+
+    fn from_str(source: &str) -> Result<Self, Self::Err> {
+        let mut script = Self::default();
+        for (line_index, raw_line) in source.lines().enumerate() {
+            let line_number = line_index + 1;
+            let line = raw_line
+                .split_once('#')
+                .map_or(raw_line, |(before_comment, _)| before_comment)
+                .trim();
+            if line.is_empty() {
+                continue;
+            }
+            parse_behavior_script_line(line_number, line, &mut script)?;
+        }
+        Ok(script)
+    }
+}
+
+impl ActorBehaviorScript {
+    pub fn parse_text(source: &str) -> Result<Self, ActorBehaviorScriptParseError> {
+        source.parse()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorBehaviorScriptParseError {
+    pub line: usize,
+    pub message: String,
+}
+
+impl ActorBehaviorScriptParseError {
+    fn new(line: usize, message: impl Into<String>) -> Self {
+        Self {
+            line,
+            message: message.into(),
+        }
+    }
+}
+
+impl fmt::Display for ActorBehaviorScriptParseError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "actor behavior script line {}: {}",
+            self.line, self.message
+        )
+    }
+}
+
+impl std::error::Error for ActorBehaviorScriptParseError {}
+
+fn parse_behavior_script_line(
+    line_number: usize,
+    line: &str,
+    script: &mut ActorBehaviorScript,
+) -> Result<(), ActorBehaviorScriptParseError> {
+    let tokens = line.split_whitespace().collect::<Vec<_>>();
+    match tokens.as_slice() {
+        ["default", field, values @ ..] => {
+            let mut profile = script.default_profile;
+            apply_behavior_profile_field(line_number, &mut profile, field, values)?;
+            script.set_default_profile(profile);
+            Ok(())
+        }
+        ["kind", kind, field, values @ ..] => {
+            let kind = parse_behavior_actor_kind(line_number, kind)?;
+            let mut profile = script
+                .kind_profiles
+                .get(&kind)
+                .copied()
+                .unwrap_or_else(|| script.behavior_for(ActorId::new(0), kind));
+            apply_behavior_profile_field(line_number, &mut profile, field, values)?;
+            script.set_kind_behavior(kind, profile);
+            Ok(())
+        }
+        ["actor", actor, field, values @ ..] => {
+            let actor = ActorId::new(parse_behavior_u64(line_number, actor, "actor id")?);
+            let mut profile = script
+                .actor_profiles
+                .get(&actor)
+                .copied()
+                .unwrap_or(script.default_profile);
+            apply_behavior_profile_field(line_number, &mut profile, field, values)?;
+            script.set_actor_behavior(actor, profile);
+            Ok(())
+        }
+        [scope, ..] => Err(ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("unknown profile scope `{scope}`"),
+        )),
+        [] => Err(ActorBehaviorScriptParseError::new(
+            line_number,
+            "missing profile scope",
+        )),
+    }
+}
+
+fn apply_behavior_profile_field(
+    line_number: usize,
+    profile: &mut ActorBehaviorProfile,
+    field: &str,
+    values: &[&str],
+) -> Result<(), ActorBehaviorScriptParseError> {
+    let field = normalize_script_token(field);
+    match field.as_str() {
+        "player_speed" => {
+            profile.player_speed = parse_behavior_i16_value(line_number, values, field.as_str())?
+        }
+        "player_laser_cooldown_steps" => {
+            profile.player_laser_cooldown_steps =
+                parse_behavior_u8_value(line_number, values, field.as_str())?;
+        }
+        "player_hyperspace_hidden_steps" => {
+            profile.player_hyperspace_hidden_steps =
+                parse_behavior_u8_value(line_number, values, field.as_str())?;
+        }
+        "player_hyperspace_rematerialize_x" => {
+            profile.player_hyperspace_rematerialize_x =
+                parse_behavior_i16_value(line_number, values, field.as_str())?;
+        }
+        "player_hyperspace_rematerialize_y" => {
+            profile.player_hyperspace_rematerialize_y =
+                parse_behavior_i16_value(line_number, values, field.as_str())?;
+        }
+        "player_hyperspace_source_seed" => {
+            profile.player_hyperspace_source_seed =
+                parse_behavior_hyperspace_seed_value(line_number, values, field.as_str())?;
+        }
+        "player_hyperspace_death_delay_steps" => {
+            profile.player_hyperspace_death_delay_steps =
+                parse_behavior_u8_value(line_number, values, field.as_str())?;
+        }
+        "player_hyperspace_death_lseed" => {
+            profile.player_hyperspace_death_lseed =
+                parse_behavior_u8_value(line_number, values, field.as_str())?;
+        }
+        "player_takes_enemy_collision_damage" => {
+            profile.player_takes_enemy_collision_damage =
+                parse_behavior_bool_value(line_number, values, field.as_str())?;
+        }
+        "laser_speed" => {
+            profile.laser_speed = parse_behavior_i16_value(line_number, values, field.as_str())?
+        }
+        "laser_lifetime_steps" => {
+            profile.laser_lifetime_steps =
+                parse_behavior_u16_value(line_number, values, field.as_str())?;
+        }
+        "lander_seek_speed" => {
+            profile.lander_seek_speed =
+                parse_behavior_i16_value(line_number, values, field.as_str())?
+        }
+        "lander_drift_speed" => {
+            profile.lander_drift_speed =
+                parse_behavior_i16_value(line_number, values, field.as_str())?
+        }
+        "lander_carry_speed" => {
+            profile.lander_carry_speed =
+                parse_behavior_i16_value(line_number, values, field.as_str())?
+        }
+        "lander_pickup_radius_x" => {
+            profile.lander_pickup_radius_x =
+                parse_behavior_i16_value(line_number, values, field.as_str())?;
+        }
+        "lander_pickup_radius_y" => {
+            profile.lander_pickup_radius_y =
+                parse_behavior_i16_value(line_number, values, field.as_str())?;
+        }
+        "lander_conversion_y" => {
+            profile.lander_conversion_y =
+                parse_behavior_i16_value(line_number, values, field.as_str())?;
+        }
+        "lander_fire_period_steps" => {
+            profile.lander_fire_period_steps =
+                parse_behavior_u64_value(line_number, values, field.as_str())?;
+        }
+        "lander_shot_speed" => {
+            profile.lander_shot_speed =
+                parse_behavior_i16_value(line_number, values, field.as_str())?
+        }
+        "lander_shot_lifetime_steps" => {
+            profile.lander_shot_lifetime_steps =
+                parse_behavior_u16_value(line_number, values, field.as_str())?;
+        }
+        "lander_mode" => {
+            profile.lander_mode =
+                parse_lander_behavior_mode_value(line_number, values, field.as_str())?;
+        }
+        "mutant_seek_speed" => {
+            profile.mutant_seek_speed =
+                parse_behavior_i16_value(line_number, values, field.as_str())?
+        }
+        "mutant_shot_lifetime_steps" => {
+            profile.mutant_shot_lifetime_steps =
+                parse_behavior_u16_value(line_number, values, field.as_str())?;
+        }
+        "mutant_mode" => {
+            profile.mutant_mode =
+                parse_hostile_movement_mode_value(line_number, values, field.as_str())?;
+        }
+        "bomber_drift_speed" => {
+            profile.bomber_drift_speed =
+                parse_behavior_i16_value(line_number, values, field.as_str())?
+        }
+        "bomber_bomb_period_steps" => {
+            profile.bomber_bomb_period_steps =
+                parse_behavior_u64_value(line_number, values, field.as_str())?;
+        }
+        "bomber_mode" => {
+            profile.bomber_mode =
+                parse_hostile_movement_mode_value(line_number, values, field.as_str())?;
+        }
+        "pod_drift_speed" => {
+            profile.pod_drift_speed = parse_behavior_i16_value(line_number, values, field.as_str())?
+        }
+        "pod_mode" => {
+            profile.pod_mode =
+                parse_hostile_movement_mode_value(line_number, values, field.as_str())?;
+        }
+        "swarmer_seek_speed" => {
+            profile.swarmer_seek_speed =
+                parse_behavior_i16_value(line_number, values, field.as_str())?
+        }
+        "swarmer_fire_period_steps" => {
+            profile.swarmer_fire_period_steps =
+                parse_behavior_u64_value(line_number, values, field.as_str())?;
+        }
+        "swarmer_shot_speed" => {
+            profile.swarmer_shot_speed =
+                parse_behavior_i16_value(line_number, values, field.as_str())?
+        }
+        "swarmer_mode" => {
+            profile.swarmer_mode =
+                parse_hostile_movement_mode_value(line_number, values, field.as_str())?;
+        }
+        "baiter_seek_speed" => {
+            profile.baiter_seek_speed =
+                parse_behavior_i16_value(line_number, values, field.as_str())?
+        }
+        "baiter_fire_period_steps" => {
+            profile.baiter_fire_period_steps =
+                parse_behavior_u64_value(line_number, values, field.as_str())?;
+        }
+        "baiter_shot_speed" => {
+            profile.baiter_shot_speed =
+                parse_behavior_i16_value(line_number, values, field.as_str())?
+        }
+        "baiter_mode" => {
+            profile.baiter_mode =
+                parse_hostile_movement_mode_value(line_number, values, field.as_str())?;
+        }
+        "bomb_lifetime_steps" => {
+            profile.bomb_lifetime_steps =
+                parse_behavior_u16_value(line_number, values, field.as_str())?
+        }
+        "human_ground_y" => {
+            profile.human_ground_y = parse_behavior_i16_value(line_number, values, field.as_str())?
+        }
+        "human_fall_acceleration" => {
+            profile.human_fall_acceleration =
+                parse_behavior_i16_value(line_number, values, field.as_str())?;
+        }
+        "human_max_fall_speed" => {
+            profile.human_max_fall_speed =
+                parse_behavior_i16_value(line_number, values, field.as_str())?;
+        }
+        "human_safe_landing_speed" => {
+            profile.human_safe_landing_speed =
+                parse_behavior_i16_value(line_number, values, field.as_str())?;
+        }
+        "human_carried_offset_y" => {
+            profile.human_carried_offset_y =
+                parse_behavior_i16_value(line_number, values, field.as_str())?;
+        }
+        "explosion_lifetime_steps" => {
+            profile.explosion_lifetime_steps =
+                parse_behavior_u16_value(line_number, values, field.as_str())?;
+        }
+        "score_popup_lifetime_steps" => {
+            profile.score_popup_lifetime_steps =
+                parse_behavior_u16_value(line_number, values, field.as_str())?;
+        }
+        _ => {
+            return Err(ActorBehaviorScriptParseError::new(
+                line_number,
+                format!("unknown behavior field `{field}`"),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn parse_behavior_actor_kind(
+    line_number: usize,
+    token: &str,
+) -> Result<ActorKind, ActorBehaviorScriptParseError> {
+    match normalize_script_token(token).as_str() {
+        "attract_director" => Ok(ActorKind::AttractDirector),
+        "attract_script" => Ok(ActorKind::AttractScript),
+        "status_display" => Ok(ActorKind::StatusDisplay),
+        "williams_logo" => Ok(ActorKind::WilliamsLogo),
+        "defender_wordmark" => Ok(ActorKind::DefenderWordmark),
+        "player" => Ok(ActorKind::Player),
+        "lander" => Ok(ActorKind::Lander),
+        "mutant" => Ok(ActorKind::Mutant),
+        "bomber" => Ok(ActorKind::Bomber),
+        "bomb" => Ok(ActorKind::Bomb),
+        "pod" => Ok(ActorKind::Pod),
+        "swarmer" => Ok(ActorKind::Swarmer),
+        "baiter" => Ok(ActorKind::Baiter),
+        "human" => Ok(ActorKind::Human),
+        "laser" => Ok(ActorKind::Laser),
+        "enemy_laser" => Ok(ActorKind::EnemyLaser),
+        "explosion" => Ok(ActorKind::Explosion),
+        "score_popup" => Ok(ActorKind::ScorePopup),
+        "text" => Ok(ActorKind::Text),
+        _ => Err(ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("unknown actor kind `{token}`"),
+        )),
+    }
+}
+
+fn parse_behavior_i16_value(
+    line_number: usize,
+    values: &[&str],
+    field: &str,
+) -> Result<i16, ActorBehaviorScriptParseError> {
+    let value = parse_behavior_single_value(line_number, values, field)?;
+    i16::try_from(parse_behavior_i64(line_number, value, field)?).map_err(|error| {
+        ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is invalid: {error}"),
+        )
+    })
+}
+
+fn parse_behavior_u8_value(
+    line_number: usize,
+    values: &[&str],
+    field: &str,
+) -> Result<u8, ActorBehaviorScriptParseError> {
+    let value = parse_behavior_single_value(line_number, values, field)?;
+    u8::try_from(parse_behavior_u64(line_number, value, field)?).map_err(|error| {
+        ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is invalid: {error}"),
+        )
+    })
+}
+
+fn parse_behavior_u16_value(
+    line_number: usize,
+    values: &[&str],
+    field: &str,
+) -> Result<u16, ActorBehaviorScriptParseError> {
+    let value = parse_behavior_single_value(line_number, values, field)?;
+    u16::try_from(parse_behavior_u64(line_number, value, field)?).map_err(|error| {
+        ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is invalid: {error}"),
+        )
+    })
+}
+
+fn parse_behavior_u64_value(
+    line_number: usize,
+    values: &[&str],
+    field: &str,
+) -> Result<u64, ActorBehaviorScriptParseError> {
+    let value = parse_behavior_single_value(line_number, values, field)?;
+    parse_behavior_u64(line_number, value, field)
+}
+
+fn parse_behavior_bool_value(
+    line_number: usize,
+    values: &[&str],
+    field: &str,
+) -> Result<bool, ActorBehaviorScriptParseError> {
+    let value = parse_behavior_single_value(line_number, values, field)?;
+    match normalize_script_token(value).as_str() {
+        "true" | "yes" | "on" | "1" => Ok(true),
+        "false" | "no" | "off" | "0" => Ok(false),
+        _ => Err(ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is not a boolean"),
+        )),
+    }
+}
+
+fn parse_behavior_hyperspace_seed_value(
+    line_number: usize,
+    values: &[&str],
+    field: &str,
+) -> Result<Option<ActorHyperspaceSourceSeed>, ActorBehaviorScriptParseError> {
+    if values.len() == 1 && normalize_script_token(values[0]) == "none" {
+        return Ok(None);
+    }
+    if values.len() != 3 {
+        return Err(ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} needs `none` or three seed bytes"),
+        ));
+    }
+    Ok(Some(ActorHyperspaceSourceSeed {
+        seed: parse_behavior_u8_value(line_number, &values[0..1], "seed")?,
+        hseed: parse_behavior_u8_value(line_number, &values[1..2], "hseed")?,
+        lseed: parse_behavior_u8_value(line_number, &values[2..3], "lseed")?,
+    }))
+}
+
+fn parse_lander_behavior_mode_value(
+    line_number: usize,
+    values: &[&str],
+    field: &str,
+) -> Result<LanderBehaviorMode, ActorBehaviorScriptParseError> {
+    let value = parse_behavior_single_value(line_number, values, field)?;
+    match normalize_script_token(value).as_str() {
+        "seek_nearest_human" | "seek_human" | "human" => Ok(LanderBehaviorMode::SeekNearestHuman),
+        "chase_player" | "chase" | "player" => Ok(LanderBehaviorMode::ChasePlayer),
+        "drift" => Ok(LanderBehaviorMode::Drift),
+        _ => Err(ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is not a lander behavior mode"),
+        )),
+    }
+}
+
+fn parse_hostile_movement_mode_value(
+    line_number: usize,
+    values: &[&str],
+    field: &str,
+) -> Result<HostileMovementMode, ActorBehaviorScriptParseError> {
+    let value = parse_behavior_single_value(line_number, values, field)?;
+    match normalize_script_token(value).as_str() {
+        "drift" => Ok(HostileMovementMode::Drift),
+        "chase_player" | "chase" | "player" => Ok(HostileMovementMode::ChasePlayer),
+        _ => Err(ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is not a hostile movement mode"),
+        )),
+    }
+}
+
+fn parse_behavior_single_value<'a>(
+    line_number: usize,
+    values: &'a [&'a str],
+    field: &str,
+) -> Result<&'a str, ActorBehaviorScriptParseError> {
+    match values {
+        [value] => Ok(value),
+        [] => Err(ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} needs a value"),
+        )),
+        _ => Err(ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} accepts one value"),
+        )),
+    }
+}
+
+fn parse_behavior_u64(
+    line_number: usize,
+    value: &str,
+    field: &str,
+) -> Result<u64, ActorBehaviorScriptParseError> {
+    if let Some(hex) = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))
+    {
+        return u64::from_str_radix(hex, 16).map_err(|error| {
+            ActorBehaviorScriptParseError::new(
+                line_number,
+                format!("{field} `{value}` is invalid: {error}"),
+            )
+        });
+    }
+    value.parse::<u64>().map_err(|error| {
+        ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is invalid: {error}"),
+        )
+    })
+}
+
+fn parse_behavior_i64(
+    line_number: usize,
+    value: &str,
+    field: &str,
+) -> Result<i64, ActorBehaviorScriptParseError> {
+    if let Some(hex) = value
+        .strip_prefix("-0x")
+        .or_else(|| value.strip_prefix("-0X"))
+    {
+        return i64::from_str_radix(hex, 16)
+            .map(|value| -value)
+            .map_err(|error| {
+                ActorBehaviorScriptParseError::new(
+                    line_number,
+                    format!("{field} `{value}` is invalid: {error}"),
+                )
+            });
+    }
+    if let Some(hex) = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))
+    {
+        return i64::from_str_radix(hex, 16).map_err(|error| {
+            ActorBehaviorScriptParseError::new(
+                line_number,
+                format!("{field} `{value}` is invalid: {error}"),
+            )
+        });
+    }
+    value.parse::<i64>().map_err(|error| {
+        ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is invalid: {error}"),
+        )
+    })
+}
+
 impl Default for ActorBehaviorScript {
     fn default() -> Self {
         Self::new(ActorBehaviorProfile::DEFAULT)
@@ -2559,7 +3083,7 @@ fn parse_attract_script_event(
     let start_after_steps = parse_attract_u64(line_number, parts.next(), "start step")?;
     let duration_steps = parse_attract_duration(line_number, parts.next())?;
 
-    match normalize_attract_token(action).as_str() {
+    match normalize_script_token(action).as_str() {
         "text" => {
             let position = parse_attract_point(line_number, &mut parts)?;
             let value = parts.collect::<Vec<_>>().join(" ");
@@ -2633,7 +3157,7 @@ fn parse_attract_duration(
     if token == "-" {
         return Ok(None);
     }
-    match normalize_attract_token(token).as_str() {
+    match normalize_script_token(token).as_str() {
         "none" | "forever" | "infinite" => Ok(None),
         _ => Ok(Some(parse_attract_u64(
             line_number,
@@ -2677,7 +3201,7 @@ fn parse_attract_sprite_key(
     line_number: usize,
     token: &str,
 ) -> Result<SpriteKey, AttractScriptParseError> {
-    match normalize_attract_token(token).as_str() {
+    match normalize_script_token(token).as_str() {
         "williams_logo" | "williams" => Ok(SpriteKey::WilliamsLogo),
         "defender_wordmark" | "wordmark" => Ok(SpriteKey::DefenderWordmark),
         "defender_logo" | "defender" => Ok(SpriteKey::DefenderLogo),
@@ -2721,7 +3245,7 @@ fn reject_extra_attract_fields<'a>(
     }
 }
 
-fn normalize_attract_token(token: &str) -> String {
+fn normalize_script_token(token: &str) -> String {
     token.trim().replace('-', "_").to_ascii_lowercase()
 }
 
@@ -12611,6 +13135,96 @@ mod tests {
             manifest.behavior_for(ActorId::new(99), ActorKind::Bomber),
             default_behavior
         );
+    }
+
+    #[test]
+    fn behavior_script_text_parser_updates_default_kind_and_actor_profiles() {
+        let script = ActorBehaviorScript::parse_text(
+            "\
+            # Movement and behavior script\n\
+            default player_speed 5\n\
+            default player_takes_enemy_collision_damage off\n\
+            kind lander lander_mode chase_player\n\
+            kind lander lander_seek_speed 6\n\
+            actor 42 lander_drift_speed 7\n\
+            actor 42 player_hyperspace_source_seed 0x52 0x62 0x0c\n",
+        )
+        .expect("behavior script text should parse");
+
+        let manifest = script.manifest();
+
+        assert_eq!(manifest.default_profile.player_speed, 5);
+        assert!(!manifest.default_profile.player_takes_enemy_collision_damage);
+        let lander = manifest
+            .kind_profile(ActorKind::Lander)
+            .expect("lander kind profile should be parsed");
+        assert_eq!(lander.lander_mode, LanderBehaviorMode::ChasePlayer);
+        assert_eq!(lander.lander_seek_speed, 6);
+        let actor = manifest
+            .actor_profile(ActorId::new(42))
+            .expect("actor profile should be parsed");
+        assert_eq!(actor.lander_drift_speed, 7);
+        assert_eq!(
+            actor.player_hyperspace_source_seed,
+            Some(ActorHyperspaceSourceSeed {
+                seed: 0x52,
+                hseed: 0x62,
+                lseed: 0x0C,
+            })
+        );
+    }
+
+    #[test]
+    fn parsed_behavior_script_drives_motion_and_damage_policy() {
+        let script = "\
+            kind lander lander_mode chase_player\n\
+            kind lander lander_seek_speed 4\n\
+            kind player player_takes_enemy_collision_damage false\n"
+            .parse::<ActorBehaviorScript>()
+            .expect("behavior script should parse");
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.behavior_script = script;
+        driver.spawn_player();
+        let lander = driver.spawn_lander_for_test(Point::new(80, HUMAN_GROUND_Y));
+        driver.spawn_human_for_test(Point::new(100, HUMAN_GROUND_Y));
+
+        driver.step(GameInput::NONE);
+        let chasing = driver.step(GameInput::NONE);
+
+        assert_eq!(snapshot_for(&chasing, lander).position.x, 75);
+
+        let script = "kind player player_takes_enemy_collision_damage false"
+            .parse::<ActorBehaviorScript>()
+            .expect("damage behavior script should parse");
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.behavior_script = script;
+        driver.spawn_player();
+        driver.spawn_lander_for_test(Point::new(42, 120));
+        let protected = driver.step(GameInput::NONE);
+
+        assert_eq!(protected.phase, Phase::Playing);
+        assert_eq!(protected.lives, 3);
+        assert!(
+            !protected
+                .commands
+                .iter()
+                .any(|command| matches!(command, GameCommand::PlayerKilled))
+        );
+    }
+
+    #[test]
+    fn behavior_script_text_parser_reports_line_errors() {
+        let error = ActorBehaviorScript::parse_text("kind lander no_such_field 1\n")
+            .expect_err("unknown behavior field should fail");
+        assert_eq!(error.line, 1);
+        assert!(error.to_string().contains("unknown behavior field"));
+
+        let error = ActorBehaviorScript::parse_text("kind no_such_kind lander_seek_speed 1\n")
+            .expect_err("unknown actor kind should fail");
+        assert_eq!(error.line, 1);
+        assert!(error.to_string().contains("unknown actor kind"));
     }
 
     #[test]

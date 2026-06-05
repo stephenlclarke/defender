@@ -99,10 +99,11 @@ bomber movement speed, lander fire cadence, baiter entry/shot/seek timing, and
 scripted hostile/human spawn records. Read-only script manifests expose the
 configured attract events, driver behavior, and wave profiles, while each
 `StepReport` carries the effective per-step behavior manifest after transient
-input overrides such as `XYZZY` invincibility. The default actor wave allocator
-now uses the source active-family shape, so later waves can introduce bomber
-and pod actor families alongside landers instead of remaining lander-only.
-Later-wave
+input overrides such as `XYZZY` invincibility. Behavior scripts can also be
+parsed from checked text lines that update default, actor-kind, or actor-id
+profiles. The default actor wave allocator now uses the source active-family
+shape, so later waves can introduce bomber and pod actor families alongside
+landers instead of remaining lander-only. Later-wave
 actor landers now restore from source RNG placement/shot/velocity state, and
 later-wave humans restore from the source target-list distribution.
 Custom attract drivers can construct scripts in Rust or parse checked text

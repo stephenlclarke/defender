@@ -142,6 +142,23 @@ specific actor without changing the actor struct. Scripts can also choose
 movement behavior modes, for example making a later-wave lander ignore humans
 and chase the player, or making a specific bomber chase the player instead of
 using its fallback drift.
+`ActorBehaviorScript::parse_text(...)` and
+`str::parse::<ActorBehaviorScript>()` accept checked text profile updates using
+the same resolution model:
+
+```text
+# scope target field value
+default player_speed 5
+kind lander lander_mode chase_player
+kind lander lander_seek_speed 6
+actor 42 lander_drift_speed 7
+kind player player_takes_enemy_collision_damage false
+```
+
+`default` lines update the baseline profile, `kind` lines update all actors of
+an `ActorKind`, and `actor` lines update one actor id. Numeric values accept
+decimal or `0x` hex notation, mode fields accept names such as `drift` and
+`chase_player`, and parser errors include the source line number.
 
 `AttractScript::manifest`, `ActorBehaviorScript::manifest`,
 `ActorWaveScript::manifest`, and `ActorGameDriver::script_manifest` expose

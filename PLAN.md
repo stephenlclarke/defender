@@ -36,8 +36,9 @@ verification tools.
   higher-priority movement source. Read-only script manifests now expose the
   configured attract events, behavior profiles, and wave profiles so custom
   drivers can inspect their installed scripts without actor-thread
-  introspection, and attract scripts can now be parsed from checked text lines
-  before installation in a custom driver. `ActorWaveScript` now names per-wave
+  introspection. Attract scripts and behavior scripts can now be parsed from
+  checked text lines before installation in a custom driver. `ActorWaveScript`
+  now names per-wave
   progression data and applies behavior scripts plus hostile and initial-human
   spawn records as play starts and waves are cleared. Default actor wave progression
   now reads
@@ -747,6 +748,25 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 11:33 BST`: Completed the actor behavior-script text parser
+  slice. `ActorBehaviorScript::parse_text` and
+  `str::parse::<ActorBehaviorScript>()` now accept checked text lines for
+  `default`, `kind`, and `actor` profile updates. Parsed scripts can tune the
+  full `ActorBehaviorProfile` surface, including movement speeds, fire and
+  lifetime timings, movement modes, hyperspace seed bytes, human gravity and
+  safe-landing values, explosion/score lifetimes, and the player damage policy
+  used by `XYZZY` invincibility. Added focused parser manifest, runtime
+  movement/damage-policy, and parse-error regressions. Validation passed with
+  `cargo fmt --check`, focused behavior parser/runtime tests, `cargo test
+  actor_game --all-targets --features legacy-tools`, `cargo test actor_live
+  --all-targets --features legacy-tools`, `cargo test actor_smoke
+  --all-targets --features legacy-tools`, `cargo check --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features
+  legacy-tools -- -D warnings`, touched-doc markdownlint, and `git diff
+  --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780655157405839`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780655626269779`.
 - `2026-06-05 11:23 BST`: Completed the actor attract-script text parser
   slice. `AttractScript::parse_text` and `str::parse::<AttractScript>()` now
   accept checked text lines for `text`, `sprite`, `williams_logo`, and
