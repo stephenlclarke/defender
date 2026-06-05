@@ -172,7 +172,13 @@ verification tools.
   command path without consuming stock. Accepted actor smart bombs queue the
   source `SBSND` / cannon command-byte sequence, publish a five-step white
   flash through report/render state, and hold source reserve activation behind
-  the source smart-bomb cooldown. Player hazard collisions now decrement
+  the source smart-bomb cooldown. Actor playing reports now project source
+  `BGOUT` terrain into the clean state/render bridge. Removing the last human
+  starts a driver-owned source terrain-blow path that erases clean terrain and
+  scanner terrain, publishes `TerrainBlowSnapshot` state, projects source flash
+  windows plus `TEREX` terrain explosion births/growth/lifetime, and emits the
+  source `AHSND` / `TBSND` command cadence with tail commands. Player hazard
+  collisions now decrement
   driver-owned life stock and spawn a replacement player while lives remain,
   with final-life collisions entering the game-over/high-score path. Actor wave
   clear now publishes a separate interstitial `StepReport` with `WaveCleared`,
@@ -839,6 +845,36 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 20:40 BST`: Completed the actor source terrain and terrain-blow
+  cycle. Actor playing reports now publish clean terrain segments and render
+  the playfield from source `BGOUT` records while no terrain blow is active.
+  Removing the final human starts a driver-owned source `TerrainBlowSnapshot`,
+  erases clean terrain and scanner terrain, suppresses the same-batch generic
+  human-loss cue, projects the MAME-observed terrain flash windows through the
+  render bridge, spawns source-positioned `TEREX` terrain explosion actors with
+  the source terrain-explosion growth/lifetime curve, and emits the source
+  `AHSND` / `TBSND` sound-command cadence plus tail commands. README, SPEC,
+  and actor architecture docs now document the actor terrain bridge and
+  last-human terrain-blow path. No legacy code, tests, or scaffolding were safe
+  to remove in this slice because the remaining clean smoke/fidelity/oracle
+  evidence still depends on those boundaries. Validation passed with
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo test terrain_blow --lib --features legacy-tools`, `cargo test
+  actor_game --all-targets --features legacy-tools`, `cargo test actor_smoke
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test runtime --all-targets --features
+  legacy-tools`, `cargo test actor_wgpu --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, the actor smoke CLI commands (`--actor-smoke`,
+  `--actor-attract-smoke`, `--actor-post-game-smoke`, and
+  `--actor-wgpu-smoke`), `markdownlint README.md SPEC.md PLAN.md
+  docs/actor-architecture.md`, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite was not rerun in this cycle; the previously isolated
+  clean-game MAME window/post-game audio failures remain outside this slice.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780687368830329`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780688431792669`.
 - `2026-06-05 20:20 BST`: Completed the actor source smart-bomb cadence
   cycle. Accepted actor smart bombs now consume driver-owned stock on the
   input report, wait the source three-step detonation delay before clearing

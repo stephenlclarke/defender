@@ -16,12 +16,16 @@ use crate::{
         GameState, HIGH_SCORE_TABLE_ENTRIES, HighScoreEntrySnapshot, HighScoreTableEntrySnapshot,
         HighScoreTablesSnapshot, HumanSnapshot as CleanHumanSnapshot, PlayerSnapshot,
         PlayerStockSnapshot, ProjectileSnapshot as CleanProjectileSnapshot,
-        ScorePopupKind as CleanScorePopupKind, ScorePopupSnapshot as CleanScorePopupSnapshot,
-        ScoreSnapshot, SoundEvent, SourceBaiterSnapshot, SourceBomberSnapshot,
-        SourceLanderSnapshot, SourceMutantSnapshot, SourcePodSnapshot, SourceRandSnapshot,
-        SourceSwarmerSnapshot, WaveProfileSnapshot, WorldSnapshot, WorldVector,
-        push_source_explosion_cloud_pixels, source_explosion_render_scale,
-        source_explosion_size_for_age,
+        SOURCE_TERRAIN_BLOW_COMPLETE_FRAME, SOURCE_TERRAIN_BLOW_FLASH_COLOR_BYTES,
+        SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER, SOURCE_TERRAIN_BLOW_START_SOUND_FRAMES,
+        SOURCE_TERRAIN_EXPLOSION_LIFETIME_FRAMES, ScorePopupKind as CleanScorePopupKind,
+        ScorePopupSnapshot as CleanScorePopupSnapshot, ScoreSnapshot, SoundEvent,
+        SourceBaiterSnapshot, SourceBomberSnapshot, SourceLanderSnapshot, SourceMutantSnapshot,
+        SourcePodSnapshot, SourceRandSnapshot, SourceSwarmerSnapshot, TerrainBlowSnapshot,
+        TerrainBlowStage, TerrainSegment, WaveProfileSnapshot, WorldSnapshot, WorldVector,
+        push_source_bgout_terrain_sprites, push_source_explosion_cloud_pixels,
+        source_explosion_render_scale, source_explosion_size_for_age,
+        source_terrain_blow_flash_tint, source_terrain_explosion_size_for_age,
     },
     renderer::{
         Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
@@ -71,6 +75,7 @@ const SOURCE_SMART_BOMB_FLASH_STEPS: u8 = 5;
 const SOURCE_SMART_BOMB_RESERVE_DELAY_STEPS: u16 = 240;
 const SOURCE_SBSND_SOUND_COMMAND: u8 = 0xEE;
 const SOURCE_CANNON_SOUND_COMMAND: u8 = 0xE8;
+const SOURCE_TBSND_SOUND_COMMAND: u8 = 0xEB;
 const SOURCE_SMART_BOMB_SOUND_SEQUENCE: [(u8, u8); 7] = [
     (4, SOURCE_SBSND_SOUND_COMMAND),
     (8, SOURCE_SBSND_SOUND_COMMAND),
@@ -79,6 +84,12 @@ const SOURCE_SMART_BOMB_SOUND_SEQUENCE: [(u8, u8); 7] = [
     (20, SOURCE_SBSND_SOUND_COMMAND),
     (24, SOURCE_SBSND_SOUND_COMMAND),
     (28, SOURCE_CANNON_SOUND_COMMAND),
+];
+const SOURCE_TERRAIN_BLOW_SOUND_TAIL_SEQUENCE: [(u8, u8); 4] = [
+    (4, SOURCE_SBSND_SOUND_COMMAND),
+    (10, SOURCE_SBSND_SOUND_COMMAND),
+    (16, SOURCE_CANNON_SOUND_COMMAND),
+    (26, SOURCE_CANNON_SOUND_COMMAND),
 ];
 const SOURCE_PLAYER_SWITCH_SLEEP_STEPS: u8 = 0x60;
 const SOURCE_START_SOUND_DELAY_STEPS: u8 = 1;
@@ -3896,6 +3907,7 @@ pub enum ExplosionKind {
     Bomb,
     Player,
     Human,
+    Terrain,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -5619,6 +5631,7 @@ pub struct StepReport {
     pub enemy_reserve: EnemyReserveSnapshot,
     pub source_background_left: u16,
     pub source_rng: Option<ActorSourceRngSnapshot>,
+    pub terrain_blow: Option<TerrainBlowSnapshot>,
     pub snapshots: Vec<ActorSnapshot>,
     pub draws: Vec<DrawCommand>,
     pub sounds: Vec<SoundCue>,
@@ -5823,6 +5836,8 @@ fn world_snapshot_for_report(report: &StepReport) -> WorldSnapshot {
     }
 
     let mut world = WorldSnapshot {
+        terrain: actor_playfield_terrain_segments(report),
+        terrain_blow: report.terrain_blow,
         enemies: actor_enemies_for_report(report),
         humans: actor_humans_for_report(report),
         projectiles: actor_projectiles_for_report(report),
@@ -5833,8 +5848,41 @@ fn world_snapshot_for_report(report: &StepReport) -> WorldSnapshot {
         source_rng: SourceRandSnapshot::default(),
         ..WorldSnapshot::default()
     };
-    world.scanner.enabled = report.phase == Phase::Playing;
+    world.scanner.enabled = report.phase == Phase::Playing && report.terrain_blow.is_none();
     world
+}
+
+fn actor_playfield_terrain_segments(report: &StepReport) -> Vec<TerrainSegment> {
+    if report.phase != Phase::Playing || report.terrain_blow.is_some() {
+        return Vec::new();
+    }
+
+    source_playfield_terrain_segments()
+}
+
+fn source_playfield_terrain_segments() -> Vec<TerrainSegment> {
+    vec![
+        TerrainSegment {
+            position: ScreenPosition::new(0, 224),
+            size: (64, 8),
+        },
+        TerrainSegment {
+            position: ScreenPosition::new(64, 222),
+            size: (64, 8),
+        },
+        TerrainSegment {
+            position: ScreenPosition::new(128, 226),
+            size: (64, 8),
+        },
+        TerrainSegment {
+            position: ScreenPosition::new(192, 220),
+            size: (56, 8),
+        },
+        TerrainSegment {
+            position: ScreenPosition::new(248, 224),
+            size: (44, 8),
+        },
+    ]
 }
 
 fn actor_enemies_for_report(report: &StepReport) -> Vec<CleanEnemySnapshot> {
@@ -6035,7 +6083,7 @@ fn actor_explosions_for_report(report: &StepReport) -> Vec<CleanExplosionSnapsho
                     screen_position(draw.position),
                 );
                 explosion.source_center = source_center.map(screen_position);
-                explosion.source_size = source_explosion_size_for_age(age);
+                explosion.source_size = actor_source_explosion_size_for_kind(kind, age);
                 Some(explosion)
             }
             _ => None,
@@ -6054,6 +6102,7 @@ fn clean_explosion_kind(kind: ExplosionKind) -> CleanExplosionKind {
         ExplosionKind::Bomb => CleanExplosionKind::Bomb,
         ExplosionKind::Player => CleanExplosionKind::PlayerShip,
         ExplosionKind::Human => CleanExplosionKind::Astronaut,
+        ExplosionKind::Terrain => CleanExplosionKind::Terrain,
     }
 }
 
@@ -6164,6 +6213,20 @@ impl ActorRenderSceneBridge {
         let mut scene = RenderScene::empty(report.step, self.surface);
         if report.phase == Phase::Playing && report.smart_bomb_flash_steps_remaining > 0 {
             scene.clear_color = Color::WHITE;
+        }
+        if report.phase == Phase::Playing
+            && let Some(terrain_blow) = report.terrain_blow
+        {
+            let flash_tint = source_terrain_blow_flash_tint(terrain_blow.source_elapsed_frames);
+            if flash_tint.rgba[3] != 0 {
+                scene.clear_color = flash_tint;
+            }
+        }
+        if report.phase == Phase::Playing
+            && report.player_start.is_none()
+            && report.terrain_blow.is_none()
+        {
+            push_source_bgout_terrain_sprites(&mut scene);
         }
         for draw in &report.draws {
             self.push_draw(&mut scene, report.phase, draw);
@@ -6319,12 +6382,13 @@ impl ActorRenderSceneBridge {
             ExplosionKind::Baiter => (SpriteId::ENEMY_BAITER, BAITER_SCENE_SIZE),
             ExplosionKind::Bomb => (SpriteId::BOMB_EXPLOSION, EXPLOSION_SCENE_SIZE),
             ExplosionKind::Human => (SpriteId::ASTRONAUT_EXPLOSION, EXPLOSION_SCENE_SIZE),
+            ExplosionKind::Terrain => (SpriteId::TERRAIN_EXPLOSION, EXPLOSION_SCENE_SIZE),
             ExplosionKind::Player => (
                 SpriteId::PLAYER_EXPLOSION_PIXEL,
                 PLAYER_EXPLOSION_PIXEL_SCENE_SIZE,
             ),
         };
-        let source_size = source_explosion_size_for_age(age);
+        let source_size = actor_source_explosion_size_for_kind(kind, age);
         if let Some(source_position) = try_screen_position(position)
             && push_source_explosion_cloud_pixels(
                 scene,
@@ -7769,6 +7833,16 @@ fn actor_source_explosion_render_scale(source_size: u16) -> f32 {
         .unwrap_or(1.0)
 }
 
+fn actor_source_explosion_size_for_kind(kind: ExplosionKind, age: u16) -> u16 {
+    if kind == ExplosionKind::Terrain {
+        return source_terrain_explosion_size_for_age(
+            u8::try_from(age).unwrap_or(SOURCE_TERRAIN_EXPLOSION_LIFETIME_FRAMES),
+        );
+    }
+
+    source_explosion_size_for_age(age)
+}
+
 fn point_position(point: Point) -> [f32; 2] {
     [f32::from(point.x), f32::from(point.y)]
 }
@@ -8044,6 +8118,7 @@ struct HighScoreEntryStep {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct AppliedCommands {
     sounds: Vec<SoundCue>,
+    draws: Vec<DrawCommand>,
     bonus_awarded: bool,
 }
 
@@ -8156,6 +8231,13 @@ impl PendingPlayerStart {
 struct PendingActorSoundCommand {
     steps_remaining: u8,
     command: u8,
+    source: PendingActorSoundSource,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PendingActorSoundSource {
+    SmartBomb,
+    TerrainBlow,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -8278,6 +8360,7 @@ pub struct ActorGameDriver {
     pending_smart_bomb_detonation_steps: Option<u8>,
     smart_bomb_flash_steps_remaining: u8,
     pending_sound_commands: Vec<PendingActorSoundCommand>,
+    terrain_blow: Option<TerrainBlowSnapshot>,
     game_over_hall_of_fame_stall_remaining: Option<u8>,
     pending_survivor_bonus: Option<PendingSurvivorBonus>,
     pending_player_switch: Option<PendingPlayerSwitch>,
@@ -8336,6 +8419,7 @@ impl ActorGameDriver {
             pending_smart_bomb_detonation_steps: None,
             smart_bomb_flash_steps_remaining: 0,
             pending_sound_commands: Vec::new(),
+            terrain_blow: None,
             game_over_hall_of_fame_stall_remaining: None,
             pending_survivor_bonus: None,
             pending_player_switch: None,
@@ -8357,6 +8441,7 @@ impl ActorGameDriver {
         let mut delayed_sounds = self.advance_pending_start_sound();
         delayed_sounds.extend(self.advance_pending_sound_commands());
         self.advance_smart_bomb_flash();
+        delayed_sounds.extend(self.advance_terrain_blow(&mut step_commands));
         let smart_bomb_replay_awarded =
             self.advance_pending_smart_bomb_detonation(&mut step_commands);
         let mut survivor_bonus_awarded_points = None;
@@ -8477,6 +8562,7 @@ impl ActorGameDriver {
         self.advance_baiter_timer(&mut commands);
         let applied_commands = self.apply_commands(&commands[pre_applied_command_count..]);
         self.remove_dead_actors(&dead_actor_ids);
+        draws.extend(applied_commands.draws);
         delayed_sounds.extend(applied_commands.sounds);
         survivor_bonus_replay_awarded |= applied_commands.bonus_awarded;
         if self.start_survivor_bonus_if_wave_cleared(was_playing, &commands) {
@@ -8530,6 +8616,7 @@ impl ActorGameDriver {
             enemy_reserve: self.enemy_reserve,
             source_background_left: self.source_background_left,
             source_rng,
+            terrain_blow: self.terrain_blow,
             snapshots: self.snapshots.values().cloned().collect(),
             draws,
             sounds: delayed_sounds,
@@ -8889,6 +8976,7 @@ impl ActorGameDriver {
         let mut active_bomb_shells = self.active_bomb_shell_count();
         let mut removed_source_shells = BTreeSet::new();
         let mut removed_bomb_shells = BTreeSet::new();
+        let mut terrain_blow_started_this_batch = false;
         for command in commands {
             match *command {
                 GameCommand::Credit => {
@@ -8969,6 +9057,7 @@ impl ActorGameDriver {
                     self.spawn_score_popup(position, points);
                 }
                 GameCommand::Destroy(id) => {
+                    let removed_kind = self.snapshots.get(&id).map(|snapshot| snapshot.kind);
                     if let Some(snapshot) = self.snapshots.get(&id) {
                         if removed_source_shells.insert(id) && is_source_shell_kind(snapshot.kind) {
                             active_source_shells = active_source_shells.saturating_sub(1);
@@ -8980,6 +9069,11 @@ impl ActorGameDriver {
                     self.snapshots.remove(&id);
                     self.actors.remove(&id);
                     self.behavior_script.remove_actor_behavior(id);
+                    if removed_kind == Some(ActorKind::Human) {
+                        let draws = self.start_terrain_blow_if_no_humans();
+                        terrain_blow_started_this_batch |= !draws.is_empty();
+                        applied.draws.extend(draws);
+                    }
                 }
                 GameCommand::SetSourceBackgroundLeft(background_left) => {
                     self.source_background_left = background_left;
@@ -9012,13 +9106,20 @@ impl ActorGameDriver {
                     self.snapshots.remove(&id);
                     self.actors.remove(&id);
                     self.behavior_script.remove_actor_behavior(id);
+                    let draws = self.start_terrain_blow_if_no_humans();
+                    terrain_blow_started_this_batch |= !draws.is_empty();
+                    applied.draws.extend(draws);
                 }
                 GameCommand::AddScore(points) => {
                     if self.award_points(points) {
                         applied.bonus_awarded = true;
                     }
                 }
-                GameCommand::PlaySound(sound) => applied.sounds.push(sound),
+                GameCommand::PlaySound(sound) => {
+                    if !(terrain_blow_started_this_batch && sound == SoundCue::HumanLost) {
+                        applied.sounds.push(sound);
+                    }
+                }
                 GameCommand::PlayerKilled => {
                     self.lose_player_life(&mut applied.sounds);
                 }
@@ -9135,6 +9236,7 @@ impl ActorGameDriver {
         self.pending_player_start = None;
         self.pending_start_sound_steps = None;
         self.clear_pending_smart_bomb();
+        self.clear_terrain_blow();
         self.enemy_reserve = EnemyReserveSnapshot::default();
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
@@ -9171,6 +9273,7 @@ impl ActorGameDriver {
         self.pending_player_start = Some(PendingPlayerStart::new(player));
         self.pending_start_sound_steps = None;
         self.clear_pending_smart_bomb();
+        self.clear_terrain_blow();
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.source_background_left = 0;
         self.source_reserve_activation_cooldown_steps = 0;
@@ -9215,8 +9318,21 @@ impl ActorGameDriver {
                 |(steps_remaining, command)| PendingActorSoundCommand {
                     steps_remaining,
                     command,
+                    source: PendingActorSoundSource::SmartBomb,
                 },
             ));
+    }
+
+    fn queue_terrain_blow_sound_tail(&mut self) {
+        self.pending_sound_commands.extend(
+            SOURCE_TERRAIN_BLOW_SOUND_TAIL_SEQUENCE.iter().copied().map(
+                |(steps_remaining, command)| PendingActorSoundCommand {
+                    steps_remaining,
+                    command,
+                    source: PendingActorSoundSource::TerrainBlow,
+                },
+            ),
+        );
     }
 
     fn advance_smart_bomb_flash(&mut self) {
@@ -9224,10 +9340,131 @@ impl ActorGameDriver {
             self.smart_bomb_flash_steps_remaining.saturating_sub(1);
     }
 
+    fn start_terrain_blow_if_no_humans(&mut self) -> Vec<DrawCommand> {
+        if self.terrain_blow.is_some()
+            || self
+                .snapshots
+                .values()
+                .any(|snapshot| snapshot.kind == ActorKind::Human && snapshot.alive)
+        {
+            return Vec::new();
+        }
+
+        self.terrain_blow = Some(TerrainBlowSnapshot::source_started());
+        self.spawn_terrain_blow_explosion_births(0)
+    }
+
+    fn advance_terrain_blow(&mut self, commands: &mut Vec<GameCommand>) -> Vec<SoundCue> {
+        let Some(terrain_blow) = self.terrain_blow else {
+            return Vec::new();
+        };
+        if terrain_blow.stage == TerrainBlowStage::Completed {
+            return Vec::new();
+        }
+
+        let elapsed = terrain_blow.source_elapsed_frames.saturating_add(1);
+        for draw in self.spawn_terrain_blow_explosion_births(elapsed) {
+            commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
+                position: draw.position,
+                kind: ExplosionKind::Terrain,
+                source_center: None,
+            }));
+        }
+
+        let mut sounds = Vec::new();
+        if elapsed >= SOURCE_TERRAIN_BLOW_COMPLETE_FRAME {
+            if let Some(terrain_blow) = self.terrain_blow.as_mut() {
+                terrain_blow.stage = TerrainBlowStage::Completed;
+                terrain_blow.source_elapsed_frames = elapsed;
+                terrain_blow.source_iteration = terrain_blow.source_iteration_limit;
+                terrain_blow.source_sleep_remaining = None;
+                terrain_blow.source_pseudo_color = 0;
+            }
+            sounds.push(SoundCue::SourceCommand(SOURCE_TBSND_SOUND_COMMAND));
+            self.queue_terrain_blow_sound_tail();
+            return sounds;
+        }
+
+        let start_sound_index = SOURCE_TERRAIN_BLOW_START_SOUND_FRAMES
+            .iter()
+            .position(|frame| *frame == elapsed);
+        let next_frame = SOURCE_TERRAIN_BLOW_START_SOUND_FRAMES
+            .iter()
+            .copied()
+            .find(|frame| *frame > elapsed)
+            .unwrap_or(SOURCE_TERRAIN_BLOW_COMPLETE_FRAME);
+        if let Some(terrain_blow) = self.terrain_blow.as_mut() {
+            terrain_blow.source_elapsed_frames = elapsed;
+            terrain_blow.source_sleep_remaining = u8::try_from(next_frame - elapsed).ok();
+            terrain_blow.source_overload_counter = SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER;
+            if let Some(start_sound_index) = start_sound_index {
+                terrain_blow.stage = TerrainBlowStage::ExplosionPassSleeping;
+                terrain_blow.source_iteration = terrain_blow.source_iteration.saturating_add(1);
+                terrain_blow.source_pseudo_color =
+                    SOURCE_TERRAIN_BLOW_FLASH_COLOR_BYTES[start_sound_index];
+            } else {
+                terrain_blow.stage = TerrainBlowStage::FlashClearedSleeping;
+                terrain_blow.source_pseudo_color = 0;
+            }
+        }
+        if start_sound_index.is_some() {
+            sounds.push(SoundCue::SourceCommand(SOURCE_SBSND_SOUND_COMMAND));
+        }
+        sounds
+    }
+
+    fn spawn_terrain_blow_explosion_births(&mut self, elapsed: u16) -> Vec<DrawCommand> {
+        const TERRAIN_BLOW_EXPLOSION_BIRTHS: [(u16, Point); 17] = [
+            (0, Point::new(0x4C, 0xC2)),
+            (4, Point::new(0x14, 0xE2)),
+            (4, Point::new(0x5C, 0xDE)),
+            (8, Point::new(0x80, 0xDE)),
+            (12, Point::new(0x00, 0xE0)),
+            (16, Point::new(0x68, 0xDC)),
+            (21, Point::new(0x30, 0xE0)),
+            (26, Point::new(0x80, 0xDE)),
+            (31, Point::new(0x44, 0xD2)),
+            (31, Point::new(0x50, 0xC6)),
+            (51, Point::new(0x20, 0xE2)),
+            (52, Point::new(0x70, 0xD8)),
+            (60, Point::new(0x6C, 0xD4)),
+            (60, Point::new(0x28, 0xE0)),
+            (70, Point::new(0x94, 0xDC)),
+            (70, Point::new(0x00, 0xE0)),
+            (81, Point::new(0x0C, 0xE2)),
+        ];
+
+        TERRAIN_BLOW_EXPLOSION_BIRTHS
+            .iter()
+            .copied()
+            .filter(|(birth_frame, _)| *birth_frame == elapsed)
+            .map(|(_, position)| {
+                let id = self.spawn_explosion(position, ExplosionKind::Terrain);
+                DrawCommand::sprite_with_effect(
+                    id,
+                    SpriteKey::Explosion,
+                    position,
+                    VisualEffect::ExplosionCloud {
+                        kind: ExplosionKind::Terrain,
+                        age: 0,
+                        source_center: None,
+                    },
+                )
+            })
+            .collect()
+    }
+
     fn clear_pending_smart_bomb(&mut self) {
         self.pending_smart_bomb_detonation_steps = None;
         self.smart_bomb_flash_steps_remaining = 0;
-        self.pending_sound_commands.clear();
+        self.pending_sound_commands
+            .retain(|command| command.source != PendingActorSoundSource::SmartBomb);
+    }
+
+    fn clear_terrain_blow(&mut self) {
+        self.terrain_blow = None;
+        self.pending_sound_commands
+            .retain(|command| command.source != PendingActorSoundSource::TerrainBlow);
     }
 
     fn start_smart_bomb(&mut self, consume_stock: bool) -> bool {
@@ -9304,6 +9541,7 @@ impl ActorGameDriver {
         self.pending_player_start = None;
         self.pending_start_sound_steps = None;
         self.clear_pending_smart_bomb();
+        self.clear_terrain_blow();
         self.enemy_reserve = EnemyReserveSnapshot::default();
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
@@ -9359,6 +9597,7 @@ impl ActorGameDriver {
         self.pending_player_start = None;
         self.pending_start_sound_steps = None;
         self.clear_pending_smart_bomb();
+        self.clear_terrain_blow();
         self.enemy_reserve = EnemyReserveSnapshot::default();
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
@@ -9378,6 +9617,7 @@ impl ActorGameDriver {
         self.pending_player_start = None;
         self.pending_start_sound_steps = None;
         self.clear_pending_smart_bomb();
+        self.clear_terrain_blow();
         self.clear_wave_playfield_actors();
         self.apply_wave_profile();
         self.source_reserve_activation_cooldown_steps = 0;
@@ -13718,7 +13958,8 @@ impl AssetActor for Explosion {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
         let behavior = prompt.behavior_for(self.id, ActorKind::Explosion);
-        if self.age < behavior.explosion_lifetime_steps {
+        let lifetime_steps = explosion_lifetime_steps(self.kind, behavior);
+        if self.age < lifetime_steps {
             draws.push(DrawCommand::sprite_with_effect(
                 self.id,
                 SpriteKey::Explosion,
@@ -13731,7 +13972,7 @@ impl AssetActor for Explosion {
             ));
             self.age = self.age.saturating_add(1);
         }
-        if self.age >= behavior.explosion_lifetime_steps {
+        if self.age >= lifetime_steps {
             commands.push(GameCommand::Destroy(self.id));
         }
         ActorReply {
@@ -13743,7 +13984,7 @@ impl AssetActor for Explosion {
                 velocity: Velocity::default(),
                 direction: None,
                 bounds: None,
-                alive: self.age < behavior.explosion_lifetime_steps,
+                alive: self.age < lifetime_steps,
                 source_lander: None,
                 source_bomber: None,
                 source_pod: None,
@@ -13757,6 +13998,14 @@ impl AssetActor for Explosion {
             draws,
         }
     }
+}
+
+fn explosion_lifetime_steps(kind: ExplosionKind, behavior: ActorBehaviorProfile) -> u16 {
+    if kind == ExplosionKind::Terrain {
+        return u16::from(SOURCE_TERRAIN_EXPLOSION_LIFETIME_FRAMES);
+    }
+
+    behavior.explosion_lifetime_steps
 }
 
 #[cfg(test)]
@@ -14346,6 +14595,7 @@ mod tests {
             enemy_reserve: EnemyReserveSnapshot::default(),
             source_background_left: 0,
             source_rng: None,
+            terrain_blow: None,
             snapshots: Vec::new(),
             draws: vec![
                 DrawCommand::sprite(ActorId(101), SpriteKey::Laser, Point::new(40, 80)),
@@ -14555,6 +14805,7 @@ mod tests {
             enemy_reserve: EnemyReserveSnapshot::default(),
             source_background_left: 0,
             source_rng: None,
+            terrain_blow: None,
             snapshots: Vec::new(),
             draws: vec![DrawCommand::sprite_with_effect(
                 ActorId(101),
@@ -14595,7 +14846,13 @@ mod tests {
             Some(ScreenPosition::new(0x21, 0xA9)),
             source_explosion_size_for_age(2),
         ));
-        assert_eq!(scene.sprites, expected.sprites);
+        let object_sprites = scene
+            .sprites
+            .iter()
+            .filter(|sprite| sprite.layer == RenderLayer::Objects)
+            .copied()
+            .collect::<Vec<_>>();
+        assert_eq!(object_sprites, expected.sprites);
     }
 
     #[test]
@@ -14677,6 +14934,7 @@ mod tests {
             enemy_reserve: EnemyReserveSnapshot::default(),
             source_background_left: 0,
             source_rng: None,
+            terrain_blow: None,
             snapshots: vec![player, lander, human, laser, enemy_laser, bomb],
             draws: vec![
                 DrawCommand::sprite(ActorId(11), SpriteKey::PlayerLeft, Point::new(40, 70)),
@@ -14840,6 +15098,7 @@ mod tests {
             enemy_reserve: EnemyReserveSnapshot::default(),
             source_background_left: 0,
             source_rng: None,
+            terrain_blow: None,
             snapshots: Vec::new(),
             draws,
             sounds: Vec::new(),
@@ -21215,6 +21474,120 @@ mod tests {
     }
 
     #[test]
+    fn actor_playing_state_and_render_bridge_project_source_terrain_until_blow() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 1;
+        driver.spawn_player();
+
+        let report = driver.step(GameInput::NONE);
+        let state = report.game_state();
+        let scene = report.render_scene();
+
+        assert_eq!(state.world.terrain, source_playfield_terrain_segments());
+        assert!(state.world.terrain_blow.is_none());
+        assert!(state.world.scanner.enabled);
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::TERRAIN_TILE && sprite.layer == RenderLayer::Terrain
+        }));
+    }
+
+    #[test]
+    fn last_human_loss_starts_actor_source_terrain_blow() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 1;
+        driver.spawn_pod_for_test(Point::new(180, 80));
+        driver.spawn_falling_human_for_test(Point::new(100, HUMAN_GROUND_Y - 1), 4);
+
+        let report = driver.step(GameInput::NONE);
+
+        assert!(driver.snapshot_count(ActorKind::Human) == 0);
+        assert!(report.sounds.is_empty());
+        let terrain_blow = report.terrain_blow.expect("terrain blow should start");
+        assert!(terrain_blow.status_terrain_blown);
+        assert_eq!(terrain_blow.stage, TerrainBlowStage::ExplosionPassSleeping);
+        assert_eq!(terrain_blow.source_elapsed_frames, 0);
+        assert_eq!(terrain_blow.source_iteration, 0);
+        assert_eq!(terrain_blow.source_sleep_remaining, Some(1));
+        assert_eq!(
+            terrain_blow.source_overload_counter,
+            SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER
+        );
+        assert!(terrain_blow.terrain_erased());
+        assert!(terrain_blow.scanner_terrain_erased());
+
+        let state = report.game_state();
+        assert!(state.world.terrain.is_empty());
+        assert_eq!(state.world.terrain_blow, Some(terrain_blow));
+        assert!(!state.world.scanner.enabled);
+        assert!(state.world.explosions.iter().any(|explosion| {
+            explosion.kind == CleanExplosionKind::Terrain
+                && explosion.position == ScreenPosition::new(0x4C, 0xC2)
+                && explosion.picture_label == "TEREX"
+                && explosion.mapped_sprite == SpriteId::TERRAIN_EXPLOSION
+        }));
+
+        let scene = report.render_scene();
+        assert!(!scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::TERRAIN_TILE && sprite.layer == RenderLayer::Terrain
+        }));
+    }
+
+    #[test]
+    fn actor_source_terrain_blow_advances_flash_explosions_and_sound_tail() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 1;
+        driver.spawn_pod_for_test(Point::new(180, 80));
+        driver.spawn_falling_human_for_test(Point::new(100, HUMAN_GROUND_Y - 1), 4);
+        let start = driver.step(GameInput::NONE);
+        assert!(start.terrain_blow.is_some());
+
+        let mut observed_sounds = Vec::new();
+        let mut saw_completion = false;
+        for offset in 1..=SOURCE_TERRAIN_BLOW_COMPLETE_FRAME + 26 {
+            let report = driver.step(GameInput::NONE);
+            if !report.sounds.is_empty() {
+                observed_sounds.push((offset, report.sounds.clone()));
+            }
+            let terrain_blow = report
+                .terrain_blow
+                .expect("terrain blow should remain published");
+            if offset == 2 {
+                assert_eq!(
+                    report.render_scene().clear_color,
+                    source_terrain_blow_flash_tint(terrain_blow.source_elapsed_frames)
+                );
+            }
+            if offset == 4 {
+                assert!(
+                    report
+                        .game_state()
+                        .world
+                        .explosions
+                        .iter()
+                        .any(|explosion| {
+                            explosion.kind == CleanExplosionKind::Terrain
+                                && explosion.position == ScreenPosition::new(0x14, 0xE2)
+                        })
+                );
+            }
+            if terrain_blow.stage == TerrainBlowStage::Completed {
+                saw_completion = true;
+                assert_eq!(
+                    terrain_blow.source_iteration,
+                    SOURCE_TERRAIN_BLOW_START_SOUND_FRAMES.len() as u8
+                );
+                assert_eq!(terrain_blow.source_sleep_remaining, None);
+            }
+        }
+
+        assert!(saw_completion);
+        assert_eq!(observed_sounds, source_terrain_blow_sound_cues());
+    }
+
+    #[test]
     fn completed_abduction_consumes_human_and_spawns_mutant() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
@@ -22328,6 +22701,31 @@ mod tests {
         SOURCE_SMART_BOMB_SOUND_SEQUENCE
             .iter()
             .map(|(_, command)| SoundCue::SourceCommand(*command))
+            .collect()
+    }
+
+    fn source_terrain_blow_sound_cues() -> Vec<(u16, Vec<SoundCue>)> {
+        SOURCE_TERRAIN_BLOW_START_SOUND_FRAMES
+            .iter()
+            .copied()
+            .map(|frame| {
+                (
+                    frame,
+                    vec![SoundCue::SourceCommand(SOURCE_SBSND_SOUND_COMMAND)],
+                )
+            })
+            .chain(std::iter::once((
+                SOURCE_TERRAIN_BLOW_COMPLETE_FRAME,
+                vec![SoundCue::SourceCommand(SOURCE_TBSND_SOUND_COMMAND)],
+            )))
+            .chain(SOURCE_TERRAIN_BLOW_SOUND_TAIL_SEQUENCE.iter().copied().map(
+                |(offset, command)| {
+                    (
+                        SOURCE_TERRAIN_BLOW_COMPLETE_FRAME + u16::from(offset),
+                        vec![SoundCue::SourceCommand(command)],
+                    )
+                },
+            ))
             .collect()
     }
 

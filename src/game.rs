@@ -528,7 +528,7 @@ pub(crate) const SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER: u8 = 8;
 pub(crate) const SOURCE_TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES: u16 = 0x98;
 pub(crate) const SOURCE_TERRAIN_BLOW_SCANNER_ERASE_ENTRIES: u16 = 0x40;
 pub(crate) const SOURCE_TERRAIN_BLOW_COMPLETE_FRAME: u16 = 111;
-const SOURCE_TERRAIN_EXPLOSION_LIFETIME_FRAMES: u8 = 81;
+pub(crate) const SOURCE_TERRAIN_EXPLOSION_LIFETIME_FRAMES: u8 = 81;
 const SOURCE_TERRAIN_EXPLOSION_GROWTH_STEPS: [u8; SOURCE_TERRAIN_EXPLOSION_LIFETIME_FRAMES
     as usize] = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 22, 23, 24,
@@ -557,7 +557,7 @@ const SOURCE_TERRAIN_BLOW_EXPLOSION_BIRTHS: [(u16, ScreenPosition); 17] = [
     (70, ScreenPosition::new(0x00, 0xE0)),
     (81, ScreenPosition::new(0x0C, 0xE2)),
 ];
-const SOURCE_TERRAIN_BLOW_FLASH_COLOR_BYTES: [u8; 16] = [
+pub(crate) const SOURCE_TERRAIN_BLOW_FLASH_COLOR_BYTES: [u8; 16] = [
     0xC6, 0xCA, 0xC6, 0xC7, 0xF8, 0x87, 0x38, 0xC5, 0xE8, 0x47, 0xFA, 0x27, 0x38, 0x47, 0xCC, 0xDA,
 ];
 const SOURCE_TERRAIN_BLOW_FLASH_WINDOWS: [(u16, u16, u8); 16] = [
@@ -2458,7 +2458,7 @@ pub(crate) fn source_explosion_size_for_age(age: u16) -> u16 {
     SOURCE_EXPLOSION_INITIAL_SIZE.wrapping_add(SOURCE_EXPLOSION_SIZE_DELTA.wrapping_mul(age))
 }
 
-fn source_terrain_explosion_size_for_age(age: u8) -> u16 {
+pub(crate) fn source_terrain_explosion_size_for_age(age: u8) -> u16 {
     let step_index = usize::from(
         SOURCE_TERRAIN_EXPLOSION_GROWTH_STEPS
             .get(usize::from(age))
@@ -13085,7 +13085,7 @@ fn source_pseudo_color_tint(value: u8) -> Color {
     )
 }
 
-fn source_terrain_blow_flash_tint(elapsed: u16) -> Color {
+pub(crate) fn source_terrain_blow_flash_tint(elapsed: u16) -> Color {
     let color = SOURCE_TERRAIN_BLOW_FLASH_WINDOWS
         .iter()
         .find_map(|(start, end, color)| (*start <= elapsed && elapsed <= *end).then_some(*color))
@@ -13399,7 +13399,7 @@ struct SourceTerrainGenerationState {
     flavor_1_pointer: usize,
 }
 
-fn push_source_bgout_terrain_sprites(scene: &mut RenderScene) {
+pub(crate) fn push_source_bgout_terrain_sprites(scene: &mut RenderScene) {
     for record in source_bgout_default_terrain_records() {
         scene.push_sprite(SceneSprite {
             sprite: source_terrain_word_sprite(record.word),

@@ -181,8 +181,9 @@ tree:
   scriptable behavior and wave profiles, two-player admission/session
   snapshots, bounded source start-playfield delay reports, source-cadenced
   start/appearance sound cues, two-player player-switch sleep reports,
-  draw/effect descriptions, and `SoundCue::source_sound_command` metadata for
-  red-label Williams sound-board command bytes where source evidence exists.
+  draw/effect descriptions, source playfield terrain and terrain-blow report
+  state, and `SoundCue::source_sound_command` metadata for red-label Williams
+  sound-board command bytes where source evidence exists.
   `ActorSoundEventBridge` adapts
   report sound cues into clean `SoundEvent` batches for the existing audio
   runtime contract. `ActorRenderSceneBridge` adapts report draw commands into
@@ -201,6 +202,12 @@ tree:
   target6 fire2524 wait window, projected collision position,
   source-positioned enemy explosion, hit cue, and score award before routing
   through the normal player death command path.
+  Playing reports project the source `BGOUT` terrain into state/render output.
+  Final-human removal starts a driver-owned source terrain-blow snapshot,
+  erases clean terrain and scanner terrain, emits source flash windows,
+  projects `TEREX` terrain explosion actors through the source
+  terrain-explosion growth/lifetime curve, and queues the source `AHSND` /
+  `TBSND` sound-command cadence plus tail commands.
   `ActorRuntimeAdapter` bundles reports, clean `GameState`, clean `GameEvents`,
   and clean `RenderScene` values into actor `ActorFrame` values. Normal
   interactive play uses the actor live runtime, with explicit actor smoke and

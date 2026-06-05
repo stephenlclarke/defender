@@ -24,14 +24,17 @@ evidence commands.
 - Rendering is described by `DrawCommand`, `SpriteKey`, and `VisualEffect`
   values. The status display is also an actor: it draws player-one/player-two
   scores, high score, wave, lives, credits, and high-score-entry rows from
-  `StepPrompt` state. Explosion
+  `StepPrompt` state. Playing reports also expose the source `BGOUT` terrain
+  through the state and render bridges while no terrain blow is active.
+  Explosion
   draws carry `ExplosionKind` metadata for lander, mutant, bomber, pod,
-  swarmer, baiter, bomb, player, and human clouds plus optional source-center
-  metadata, so the actor render and clean-state bridges preserve source family
-  identity and source top-left/center placement. The render bridge also routes
-  descriptor-backed enemy-family explosions through the clean source
-  expanded-object pixel-cloud renderer and uses the draw age to apply the clean
-  source explosion-size curve. Audio is
+  swarmer, baiter, bomb, player, human, and terrain clouds plus optional
+  source-center metadata, so the actor render and clean-state bridges preserve
+  source family identity and source top-left/center placement. The render
+  bridge also routes descriptor-backed enemy-family explosions through the
+  clean source expanded-object pixel-cloud renderer, uses the draw age to apply
+  the clean source explosion-size curve, and uses the source terrain-explosion
+  growth curve for terrain clouds. Audio is
   described by `SoundCue`; source-backed cues expose their red-label Williams
   sound-board command byte through `SoundCue::source_sound_command`.
   `ActorSoundEventBridge` converts a stream of `StepReport` sound cues into the
@@ -600,13 +603,20 @@ The actor driver now owns a first Defender gameplay loop:
   cue, and spawn a 500-point popup actor.
 - Slow falling humans settle safely on the terrain line for 250 points and a
   250-point popup. Fast impacts destroy the human and spawn an explosion.
+- When the last human is removed, the driver starts a source
+  `TerrainBlowSnapshot`, erases clean terrain and scanner terrain, suppresses
+  the normal human-loss cue for that batch, emits the source terrain-blow flash
+  and `AHSND` / `TBSND` command cadence, and spawns `TEREX` terrain explosion
+  actors at the source birth positions.
 - Explosion actors publish family-specific variant metadata for lander, mutant,
-  bomber, pod, swarmer, baiter, bomb, player, and human clouds while retaining
-  actor-owned lifetime state. `ActorRenderSceneBridge` maps that age through
-  the clean source explosion-size curve, caps the render scale the same way as
-  the clean expanded-object path, and projects descriptor-backed lander,
+  bomber, pod, swarmer, baiter, bomb, player, human, and terrain clouds while
+  retaining actor-owned lifetime state. `ActorRenderSceneBridge` maps that age
+  through the clean source explosion-size curve, caps the render scale the same
+  way as the clean expanded-object path, projects descriptor-backed lander,
   mutant, bomber, pod, swarmer, and baiter clouds through source pixels with
-  optional source-center metadata instead of static atlas sprites.
+  optional source-center metadata instead of static atlas sprites, and maps
+  terrain explosions through the source terrain-explosion growth/lifetime
+  curve.
 - Smart bomb is now a real driver command: normal player requests consume the
   driver-owned stock, then the driver waits the source three-step detonation
   delay before clearing active hostile actors, awarding enemy scores, and

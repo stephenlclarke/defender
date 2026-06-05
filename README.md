@@ -68,9 +68,10 @@ simulation turn and emits a `StepReport`, while renderers are expected to draw
 the latest report at whatever cadence they own.
 `StepReport::render_scene` and `ActorRenderSceneBridge` now project actor draw
 commands into the clean `RenderScene` contract using renderer-owned source
-text, Williams logo, Defender coalescence, sprite atlas, projectile, and
-explosion assets; this keeps actor behavior separate from render cadence while
-making the actor report consumable by the native renderer path.
+text, Williams logo, Defender coalescence, source `BGOUT` terrain, sprite
+atlas, projectile, and explosion assets; this keeps actor behavior separate
+from render cadence while making the actor report consumable by the native
+renderer path.
 `ActorRuntimeAdapter` bundles each actor step into an `ActorFrame` containing
 the original report, an actor-derived clean `GameState`, clean gameplay/audio
 `GameEvents`, and the clean `RenderScene`. The state bridge maps actor phase,
@@ -242,6 +243,14 @@ hostiles/scoring/spawning explosions, publish a five-step white flash through
 sequence on its own cadence, and hold source reserve activation behind the
 source smart-bomb cooldown. `XYZZY` overlay smart bombs use the same delayed
 command path without consuming stock.
+Actor playing reports now expose the source playfield terrain through the
+clean state bridge and render it from the source `BGOUT` records. Removing the
+last human starts a driver-owned source `TerrainBlowSnapshot`: clean terrain
+and scanner terrain are erased, source flash windows tint the playfield,
+`TEREX` terrain explosion actors use the source birth positions and
+terrain-explosion growth/lifetime curve, and the actor sound stream emits the
+source `AHSND` / `TBSND` command cadence plus tail commands instead of the
+normal human-loss cue.
 Actor score awards now use the same replay-bonus threshold model as the clean
 score system, so threshold crossings add life/smart-bomb stock and emit
 `BonusAwarded` through the actor event bridge. Score and replay-bonus stock
