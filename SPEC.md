@@ -186,7 +186,10 @@ tree:
   clean `RenderScene` sprites for the existing native renderer contract, and
   `ActorStateBridge` adapts report phase, score, stock, high-score state, and
   actor snapshots with velocity/facing plus hostile-projectile source metadata
-  into clean `GameState` values.
+  into clean `GameState` values. Source-backed mutant actors consume
+  source-shaped conversion metadata, wave-table mutant velocity/random-hop
+  rows, driver-provided source RNG snapshots, and actor-owned shot timers to
+  emit `0xF6` source-shaped hostile projectile commands.
   `ActorRuntimeAdapter` bundles reports, clean `GameState`, clean `GameEvents`,
   and clean `RenderScene` values into actor `ActorFrame` values. Normal
   interactive play uses the actor live runtime, with explicit actor smoke and

@@ -131,9 +131,11 @@ X/Y placement bounds at X `0x98` and Y `0x2A`, while non-source scripted bombs
 remain available. Enemy-shot spawn commands use the same source shell placement
 bounds. Source-backed lander/human conversions now spawn mutant actors with
 source-shaped mutant fractions, shot timer, hop RNG, and clean-state bridge
-metadata for the next source mutant AI slice. It also includes Williams title animation
-metadata, the coalescing
-Defender wordmark surface, lander target-slot seeking, an actor-owned
+metadata. Source-backed mutant actors now read the red-label mutant wave
+motion rows, advance actor-owned fixed-point velocity and hop state, and emit
+source-shaped `0xF6` hostile shots. It also includes Williams title animation
+metadata, the coalescing Defender wordmark surface, lander target-slot seeking,
+an actor-owned
 status display for score, high score, wave, lives, smart-bomb stock, credits,
 and high-score-entry rows, pickup/carry/conversion, source-shaped
 converted-mutant metadata,

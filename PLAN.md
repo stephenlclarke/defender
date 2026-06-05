@@ -46,7 +46,10 @@ verification tools.
   configured target slots before falling back to nearest-human seeking. Source
   lander/human conversions now spawn mutant actors with source-shaped mutant
   fractions, wave-derived shot timer, driver-owned hop RNG, and clean
-  `SourceMutantSnapshot` bridge metadata. The
+  `SourceMutantSnapshot` bridge metadata. Source-backed mutant actors now
+  consume that metadata to select wave-table X/Y velocities, advance
+  actor-owned hop RNG and fixed-point fractions, and emit source-shaped
+  `0xF6` hostile projectile commands from their shot timers. The
   actor rewrite now has source-RNG-restored later-wave lander placement, shot
   timers, X/Y velocity metadata, and later-wave human target-list restores. It
   also has a persistent `StatusDisplay` actor that draws
@@ -4773,3 +4776,27 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780645950497009`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780646630879589`.
+- `2026-06-05 09:24 BST`: Completed the actor source-mutant behavior cycle.
+  Source-backed mutant actors now read the red-label wave-table mutant X/Y
+  velocity, random-hop, and shot-timer fields; advance actor-owned fixed-point
+  fractions and hop RNG instead of generic chase/drift motion; and emit
+  source-shaped hostile projectile metadata plus the red-label `0xF6`
+  mutant-shot cue when their shot timer expires. Added focused regressions for
+  wave-table mutant values, source mutant movement/hop state, source mutant
+  shot command metadata, and sound cue mapping. README, SPEC, and the actor
+  architecture notes now document the behavior. Validation passed with
+  `cargo fmt --check`, `cargo test source_mutant --lib`,
+  `cargo test actor_sound_cues --lib`,
+  `cargo test default_wave_script_uses_source_wave_table_values --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite was not rerun in this cycle; the previously isolated
+  clean-game MAME window/post-game audio failures remain outside this slice.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780647196072959`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780648443923729`.

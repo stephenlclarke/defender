@@ -140,6 +140,11 @@ const LANDER_PICKUP_RADIUS_X: i16 = 6;
 const LANDER_PICKUP_RADIUS_Y: i16 = 8;
 const LANDER_CONVERSION_Y: i16 = 24;
 const MUTANT_SEEK_SPEED: i16 = 1;
+const MUTANT_SHOT_LIFETIME: u16 = 90;
+const SOURCE_MUTANT_LOOP_SLEEP_TICKS: u8 = 2;
+const SOURCE_MUTANT_X_DISTANCE_OFFSET: u16 = 380;
+const SOURCE_MUTANT_CLOSE_X_WINDOW: u16 = 0x0700;
+const SOURCE_MUTANT_VERTICAL_WINDOW: u8 = 8;
 const BOMBER_DRIFT_SPEED: i16 = 1;
 const BOMBER_BOMB_PERIOD: u64 = 64;
 const POD_DRIFT_SPEED: i16 = 1;
@@ -967,6 +972,7 @@ pub struct ActorBehaviorProfile {
     pub lander_shot_lifetime_steps: u16,
     pub lander_mode: LanderBehaviorMode,
     pub mutant_seek_speed: i16,
+    pub mutant_shot_lifetime_steps: u16,
     pub mutant_mode: HostileMovementMode,
     pub bomber_drift_speed: i16,
     pub bomber_bomb_period_steps: u64,
@@ -1015,6 +1021,7 @@ impl ActorBehaviorProfile {
         lander_shot_lifetime_steps: LANDER_SHOT_LIFETIME,
         lander_mode: LanderBehaviorMode::SeekNearestHuman,
         mutant_seek_speed: MUTANT_SEEK_SPEED,
+        mutant_shot_lifetime_steps: MUTANT_SHOT_LIFETIME,
         mutant_mode: HostileMovementMode::ChasePlayer,
         bomber_drift_speed: BOMBER_DRIFT_SPEED,
         bomber_bomb_period_steps: BOMBER_BOMB_PERIOD,
@@ -1237,6 +1244,10 @@ pub struct ActorSourceWaveProfile {
     pub baiter_shot_time: u32,
     pub baiter_seek_probability: u8,
     pub lander_shot_time: u32,
+    pub mutant_random_y: u8,
+    pub mutant_y_velocity_msb: u8,
+    pub mutant_y_velocity_lsb: u8,
+    pub mutant_x_velocity: u8,
     pub mutant_shot_time: u32,
 }
 
@@ -1770,6 +1781,10 @@ impl ActorSourceWaveProfile {
             baiter_shot_time: actor_source_wave_u32("baiter_shot_time", wave),
             baiter_seek_probability: actor_source_wave_u8("baiter_seek_probability", wave),
             lander_shot_time: actor_source_wave_u32("lander_shot_time", wave),
+            mutant_random_y: actor_source_wave_u8("mutant_random_y", wave),
+            mutant_y_velocity_msb: actor_source_wave_u8("mutant_y_velocity_msb", wave),
+            mutant_y_velocity_lsb: actor_source_wave_u8("mutant_y_velocity_lsb", wave),
+            mutant_x_velocity: actor_source_wave_u8("mutant_x_velocity", wave),
             mutant_shot_time: actor_source_wave_u32("mutant_shot_time", wave),
         }
     }
@@ -2319,6 +2334,7 @@ pub enum SoundCue {
     PodHit,
     SwarmerHit,
     LanderShot,
+    MutantShot,
     SwarmerShot,
     BaiterHit,
     BaiterShot,
@@ -2351,6 +2367,7 @@ impl SoundCue {
             Self::PodHit => Some(0xFA),
             Self::SwarmerHit => Some(0xF8),
             Self::LanderShot => Some(0xFC),
+            Self::MutantShot => Some(0xF6),
             Self::SwarmerShot => Some(0xF3),
             Self::BaiterHit => Some(0xF8),
             Self::BaiterShot => Some(0xFC),
@@ -5898,13 +5915,90 @@ impl Mutant {
         Self {
             id,
             position: spawn.position,
-            drift: -1,
+            drift: spawn
+                .source
+                .map(|source| actor_source_drift_from_velocity(source.x_velocity))
+                .unwrap_or(-1),
             source: spawn.source,
         }
     }
 
     fn bounds(&self) -> Rect {
         Rect::from_center(self.position, 14, 12)
+    }
+
+    fn advance_source_motion(
+        &mut self,
+        prompt: &StepPrompt,
+        behavior: ActorBehaviorProfile,
+        commands: &mut Vec<GameCommand>,
+    ) -> bool {
+        let Some(source) = &mut self.source else {
+            return false;
+        };
+        if source.sleep_ticks > 0 {
+            source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
+            return true;
+        }
+
+        let Some(player_position) = prompt.player_position() else {
+            return false;
+        };
+        let profile = ActorSourceWaveProfile::for_wave(prompt.wave.max(1));
+        let player_absolute_x = actor_source_absolute_x(player_position, 0);
+        let object_absolute_x = actor_source_absolute_x(self.position, source.x_fraction);
+        source.x_velocity = actor_source_mutant_x_velocity(
+            profile.mutant_x_velocity,
+            player_absolute_x,
+            object_absolute_x,
+        );
+        source.y_velocity = actor_source_mutant_y_velocity(
+            profile,
+            player_position.y,
+            player_absolute_x,
+            object_absolute_x,
+            self.position,
+        );
+
+        if actor_source_mutant_should_hop_and_shoot(
+            player_absolute_x,
+            object_absolute_x,
+            self.position,
+        ) {
+            let mut hop_rng = actor_source_rng_from_snapshot(source.hop_rng);
+            let hop_state = hop_rng.advance();
+            source.hop_rng = hop_state.snapshot();
+            self.position.y =
+                actor_source_mutant_hop_y(self.position.y, profile.mutant_random_y, hop_state.seed);
+
+            source.shot_timer = source.shot_timer.wrapping_sub(1);
+            if source.shot_timer == 0 {
+                let shot_rng = actor_source_mutant_shot_rng(prompt, self.id, self.position);
+                source.shot_timer = actor_source_mutant_shot_reset(profile, shot_rng.seed);
+                push_source_mutant_shot(
+                    self.position,
+                    prompt,
+                    behavior,
+                    *source,
+                    shot_rng,
+                    commands,
+                );
+            }
+        }
+
+        let (x, x_fraction) =
+            actor_source_axis_step(self.position.x, source.x_fraction, source.x_velocity);
+        let (y, y_fraction) = actor_source_active_object_y_step(
+            self.position.y,
+            source.y_fraction,
+            source.y_velocity,
+        );
+        self.position = Point::new(x, y);
+        source.x_fraction = x_fraction;
+        source.y_fraction = y_fraction;
+        source.sleep_ticks = SOURCE_MUTANT_LOOP_SLEEP_TICKS;
+        self.drift = actor_source_drift_from_velocity(source.x_velocity);
+        true
     }
 }
 
@@ -5914,17 +6008,20 @@ impl AssetActor for Mutant {
     }
 
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
+        let mut commands = Vec::new();
         let mut draws = Vec::new();
         let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Mutant);
-            if let Some(position) = move_by_hostile_mode(
-                self.position,
-                behavior.mutant_mode,
-                prompt,
-                behavior.mutant_seek_speed,
-                self.drift,
-            ) {
+            if !self.advance_source_motion(prompt, behavior, &mut commands)
+                && let Some(position) = move_by_hostile_mode(
+                    self.position,
+                    behavior.mutant_mode,
+                    prompt,
+                    behavior.mutant_seek_speed,
+                    self.drift,
+                )
+            {
                 self.position = position;
             }
             draws.push(DrawCommand::sprite(
@@ -5957,9 +6054,207 @@ impl AssetActor for Mutant {
                 source_human: None,
                 source_enemy_projectile: None,
             },
-            commands: Vec::new(),
+            commands,
             draws,
         }
+    }
+}
+
+fn actor_source_absolute_x(position: Point, x_fraction: u8) -> u16 {
+    u16::from_be_bytes([position.x as u8, x_fraction])
+}
+
+const fn actor_source_rng_from_snapshot(snapshot: ActorSourceRngSnapshot) -> ActorSourceRng {
+    ActorSourceRng {
+        seed: snapshot.seed,
+        hseed: snapshot.hseed,
+        lseed: snapshot.lseed,
+    }
+}
+
+fn actor_source_mutant_x_velocity(
+    source_x_velocity: u8,
+    player_absolute_x: u16,
+    object_absolute_x: u16,
+) -> u16 {
+    let x_velocity_low = if (player_absolute_x as i16) >= (object_absolute_x as i16) {
+        source_x_velocity
+    } else {
+        0u8.wrapping_sub(source_x_velocity)
+    };
+    actor_sign_extend_u8_to_u16(x_velocity_low)
+}
+
+fn actor_source_mutant_y_velocity(
+    profile: ActorSourceWaveProfile,
+    player_y: i16,
+    player_absolute_x: u16,
+    object_absolute_x: u16,
+    position: Point,
+) -> u16 {
+    let base_y_velocity =
+        u16::from_be_bytes([profile.mutant_y_velocity_msb, profile.mutant_y_velocity_lsb]);
+    let player_y = player_y as u8;
+    let position_y = position.y as u8;
+    let x_distance = player_absolute_x
+        .wrapping_sub(object_absolute_x)
+        .wrapping_add(SOURCE_MUTANT_X_DISTANCE_OFFSET);
+    if x_distance <= SOURCE_MUTANT_CLOSE_X_WINDOW {
+        if player_y >= position_y {
+            base_y_velocity
+        } else {
+            !base_y_velocity
+        }
+    } else {
+        let delta = player_y.wrapping_sub(position_y);
+        if player_y > position_y {
+            if delta > SOURCE_MUTANT_VERTICAL_WINDOW {
+                0
+            } else {
+                !base_y_velocity
+            }
+        } else if (delta as i8) > -(SOURCE_MUTANT_VERTICAL_WINDOW as i8) {
+            base_y_velocity
+        } else {
+            0
+        }
+    }
+}
+
+fn actor_source_mutant_should_hop_and_shoot(
+    player_absolute_x: u16,
+    object_absolute_x: u16,
+    position: Point,
+) -> bool {
+    let x_distance = player_absolute_x
+        .wrapping_sub(object_absolute_x)
+        .wrapping_add(SOURCE_MUTANT_X_DISTANCE_OFFSET);
+    x_distance > SOURCE_MUTANT_CLOSE_X_WINDOW
+        || (position.y > i16::from(SOURCE_PLAYFIELD_Y_MIN)
+            && position.y <= i16::from(SOURCE_PLAYFIELD_Y_MAX))
+}
+
+fn actor_source_mutant_hop_y(position_y: i16, random_y: u8, seed: u8) -> i16 {
+    let step = if seed & 0x80 == 0 {
+        0u8.wrapping_sub(random_y)
+    } else {
+        random_y
+    };
+    let mut y = (position_y as u8).wrapping_add(step);
+    if y < SOURCE_PLAYFIELD_Y_MIN {
+        y = SOURCE_PLAYFIELD_Y_MAX;
+    }
+    i16::from(y)
+}
+
+fn actor_source_mutant_shot_rng(
+    prompt: &StepPrompt,
+    actor: ActorId,
+    position: Point,
+) -> ActorSourceRngSnapshot {
+    let mut source_rng = prompt
+        .source_rng
+        .map(actor_source_rng_from_snapshot)
+        .unwrap_or(ActorSourceRng {
+            seed: actor_source_motion_seed(prompt.step, actor),
+            hseed: position.x as u8,
+            lseed: position.y as u8,
+        });
+    source_rng.advance().snapshot()
+}
+
+fn actor_source_mutant_shot_reset(profile: ActorSourceWaveProfile, seed: u8) -> u8 {
+    source_rmax(
+        profile.mutant_shot_time.max(1).min(u32::from(u8::MAX)) as u8,
+        seed,
+    )
+}
+
+fn push_source_mutant_shot(
+    position: Point,
+    prompt: &StepPrompt,
+    behavior: ActorBehaviorProfile,
+    source: ActorSourceMutantMetadata,
+    shot_rng: ActorSourceRngSnapshot,
+    commands: &mut Vec<GameCommand>,
+) {
+    let Some((velocity, source)) =
+        actor_source_mutant_fireball(position, prompt, behavior, source, shot_rng)
+    else {
+        return;
+    };
+    commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
+        position,
+        velocity,
+        source: Some(source),
+    }));
+    commands.push(GameCommand::PlaySound(SoundCue::MutantShot));
+}
+
+fn actor_source_mutant_fireball(
+    position: Point,
+    prompt: &StepPrompt,
+    behavior: ActorBehaviorProfile,
+    source: ActorSourceMutantMetadata,
+    shot_rng: ActorSourceRngSnapshot,
+) -> Option<(Velocity, ActorSourceEnemyProjectileMetadata)> {
+    if !source_shell_spawn_in_bounds(position)
+        || prompt
+            .snapshots
+            .iter()
+            .filter(|snapshot| is_source_shell_kind(snapshot.kind))
+            .count()
+            >= SOURCE_SHELL_LIMIT
+    {
+        return None;
+    }
+    let player_position = prompt.player_position()?;
+    let player_velocity = prompt.player_velocity().unwrap_or_default();
+    let x_delta = (shot_rng.seed & 0x1F)
+        .wrapping_sub(0x10)
+        .wrapping_add(player_position.x as u8)
+        .wrapping_sub(position.x as u8);
+    let mut x_velocity = actor_sign_extend_u8_to_u16(x_delta).wrapping_shl(2);
+    if shot_rng.seed > 120 {
+        x_velocity =
+            x_velocity.wrapping_add(actor_source_velocity_word(player_velocity.dx).wrapping_shl(2));
+    }
+    let y_delta = (shot_rng.lseed & 0x1F)
+        .wrapping_sub(0x10)
+        .wrapping_add(player_position.y as u8)
+        .wrapping_sub(position.y as u8);
+    let y_velocity = actor_sign_extend_u8_to_u16(y_delta).wrapping_shl(2);
+    let velocity = actor_source_screen_velocity(x_velocity, y_velocity);
+    let lifetime_ticks =
+        actor_source_projectile_lifetime_ticks(behavior.mutant_shot_lifetime_steps);
+    let source = ActorSourceEnemyProjectileMetadata {
+        x_fraction: source.x_fraction,
+        y_fraction: source.y_fraction,
+        x_velocity,
+        y_velocity,
+        lifetime_ticks,
+    };
+    Some((velocity, source))
+}
+
+fn actor_source_screen_velocity(x_velocity: u16, y_velocity: u16) -> Velocity {
+    Velocity::new(
+        actor_source_screen_velocity_component(x_velocity),
+        actor_source_screen_velocity_component(y_velocity),
+    )
+}
+
+fn actor_source_screen_velocity_component(velocity: u16) -> i16 {
+    let signed = velocity as i16;
+    if signed == 0 {
+        return 0;
+    }
+
+    let pixels = signed / 256;
+    if pixels == 0 {
+        if signed > 0 { 1 } else { -1 }
+    } else {
+        pixels
     }
 }
 
@@ -7430,6 +7725,7 @@ mod tests {
             (SoundCue::PodHit, 0xFA),
             (SoundCue::SwarmerHit, 0xF8),
             (SoundCue::LanderShot, 0xFC),
+            (SoundCue::MutantShot, 0xF6),
             (SoundCue::SwarmerShot, 0xF3),
             (SoundCue::BaiterHit, 0xF8),
             (SoundCue::BaiterShot, 0xFC),
@@ -7467,6 +7763,10 @@ mod tests {
             SoundCue::LanderShot.sound_event(),
             Some(SoundEvent::UnmappedSoundCommand { command: 0xFC })
         );
+        assert_eq!(
+            SoundCue::MutantShot.sound_event(),
+            Some(SoundEvent::UnmappedSoundCommand { command: 0xF6 })
+        );
         assert_eq!(SoundCue::Hyperspace.sound_event(), None);
         assert_eq!(SoundCue::HumanReleased.sound_event(), None);
     }
@@ -7492,6 +7792,10 @@ mod tests {
         assert_eq!(
             bridge.sound_events_for_cues(&[SoundCue::Thrust, SoundCue::SwarmerShot]),
             [SoundEvent::UnmappedSoundCommand { command: 0xF3 }]
+        );
+        assert_eq!(
+            ActorSoundEventBridge::new().sound_events_for_cues(&[SoundCue::MutantShot]),
+            [SoundEvent::UnmappedSoundCommand { command: 0xF6 }]
         );
         assert_eq!(
             bridge.sound_events_for_cues(&[SoundCue::HumanReleased]),
@@ -8465,6 +8769,10 @@ mod tests {
         assert_eq!(first_source.baiter_delay, 192);
         assert_eq!(first_source.baiter_shot_time, 10);
         assert_eq!(first_source.baiter_seek_probability, 200);
+        assert_eq!(first_source.mutant_random_y, 1);
+        assert_eq!(first_source.mutant_y_velocity_msb, 0);
+        assert_eq!(first_source.mutant_y_velocity_lsb, 128);
+        assert_eq!(first_source.mutant_x_velocity, 32);
         assert_eq!(first_source.mutant_shot_time, 32);
 
         let first = script.profile_for_wave(1);
@@ -11384,6 +11692,131 @@ mod tests {
     }
 
     #[test]
+    fn source_mutant_actor_advances_wave_velocity_and_hop_rng() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 1;
+        driver.spawn_player();
+        driver.step(GameInput::NONE);
+        driver.wave = 1;
+        let source = ActorSourceMutantMetadata {
+            x_fraction: 0x20,
+            y_fraction: 0x40,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 9,
+            sleep_ticks: 0,
+            hop_rng: ActorSourceRngSnapshot {
+                seed: 0x81,
+                hseed: 0x22,
+                lseed: 0x44,
+            },
+            render_x_correction: 0,
+            target6_first_shot_deferred: false,
+        };
+        let start = Point::new(100, 80);
+        let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
+            position: start,
+            source: Some(source),
+        });
+
+        let report = driver.step(GameInput::NONE);
+        let prompt = source_mutant_prompt_for_test(
+            report.step,
+            report.wave,
+            report
+                .source_rng
+                .expect("playing report should carry source rng"),
+            Point::new(42, 120),
+            Velocity::default(),
+        );
+        let behavior = ActorBehaviorProfile::default();
+        let (expected_position, expected_source, shot) =
+            expected_source_mutant_after_motion(start, source, mutant, &prompt, behavior);
+
+        assert_eq!(shot, None);
+        let snapshot = snapshot_for(&report, mutant);
+        assert_eq!(snapshot.position, expected_position);
+        assert_eq!(snapshot.source_mutant, Some(expected_source));
+        assert_eq!(
+            expected_source.x_velocity,
+            actor_source_mutant_x_velocity(
+                ActorSourceWaveProfile::for_wave(1).mutant_x_velocity,
+                actor_source_absolute_x(Point::new(42, 120), 0),
+                actor_source_absolute_x(start, source.x_fraction),
+            )
+        );
+        assert_ne!(expected_source.hop_rng, source.hop_rng);
+    }
+
+    #[test]
+    fn source_mutant_shot_timer_spawns_source_projectile() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 1;
+        driver.spawn_player();
+        driver.step(GameInput::NONE);
+        driver.wave = 1;
+        let source = ActorSourceMutantMetadata {
+            x_fraction: 0x12,
+            y_fraction: 0x34,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            hop_rng: ActorSourceRngSnapshot {
+                seed: 0x71,
+                hseed: 0x44,
+                lseed: 0x88,
+            },
+            render_x_correction: 0,
+            target6_first_shot_deferred: false,
+        };
+        let start = Point::new(70, 120);
+        let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
+            position: start,
+            source: Some(source),
+        });
+
+        let report = driver.step(GameInput::NONE);
+        let prompt = source_mutant_prompt_for_test(
+            report.step,
+            report.wave,
+            report
+                .source_rng
+                .expect("playing report should carry source rng"),
+            Point::new(42, 120),
+            Velocity::default(),
+        );
+        let behavior = ActorBehaviorProfile::default();
+        let (expected_position, expected_source, expected_shot) =
+            expected_source_mutant_after_motion(start, source, mutant, &prompt, behavior);
+        let expected_shot = expected_shot.expect("shot timer should emit a mutant fireball");
+
+        assert!(report.sounds.contains(&SoundCue::MutantShot));
+        let mutant_shot = report
+            .commands
+            .iter()
+            .find_map(|command| match command {
+                GameCommand::Spawn(SpawnRequest::EnemyLaser {
+                    position,
+                    velocity,
+                    source,
+                }) => source.map(|source| (*position, *velocity, source)),
+                _ => None,
+            })
+            .expect("source mutant should emit a hostile shot command");
+        assert_eq!(mutant_shot, expected_shot);
+        assert_eq!(
+            mutant_shot.2.lifetime_ticks,
+            actor_source_projectile_lifetime_ticks(MUTANT_SHOT_LIFETIME)
+        );
+        let snapshot = snapshot_for(&report, mutant);
+        assert_eq!(snapshot.position, expected_position);
+        assert_eq!(snapshot.source_mutant, Some(expected_source));
+    }
+
+    #[test]
     fn driver_resolves_laser_lander_collision_with_score_sound_and_explosion() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
@@ -11742,6 +12175,109 @@ mod tests {
             source_human: None,
             source_enemy_projectile: None,
         }
+    }
+
+    fn actor_snapshot_with_velocity(
+        id: u64,
+        kind: ActorKind,
+        position: Point,
+        velocity: Velocity,
+    ) -> ActorSnapshot {
+        let mut snapshot = actor_snapshot(id, kind, position);
+        snapshot.velocity = velocity;
+        snapshot
+    }
+
+    fn source_mutant_prompt_for_test(
+        step: u64,
+        wave: u16,
+        source_rng: ActorSourceRngSnapshot,
+        player_position: Point,
+        player_velocity: Velocity,
+    ) -> StepPrompt {
+        StepPrompt {
+            step,
+            phase: Phase::Playing,
+            input: GameInput::NONE,
+            wave,
+            score: 0,
+            credits: 0,
+            lives: 3,
+            smart_bombs: INITIAL_SMART_BOMBS,
+            high_scores: [0; 5],
+            high_score_initials: HighScoreInitialsState::EMPTY,
+            snapshots: vec![actor_snapshot_with_velocity(
+                999,
+                ActorKind::Player,
+                player_position,
+                player_velocity,
+            )],
+            behavior_script: ActorBehaviorScript::default(),
+            source_rng: Some(source_rng),
+            source_shell_scan_tick: false,
+        }
+    }
+
+    fn expected_source_mutant_after_motion(
+        mut position: Point,
+        mut source: ActorSourceMutantMetadata,
+        actor: ActorId,
+        prompt: &StepPrompt,
+        behavior: ActorBehaviorProfile,
+    ) -> (
+        Point,
+        ActorSourceMutantMetadata,
+        Option<(Point, Velocity, ActorSourceEnemyProjectileMetadata)>,
+    ) {
+        if source.sleep_ticks > 0 {
+            source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
+            return (position, source, None);
+        }
+
+        let player_position = prompt
+            .player_position()
+            .expect("source mutant expected helper needs a player");
+        let profile = ActorSourceWaveProfile::for_wave(prompt.wave.max(1));
+        let player_absolute_x = actor_source_absolute_x(player_position, 0);
+        let object_absolute_x = actor_source_absolute_x(position, source.x_fraction);
+        source.x_velocity = actor_source_mutant_x_velocity(
+            profile.mutant_x_velocity,
+            player_absolute_x,
+            object_absolute_x,
+        );
+        source.y_velocity = actor_source_mutant_y_velocity(
+            profile,
+            player_position.y,
+            player_absolute_x,
+            object_absolute_x,
+            position,
+        );
+
+        let mut shot = None;
+        if actor_source_mutant_should_hop_and_shoot(player_absolute_x, object_absolute_x, position)
+        {
+            let mut hop_rng = actor_source_rng_from_snapshot(source.hop_rng);
+            let hop_state = hop_rng.advance();
+            source.hop_rng = hop_state.snapshot();
+            position.y =
+                actor_source_mutant_hop_y(position.y, profile.mutant_random_y, hop_state.seed);
+            source.shot_timer = source.shot_timer.wrapping_sub(1);
+            if source.shot_timer == 0 {
+                let shot_rng = actor_source_mutant_shot_rng(prompt, actor, position);
+                source.shot_timer = actor_source_mutant_shot_reset(profile, shot_rng.seed);
+                shot = actor_source_mutant_fireball(position, prompt, behavior, source, shot_rng)
+                    .map(|(velocity, projectile_source)| (position, velocity, projectile_source));
+            }
+        }
+
+        let (x, x_fraction) =
+            actor_source_axis_step(position.x, source.x_fraction, source.x_velocity);
+        let (y, y_fraction) =
+            actor_source_active_object_y_step(position.y, source.y_fraction, source.y_velocity);
+        source.x_fraction = x_fraction;
+        source.y_fraction = y_fraction;
+        source.sleep_ticks = SOURCE_MUTANT_LOOP_SLEEP_TICKS;
+        (Point::new(x, y), source, shot)
     }
 
     fn source_shell_snapshot_count(report: &StepReport) -> usize {

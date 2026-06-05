@@ -183,8 +183,10 @@ when the current hostile snapshots are cleared.
 The default actor progression reads `assets/red-label/wave-table.tsv` through
 an actor-owned adapter. The current actor mapping uses source-backed
 `wave_size`, `lander_x_velocity`, `bomber_x_velocity`, `lander_shot_time`,
-`baiter_time`, `baiter_shot_time`, `baiter_seek_probability`, `bombers`, and
-`pods` to set active family allocation, movement speed, fire cadence, and baiter
+`mutant_random_y`, `mutant_y_velocity_msb`, `mutant_y_velocity_lsb`,
+`mutant_x_velocity`, `mutant_shot_time`, `baiter_time`, `baiter_shot_time`,
+`baiter_seek_probability`, `bombers`, and `pods` to set active family
+allocation, movement speed, fire cadence, mutant hop/shot behavior, and baiter
 entry pacing. Wave `1` remains lander-only; later source waves seed one
 lander, one bomber, and one pod when those reserve counts are available before
 filling the rest of the active batch, matching the clean source allocator's
@@ -229,7 +231,11 @@ only fall back to nearest-human seeking when that target is unavailable.
 When a source-backed lander completes a human conversion, the spawn command for
 the new mutant carries source-shaped mutant fractions, wave-derived shot timer,
 driver-provided hop RNG, render correction, and deferred-shot metadata into the
-mutant actor snapshot and clean `SourceMutantSnapshot` bridge.
+mutant actor snapshot and clean `SourceMutantSnapshot` bridge. Source-backed
+mutant actors use that state as their movement source: they select X/Y velocity
+from the wave table and player position, advance their own hop RNG and
+fixed-point fractions, decrement shot timers, and emit source-shaped hostile
+projectile metadata with the red-label `0xF6` mutant-shot cue.
 
 ## Attract Graphics
 
@@ -286,6 +292,10 @@ The actor driver now owns a first Defender gameplay loop:
   their configured target-human slot before falling back to nearest-human
   seeking, and source-backed conversions preserve source mutant metadata for
   the clean state bridge.
+- Source-backed mutant actors advance through actor-owned source velocity,
+  random-hop, sleep, and shot-timer state. Mutant shots emit source-shaped enemy
+  projectile metadata and the red-label `0xF6` cue through the same driver
+  command boundary as other hostile shots.
 - Lander shot timers emit the source `0xFC` lander-shot cue and an `EnemyLaser`
   actor.
   Enemy lasers are player hazards, smart-bomb targets with no score value, and
