@@ -47,6 +47,10 @@ impl<B: RuntimeBackend> RuntimeHost<B> {
         self.backend.run_command(RuntimeCommand::ActorSmoke)
     }
 
+    pub(crate) fn run_actor_attract_smoke(&self) -> anyhow::Result<()> {
+        self.backend.run_command(RuntimeCommand::ActorAttractSmoke)
+    }
+
     pub(crate) fn run_actor_wgpu_smoke(&self) -> anyhow::Result<()> {
         self.backend.run_command(RuntimeCommand::ActorWgpuSmoke)
     }
@@ -122,6 +126,7 @@ pub(crate) enum RuntimeCommand {
     },
     GameSmoke,
     ActorSmoke,
+    ActorAttractSmoke,
     ActorWgpuSmoke,
     FidelityTrace {
         frame_count: usize,
@@ -203,6 +208,7 @@ impl RuntimeBackend for InstalledRuntimeBackend {
             RuntimeCommand::VerifyRoms { path } => run_verify_roms_command(path),
             RuntimeCommand::GameSmoke => crate::game_smoke::run(),
             RuntimeCommand::ActorSmoke => crate::actor_smoke::run(),
+            RuntimeCommand::ActorAttractSmoke => crate::actor_smoke::run_attract_cycle(),
             RuntimeCommand::ActorWgpuSmoke => {
                 let report = crate::live_wgpu::run_actor_wgpu_smoke()?;
                 print!("{}", report.to_text());
@@ -383,6 +389,10 @@ pub(crate) fn run_actor_smoke() -> anyhow::Result<()> {
     RuntimeHost::current().run_actor_smoke()
 }
 
+pub(crate) fn run_actor_attract_smoke() -> anyhow::Result<()> {
+    RuntimeHost::current().run_actor_attract_smoke()
+}
+
 pub(crate) fn run_actor_wgpu_smoke() -> anyhow::Result<()> {
     RuntimeHost::current().run_actor_wgpu_smoke()
 }
@@ -434,6 +444,7 @@ pub(crate) fn help_text() -> &'static str {
         "  cargo run -- --live-smoke\n",
         "  cargo run -- --game-smoke\n",
         "  cargo run -- --actor-smoke\n",
+        "  cargo run -- --actor-attract-smoke\n",
         "  cargo run -- --actor-wgpu-smoke\n",
         "  cargo run -- --mute\n",
         "  cargo run -- --input-profile planetoid\n",
@@ -593,6 +604,20 @@ mod tests {
 
         let observed = calls.borrow();
         assert_eq!(observed.as_slice(), &[RuntimeCommand::ActorSmoke]);
+    }
+
+    #[test]
+    fn runtime_host_launches_actor_attract_smoke_separately() {
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let host = RuntimeHost::with_backend(RecordingBackend {
+            calls: Rc::clone(&calls),
+        });
+
+        host.run_actor_attract_smoke()
+            .expect("runtime host should run actor attract smoke command");
+
+        let observed = calls.borrow();
+        assert_eq!(observed.as_slice(), &[RuntimeCommand::ActorAttractSmoke]);
     }
 
     #[test]
@@ -891,6 +916,13 @@ mod tests {
     }
 
     #[test]
+    fn installed_backend_runs_actor_attract_smoke() {
+        RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run_actor_attract_smoke()
+            .expect("installed backend should run actor attract smoke");
+    }
+
+    #[test]
     fn installed_backend_runs_actor_wgpu_smoke() {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
             .run_actor_wgpu_smoke()
@@ -1008,6 +1040,7 @@ mod tests {
         assert!(text.contains("--live-smoke"));
         assert!(text.contains("--game-smoke"));
         assert!(text.contains("--actor-smoke"));
+        assert!(text.contains("--actor-attract-smoke"));
         assert!(text.contains("--actor-wgpu-smoke"));
         assert!(text.contains("--mute"));
         assert!(text.contains("--verify-roms"));

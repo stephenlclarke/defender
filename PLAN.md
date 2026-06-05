@@ -290,6 +290,7 @@ make reference-mame-doctor
 make reference-mame-smoke
 make readme-media
 cargo run -- --game-smoke
+cargo run -- --actor-attract-smoke
 cargo run -- --live-smoke
 markdownlint README.md SPEC.md PLAN.md docs/fidelity/mame-golden-clips.md \
   docs/fidelity/release-closure-audit.md assets/sounds/README.md
@@ -779,6 +780,33 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 15:16 BST`: Completed the actor attract-cycle smoke gate
+  slice. Added `--actor-attract-smoke` and `make actor-attract-smoke`, wiring
+  the command through the clean platform/runtime boundary and into
+  `make release-gate`. The new report advances the default no-input actor
+  attract script through the full `cycle 3367` path and proves Williams reveal,
+  Defender coalescence, Hall of Fame, scoring surface, final scoring label,
+  cycle return, native draw-plan coverage, zero non-attract frames, and zero
+  actor gameplay/audio events. Focused regressions now cover the report
+  milestones, validation failures, CLI classification/errors, runtime dispatch,
+  installed backend execution, help text, and the Make target. README, SPEC,
+  PLAN, and the actor architecture notes document the new command and release
+  gate. No legacy code, tests, or scaffolding were safe to remove because
+  legacy tooling still backs ROM reports, trace/media helpers, and
+  oracle-equivalence evidence while the actor runtime continues closing
+  fidelity gaps. Validation passed with `cargo test actor_attract
+  --all-targets --features legacy-tools`, `cargo run -- --actor-attract-smoke`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`, `cargo test
+  runtime --all-targets --features legacy-tools`, `cargo test platform
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test actor_wgpu --all-targets --features
+  legacy-tools`, `make actor-attract-smoke`, `cargo check --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features
+  legacy-tools -- -D warnings`, `cargo fmt --check`, touched-doc markdownlint,
+  and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780668322381529`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780668964948859`.
 - `2026-06-05 15:03 BST`: Completed the actor attract default-cycle slice.
   `AttractScript` now exposes an optional script-level cycle count in its
   manifest, the checked parser accepts `cycle`, `loop`, or `repeat`

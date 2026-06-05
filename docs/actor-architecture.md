@@ -56,7 +56,11 @@ evidence commands.
   attract, credited attract, playing actor frames, clean gameplay/audio events,
   required actor sprite families, projectiles, HUD text, overlays, native
   draw-command pipelines, and frame-level `wgpu` command plans for actor live
-  runtime coverage.
+  runtime coverage. The same module owns `--actor-attract-smoke`, a no-input
+  full-cycle gate that advances the default checked attract script through
+  Williams reveal, Defender coalescence, Hall of Fame, scoring surface, final
+  scoring label, and the `cycle 3367` return while checking native draw plans
+  and absence of attract gameplay/audio events.
 - `--actor-wgpu-smoke` reuses that actor smoke sequence but sends the resulting
   actor `RenderScene` values through the offscreen `wgpu` texture/readback path.
   It requires every actor frame to render nonblank pixels and produce dynamic

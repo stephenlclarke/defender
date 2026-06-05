@@ -9,8 +9,13 @@ use std::collections::BTreeSet;
 use anyhow::bail;
 
 use crate::{
-    actor_game::{ActorFrame, ActorRuntimeAdapter, GameInput, Phase},
-    renderer::{NativeRenderPipeline, NativeSceneRenderer, RenderLayer, SceneDrawPlan, SpriteId},
+    actor_game::{
+        ActorFrame, ActorRuntimeAdapter, AttractScript, GameInput, Phase, SpriteKey, VisualEffect,
+    },
+    renderer::{
+        NativeRenderPipeline, NativeSceneRenderer, RenderLayer, SceneDrawPlan, SpriteId,
+        source_message_text,
+    },
 };
 
 const ACTOR_SMOKE_FRAMES: u32 = 96;
@@ -65,6 +70,31 @@ pub(crate) struct ActorSmokeReport {
     pub(crate) temporary_raster_commands: usize,
     pub(crate) missing_sprite_regions: usize,
     pub(crate) injected_inputs: Vec<String>,
+    pub(crate) clean_exit: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ActorAttractCycleSmokeReport {
+    pub(crate) frames: u64,
+    pub(crate) cycle_steps: u64,
+    pub(crate) distinct_scene_signatures: usize,
+    pub(crate) attract_frames: u64,
+    pub(crate) playing_frames: u64,
+    pub(crate) game_over_frames: u64,
+    pub(crate) high_score_entry_frames: u64,
+    pub(crate) actor_event_frames: u64,
+    pub(crate) actor_sound_frames: u64,
+    pub(crate) actor_sound_events: usize,
+    pub(crate) sprite_instances: usize,
+    pub(crate) sprite_draw_commands: usize,
+    pub(crate) wgpu_frame_commands: usize,
+    pub(crate) missing_sprite_regions: usize,
+    pub(crate) saw_williams_reveal: bool,
+    pub(crate) saw_defender_coalescence: bool,
+    pub(crate) saw_hall_of_fame: bool,
+    pub(crate) saw_scoring_surface: bool,
+    pub(crate) saw_final_scoring_label: bool,
+    pub(crate) saw_cycle_return: bool,
     pub(crate) clean_exit: bool,
 }
 
@@ -199,6 +229,100 @@ impl ActorSmokeReport {
     }
 }
 
+impl ActorAttractCycleSmokeReport {
+    pub(crate) fn validate(&self) -> anyhow::Result<()> {
+        if self.frames == 0 {
+            bail!("actor attract smoke did not advance any steps");
+        }
+        if self.cycle_steps == 0 {
+            bail!("actor attract smoke did not find an attract cycle length");
+        }
+        if self.frames < self.cycle_steps {
+            bail!(
+                "actor attract smoke only advanced {} step(s), expected at least {}",
+                self.frames,
+                self.cycle_steps
+            );
+        }
+        if self.attract_frames != self.frames {
+            bail!("actor attract smoke left attract mode");
+        }
+        if self.playing_frames != 0
+            || self.game_over_frames != 0
+            || self.high_score_entry_frames != 0
+        {
+            bail!("actor attract smoke observed non-attract phases");
+        }
+        if self.distinct_scene_signatures < 8 {
+            bail!("actor attract smoke did not produce dynamic attract scene signatures");
+        }
+        if self.actor_event_frames != 0 {
+            bail!("actor attract smoke unexpectedly produced gameplay events");
+        }
+        if self.actor_sound_frames != 0 || self.actor_sound_events != 0 {
+            bail!("actor attract smoke unexpectedly produced sound events");
+        }
+        if self.sprite_instances == 0 || self.sprite_draw_commands == 0 {
+            bail!("actor attract smoke did not produce sprite draw plans");
+        }
+        if self.wgpu_frame_commands == 0 {
+            bail!("actor attract smoke did not produce wgpu frame commands");
+        }
+        if self.missing_sprite_regions != 0 {
+            bail!("actor attract smoke had missing sprite atlas regions");
+        }
+        if !self.saw_williams_reveal {
+            bail!("actor attract smoke did not cover Williams reveal pixels");
+        }
+        if !self.saw_defender_coalescence {
+            bail!("actor attract smoke did not cover Defender coalescence");
+        }
+        if !self.saw_hall_of_fame {
+            bail!("actor attract smoke did not cover Hall of Fame attract page");
+        }
+        if !self.saw_scoring_surface {
+            bail!("actor attract smoke did not cover scoring surface");
+        }
+        if !self.saw_final_scoring_label {
+            bail!("actor attract smoke did not cover final scoring label");
+        }
+        if !self.saw_cycle_return {
+            bail!("actor attract smoke did not return to Williams after cycle boundary");
+        }
+        if !self.clean_exit {
+            bail!("actor attract smoke did not exit cleanly");
+        }
+        Ok(())
+    }
+
+    pub(crate) fn to_text(&self) -> String {
+        format!(
+            "actor attract smoke passed\n  frames: {}\n  cycle_steps: {}\n  distinct_scene_signatures: {}\n  attract_frames: {}\n  non_attract_frames: {}\n  actor_event_frames: {}\n  actor_sound_frames: {}\n  actor_sound_events: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  wgpu_frame_commands: {}\n  missing_sprite_regions: {}\n  saw_williams_reveal: {}\n  saw_defender_coalescence: {}\n  saw_hall_of_fame: {}\n  saw_scoring_surface: {}\n  saw_final_scoring_label: {}\n  saw_cycle_return: {}\n  clean_exit: {}\n",
+            self.frames,
+            self.cycle_steps,
+            self.distinct_scene_signatures,
+            self.attract_frames,
+            self.playing_frames
+                .saturating_add(self.game_over_frames)
+                .saturating_add(self.high_score_entry_frames),
+            self.actor_event_frames,
+            self.actor_sound_frames,
+            self.actor_sound_events,
+            self.sprite_instances,
+            self.sprite_draw_commands,
+            self.wgpu_frame_commands,
+            self.missing_sprite_regions,
+            self.saw_williams_reveal,
+            self.saw_defender_coalescence,
+            self.saw_hall_of_fame,
+            self.saw_scoring_surface,
+            self.saw_final_scoring_label,
+            self.saw_cycle_return,
+            self.clean_exit
+        )
+    }
+}
+
 pub(crate) fn run() -> anyhow::Result<()> {
     let report = default_smoke_report()?;
 
@@ -206,8 +330,19 @@ pub(crate) fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
+pub(crate) fn run_attract_cycle() -> anyhow::Result<()> {
+    let report = default_attract_cycle_report()?;
+
+    print!("{}", report.to_text());
+    Ok(())
+}
+
 pub(crate) fn default_smoke_report() -> anyhow::Result<ActorSmokeReport> {
     smoke_report(ACTOR_SMOKE_FRAMES)
+}
+
+pub(crate) fn default_attract_cycle_report() -> anyhow::Result<ActorAttractCycleSmokeReport> {
+    attract_cycle_report(default_attract_cycle_steps()?)
 }
 
 pub(crate) fn smoke_frame_count() -> u32 {
@@ -240,6 +375,32 @@ pub(crate) fn smoke_report(frames: u32) -> anyhow::Result<ActorSmokeReport> {
         let frame = runtime.step(input.value);
         let plan = renderer.prepare(&frame.scene);
         observe_frame(&mut report, &mut signatures, &frame, &plan);
+    }
+
+    report.distinct_scene_signatures = signatures.len();
+    report.validate()?;
+    Ok(report)
+}
+
+pub(crate) fn attract_cycle_report(frames: u64) -> anyhow::Result<ActorAttractCycleSmokeReport> {
+    if frames == 0 {
+        bail!("actor attract smoke frame count must be positive");
+    }
+
+    let cycle_steps = default_attract_cycle_steps()?;
+    let mut runtime = ActorRuntimeAdapter::new();
+    let renderer = NativeSceneRenderer::default();
+    let mut report = ActorAttractCycleSmokeReport {
+        cycle_steps,
+        clean_exit: true,
+        ..ActorAttractCycleSmokeReport::default()
+    };
+    let mut signatures = BTreeSet::new();
+
+    for _ in 0..frames {
+        let frame = runtime.step(GameInput::NONE);
+        let plan = renderer.prepare(&frame.scene);
+        observe_attract_cycle_frame(&mut report, &mut signatures, &frame, &plan);
     }
 
     report.distinct_scene_signatures = signatures.len();
@@ -320,6 +481,115 @@ fn observe_frame(
         .missing_sprite_regions
         .saturating_add(plan.missing_sprite_regions);
     signatures.insert(scene_signature(frame, plan));
+}
+
+fn observe_attract_cycle_frame(
+    report: &mut ActorAttractCycleSmokeReport,
+    signatures: &mut BTreeSet<u64>,
+    frame: &ActorFrame,
+    plan: &SceneDrawPlan,
+) {
+    report.frames = report.frames.saturating_add(1);
+    match frame.report.phase {
+        Phase::Attract => report.attract_frames = report.attract_frames.saturating_add(1),
+        Phase::Playing => report.playing_frames = report.playing_frames.saturating_add(1),
+        Phase::GameOver => report.game_over_frames = report.game_over_frames.saturating_add(1),
+        Phase::HighScoreEntry => {
+            report.high_score_entry_frames = report.high_score_entry_frames.saturating_add(1);
+        }
+    }
+
+    if !frame.events.gameplay().is_empty() {
+        report.actor_event_frames = report.actor_event_frames.saturating_add(1);
+    }
+    if !frame.events.sounds().is_empty() {
+        report.actor_sound_frames = report.actor_sound_frames.saturating_add(1);
+        report.actor_sound_events = report
+            .actor_sound_events
+            .saturating_add(frame.events.sounds().len());
+    }
+
+    observe_attract_cycle_draws(report, frame);
+    observe_attract_cycle_scene(report, frame);
+
+    report.sprite_instances = report
+        .sprite_instances
+        .saturating_add(plan.sprite_instances);
+    report.sprite_draw_commands = report
+        .sprite_draw_commands
+        .saturating_add(plan.sprite_draw_commands.len());
+    report.wgpu_frame_commands = report
+        .wgpu_frame_commands
+        .saturating_add(plan.frame_plan.command_count());
+    report.missing_sprite_regions = report
+        .missing_sprite_regions
+        .saturating_add(plan.missing_sprite_regions);
+    signatures.insert(scene_signature(frame, plan));
+}
+
+fn observe_attract_cycle_draws(report: &mut ActorAttractCycleSmokeReport, frame: &ActorFrame) {
+    let hall_title = source_message_text("HALLD_TITLE").expect("HALLD_TITLE message is checked in");
+    let final_scoring_label = source_message_text("SWARMV").expect("SWARMV message is checked in");
+    let mut cycle_has_first_williams_step = false;
+    let mut cycle_has_scoring_surface = false;
+    let mut cycle_has_final_label = false;
+
+    for draw in &frame.report.draws {
+        if draw.sprite == SpriteKey::WilliamsLogo
+            && matches!(draw.effect, VisualEffect::WilliamsReveal { .. })
+        {
+            report.saw_williams_reveal = true;
+        }
+        if draw.sprite == SpriteKey::DefenderCoalescence {
+            report.saw_defender_coalescence = true;
+        }
+        if draw.text.as_deref() == Some(hall_title) {
+            report.saw_hall_of_fame = true;
+        }
+        if matches!(draw.effect, VisualEffect::AttractScoringSurface { .. }) {
+            report.saw_scoring_surface = true;
+            cycle_has_scoring_surface = true;
+        }
+        if draw.text.as_deref() == Some(final_scoring_label) {
+            report.saw_final_scoring_label = true;
+            cycle_has_final_label = true;
+        }
+        if frame.report.step == report.cycle_steps
+            && draw.sprite == SpriteKey::WilliamsLogo
+            && matches!(
+                draw.effect,
+                VisualEffect::WilliamsReveal { stroke_step: 1, .. }
+            )
+        {
+            cycle_has_first_williams_step = true;
+        }
+    }
+
+    if frame.report.step == report.cycle_steps {
+        report.saw_cycle_return =
+            cycle_has_first_williams_step && !cycle_has_scoring_surface && !cycle_has_final_label;
+    }
+}
+
+fn observe_attract_cycle_scene(report: &mut ActorAttractCycleSmokeReport, frame: &ActorFrame) {
+    for sprite in &frame.scene.sprites {
+        if sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL {
+            report.saw_williams_reveal = true;
+        }
+        if SpriteId::attract_defender_wordmark_block(0) == Some(sprite.sprite) {
+            report.saw_defender_coalescence = true;
+        }
+        if sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO {
+            report.saw_hall_of_fame = true;
+        }
+    }
+}
+
+fn default_attract_cycle_steps() -> anyhow::Result<u64> {
+    AttractScript::red_label_title()
+        .manifest()
+        .cycle_steps
+        .ok_or_else(|| anyhow::anyhow!("default actor attract script does not declare a cycle"))
 }
 
 fn required_sprite_label(sprite: SpriteId) -> Option<&'static str> {
@@ -476,7 +746,8 @@ fn record_unique_label(labels: &mut Vec<String>, label: &str) {
 #[cfg(test)]
 mod tests {
     use super::{
-        ACTOR_SMOKE_FRAMES, ActorSmokeReport, smoke_actor_input, smoke_frame_count, smoke_input,
+        ACTOR_SMOKE_FRAMES, ActorAttractCycleSmokeReport, ActorSmokeReport, attract_cycle_report,
+        default_attract_cycle_report, smoke_actor_input, smoke_frame_count, smoke_input,
         smoke_report,
     };
 
@@ -505,6 +776,83 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "actor smoke frame count must be positive"
+        );
+    }
+
+    #[test]
+    fn attract_cycle_report_exercises_default_actor_attract_loop() {
+        let report = default_attract_cycle_report().expect("actor attract cycle smoke report");
+
+        assert_eq!(report.frames, 3367);
+        assert_eq!(report.cycle_steps, 3367);
+        assert_eq!(report.attract_frames, report.frames);
+        assert_eq!(report.playing_frames, 0);
+        assert_eq!(report.game_over_frames, 0);
+        assert_eq!(report.high_score_entry_frames, 0);
+        assert_eq!(report.actor_event_frames, 0);
+        assert_eq!(report.actor_sound_frames, 0);
+        assert_eq!(report.actor_sound_events, 0);
+        assert!(report.distinct_scene_signatures >= 8);
+        assert!(report.sprite_instances > 0);
+        assert!(report.sprite_draw_commands > 0);
+        assert!(report.wgpu_frame_commands > 0);
+        assert_eq!(report.missing_sprite_regions, 0);
+        assert!(report.saw_williams_reveal);
+        assert!(report.saw_defender_coalescence);
+        assert!(report.saw_hall_of_fame);
+        assert!(report.saw_scoring_surface);
+        assert!(report.saw_final_scoring_label);
+        assert!(report.saw_cycle_return);
+        assert!(report.clean_exit);
+    }
+
+    #[test]
+    fn attract_cycle_report_rejects_zero_frames() {
+        let error = attract_cycle_report(0).expect_err("zero-frame attract smoke should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "actor attract smoke frame count must be positive"
+        );
+    }
+
+    #[test]
+    fn attract_cycle_report_validates_required_default_milestones() {
+        let mut report = ActorAttractCycleSmokeReport {
+            frames: 3367,
+            cycle_steps: 3367,
+            distinct_scene_signatures: 8,
+            attract_frames: 3367,
+            sprite_instances: 1,
+            sprite_draw_commands: 1,
+            wgpu_frame_commands: 1,
+            saw_williams_reveal: true,
+            saw_defender_coalescence: true,
+            saw_hall_of_fame: true,
+            saw_scoring_surface: true,
+            saw_final_scoring_label: true,
+            saw_cycle_return: true,
+            clean_exit: true,
+            ..ActorAttractCycleSmokeReport::default()
+        };
+
+        report.saw_cycle_return = false;
+        let error = report
+            .validate()
+            .expect_err("missing cycle return should fail");
+        assert_eq!(
+            error.to_string(),
+            "actor attract smoke did not return to Williams after cycle boundary"
+        );
+
+        report.saw_cycle_return = true;
+        report.actor_sound_frames = 1;
+        let error = report
+            .validate()
+            .expect_err("attract sound event should fail");
+        assert_eq!(
+            error.to_string(),
+            "actor attract smoke unexpectedly produced sound events"
         );
     }
 
@@ -635,5 +983,33 @@ mod tests {
         assert!(text.contains("first_frame_size: 292x240"));
         assert!(text.contains("covered_sprites: player_ship,enemy_lander"));
         assert!(text.contains("injected_inputs: coin,start_one"));
+    }
+
+    #[test]
+    fn attract_cycle_report_formats_current_cli_output() {
+        let report = ActorAttractCycleSmokeReport {
+            frames: 3367,
+            cycle_steps: 3367,
+            distinct_scene_signatures: 42,
+            attract_frames: 3367,
+            sprite_instances: 1200,
+            sprite_draw_commands: 340,
+            wgpu_frame_commands: 680,
+            saw_williams_reveal: true,
+            saw_defender_coalescence: true,
+            saw_hall_of_fame: true,
+            saw_scoring_surface: true,
+            saw_final_scoring_label: true,
+            saw_cycle_return: true,
+            clean_exit: true,
+            ..ActorAttractCycleSmokeReport::default()
+        };
+
+        let text = report.to_text();
+
+        assert!(text.starts_with("actor attract smoke passed\n"));
+        assert!(text.contains("cycle_steps: 3367"));
+        assert!(text.contains("saw_scoring_surface: true"));
+        assert!(text.contains("saw_cycle_return: true"));
     }
 }

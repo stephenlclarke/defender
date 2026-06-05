@@ -205,7 +205,11 @@ tree:
   `ActorRuntimeAdapter` through scripted attract/play inputs, verifies
   actor-origin clean gameplay/audio events, required actor sprite coverage,
   projectile/HUD/overlay layers, native draw-command pipeline coverage, and
-  frame-level `wgpu` command plans.
+  frame-level `wgpu` command plans. It also owns `--actor-attract-smoke`, which
+  advances the default no-input actor attract script through Williams reveal,
+  Defender coalescence, Hall of Fame, scoring surface, final scoring label, and
+  the `cycle 3367` return while verifying native draw plans and no attract
+  gameplay/audio events.
 - `src/live_wgpu.rs`: also owns `--actor-wgpu-smoke`, which reuses the actor
   smoke input sequence, renders actor `RenderScene` frames through the offscreen
   `wgpu` texture/readback path, and checks nonblank dynamic readback evidence
@@ -714,6 +718,10 @@ reintroduce legacy implementation terminology.
   attract, and playing actor steps, verifies clean gameplay/audio events,
   actor sprite families, projectile/HUD/overlay layers, native draw-command
   pipeline coverage, and frame-level `wgpu` command plans.
+- `--actor-attract-smoke` runs the default no-input actor attract cycle through
+  Williams reveal, Defender coalescence, Hall of Fame, scoring surface, final
+  scoring label, and the `cycle 3367` return while verifying native draw-plan
+  coverage and attract silence.
 - `--actor-wgpu-smoke` renders the same actor smoke frames through the actual
   offscreen `wgpu` readback path and verifies nonblank dynamic frame signatures.
 - Normal `cargo run` and the explicit `--actor-live` alias open an interactive

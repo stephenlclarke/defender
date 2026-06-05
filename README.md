@@ -80,9 +80,13 @@ runtime contract without making actor behavior display-frame driven.
 `--actor-smoke` exercises that actor frame path through a
 scripted attract/play input sequence and the native draw planner, proving actor
 events, audio, sprites, projectiles, HUD text, overlays, and `wgpu` command-plan
-coverage. `--actor-wgpu-smoke` uses the same actor input sequence and renders
-actor `RenderScene` frames through the offscreen `wgpu` readback path, proving
-nonblank dynamic WGPU output. Normal `cargo run` now opens the actor live
+coverage. `--actor-attract-smoke` advances the default no-input actor attract
+cycle through Williams reveal, Defender coalescence, Hall of Fame, scoring
+surface, final scoring label, and the `cycle 3367` return while verifying
+native draw plans and attract silence. `--actor-wgpu-smoke` uses the same actor
+input sequence and renders actor `RenderScene` frames through the offscreen
+`wgpu` readback path, proving nonblank dynamic WGPU output. Normal `cargo run`
+now opens the actor live
 runtime through `ActorRuntimeAdapter`, actor-derived clean `GameFrame` values,
 the existing `wgpu` presenter, live audio runtime, and the same live key
 bindings/XYZZY input state. `--actor-live` remains as an explicit alias for
@@ -258,6 +262,7 @@ cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin
 cargo run -- --live-smoke
 cargo run -- --game-smoke
 cargo run -- --actor-smoke
+cargo run -- --actor-attract-smoke
 cargo run -- --actor-wgpu-smoke
 cargo run -- --mute
 cargo run --features legacy-tools -- --rom-report
@@ -290,6 +295,7 @@ make run-wgpu
 make live-wgpu
 make smoke-wgpu
 make game-smoke
+make actor-attract-smoke
 make live-smoke
 make ci
 make ci-doctor
@@ -642,6 +648,9 @@ the scenario set during focused work.
 `frame_source: clean_game`, `legacy_presenter_used: false`, sprite counts,
 temporary-raster counts, and offscreen `wgpu` frame readback counts with
 checked first/last frame signatures.
+`cargo run -- --actor-attract-smoke` runs the default actor attract sequence
+without inputs through the full checked script cycle and reports milestone,
+draw-plan, silence, and cycle-return evidence.
 `make coverage-new-code` requires an explicit base and subtracts the accepted
 uncovered-line baseline in `tools/new_rust_coverage_baseline.txt`; refresh that
 baseline only when intentionally accepting existing uncovered debt. `make ci`
@@ -793,10 +802,12 @@ actor-runtime counterpart: it steps `ActorRuntimeAdapter`, verifies attract,
 credited attract, playing, clean gameplay/audio events, required actor sprite
 families, projectile/HUD/overlay layers, native sprite draw commands, native
 pipelines, and frame-level `wgpu` command plans without entering the legacy
-presenter. `--actor-wgpu-smoke` then renders actor scenes through the actual
-offscreen `wgpu` texture/readback path and requires every actor smoke frame to
-produce nonblank output plus dynamic readback signatures. Normal interactive
-play and the explicit `--actor-live` alias now open an actor-frame window
+presenter. `--actor-attract-smoke` covers the no-input default attract cycle
+through the Hall/scoring/cycle-return milestones before `--actor-wgpu-smoke`
+renders actor scenes through the actual offscreen `wgpu` texture/readback path
+and requires every actor smoke frame to produce nonblank output plus dynamic
+readback signatures. Normal interactive play and the explicit `--actor-live`
+alias now open an actor-frame window
 through the same `wgpu` presenter and submit actor-derived clean `GameFrame`
 values to live audio; actor high-score entry accepts the same
 initials/backspace keys through that path. Actor frames publish a clean state

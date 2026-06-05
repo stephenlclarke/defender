@@ -382,6 +382,7 @@ mod public_api_tests {
         assert!(platform_rs.contains("ArgClassification::Error"));
         assert!(platform_rs.contains("\"--live-smoke\""));
         assert!(platform_rs.contains("\"--game-smoke\""));
+        assert!(platform_rs.contains("\"--actor-attract-smoke\""));
         assert!(platform_rs.contains("RuntimeConfig::smoke()"));
         assert!(!platform_rs.contains(&accepted_runtime_call));
         assert!(!platform_rs.contains("crate::compatibility::"));
@@ -398,6 +399,7 @@ mod public_api_tests {
         assert!(runtime_rs.contains("RuntimeCommand::VerifyRoms { path }"));
         assert!(runtime_rs.contains("RuntimeCommand::GameSmoke"));
         assert!(runtime_rs.contains("RuntimeCommand::ActorSmoke"));
+        assert!(runtime_rs.contains("RuntimeCommand::ActorAttractSmoke"));
         assert!(runtime_rs.contains("RuntimeCommand::ActorWgpuSmoke"));
         assert!(runtime_rs.contains("RuntimeCommand::ActorWgpuLive"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityTrace { frame_count }"));
@@ -415,6 +417,7 @@ mod public_api_tests {
         assert!(runtime_rs.contains("pub(crate) fn run_verify_roms"));
         assert!(runtime_rs.contains("pub(crate) fn run_game_smoke"));
         assert!(runtime_rs.contains("pub(crate) fn run_actor_smoke"));
+        assert!(runtime_rs.contains("pub(crate) fn run_actor_attract_smoke"));
         assert!(runtime_rs.contains("pub(crate) fn run_actor_wgpu_smoke"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_trace"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_trace_inputs"));
@@ -428,6 +431,7 @@ mod public_api_tests {
         assert!(runtime_rs.contains("run_verify_roms_command(path)"));
         assert!(runtime_rs.contains("crate::game_smoke::run()"));
         assert!(runtime_rs.contains("crate::actor_smoke::run()"));
+        assert!(runtime_rs.contains("crate::actor_smoke::run_attract_cycle()"));
         assert!(runtime_rs.contains("crate::live_wgpu::run_actor_wgpu_smoke()"));
         assert!(runtime_rs.contains("crate::live_wgpu::run_actor_live("));
         assert!(runtime_rs.contains("run_fidelity_trace_command(frame_count)"));
