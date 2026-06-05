@@ -109,12 +109,17 @@ verification tools.
   two-player start requests no longer emit false clean `GameStarted` /
   `WaveStarted` events. Score and replay-bonus stock awards route through the
   active player fields so the actor bridge can represent player-two score and
-  stock ownership. Player hazard deaths now decrement the active player's
-  stock, enter a source-length `0x60` actor player-switch sleep when another
-  player has stock, publish the switch through `GameOverSnapshot`, suppress the
-  attract script during the handoff, and start the next stocked player's actor
-  turn when the sleep expires. The remaining two-player fidelity boundary is
-  the full source `PLE02` death/player-start prompt pixel path. Actor
+  stock ownership. Credited two-player starts now publish a source-length
+  actor player-start delay, render the source `PLAYER ONE` prompt through the
+  actor render bridge, and delay actor playfield spawning plus `WaveStarted`
+  until the delay expires. Player hazard deaths now decrement the active
+  player's stock, enter a source-length `0x60` actor player-switch sleep when
+  another player has stock, publish the switch through `GameOverSnapshot`,
+  suppress the attract script during the handoff, render the source
+  `PLAYER ONE` / `PLAYER TWO` plus `GAME OVER` switch prompts, and start the
+  next stocked player's source prompt/delayed actor turn when the switch sleep
+  expires. The remaining two-player fidelity boundary is MAME media proof and
+  exact prompt pixel/timing parity. Actor
   high-score initials
   submission now reports accepted and submitted initials through the clean event
   bridge, enters a finite 60-step
@@ -5612,3 +5617,35 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780674174951459`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780675123787219`.
+- `2026-06-05 17:16 BST`: Completed the actor two-player source-prompt/start
+  handoff cycle. `StepPrompt`/`StepReport` now carry `PlayerStartReport`
+  alongside `PlayerSwitchReport`; accepted two-player starts and post-switch
+  turns publish a source-length `138`-step actor player-start delay before
+  playfield actors spawn. `ActorRenderSceneBridge` now projects the source
+  `PLYR1` / `PLYR2` and `GO` message-glyph prompts from report state, so the
+  credited two-player start shows `PLAYER ONE`, a player switch shows the
+  source player label plus `GAME OVER`, and the next stocked player receives a
+  source player-start prompt before `WaveStarted`. Actor source RNG, shell
+  scan, input, and wave-clear detection stay paused during this interstitial.
+  Focused tests now cover source glyph rendering, the start delay countdown,
+  delayed `WaveStarted`, and both switch directions. README, SPEC, and the
+  actor architecture notes now document the implemented report/render contract
+  and leave only MAME media proof plus exact prompt pixel/timing parity as the
+  remaining prompt boundary. No legacy code, tests, or scaffolding were safe to
+  remove in this slice because clean smoke/fidelity/oracle evidence still
+  depends on clean runtime boundaries outside the actor path. Validation passed
+  with `cargo test actor_two_player --lib --features legacy-tools`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo test runtime --all-targets --features legacy-tools`, the actor smoke
+  CLI commands (`--actor-smoke`, `--actor-attract-smoke`,
+  `--actor-post-game-smoke`, and `--actor-wgpu-smoke`), touched-doc
+  markdownlint, and `git diff --check`. The full unfiltered `legacy-tools`
+  suite was not rerun in this cycle; the previously isolated clean-game MAME
+  window/post-game audio failures remain outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780675275699089`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780676232273589`.

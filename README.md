@@ -80,10 +80,14 @@ hostile-projectile source metadata into the clean runtime contract without
 making actor behavior display-frame driven. Two-player actor starts now require
 two credits, consume both credits, initialize player one as active, publish both
 player score/stock snapshots, and suppress false `GameStarted` events for
-blocked two-player start requests. Actor player deaths now decrement the active
-player's stock and, when the other player has stock, enter a source-length
-`0x60` player-switch sleep exposed through `GameOverSnapshot` before starting
-the next stocked player's actor turn.
+blocked two-player start requests. Credited two-player starts now publish the
+source `PLAYER ONE` start prompt and delay actor playfield spawning plus
+`WaveStarted` until the source start interval completes. Actor player deaths
+now decrement the active player's stock and, when the other player has stock,
+enter a source-length `0x60` player-switch sleep exposed through
+`GameOverSnapshot`; the render bridge projects the source `PLAYER ONE` /
+`PLAYER TWO` plus `GAME OVER` switch prompts before the next stocked player's
+source start prompt and delayed actor playfield turn.
 `--actor-smoke` exercises that actor frame path through a
 scripted attract/play input sequence and the native draw planner, proving actor
 events, audio, sprites, projectiles, HUD text, overlays, and `wgpu` command-plan
@@ -214,9 +218,9 @@ score system, so threshold crossings add life/smart-bomb stock and emit
 `BonusAwarded` through the actor event bridge. Score and replay-bonus stock
 awards now update the driver-owned active-player score/stock fields, so the
 actor session bridge preserves player-one/player-two ownership across
-two-player death switches. The remaining two-player prompt work is full
-source-glyph `PLE02` player-start/death-prompt parity. When source-counted
-hostile
+two-player death switches. The remaining two-player prompt work is MAME media
+proof and exact pixel/timing parity beyond the source-message report/render
+contract. When source-counted hostile
 actors are gone, the actor driver publishes a wave-cleared interstitial
 `StepReport` before spawning the next wave: the clear report keeps surviving
 humans visible for the source `ATTACK WAVE` / `COMPLETED` / `BONUS X`

@@ -179,9 +179,10 @@ tree:
 - `src/actor_game.rs`: isolated actor-oriented rewrite surface with
   thread-backed assets, `StepPrompt`/`StepReport` simulation turns,
   scriptable behavior and wave profiles, two-player admission/session
-  snapshots, bounded two-player player-switch sleep reports, draw/effect
-  descriptions, and `SoundCue::source_sound_command` metadata for red-label
-  Williams sound-board command bytes where source evidence exists.
+  snapshots, bounded two-player player-switch sleep and player-start delay
+  reports, draw/effect descriptions, and `SoundCue::source_sound_command`
+  metadata for red-label Williams sound-board command bytes where source
+  evidence exists.
   `ActorSoundEventBridge` adapts
   report sound cues into clean `SoundEvent` batches for the existing audio
   runtime contract. `ActorRenderSceneBridge` adapts report draw commands into

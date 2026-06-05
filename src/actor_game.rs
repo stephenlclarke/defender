@@ -64,6 +64,7 @@ const SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS: u8 = 6;
 const SOURCE_SHELL_SCAN_CADENCE_STEPS: u8 = 8;
 const SOURCE_SHELL_LIMIT: usize = 20;
 const SOURCE_PLAYER_SWITCH_SLEEP_STEPS: u8 = 0x60;
+const SOURCE_START_PLAYFIELD_DELAY_STEPS: u8 = 138;
 const SOURCE_SHELL_X_MAX: i16 = 0x98;
 const SOURCE_PLAYFIELD_START_RNG: ActorSourceRng = ActorSourceRng {
     seed: 0x52,
@@ -136,6 +137,9 @@ const SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES: [(&str, u16); 7] = [
     ("SWRMPV", 0x40A8),
     ("SWARMV", 0x5CA8),
 ];
+const SOURCE_PLAYER_START_PROMPT_SCREEN: u16 = 0x3C80;
+const SOURCE_PLAYER_SWITCH_LABEL_SCREEN: u16 = 0x3C78;
+const SOURCE_PLAYER_SWITCH_GAME_OVER_SCREEN: u16 = 0x3E88;
 const SOURCE_TOP_DISPLAY_BORDER_SEGMENTS: [(u16, [f32; 2]); 6] = [
     (0x0028, [312.0, 2.0]),
     (0x2F08, [2.0, 32.0]),
@@ -284,7 +288,6 @@ const STATUS_WAVE_POSITION: Point = Point::new(8, 18);
 const STATUS_LIVES_POSITION: Point = Point::new(86, 18);
 const STATUS_SMART_BOMBS_POSITION: Point = Point::new(140, 18);
 const STATUS_CREDITS_POSITION: Point = Point::new(176, 226);
-const STATUS_PLAYER_SWITCH_POSITION: Point = Point::new(104, 116);
 const SOURCE_CREDITS_MESSAGE_LABEL: &str = "CREDV";
 const SOURCE_PRESENTS_MESSAGE_LABEL: &str = "ELECV";
 const SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN: u16 = 0x3258;
@@ -5112,6 +5115,7 @@ pub struct StepPrompt {
     pub player_stocks: [PlayerStockSnapshot; 2],
     pub game_over_hall_of_fame_stall_remaining: Option<u8>,
     pub player_switch: Option<PlayerSwitchReport>,
+    pub player_start: Option<PlayerStartReport>,
     pub high_scores: [u32; 5],
     pub high_score_initials: HighScoreInitialsState,
     pub snapshots: Vec<ActorSnapshot>,
@@ -5251,6 +5255,7 @@ pub struct StepReport {
     pub next_bonus: u32,
     pub game_over_hall_of_fame_stall_remaining: Option<u8>,
     pub player_switch: Option<PlayerSwitchReport>,
+    pub player_start: Option<PlayerStartReport>,
     pub high_scores: [u32; 5],
     pub high_score_initials: HighScoreInitialsState,
     pub high_score_initial_accepted: bool,
@@ -5300,6 +5305,12 @@ pub struct PlayerSwitchReport {
     pub sleep_steps_remaining: u8,
     pub from_player: u8,
     pub to_player: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlayerStartReport {
+    pub delay_steps_remaining: u8,
+    pub player: u8,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -5452,6 +5463,10 @@ fn game_over_snapshot_for_report(report: &StepReport) -> GameOverSnapshot {
 }
 
 fn world_snapshot_for_report(report: &StepReport) -> WorldSnapshot {
+    if report.player_start.is_some() {
+        return WorldSnapshot::default();
+    }
+
     let mut world = WorldSnapshot {
         enemies: actor_enemies_for_report(report),
         humans: actor_humans_for_report(report),
@@ -5794,6 +5809,8 @@ impl ActorRenderSceneBridge {
         for draw in &report.draws {
             self.push_draw(&mut scene, report.phase, draw);
         }
+        push_actor_player_switch_prompt_sprites(&mut scene, report);
+        push_actor_player_start_prompt_sprites(&mut scene, report);
         push_actor_wave_completion_status_sprites(&mut scene, report);
         push_actor_survivor_bonus_icon_sprites(&mut scene, report);
         scene
@@ -6056,6 +6073,49 @@ fn should_show_actor_wave_completion_status(report: &StepReport) -> bool {
             .snapshots
             .iter()
             .any(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive)
+}
+
+fn push_actor_player_switch_prompt_sprites(scene: &mut RenderScene, report: &StepReport) {
+    let Some(player_switch) = report.player_switch else {
+        return;
+    };
+
+    push_actor_source_message_sprites(
+        scene,
+        player_source_message_label(player_switch.from_player),
+        SOURCE_PLAYER_SWITCH_LABEL_SCREEN,
+        RenderLayer::Overlay,
+    );
+    push_actor_source_message_sprites(
+        scene,
+        "GO",
+        SOURCE_PLAYER_SWITCH_GAME_OVER_SCREEN,
+        RenderLayer::Overlay,
+    );
+}
+
+fn push_actor_player_start_prompt_sprites(scene: &mut RenderScene, report: &StepReport) {
+    let Some(player_start) = report.player_start else {
+        return;
+    };
+
+    push_actor_source_message_sprites(
+        scene,
+        player_source_message_label(player_start.player),
+        SOURCE_PLAYER_START_PROMPT_SCREEN,
+        RenderLayer::Overlay,
+    );
+}
+
+fn push_actor_source_message_sprites(
+    scene: &mut RenderScene,
+    label: &str,
+    top_left_screen_address: u16,
+    layer: RenderLayer,
+) {
+    if let Some(text) = source_message_text(label) {
+        push_source_controlled_message_sprites(scene, text, top_left_screen_address, layer);
+    }
 }
 
 fn actor_visible_survivor_bonus_icon_count(report: &StepReport) -> usize {
@@ -7709,10 +7769,38 @@ impl PendingPlayerSwitch {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PendingPlayerStart {
+    delay_steps_remaining: u8,
+    player: u8,
+}
+
+impl PendingPlayerStart {
+    const fn new(player: u8) -> Self {
+        Self {
+            delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS,
+            player,
+        }
+    }
+
+    const fn report(self) -> PlayerStartReport {
+        PlayerStartReport {
+            delay_steps_remaining: self.delay_steps_remaining,
+            player: self.player,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SurvivorBonusStep {
     Waiting,
     Award(u32),
     StartNextWave,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PlayerStartStep {
+    Waiting,
+    StartPlayfield,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -7734,7 +7822,9 @@ fn actor_gameplay_events_for_report(report: &StepReport) -> Vec<GameEvent> {
             GameCommand::StartOnePlayer | GameCommand::StartTwoPlayer => {
                 if report.phase == Phase::Playing {
                     push_unique_game_event(&mut events, GameEvent::GameStarted);
-                    push_unique_game_event(&mut events, GameEvent::WaveStarted);
+                    if report.player_start.is_none() {
+                        push_unique_game_event(&mut events, GameEvent::WaveStarted);
+                    }
                 }
             }
             GameCommand::SmartBomb { .. } => {
@@ -7814,6 +7904,7 @@ pub struct ActorGameDriver {
     game_over_hall_of_fame_stall_remaining: Option<u8>,
     pending_survivor_bonus: Option<PendingSurvivorBonus>,
     pending_player_switch: Option<PendingPlayerSwitch>,
+    pending_player_start: Option<PendingPlayerStart>,
 }
 
 impl ActorGameDriver {
@@ -7862,6 +7953,7 @@ impl ActorGameDriver {
             game_over_hall_of_fame_stall_remaining: None,
             pending_survivor_bonus: None,
             pending_player_switch: None,
+            pending_player_start: None,
         };
         let attract_id = driver.allocate_actor_id();
         let script_id = driver.allocate_actor_id();
@@ -7877,6 +7969,9 @@ impl ActorGameDriver {
         let mut step_commands = Vec::new();
         let mut survivor_bonus_awarded_points = None;
         let mut survivor_bonus_replay_awarded = false;
+        if let PlayerStartStep::StartPlayfield = self.advance_pending_player_start() {
+            step_commands.push(GameCommand::AdvanceWave { wave: self.wave });
+        }
         self.advance_pending_player_switch();
         match self.advance_pending_survivor_bonus() {
             SurvivorBonusStep::StartNextWave => {
@@ -7894,8 +7989,13 @@ impl ActorGameDriver {
         let survivor_bonus_interstitial = self.pending_survivor_bonus.is_some();
         let prompt_player_switch = self.pending_player_switch.map(PendingPlayerSwitch::report);
         let player_switch_interstitial = prompt_player_switch.is_some();
+        let prompt_player_start = self.pending_player_start.map(PendingPlayerStart::report);
+        let player_start_interstitial = prompt_player_start.is_some();
         let was_playing = self.phase == Phase::Playing;
-        let effective_input = if survivor_bonus_interstitial || player_switch_interstitial {
+        let effective_input = if survivor_bonus_interstitial
+            || player_switch_interstitial
+            || player_start_interstitial
+        {
             GameInput::NONE
         } else {
             input
@@ -7907,6 +8007,7 @@ impl ActorGameDriver {
         let source_rng = if self.phase == Phase::Playing
             && !survivor_bonus_interstitial
             && !player_switch_interstitial
+            && !player_start_interstitial
         {
             Some(self.source_rng.advance().snapshot())
         } else {
@@ -7919,6 +8020,7 @@ impl ActorGameDriver {
         let source_shell_scan_tick = if self.phase == Phase::Playing
             && !survivor_bonus_interstitial
             && !player_switch_interstitial
+            && !player_start_interstitial
         {
             self.advance_source_shell_scan_tick()
         } else {
@@ -7942,6 +8044,7 @@ impl ActorGameDriver {
             player_stocks: self.player_stocks(),
             game_over_hall_of_fame_stall_remaining: self.game_over_hall_of_fame_stall_remaining,
             player_switch: prompt_player_switch,
+            player_start: prompt_player_start,
             high_scores: self.high_scores.entries(),
             high_score_initials: self.high_score_initials,
             snapshots: self.snapshots.values().cloned().collect(),
@@ -7992,6 +8095,7 @@ impl ActorGameDriver {
             .pending_survivor_bonus
             .map(|bonus| bonus.report(survivor_bonus_awarded_points));
         let player_switch = self.pending_player_switch.map(PendingPlayerSwitch::report);
+        let player_start = self.pending_player_start.map(PendingPlayerStart::report);
 
         let report = StepReport {
             step: self.step,
@@ -8008,6 +8112,7 @@ impl ActorGameDriver {
             next_bonus: self.next_bonus,
             game_over_hall_of_fame_stall_remaining: self.game_over_hall_of_fame_stall_remaining,
             player_switch,
+            player_start,
             high_scores: self.high_scores.entries(),
             high_score_initials: self.high_score_initials,
             high_score_initial_accepted: high_score_entry_step.accepted,
@@ -8617,6 +8722,7 @@ impl ActorGameDriver {
         self.game_over_hall_of_fame_stall_remaining = None;
         self.pending_survivor_bonus = None;
         self.pending_player_switch = Some(PendingPlayerSwitch::new(from_player, to_player));
+        self.pending_player_start = None;
         self.baiter_timer_steps = None;
         self.clear_turn_playfield_actors();
     }
@@ -8645,8 +8751,30 @@ impl ActorGameDriver {
         self.game_over_hall_of_fame_stall_remaining = None;
         self.pending_survivor_bonus = None;
         self.pending_player_switch = None;
+        self.pending_player_start = Some(PendingPlayerStart::new(player));
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.reset_source_shell_scan();
+        self.clear_turn_playfield_actors();
+        self.apply_wave_profile();
+    }
+
+    fn advance_pending_player_start(&mut self) -> PlayerStartStep {
+        let Some(mut pending) = self.pending_player_start else {
+            return PlayerStartStep::Waiting;
+        };
+
+        pending.delay_steps_remaining = pending.delay_steps_remaining.saturating_sub(1);
+        if pending.delay_steps_remaining > 0 {
+            self.pending_player_start = Some(pending);
+            return PlayerStartStep::Waiting;
+        }
+
+        self.pending_player_start = None;
+        self.start_delayed_playfield();
+        PlayerStartStep::StartPlayfield
+    }
+
+    fn start_delayed_playfield(&mut self) {
         self.clear_turn_playfield_actors();
         self.apply_wave_profile();
         self.spawn_player();
@@ -8664,6 +8792,7 @@ impl ActorGameDriver {
         self.game_over_hall_of_fame_stall_remaining = None;
         self.pending_survivor_bonus = None;
         self.pending_player_switch = None;
+        self.pending_player_start = None;
         self.high_scores.record(active_score);
         self.phase = if self.high_scores.qualifies(active_score) {
             Phase::HighScoreEntry
@@ -8712,19 +8841,25 @@ impl ActorGameDriver {
         self.game_over_hall_of_fame_stall_remaining = None;
         self.pending_survivor_bonus = None;
         self.pending_player_switch = None;
+        self.pending_player_start = None;
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.reset_source_shell_scan();
         self.clear_turn_playfield_actors();
         self.apply_wave_profile();
-        self.spawn_player();
-        self.spawn_wave_hostiles();
-        self.spawn_initial_humans();
+        if player_count > 1 {
+            self.pending_player_start = Some(PendingPlayerStart::new(self.current_player));
+        } else {
+            self.spawn_player();
+            self.spawn_wave_hostiles();
+            self.spawn_initial_humans();
+        }
     }
 
     fn start_pending_wave(&mut self) {
         self.wave = self.wave.saturating_add(1);
         self.pending_survivor_bonus = None;
         self.pending_player_switch = None;
+        self.pending_player_start = None;
         self.clear_wave_playfield_actors();
         self.apply_wave_profile();
         self.spawn_wave_hostiles();
@@ -8870,6 +9005,7 @@ impl ActorGameDriver {
             || self.phase != Phase::Playing
             || self.wave == 0
             || self.pending_survivor_bonus.is_some()
+            || self.pending_player_start.is_some()
             || self.has_hostile_snapshots()
             || commands_spawn_hostiles(commands)
         {
@@ -9578,7 +9714,7 @@ impl StatusDisplay {
     }
 
     fn player_switch_draws(&self, prompt: &StepPrompt) -> Vec<DrawCommand> {
-        let Some(player_switch) = prompt.player_switch else {
+        if prompt.player_switch.is_none() {
             return Vec::new();
         };
 
@@ -9597,11 +9733,6 @@ impl StatusDisplay {
                 self.id,
                 STATUS_HIGH_SCORE_POSITION,
                 format!("HIGH {}", format_status_score(prompt.high_scores[0])),
-            ),
-            DrawCommand::text(
-                self.id,
-                STATUS_PLAYER_SWITCH_POSITION,
-                format!("PLAYER {}", player_switch.to_player),
             ),
             DrawCommand::text(
                 self.id,
@@ -9664,6 +9795,10 @@ fn format_high_score_initials(state: HighScoreInitialsState) -> String {
         .iter()
         .map(|initial| initial.unwrap_or('_'))
         .collect()
+}
+
+fn player_source_message_label(player: u8) -> &'static str {
+    if player == 2 { "PLYR2" } else { "PLYR1" }
 }
 
 #[derive(Debug)]
@@ -13291,6 +13426,7 @@ mod tests {
             next_bonus: SOURCE_REPLAY_SCORE,
             game_over_hall_of_fame_stall_remaining: None,
             player_switch: None,
+            player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
@@ -13496,6 +13632,7 @@ mod tests {
             next_bonus: SOURCE_REPLAY_SCORE,
             game_over_hall_of_fame_stall_remaining: None,
             player_switch: None,
+            player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
@@ -13611,6 +13748,7 @@ mod tests {
             next_bonus: 20_000,
             game_over_hall_of_fame_stall_remaining: None,
             player_switch: None,
+            player_start: None,
             high_scores: [12_000, 10_000, 7_500, 5_000, 2_500],
             high_score_initials: HighScoreInitialsState {
                 initials: [Some('R'), None, None],
@@ -13773,6 +13911,7 @@ mod tests {
             next_bonus: SOURCE_REPLAY_SCORE,
             game_over_hall_of_fame_stall_remaining: None,
             player_switch: None,
+            player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
@@ -15239,10 +15378,38 @@ mod tests {
         );
         assert!(started.report.sounds.contains(&SoundCue::Start));
         assert!(started.events.gameplay().contains(&GameEvent::GameStarted));
-        assert!(started.events.gameplay().contains(&GameEvent::WaveStarted));
+        assert!(!started.events.gameplay().contains(&GameEvent::WaveStarted));
+        assert_eq!(
+            started.report.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS,
+                player: 1,
+            })
+        );
+        assert!(started.state.world.enemies.is_empty());
+        assert_source_message(&started.report, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
 
         let status = runtime.step(GameInput::NONE);
         assert_text(&status.report, "2UP 000000");
+        assert_eq!(
+            status.report.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS - 1,
+                player: 1,
+            })
+        );
+        assert_source_message(&status.report, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
+
+        let active = step_until_player_start_completes(&mut runtime, 1);
+        assert_eq!(active.report.phase, Phase::Playing);
+        assert_eq!(active.report.current_player, 1);
+        assert!(active.report.player_start.is_none());
+        assert!(active.events.gameplay().contains(&GameEvent::WaveStarted));
+        assert!(active.state.world.enemies.iter().any(|enemy| {
+            enemy.kind == CleanEnemyKind::Lander
+                || enemy.kind == CleanEnemyKind::Bomber
+                || enemy.kind == CleanEnemyKind::Pod
+        }));
     }
 
     #[test]
@@ -15357,7 +15524,22 @@ mod tests {
             ]
         );
         assert!(switched.report.player_switch.is_none());
-        assert!(switched.state.world.enemies.iter().any(|enemy| {
+        assert_eq!(
+            switched.report.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS,
+                player: 2,
+            })
+        );
+        assert!(switched.state.world.enemies.is_empty());
+        assert_source_message(&switched.report, "PLYR2", SOURCE_PLAYER_START_PROMPT_SCREEN);
+
+        let active = step_until_player_start_completes(&mut runtime, 2);
+        assert_eq!(active.report.phase, Phase::Playing);
+        assert_eq!(active.report.current_player, 2);
+        assert!(active.report.player_start.is_none());
+        assert!(active.events.gameplay().contains(&GameEvent::WaveStarted));
+        assert!(active.state.world.enemies.iter().any(|enemy| {
             enemy.kind == CleanEnemyKind::Lander
                 || enemy.kind == CleanEnemyKind::Bomber
                 || enemy.kind == CleanEnemyKind::Pod
@@ -15414,6 +15596,20 @@ mod tests {
                 PlayerStockSnapshot::new(2, 1),
             ]
         );
+        assert_eq!(
+            switched.report.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS,
+                player: 2,
+            })
+        );
+        assert_source_message(&switched.report, "PLYR2", SOURCE_PLAYER_START_PROMPT_SCREEN);
+
+        let active = step_until_player_start_completes(&mut runtime, 2);
+        assert_eq!(active.report.current_player, 2);
+        assert_eq!(active.report.lives, 2);
+        assert_eq!(active.report.smart_bombs, 1);
+        assert!(active.events.gameplay().contains(&GameEvent::WaveStarted));
     }
 
     #[test]
@@ -15491,6 +15687,20 @@ mod tests {
                 PlayerStockSnapshot::new(0, 2),
             ]
         );
+        assert_eq!(
+            switched.report.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS,
+                player: 1,
+            })
+        );
+        assert_source_message(&switched.report, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
+
+        let active = step_until_player_start_completes(&mut runtime, 1);
+        assert_eq!(active.report.current_player, 1);
+        assert_eq!(active.report.lives, 2);
+        assert_eq!(active.report.smart_bombs, 1);
+        assert!(active.events.gameplay().contains(&GameEvent::WaveStarted));
     }
 
     #[test]
@@ -16550,6 +16760,7 @@ mod tests {
             player_stocks: [PlayerStockSnapshot::new(3, 3); 2],
             game_over_hall_of_fame_stall_remaining: None,
             player_switch: None,
+            player_start: None,
             high_scores: [0; 5],
             high_score_initials: HighScoreInitialsState::EMPTY,
             snapshots: Vec::new(),
@@ -19984,6 +20195,7 @@ mod tests {
         runtime: &mut ActorRuntimeAdapter,
         to_player: u8,
     ) -> ActorFrame {
+        let from_player = if to_player == 1 { 2 } else { 1 };
         for expected_sleep in (1..SOURCE_PLAYER_SWITCH_SLEEP_STEPS).rev() {
             let waiting = runtime.step(GameInput::NONE);
             assert_eq!(waiting.report.phase, Phase::GameOver);
@@ -19991,7 +20203,7 @@ mod tests {
                 waiting.report.player_switch,
                 Some(PlayerSwitchReport {
                     sleep_steps_remaining: expected_sleep,
-                    from_player: if to_player == 1 { 2 } else { 1 },
+                    from_player,
                     to_player,
                 })
             );
@@ -20002,7 +20214,12 @@ mod tests {
             assert!(!waiting.events.gameplay().contains(&GameEvent::GameOver));
             assert!(!waiting.report.sounds.contains(&SoundCue::GameOver));
             if expected_sleep == SOURCE_PLAYER_SWITCH_SLEEP_STEPS - 1 {
-                assert_text(&waiting.report, &format!("PLAYER {to_player}"));
+                assert_source_message(
+                    &waiting.report,
+                    player_source_message_label(from_player),
+                    SOURCE_PLAYER_SWITCH_LABEL_SCREEN,
+                );
+                assert_source_message(&waiting.report, "GO", SOURCE_PLAYER_SWITCH_GAME_OVER_SCREEN);
                 assert!(
                     !waiting
                         .report
@@ -20014,6 +20231,36 @@ mod tests {
         }
 
         runtime.step(GameInput::NONE)
+    }
+
+    fn step_until_player_start_completes(
+        runtime: &mut ActorRuntimeAdapter,
+        player: u8,
+    ) -> ActorFrame {
+        let mut previous_delay = SOURCE_START_PLAYFIELD_DELAY_STEPS.saturating_add(1);
+        for _ in 0..=SOURCE_START_PLAYFIELD_DELAY_STEPS {
+            let frame = runtime.step(GameInput::NONE);
+            if let Some(player_start) = frame.report.player_start {
+                assert_eq!(player_start.player, player);
+                assert!(player_start.delay_steps_remaining < previous_delay);
+                previous_delay = player_start.delay_steps_remaining;
+                assert!(!frame.events.gameplay().contains(&GameEvent::WaveStarted));
+                assert!(frame.state.world.enemies.is_empty());
+                assert_source_message(
+                    &frame.report,
+                    player_source_message_label(player),
+                    SOURCE_PLAYER_START_PROMPT_SCREEN,
+                );
+                continue;
+            }
+
+            assert_eq!(frame.report.phase, Phase::Playing);
+            assert_eq!(frame.report.current_player, player);
+            assert!(frame.events.gameplay().contains(&GameEvent::WaveStarted));
+            return frame;
+        }
+
+        panic!("player {player} start should complete after source delay");
     }
 
     fn snapshot_for(report: &StepReport, id: ActorId) -> &ActorSnapshot {
@@ -20143,6 +20390,7 @@ mod tests {
             player_stocks: [PlayerStockSnapshot::new(3, INITIAL_SMART_BOMBS); 2],
             game_over_hall_of_fame_stall_remaining: None,
             player_switch: None,
+            player_start: None,
             high_scores: [0; 5],
             high_score_initials: HighScoreInitialsState::EMPTY,
             snapshots: vec![actor_snapshot_with_velocity(
@@ -20263,6 +20511,24 @@ mod tests {
                 .iter()
                 .any(|draw| draw.text.as_deref() == Some(value)),
             "expected draw text {value:?}"
+        );
+    }
+
+    fn assert_source_message(report: &StepReport, label: &str, top_left_screen_address: u16) {
+        let text = source_message_text(label).expect("source message label should exist");
+        let first_glyph = text
+            .chars()
+            .find_map(SpriteId::message_glyph)
+            .expect("source message should contain a visible glyph");
+        let position = source_screen_position(top_left_screen_address);
+        let scene = report.render_scene();
+        assert!(
+            scene.sprites.iter().any(|sprite| {
+                sprite.sprite == first_glyph
+                    && sprite.layer == RenderLayer::Overlay
+                    && sprite.position == position
+            }),
+            "expected source message {label} at {top_left_screen_address:#06x}"
         );
     }
 }
