@@ -565,9 +565,13 @@ The actor driver now owns a first Defender gameplay loop:
   deriving spread from the local spawn index. Source-backed swarmers carry an
   entry horizontal-seek flag, then advance actor-owned fixed-point fractions
   with source-shaped vertical acceleration/damping, turn-window reseek, and
-  source `RMAX` shot-timer reset before emitting hostile projectile commands
-  with a distinct swarmer shot cue. Smart-bomb pod scoring intentionally does
-  not spawn swarmers, matching the clean source behavior.
+  source `RMAX` shot-timer reset. Source-backed swarmer shots now use the
+  source `SWBMB` fireball projection: they suppress fire and sound after the
+  swarmer has passed the player or the source shell list is full, otherwise
+  they emit X velocity from swarmer `OXV << 3`, Y velocity from the
+  player/shell delta, source shell lifetime metadata, and the distinct swarmer
+  shot cue. Smart-bomb pod scoring intentionally does not spawn swarmers,
+  matching the clean source behavior.
 - The driver advances a source-paced baiter timer while source-counted wave
   enemies remain. Expired timers spawn source-backed baiter actors up to the
   source active cap. Baiters pursue and shoot through actor-owned metadata,

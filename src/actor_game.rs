@@ -65,6 +65,7 @@ const SOURCE_MUTANT_RESTORE_AVOID_WIDTH: u16 = 600 * 32;
 const SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS: u8 = 6;
 const SOURCE_SHELL_SCAN_CADENCE_STEPS: u8 = 8;
 const SOURCE_SHELL_LIMIT: usize = 20;
+const SOURCE_SHELL_LIFETIME_TICKS: u8 = 20;
 const SOURCE_PLAYER_SWITCH_SLEEP_STEPS: u8 = 0x60;
 const SOURCE_START_SOUND_DELAY_STEPS: u8 = 1;
 const SOURCE_START_PLAYFIELD_DELAY_STEPS: u8 = 138;
@@ -12467,21 +12468,60 @@ fn push_swarmer_shot(
     source: Option<ActorSourceSwarmerMetadata>,
     commands: &mut Vec<GameCommand>,
 ) {
+    if let Some(source) = source {
+        if let Some((velocity, projectile_source)) =
+            actor_source_mini_swarmer_fireball(position, prompt, source)
+        {
+            push_source_enemy_projectile_command(
+                position,
+                velocity,
+                projectile_source,
+                SoundCue::SwarmerShot,
+                commands,
+            );
+        }
+        return;
+    }
+
     let velocity = hostile_shot_velocity(position, prompt, behavior.swarmer_shot_speed);
-    let source = source.map(|source| {
-        actor_source_enemy_shot_metadata(
-            source.x_fraction,
-            source.y_fraction,
-            velocity,
-            behavior.lander_shot_lifetime_steps,
-        )
-    });
     commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
         position,
         velocity,
-        source,
+        source: None,
     }));
     commands.push(GameCommand::PlaySound(SoundCue::SwarmerShot));
+}
+
+fn actor_source_mini_swarmer_fireball(
+    position: Point,
+    prompt: &StepPrompt,
+    source: ActorSourceSwarmerMetadata,
+) -> Option<(Velocity, ActorSourceEnemyProjectileMetadata)> {
+    let player = prompt.player_position()?;
+    let player_delta = actor_source_absolute_x(player, 0)
+        .wrapping_sub(actor_source_absolute_x(position, source.x_fraction));
+    if (player_delta.to_be_bytes()[0] ^ source.x_velocity.to_be_bytes()[0]) & 0x80 != 0
+        || actor_source_shell_count(prompt) >= SOURCE_SHELL_LIMIT
+    {
+        return None;
+    }
+
+    let x_velocity = source.x_velocity.wrapping_shl(3);
+    let y_velocity = actor_arithmetic_shift_right_word(
+        u16::from_be_bytes([(player.y as u8).wrapping_sub(position.y as u8), 0]),
+        5,
+    );
+    let velocity = actor_source_screen_velocity(x_velocity, y_velocity);
+    Some((
+        velocity,
+        ActorSourceEnemyProjectileMetadata {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity,
+            y_velocity,
+            lifetime_ticks: SOURCE_SHELL_LIFETIME_TICKS,
+        },
+    ))
 }
 
 fn clamped_source_swarmer_shot_reset(profile: ActorSourceWaveProfile) -> u8 {
@@ -19152,7 +19192,7 @@ mod tests {
         let source = ActorSourceSwarmerMetadata {
             x_fraction: 0,
             y_fraction: 0,
-            x_velocity: 0,
+            x_velocity: 0x0020,
             y_velocity: 0,
             acceleration: 0,
             sleep_ticks: 0,
@@ -19198,11 +19238,9 @@ mod tests {
             report_source_rng.seed,
         );
         expected_source.sleep_ticks = SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS;
-        let expected_velocity = hostile_shot_velocity(
-            expected_position,
-            &prompt,
-            ActorBehaviorProfile::default().swarmer_shot_speed,
-        );
+        let (expected_velocity, expected_projectile_source) =
+            actor_source_mini_swarmer_fireball(expected_position, &prompt, expected_source)
+                .expect("expected source swarmer fireball");
 
         assert!(report.sounds.contains(&SoundCue::SwarmerShot));
         let swarmer_shot = report
@@ -19222,19 +19260,131 @@ mod tests {
             (
                 expected_position,
                 expected_velocity,
-                Some(ActorSourceEnemyProjectileMetadata {
-                    x_fraction: expected_source.x_fraction,
-                    y_fraction: expected_source.y_fraction,
-                    x_velocity: actor_source_projectile_velocity_component(expected_velocity.dx),
-                    y_velocity: actor_source_projectile_velocity_component(expected_velocity.dy),
-                    lifetime_ticks: actor_source_projectile_lifetime_ticks(LANDER_SHOT_LIFETIME),
-                })
+                Some(expected_projectile_source)
             )
         );
         assert_eq!(
             snapshot_for(&report, swarmer).source_swarmer,
             Some(expected_source)
         );
+    }
+
+    #[test]
+    fn source_swarmer_shot_direction_gate_suppresses_fireball_and_sound() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 2;
+        let player = driver.spawn_player();
+        driver.snapshots.insert(
+            player,
+            actor_snapshot(player.value(), ActorKind::Player, Point::new(42, 120)),
+        );
+        let start = Point::new(48, 100);
+        let source = ActorSourceSwarmerMetadata {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0x0020,
+            y_velocity: 0,
+            acceleration: 0,
+            sleep_ticks: 0,
+            shot_timer: 1,
+            horizontal_seek_pending: false,
+        };
+        let swarmer = driver.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
+            position: start,
+            source: Some(source),
+        });
+
+        let report = driver.step(GameInput::NONE);
+        let report_source_rng = report
+            .source_rng
+            .expect("playing report should carry source rng");
+        let mut expected_source = source;
+        expected_source.y_velocity = source_mini_swarmer_y_velocity(
+            source.y_velocity,
+            source.acceleration,
+            120,
+            start.y,
+            report_source_rng.seed,
+        );
+        let (expected_x, expected_x_fraction) =
+            actor_source_axis_step(start.x, source.x_fraction, expected_source.x_velocity);
+        let (expected_y, expected_y_fraction) = actor_source_active_object_y_step(
+            start.y,
+            source.y_fraction,
+            expected_source.y_velocity,
+        );
+        expected_source.x_fraction = expected_x_fraction;
+        expected_source.y_fraction = expected_y_fraction;
+        expected_source.shot_timer = source_rmax(
+            clamped_source_swarmer_shot_reset(ActorSourceWaveProfile::for_wave(report.wave)),
+            report_source_rng.seed,
+        );
+        expected_source.sleep_ticks = SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS;
+
+        assert!(!report.sounds.contains(&SoundCue::SwarmerShot));
+        assert!(!report.commands.iter().any(|command| {
+            matches!(
+                command,
+                GameCommand::Spawn(SpawnRequest::EnemyLaser {
+                    source: Some(_),
+                    ..
+                })
+            )
+        }));
+        assert_eq!(
+            snapshot_for(&report, swarmer).position,
+            Point::new(expected_x, expected_y)
+        );
+        assert_eq!(
+            snapshot_for(&report, swarmer).source_swarmer,
+            Some(expected_source)
+        );
+    }
+
+    #[test]
+    fn source_swarmer_full_shell_cap_suppresses_fireball_and_sound() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 2;
+        let player = driver.spawn_player();
+        driver.snapshots.insert(
+            player,
+            actor_snapshot(player.value(), ActorKind::Player, Point::new(42, 120)),
+        );
+        for index in 0..SOURCE_SHELL_LIMIT {
+            let id = ActorId::new(10_000 + index as u64);
+            driver.snapshots.insert(
+                id,
+                actor_snapshot(id.value(), ActorKind::EnemyLaser, Point::new(64, 120)),
+            );
+        }
+        driver.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
+            position: Point::new(25, 100),
+            source: Some(ActorSourceSwarmerMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0x0020,
+                y_velocity: 0,
+                acceleration: 0,
+                sleep_ticks: 0,
+                shot_timer: 1,
+                horizontal_seek_pending: false,
+            }),
+        });
+
+        let report = driver.step(GameInput::NONE);
+
+        assert!(!report.sounds.contains(&SoundCue::SwarmerShot));
+        assert!(!report.commands.iter().any(|command| {
+            matches!(
+                command,
+                GameCommand::Spawn(SpawnRequest::EnemyLaser {
+                    source: Some(_),
+                    ..
+                })
+            )
+        }));
     }
 
     #[test]

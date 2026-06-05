@@ -152,8 +152,9 @@ verification tools.
   laser kills spawn bounded mini-swarmer actors with source RNG-derived
   velocity, acceleration, sleep, and shot-timer metadata, source swarmers now
   perform the source entry seek and fixed-point vertical acceleration/damping
-  loop before emitting hostile projectiles and distinct shot cues, and
-  source-paced baiter timer entry now spawns
+  loop before using the source `SWBMB` fireball projection with pass-player and
+  shell-cap suppression, source shell lifetime metadata, and distinct shot
+  cues, and source-paced baiter timer entry now spawns
   source-backed baiter actors that can shoot and pursue the player without
   blocking wave completion after source-counted enemies are gone. Smart bombs
   now use driver-owned stock: normal player requests consume stock before
@@ -826,6 +827,33 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 19:04 BST`: Completed the actor source mini-swarmer fireball
+  projection cycle. Source-backed swarmer shots now use the red-label `SWBMB`
+  fireball shape instead of the generic hostile-shot helper: the actor path
+  suppresses both projectile and `SWSSND` cue when the swarmer has passed the
+  player or the shared source shell list is full, and successful shots emit
+  source fireball metadata with X velocity from swarmer `OXV << 3`, Y velocity
+  from the player/shell delta, zero shell fractions, and the source 20-tick
+  shell lifetime. Non-source scripted swarmers keep the existing behavior
+  profile shot helper. Focused regressions now cover successful source
+  projection, the pass-player direction gate, and full-shell suppression.
+  README, SPEC, and actor architecture docs now document the actor-side
+  `SWBMB` projection. No legacy code, tests, or scaffolding were safe to remove
+  in this slice because clean smoke/fidelity/oracle evidence still depends on
+  clean runtime boundaries outside the actor path. Validation passed with
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo test source_swarmer --lib --features legacy-tools`, `cargo test
+  actor_game --all-targets --features legacy-tools`, `cargo clippy
+  --all-targets --features legacy-tools -- -D warnings`, the
+  actor-game/smoke/live/runtime/wgpu all-target `legacy-tools` filters, the
+  actor smoke CLI commands (`--actor-smoke`, `--actor-attract-smoke`,
+  `--actor-post-game-smoke`, and `--actor-wgpu-smoke`), touched-doc
+  markdownlint, and `git diff --check`. The full unfiltered `legacy-tools`
+  suite was not rerun in this cycle; the previously isolated clean-game MAME
+  window/post-game audio failures remain outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780682222928479`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780682658802129`.
 - `2026-06-05 18:50 BST`: Completed the actor source mini-swarmer RNG-state
   cycle. Pod laser kills now seed the bounded mini-swarmer actor batch from the
   driver source RNG for initial X/Y velocity, acceleration, sleep ticks, and

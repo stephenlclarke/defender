@@ -883,8 +883,9 @@ reintroduce legacy implementation terminology.
   Y-motion metadata, pod laser-hit mini-swarmer spawning with the source
   request bound, source RNG-derived swarmer velocity/acceleration/sleep/
   shot-timer metadata, source entry seek plus fixed-point vertical
-  acceleration/damping, swarmer shot timer projectile/cue emission, smart-bomb
-  pod scoring without swarmer spawning, source-paced baiter timer entry with
+  acceleration/damping, `SWBMB` fireball direction/shell-cap suppression,
+  swarmer shot timer projectile/cue emission, smart-bomb pod scoring without
+  swarmer spawning, source-paced baiter timer entry with
   non-wave-blocking baiters, baiter shots/scores/hit cues,
   stock-backed smart-bomb hostile clearing with exhausted-stock guards and a
   non-consuming `XYZZY` overlay path, hyperspace source-shell cleanup for enemy
