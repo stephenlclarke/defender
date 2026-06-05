@@ -29,8 +29,12 @@ use crate::{
         source_attract_defender_appearance_pixels,
         source_attract_williams_logo_operation_pixel_counts,
         source_attract_williams_logo_pixel_path, source_message_text, source_screen_position,
+        source_screen_position_with_offset,
     },
-    systems::{HighScoreEntrySystem, HighScoreInitialsState, ScreenPosition, ScreenVelocity},
+    systems::{
+        HighScoreEntrySystem, HighScoreInitialsState, PlayerStock, ScoreSystem, ScreenPosition,
+        ScreenVelocity,
+    },
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -87,6 +91,15 @@ const SOURCE_HIGH_SCORE_HALL_STALL_STEPS: u8 = 60;
 const SOURCE_ATTRACT_WILLIAMS_LOGO_DURATION_STEPS: u64 = SOURCE_ATTRACT_HALL_OF_FAME_START_STEP - 1;
 const SOURCE_ATTRACT_PRESENTS_DURATION_STEPS: u64 =
     SOURCE_ATTRACT_HALL_OF_FAME_START_STEP - SOURCE_ATTRACT_PRESENTS_START_STEP;
+const SOURCE_REPLAY_SCORE: u32 = 10_000;
+const SOURCE_WAVE_COMPLETION_STATUS_LINES: &[(&str, u16)] =
+    &[("ATWV", 0x3850), ("COMPV", 0x3D60), ("BONSX", 0x3C90)];
+const SOURCE_WAVE_COMPLETION_WAVE_NUMBER_SCREEN: u16 = 0x6550;
+const SOURCE_WAVE_COMPLETION_MULTIPLIER_NUMBER_SCREEN: u16 = 0x5890;
+const SOURCE_SURVIVOR_BONUS_FIRST_HUMAN_SCREEN: u16 = 0x3CA0;
+const SOURCE_SURVIVOR_BONUS_HUMAN_STEP: u8 = 0x04;
+const SOURCE_SURVIVOR_BONUS_HUMAN_LIMIT: usize = 10;
+const SOURCE_SURVIVOR_BONUS_HUMAN_SIZE: [f32; 2] = [4.0, 8.0];
 const SOURCE_ATTRACT_DEFENDER_WORDMARK_DURATION_STEPS: u64 =
     SOURCE_ATTRACT_HALL_OF_FAME_START_STEP - SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP;
 const SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS: u64 =
@@ -5068,6 +5081,9 @@ pub enum GameCommand {
     AddScore(u32),
     PlaySound(SoundCue),
     PlayerKilled,
+    WaveCleared {
+        next_wave: u16,
+    },
     AdvanceWave {
         wave: u16,
     },
@@ -5217,11 +5233,13 @@ pub struct StepReport {
     pub credits: u8,
     pub lives: u8,
     pub smart_bombs: u8,
+    pub next_bonus: u32,
     pub game_over_hall_of_fame_stall_remaining: Option<u8>,
     pub high_scores: [u32; 5],
     pub high_score_initials: HighScoreInitialsState,
     pub high_score_initial_accepted: bool,
     pub high_score_submitted: bool,
+    pub bonus_awarded: bool,
     pub behavior_script: ActorBehaviorScriptManifest,
     pub source_rng: Option<ActorSourceRngSnapshot>,
     pub snapshots: Vec<ActorSnapshot>,
@@ -5276,8 +5294,8 @@ impl ActorStateBridge {
             scores: ScoreSnapshot {
                 player_one: report.score,
                 player_two: 0,
-                high_score: report.high_scores[0],
-                next_bonus: 10_000,
+                high_score: report.high_scores[0].max(report.score),
+                next_bonus: report.next_bonus,
             },
             attract: attract_snapshot_for_report(report),
             post_game_playfield: None,
@@ -5732,6 +5750,8 @@ impl ActorRenderSceneBridge {
         for draw in &report.draws {
             self.push_draw(&mut scene, report.phase, draw);
         }
+        push_actor_wave_completion_status_sprites(&mut scene, report);
+        push_actor_survivor_bonus_icon_sprites(&mut scene, report);
         scene
     }
 
@@ -5924,6 +5944,89 @@ impl ActorRenderSceneBridge {
 impl Default for ActorRenderSceneBridge {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+fn push_actor_wave_completion_status_sprites(scene: &mut RenderScene, report: &StepReport) {
+    if !should_show_actor_wave_completion_status(report) {
+        return;
+    }
+
+    for (label, screen_address) in SOURCE_WAVE_COMPLETION_STATUS_LINES {
+        if let Some(text) = source_message_text(label) {
+            push_source_text_bytes_sprites(
+                scene,
+                text.as_bytes(),
+                source_screen_position(*screen_address),
+                RenderLayer::Overlay,
+            );
+        }
+    }
+
+    let (wave_digits, wave_digit_count) = actor_visible_decimal_digits(clean_wave(report.wave));
+    push_source_text_bytes_sprites(
+        scene,
+        &wave_digits[..wave_digit_count],
+        source_screen_position(SOURCE_WAVE_COMPLETION_WAVE_NUMBER_SCREEN),
+        RenderLayer::Overlay,
+    );
+
+    let multiplier = clean_wave(report.wave).min(5);
+    let (multiplier_digits, multiplier_digit_count) = actor_visible_decimal_digits(multiplier);
+    push_source_text_bytes_sprites(
+        scene,
+        &multiplier_digits[..multiplier_digit_count],
+        source_screen_position(SOURCE_WAVE_COMPLETION_MULTIPLIER_NUMBER_SCREEN),
+        RenderLayer::Overlay,
+    );
+}
+
+fn push_actor_survivor_bonus_icon_sprites(scene: &mut RenderScene, report: &StepReport) {
+    if !should_show_actor_wave_completion_status(report) {
+        return;
+    }
+
+    for index in 0..actor_surviving_human_count(report).min(SOURCE_SURVIVOR_BONUS_HUMAN_LIMIT) {
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::HUMAN,
+            layer: RenderLayer::Overlay,
+            position: source_screen_position_with_offset(
+                SOURCE_SURVIVOR_BONUS_FIRST_HUMAN_SCREEN,
+                (index as u8) * SOURCE_SURVIVOR_BONUS_HUMAN_STEP,
+                0,
+            ),
+            size: SOURCE_SURVIVOR_BONUS_HUMAN_SIZE,
+            tint: Color::WHITE,
+        });
+    }
+}
+
+fn should_show_actor_wave_completion_status(report: &StepReport) -> bool {
+    report.phase == Phase::Playing
+        && report
+            .commands
+            .iter()
+            .any(|command| matches!(command, GameCommand::WaveCleared { .. }))
+        && report
+            .snapshots
+            .iter()
+            .any(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive)
+}
+
+fn actor_surviving_human_count(report: &StepReport) -> usize {
+    report
+        .snapshots
+        .iter()
+        .filter(|snapshot| snapshot.kind == ActorKind::Human && snapshot.alive)
+        .count()
+}
+
+fn actor_visible_decimal_digits(value: u8) -> ([u8; 2], usize) {
+    let value = value.min(99);
+    if value < 10 {
+        ([b'0' + value, b' '], 1)
+    } else {
+        ([b'0' + value / 10, b'0' + value % 10], 2)
     }
 }
 
@@ -7472,6 +7575,12 @@ struct HighScoreEntryStep {
     submitted: bool,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct AppliedCommands {
+    sounds: Vec<SoundCue>,
+    bonus_awarded: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorDriverScriptManifest {
     pub step: u64,
@@ -7501,8 +7610,10 @@ fn actor_gameplay_events_for_report(report: &StepReport) -> Vec<GameEvent> {
             GameCommand::PlayerKilled => {
                 push_unique_game_event(&mut events, GameEvent::PlayerDestroyed)
             }
-            GameCommand::AdvanceWave { .. } => {
+            GameCommand::WaveCleared { .. } => {
                 push_unique_game_event(&mut events, GameEvent::WaveCleared);
+            }
+            GameCommand::AdvanceWave { .. } => {
                 push_unique_game_event(&mut events, GameEvent::WaveStarted);
             }
             GameCommand::EnterGameOver => push_unique_game_event(&mut events, GameEvent::GameOver),
@@ -7526,6 +7637,9 @@ fn actor_gameplay_events_for_report(report: &StepReport) -> Vec<GameEvent> {
     if report.high_score_submitted {
         push_unique_game_event(&mut events, GameEvent::HighScoreSubmitted);
     }
+    if report.bonus_awarded {
+        push_unique_game_event(&mut events, GameEvent::BonusAwarded);
+    }
     events
 }
 
@@ -7543,6 +7657,7 @@ pub struct ActorGameDriver {
     credits: u8,
     lives: u8,
     smart_bombs: u8,
+    next_bonus: u32,
     next_actor_id: u64,
     actors: BTreeMap<ActorId, ThreadedAsset>,
     snapshots: BTreeMap<ActorId, ActorSnapshot>,
@@ -7556,6 +7671,7 @@ pub struct ActorGameDriver {
     source_rng: ActorSourceRng,
     source_shell_scan_steps_remaining: u8,
     game_over_hall_of_fame_stall_remaining: Option<u8>,
+    pending_wave_start: bool,
 }
 
 impl ActorGameDriver {
@@ -7583,6 +7699,7 @@ impl ActorGameDriver {
             credits: 0,
             lives: 3,
             smart_bombs: 0,
+            next_bonus: SOURCE_REPLAY_SCORE,
             next_actor_id: 1,
             actors: BTreeMap::new(),
             snapshots: BTreeMap::new(),
@@ -7596,6 +7713,7 @@ impl ActorGameDriver {
             source_rng: SOURCE_PLAYFIELD_START_RNG,
             source_shell_scan_steps_remaining: SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS,
             game_over_hall_of_fame_stall_remaining: None,
+            pending_wave_start: false,
         };
         let attract_id = driver.allocate_actor_id();
         let script_id = driver.allocate_actor_id();
@@ -7608,6 +7726,11 @@ impl ActorGameDriver {
 
     pub fn step(&mut self, input: GameInput) -> StepReport {
         self.step = self.step.saturating_add(1);
+        let mut step_commands = Vec::new();
+        let started_pending_wave = self.start_pending_wave_if_needed();
+        if started_pending_wave {
+            step_commands.push(GameCommand::AdvanceWave { wave: self.wave });
+        }
         let was_playing = self.phase == Phase::Playing;
         let high_score_entry_step = self.apply_high_score_entry_input(input);
         let mut behavior_script = self
@@ -7655,7 +7778,7 @@ impl ActorGameDriver {
         replies.sort_by_key(|(id, _)| *id);
 
         let mut draws = Vec::new();
-        let mut commands = Vec::new();
+        let mut commands = step_commands;
         let mut dead_actor_ids = Vec::new();
         self.snapshots.clear();
         for (_, reply) in replies {
@@ -7670,10 +7793,12 @@ impl ActorGameDriver {
 
         self.resolve_collisions(&behavior_script, &mut commands);
         self.advance_baiter_timer(&mut commands);
-        let sounds = self.apply_commands(&commands);
+        let applied_commands = self.apply_commands(&commands);
         self.remove_dead_actors(&dead_actor_ids);
         if self.advance_wave_if_cleared(was_playing, &commands) {
-            commands.push(GameCommand::AdvanceWave { wave: self.wave });
+            commands.push(GameCommand::WaveCleared {
+                next_wave: self.wave.saturating_add(1),
+            });
         }
 
         let report = StepReport {
@@ -7684,16 +7809,18 @@ impl ActorGameDriver {
             credits: self.credits,
             lives: self.lives,
             smart_bombs: self.smart_bombs,
+            next_bonus: self.next_bonus,
             game_over_hall_of_fame_stall_remaining: self.game_over_hall_of_fame_stall_remaining,
             high_scores: self.high_scores.entries(),
             high_score_initials: self.high_score_initials,
             high_score_initial_accepted: high_score_entry_step.accepted,
             high_score_submitted: high_score_entry_step.submitted,
+            bonus_awarded: applied_commands.bonus_awarded,
             behavior_script: behavior_script.manifest(),
             source_rng,
             snapshots: self.snapshots.values().cloned().collect(),
             draws,
-            sounds,
+            sounds: applied_commands.sounds,
             commands,
         };
         self.advance_game_over_hall_of_fame_return();
@@ -8044,8 +8171,8 @@ impl ActorGameDriver {
         }
     }
 
-    fn apply_commands(&mut self, commands: &[GameCommand]) -> Vec<SoundCue> {
-        let mut sounds = Vec::new();
+    fn apply_commands(&mut self, commands: &[GameCommand]) -> AppliedCommands {
+        let mut applied = AppliedCommands::default();
         let mut active_source_shells = self.active_source_shell_count();
         let mut active_bomb_shells = self.active_bomb_shell_count();
         let mut removed_source_shells = BTreeSet::new();
@@ -8054,20 +8181,20 @@ impl ActorGameDriver {
             match *command {
                 GameCommand::Credit => {
                     self.credits = self.credits.saturating_add(1);
-                    sounds.push(SoundCue::Credit);
+                    applied.sounds.push(SoundCue::Credit);
                 }
                 GameCommand::StartOnePlayer => {
                     if self.phase == Phase::Attract && self.credits > 0 {
                         self.credits = self.credits.saturating_sub(1);
                         self.start_play();
-                        sounds.push(SoundCue::Start);
+                        applied.sounds.push(SoundCue::Start);
                     }
                 }
                 GameCommand::StartTwoPlayer => {
                     if self.phase == Phase::Attract && self.credits > 1 {
                         self.credits = self.credits.saturating_sub(2);
                         self.start_play();
-                        sounds.push(SoundCue::Start);
+                        applied.sounds.push(SoundCue::Start);
                     }
                 }
                 GameCommand::Spawn(SpawnRequest::Laser {
@@ -8161,7 +8288,9 @@ impl ActorGameDriver {
                     ));
                 }
                 GameCommand::SmartBomb { consume_stock } => {
-                    self.detonate_smart_bomb(&mut sounds, consume_stock);
+                    if self.detonate_smart_bomb(&mut applied.sounds, consume_stock) {
+                        applied.bonus_awarded = true;
+                    }
                 }
                 GameCommand::Hyperspace => {
                     self.clear_enemy_projectiles_for_hyperspace();
@@ -8172,19 +8301,22 @@ impl ActorGameDriver {
                     self.behavior_script.remove_actor_behavior(id);
                 }
                 GameCommand::AddScore(points) => {
-                    self.score = self.score.saturating_add(points);
+                    if self.award_points(points) {
+                        applied.bonus_awarded = true;
+                    }
                 }
-                GameCommand::PlaySound(sound) => sounds.push(sound),
+                GameCommand::PlaySound(sound) => applied.sounds.push(sound),
                 GameCommand::PlayerKilled => {
-                    self.lose_player_life(&mut sounds);
+                    self.lose_player_life(&mut applied.sounds);
                 }
+                GameCommand::WaveCleared { .. } => {}
                 GameCommand::AdvanceWave { .. } => {}
                 GameCommand::EnterGameOver => {
-                    self.enter_game_over(&mut sounds);
+                    self.enter_game_over(&mut applied.sounds);
                 }
             }
         }
-        sounds
+        applied
     }
 
     fn active_source_shell_count(&self) -> usize {
@@ -8219,6 +8351,7 @@ impl ActorGameDriver {
         self.reset_source_shell_scan();
         self.high_score_initials = HighScoreInitialsState::EMPTY;
         self.game_over_hall_of_fame_stall_remaining = None;
+        self.pending_wave_start = false;
         self.high_scores.record(self.score);
         self.phase = if self.high_scores.qualifies(self.score) {
             Phase::HighScoreEntry
@@ -8256,14 +8389,30 @@ impl ActorGameDriver {
         self.score = 0;
         self.lives = 3;
         self.smart_bombs = INITIAL_SMART_BOMBS;
+        self.next_bonus = SOURCE_REPLAY_SCORE;
         self.high_score_initials = HighScoreInitialsState::EMPTY;
         self.game_over_hall_of_fame_stall_remaining = None;
+        self.pending_wave_start = false;
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.reset_source_shell_scan();
         self.apply_wave_profile();
         self.spawn_player();
         self.spawn_wave_hostiles();
         self.spawn_initial_humans();
+    }
+
+    fn start_pending_wave_if_needed(&mut self) -> bool {
+        if self.phase != Phase::Playing || !self.pending_wave_start {
+            return false;
+        }
+
+        self.wave = self.wave.saturating_add(1);
+        self.pending_wave_start = false;
+        self.clear_wave_playfield_actors();
+        self.apply_wave_profile();
+        self.spawn_wave_hostiles();
+        self.spawn_initial_humans();
+        true
     }
 
     fn reset_source_shell_scan(&mut self) {
@@ -8348,15 +8497,14 @@ impl ActorGameDriver {
         if !was_playing
             || self.phase != Phase::Playing
             || self.wave == 0
+            || self.pending_wave_start
             || self.has_hostile_snapshots()
             || commands_spawn_hostiles(commands)
         {
             return false;
         }
 
-        self.wave = self.wave.saturating_add(1);
-        self.apply_wave_profile();
-        self.spawn_wave_hostiles();
+        self.pending_wave_start = true;
         true
     }
 
@@ -8449,14 +8597,15 @@ impl ActorGameDriver {
         }
     }
 
-    fn detonate_smart_bomb(&mut self, sounds: &mut Vec<SoundCue>, consume_stock: bool) {
+    fn detonate_smart_bomb(&mut self, sounds: &mut Vec<SoundCue>, consume_stock: bool) -> bool {
         if consume_stock {
             if self.smart_bombs == 0 {
-                return;
+                return false;
             }
             self.smart_bombs = self.smart_bombs.saturating_sub(1);
         }
 
+        let mut bonus_awarded = false;
         let targets = self
             .snapshots
             .values()
@@ -8470,9 +8619,31 @@ impl ActorGameDriver {
             if let Some(explosion_kind) = explosion_kind_for_target(kind) {
                 self.spawn_explosion(position, explosion_kind);
             }
-            self.score = self.score.saturating_add(score_for_hostile(kind));
+            if self.award_points(score_for_hostile(kind)) {
+                bonus_awarded = true;
+            }
             sounds.push(SoundCue::Explosion);
         }
+        bonus_awarded
+    }
+
+    fn award_points(&mut self, points: u32) -> bool {
+        let frame = ScoreSystem::award_points(
+            ScoreSnapshot {
+                player_one: self.score,
+                player_two: 0,
+                high_score: self.high_scores.entries()[0].max(self.score),
+                next_bonus: self.next_bonus,
+            },
+            PlayerStock::new(self.lives, self.smart_bombs),
+            1,
+            points,
+        );
+        self.score = frame.scores.player_one;
+        self.lives = frame.stock.lives;
+        self.smart_bombs = frame.stock.smart_bombs;
+        self.next_bonus = frame.scores.next_bonus;
+        frame.bonus_awards > 0
     }
 
     fn clear_enemy_projectiles_for_hyperspace(&mut self) {
@@ -8494,6 +8665,20 @@ impl ActorGameDriver {
             self.snapshots.remove(id);
             self.actors.remove(id);
             self.behavior_script.remove_actor_behavior(*id);
+        }
+    }
+
+    fn clear_wave_playfield_actors(&mut self) {
+        let targets = self
+            .snapshots
+            .values()
+            .filter(|snapshot| clears_for_next_wave(snapshot.kind))
+            .map(|snapshot| snapshot.id)
+            .collect::<Vec<_>>();
+        for id in targets {
+            self.snapshots.remove(&id);
+            self.actors.remove(&id);
+            self.behavior_script.remove_actor_behavior(id);
         }
     }
 }
@@ -8523,6 +8708,24 @@ fn is_hostile(kind: ActorKind) -> bool {
             | ActorKind::Bomber
             | ActorKind::Pod
             | ActorKind::Swarmer
+    )
+}
+
+fn clears_for_next_wave(kind: ActorKind) -> bool {
+    matches!(
+        kind,
+        ActorKind::Lander
+            | ActorKind::Mutant
+            | ActorKind::Bomber
+            | ActorKind::Bomb
+            | ActorKind::Pod
+            | ActorKind::Swarmer
+            | ActorKind::Baiter
+            | ActorKind::Human
+            | ActorKind::Laser
+            | ActorKind::EnemyLaser
+            | ActorKind::Explosion
+            | ActorKind::ScorePopup
     )
 }
 
@@ -12311,6 +12514,156 @@ mod tests {
     }
 
     #[test]
+    fn actor_wave_clear_delays_next_wave_and_draws_source_survivor_bonus_scene() {
+        let wave_script = ActorWaveScript::new(
+            "wave-clear-interstitial",
+            vec![
+                ActorWaveProfile::with_spawns(
+                    1,
+                    ActorBehaviorScript::default(),
+                    vec![ActorLanderSpawn::new(Point::new(100, 80))],
+                    vec![
+                        ActorHumanSpawn::new(Point::new(40, HUMAN_GROUND_Y), HumanMode::Grounded),
+                        ActorHumanSpawn::new(Point::new(64, HUMAN_GROUND_Y), HumanMode::Grounded),
+                    ],
+                ),
+                ActorWaveProfile::with_spawns(
+                    2,
+                    ActorBehaviorScript::default(),
+                    vec![ActorLanderSpawn::new(Point::new(120, 80))],
+                    Vec::new(),
+                ),
+            ],
+        );
+        let mut runtime =
+            ActorRuntimeAdapter::with_driver(ActorGameDriver::with_wave_script(wave_script));
+        runtime.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        runtime.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        runtime.step(GameInput::NONE);
+
+        let cleared = runtime.step(GameInput {
+            smart_bomb: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(cleared.state.wave, 1);
+        assert!(cleared.state.world.enemies.is_empty());
+        assert_eq!(cleared.state.world.humans.len(), 2);
+        assert!(
+            cleared
+                .report
+                .commands
+                .contains(&GameCommand::WaveCleared { next_wave: 2 })
+        );
+        assert!(cleared.events.gameplay().contains(&GameEvent::WaveCleared));
+        assert!(!cleared.events.gameplay().contains(&GameEvent::WaveStarted));
+        assert!(cleared.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_A
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [112.0, 80.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(cleared.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_C
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [122.0, 96.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(cleared.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_B
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [120.0, 144.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(cleared.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_DIGIT_1
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [202.0, 80.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(cleared.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_DIGIT_1
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [176.0, 144.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        for position in [[120.0, 160.0], [128.0, 160.0]] {
+            assert!(cleared.scene.sprites.iter().any(|sprite| {
+                sprite.sprite == SpriteId::HUMAN
+                    && sprite.layer == RenderLayer::Overlay
+                    && sprite.position == position
+                    && sprite.size == SOURCE_SURVIVOR_BONUS_HUMAN_SIZE
+                    && sprite.tint == Color::WHITE
+            }));
+        }
+
+        let next_wave = runtime.step(GameInput::NONE);
+
+        assert_eq!(next_wave.state.wave, 2);
+        assert!(
+            next_wave
+                .events
+                .gameplay()
+                .contains(&GameEvent::WaveStarted)
+        );
+        assert!(
+            next_wave
+                .report
+                .commands
+                .contains(&GameCommand::AdvanceWave { wave: 2 })
+        );
+        assert_eq!(next_wave.state.world.humans.len(), 0);
+        assert!(
+            next_wave
+                .state
+                .world
+                .enemies
+                .iter()
+                .any(|enemy| enemy.kind == CleanEnemyKind::Lander)
+        );
+    }
+
+    #[test]
+    fn actor_score_awards_replay_stock_and_bonus_event() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 1;
+        driver.score = 9_900;
+        driver.next_bonus = SOURCE_REPLAY_SCORE;
+        driver.lives = 3;
+        driver.smart_bombs = 1;
+        driver.spawn_player();
+        driver.spawn_lander_for_test(Point::new(62, 120));
+        let mut runtime = ActorRuntimeAdapter::with_driver(driver);
+
+        runtime.step(GameInput {
+            fire: true,
+            ..GameInput::NONE
+        });
+        let scored = runtime.step(GameInput::NONE);
+
+        assert_eq!(scored.report.score, 10_050);
+        assert_eq!(scored.report.next_bonus, 20_000);
+        assert!(scored.report.bonus_awarded);
+        assert_eq!(scored.state.scores.player_one, 10_050);
+        assert_eq!(scored.state.scores.high_score, 10_050);
+        assert_eq!(scored.state.scores.next_bonus, 20_000);
+        assert_eq!(scored.state.player.lives, 4);
+        assert_eq!(scored.state.player.smart_bombs, 2);
+        assert_eq!(
+            scored.state.player_stocks[0],
+            PlayerStockSnapshot::new(4, 2)
+        );
+        assert!(scored.events.gameplay().contains(&GameEvent::BonusAwarded));
+    }
+
+    #[test]
     fn actor_render_scene_bridge_maps_projectiles_and_explosion_variants() {
         let report = StepReport {
             step: 99,
@@ -12320,11 +12673,13 @@ mod tests {
             credits: 0,
             lives: 3,
             smart_bombs: 3,
+            next_bonus: SOURCE_REPLAY_SCORE,
             game_over_hall_of_fame_stall_remaining: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,
+            bonus_awarded: false,
             behavior_script: ActorBehaviorScript::default().manifest(),
             source_rng: None,
             snapshots: Vec::new(),
@@ -12517,11 +12872,13 @@ mod tests {
             credits: 0,
             lives: 3,
             smart_bombs: 3,
+            next_bonus: SOURCE_REPLAY_SCORE,
             game_over_hall_of_fame_stall_remaining: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,
+            bonus_awarded: false,
             behavior_script: ActorBehaviorScript::default().manifest(),
             source_rng: None,
             snapshots: Vec::new(),
@@ -12621,6 +12978,7 @@ mod tests {
             credits: 1,
             lives: 2,
             smart_bombs: 1,
+            next_bonus: 20_000,
             game_over_hall_of_fame_stall_remaining: None,
             high_scores: [12_000, 10_000, 7_500, 5_000, 2_500],
             high_score_initials: HighScoreInitialsState {
@@ -12629,6 +12987,7 @@ mod tests {
             },
             high_score_initial_accepted: false,
             high_score_submitted: false,
+            bonus_awarded: false,
             behavior_script: ActorBehaviorScript::default().manifest(),
             source_rng: None,
             snapshots: vec![player, lander, human, laser, enemy_laser, bomb],
@@ -12775,11 +13134,13 @@ mod tests {
             credits: 0,
             lives: 3,
             smart_bombs: 3,
+            next_bonus: SOURCE_REPLAY_SCORE,
             game_over_hall_of_fame_stall_remaining: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,
+            bonus_awarded: false,
             behavior_script: ActorBehaviorScript::default().manifest(),
             source_rng: None,
             snapshots: Vec::new(),
@@ -14238,6 +14599,7 @@ mod tests {
         driver.phase = Phase::Playing;
         driver.lives = 1;
         driver.score = 12_000;
+        driver.next_bonus = 20_000;
         driver.spawn_player();
         driver.spawn_lander_for_test(Point::new(42, 120));
 
@@ -14756,14 +15118,19 @@ mod tests {
             smart_bomb: true,
             ..GameInput::NONE
         });
-        assert_eq!(cleared.wave, 2);
+        assert_eq!(cleared.wave, 1);
         assert!(
             cleared
                 .commands
-                .contains(&GameCommand::AdvanceWave { wave: 2 })
+                .contains(&GameCommand::WaveCleared { next_wave: 2 })
         );
 
         let live = driver.step(GameInput::NONE);
+        assert_eq!(live.wave, 2);
+        assert!(
+            live.commands
+                .contains(&GameCommand::AdvanceWave { wave: 2 })
+        );
 
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 3);
         assert_eq!(driver.snapshot_count(ActorKind::Bomber), 1);
@@ -16676,6 +17043,7 @@ mod tests {
         driver.phase = Phase::Playing;
         driver.wave = 1;
         driver.spawn_player();
+        driver.wave = 0;
         driver.step(GameInput::NONE);
         driver.wave = 1;
         let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
@@ -16864,11 +17232,20 @@ mod tests {
         let cleared = driver.step(GameInput::NONE);
 
         assert!(snapshot_for(&cleared, baiter).alive);
-        assert_eq!(cleared.wave, 2);
+        assert_eq!(cleared.wave, 1);
         assert!(
             cleared
                 .commands
-                .contains(&GameCommand::AdvanceWave { wave: 2 })
+                .contains(&GameCommand::WaveCleared { next_wave: 2 })
+        );
+
+        let next_wave = driver.step(GameInput::NONE);
+        assert_eq!(next_wave.wave, 2);
+        assert!(
+            !next_wave
+                .snapshots
+                .iter()
+                .any(|snapshot| snapshot.id == baiter)
         );
     }
 
@@ -17359,9 +17736,20 @@ mod tests {
             smart_bomb: true,
             ..GameInput::NONE
         });
-        assert_eq!(cleared.wave, 2);
+        assert_eq!(cleared.wave, 1);
+        assert!(
+            cleared
+                .commands
+                .contains(&GameCommand::WaveCleared { next_wave: 2 })
+        );
 
         let next_wave = driver.step(GameInput::NONE);
+        assert_eq!(next_wave.wave, 2);
+        assert!(
+            next_wave
+                .commands
+                .contains(&GameCommand::AdvanceWave { wave: 2 })
+        );
         let lander = next_wave
             .snapshots
             .iter()
@@ -17473,14 +17861,20 @@ mod tests {
             smart_bomb: true,
             ..GameInput::NONE
         });
-        assert_eq!(cleared.wave, 2);
+        assert_eq!(cleared.wave, 1);
         assert!(
             cleared
                 .commands
-                .contains(&GameCommand::AdvanceWave { wave: 2 })
+                .contains(&GameCommand::WaveCleared { next_wave: 2 })
         );
 
         let next_wave = driver.step(GameInput::NONE);
+        assert_eq!(next_wave.wave, 2);
+        assert!(
+            next_wave
+                .commands
+                .contains(&GameCommand::AdvanceWave { wave: 2 })
+        );
         let lander = next_wave
             .snapshots
             .iter()
@@ -17811,7 +18205,6 @@ mod tests {
     fn source_mutant_actor_advances_wave_velocity_and_hop_rng() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
-        driver.wave = 1;
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
@@ -17909,7 +18302,6 @@ mod tests {
     fn target6_source_mutant_defers_first_entry_shot() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
-        driver.wave = 1;
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
@@ -17950,7 +18342,6 @@ mod tests {
     fn target6_source_mutant_visible_entry_shot_uses_projected_position() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
-        driver.wave = 1;
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
@@ -17995,7 +18386,6 @@ mod tests {
     fn target6_source_mutant_fire2524_sleep_shot_uses_exact_projectile() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
-        driver.wave = 1;
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
@@ -18247,7 +18637,6 @@ mod tests {
     fn source_mutant_shot_timer_spawns_source_projectile() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
-        driver.wave = 1;
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
@@ -18543,6 +18932,7 @@ mod tests {
         driver.phase = Phase::Playing;
         driver.lives = 1;
         driver.score = 12_000;
+        driver.next_bonus = 20_000;
         driver.spawn_player();
         driver.spawn_lander_for_test(Point::new(42, 120));
 

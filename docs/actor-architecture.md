@@ -533,15 +533,23 @@ The actor driver now owns a first Defender gameplay loop:
   scores, and spawning explosions while preserving human actors. Exhausted stock
   leaves hostiles alive. The `XYZZY` overlay smart bomb uses the same command
   path without consuming stock.
+- Actor scoring uses the clean replay-bonus threshold model. Enemy, rescue, and
+  safe-landing awards update driver-owned life/smart-bomb stock when a threshold
+  is crossed, carry the new `next_bonus` into `GameState`, and emit
+  `BonusAwarded` through the actor event bridge.
 - Player hazard collisions destroy the current player actor, decrement the
   driver-owned life stock, and spawn a replacement player when lives remain.
   Final-life collisions enter the game-over/high-score path.
 - Player laser hits now resolve lander, mutant, bomber, pod, swarmer, and baiter
   targets through the driver, awarding source scores and family hit cues for
   bomber, pod, swarmer, and baiter families.
-- Wave scripts now apply behavior profiles when play starts and when all
-  hostile snapshots are cleared, allowing level difficulty to progress through
-  driver-owned data.
+- Wave scripts now apply behavior profiles when play starts and after a
+  wave-cleared interstitial report, allowing level difficulty to progress
+  through driver-owned data. The clear report keeps the current wave number,
+  surviving human snapshots, `WaveCleared`, and the source `ATTACK WAVE` /
+  `COMPLETED` / `BONUS X` plus survivor-icon overlay. The following actor step
+  clears transient playfield actors, installs the next wave script, spawns the
+  next wave's actors, and emits `WaveStarted`.
 
 These mechanics are still intentionally compact. The next fidelity slices
 should port the remaining source restore positions against the actor state,

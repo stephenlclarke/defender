@@ -872,7 +872,13 @@ reintroduce legacy implementation terminology.
   advancement and default/kind player-behavior injection, life-stock decrement
   and replacement-player respawn on non-final player hazard collisions, source
   `HYP2` `LSEED > 0xC0` delayed death-risk routing through the same player
-  death path, final-life game-over/high-score handoff, source-family explosion
+  death path, final-life game-over/high-score handoff, clean replay-bonus stock
+  awards through actor scoring, and an
+  actor wave-cleared interstitial report. On that report, the driver emits
+  `WaveCleared`, keeps surviving humans visible for the source `ATWV` /
+  `COMPV` / `BONSX` status and survivor icon projection, and delays the next
+  wave's actor spawns plus `WaveStarted` event until the following simulation
+  step.
   variant draw metadata for hostile families, bomb, player, and human clouds,
   age-based source explosion-size scaling in the actor render bridge,
   descriptor-backed enemy-family source explosion pixel clouds, source

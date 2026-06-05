@@ -202,6 +202,14 @@ rescue/loss, and safe landing, bomber-laid bomb actors with source
 bomb-collision cues and seeded source Y-motion metadata, pod laser-hit swarmer
 spawning, swarmer scoring and shot cues, source-paced baiter timer entry,
 baiter shots/scoring/hit cues, and stock-backed smart-bomb hostile clearing.
+Actor score awards now use the same replay-bonus threshold model as the clean
+score system, so threshold crossings add life/smart-bomb stock and emit
+`BonusAwarded` through the actor event bridge. When source-counted hostile
+actors are gone, the actor driver publishes a wave-cleared interstitial
+`StepReport` before spawning the next wave: the clear report keeps surviving
+humans visible for the source `ATTACK WAVE` / `COMPLETED` / `BONUS X`
+presentation and survivor icon row, then the following actor step applies the
+next wave script and emits `WaveStarted`.
 `ActorSoundEventBridge` now converts
 actor `StepReport` sound cues into the clean `SoundEvent` surface consumed by
 the live audio runtime, deriving thrust start/stop edges from the actor cue
@@ -627,7 +635,9 @@ hall-of-fame display stall stays suppressed.
 Wave-cleared scenes draw the source-backed `ATTACK WAVE`, `COMPLETED`, and
 `BONUS X` status text with source-shaped wave and multiplier digits, plus
 source-positioned survivor bonus icons for the clean survivors currently
-remaining on that frame.
+remaining on that frame. The actor runtime now reaches this same scene
+contract on its wave-cleared interstitial report before its driver installs the
+next wave's actor script on the following simulation step.
 Playing scenes also project the source `BORDER` top-display frame as clean HUD
 sprites: the lower display line, scanner side/top boundaries, and scanner
 marker bars at translated source screen positions. Playing scenes also project
@@ -1121,7 +1131,9 @@ wave-completion `ATTACK WAVE` / `COMPLETED` / `BONUS X` status text, active
 isolated high-score-entry player label/instruction/initial glyphs, and
 hall-of-fame display heading/table text; survivor bonus icons use the source
 `ASTP3`
-shape at the translated wave-cleared frame positions. The entry and display
+shape at the translated wave-cleared frame positions. Actor wave-clear reports
+now project the same source glyphs and survivor icons through
+`ActorRenderSceneBridge`. The entry and display
 underline words use a small atlas-backed clean sprite at the source-shaped
 word positions. The
 hall-of-fame Defender logo and normal attract Defender wordmark are generated

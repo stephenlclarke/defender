@@ -23,7 +23,8 @@ verification tools.
   `XYZZY`, data-driven `AttractScript` custom driver sequencing,
   Williams/Defender attract metadata, player/lander/laser/explosion basics,
   initial humans, lander pickup/carry/conversion, rescue/safe-landing scoring,
-  score popups, smart bomb clearing, and high-score/game-over phase handoff.
+  replay-bonus stock awards, score popups, smart bomb clearing, wave-clear
+  interstitial presentation, and high-score/game-over phase handoff.
   The actor API is simulation-step driven through `StepPrompt`/`StepReport`,
   not display-frame driven; attract scripts advance on actor-local elapsed
   steps so custom drivers can own sequencing without MAME frame scripts.
@@ -125,7 +126,11 @@ verification tools.
   stock leaves hostiles alive, and `XYZZY` overlay smart bombs use the same
   command path without consuming stock. Player hazard collisions now decrement
   driver-owned life stock and spawn a replacement player while lives remain,
-  with final-life collisions entering the game-over/high-score path. Explosion
+  with final-life collisions entering the game-over/high-score path. Actor wave
+  clear now publishes a separate interstitial `StepReport` with `WaveCleared`,
+  surviving human snapshots, source `ATTACK WAVE` / `COMPLETED` / `BONUS X`
+  text, and survivor bonus icons before the following actor step installs the
+  next wave's script, spawns its actors, and emits `WaveStarted`. Explosion
   draws now carry lander, mutant, bomber, pod, swarmer, baiter, bomb, player,
   and human variant metadata through the actor render and clean-state bridges,
   and actor render output now uses draw age with the clean source
@@ -784,6 +789,34 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 15:59 BST`: Completed the actor wave-clear interstitial and
+  replay-bonus scoring slice. Actor scoring now uses the clean replay-bonus
+  threshold model, carries `next_bonus` into bridged `GameState`, adds
+  life/smart-bomb stock on threshold crossings, and emits `BonusAwarded`.
+  Source-counted wave clear now publishes a distinct `WaveCleared`
+  interstitial report before the next wave starts. That report keeps surviving
+  human snapshots visible and projects source `ATTACK WAVE`, `COMPLETED`,
+  `BONUS X`, wave/multiplier digits, and survivor bonus icons through
+  `ActorRenderSceneBridge`; the following actor step clears transient
+  playfield actors, installs the next wave script, spawns the next wave actors,
+  and emits `WaveStarted`. No legacy code, tests, or scaffolding were safe to
+  remove because legacy tooling still backs ROM reports, trace/media helpers,
+  and oracle-equivalence evidence while the actor runtime continues closing
+  fidelity gaps. Validation passed with `cargo test actor_wave_clear --lib
+  --features legacy-tools`, `cargo test actor_score_awards --lib --features
+  legacy-tools`, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo run -- --actor-smoke`, `cargo run
+  -- --actor-attract-smoke`, `cargo run -- --actor-post-game-smoke`, `cargo
+  test runtime --all-targets --features legacy-tools`, `cargo test actor_live
+  --all-targets --features legacy-tools`, `cargo test actor_wgpu --all-targets
+  --features legacy-tools`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, `cargo fmt --check`, touched-doc markdownlint, and
+  `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780670549435699`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780671539676689`.
 - `2026-06-05 15:40 BST`: Completed the actor post-game Hall-return smoke
   gate slice. Actor high-score initials submission now emits
   accepted/submitted clean events, enters a finite 60-step Hall-of-Fame
