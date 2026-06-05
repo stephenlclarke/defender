@@ -7,8 +7,9 @@ evidence commands.
 
 ## Structure
 
-- `ActorGameDriver` owns game phase, score, credits, lives, high scores, actor
-  ids, actor threads, and the latest snapshots.
+- `ActorGameDriver` owns game phase, current player, player count, per-player
+  scores/stocks, credits, high scores, actor ids, actor threads, and the latest
+  snapshots.
 - Each asset is a Rust struct implementing `AssetActor`. The current slice has
   `AttractDirector`, `ScriptedAttractProgram`, `StatusDisplay`, `PlayerShip`,
   `Lander`, `Mutant`, `Bomber`, `Bomb`, `Pod`, `Swarmer`, `Baiter`, `Human`,
@@ -21,8 +22,9 @@ evidence commands.
   commands, sound cues, and gameplay commands. The driver resolves collisions
   and applies world rules in stable actor-id order.
 - Rendering is described by `DrawCommand`, `SpriteKey`, and `VisualEffect`
-  values. The status display is also an actor: it draws score, high score, wave,
-  lives, credits, and high-score-entry rows from `StepPrompt` state. Explosion
+  values. The status display is also an actor: it draws player-one/player-two
+  scores, high score, wave, lives, credits, and high-score-entry rows from
+  `StepPrompt` state. Explosion
   draws carry `ExplosionKind` metadata for lander, mutant, bomber, pod,
   swarmer, baiter, bomb, player, and human clouds plus optional source-center
   metadata, so the actor render and clean-state bridges preserve source family

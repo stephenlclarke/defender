@@ -178,15 +178,17 @@ tree:
   machine adapter.
 - `src/actor_game.rs`: isolated actor-oriented rewrite surface with
   thread-backed assets, `StepPrompt`/`StepReport` simulation turns,
-  scriptable behavior and wave profiles, draw/effect descriptions, and
-  `SoundCue::source_sound_command` metadata for red-label Williams sound-board
-  command bytes where source evidence exists. `ActorSoundEventBridge` adapts
+  scriptable behavior and wave profiles, two-player admission/session
+  snapshots, draw/effect descriptions, and `SoundCue::source_sound_command`
+  metadata for red-label Williams sound-board command bytes where source
+  evidence exists. `ActorSoundEventBridge` adapts
   report sound cues into clean `SoundEvent` batches for the existing audio
   runtime contract. `ActorRenderSceneBridge` adapts report draw commands into
   clean `RenderScene` sprites for the existing native renderer contract, and
-  `ActorStateBridge` adapts report phase, score, stock, high-score state, and
-  actor snapshots with velocity/facing plus hostile-projectile source metadata
-  into clean `GameState` values. Source-backed mutant actors consume
+  `ActorStateBridge` adapts report phase, current player, player count,
+  per-player scores/stocks, high-score state, and actor snapshots with
+  velocity/facing plus hostile-projectile source metadata into clean
+  `GameState` values. Source-backed mutant actors consume
   source-shaped conversion metadata, wave-table mutant velocity/random-hop
   rows, driver-provided source RNG snapshots, and actor-owned shot timers to
   emit `0xF6` source-shaped hostile projectile commands. First-wave target6

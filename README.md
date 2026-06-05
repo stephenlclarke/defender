@@ -74,9 +74,13 @@ making the actor report consumable by the native renderer path.
 `ActorRuntimeAdapter` bundles each actor step into an `ActorFrame` containing
 the original report, an actor-derived clean `GameState`, clean gameplay/audio
 `GameEvents`, and the clean `RenderScene`. The state bridge maps actor phase,
-score, stock, high-score state, and published actor snapshots with movement
-velocity/facing metadata plus hostile-projectile source metadata into the clean
-runtime contract without making actor behavior display-frame driven.
+current player, player count, per-player scores/stocks, high-score state, and
+published actor snapshots with movement velocity/facing metadata plus
+hostile-projectile source metadata into the clean runtime contract without
+making actor behavior display-frame driven. Two-player actor starts now require
+two credits, consume both credits, initialize player one as active, publish both
+player score/stock snapshots, and suppress false `GameStarted` events for
+blocked two-player start requests.
 `--actor-smoke` exercises that actor frame path through a
 scripted attract/play input sequence and the native draw planner, proving actor
 events, audio, sprites, projectiles, HUD text, overlays, and `wgpu` command-plan
@@ -204,7 +208,10 @@ spawning, swarmer scoring and shot cues, source-paced baiter timer entry,
 baiter shots/scoring/hit cues, and stock-backed smart-bomb hostile clearing.
 Actor score awards now use the same replay-bonus threshold model as the clean
 score system, so threshold crossings add life/smart-bomb stock and emit
-`BonusAwarded` through the actor event bridge. When source-counted hostile
+`BonusAwarded` through the actor event bridge. Score and replay-bonus stock
+awards now update the driver-owned active-player score/stock fields, so the
+actor session bridge is ready for the remaining source-shaped two-player
+switch/death-prompt handoff work. When source-counted hostile
 actors are gone, the actor driver publishes a wave-cleared interstitial
 `StepReport` before spawning the next wave: the clear report keeps surviving
 humans visible for the source `ATTACK WAVE` / `COMPLETED` / `BONUS X`

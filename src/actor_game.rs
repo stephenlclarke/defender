@@ -49,6 +49,7 @@ use std::{
 
 const PLAYER_SPEED: i16 = 2;
 const ACTOR_RENDER_SURFACE: SurfaceSize = SurfaceSize::new(292, 240);
+const INITIAL_PLAYER_LIVES: u8 = 3;
 const INITIAL_SMART_BOMBS: u8 = 3;
 const PLAYER_LASER_COOLDOWN_STEPS: u8 = 8;
 const PLAYER_HYPERSPACE_HIDDEN_STEPS: u8 = 33;
@@ -277,6 +278,7 @@ const SOURCE_START_HUMAN_COUNT: u8 = 10;
 const SOURCE_TARGET_LIST_ENTRY_COUNT: usize = 32;
 const STATUS_SCORE_POSITION: Point = Point::new(8, 6);
 const STATUS_HIGH_SCORE_POSITION: Point = Point::new(94, 6);
+const STATUS_PLAYER_TWO_SCORE_POSITION: Point = Point::new(208, 6);
 const STATUS_WAVE_POSITION: Point = Point::new(8, 18);
 const STATUS_LIVES_POSITION: Point = Point::new(86, 18);
 const STATUS_SMART_BOMBS_POSITION: Point = Point::new(140, 18);
@@ -5098,10 +5100,14 @@ pub struct StepPrompt {
     pub phase: Phase,
     pub input: GameInput,
     pub wave: u16,
+    pub current_player: u8,
+    pub player_count: u8,
     pub score: u32,
+    pub player_scores: [u32; 2],
     pub credits: u8,
     pub lives: u8,
     pub smart_bombs: u8,
+    pub player_stocks: [PlayerStockSnapshot; 2],
     pub game_over_hall_of_fame_stall_remaining: Option<u8>,
     pub high_scores: [u32; 5],
     pub high_score_initials: HighScoreInitialsState,
@@ -5231,10 +5237,14 @@ pub struct StepReport {
     pub step: u64,
     pub phase: Phase,
     pub wave: u16,
+    pub current_player: u8,
+    pub player_count: u8,
     pub score: u32,
+    pub player_scores: [u32; 2],
     pub credits: u8,
     pub lives: u8,
     pub smart_bombs: u8,
+    pub player_stocks: [PlayerStockSnapshot; 2],
     pub next_bonus: u32,
     pub game_over_hall_of_fame_stall_remaining: Option<u8>,
     pub high_scores: [u32; 5],
@@ -5297,19 +5307,18 @@ impl ActorStateBridge {
             frame: report.step,
             phase,
             credits: report.credits,
-            current_player: 1,
-            player_count: 1,
+            current_player: report.current_player,
+            player_count: report.player_count,
             wave,
             wave_profile: WaveProfileSnapshot::for_wave(wave.max(1)),
             player: player_snapshot_for_report(report),
-            player_stocks: [
-                PlayerStockSnapshot::new(report.lives, report.smart_bombs),
-                PlayerStockSnapshot::default(),
-            ],
+            player_stocks: report.player_stocks,
             scores: ScoreSnapshot {
-                player_one: report.score,
-                player_two: 0,
-                high_score: report.high_scores[0].max(report.score),
+                player_one: report.player_scores[0],
+                player_two: report.player_scores[1],
+                high_score: report.high_scores[0]
+                    .max(report.player_scores[0])
+                    .max(report.player_scores[1]),
                 next_bonus: report.next_bonus,
             },
             attract: attract_snapshot_for_report(report),
@@ -7678,8 +7687,10 @@ fn actor_gameplay_events_for_report(report: &StepReport) -> Vec<GameEvent> {
         match command {
             GameCommand::Credit => push_unique_game_event(&mut events, GameEvent::CreditAdded),
             GameCommand::StartOnePlayer | GameCommand::StartTwoPlayer => {
-                push_unique_game_event(&mut events, GameEvent::GameStarted);
-                push_unique_game_event(&mut events, GameEvent::WaveStarted);
+                if report.phase == Phase::Playing {
+                    push_unique_game_event(&mut events, GameEvent::GameStarted);
+                    push_unique_game_event(&mut events, GameEvent::WaveStarted);
+                }
             }
             GameCommand::SmartBomb { .. } => {
                 push_unique_game_event(&mut events, GameEvent::SmartBombPressed)
@@ -7733,10 +7744,15 @@ pub struct ActorGameDriver {
     step: u64,
     phase: Phase,
     wave: u16,
+    current_player: u8,
+    player_count: u8,
     score: u32,
+    player_two_score: u32,
     credits: u8,
     lives: u8,
     smart_bombs: u8,
+    player_two_lives: u8,
+    player_two_smart_bombs: u8,
     next_bonus: u32,
     next_actor_id: u64,
     actors: BTreeMap<ActorId, ThreadedAsset>,
@@ -7775,10 +7791,15 @@ impl ActorGameDriver {
             step: 0,
             phase: Phase::Attract,
             wave: 0,
+            current_player: 1,
+            player_count: 1,
             score: 0,
+            player_two_score: 0,
             credits: 0,
-            lives: 3,
+            lives: INITIAL_PLAYER_LIVES,
             smart_bombs: 0,
+            player_two_lives: INITIAL_PLAYER_LIVES,
+            player_two_smart_bombs: 0,
             next_bonus: SOURCE_REPLAY_SCORE,
             next_actor_id: 1,
             actors: BTreeMap::new(),
@@ -7856,10 +7877,14 @@ impl ActorGameDriver {
             phase: self.phase,
             input: effective_input,
             wave: self.wave,
-            score: self.score,
+            current_player: self.current_player,
+            player_count: self.player_count,
+            score: self.active_score(),
+            player_scores: self.player_scores(),
             credits: prompt_credits,
-            lives: self.lives,
-            smart_bombs: self.smart_bombs,
+            lives: self.active_stock().lives,
+            smart_bombs: self.active_stock().smart_bombs,
+            player_stocks: self.player_stocks(),
             game_over_hall_of_fame_stall_remaining: self.game_over_hall_of_fame_stall_remaining,
             high_scores: self.high_scores.entries(),
             high_score_initials: self.high_score_initials,
@@ -7915,10 +7940,14 @@ impl ActorGameDriver {
             step: self.step,
             phase: self.phase,
             wave: self.wave,
-            score: self.score,
+            current_player: self.current_player,
+            player_count: self.player_count,
+            score: self.active_score(),
+            player_scores: self.player_scores(),
             credits: self.credits,
-            lives: self.lives,
-            smart_bombs: self.smart_bombs,
+            lives: self.active_stock().lives,
+            smart_bombs: self.active_stock().smart_bombs,
+            player_stocks: self.player_stocks(),
             next_bonus: self.next_bonus,
             game_over_hall_of_fame_stall_remaining: self.game_over_hall_of_fame_stall_remaining,
             high_scores: self.high_scores.entries(),
@@ -8297,14 +8326,14 @@ impl ActorGameDriver {
                 GameCommand::StartOnePlayer => {
                     if self.phase == Phase::Attract && self.credits > 0 {
                         self.credits = self.credits.saturating_sub(1);
-                        self.start_play();
+                        self.start_play(1);
                         applied.sounds.push(SoundCue::Start);
                     }
                 }
                 GameCommand::StartTwoPlayer => {
                     if self.phase == Phase::Attract && self.credits > 1 {
                         self.credits = self.credits.saturating_sub(2);
-                        self.start_play();
+                        self.start_play(2);
                         applied.sounds.push(SoundCue::Start);
                     }
                 }
@@ -8444,9 +8473,54 @@ impl ActorGameDriver {
             .count()
     }
 
+    fn active_score(&self) -> u32 {
+        if self.current_player == 2 {
+            self.player_two_score
+        } else {
+            self.score
+        }
+    }
+
+    fn player_scores(&self) -> [u32; 2] {
+        [self.score, self.player_two_score]
+    }
+
+    fn active_stock(&self) -> PlayerStock {
+        if self.current_player == 2 {
+            PlayerStock::new(self.player_two_lives, self.player_two_smart_bombs)
+        } else {
+            PlayerStock::new(self.lives, self.smart_bombs)
+        }
+    }
+
+    fn set_active_stock(&mut self, stock: PlayerStock) {
+        if self.current_player == 2 {
+            self.player_two_lives = stock.lives;
+            self.player_two_smart_bombs = stock.smart_bombs;
+        } else {
+            self.lives = stock.lives;
+            self.smart_bombs = stock.smart_bombs;
+        }
+    }
+
+    fn player_stocks(&self) -> [PlayerStockSnapshot; 2] {
+        [
+            PlayerStockSnapshot::new(self.lives, self.smart_bombs),
+            PlayerStockSnapshot::new(self.player_two_lives, self.player_two_smart_bombs),
+        ]
+    }
+
+    fn highest_visible_score(&self) -> u32 {
+        self.high_scores.entries()[0]
+            .max(self.score)
+            .max(self.player_two_score)
+    }
+
     fn lose_player_life(&mut self, sounds: &mut Vec<SoundCue>) {
-        if self.lives > 1 {
-            self.lives = self.lives.saturating_sub(1);
+        let mut stock = self.active_stock();
+        if stock.lives > 1 {
+            stock.lives = stock.lives.saturating_sub(1);
+            self.set_active_stock(stock);
             self.spawn_player();
             return;
         }
@@ -8455,16 +8529,16 @@ impl ActorGameDriver {
     }
 
     fn enter_game_over(&mut self, sounds: &mut Vec<SoundCue>) {
-        self.lives = 0;
-        self.smart_bombs = 0;
+        let active_score = self.active_score();
+        self.set_active_stock(PlayerStock::new(0, 0));
         self.wave = 0;
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.reset_source_shell_scan();
         self.high_score_initials = HighScoreInitialsState::EMPTY;
         self.game_over_hall_of_fame_stall_remaining = None;
         self.pending_survivor_bonus = None;
-        self.high_scores.record(self.score);
-        self.phase = if self.high_scores.qualifies(self.score) {
+        self.high_scores.record(active_score);
+        self.phase = if self.high_scores.qualifies(active_score) {
             Phase::HighScoreEntry
         } else {
             Phase::GameOver
@@ -8494,12 +8568,18 @@ impl ActorGameDriver {
         }
     }
 
-    fn start_play(&mut self) {
+    fn start_play(&mut self, player_count: u8) {
+        let player_count = player_count.clamp(1, 2);
         self.phase = Phase::Playing;
+        self.current_player = 1;
+        self.player_count = player_count;
         self.wave = 1;
         self.score = 0;
-        self.lives = 3;
+        self.player_two_score = 0;
+        self.lives = INITIAL_PLAYER_LIVES;
         self.smart_bombs = INITIAL_SMART_BOMBS;
+        self.player_two_lives = INITIAL_PLAYER_LIVES;
+        self.player_two_smart_bombs = INITIAL_SMART_BOMBS;
         self.next_bonus = SOURCE_REPLAY_SCORE;
         self.high_score_initials = HighScoreInitialsState::EMPTY;
         self.game_over_hall_of_fame_stall_remaining = None;
@@ -8772,10 +8852,12 @@ impl ActorGameDriver {
 
     fn detonate_smart_bomb(&mut self, sounds: &mut Vec<SoundCue>, consume_stock: bool) -> bool {
         if consume_stock {
-            if self.smart_bombs == 0 {
+            let mut stock = self.active_stock();
+            if stock.smart_bombs == 0 {
                 return false;
             }
-            self.smart_bombs = self.smart_bombs.saturating_sub(1);
+            stock.smart_bombs = stock.smart_bombs.saturating_sub(1);
+            self.set_active_stock(stock);
         }
 
         let mut bonus_awarded = false;
@@ -8804,17 +8886,17 @@ impl ActorGameDriver {
         let frame = ScoreSystem::award_points(
             ScoreSnapshot {
                 player_one: self.score,
-                player_two: 0,
-                high_score: self.high_scores.entries()[0].max(self.score),
+                player_two: self.player_two_score,
+                high_score: self.highest_visible_score(),
                 next_bonus: self.next_bonus,
             },
-            PlayerStock::new(self.lives, self.smart_bombs),
-            1,
+            self.active_stock(),
+            self.current_player,
             points,
         );
         self.score = frame.scores.player_one;
-        self.lives = frame.stock.lives;
-        self.smart_bombs = frame.stock.smart_bombs;
+        self.player_two_score = frame.scores.player_two;
+        self.set_active_stock(frame.stock);
         self.next_bonus = frame.scores.next_bonus;
         frame.bonus_awards > 0
     }
@@ -9265,11 +9347,11 @@ impl StatusDisplay {
     }
 
     fn playing_draws(&self, prompt: &StepPrompt) -> Vec<DrawCommand> {
-        vec![
+        let mut draws = vec![
             DrawCommand::text(
                 self.id,
                 STATUS_SCORE_POSITION,
-                format!("1UP {}", format_status_score(prompt.score)),
+                format!("1UP {}", format_status_score(prompt.player_scores[0])),
             ),
             DrawCommand::text(
                 self.id,
@@ -9296,7 +9378,15 @@ impl StatusDisplay {
                 STATUS_CREDITS_POSITION,
                 format!("CREDIT {:02}", prompt.credits.min(99)),
             ),
-        ]
+        ];
+        if prompt.player_count > 1 {
+            draws.push(DrawCommand::text(
+                self.id,
+                STATUS_PLAYER_TWO_SCORE_POSITION,
+                format!("2UP {}", format_status_score(prompt.player_scores[1])),
+            ));
+        }
+        draws
     }
 
     fn high_score_entry_draws(&self, prompt: &StepPrompt) -> Vec<DrawCommand> {
@@ -13003,10 +13093,14 @@ mod tests {
             step: 99,
             phase: Phase::Playing,
             wave: 1,
+            current_player: 1,
+            player_count: 1,
             score: 0,
+            player_scores: [0, 0],
             credits: 0,
             lives: 3,
             smart_bombs: 3,
+            player_stocks: [PlayerStockSnapshot::new(3, 3); 2],
             next_bonus: SOURCE_REPLAY_SCORE,
             game_over_hall_of_fame_stall_remaining: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
@@ -13203,10 +13297,14 @@ mod tests {
             step: 7,
             phase: Phase::Playing,
             wave: 1,
+            current_player: 1,
+            player_count: 1,
             score: 0,
+            player_scores: [0, 0],
             credits: 0,
             lives: 3,
             smart_bombs: 3,
+            player_stocks: [PlayerStockSnapshot::new(3, 3); 2],
             next_bonus: SOURCE_REPLAY_SCORE,
             game_over_hall_of_fame_stall_remaining: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
@@ -13310,10 +13408,17 @@ mod tests {
             step: 77,
             phase: Phase::HighScoreEntry,
             wave: 2,
+            current_player: 1,
+            player_count: 1,
             score: 12_000,
+            player_scores: [12_000, 0],
             credits: 1,
             lives: 2,
             smart_bombs: 1,
+            player_stocks: [
+                PlayerStockSnapshot::new(2, 1),
+                PlayerStockSnapshot::new(3, 3),
+            ],
             next_bonus: 20_000,
             game_over_hall_of_fame_stall_remaining: None,
             high_scores: [12_000, 10_000, 7_500, 5_000, 2_500],
@@ -13467,10 +13572,14 @@ mod tests {
             step: 101,
             phase: Phase::Playing,
             wave: 3,
+            current_player: 1,
+            player_count: 1,
             score: 0,
+            player_scores: [0, 0],
             credits: 0,
             lives: 3,
             smart_bombs: 3,
+            player_stocks: [PlayerStockSnapshot::new(3, 3); 2],
             next_bonus: SOURCE_REPLAY_SCORE,
             game_over_hall_of_fame_stall_remaining: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
@@ -14886,6 +14995,111 @@ mod tests {
     }
 
     #[test]
+    fn actor_two_player_start_requires_two_credits() {
+        let mut driver = ActorGameDriver::new();
+        driver.credits = 1;
+        let mut runtime = ActorRuntimeAdapter::with_driver(driver);
+
+        let blocked = runtime.step(GameInput {
+            start_two: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(blocked.report.phase, Phase::Attract);
+        assert_eq!(blocked.report.credits, 1);
+        assert_eq!(blocked.state.phase, GamePhase::Attract);
+        assert_eq!(blocked.state.credits, 1);
+        assert_eq!(blocked.state.current_player, 1);
+        assert_eq!(blocked.state.player_count, 1);
+        assert_eq!(blocked.state.scores.player_two, 0);
+        assert!(!blocked.events.gameplay().contains(&GameEvent::GameStarted));
+        assert!(!blocked.report.sounds.contains(&SoundCue::Start));
+    }
+
+    #[test]
+    fn actor_two_player_start_initializes_session_state_bridge() {
+        let mut driver = ActorGameDriver::new();
+        driver.credits = 2;
+        let mut runtime = ActorRuntimeAdapter::with_driver(driver);
+
+        let started = runtime.step(GameInput {
+            start_two: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(started.report.phase, Phase::Playing);
+        assert_eq!(started.report.credits, 0);
+        assert_eq!(started.report.current_player, 1);
+        assert_eq!(started.report.player_count, 2);
+        assert_eq!(started.report.player_scores, [0, 0]);
+        assert_eq!(
+            started.report.player_stocks,
+            [PlayerStockSnapshot::new(3, 3); 2]
+        );
+        assert_eq!(started.state.phase, GamePhase::Playing);
+        assert_eq!(started.state.credits, 0);
+        assert_eq!(started.state.current_player, 1);
+        assert_eq!(started.state.player_count, 2);
+        assert_eq!(started.state.scores.player_one, 0);
+        assert_eq!(started.state.scores.player_two, 0);
+        assert_eq!(
+            started.state.player_stocks,
+            [PlayerStockSnapshot::new(3, 3); 2]
+        );
+        assert!(started.report.sounds.contains(&SoundCue::Start));
+        assert!(started.events.gameplay().contains(&GameEvent::GameStarted));
+        assert!(started.events.gameplay().contains(&GameEvent::WaveStarted));
+
+        let status = runtime.step(GameInput::NONE);
+        assert_text(&status.report, "2UP 000000");
+    }
+
+    #[test]
+    fn actor_score_awards_follow_current_player_two_stock() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 1;
+        driver.current_player = 2;
+        driver.player_count = 2;
+        driver.score = 900;
+        driver.player_two_score = 9_900;
+        driver.next_bonus = SOURCE_REPLAY_SCORE;
+        driver.lives = 2;
+        driver.smart_bombs = 1;
+        driver.player_two_lives = 3;
+        driver.player_two_smart_bombs = 1;
+        driver.spawn_player();
+        driver.spawn_lander_for_test(Point::new(62, 120));
+        let mut runtime = ActorRuntimeAdapter::with_driver(driver);
+
+        runtime.step(GameInput {
+            fire: true,
+            ..GameInput::NONE
+        });
+        let scored = runtime.step(GameInput::NONE);
+
+        assert_eq!(scored.report.current_player, 2);
+        assert_eq!(scored.report.player_scores, [900, 10_050]);
+        assert_eq!(scored.report.score, 10_050);
+        assert_eq!(scored.report.next_bonus, 20_000);
+        assert_eq!(
+            scored.report.player_stocks,
+            [
+                PlayerStockSnapshot::new(2, 1),
+                PlayerStockSnapshot::new(4, 2),
+            ]
+        );
+        assert_eq!(scored.state.scores.player_one, 900);
+        assert_eq!(scored.state.scores.player_two, 10_050);
+        assert_eq!(scored.state.scores.high_score, 10_050);
+        assert_eq!(
+            scored.state.player_stocks[1],
+            PlayerStockSnapshot::new(4, 2)
+        );
+        assert!(scored.events.gameplay().contains(&GameEvent::BonusAwarded));
+    }
+
+    #[test]
     fn status_display_actor_draws_play_state_from_prompt() {
         let mut driver = started_driver();
         driver.score = 9_875;
@@ -15932,10 +16146,14 @@ mod tests {
             phase: Phase::Playing,
             input: GameInput::NONE,
             wave: 1,
+            current_player: 1,
+            player_count: 1,
             score: 0,
+            player_scores: [0, 0],
             credits: 0,
             lives: 3,
             smart_bombs: 3,
+            player_stocks: [PlayerStockSnapshot::new(3, 3); 2],
             game_over_hall_of_fame_stall_remaining: None,
             high_scores: [0; 5],
             high_score_initials: HighScoreInitialsState::EMPTY,
@@ -19484,10 +19702,14 @@ mod tests {
             phase: Phase::Playing,
             input: GameInput::NONE,
             wave,
+            current_player: 1,
+            player_count: 1,
             score: 0,
+            player_scores: [0, 0],
             credits: 0,
             lives: 3,
             smart_bombs: INITIAL_SMART_BOMBS,
+            player_stocks: [PlayerStockSnapshot::new(3, INITIAL_SMART_BOMBS); 2],
             game_over_hall_of_fame_stall_remaining: None,
             high_scores: [0; 5],
             high_score_initials: HighScoreInitialsState::EMPTY,

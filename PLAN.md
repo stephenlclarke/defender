@@ -101,8 +101,18 @@ verification tools.
   score, high score, wave, lives, smart-bomb stock, credits, and
   high-score-entry rows from the same `StepPrompt` state as gameplay actors
   while staying inert during attract so custom attract scripts retain control of
-  that screen. Actor high-score initials submission now reports accepted and
-  submitted initials through the clean event bridge, enters a finite 60-step
+  that screen. Actor `StepPrompt`/`StepReport` values now carry the driver-owned
+  current player, player count, per-player scores, and per-player stock
+  snapshots. `StartTwoPlayer` now requires two actor credits, consumes both,
+  initializes player one as active in a two-player session, publishes both
+  player score/stock snapshots through `ActorStateBridge`, and blocked
+  two-player start requests no longer emit false clean `GameStarted` /
+  `WaveStarted` events. Score and replay-bonus stock awards route through the
+  active player fields so the actor bridge can represent player-two score and
+  stock ownership while the full source `PLE02` switch/death-prompt handoff
+  remains the next two-player fidelity boundary. Actor high-score initials
+  submission now reports accepted and submitted initials through the clean event
+  bridge, enters a finite 60-step
   Hall-of-Fame game-over stall through `GameOverSnapshot`, draws the source
   Hall page during that stall, and returns to the Williams attract reveal after
   the stall. Lander
@@ -791,6 +801,38 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 16:40 BST`: Completed the actor two-player session-state
+  slice. Actor reports now carry driver-owned `current_player`, `player_count`,
+  per-player scores, and per-player stock snapshots. `ActorStateBridge` maps
+  those values into clean `GameState` instead of hard-coding one-player state.
+  `StartTwoPlayer` now requires two credits, consumes both, initializes player
+  one as active in a two-player actor session, and publishes both players'
+  zeroed scores plus `3` lives / `3` smart bombs. Blocked two-player start
+  requests stay in attract and no longer emit false clean `GameStarted` /
+  `WaveStarted` events. Score and replay-bonus awards now route through the
+  active-player score/stock fields, including player two when selected by the
+  driver. The status actor can draw a `2UP` line for two-player sessions. Full
+  source `PLE02` switch sleep, player-start prompt, and two-player death
+  rotation remain the next two-player fidelity boundary. No legacy code, tests,
+  or scaffolding were safe to remove because legacy tooling still backs ROM
+  reports, trace/media helpers, and oracle-equivalence evidence while the actor
+  runtime continues closing fidelity gaps. Validation passed with
+  `cargo test actor_two_player --lib --features legacy-tools`, `cargo test
+  actor_score_awards_follow_current_player_two_stock --lib --features
+  legacy-tools`, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo test actor_live --all-targets --features
+  legacy-tools`, `cargo test actor_wgpu --all-targets --features
+  legacy-tools`, `cargo run -- --actor-smoke`, `cargo run
+  -- --actor-attract-smoke`, `cargo run -- --actor-post-game-smoke`, `cargo run
+  -- --actor-wgpu-smoke`, `cargo test runtime --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, `cargo fmt
+  --check`, touched-doc markdownlint, and `git diff --check`. Slack cycle
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780673244065439`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780674065277969`.
 - `2026-06-05 15:59 BST`: Completed the actor wave-clear interstitial and
   replay-bonus scoring slice. Actor scoring now uses the clean replay-bonus
   threshold model, carries `next_bonus` into bridged `GameState`, adds
