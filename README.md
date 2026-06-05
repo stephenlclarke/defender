@@ -126,10 +126,11 @@ embedded red-label seed initials. The scoring/instruction page draws `SCANV`,
 `messages.tsv` rows and source screen addresses, while `scoring_surface` draws
 the source top scanner frame/marker bars, `MTERR` mini-terrain records,
 source-shaped rescue-demo player/human/lander object sprites, scanner blips,
-and the 500-point rescue popup. Custom attract scripts can draw checked
-`messages.tsv` labels through source cursor controls with optional visual
-offsets, and the older one-column `high_scores` action remains available for
-custom screens.
+source-shaped rescue laser pixels, lander explosion fragments, the 500-point
+rescue popup, and the `ENMYTB` enemy legend transfer/materialization/reveal
+objects. Custom attract scripts can draw checked `messages.tsv` labels through
+source cursor controls with optional visual offsets, and the older one-column
+`high_scores` action remains available for custom screens.
 The default actor wave allocator now
 uses the source active-family
 shape, so later waves can introduce bomber and pod actor families alongside

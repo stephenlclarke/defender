@@ -773,6 +773,32 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 14:37 BST`: Completed the actor attract scoring laser/explosion/
+  materialization slice. `VisualEffect::AttractScoringSurface` now uses
+  actor-local scoring stages to project source-shaped rescue laser pixels,
+  lander explosion fragments, and `ENMYTB` enemy legend
+  transfer/materialization/reveal objects alongside the existing scoring
+  labels, scanner frame, `MTERR` terrain, rescue objects/blips, and
+  500-point rescue popup. Added actor-local source object-image decoding for
+  the six legend enemy families and a focused regression proving rescue laser
+  pixels, rescue explosion fragments, the 250-point legend transfer popup, and
+  the first lander score-card reveal. README, SPEC, and the actor architecture
+  notes now document the scoring-surface effect coverage. No legacy code,
+  tests, or scaffolding were safe to remove because legacy tooling still backs
+  ROM reports, trace/media helpers, and oracle-equivalence evidence while the
+  actor runtime continues closing fidelity gaps. Validation passed with the
+  focused attract scoring regression,
+  `cargo test attract_title_uses_williams_animation_and_defender_coalescence
+  --lib --features legacy-tools`, `cargo test actor_game --all-targets
+  --features legacy-tools`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo test actor_live --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, `cargo fmt
+  --check`, touched-doc markdownlint, and `git diff --check`.
+  Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780665733446049`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780666654723459`.
 - `2026-06-05 14:17 BST`: Completed the actor attract scoring-demo object
   projection slice. `VisualEffect::AttractScoringSurface` now uses actor-local
   `scoring_tick` to project the source-shaped rescue-demo player, human, and

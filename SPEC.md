@@ -788,10 +788,11 @@ reintroduce legacy implementation terminology.
   rows and source screen addresses, while `scoring_surface` draws the source
   top scanner frame/marker bars, `MTERR` mini-terrain records, source-shaped
   rescue-demo player/human/lander object sprites, scanner blips, and the
-  500-point rescue popup. Custom attract scripts can draw checked
-  `messages.tsv` labels through source cursor controls with optional visual
-  offsets, and the older one-column `high_scores` action remains available for
-  custom screens. The
+  source-shaped rescue laser, lander explosion fragments, 500-point rescue
+  popup, and `ENMYTB` enemy legend transfer/materialization/reveal objects.
+  Custom attract scripts can draw checked `messages.tsv` labels through source
+  cursor controls with optional visual offsets, and the older one-column
+  `high_scores` action remains available for custom screens. The
   default actor wave progression expands
   that wave script through `assets/red-label/wave-table.tsv` for active
   wave size, lander and bomber movement speed, lander fire cadence, baiter
