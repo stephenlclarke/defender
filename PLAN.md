@@ -3853,3 +3853,20 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780622665248849`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780623042708869`.
+- `2026-06-05 02:42 BST`: Completed the actor hyperspace command cycle. Added
+  `GameCommand::Hyperspace` and `SoundCue::Hyperspace` from mapped `H` input,
+  made the driver clear active hostile projectile actors without spending
+  lives or smart-bomb stock, and kept player lasers, hostile actor families,
+  score, and smart-bomb stock unchanged. Added regressions for same-step
+  enemy-laser damage avoidance and for hyperspace staying separate from smart
+  bombs. No legacy code, tests, or scaffolding were safe to remove because
+  `legacy-tools` still owns ROM reports, trace tools, README/reference media
+  generation, and oracle-equivalence evidence while the actor runtime remains
+  isolated. Validation passed with `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780623279783919`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780623737610639`.

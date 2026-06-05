@@ -1786,6 +1786,7 @@ pub enum SoundCue {
     Thrust,
     Laser,
     SmartBomb,
+    Hyperspace,
     Explosion,
     LanderPickup,
     HumanPulled,
@@ -2154,6 +2155,7 @@ pub enum GameCommand {
     SmartBomb {
         consume_stock: bool,
     },
+    Hyperspace,
     HumanLost(ActorId),
     AddScore(u32),
     PlaySound(SoundCue),
@@ -2687,8 +2689,14 @@ impl ActorGameDriver {
         if !player_behavior.player_takes_enemy_collision_damage {
             return;
         }
+        let hyperspace_clears_enemy_lasers = commands
+            .iter()
+            .any(|command| matches!(command, GameCommand::Hyperspace));
         for enemy in bodies.iter().filter(|body| is_player_hazard(body.kind)) {
             if destroyed.contains(&enemy.owner) {
+                continue;
+            }
+            if hyperspace_clears_enemy_lasers && enemy.kind == ActorKind::EnemyLaser {
                 continue;
             }
             if player.bounds.intersects(enemy.bounds) {
@@ -2792,6 +2800,9 @@ impl ActorGameDriver {
                 }
                 GameCommand::SmartBomb { consume_stock } => {
                     self.detonate_smart_bomb(&mut sounds, consume_stock);
+                }
+                GameCommand::Hyperspace => {
+                    self.clear_enemy_projectiles_for_hyperspace();
                 }
                 GameCommand::HumanLost(id) => {
                     self.snapshots.remove(&id);
@@ -3023,6 +3034,20 @@ impl ActorGameDriver {
             self.spawn_explosion(position, explosion_kind_for_target(kind));
             self.score = self.score.saturating_add(score_for_hostile(kind));
             sounds.push(SoundCue::Explosion);
+        }
+    }
+
+    fn clear_enemy_projectiles_for_hyperspace(&mut self) {
+        let targets = self
+            .snapshots
+            .values()
+            .filter(|snapshot| snapshot.kind == ActorKind::EnemyLaser)
+            .map(|snapshot| snapshot.id)
+            .collect::<Vec<_>>();
+        for id in targets {
+            self.snapshots.remove(&id);
+            self.actors.remove(&id);
+            self.behavior_script.remove_actor_behavior(id);
         }
     }
 
@@ -3518,6 +3543,10 @@ impl AssetActor for PlayerShip {
                     consume_stock: true,
                 });
                 commands.push(GameCommand::PlaySound(SoundCue::SmartBomb));
+            }
+            if prompt.input.hyperspace {
+                commands.push(GameCommand::Hyperspace);
+                commands.push(GameCommand::PlaySound(SoundCue::Hyperspace));
             }
             draws.push(DrawCommand::sprite(
                 self.id,
@@ -5951,6 +5980,61 @@ mod tests {
         assert_eq!(report.lives, 0);
         assert!(report.sounds.contains(&SoundCue::Explosion));
         assert!(report.sounds.contains(&SoundCue::GameOver));
+    }
+
+    #[test]
+    fn hyperspace_clears_enemy_lasers_without_spending_stock_or_life() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.lives = 3;
+        driver.smart_bombs = INITIAL_SMART_BOMBS;
+        driver.spawn_player();
+        driver.spawn_enemy_laser(Point::new(42, 120), Velocity::new(0, 0));
+
+        let report = driver.step(GameInput {
+            hyperspace: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(report.phase, Phase::Playing);
+        assert_eq!(report.lives, 3);
+        assert_eq!(report.smart_bombs, INITIAL_SMART_BOMBS);
+        assert!(report.commands.contains(&GameCommand::Hyperspace));
+        assert!(!report.commands.contains(&GameCommand::PlayerKilled));
+        assert!(report.sounds.contains(&SoundCue::Hyperspace));
+        assert!(!report.sounds.contains(&SoundCue::GameOver));
+        assert_eq!(driver.snapshot_count(ActorKind::EnemyLaser), 0);
+        assert_eq!(driver.snapshot_count(ActorKind::Player), 1);
+    }
+
+    #[test]
+    fn hyperspace_leaves_hostiles_and_player_lasers_active() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.lives = 3;
+        driver.smart_bombs = INITIAL_SMART_BOMBS;
+        let player = driver.spawn_player();
+        driver.spawn_lander_for_test(Point::new(90, 120));
+        driver.spawn_laser(Point::new(10, 40), Direction::Right, player);
+        driver.spawn_enemy_laser(Point::new(70, 120), Velocity::new(0, 0));
+
+        let report = driver.step(GameInput {
+            hyperspace: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(report.phase, Phase::Playing);
+        assert!(report.commands.contains(&GameCommand::Hyperspace));
+        let emitted_smart_bomb = report
+            .commands
+            .iter()
+            .any(|command| matches!(command, GameCommand::SmartBomb { .. }));
+        assert!(!emitted_smart_bomb);
+        assert_eq!(driver.snapshot_count(ActorKind::EnemyLaser), 0);
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 1);
+        assert_eq!(driver.snapshot_count(ActorKind::Laser), 1);
+        assert_eq!(report.score, 0);
+        assert_eq!(report.smart_bombs, INITIAL_SMART_BOMBS);
     }
 
     #[test]

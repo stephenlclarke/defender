@@ -99,6 +99,13 @@ movement behavior modes, for example making a later-wave lander ignore humans
 and chase the player, or making a specific bomber chase the player instead of
 using its fallback drift.
 
+Hyperspace is represented as a driver-applied gameplay command rather than a
+render frame effect. The player actor emits `GameCommand::Hyperspace` and
+`SoundCue::Hyperspace` from the mapped `H` input; the driver clears active
+`EnemyLaser` projectile actors while leaving player lasers, hostile actor
+families, score, lives, and smart-bomb stock unchanged. The later MAME
+rematerialization and death-risk tail remains a separate porting slice.
+
 `XYZZY` invincibility uses the same mechanism. When invincibility is active,
 the driver applies a temporary player behavior override that disables enemy
 collision damage for that simulation step; collision handling reads that
