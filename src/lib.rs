@@ -399,6 +399,7 @@ mod public_api_tests {
         assert!(runtime_rs.contains("RuntimeCommand::GameSmoke"));
         assert!(runtime_rs.contains("RuntimeCommand::ActorSmoke"));
         assert!(runtime_rs.contains("RuntimeCommand::ActorWgpuSmoke"));
+        assert!(runtime_rs.contains("RuntimeCommand::ActorWgpuLive"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityTrace { frame_count }"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityTraceInputs { script }"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityTraceInputsFile { path }"));
@@ -428,6 +429,7 @@ mod public_api_tests {
         assert!(runtime_rs.contains("crate::game_smoke::run()"));
         assert!(runtime_rs.contains("crate::actor_smoke::run()"));
         assert!(runtime_rs.contains("crate::live_wgpu::run_actor_wgpu_smoke()"));
+        assert!(runtime_rs.contains("crate::live_wgpu::run_actor_live("));
         assert!(runtime_rs.contains("run_fidelity_trace_command(frame_count)"));
         assert!(runtime_rs.contains("run_fidelity_trace_inputs_command(script)"));
         assert!(runtime_rs.contains("run_fidelity_trace_inputs_file_command(path)"));

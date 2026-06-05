@@ -151,6 +151,11 @@ pub(crate) enum RuntimeCommand {
         audio_mode: LiveAudioMode,
         cmos_path: Option<PathBuf>,
     },
+    ActorWgpuLive {
+        input_profile: LiveInputProfile,
+        audio_mode: LiveAudioMode,
+        cmos_path: Option<PathBuf>,
+    },
     WgpuLiveSmoke {
         input_profile: LiveInputProfile,
         cmos_path: Option<PathBuf>,
@@ -161,6 +166,11 @@ impl RuntimeCommand {
     fn from_config(config: &RuntimeConfig) -> Self {
         match config.mode {
             RunMode::Interactive => Self::WgpuLive {
+                input_profile: input_profile(config.controls),
+                audio_mode: audio_mode(config.audio),
+                cmos_path: config.cmos_path.clone(),
+            },
+            RunMode::ActorInteractive => Self::ActorWgpuLive {
                 input_profile: input_profile(config.controls),
                 audio_mode: audio_mode(config.audio),
                 cmos_path: config.cmos_path.clone(),
@@ -236,6 +246,11 @@ impl RuntimeBackend for InstalledRuntimeBackend {
                 audio_mode,
                 cmos_path,
             } => crate::live_wgpu::run(input_profile, audio_mode, cmos_path.as_deref()),
+            RuntimeCommand::ActorWgpuLive {
+                input_profile,
+                audio_mode,
+                cmos_path,
+            } => crate::live_wgpu::run_actor_live(input_profile, audio_mode, cmos_path.as_deref()),
             RuntimeCommand::WgpuLiveSmoke {
                 input_profile,
                 cmos_path,
@@ -430,6 +445,7 @@ pub(crate) fn help_text() -> &'static str {
     concat!(
         "defender\n",
         "  cargo run\n",
+        "  cargo run -- --actor-live\n",
         "  cargo run -- --live-smoke\n",
         "  cargo run -- --game-smoke\n",
         "  cargo run -- --actor-smoke\n",
@@ -773,6 +789,25 @@ mod tests {
     }
 
     #[test]
+    fn actor_live_config_uses_actor_wgpu_live_launch() {
+        let config = RuntimeConfig {
+            controls: ControlProfile::Cabinet,
+            audio: AudioOutput::Disabled,
+            mode: RunMode::ActorInteractive,
+            cmos_path: Some(PathBuf::from("actor_cmos.bin")),
+        };
+
+        assert_eq!(
+            RuntimeCommand::from_config(&config),
+            RuntimeCommand::ActorWgpuLive {
+                input_profile: LiveInputProfile::Cabinet,
+                audio_mode: LiveAudioMode::Disabled,
+                cmos_path: Some(PathBuf::from("actor_cmos.bin")),
+            }
+        );
+    }
+
+    #[test]
     fn clean_audio_outputs_map_to_runtime_audio_modes() {
         assert_eq!(audio_mode(AudioOutput::Disabled), LiveAudioMode::Disabled);
         assert_eq!(audio_mode(AudioOutput::Device), LiveAudioMode::Device);
@@ -812,6 +847,18 @@ mod tests {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
             .run(&RuntimeConfig::default())
             .expect("installed backend should run config-driven live");
+    }
+
+    #[test]
+    fn installed_backend_runs_config_driven_actor_wgpu_live() {
+        RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run(&RuntimeConfig {
+                controls: ControlProfile::Test,
+                audio: AudioOutput::Null,
+                mode: RunMode::ActorInteractive,
+                cmos_path: None,
+            })
+            .expect("installed backend should run config-driven actor live");
     }
 
     #[test]
@@ -969,6 +1016,7 @@ mod tests {
         let text = help_text();
 
         assert!(text.starts_with("defender\n  cargo run\n"));
+        assert!(text.contains("--actor-live"));
         assert!(text.contains("--rom-report"));
         assert!(text.contains("--input-profile planetoid"));
         assert!(text.contains("--input-profile cabinet"));

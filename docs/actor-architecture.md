@@ -53,6 +53,12 @@ verified.
   It requires every actor frame to render nonblank pixels and produce dynamic
   readback signatures before actor frames are considered for interactive live
   play.
+- `--actor-live` is the first explicit interactive actor runtime preflight. It
+  keeps default `cargo run` on clean `Game`, but the opt-in actor window steps
+  `ActorRuntimeAdapter`, forwards actor sound-event batches to the live audio
+  runtime, and draws actor scenes with the existing `wgpu` presenter. The shared
+  live input state carries the same key bindings and `XYZZY` mode into actor
+  steps.
 
 ## C++ to Rust Mapping
 

@@ -4123,3 +4123,30 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780630546987929`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780631138579499`.
+- `2026-06-05 04:55 BST`: Completed the optional actor live runtime cycle.
+  Added `--actor-live` as an explicit interactive actor-frame preflight mode
+  while leaving default `cargo run` on the clean `Game` runtime. The actor live
+  app steps `ActorRuntimeAdapter`, draws actor `RenderScene` values through the
+  existing `wgpu` presenter, and submits actor sound-event batches directly to
+  the live audio queue without fabricating a clean `GameFrame`. The shared live
+  input state now carries `XYZZY` mode into actor frames while preserving the
+  current live key-binding surface, and `--input-profile`, `--mute`, and
+  `--cmos-path` continue to parse through the runtime config boundary. No legacy
+  code, tests, or scaffolding were safe to remove because this is still an
+  opt-in actor runtime path and legacy tooling remains required for ROM reports,
+  trace/media helpers, and oracle evidence. Validation passed with
+  `cargo test actor_live --lib`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test live_input_state_carries_xyzzy_mode_for_actor_runtime --lib`,
+  the all-targets `legacy-tools` run of
+  `live_input_state_carries_xyzzy_mode_for_actor_runtime`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `cargo test clean_help_text_preserves_current_cli_contract --lib`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780631200808809`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780631731264419`.

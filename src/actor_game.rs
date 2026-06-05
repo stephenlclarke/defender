@@ -688,19 +688,19 @@ impl XyzzyController {
         }
     }
 
-    fn toggle_auto_fire(&mut self) {
+    pub fn toggle_auto_fire(&mut self) {
         if self.active {
             self.auto_fire = !self.auto_fire;
         }
     }
 
-    fn toggle_invincible(&mut self) {
+    pub fn toggle_invincible(&mut self) {
         if self.active {
             self.invincible = !self.invincible;
         }
     }
 
-    fn mode(&self, overlay_smart_bomb: bool) -> XyzzyMode {
+    pub fn mode(&self, overlay_smart_bomb: bool) -> XyzzyMode {
         XyzzyMode {
             active: self.active,
             auto_fire: self.active && self.auto_fire,

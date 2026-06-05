@@ -22,6 +22,7 @@ pub enum AudioOutput {
 pub enum RunMode {
     #[default]
     Interactive,
+    ActorInteractive,
     Smoke,
 }
 
@@ -249,6 +250,10 @@ impl RuntimeCliClassifier {
         match arg {
             "--live-smoke" => {
                 config.mode = RunMode::Smoke;
+                ArgClassification::Runtime
+            }
+            "--actor-live" => {
+                config.mode = RunMode::ActorInteractive;
                 ArgClassification::Runtime
             }
             "--game-smoke" => {
@@ -805,6 +810,17 @@ mod tests {
     }
 
     #[test]
+    fn clean_cli_owns_actor_live_launch() {
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&["--actor-live"])),
+            CliClassification::Runtime(RuntimeConfig {
+                mode: RunMode::ActorInteractive,
+                ..RuntimeConfig::default()
+            })
+        );
+    }
+
+    #[test]
     fn clean_cli_owns_game_smoke_command() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--game-smoke"])),
@@ -844,6 +860,26 @@ mod tests {
                 audio: AudioOutput::Disabled,
                 mode: RunMode::Smoke,
                 cmos_path: Some(PathBuf::from("scores.bin")),
+            })
+        );
+    }
+
+    #[test]
+    fn clean_cli_owns_actor_live_configuration_flags() {
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&[
+                "--input-profile",
+                "cabinet",
+                "--mute",
+                "--cmos-path",
+                "actor-scores.bin",
+                "--actor-live",
+            ])),
+            CliClassification::Runtime(RuntimeConfig {
+                controls: ControlProfile::Cabinet,
+                audio: AudioOutput::Disabled,
+                mode: RunMode::ActorInteractive,
+                cmos_path: Some(PathBuf::from("actor-scores.bin")),
             })
         );
     }
@@ -1490,6 +1526,12 @@ mod tests {
     fn live_smoke_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&["--live-smoke", "--input-profile", "test", "--mute"]))
             .expect("clean live-smoke CLI should run through configured runtime");
+    }
+
+    #[test]
+    fn actor_live_cli_entrypoint_accepts_supported_args() {
+        super::run_with_args(args(&["--actor-live", "--input-profile", "test", "--mute"]))
+            .expect("actor live CLI should run through configured runtime");
     }
 
     #[test]

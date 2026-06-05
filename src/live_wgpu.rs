@@ -24,8 +24,8 @@ use winit::{
 use crate::game::GameInput;
 #[cfg(all(not(test), not(coverage)))]
 use crate::{
-    actor_game::ActorRuntimeAdapter,
-    audio::LiveAudioRuntime,
+    actor_game::{ActorFrame, ActorRuntimeAdapter},
+    audio::{LiveAudioEventBatch, LiveAudioRuntime},
     game::{Game, GameFrame},
     renderer::{
         GpuRendererSettings, NativeSceneRenderer, SceneDrawPlan, SpriteBindGroupRole,
@@ -33,7 +33,12 @@ use crate::{
     },
     systems::{FixedStepAccumulator, FrameRate},
 };
-use crate::{actor_smoke::ActorSmokeReport, audio::LiveAudioMode, game_smoke::GameSmokeReport};
+use crate::{
+    actor_game::{XyzzyController, XyzzyMode},
+    actor_smoke::ActorSmokeReport,
+    audio::LiveAudioMode,
+    game_smoke::GameSmokeReport,
+};
 
 #[cfg(all(not(test), not(coverage)))]
 const INITIAL_WINDOW_WIDTH: u32 = 1_024;
@@ -296,6 +301,24 @@ pub(crate) fn run(
 }
 
 #[cfg(all(not(test), not(coverage)))]
+pub(crate) fn run_actor_live(
+    input_profile: LiveInputProfile,
+    audio_mode: LiveAudioMode,
+    cmos_path: Option<&Path>,
+) -> anyhow::Result<()> {
+    run_actor_live_app(input_profile, audio_mode, cmos_path)
+}
+
+#[cfg(any(test, coverage))]
+pub(crate) fn run_actor_live(
+    _input_profile: LiveInputProfile,
+    _audio_mode: LiveAudioMode,
+    _cmos_path: Option<&Path>,
+) -> anyhow::Result<()> {
+    Ok(())
+}
+
+#[cfg(all(not(test), not(coverage)))]
 pub(crate) fn run_smoke(
     _input_profile: LiveInputProfile,
     _cmos_path: Option<&Path>,
@@ -360,6 +383,25 @@ fn run_clean_live(
 }
 
 #[cfg(all(not(test), not(coverage)))]
+fn run_actor_live_app(
+    input_profile: LiveInputProfile,
+    audio_mode: LiveAudioMode,
+    _cmos_path: Option<&Path>,
+) -> anyhow::Result<()> {
+    let event_loop =
+        winit::event_loop::EventLoop::new().context("creating actor wgpu event loop")?;
+    let mut app = ActorLiveApp::new(input_profile, LiveAudioRuntime::for_mode(audio_mode));
+
+    event_loop
+        .run_app(&mut app)
+        .context("running actor wgpu live event loop")?;
+    if let Some(error) = app.take_error() {
+        return Err(error);
+    }
+    Ok(())
+}
+
+#[cfg(all(not(test), not(coverage)))]
 struct CleanLiveApp {
     input_profile: LiveInputProfile,
     game: Game,
@@ -374,6 +416,213 @@ struct CleanLiveApp {
     window: Option<Arc<Window>>,
     presenter: Option<WgpuScenePresenter>,
     error: Option<anyhow::Error>,
+}
+
+#[cfg(all(not(test), not(coverage)))]
+struct ActorLiveApp {
+    input_profile: LiveInputProfile,
+    runtime: ActorRuntimeAdapter,
+    audio: LiveAudioRuntime,
+    input: LiveInputState,
+    accumulator: FixedStepAccumulator,
+    frame_duration: Duration,
+    last_tick: Instant,
+    next_wake_at: Instant,
+    latest_frame: Option<ActorFrame>,
+    quit_requested: bool,
+    window: Option<Arc<Window>>,
+    presenter: Option<WgpuScenePresenter>,
+    error: Option<anyhow::Error>,
+}
+
+#[cfg(all(not(test), not(coverage)))]
+impl ActorLiveApp {
+    fn new(input_profile: LiveInputProfile, audio: LiveAudioRuntime) -> Self {
+        let now = Instant::now();
+        let frame_duration = Duration::from_micros(FrameRate::CABINET.frame_duration_micros());
+        let mut app = Self {
+            input_profile,
+            runtime: ActorRuntimeAdapter::new(),
+            audio,
+            input: LiveInputState::default(),
+            accumulator: FixedStepAccumulator::new(FrameRate::CABINET),
+            frame_duration,
+            last_tick: now,
+            next_wake_at: now + frame_duration,
+            latest_frame: None,
+            quit_requested: false,
+            window: None,
+            presenter: None,
+            error: None,
+        };
+        app.step_one_frame();
+        app
+    }
+
+    fn take_error(&mut self) -> Option<anyhow::Error> {
+        self.error.take()
+    }
+
+    fn initialize_window(&mut self, event_loop: &ActiveEventLoop) -> anyhow::Result<()> {
+        if self.window.is_some() {
+            return Ok(());
+        }
+
+        let window = Arc::new(
+            event_loop
+                .create_window(
+                    Window::default_attributes()
+                        .with_title("Defender Actor Runtime")
+                        .with_inner_size(LogicalSize::new(
+                            f64::from(INITIAL_WINDOW_WIDTH),
+                            f64::from(INITIAL_WINDOW_HEIGHT),
+                        )),
+                )
+                .context("creating actor wgpu window")?,
+        );
+        let presenter = pollster::block_on(WgpuScenePresenter::new(window.clone()))
+            .context("initializing actor wgpu presenter")?;
+        self.window = Some(window);
+        self.presenter = Some(presenter);
+        self.last_tick = Instant::now();
+        self.next_wake_at = self.last_tick + self.frame_duration;
+        Ok(())
+    }
+
+    fn handle_error(&mut self, event_loop: &ActiveEventLoop, error: anyhow::Error) {
+        if self.error.is_none() {
+            self.error = Some(error);
+        }
+        event_loop.exit();
+    }
+
+    fn window_matches(&self, window_id: WindowId) -> bool {
+        self.window
+            .as_ref()
+            .is_some_and(|window| window.id() == window_id)
+    }
+
+    fn handle_keyboard_input(&mut self, event: &KeyEvent) {
+        let control = live_control_from_winit(self.input_profile, event);
+        self.input.observe_key_event_for_xyzzy(event, control);
+        let Some(control) = control else {
+            return;
+        };
+        let pressed = event.state == ElementState::Pressed;
+        if control == LiveControl::Quit && pressed {
+            self.quit_requested = true;
+            return;
+        }
+        self.input.apply(control, pressed);
+    }
+
+    fn resize(&mut self, size: PhysicalSize<u32>) {
+        let Some((width, height)) = renderable_window_size(size) else {
+            return;
+        };
+        if let Some(presenter) = &mut self.presenter {
+            presenter.resize(width, height);
+        }
+    }
+
+    fn step_one_frame(&mut self) {
+        let input = self.input.drain_game_input();
+        let xyzzy = self.input.drain_xyzzy_mode();
+        let frame = self.runtime.step_clean_input(input, xyzzy);
+        if let Some(batch) = LiveAudioEventBatch::new(frame.report.step, frame.events.sounds()) {
+            self.audio.submit_event_batch(batch);
+        }
+        self.latest_frame = Some(frame);
+    }
+
+    fn step_due_frames(&mut self) -> bool {
+        let now = Instant::now();
+        let elapsed = now.saturating_duration_since(self.last_tick);
+        self.last_tick = now;
+        self.accumulator
+            .add_elapsed_micros(elapsed.as_micros().try_into().unwrap_or(u64::MAX));
+        let due_steps = self.accumulator.consume_due_steps(MAX_STEPS_PER_TICK);
+
+        for _ in 0..due_steps {
+            self.step_one_frame();
+        }
+
+        let micros_until_next = FrameRate::CABINET
+            .frame_duration_micros()
+            .saturating_sub(self.accumulator.accumulated_micros())
+            .max(1);
+        self.next_wake_at = Instant::now() + Duration::from_micros(micros_until_next);
+        due_steps > 0
+    }
+
+    fn draw_frame(&mut self) -> anyhow::Result<()> {
+        let Some(frame) = &self.latest_frame else {
+            return Ok(());
+        };
+        let Some(presenter) = &mut self.presenter else {
+            return Ok(());
+        };
+        presenter.draw_scene(&frame.scene)
+    }
+}
+
+#[cfg(all(not(test), not(coverage)))]
+impl ApplicationHandler for ActorLiveApp {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if let Err(error) = self.initialize_window(event_loop) {
+            self.handle_error(event_loop, error);
+        }
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        if !self.window_matches(window_id) {
+            return;
+        }
+
+        match event {
+            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::KeyboardInput { event, .. } => {
+                self.handle_keyboard_input(&event);
+                if self.quit_requested {
+                    event_loop.exit();
+                }
+            }
+            WindowEvent::Resized(size) => self.resize(size),
+            WindowEvent::RedrawRequested => {
+                if let Some(window) = &self.window {
+                    window.pre_present_notify();
+                }
+                if let Err(error) = self.draw_frame() {
+                    self.handle_error(event_loop, error);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        if self.error.is_some() || self.quit_requested {
+            event_loop.exit();
+            return;
+        }
+
+        if self.step_due_frames()
+            && let Some(window) = &self.window
+        {
+            window.request_redraw();
+        }
+        event_loop.set_control_flow(ControlFlow::WaitUntil(self.next_wake_at));
+    }
+
+    fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
+        self.presenter = None;
+        self.window = None;
+    }
 }
 
 #[cfg(all(not(test), not(coverage)))]
@@ -1375,10 +1624,37 @@ struct LiveInputState {
     high_score_reset: bool,
     high_score_initial: Option<char>,
     high_score_backspace: bool,
+    xyzzy: XyzzyController,
+    overlay_smart_bomb: bool,
 }
 
 #[cfg(any(test, all(not(test), not(coverage))))]
 impl LiveInputState {
+    #[cfg(all(not(test), not(coverage)))]
+    fn observe_key_event_for_xyzzy(&mut self, event: &KeyEvent, control: Option<LiveControl>) {
+        if event.state != ElementState::Pressed {
+            return;
+        }
+        if matches!(control, Some(LiveControl::HighScoreInitial(_))) {
+            return;
+        }
+        let Some(character) = logical_key_character(&event.logical_key) else {
+            return;
+        };
+        self.ingest_xyzzy_character(character);
+    }
+
+    fn ingest_xyzzy_character(&mut self, character: char) {
+        self.xyzzy.ingest(character);
+        if self.xyzzy.active() {
+            match character.to_ascii_lowercase() {
+                'f' => self.xyzzy.toggle_auto_fire(),
+                'g' => self.xyzzy.toggle_invincible(),
+                _ => {}
+            }
+        }
+    }
+
     fn apply(&mut self, control: LiveControl, pressed: bool) {
         match control {
             LiveControl::Coin => self.coin |= pressed,
@@ -1389,7 +1665,12 @@ impl LiveInputState {
             LiveControl::Reverse => self.reverse = pressed,
             LiveControl::Thrust => self.thrust = pressed,
             LiveControl::Fire => self.fire = pressed,
-            LiveControl::SmartBomb => self.smart_bomb = pressed,
+            LiveControl::SmartBomb => {
+                self.smart_bomb = pressed;
+                if pressed && self.xyzzy.active() {
+                    self.overlay_smart_bomb = true;
+                }
+            }
             LiveControl::Hyperspace => self.hyperspace = pressed,
             LiveControl::ServiceAutoUp => self.service_auto_up = pressed,
             LiveControl::ServiceAdvance => self.service_advance |= pressed,
@@ -1398,6 +1679,7 @@ impl LiveInputState {
             LiveControl::HighScoreInitial(value) => {
                 if pressed {
                     self.high_score_initial = Some(value);
+                    self.ingest_xyzzy_character(value);
                 }
             }
             LiveControl::Quit => {}
@@ -1425,6 +1707,18 @@ impl LiveInputState {
             high_score_backspace: take_bool(&mut self.high_score_backspace),
             tilt: false,
         }
+    }
+
+    fn drain_xyzzy_mode(&mut self) -> XyzzyMode {
+        self.xyzzy.mode(take_bool(&mut self.overlay_smart_bomb))
+    }
+}
+
+#[cfg(all(not(test), not(coverage)))]
+fn logical_key_character(key: &Key) -> Option<char> {
+    match key {
+        Key::Character(text) => single_character(text),
+        _ => None,
     }
 }
 
@@ -1545,7 +1839,7 @@ fn single_character(text: &str) -> Option<char> {
 mod tests {
     use crate::GameInput;
 
-    use super::{LiveInputState, LiveSmokeReport, run_actor_wgpu_smoke, run_smoke};
+    use super::{LiveInputState, LiveSmokeReport, run_actor_live, run_actor_wgpu_smoke, run_smoke};
 
     #[test]
     fn live_smoke_report_formats_current_cli_output() {
@@ -1650,6 +1944,37 @@ mod tests {
         assert!(report.saw_attract);
         assert!(report.saw_credit);
         assert!(report.saw_playing);
+    }
+
+    #[test]
+    fn actor_live_entrypoint_is_available_under_tests() {
+        run_actor_live(
+            super::LiveInputProfile::Test,
+            crate::audio::LiveAudioMode::Null,
+            None,
+        )
+        .expect("actor live entrypoint should be wired");
+    }
+
+    #[test]
+    fn live_input_state_carries_xyzzy_mode_for_actor_runtime() {
+        let mut input = LiveInputState::default();
+        for character in ['X', 'Y', 'Z', 'Z', 'Y'] {
+            input.apply(super::LiveControl::HighScoreInitial(character), true);
+        }
+        input.apply(super::LiveControl::HighScoreInitial('F'), true);
+        input.apply(super::LiveControl::HighScoreInitial('G'), true);
+        input.apply(super::LiveControl::SmartBomb, true);
+
+        let clean_input = input.drain_game_input();
+        let xyzzy = input.drain_xyzzy_mode();
+
+        assert!(clean_input.smart_bomb);
+        assert!(xyzzy.active);
+        assert!(xyzzy.auto_fire);
+        assert!(xyzzy.invincible);
+        assert!(xyzzy.overlay_smart_bomb);
+        assert!(!input.drain_xyzzy_mode().overlay_smart_bomb);
     }
 
     #[test]

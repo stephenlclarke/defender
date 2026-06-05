@@ -81,7 +81,10 @@ coverage without switching interactive live play away from the current clean
 `Game` runtime. `--actor-wgpu-smoke` uses the same actor input sequence and
 renders actor `RenderScene` frames through the offscreen `wgpu` readback path,
 proving nonblank dynamic WGPU output before actor frames replace interactive
-live play.
+live play. `--actor-live` is now available as an explicit interactive preflight
+mode that uses `ActorRuntimeAdapter`, actor scenes, actor sound events, the
+existing `wgpu` presenter, and the same live key bindings/XYZZY input state
+while leaving normal `cargo run` on the clean `Game` runtime.
 The current slice includes same-contract keyboard profiles, `XYZZY` overlay
 state, thread-backed actors, a data-driven `AttractScript` for custom attract
 drivers, `ActorBehaviorScript` profiles for level-wide and per-actor movement
@@ -157,6 +160,7 @@ Common commands:
 
 ```sh
 cargo run
+cargo run -- --actor-live
 cargo run -- --input-profile planetoid
 cargo run -- --input-profile cabinet
 cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin
@@ -703,7 +707,9 @@ pipelines, and frame-level `wgpu` command plans without entering the legacy
 presenter or replacing the live `Game` runtime. `--actor-wgpu-smoke` then
 renders actor scenes through the actual offscreen `wgpu` texture/readback path
 and requires every actor smoke frame to produce nonblank output plus dynamic
-readback signatures.
+readback signatures. `--actor-live` opens an interactive actor-frame window
+through the same `wgpu` presenter and live audio event queue while default
+interactive play remains clean `Game`.
 The clean `Game` world seeds terrain, starfield, source-profile active enemy
 batches, human, and projectile snapshots for playing waves and renders them as
 atlas-backed scene sprites. Operator controls are
