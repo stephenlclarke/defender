@@ -37,11 +37,11 @@ verified.
   score popups, and explosion variants. Actors do not own renderer resources or
   display cadence.
 - `ActorRuntimeAdapter` combines the sound and render bridges into an
-  actor-specific `ActorFrame`: the original `StepReport`, a clean
-  gameplay/audio `GameEvents` batch, and the clean `RenderScene`. This is a
-  truthful runtime-facing adapter, not a premature `GameFrame` implementation,
-  because the actor driver does not yet publish the full clean `GameState`
-  snapshot.
+  actor-specific `ActorFrame`: the original `StepReport`, an actor-derived
+  clean `GameState`, a clean gameplay/audio `GameEvents` batch, and the clean
+  `RenderScene`. `ActorStateBridge` maps actor phase, score, stock,
+  high-score-entry state, and published actor snapshots into the clean state
+  contract without making the actor simulation display-frame driven.
 - `src/actor_smoke.rs` exercises `ActorRuntimeAdapter` through a scripted
   attract/play sequence and the native draw planner. The smoke report verifies
   attract, credited attract, playing actor frames, clean gameplay/audio events,
@@ -296,6 +296,6 @@ The actor driver now owns a first Defender gameplay loop:
   driver-owned data.
 
 These mechanics are still intentionally compact. The next fidelity slices
-should port the remaining source restore positions and wire the actor
-render/audio bridges into the live runtime once actor gameplay parity is high
-enough to retire isolated scaffolding.
+should port the remaining source restore positions and use the actor state,
+render, and audio bridges as the replacement boundary once actor gameplay parity
+is high enough to retire isolated scaffolding.

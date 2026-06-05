@@ -72,9 +72,11 @@ text, Williams logo, Defender coalescence, sprite atlas, projectile, and
 explosion assets; this keeps actor behavior separate from render cadence while
 making the actor report consumable by the native renderer path.
 `ActorRuntimeAdapter` bundles each actor step into an `ActorFrame` containing
-the original report, clean gameplay/audio `GameEvents`, and the clean
-`RenderScene`, without fabricating the full clean `GameState` before actor
-state parity exists. `--actor-smoke` exercises that actor frame path through a
+the original report, an actor-derived clean `GameState`, clean gameplay/audio
+`GameEvents`, and the clean `RenderScene`. The state bridge maps actor phase,
+score, stock, high-score state, and published actor snapshots into the clean
+runtime contract without making actor behavior display-frame driven.
+`--actor-smoke` exercises that actor frame path through a
 scripted attract/play input sequence and the native draw planner, proving actor
 events, audio, sprites, projectiles, HUD text, overlays, and `wgpu` command-plan
 coverage without switching interactive live play away from the current clean
@@ -712,7 +714,9 @@ and requires every actor smoke frame to produce nonblank output plus dynamic
 readback signatures. `--actor-live` opens an interactive actor-frame window
 through the same `wgpu` presenter and live audio event queue while default
 interactive play remains clean `Game`; actor high-score entry accepts the same
-initials/backspace keys through that path.
+initials/backspace keys through that path. Actor frames now also publish a
+clean state snapshot alongside events and scene data for runtime replacement
+preflights.
 The clean `Game` world seeds terrain, starfield, source-profile active enemy
 batches, human, and projectile snapshots for playing waves and renders them as
 atlas-backed scene sprites. Operator controls are

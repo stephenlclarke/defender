@@ -183,11 +183,13 @@ tree:
   command bytes where source evidence exists. `ActorSoundEventBridge` adapts
   report sound cues into clean `SoundEvent` batches for the existing audio
   runtime contract. `ActorRenderSceneBridge` adapts report draw commands into
-  clean `RenderScene` sprites for the existing native renderer contract.
-  `ActorRuntimeAdapter` bundles reports, clean `GameEvents`, and clean
-  `RenderScene` values into actor `ActorFrame` values without claiming full
-  clean `GameFrame`/`GameState` parity. The actor game is not wired into the
-  live runtime yet.
+  clean `RenderScene` sprites for the existing native renderer contract, and
+  `ActorStateBridge` adapts report phase, score, stock, high-score state, and
+  actor snapshots into clean `GameState` values. `ActorRuntimeAdapter` bundles
+  reports, clean `GameState`, clean `GameEvents`, and clean `RenderScene`
+  values into actor `ActorFrame` values. The actor game is available through
+  explicit actor smoke/live preflight commands while default live play remains
+  on the clean `Game` runtime.
 - `src/actor_smoke.rs`: the crate-private actor smoke command that steps
   `ActorRuntimeAdapter` through scripted attract/play inputs, verifies
   actor-origin clean gameplay/audio events, required actor sprite coverage,
@@ -729,10 +731,11 @@ reintroduce legacy implementation terminology.
   source text glyphs, Williams logo reveal pixels, Defender appearance pixels,
   sprite atlas families, projectile layers, and explosion families. The actor
   slice also exposes `ActorRuntimeAdapter`, which steps the actor driver and
-  returns `ActorFrame` values containing the original report, a clean
-  gameplay/audio `GameEvents` batch, and the clean render scene. It is
-  simulation-step driven rather than display-frame driven: render cadence is
-  outside actor behavior, and attract scripts use actor-local elapsed steps.
+  returns `ActorFrame` values containing the original report, an actor-derived
+  clean `GameState`, a clean gameplay/audio `GameEvents` batch, and the clean
+  render scene. It is simulation-step driven rather than display-frame driven:
+  render cadence is outside actor behavior, and attract scripts use actor-local
+  elapsed steps.
   Actor movement and behavior are scriptable through `ActorBehaviorScript`,
   which resolves default, actor-kind, and actor-id profiles into each prompt;
   level scripts can tune speeds, fire cadence, pickup/conversion bands,

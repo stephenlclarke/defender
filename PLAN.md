@@ -4172,3 +4172,28 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780631835946159`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780632444002359`.
+- `2026-06-05 05:18 BST`: Completed the actor state bridge cycle. Added
+  `ActorStateBridge` so actor `StepReport` values publish clean `GameState`
+  snapshots for phase, credits, wave, score/stock, high-score rows and
+  initials, player direction, actor world snapshots, projectiles, enemy
+  projectiles, explosions, and score popups. `ActorFrame` now carries clean
+  state plus the original report, clean events, and render scene, and exposes
+  `ActorFrame::game_frame()` for runtime replacement preflights while keeping
+  actor behavior simulation-step driven instead of display-frame driven. README,
+  SPEC, and the actor architecture notes were updated to remove stale
+  no-`GameState` wording. No legacy code, tests, or scaffolding were safe to
+  remove because default live play still uses clean `Game`, and legacy tooling
+  still backs ROM reports, trace/media helpers, and oracle evidence. Validation
+  passed with `cargo fmt --check`, `cargo test actor_state --lib`,
+  `cargo test actor_runtime_adapter --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780632487814759`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780633107380529`.

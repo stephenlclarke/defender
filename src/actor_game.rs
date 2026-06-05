@@ -6,14 +6,26 @@
 //! world rules in a stable order, and publishes a step description.
 
 use crate::{
-    game::{GameEvent, GameEvents, GameInput as CleanGameInput, SoundEvent},
+    game::{
+        AttractPresentationSnapshot, Direction as CleanDirection, EnemyKind as CleanEnemyKind,
+        EnemyProjectileSnapshot as CleanEnemyProjectileSnapshot, EnemyProjectileSourceKind,
+        EnemySnapshot as CleanEnemySnapshot, ExplosionKind as CleanExplosionKind,
+        ExplosionSnapshot as CleanExplosionSnapshot, GameEvent, GameEvents, GameFrame,
+        GameInput as CleanGameInput, GameOverSnapshot, GamePhase, GameState,
+        HighScoreEntrySnapshot, HighScoreTableEntrySnapshot, HighScoreTablesSnapshot,
+        HumanSnapshot as CleanHumanSnapshot, PlayerSnapshot, PlayerStockSnapshot,
+        ProjectileSnapshot as CleanProjectileSnapshot, ScorePopupKind as CleanScorePopupKind,
+        ScorePopupSnapshot as CleanScorePopupSnapshot, ScoreSnapshot, SoundEvent,
+        SourceBaiterSnapshot, SourceBomberSnapshot, SourceLanderSnapshot, SourcePodSnapshot,
+        SourceRandSnapshot, SourceSwarmerSnapshot, WaveProfileSnapshot, WorldSnapshot, WorldVector,
+    },
     renderer::{
         Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
         push_source_text_bytes_sprites, source_attract_defender_appearance_pixels,
         source_attract_williams_logo_operation_pixel_counts,
         source_attract_williams_logo_pixel_path,
     },
-    systems::{HighScoreEntrySystem, HighScoreInitialsState},
+    systems::{HighScoreEntrySystem, HighScoreInitialsState, ScreenPosition, ScreenVelocity},
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -2709,6 +2721,8 @@ pub struct StepReport {
     pub credits: u8,
     pub lives: u8,
     pub smart_bombs: u8,
+    pub high_scores: [u32; 5],
+    pub high_score_initials: HighScoreInitialsState,
     pub snapshots: Vec<ActorSnapshot>,
     pub draws: Vec<DrawCommand>,
     pub sounds: Vec<SoundCue>,
@@ -2727,6 +2741,353 @@ impl StepReport {
     pub fn render_scene_with(&self, bridge: &ActorRenderSceneBridge) -> RenderScene {
         bridge.render_scene_for_report(self)
     }
+
+    pub fn game_state(&self) -> GameState {
+        ActorStateBridge::new().state_for_report(self)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ActorStateBridge;
+
+impl ActorStateBridge {
+    pub const fn new() -> Self {
+        Self
+    }
+
+    pub fn state_for_report(&self, report: &StepReport) -> GameState {
+        let phase = clean_phase(report.phase);
+        let wave = clean_wave(report.wave);
+        let high_score_tables = high_score_tables_for_report(report);
+        GameState {
+            frame: report.step,
+            phase,
+            credits: report.credits,
+            current_player: 1,
+            player_count: 1,
+            wave,
+            wave_profile: WaveProfileSnapshot::for_wave(wave.max(1)),
+            player: player_snapshot_for_report(report),
+            player_stocks: [
+                PlayerStockSnapshot::new(report.lives, report.smart_bombs),
+                PlayerStockSnapshot::default(),
+            ],
+            scores: ScoreSnapshot {
+                player_one: report.score,
+                player_two: 0,
+                high_score: report.high_scores[0],
+                next_bonus: 10_000,
+            },
+            attract: attract_snapshot_for_report(report),
+            post_game_playfield: None,
+            high_score_initials: report.high_score_initials,
+            high_score_entry: high_score_entry_for_report(report),
+            high_score_submission: None,
+            high_score_tables,
+            game_over: GameOverSnapshot::NONE,
+            world: world_snapshot_for_report(report),
+        }
+    }
+}
+
+fn clean_phase(phase: Phase) -> GamePhase {
+    match phase {
+        Phase::Attract => GamePhase::Attract,
+        Phase::Playing => GamePhase::Playing,
+        Phase::GameOver => GamePhase::GameOver,
+        Phase::HighScoreEntry => GamePhase::HighScoreEntry,
+    }
+}
+
+fn clean_wave(wave: u16) -> u8 {
+    u8::try_from(wave.max(1)).unwrap_or(u8::MAX)
+}
+
+fn attract_snapshot_for_report(report: &StepReport) -> AttractPresentationSnapshot {
+    if report.phase == Phase::Attract {
+        AttractPresentationSnapshot::for_page_frame(u16::try_from(report.step).unwrap_or(u16::MAX))
+    } else {
+        AttractPresentationSnapshot::INACTIVE
+    }
+}
+
+fn player_snapshot_for_report(report: &StepReport) -> PlayerSnapshot {
+    let position = report
+        .snapshots
+        .iter()
+        .find(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive)
+        .map(|snapshot| snapshot.position)
+        .unwrap_or_default();
+    PlayerSnapshot {
+        position: (world_vector(position.x), world_vector(position.y)),
+        velocity: (WorldVector::default(), WorldVector::default()),
+        direction: player_direction_for_report(report),
+        lives: report.lives,
+        smart_bombs: report.smart_bombs,
+    }
+}
+
+fn player_direction_for_report(report: &StepReport) -> CleanDirection {
+    report
+        .draws
+        .iter()
+        .rev()
+        .find_map(|draw| match draw.sprite {
+            SpriteKey::PlayerLeft => Some(CleanDirection::Left),
+            SpriteKey::PlayerRight => Some(CleanDirection::Right),
+            _ => None,
+        })
+        .unwrap_or(CleanDirection::Right)
+}
+
+fn high_score_tables_for_report(report: &StepReport) -> HighScoreTablesSnapshot {
+    let mut entries = HighScoreTablesSnapshot::EMPTY.all_time;
+    for (index, score) in report.high_scores.iter().copied().enumerate() {
+        entries[index] = HighScoreTableEntrySnapshot {
+            rank: u8::try_from(index + 1).expect("actor high-score rank should fit u8"),
+            score,
+            initials: [None; 3],
+        };
+    }
+    HighScoreTablesSnapshot {
+        all_time: entries,
+        todays_greatest: entries,
+    }
+}
+
+fn high_score_entry_for_report(report: &StepReport) -> Option<HighScoreEntrySnapshot> {
+    if report.phase != Phase::HighScoreEntry {
+        return None;
+    }
+
+    report
+        .high_scores
+        .iter()
+        .position(|score| *score == report.score)
+        .map(|index| HighScoreEntrySnapshot {
+            score: report.score,
+            rank: u8::try_from(index + 1).expect("actor high-score rank should fit u8"),
+        })
+}
+
+fn world_snapshot_for_report(report: &StepReport) -> WorldSnapshot {
+    let mut world = WorldSnapshot {
+        enemies: actor_enemies_for_report(report),
+        humans: actor_humans_for_report(report),
+        projectiles: actor_projectiles_for_report(report),
+        enemy_projectiles: actor_enemy_projectiles_for_report(report),
+        explosions: actor_explosions_for_report(report),
+        score_popups: actor_score_popups_for_report(report),
+        source_rng: SourceRandSnapshot::default(),
+        ..WorldSnapshot::default()
+    };
+    world.scanner.enabled = report.phase == Phase::Playing;
+    world
+}
+
+fn actor_enemies_for_report(report: &StepReport) -> Vec<CleanEnemySnapshot> {
+    report
+        .snapshots
+        .iter()
+        .filter_map(clean_enemy_snapshot)
+        .collect()
+}
+
+fn clean_enemy_snapshot(snapshot: &ActorSnapshot) -> Option<CleanEnemySnapshot> {
+    let kind = match snapshot.kind {
+        ActorKind::Lander => CleanEnemyKind::Lander,
+        ActorKind::Mutant => CleanEnemyKind::Mutant,
+        ActorKind::Bomber => CleanEnemyKind::Bomber,
+        ActorKind::Pod => CleanEnemyKind::Pod,
+        ActorKind::Swarmer => CleanEnemyKind::Swarmer,
+        ActorKind::Baiter => CleanEnemyKind::Baiter,
+        _ => return None,
+    };
+    let mut enemy = CleanEnemySnapshot::new(
+        kind,
+        screen_position(snapshot.position),
+        ScreenVelocity::default(),
+    );
+    enemy.source_lander = snapshot.source_lander.map(clean_source_lander);
+    enemy.source_bomber = snapshot.source_bomber.map(clean_source_bomber);
+    enemy.source_pod = snapshot.source_pod.map(clean_source_pod);
+    enemy.source_swarmer = snapshot.source_swarmer.map(clean_source_swarmer);
+    enemy.source_baiter = snapshot.source_baiter.map(clean_source_baiter);
+    Some(enemy)
+}
+
+fn clean_source_lander(source: ActorSourceLanderMetadata) -> SourceLanderSnapshot {
+    SourceLanderSnapshot {
+        x_fraction: source.x_fraction,
+        y_fraction: source.y_fraction,
+        x_velocity: source.x_velocity,
+        y_velocity: source.y_velocity,
+        shot_timer: source.shot_timer,
+        sleep_ticks: source.sleep_ticks,
+        picture_frame: source.picture_frame,
+        target_human_index: source.target_human_index,
+    }
+}
+
+fn clean_source_bomber(source: ActorSourceBomberMetadata) -> SourceBomberSnapshot {
+    SourceBomberSnapshot {
+        x_fraction: source.x_fraction,
+        y_fraction: source.y_fraction,
+        x_velocity: source.x_velocity,
+        y_velocity: source.y_velocity,
+        picture_frame: source.picture_frame,
+        cruise_altitude: screen_coordinate(source.cruise_altitude),
+        sleep_ticks: source.sleep_ticks,
+        source_slot: source.source_slot,
+    }
+}
+
+fn clean_source_pod(source: ActorSourcePodMetadata) -> SourcePodSnapshot {
+    SourcePodSnapshot {
+        x_fraction: source.x_fraction,
+        y_fraction: source.y_fraction,
+        x_velocity: source.x_velocity,
+        y_velocity: source.y_velocity,
+    }
+}
+
+fn clean_source_swarmer(source: ActorSourceSwarmerMetadata) -> SourceSwarmerSnapshot {
+    SourceSwarmerSnapshot {
+        x_fraction: source.x_fraction,
+        y_fraction: source.y_fraction,
+        x_velocity: source.x_velocity,
+        y_velocity: source.y_velocity,
+        acceleration: source.acceleration,
+        shot_timer: source.shot_timer,
+        sleep_ticks: source.sleep_ticks,
+        horizontal_seek_pending: false,
+    }
+}
+
+fn clean_source_baiter(source: ActorSourceBaiterMetadata) -> SourceBaiterSnapshot {
+    SourceBaiterSnapshot {
+        x_fraction: source.x_fraction,
+        y_fraction: source.y_fraction,
+        x_velocity: source.x_velocity,
+        y_velocity: source.y_velocity,
+        shot_timer: source.shot_timer,
+        sleep_ticks: source.sleep_ticks,
+        picture_frame: source.picture_frame,
+    }
+}
+
+fn actor_humans_for_report(report: &StepReport) -> Vec<CleanHumanSnapshot> {
+    report
+        .snapshots
+        .iter()
+        .filter(|snapshot| snapshot.kind == ActorKind::Human && snapshot.alive)
+        .map(|snapshot| {
+            let mut human = CleanHumanSnapshot::new(screen_position(snapshot.position));
+            human.carried = report.draws.iter().any(|draw| {
+                draw.actor == snapshot.id && matches!(draw.sprite, SpriteKey::HumanCarried)
+            });
+            if let Some(source) = snapshot.source_human {
+                human.source_x_fraction = source.x_fraction;
+                human.source_picture_frame = source.picture_frame;
+            }
+            human
+        })
+        .collect()
+}
+
+fn actor_projectiles_for_report(report: &StepReport) -> Vec<CleanProjectileSnapshot> {
+    report
+        .snapshots
+        .iter()
+        .filter(|snapshot| snapshot.kind == ActorKind::Laser && snapshot.alive)
+        .map(|snapshot| CleanProjectileSnapshot {
+            position: screen_position(snapshot.position),
+            source_tail_position: screen_position(Point::new(
+                snapshot.position.x.saturating_sub(16),
+                snapshot.position.y,
+            )),
+            velocity: ScreenVelocity::default(),
+        })
+        .collect()
+}
+
+fn actor_enemy_projectiles_for_report(report: &StepReport) -> Vec<CleanEnemyProjectileSnapshot> {
+    report
+        .snapshots
+        .iter()
+        .filter(|snapshot| {
+            matches!(snapshot.kind, ActorKind::EnemyLaser | ActorKind::Bomb) && snapshot.alive
+        })
+        .map(|snapshot| CleanEnemyProjectileSnapshot {
+            position: screen_position(snapshot.position),
+            velocity: ScreenVelocity::default(),
+            source_kind: if snapshot.kind == ActorKind::Bomb {
+                EnemyProjectileSourceKind::BomberBombShell
+            } else {
+                EnemyProjectileSourceKind::Fireball
+            },
+            source_x_fraction: 0,
+            source_y_fraction: 0,
+            source_x_velocity: 0,
+            source_y_velocity: 0,
+            source_lifetime_ticks: 0,
+        })
+        .collect()
+}
+
+fn actor_explosions_for_report(report: &StepReport) -> Vec<CleanExplosionSnapshot> {
+    report
+        .draws
+        .iter()
+        .filter_map(|draw| match draw.effect {
+            VisualEffect::ExplosionCloud { kind, .. } => {
+                Some(CleanExplosionSnapshot::source_spawn(
+                    clean_explosion_kind(kind),
+                    screen_position(draw.position),
+                ))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+fn clean_explosion_kind(kind: ExplosionKind) -> CleanExplosionKind {
+    match kind {
+        ExplosionKind::Enemy => CleanExplosionKind::Lander,
+        ExplosionKind::Bomb => CleanExplosionKind::Bomb,
+        ExplosionKind::Player => CleanExplosionKind::PlayerShip,
+        ExplosionKind::Human => CleanExplosionKind::Astronaut,
+    }
+}
+
+fn actor_score_popups_for_report(report: &StepReport) -> Vec<CleanScorePopupSnapshot> {
+    report
+        .draws
+        .iter()
+        .filter_map(|draw| {
+            let kind = match draw.sprite {
+                SpriteKey::Score250 => CleanScorePopupKind::Points250,
+                SpriteKey::Score500 => CleanScorePopupKind::Points500,
+                _ => return None,
+            };
+            Some(CleanScorePopupSnapshot::source_spawn(
+                kind,
+                screen_position(draw.position),
+            ))
+        })
+        .collect()
+}
+
+fn world_vector(value: i16) -> WorldVector {
+    WorldVector::from_subpixels(i32::from(value) * WorldVector::SUBPIXELS_PER_PIXEL)
+}
+
+fn screen_position(point: Point) -> ScreenPosition {
+    ScreenPosition::new(screen_coordinate(point.x), screen_coordinate(point.y))
+}
+
+fn screen_coordinate(value: i16) -> u8 {
+    u8::try_from(value.clamp(0, 255)).expect("screen coordinate should be clamped to u8")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -3059,17 +3420,32 @@ fn actor_scene_sprite(sprite: SpriteKey, position: Point) -> Option<SceneSprite>
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ActorFrame {
+    pub state: GameState,
     pub report: StepReport,
     pub events: GameEvents,
     pub scene: RenderScene,
 }
 
 impl ActorFrame {
-    pub fn new(report: StepReport, events: GameEvents, scene: RenderScene) -> Self {
+    pub fn new(
+        report: StepReport,
+        state: GameState,
+        events: GameEvents,
+        scene: RenderScene,
+    ) -> Self {
         Self {
+            state,
             report,
             events,
             scene,
+        }
+    }
+
+    pub fn game_frame(&self) -> GameFrame {
+        GameFrame {
+            state: self.state.clone(),
+            events: self.events.clone(),
+            scene: self.scene.clone(),
         }
     }
 }
@@ -3123,11 +3499,13 @@ impl ActorRuntimeAdapter {
     }
 
     fn frame_for_report(&mut self, report: StepReport) -> ActorFrame {
+        let state = report.game_state();
         let gameplay_events = actor_gameplay_events_for_report(&report);
         let sound_events = self.sound_bridge.sound_events_for_report(&report);
         let scene = self.render_bridge.render_scene_for_report(&report);
         ActorFrame::new(
             report,
+            state,
             GameEvents::new(gameplay_events, sound_events),
             scene,
         )
@@ -3312,6 +3690,8 @@ impl ActorGameDriver {
             credits: self.credits,
             lives: self.lives,
             smart_bombs: self.smart_bombs,
+            high_scores: self.high_scores.entries(),
+            high_score_initials: self.high_score_initials,
             snapshots: self.snapshots.values().cloned().collect(),
             draws,
             sounds,
@@ -6407,6 +6787,8 @@ mod tests {
             credits: 0,
             lives: 3,
             smart_bombs: 3,
+            high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
+            high_score_initials: HighScoreInitialsState::EMPTY,
             snapshots: Vec::new(),
             draws: vec![
                 DrawCommand::sprite(ActorId(101), SpriteKey::Laser, Point::new(40, 80)),
@@ -6466,6 +6848,121 @@ mod tests {
             sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
                 && sprite.layer == RenderLayer::Objects
         }));
+    }
+
+    #[test]
+    fn actor_state_bridge_maps_report_snapshots_and_draw_effects_to_clean_state() {
+        let mut player = actor_snapshot(11, ActorKind::Player, Point::new(40, 70));
+        player.bounds = Some(Rect::from_center(player.position, 16, 6));
+        let mut lander = actor_snapshot(12, ActorKind::Lander, Point::new(0x3F, 0x2C));
+        lander.source_lander = Some(ActorSourceLanderMetadata {
+            x_fraction: 0x4A,
+            y_fraction: 0xE0,
+            x_velocity: 0xFFEE,
+            y_velocity: 0x0070,
+            shot_timer: 0x3B,
+            sleep_ticks: 0x04,
+            picture_frame: 1,
+            target_human_index: Some(2),
+        });
+        let mut human = actor_snapshot(13, ActorKind::Human, Point::new(0x1C, 0xE1));
+        human.source_human = Some(ActorSourceHumanMetadata {
+            x_fraction: 0x81,
+            y_fraction: 0,
+            picture_frame: 3,
+            target_slot_index: 1,
+        });
+
+        let report = StepReport {
+            step: 77,
+            phase: Phase::HighScoreEntry,
+            wave: 2,
+            score: 12_000,
+            credits: 1,
+            lives: 2,
+            smart_bombs: 1,
+            high_scores: [12_000, 10_000, 7_500, 5_000, 2_500],
+            high_score_initials: HighScoreInitialsState {
+                initials: [Some('R'), None, None],
+                cursor: 1,
+            },
+            snapshots: vec![
+                player,
+                lander,
+                human,
+                actor_snapshot(14, ActorKind::Laser, Point::new(80, 72)),
+                actor_snapshot(15, ActorKind::EnemyLaser, Point::new(90, 80)),
+                actor_snapshot(16, ActorKind::Bomb, Point::new(100, 84)),
+            ],
+            draws: vec![
+                DrawCommand::sprite(ActorId(11), SpriteKey::PlayerLeft, Point::new(40, 70)),
+                DrawCommand::sprite(ActorId(13), SpriteKey::HumanCarried, Point::new(0x1C, 0xE1)),
+                DrawCommand::sprite_with_effect(
+                    ActorId(17),
+                    SpriteKey::Explosion,
+                    Point::new(120, 90),
+                    VisualEffect::ExplosionCloud {
+                        kind: ExplosionKind::Enemy,
+                        age: 0,
+                    },
+                ),
+                DrawCommand::sprite(ActorId(18), SpriteKey::Score500, Point::new(122, 88)),
+            ],
+            sounds: Vec::new(),
+            commands: Vec::new(),
+        };
+
+        let state = report.game_state();
+
+        assert_eq!(state.frame, 77);
+        assert_eq!(state.phase, GamePhase::HighScoreEntry);
+        assert_eq!(state.credits, 1);
+        assert_eq!(state.wave, 2);
+        assert_eq!(state.player.direction, CleanDirection::Left);
+        assert_eq!(state.player.position.0.subpixels(), 40 * 256);
+        assert_eq!(state.player_stocks[0], PlayerStockSnapshot::new(2, 1));
+        assert_eq!(state.scores.player_one, 12_000);
+        assert_eq!(state.scores.high_score, 12_000);
+        assert_eq!(state.high_score_initials.initials, [Some('R'), None, None]);
+        assert_eq!(
+            state.high_score_entry,
+            Some(HighScoreEntrySnapshot {
+                score: 12_000,
+                rank: 1
+            })
+        );
+        assert_eq!(state.high_score_tables.all_time[0].score, 12_000);
+
+        assert_eq!(state.world.enemies.len(), 1);
+        assert_eq!(state.world.enemies[0].kind, CleanEnemyKind::Lander);
+        assert_eq!(
+            state.world.enemies[0].source_lander,
+            Some(SourceLanderSnapshot {
+                x_fraction: 0x4A,
+                y_fraction: 0xE0,
+                x_velocity: 0xFFEE,
+                y_velocity: 0x0070,
+                shot_timer: 0x3B,
+                sleep_ticks: 0x04,
+                picture_frame: 1,
+                target_human_index: Some(2),
+            })
+        );
+        assert_eq!(state.world.humans.len(), 1);
+        assert!(state.world.humans[0].carried);
+        assert_eq!(state.world.humans[0].source_picture_frame, 3);
+        assert_eq!(state.world.projectiles.len(), 1);
+        assert_eq!(state.world.enemy_projectiles.len(), 2);
+        assert!(state.world.enemy_projectiles.iter().any(|projectile| {
+            projectile.source_kind == EnemyProjectileSourceKind::BomberBombShell
+        }));
+        assert_eq!(state.world.explosions.len(), 1);
+        assert_eq!(state.world.explosions[0].kind, CleanExplosionKind::Lander);
+        assert_eq!(state.world.score_popups.len(), 1);
+        assert_eq!(
+            state.world.score_popups[0].kind,
+            CleanScorePopupKind::Points500
+        );
     }
 
     #[test]
@@ -6531,6 +7028,8 @@ mod tests {
         });
         assert_eq!(credited.report.phase, Phase::Attract);
         assert_eq!(credited.report.credits, 1);
+        assert_eq!(credited.state.phase, GamePhase::Attract);
+        assert_eq!(credited.state.credits, 1);
         assert_eq!(credited.events.gameplay(), &[GameEvent::CreditAdded]);
         assert_eq!(credited.events.sounds(), &[SoundEvent::CreditAdded]);
         assert_eq!(credited.scene.frame, credited.report.step);
@@ -6554,6 +7053,27 @@ mod tests {
         assert_eq!(started.events.sounds(), &[SoundEvent::GameStarted]);
 
         let settled = runtime.step(GameInput::NONE);
+        assert_eq!(settled.state.phase, GamePhase::Playing);
+        assert_eq!(settled.state.wave, 1);
+        assert_eq!(
+            settled.state.player_stocks[0],
+            PlayerStockSnapshot::new(3, 3)
+        );
+        assert_eq!(settled.state.world.humans.len(), 10);
+        assert_eq!(
+            settled
+                .state
+                .world
+                .enemies
+                .iter()
+                .filter(|enemy| enemy.kind == CleanEnemyKind::Lander)
+                .count(),
+            5
+        );
+        let clean_frame = settled.game_frame();
+        assert_eq!(clean_frame.state, settled.state);
+        assert_eq!(clean_frame.events, settled.events);
+        assert_eq!(clean_frame.scene, settled.scene);
         assert!(settled.scene.sprites.iter().any(|sprite| {
             matches!(
                 sprite.sprite,
@@ -9007,6 +9527,22 @@ mod tests {
             .iter()
             .find(|snapshot| snapshot.id == id)
             .expect("actor snapshot should be present")
+    }
+
+    fn actor_snapshot(id: u64, kind: ActorKind, position: Point) -> ActorSnapshot {
+        ActorSnapshot {
+            id: ActorId(id),
+            kind,
+            position,
+            bounds: Some(Rect::from_center(position, 4, 4)),
+            alive: true,
+            source_lander: None,
+            source_bomber: None,
+            source_pod: None,
+            source_swarmer: None,
+            source_baiter: None,
+            source_human: None,
+        }
     }
 
     fn assert_text(report: &StepReport, value: &str) {
