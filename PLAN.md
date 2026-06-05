@@ -587,12 +587,16 @@ Exit gate:
    `ASTCNT=0x00`, `pc=0xED88`, `terrain_blown=false`, and a live `TERBLO`
    process. The candidate report at
    `target/reference-media/organic-terrain-blow-smartmix-check/report.json`
-   still needs regeneration and all-axis review, but the focused clean guard
-   now matches the terminal-death state rows through score `50`, terrain-blown
+   still needs all-axis repair and owner review. The focused clean guard now
+   matches the terminal-death state rows through score `50`, terrain-blown
    status at frame `4927`, attract handoff at frame `4947`, no clean human
-   snapshots once terrain blow is active, and the sampled `0xEE` terrain-blow
-   tail at frames `5991`, `5995`, `5999`, `6003`, and `6007`. The
-   state-steered `TERBLO` clip remains the accepted bounded
+   snapshots once terrain blow is active, delayed visible `TEREX` progression
+   at the organic `TERBLO` sound boundary, and the sampled `0xEE` terrain-blow
+   tail at frames `5991`, `5995`, `5999`, `6003`, and `6007`. The current
+   regenerated report improves from stale no-audio/static-clean evidence but
+   still fails with visual RMS `90.26` / MAE `42.20` and audio waveform
+   correlation below threshold. The state-steered `TERBLO` clip remains the
+   accepted bounded
    terrain-blow evidence, and the organic smartmix TERBLO cadence remains the
    concrete follow-up rather than a missing-evidence boundary. A follow-up
    non-lander trace inventory identified `extended_hold_up_7000`, frames
@@ -6273,3 +6277,31 @@ Exit gate:
   `markdownlint PLAN.md docs/fidelity/release-closure-audit.md`, and
   `git diff --check`. Slack start:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780695238307599`.
+- `2026-06-05 22:53 BST`: Completed the organic smartmix visible-terrain-blow
+  continuation cycle. The clean runtime now treats the earlier
+  destroyed-planet state as terrain erased, then resets the visible source
+  `TERBLO` sequence at the organic post-game frame `1044` where MAME emits the
+  first sampled `0xEE`. Post-game sync preserves terrain explosions during
+  this branch instead of overwriting them with static residual post-game
+  objects, and the organic smartmix regression now checks terrain-blow elapsed
+  time plus `TEREX` births at the sampled state rows. Regenerating the ignored
+  clean candidate with `make reference-clean-capture` for input frames
+  `5960-6140` now shows `elapsed16` and `TEREX` progression by state frame
+  `6007`, while preserving score `50`, no humans, and the `0xEE` cadence. The
+  regenerated ignored report at
+  `target/reference-media/organic-terrain-blow-smartmix-check/report.json`
+  improves from stale static/no-audio evidence but still fails all-axis
+  acceptance with visual RMS `90.26`, visual MAE `42.20`, and audio envelope
+  correlation `0.137`; no protected media was committed or accepted. No legacy
+  code, tests, or scaffolding were safe to remove because the remaining gap is
+  still a live clean-vs-MAME organic media proof boundary. Evidence runs
+  included `make reference-clean-capture ...` and `make reference-media-check
+  ...`, with the media check expectedly failing on the improved all-axis
+  metrics above. Validation passed with `cargo fmt --check`, `cargo test
+  clean_game_organic_smartmix_terminal_death_and_terrain_blow_match_mame_window
+  --lib --features legacy-tools`, `cargo test
+  clean_world_advances_source_terrain_blow_to_completion_sound --lib
+  --features legacy-tools`, terrain-blow regression tests, Cargo
+  check/clippy, touched-doc `markdownlint`, and `git diff --check`. Slack
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780695923761149`.

@@ -107,6 +107,7 @@ const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_PROJECTILE_PLAYER: ScreenPosit
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_FINAL_DEATH_DELAY_FRAMES: u16 = 168;
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_TERRAIN_BLOW_STATE_FRAME: u64 = 4927;
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_POST_GAME_DURATION_FRAMES: u16 = 1200;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_TERRAIN_BLOW_POST_GAME_FRAME: u16 = 1044;
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_PROJECTILE_DEATH_SOUND_SEQUENCE: [(u16, u8); 5] = [
     (2, SOURCE_PDSND_SOUND_COMMAND),
     (3, SOURCE_AHSND_SOUND_COMMAND),
@@ -2822,12 +2823,10 @@ impl WorldSnapshot {
     }
 
     fn sync_post_game_playfield(&mut self, frame: u16) {
+        let terrain_blow_active = self.terrain_blow.is_some();
         self.enemies = source_post_game_landers(frame);
-        if self.terrain_blow.is_some() {
-            self.humans.clear();
-            self.source_target_list_cursor_address = None;
-            self.source_astronaut_cursor_address = None;
-            self.source_astronaut_sleep_ticks = 0;
+        if terrain_blow_active {
+            self.clear_terrain_blow_human_state();
         } else {
             self.humans = source_post_game_humans(frame);
         }
@@ -2836,7 +2835,12 @@ impl WorldSnapshot {
         self.enemy_projectiles = source_post_game_enemy_projectiles(frame);
         self.enemy_appearances = source_post_game_lander_appearances(frame, &self.enemies);
         self.score_popups.clear();
-        self.explosions = source_post_game_explosions(frame);
+        if terrain_blow_active {
+            self.explosions
+                .retain(|explosion| explosion.kind == ExplosionKind::Terrain);
+        } else {
+            self.explosions = source_post_game_explosions(frame);
+        }
         self.player_explosion = None;
         self.refresh_object_evidence();
     }
@@ -3953,11 +3957,14 @@ impl WorldSnapshot {
             return;
         }
 
+        self.reset_source_terrain_blow_sequence();
+    }
+
+    fn reset_source_terrain_blow_sequence(&mut self) {
         self.terrain.clear();
-        self.humans.clear();
-        self.source_target_list_cursor_address = None;
-        self.source_astronaut_cursor_address = None;
-        self.source_astronaut_sleep_ticks = 0;
+        self.clear_terrain_blow_human_state();
+        self.explosions
+            .retain(|explosion| explosion.kind != ExplosionKind::Terrain);
         self.terrain_blow = Some(TerrainBlowSnapshot::source_started());
         for (_, position) in SOURCE_TERRAIN_BLOW_EXPLOSION_BIRTHS
             .iter()
@@ -3968,7 +3975,27 @@ impl WorldSnapshot {
         }
     }
 
+    fn clear_terrain_blow_human_state(&mut self) {
+        self.humans.clear();
+        self.source_target_list_cursor_address = None;
+        self.source_astronaut_cursor_address = None;
+        self.source_astronaut_sleep_ticks = 0;
+    }
+
     fn advance_terrain_blow(&mut self, sound_events: &mut Vec<SoundEvent>) -> bool {
+        self.advance_terrain_blow_with_audio(sound_events, true)
+    }
+
+    fn advance_terrain_blow_silently(&mut self) -> bool {
+        let mut ignored_sound_events = Vec::new();
+        self.advance_terrain_blow_with_audio(&mut ignored_sound_events, false)
+    }
+
+    fn advance_terrain_blow_with_audio(
+        &mut self,
+        sound_events: &mut Vec<SoundEvent>,
+        emit_sounds: bool,
+    ) -> bool {
         let Some(terrain_blow) = self.terrain_blow else {
             return false;
         };
@@ -3988,7 +4015,9 @@ impl WorldSnapshot {
                 terrain_blow.source_sleep_remaining = None;
                 terrain_blow.source_pseudo_color = 0;
             }
-            sound_events.push(source_terrain_blow_complete_sound_event());
+            if emit_sounds {
+                sound_events.push(source_terrain_blow_complete_sound_event());
+            }
             return true;
         }
 
@@ -4014,7 +4043,7 @@ impl WorldSnapshot {
                 terrain_blow.source_pseudo_color = 0;
             }
         }
-        if start_sound_index.is_some() {
+        if emit_sounds && start_sound_index.is_some() {
             sound_events.push(source_terrain_blow_start_sound_event());
         }
         false
@@ -9742,6 +9771,7 @@ impl Game {
             gameplay_events.push(GameEvent::EnemyDestroyed);
         }
         self.state.world.sync_post_game_playfield(post_game.frame);
+        self.step_post_game_terrain_blow(post_game.frame);
 
         if post_game.frame >= post_game_playfield_duration(self.post_game_sound_profile) {
             self.state.post_game_playfield = None;
@@ -9749,6 +9779,24 @@ impl Game {
             self.state.game_over = GameOverSnapshot::NONE;
         } else {
             self.state.post_game_playfield = Some(post_game);
+        }
+    }
+
+    fn step_post_game_terrain_blow(&mut self, post_game_frame: u16) {
+        if self.post_game_sound_profile != PostGameSoundProfile::Target4SmartmixTerminal {
+            return;
+        }
+
+        match post_game_frame
+            .cmp(&SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_TERRAIN_BLOW_POST_GAME_FRAME)
+        {
+            std::cmp::Ordering::Less => {}
+            std::cmp::Ordering::Equal => {
+                self.state.world.reset_source_terrain_blow_sequence();
+            }
+            std::cmp::Ordering::Greater => {
+                let _ = self.state.world.advance_terrain_blow_silently();
+            }
         }
     }
 
@@ -25457,6 +25505,18 @@ mod tests {
                     frame.state.world.terrain_blow.is_none() || frame.state.world.humans.is_empty(),
                     frame
                         .state
+                        .world
+                        .terrain_blow
+                        .map(|terrain_blow| terrain_blow.source_elapsed_frames),
+                    frame
+                        .state
+                        .world
+                        .explosions
+                        .iter()
+                        .filter(|explosion| explosion.kind == ExplosionKind::Terrain)
+                        .count(),
+                    frame
+                        .state
                         .post_game_playfield
                         .map(|post_game| post_game.frame),
                     frame.events.gameplay().to_vec(),
@@ -25488,6 +25548,8 @@ mod tests {
                     false,
                     true,
                     None,
+                    0,
+                    None,
                     vec![GameEvent::PlayerDestroyed],
                 ),
                 (
@@ -25497,6 +25559,8 @@ mod tests {
                     1,
                     true,
                     true,
+                    Some(0),
+                    1,
                     None,
                     vec![],
                 ),
@@ -25508,6 +25572,8 @@ mod tests {
                     true,
                     true,
                     Some(0),
+                    1,
+                    Some(0),
                     vec![GameEvent::GameOver],
                 ),
                 (
@@ -25517,6 +25583,8 @@ mod tests {
                     0,
                     true,
                     true,
+                    Some(0),
+                    1,
                     Some(1044),
                     vec![],
                 ),
@@ -25527,6 +25595,8 @@ mod tests {
                     0,
                     true,
                     true,
+                    Some(16),
+                    6,
                     Some(1060),
                     vec![],
                 ),
