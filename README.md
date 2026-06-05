@@ -71,6 +71,10 @@ commands into the clean `RenderScene` contract using renderer-owned source
 text, Williams logo, Defender coalescence, sprite atlas, projectile, and
 explosion assets; this keeps actor behavior separate from render cadence while
 making the actor report consumable by the native renderer path.
+`ActorRuntimeAdapter` bundles each actor step into an `ActorFrame` containing
+the original report, clean gameplay/audio `GameEvents`, and the clean
+`RenderScene`, without fabricating the full clean `GameState` before actor
+state parity exists.
 The current slice includes same-contract keyboard profiles, `XYZZY` overlay
 state, thread-backed actors, a data-driven `AttractScript` for custom attract
 drivers, `ActorBehaviorScript` profiles for level-wide and per-actor movement
@@ -100,7 +104,10 @@ actor `StepReport` sound cues into the clean `SoundEvent` surface consumed by
 the live audio runtime, deriving thrust start/stop edges from the actor cue
 stream. `ActorRenderSceneBridge` likewise converts report draw commands into
 clean scene sprites for renderer-owned source text, attract graphics,
-projectiles, explosions, and sprite atlas families. Player
+projectiles, explosions, and sprite atlas families. `ActorRuntimeAdapter`
+combines those bridges into actor `ActorFrame` values with clean event batches
+for future runtime selection while keeping the actor game separate from the
+full clean `GameState` contract. Player
 actor hyperspace now emits separate launch/materialization cues and clears
 active hostile projectile actors without spending lives, smart-bomb stock,
 scoring points, or clearing hostile actor families; the player actor owns the

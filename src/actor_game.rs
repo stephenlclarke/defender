@@ -6,7 +6,7 @@
 //! world rules in a stable order, and publishes a step description.
 
 use crate::{
-    game::SoundEvent,
+    game::{GameEvent, GameEvents, GameInput as CleanGameInput, SoundEvent},
     renderer::{
         Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
         push_source_text_bytes_sprites, source_attract_defender_appearance_pixels,
@@ -354,6 +354,28 @@ impl GameInput {
         tilt: false,
         xyzzy: XyzzyMode::INACTIVE,
     };
+
+    pub const fn from_clean_input(input: CleanGameInput, xyzzy: XyzzyMode) -> Self {
+        Self {
+            coin: input.coin,
+            coin_two: input.coin_two,
+            coin_three: input.coin_three,
+            start_one: input.start_one,
+            start_two: input.start_two,
+            altitude_up: input.altitude_up,
+            altitude_down: input.altitude_down,
+            thrust: input.thrust,
+            reverse: input.reverse,
+            fire: input.fire,
+            smart_bomb: input.smart_bomb,
+            hyperspace: input.hyperspace,
+            service_advance: input.service_advance,
+            high_score_reset: input.high_score_reset,
+            auto_up_manual_down: input.service_auto_up,
+            tilt: input.tilt,
+            xyzzy,
+        }
+    }
 
     fn coin_insertions(self) -> u8 {
         u8::from(self.coin) + u8::from(self.coin_two) + u8::from(self.coin_three)
@@ -3025,6 +3047,132 @@ fn actor_scene_sprite(sprite: SpriteKey, position: Point) -> Option<SceneSprite>
         size,
         tint,
     })
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActorFrame {
+    pub report: StepReport,
+    pub events: GameEvents,
+    pub scene: RenderScene,
+}
+
+impl ActorFrame {
+    pub fn new(report: StepReport, events: GameEvents, scene: RenderScene) -> Self {
+        Self {
+            report,
+            events,
+            scene,
+        }
+    }
+}
+
+pub struct ActorRuntimeAdapter {
+    driver: ActorGameDriver,
+    sound_bridge: ActorSoundEventBridge,
+    render_bridge: ActorRenderSceneBridge,
+}
+
+impl ActorRuntimeAdapter {
+    pub fn new() -> Self {
+        Self::with_driver(ActorGameDriver::new())
+    }
+
+    pub fn with_driver(driver: ActorGameDriver) -> Self {
+        Self::with_components(
+            driver,
+            ActorSoundEventBridge::new(),
+            ActorRenderSceneBridge::new(),
+        )
+    }
+
+    pub fn with_components(
+        driver: ActorGameDriver,
+        sound_bridge: ActorSoundEventBridge,
+        render_bridge: ActorRenderSceneBridge,
+    ) -> Self {
+        Self {
+            driver,
+            sound_bridge,
+            render_bridge,
+        }
+    }
+
+    pub fn driver(&self) -> &ActorGameDriver {
+        &self.driver
+    }
+
+    pub fn driver_mut(&mut self) -> &mut ActorGameDriver {
+        &mut self.driver
+    }
+
+    pub fn step(&mut self, input: GameInput) -> ActorFrame {
+        let report = self.driver.step(input);
+        self.frame_for_report(report)
+    }
+
+    pub fn step_clean_input(&mut self, input: CleanGameInput, xyzzy: XyzzyMode) -> ActorFrame {
+        self.step(GameInput::from_clean_input(input, xyzzy))
+    }
+
+    fn frame_for_report(&mut self, report: StepReport) -> ActorFrame {
+        let gameplay_events = actor_gameplay_events_for_report(&report);
+        let sound_events = self.sound_bridge.sound_events_for_report(&report);
+        let scene = self.render_bridge.render_scene_for_report(&report);
+        ActorFrame::new(
+            report,
+            GameEvents::new(gameplay_events, sound_events),
+            scene,
+        )
+    }
+}
+
+impl Default for ActorRuntimeAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn actor_gameplay_events_for_report(report: &StepReport) -> Vec<GameEvent> {
+    let mut events = Vec::new();
+    for command in &report.commands {
+        match command {
+            GameCommand::Credit => push_unique_game_event(&mut events, GameEvent::CreditAdded),
+            GameCommand::StartOnePlayer | GameCommand::StartTwoPlayer => {
+                push_unique_game_event(&mut events, GameEvent::GameStarted);
+                push_unique_game_event(&mut events, GameEvent::WaveStarted);
+            }
+            GameCommand::SmartBomb { .. } => {
+                push_unique_game_event(&mut events, GameEvent::SmartBombPressed)
+            }
+            GameCommand::Hyperspace => {
+                push_unique_game_event(&mut events, GameEvent::HyperspacePressed)
+            }
+            GameCommand::PlayerKilled => {
+                push_unique_game_event(&mut events, GameEvent::PlayerDestroyed)
+            }
+            GameCommand::AdvanceWave { .. } => {
+                push_unique_game_event(&mut events, GameEvent::WaveCleared);
+                push_unique_game_event(&mut events, GameEvent::WaveStarted);
+            }
+            GameCommand::EnterGameOver => push_unique_game_event(&mut events, GameEvent::GameOver),
+            GameCommand::Spawn(_)
+            | GameCommand::Destroy(_)
+            | GameCommand::AttachHuman { .. }
+            | GameCommand::HumanLost(_)
+            | GameCommand::AddScore(_)
+            | GameCommand::PlaySound(_) => {}
+        }
+    }
+    if report.phase == Phase::HighScoreEntry {
+        push_unique_game_event(&mut events, GameEvent::HighScoreEntryStarted);
+    }
+    events
+}
+
+fn push_unique_game_event(events: &mut Vec<GameEvent>, event: GameEvent) {
+    if !events.contains(&event) {
+        events.push(event);
+    }
 }
 
 pub struct ActorGameDriver {
@@ -6272,6 +6420,134 @@ mod tests {
             sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
                 && sprite.layer == RenderLayer::Objects
         }));
+    }
+
+    #[test]
+    fn actor_input_converts_clean_live_key_contract_with_xyzzy_overlay() {
+        let xyzzy = XyzzyMode {
+            active: true,
+            auto_fire: true,
+            invincible: true,
+            overlay_smart_bomb: true,
+        };
+        let input = GameInput::from_clean_input(
+            CleanGameInput {
+                coin: true,
+                coin_two: true,
+                coin_three: true,
+                start_one: true,
+                start_two: true,
+                altitude_up: true,
+                altitude_down: true,
+                reverse: true,
+                thrust: true,
+                fire: true,
+                smart_bomb: true,
+                hyperspace: true,
+                service_auto_up: true,
+                service_advance: true,
+                high_score_reset: true,
+                high_score_initial: Some('A'),
+                high_score_backspace: true,
+                tilt: true,
+            },
+            xyzzy,
+        );
+
+        assert!(input.coin);
+        assert!(input.coin_two);
+        assert!(input.coin_three);
+        assert!(input.start_one);
+        assert!(input.start_two);
+        assert!(input.altitude_up);
+        assert!(input.altitude_down);
+        assert!(input.reverse);
+        assert!(input.thrust);
+        assert!(input.fire);
+        assert!(input.smart_bomb);
+        assert!(input.hyperspace);
+        assert!(input.service_advance);
+        assert!(input.high_score_reset);
+        assert!(input.auto_up_manual_down);
+        assert!(input.tilt);
+        assert_eq!(input.xyzzy, xyzzy);
+    }
+
+    #[test]
+    fn actor_runtime_adapter_bundles_report_events_audio_and_scene() {
+        let mut runtime = ActorRuntimeAdapter::new();
+
+        let credited = runtime.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(credited.report.phase, Phase::Attract);
+        assert_eq!(credited.report.credits, 1);
+        assert_eq!(credited.events.gameplay(), &[GameEvent::CreditAdded]);
+        assert_eq!(credited.events.sounds(), &[SoundEvent::CreditAdded]);
+        assert_eq!(credited.scene.frame, credited.report.step);
+        assert!(credited.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL
+                && sprite.layer == RenderLayer::Overlay
+        }));
+
+        let started = runtime.step_clean_input(
+            CleanGameInput {
+                start_one: true,
+                ..CleanGameInput::NONE
+            },
+            XyzzyMode::INACTIVE,
+        );
+        assert_eq!(started.report.phase, Phase::Playing);
+        assert_eq!(
+            started.events.gameplay(),
+            &[GameEvent::GameStarted, GameEvent::WaveStarted]
+        );
+        assert_eq!(started.events.sounds(), &[SoundEvent::GameStarted]);
+
+        let settled = runtime.step(GameInput::NONE);
+        assert!(settled.scene.sprites.iter().any(|sprite| {
+            matches!(
+                sprite.sprite,
+                SpriteId::PLAYER_SHIP | SpriteId::PLAYER_SHIP_LEFT
+            )
+        }));
+        assert!(
+            settled
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
+        );
+    }
+
+    #[test]
+    fn actor_runtime_adapter_carries_audio_edge_state_between_frames() {
+        let mut runtime = ActorRuntimeAdapter::new();
+        runtime.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        runtime.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        runtime.step(GameInput::NONE);
+
+        let thrusting = runtime.step(GameInput {
+            thrust: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(thrusting.events.sounds(), &[SoundEvent::ThrustStarted]);
+
+        let still_thrusting = runtime.step(GameInput {
+            thrust: true,
+            ..GameInput::NONE
+        });
+        assert!(still_thrusting.events.sounds().is_empty());
+
+        let coasting = runtime.step(GameInput::NONE);
+        assert_eq!(coasting.events.sounds(), &[SoundEvent::ThrustStopped]);
     }
 
     #[test]

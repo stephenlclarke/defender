@@ -36,6 +36,12 @@ verified.
   Defender coalescence pixels, atlas-backed actor families, projectile layers,
   score popups, and explosion variants. Actors do not own renderer resources or
   display cadence.
+- `ActorRuntimeAdapter` combines the sound and render bridges into an
+  actor-specific `ActorFrame`: the original `StepReport`, a clean
+  gameplay/audio `GameEvents` batch, and the clean `RenderScene`. This is a
+  truthful runtime-facing adapter, not a premature `GameFrame` implementation,
+  because the actor driver does not yet publish the full clean `GameState`
+  snapshot.
 
 ## C++ to Rust Mapping
 
@@ -197,6 +203,12 @@ the renderer-owned source appearance pixels. Static attract sprites still honor
 their script positions, so custom attract drivers can place their own text and
 non-source sprite events while the default red-label title uses source screen
 positions.
+
+`GameInput::from_clean_input` preserves the current clean live gameplay,
+coin/start, service advance/reset, tilt, and auto-up key contract while
+accepting an explicit `XyzzyMode`. High-score initials/backspace remain outside
+the actor input conversion until the actor high-score-entry surface owns those
+text-editing controls.
 
 This is intentionally a Rust data script first. A later text parser or
 MAME-table translator can target the same `AttractScript` API without changing

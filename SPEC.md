@@ -183,8 +183,11 @@ tree:
   command bytes where source evidence exists. `ActorSoundEventBridge` adapts
   report sound cues into clean `SoundEvent` batches for the existing audio
   runtime contract. `ActorRenderSceneBridge` adapts report draw commands into
-  clean `RenderScene` sprites for the existing native renderer contract. The
-  actor game is not wired into the live runtime yet.
+  clean `RenderScene` sprites for the existing native renderer contract.
+  `ActorRuntimeAdapter` bundles reports, clean `GameEvents`, and clean
+  `RenderScene` values into actor `ActorFrame` values without claiming full
+  clean `GameFrame`/`GameState` parity. The actor game is not wired into the
+  live runtime yet.
 - `src/game_smoke.rs`: the crate-private clean game smoke command that steps
   `Game` through scripted controls, verifies sprite plus native pipeline and
   draw-instance coverage, verifies sprite buffer upload-plan, render-pass plan,
@@ -700,9 +703,11 @@ reintroduce legacy implementation terminology.
   `ActorRenderSceneBridge`, mapping actor draw commands to renderer-owned
   source text glyphs, Williams logo reveal pixels, Defender appearance pixels,
   sprite atlas families, projectile layers, and explosion families. The actor
-  slice is simulation-step driven rather than display-frame driven: render
-  cadence is outside actor behavior, and attract scripts use actor-local
-  elapsed steps.
+  slice also exposes `ActorRuntimeAdapter`, which steps the actor driver and
+  returns `ActorFrame` values containing the original report, a clean
+  gameplay/audio `GameEvents` batch, and the clean render scene. It is
+  simulation-step driven rather than display-frame driven: render cadence is
+  outside actor behavior, and attract scripts use actor-local elapsed steps.
   Actor movement and behavior are scriptable through `ActorBehaviorScript`,
   which resolves default, actor-kind, and actor-id profiles into each prompt;
   level scripts can tune speeds, fire cadence, pickup/conversion bands,

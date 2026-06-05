@@ -4046,3 +4046,22 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780628278846089`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780629112831999`.
+- `2026-06-05 04:20 BST`: Completed the actor runtime adapter cycle. Added
+  `ActorFrame` and `ActorRuntimeAdapter` so actor steps can bundle the original
+  `StepReport`, clean gameplay/audio `GameEvents`, and clean `RenderScene`
+  without pretending the actor driver publishes full clean `GameFrame` or
+  `GameState` parity. Added `GameInput::from_clean_input` to preserve the
+  current clean live gameplay/service input contract while carrying explicit
+  `XyzzyMode` into the actor surface. Added regressions for clean-input
+  conversion, report/events/audio/scene bundling, and thrust edge state across
+  actor frames. No legacy code, tests, or scaffolding were safe to remove
+  because runtime selection still depends on the current clean `Game`, and
+  actor frames intentionally avoid fabricating full clean state. Validation
+  passed with `cargo fmt --check`, `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780629215257879`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780629633502359`.
