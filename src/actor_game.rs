@@ -3245,6 +3245,16 @@ fn actor_source_projectile_lifetime_ticks(remaining_steps: u16) -> u8 {
     remaining_steps.min(u16::from(u8::MAX)) as u8
 }
 
+fn actor_source_projectile_axis_step(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
+    let raw = i32::from(position) * 256 + i32::from(fraction) + i32::from(velocity as i16);
+    let next_position = raw.div_euclid(256);
+    let next_fraction = raw.rem_euclid(256);
+    (
+        next_position.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16,
+        next_fraction as u8,
+    )
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorRenderSceneBridge {
     surface: SurfaceSize,
@@ -6730,8 +6740,8 @@ impl AssetActor for LaserShot {
 struct EnemyLaserShot {
     id: ActorId,
     position: Point,
-    velocity: Velocity,
-    age: u16,
+    source: ActorSourceEnemyProjectileMetadata,
+    lifetime_steps: Option<u16>,
 }
 
 impl EnemyLaserShot {
@@ -6739,13 +6749,51 @@ impl EnemyLaserShot {
         Self {
             id,
             position,
-            velocity,
-            age: 0,
+            source: ActorSourceEnemyProjectileMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: actor_source_projectile_velocity_component(velocity.dx),
+                y_velocity: actor_source_projectile_velocity_component(velocity.dy),
+                lifetime_ticks: 0,
+            },
+            lifetime_steps: None,
         }
     }
 
     fn bounds(&self) -> Rect {
         Rect::from_center(self.position, 4, 4)
+    }
+
+    fn in_playfield(&self) -> bool {
+        self.position.x >= 0
+            && self.position.x <= 255
+            && self.position.y >= 0
+            && self.position.y <= 255
+    }
+
+    fn initialize_lifetime(&mut self, behavior: ActorBehaviorProfile) {
+        let lifetime_steps = self
+            .lifetime_steps
+            .get_or_insert(behavior.lander_shot_lifetime_steps);
+        self.source.lifetime_ticks = actor_source_projectile_lifetime_ticks(*lifetime_steps);
+    }
+
+    fn advance_source_projectile(&mut self) -> Velocity {
+        let previous_position = self.position;
+        let (x, x_fraction) = actor_source_projectile_axis_step(
+            self.position.x,
+            self.source.x_fraction,
+            self.source.x_velocity,
+        );
+        let (y, y_fraction) = actor_source_projectile_axis_step(
+            self.position.y,
+            self.source.y_fraction,
+            self.source.y_velocity,
+        );
+        self.position = Point::new(x, y);
+        self.source.x_fraction = x_fraction;
+        self.source.y_fraction = y_fraction;
+        observed_velocity(previous_position, self.position)
     }
 }
 
@@ -6759,24 +6807,25 @@ impl AssetActor for EnemyLaserShot {
         let mut draws = Vec::new();
         let mut movement_velocity = Velocity::default();
         let behavior = prompt.behavior_for(self.id, ActorKind::EnemyLaser);
-        if prompt.phase == Phase::Playing && self.age < behavior.lander_shot_lifetime_steps {
-            movement_velocity = self.velocity;
-            self.position = self.position.offset(self.velocity);
-            self.age = self.age.saturating_add(1);
+        self.initialize_lifetime(behavior);
+        if prompt.phase == Phase::Playing && self.lifetime_steps.is_some_and(|steps| steps > 0) {
+            if let Some(lifetime_steps) = &mut self.lifetime_steps {
+                *lifetime_steps = lifetime_steps.saturating_sub(1);
+                self.source.lifetime_ticks =
+                    actor_source_projectile_lifetime_ticks(*lifetime_steps);
+            }
+            movement_velocity = self.advance_source_projectile();
             draws.push(DrawCommand::sprite(
                 self.id,
                 SpriteKey::EnemyLaser,
                 self.position,
             ));
         }
-        if self.age >= behavior.lander_shot_lifetime_steps
-            || self.position.x < 0
-            || self.position.x > 255
-            || self.position.y < 0
-            || self.position.y > 255
-        {
+        let expired_or_out_of_bounds = self.lifetime_steps == Some(0) || !self.in_playfield();
+        if expired_or_out_of_bounds {
             commands.push(GameCommand::Destroy(self.id));
         }
+        let alive = prompt.phase == Phase::Playing && !expired_or_out_of_bounds;
         ActorReply {
             id: self.id,
             snapshot: ActorSnapshot {
@@ -6786,22 +6835,14 @@ impl AssetActor for EnemyLaserShot {
                 velocity: movement_velocity,
                 direction: Some(direction_for_velocity(movement_velocity, Direction::Right)),
                 bounds: Some(self.bounds()),
-                alive: self.age < behavior.lander_shot_lifetime_steps,
+                alive,
                 source_lander: None,
                 source_bomber: None,
                 source_pod: None,
                 source_swarmer: None,
                 source_baiter: None,
                 source_human: None,
-                source_enemy_projectile: Some(ActorSourceEnemyProjectileMetadata {
-                    x_fraction: 0,
-                    y_fraction: 0,
-                    x_velocity: actor_source_projectile_velocity_component(self.velocity.dx),
-                    y_velocity: actor_source_projectile_velocity_component(self.velocity.dy),
-                    lifetime_ticks: actor_source_projectile_lifetime_ticks(
-                        behavior.lander_shot_lifetime_steps.saturating_sub(self.age),
-                    ),
-                }),
+                source_enemy_projectile: Some(self.source),
             },
             commands,
             draws,
@@ -8389,6 +8430,63 @@ mod tests {
                 .draws
                 .iter()
                 .any(|draw| draw.sprite == SpriteKey::EnemyLaser)
+        );
+    }
+
+    #[test]
+    fn enemy_laser_actor_advances_source_fixed_point_motion_state() {
+        let behavior = ActorBehaviorProfile {
+            lander_shot_lifetime_steps: 4,
+            ..ActorBehaviorProfile::default()
+        };
+        let prompt = StepPrompt {
+            step: 1,
+            phase: Phase::Playing,
+            input: GameInput::NONE,
+            wave: 1,
+            score: 0,
+            credits: 0,
+            lives: 3,
+            smart_bombs: 3,
+            high_scores: [0; 5],
+            high_score_initials: HighScoreInitialsState::EMPTY,
+            snapshots: Vec::new(),
+            behavior_script: ActorBehaviorScript::default()
+                .with_kind_behavior(ActorKind::EnemyLaser, behavior),
+        };
+        let mut shot =
+            EnemyLaserShot::new(ActorId::new(101), Point::new(10, 80), Velocity::new(1, -1));
+        shot.source.x_velocity = 0x0180;
+        shot.source.y_velocity = 0xFF80;
+
+        let first = shot.update(&prompt);
+
+        assert_eq!(first.snapshot.position, Point::new(11, 79));
+        assert_eq!(first.snapshot.velocity, Velocity::new(1, -1));
+        assert_eq!(
+            first.snapshot.source_enemy_projectile,
+            Some(ActorSourceEnemyProjectileMetadata {
+                x_fraction: 0x80,
+                y_fraction: 0x80,
+                x_velocity: 0x0180,
+                y_velocity: 0xFF80,
+                lifetime_ticks: 3,
+            })
+        );
+
+        let second = shot.update(&prompt);
+
+        assert_eq!(second.snapshot.position, Point::new(13, 79));
+        assert_eq!(second.snapshot.velocity, Velocity::new(2, 0));
+        assert_eq!(
+            second.snapshot.source_enemy_projectile,
+            Some(ActorSourceEnemyProjectileMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0x0180,
+                y_velocity: 0xFF80,
+                lifetime_ticks: 2,
+            })
         );
     }
 

@@ -193,8 +193,9 @@ distribution. Source-backed landers, bombers, pods, and baiters publish their
 metadata in snapshots and advance active motion by updating their own
 fixed-point position/fraction state.
 Hostile projectile actors publish source-shaped shell metadata too: enemy
-lasers carry fixed-point velocity and lifetime values, and bomb actors carry
-stationary bomb-shell lifetime values into the clean state bridge.
+lasers own and advance fixed-point velocity, fraction, and lifetime values,
+and bomb actors carry stationary bomb-shell lifetime values into the clean state
+bridge.
 
 Initial humans are source-backed: wave `1` uses the captured first-wave starts,
 while later source waves restore humans through the source target-list RNG
@@ -263,7 +264,8 @@ The actor driver now owns a first Defender gameplay loop:
   actor.
   Enemy lasers are player hazards, smart-bomb targets with no score value, and
   respect the same player damage behavior profile used by `XYZZY` invincibility.
-  Their snapshots expose source-shaped shell velocity and lifetime metadata.
+  Their snapshots expose source-shaped shell velocity, fraction, and lifetime
+  metadata advanced by the actor.
 - Later source waves seed bomber and pod actor families when the wave table
   exposes those counts. Bombers and pods draw their own sprites, move through
   actor-owned source fixed-point metadata when source-backed, publish per-step

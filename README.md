@@ -108,9 +108,10 @@ Source-backed landers, bombers, pods, swarmers, baiters, and humans publish
 their fixed-point metadata through snapshots, publish per-step movement/facing
 metadata for the clean state bridge, and advance fraction state during active
 motion. Hostile projectile actors also publish source-shaped shell metadata:
-enemy lasers carry fixed-point source velocity and lifetime state, while bomb
-actors carry stationary source bomb-shell lifetime state into the clean
-`EnemyProjectileSnapshot` contract. It also includes Williams title animation
+enemy lasers own and advance fixed-point source velocity, fraction, and
+lifetime state, while bomb actors carry stationary source bomb-shell lifetime
+state into the clean `EnemyProjectileSnapshot` contract. It also includes
+Williams title animation
 metadata, the coalescing
 Defender wordmark surface, lander target-slot seeking, an actor-owned
 status display for score, high score, wave, lives, smart-bomb stock, credits,

@@ -4334,3 +4334,30 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780635834006829`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780636580657689`.
+- `2026-06-05 06:24 BST`: Completed the actor hostile projectile source-motion
+  cycle. Enemy-shot actors now own and advance source projectile state:
+  fixed-point velocity/fraction metadata and an initialized lifetime counter
+  live inside `EnemyLaserShot` instead of being derived only for snapshots.
+  Added signed actor-world fixed-point stepping so source-style subpixel motion
+  can advance without wrapping actor positions through the playfield. Added a
+  regression for +1.5/-0.5 source projectile motion across two actor steps,
+  while existing lander-shot and clean-state bridge metadata checks continue to
+  pass. README, SPEC, and the actor architecture notes now document actor-owned
+  hostile projectile source motion. No legacy code, tests, or scaffolding were
+  safe to remove in this slice because clean smoke/fidelity/oracle evidence
+  still depends on the clean runtime boundaries outside the actor path.
+  Validation passed with `cargo fmt --check`,
+  `cargo test enemy_laser_actor_advances_source_fixed_point_motion_state --lib`,
+  `cargo test source_lander_shot_timer_spawns_hostile_projectile --lib`,
+  the focused actor-state bridge test,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780636652446429`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780637057215359`.
