@@ -316,19 +316,21 @@ The attract screen is data-driven. `AttractScript` contains ordered
 events for its own current script step into draw commands. The default
 `AttractScript::red_label_title()` parses
 `assets/red-label/actor-attract.script`, recreating the current Williams/logo,
-source `ELECV` presents, high-score, and credits opening sequence from checked
-text. The default Williams reveal, `ELECV`, and Defender wordmark events use
-the same source page-start steps as the clean attract scheduler: Williams from
-step 1, `ELECV` from step 236 at screen address `0x3258`, and the Defender
-wordmark from step 365. The default high-score title/table and zero-credit
-credit line start at the Hall-of-Fame boundary, step 488; title pages use a
-`credits_nonzero` event so an inserted credit can still be shown immediately
-without drawing a zero-credit line. The same Hall-of-Fame boundary draws
-source `HALLD_*` headings, the source Defender logo, and a `hall_scores`
-two-column table using the clean source table addresses plus embedded red-label
-seed initials. The older Rust event constructor remains available as a
-fallback. Custom drivers can pass their own parsed or constructed sequence
-through
+source `ELECV` presents, bounded Hall-of-Fame rows, scoring/instruction labels,
+and credits opening sequence from checked text. The default Williams reveal,
+`ELECV`, and Defender wordmark events use the same source page-start steps as
+the clean attract scheduler: Williams from step 1, `ELECV` from step 236 at
+screen address `0x3258`, and the Defender wordmark from step 365. The default
+high-score title/table and zero-credit credit line start at the Hall-of-Fame
+boundary, step 488; title pages use a `credits_nonzero` event so an inserted
+credit can still be shown immediately without drawing a zero-credit line. The
+same Hall-of-Fame boundary draws source `HALLD_*` headings, the source Defender
+logo, and a `hall_scores` two-column table for the source 60-tick stall window.
+After that bounded Hall window, the script starts scoring/instruction labels at
+step 1088 from the checked `SCANV`, `LANDV`, `MUTV`, `BAITV`, `BOMBV`,
+`SWRMPV`, and `SWARMV` message rows. The older Rust event constructor remains
+available as a fallback. Custom drivers can pass their own parsed or
+constructed sequence through
 `ActorGameDriver::with_attract_script(...)` without replacing coin/start
 control handling.
 `ActorGameDriver::script_manifest()` includes the immutable attract-event
@@ -340,19 +342,26 @@ same event model from checked text script lines:
 ```text
 # action start duration x y ...
 text 1 forever 10 10 PRESS START
-message 236 forever ELECV 0x3258
+williams_logo 1 487 108 60
+message 236 252 ELECV 0x3258
+defender_wordmark 365 123 96 144
 sprite 2 forever defender_logo 40 44
 credits_nonzero 1 487 176 226 248 226
 credits 488 forever 176 226 248 226
-message 488 forever HALLD_TITLE 0x3854
-message 488 forever HALLD_TODAYS 0x2268
-message 488 forever HALLD_ALL_TIME 0x6068
-message 488 forever HALLD_GREATEST 0x1E72
-message 488 forever HALLD_GREATEST 0x5F72
-sprite 488 forever defender_logo 85 50
-hall_scores 488 forever 0x1886 0x5986 -11 -6
-williams_logo 5 - 108 60
-defender_wordmark 365 - 96 144
+message 488 600 HALLD_TITLE 0x3854
+message 488 600 HALLD_TODAYS 0x2268
+message 488 600 HALLD_ALL_TIME 0x6068
+message 488 600 HALLD_GREATEST 0x1E72
+message 488 600 HALLD_GREATEST 0x5F72
+sprite 488 600 defender_logo 85 50
+hall_scores 488 600 0x1886 0x5986 -11 -6
+message 1088 forever SCANV 0x4330
+message 1088 forever LANDV 0x1C70
+message 1088 forever MUTV 0x3C70
+message 1088 forever BAITV 0x5F70
+message 1088 forever BOMBV 0x1CA8
+message 1088 forever SWRMPV 0x40A8
+message 1088 forever SWARMV 0x5CA8
 ```
 
 Blank lines and `#` comments are ignored. `duration` can be a step count or

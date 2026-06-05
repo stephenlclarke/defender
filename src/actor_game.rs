@@ -7,7 +7,8 @@
 
 use crate::{
     game::{
-        AttractPresentationSnapshot, Direction as CleanDirection, EnemyKind as CleanEnemyKind,
+        ATTRACT_SCORING_SEQUENCE_START_FRAME, AttractPresentationSnapshot,
+        Direction as CleanDirection, EnemyKind as CleanEnemyKind,
         EnemyProjectileSnapshot as CleanEnemyProjectileSnapshot, EnemyProjectileSourceKind,
         EnemySnapshot as CleanEnemySnapshot, ExplosionKind as CleanExplosionKind,
         ExplosionSnapshot as CleanExplosionSnapshot, GameEvent, GameEvents, GameFrame,
@@ -76,6 +77,14 @@ const SCORE_POPUP_LIFETIME: u16 = 50;
 const SOURCE_ATTRACT_PRESENTS_START_STEP: u64 = 236;
 const SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP: u64 = 365;
 const SOURCE_ATTRACT_HALL_OF_FAME_START_STEP: u64 = 488;
+const SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP: u64 = ATTRACT_SCORING_SEQUENCE_START_FRAME as u64;
+const SOURCE_ATTRACT_WILLIAMS_LOGO_DURATION_STEPS: u64 = SOURCE_ATTRACT_HALL_OF_FAME_START_STEP - 1;
+const SOURCE_ATTRACT_PRESENTS_DURATION_STEPS: u64 =
+    SOURCE_ATTRACT_HALL_OF_FAME_START_STEP - SOURCE_ATTRACT_PRESENTS_START_STEP;
+const SOURCE_ATTRACT_DEFENDER_WORDMARK_DURATION_STEPS: u64 =
+    SOURCE_ATTRACT_HALL_OF_FAME_START_STEP - SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP;
+const SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS: u64 =
+    SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP - SOURCE_ATTRACT_HALL_OF_FAME_START_STEP;
 const WILLIAMS_REVEAL_STEPS: u16 = SOURCE_ATTRACT_PRESENTS_START_STEP as u16;
 const WILLIAMS_COLOR_PERIOD: u16 = 8;
 const SOURCE_ATTRACT_WILLIAMS_LOGO_POSITION: Point = Point::new(108, 60);
@@ -94,6 +103,15 @@ const SOURCE_ATTRACT_HALL_TABLE_INITIALS_OFFSET: u8 = 0x05;
 const SOURCE_ATTRACT_HALL_TABLE_SCORE_OFFSET: u8 = 0x13;
 const SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET: Point = Point::new(-11, -6);
 const SOURCE_ATTRACT_HALL_SCORE_TEXT_LEN: usize = 6;
+const SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES: [(&str, u16); 7] = [
+    ("SCANV", 0x4330),
+    ("LANDV", 0x1C70),
+    ("MUTV", 0x3C70),
+    ("BAITV", 0x5F70),
+    ("BOMBV", 0x1CA8),
+    ("SWRMPV", 0x40A8),
+    ("SWARMV", 0x5CA8),
+];
 const DEFENDER_WORDMARK_START_STEP: u64 = SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP;
 const DEFENDER_WORDMARK_SLOTS: u16 = 15;
 const DEFENDER_WORDMARK_ROW_PAIRS: u16 = 6;
@@ -3551,17 +3569,21 @@ impl AttractScript {
     }
 
     pub fn red_label_title_from_events() -> Self {
-        Self::new(vec![
-            AttractScriptEvent::williams_logo(1, None, SOURCE_ATTRACT_WILLIAMS_LOGO_POSITION),
+        let mut events = vec![
+            AttractScriptEvent::williams_logo(
+                1,
+                Some(SOURCE_ATTRACT_WILLIAMS_LOGO_DURATION_STEPS),
+                SOURCE_ATTRACT_WILLIAMS_LOGO_POSITION,
+            ),
             AttractScriptEvent::source_message(
                 SOURCE_ATTRACT_PRESENTS_START_STEP,
-                None,
+                Some(SOURCE_ATTRACT_PRESENTS_DURATION_STEPS),
                 SOURCE_PRESENTS_MESSAGE_LABEL,
                 SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
             ),
             AttractScriptEvent::defender_wordmark(
                 DEFENDER_WORDMARK_START_STEP,
-                None,
+                Some(SOURCE_ATTRACT_DEFENDER_WORDMARK_DURATION_STEPS),
                 SOURCE_ATTRACT_DEFENDER_WORDMARK_POSITION,
             ),
             AttractScriptEvent::credits_when_nonzero(
@@ -3578,48 +3600,57 @@ impl AttractScript {
             ),
             AttractScriptEvent::source_message(
                 SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
-                None,
+                Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 SOURCE_ATTRACT_HALL_TITLE_LABEL,
                 0x3854,
             ),
             AttractScriptEvent::source_message(
                 SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
-                None,
+                Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 SOURCE_ATTRACT_HALL_TODAYS_LABEL,
                 0x2268,
             ),
             AttractScriptEvent::source_message(
                 SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
-                None,
+                Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 SOURCE_ATTRACT_HALL_ALL_TIME_LABEL,
                 0x6068,
             ),
             AttractScriptEvent::source_message(
                 SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
-                None,
+                Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 SOURCE_ATTRACT_HALL_GREATEST_LABEL,
                 0x1E72,
             ),
             AttractScriptEvent::source_message(
                 SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
-                None,
+                Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 SOURCE_ATTRACT_HALL_GREATEST_LABEL,
                 0x5F72,
             ),
             AttractScriptEvent::sprite(
                 SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
-                None,
+                Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 SpriteKey::DefenderLogo,
                 SOURCE_ATTRACT_HALL_DEFENDER_LOGO_POSITION,
             ),
             AttractScriptEvent::hall_scores(
                 SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
-                None,
+                Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 SOURCE_ATTRACT_HALL_TODAYS_TABLE_SCREEN,
                 SOURCE_ATTRACT_HALL_ALL_TIME_TABLE_SCREEN,
                 SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
-        ])
+        ];
+        for (label, screen_address) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES {
+            events.push(AttractScriptEvent::source_message(
+                SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP,
+                None,
+                label,
+                screen_address,
+            ));
+        }
+        Self::new(events)
     }
 
     fn draws_for(
@@ -11454,12 +11485,26 @@ mod tests {
                 )
         }));
 
-        let mut hall = None;
-        for _ in SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP..SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
-        {
-            hall = Some(driver.step(GameInput::NONE));
+        let mut settled = None;
+        for _ in 0..(DEFENDER_WORDMARK_SLOTS * DEFENDER_WORDMARK_ROW_PAIRS + 1) {
+            let step = driver.step(GameInput::NONE);
+            if step
+                .draws
+                .iter()
+                .any(|draw| draw.sprite == SpriteKey::DefenderWordmark)
+            {
+                settled = Some(step);
+                break;
+            }
         }
-        let hall = hall.expect("hall-of-fame page boundary should be reached");
+        let settled = settled.expect("wordmark should settle before hall-of-fame");
+        assert!(settled.step < SOURCE_ATTRACT_HALL_OF_FAME_START_STEP);
+
+        let mut hall = settled;
+        while hall.step < SOURCE_ATTRACT_HALL_OF_FAME_START_STEP {
+            hall = driver.step(GameInput::NONE);
+        }
+        assert_eq!(hall.step, SOURCE_ATTRACT_HALL_OF_FAME_START_STEP);
         assert!(
             hall.draws
                 .iter()
@@ -11548,19 +11593,54 @@ mod tests {
                 && sprite.layer == RenderLayer::Overlay
         }));
 
-        let mut settled = None;
-        for _ in 0..(DEFENDER_WORDMARK_SLOTS * DEFENDER_WORDMARK_ROW_PAIRS + 1) {
-            let step = driver.step(GameInput::NONE);
-            if step
+        let mut scoring = hall;
+        while scoring.step < SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP {
+            scoring = driver.step(GameInput::NONE);
+        }
+        assert_eq!(scoring.step, SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP);
+        assert!(
+            scoring
                 .draws
                 .iter()
-                .any(|draw| draw.sprite == SpriteKey::DefenderWordmark)
-            {
-                settled = Some(step);
-                break;
-            }
+                .all(|draw| draw.text.as_deref() != Some(hall_title_text))
+        );
+        assert!(
+            scoring
+                .draws
+                .iter()
+                .all(|draw| draw.sprite != SpriteKey::DefenderLogo)
+        );
+        for (label, screen_address) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES {
+            let text = source_message_text(label).expect("instruction source message");
+            assert!(scoring.draws.iter().any(|draw| {
+                draw.text.as_deref() == Some(text)
+                    && matches!(
+                        draw.effect,
+                        VisualEffect::SourceMessage {
+                            top_left_screen_address
+                        } if top_left_screen_address == screen_address
+                    )
+            }));
         }
-        assert!(settled.is_some());
+        let scoring_scene = ActorRenderSceneBridge::new().render_scene_for_report(&scoring);
+        assert!(scoring_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_S
+                && sprite.position == [134.0, 48.0]
+                && sprite.layer == RenderLayer::Overlay
+        }));
+        assert!(scoring_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_L
+                && sprite.position == [56.0, 112.0]
+                && sprite.layer == RenderLayer::Overlay
+        }));
+        assert!(!scoring_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO
+                && sprite.position
+                    == [
+                        f32::from(SOURCE_ATTRACT_HALL_DEFENDER_LOGO_POSITION.x),
+                        f32::from(SOURCE_ATTRACT_HALL_DEFENDER_LOGO_POSITION.y),
+                    ]
+        }));
     }
 
     #[test]
@@ -11579,19 +11659,23 @@ mod tests {
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
             AttractScriptActionManifest::WilliamsLogo { .. }
-        )));
+        ) && event.start_after_steps == 1
+            && event.duration_steps == Some(SOURCE_ATTRACT_WILLIAMS_LOGO_DURATION_STEPS)));
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
             AttractScriptActionManifest::SourceMessage {
                 ref label,
                 top_left_screen_address: SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
-            } if event.start_after_steps == SOURCE_ATTRACT_PRESENTS_START_STEP
-                && label == SOURCE_PRESENTS_MESSAGE_LABEL
-        )));
+            } if label == SOURCE_PRESENTS_MESSAGE_LABEL
+        ) && event.start_after_steps
+            == SOURCE_ATTRACT_PRESENTS_START_STEP
+            && event.duration_steps == Some(SOURCE_ATTRACT_PRESENTS_DURATION_STEPS)));
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
             AttractScriptActionManifest::DefenderWordmark { .. }
-        )));
+        ) && event.start_after_steps
+            == SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP
+            && event.duration_steps == Some(SOURCE_ATTRACT_DEFENDER_WORDMARK_DURATION_STEPS)));
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
             AttractScriptActionManifest::HallScores {
@@ -11599,6 +11683,7 @@ mod tests {
                 all_time_top_left_screen_address: SOURCE_ATTRACT_HALL_ALL_TIME_TABLE_SCREEN,
                 visual_offset: SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             } if event.start_after_steps == SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
+                && event.duration_steps == Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS)
         )));
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
@@ -11617,6 +11702,7 @@ mod tests {
                 count_position: SOURCE_ATTRACT_CREDIT_COUNT_POSITION,
                 minimum_credits: 0,
             } if event.start_after_steps == SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
+                && event.duration_steps.is_none()
         )));
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
@@ -11625,6 +11711,7 @@ mod tests {
                 top_left_screen_address: 0x3854,
             } if event.start_after_steps == SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
                 && label == SOURCE_ATTRACT_HALL_TITLE_LABEL
+                && event.duration_steps == Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS)
         )));
         assert_eq!(
             parsed
@@ -11638,6 +11725,7 @@ mod tests {
                         top_left_screen_address: 0x1E72 | 0x5F72,
                     } if event.start_after_steps == SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
                         && label == SOURCE_ATTRACT_HALL_GREATEST_LABEL
+                        && event.duration_steps == Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS)
                 ))
                 .count(),
             2
@@ -11648,7 +11736,20 @@ mod tests {
                 sprite: SpriteKey::DefenderLogo,
                 position: SOURCE_ATTRACT_HALL_DEFENDER_LOGO_POSITION,
             } if event.start_after_steps == SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
+                && event.duration_steps == Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS)
         )));
+        for (label, screen_address) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES {
+            assert!(parsed.manifest().events.iter().any(|event| matches!(
+                event.action,
+                AttractScriptActionManifest::SourceMessage {
+                    label: ref event_label,
+                    top_left_screen_address,
+                } if event.start_after_steps == SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP
+                    && event.duration_steps.is_none()
+                    && event_label == label
+                    && top_left_screen_address == screen_address
+            )));
+        }
     }
 
     #[test]

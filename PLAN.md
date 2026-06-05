@@ -43,18 +43,21 @@ verification tools.
   `assets/red-label/actor-behavior.script`, and
   `assets/red-label/actor-waves.script` through the same parser path. The
   attract script now draws the source `ELECV` presents message, source-style
-  Hall-of-Fame table rows, and source `CREDV` credits label/count alongside the
-  Williams reveal and Defender wordmark coalescence using source title
-  page-start steps: Williams from step 1, `ELECV` from step 236, the
-  Defender wordmark from step 365, and the high-score/zero-credit
-  Hall-of-Fame page from step 488. Title pages suppress the zero-credit line
-  but still show real inserted credits through a `credits_nonzero` script
-  action. The Hall-of-Fame page also draws source `HALLD_*` headings and the
-  source Defender logo; `hall_scores` draws Today’s and All-Time table columns
-  from driver scores plus embedded red-label seed initials. Custom attract
-  scripts can draw checked `messages.tsv` labels through source cursor
-  controls, and the older one-column `high_scores` action remains available for
-  custom screens.
+  Hall-of-Fame table rows, source scoring/instruction labels, and source
+  `CREDV` credits label/count alongside the Williams reveal and Defender
+  wordmark coalescence. Its source page-start steps are Williams from step 1,
+  `ELECV` from step 236, the Defender wordmark from step 365, the
+  high-score/zero-credit Hall-of-Fame page from step 488 for the source 60-tick
+  stall window, and scoring/instruction labels from step 1088. Title pages
+  suppress the zero-credit line but still show real inserted credits through a
+  `credits_nonzero` script action. The Hall-of-Fame page also draws source
+  `HALLD_*` headings and the source Defender logo; `hall_scores` draws Today’s
+  and All-Time table columns from driver scores plus embedded red-label seed
+  initials. The scoring/instruction page draws `SCANV`, `LANDV`, `MUTV`,
+  `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` from checked `messages.tsv` rows and
+  source screen addresses. Custom attract scripts can draw checked
+  `messages.tsv` labels through source cursor controls, and the older
+  one-column `high_scores` action remains available for custom screens.
   `ActorWaveScript` now names per-wave progression data and applies behavior
   scripts plus hostile and initial-human spawn records as play starts and waves
   are cleared. Wave scripts can now attach spawn-index behavior profiles that
@@ -766,6 +769,25 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 13:44 BST`: Completed the actor attract
+  scoring/instruction text slice. The embedded actor attract script and Rust
+  fallback now bound the title and Hall-of-Fame surfaces to their source
+  windows: Williams `1-487`, `ELECV` `236-487`, Defender wordmark `365-487`,
+  and Hall-of-Fame display rows `488-1087`. The default script now starts the
+  scoring/instruction text page at step `1088`, drawing checked
+  `messages.tsv` labels `SCANV`, `LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`,
+  and `SWARMV` at the source screen addresses. Focused regressions now prove
+  the Defender wordmark settles before the Hall boundary, the Hall rows drop
+  out at the scoring boundary, and the instruction message glyphs render from
+  the source-message path. Validation passed with focused attract/parser tests,
+  `cargo test actor_game --all-targets --features legacy-tools`, `cargo test
+  actor_smoke --all-targets --features legacy-tools`, `cargo check
+  --all-targets --features legacy-tools`, `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`, `cargo fmt --check`, touched-doc
+  markdownlint, and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780662977164499`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780663511930569`.
 - `2026-06-05 13:32 BST`: Completed the actor Hall-of-Fame table fidelity
   slice. The embedded actor attract script and Rust fallback now replace the
   generic one-column default high-score list with a source-shaped

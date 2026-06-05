@@ -771,18 +771,23 @@ reintroduce legacy implementation terminology.
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and
   `assets/red-label/actor-waves.script`. The attract script can draw
-  the source `ELECV` presents message, source-style Hall-of-Fame table rows, and
-  source `CREDV` credits label/count in addition to Williams reveal and
-  Defender wordmark coalescence using source title page-start steps: Williams
-  from step 1, `ELECV` from step 236, the Defender wordmark from step 365, and
-  the high-score/zero-credit Hall-of-Fame page from step 488. Title pages
-  suppress the zero-credit line but still show real inserted credits through a
+  the source `ELECV` presents message, source-style Hall-of-Fame table rows,
+  source scoring/instruction labels, and source `CREDV` credits label/count in
+  addition to Williams reveal and Defender wordmark coalescence. Its source
+  page-start steps are Williams from step 1, `ELECV` from step 236, the
+  Defender wordmark from step 365, the high-score/zero-credit Hall-of-Fame page
+  from step 488 for the source 60-tick stall window, and the
+  scoring/instruction labels from step 1088. Title pages suppress the
+  zero-credit line but still show real inserted credits through a
   `credits_nonzero` script action. The Hall-of-Fame page also draws source
   `HALLD_*` headings and the source Defender logo; `hall_scores` draws Today’s
   and All-Time table columns from driver scores plus embedded red-label seed
-  initials. Custom attract scripts can draw checked `messages.tsv` labels
-  through source cursor controls, and the older one-column `high_scores` action
-  remains available for custom screens. The default actor wave progression expands
+  initials. The scoring/instruction page draws `SCANV`, `LANDV`, `MUTV`,
+  `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` from checked `messages.tsv` rows
+  and source screen addresses. Custom attract scripts can draw checked
+  `messages.tsv` labels through source cursor controls, and the older
+  one-column `high_scores` action remains available for custom screens. The
+  default actor wave progression expands
   that wave script through `assets/red-label/wave-table.tsv` for active
   wave size, lander and bomber movement speed, lander fire cadence, baiter
   entry/shot/seek timing, and source bomber/pod counts. The actor allocator
