@@ -5550,8 +5550,11 @@ impl Lander {
 
         let (x, x_fraction) =
             actor_source_axis_step(self.position.x, source.x_fraction, source.x_velocity);
-        let (y, y_fraction) =
-            actor_source_axis_step(self.position.y, source.y_fraction, source.y_velocity);
+        let (y, y_fraction) = actor_source_active_object_y_step(
+            self.position.y,
+            source.y_fraction,
+            source.y_velocity,
+        );
         self.position = Point::new(x, y);
         source.x_fraction = x_fraction;
         source.y_fraction = y_fraction;
@@ -5910,8 +5913,11 @@ impl Bomber {
 
         let (x, x_fraction) =
             actor_source_axis_step(self.position.x, source.x_fraction, source.x_velocity);
-        let (y, y_fraction) =
-            actor_source_axis_step(self.position.y, source.y_fraction, source.y_velocity);
+        let (y, y_fraction) = actor_source_active_object_y_step(
+            self.position.y,
+            source.y_fraction,
+            source.y_velocity,
+        );
         self.position = Point::new(x, y);
         source.x_fraction = x_fraction;
         source.y_fraction = y_fraction;
@@ -6326,8 +6332,11 @@ impl Swarmer {
         }
         let (x, x_fraction) =
             actor_source_axis_step(self.position.x, source.x_fraction, source.x_velocity);
-        let (y, y_fraction) =
-            actor_source_axis_step(self.position.y, source.y_fraction, source.y_velocity);
+        let (y, y_fraction) = actor_source_active_object_y_step(
+            self.position.y,
+            source.y_fraction,
+            source.y_velocity,
+        );
         self.position = Point::new(x, y);
         source.x_fraction = x_fraction;
         source.y_fraction = y_fraction;
@@ -6506,8 +6515,11 @@ impl Baiter {
             source.x_fraction,
             actor_source_baiter_screen_x_velocity(source.x_velocity),
         );
-        let (y, y_fraction) =
-            actor_source_axis_step(self.position.y, source.y_fraction, source.y_velocity);
+        let (y, y_fraction) = actor_source_active_object_y_step(
+            self.position.y,
+            source.y_fraction,
+            source.y_velocity,
+        );
         self.position = Point::new(x, y);
         source.x_fraction = x_fraction;
         source.y_fraction = y_fraction;
@@ -8669,6 +8681,101 @@ mod tests {
                 y_fraction: 0,
                 x_velocity: 0,
                 y_velocity: 0x0100,
+            })
+        );
+    }
+
+    #[test]
+    fn source_hostile_y_motion_wraps_through_source_playfield_bounds() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let lander = driver.spawn_lander_from_spawn(ActorLanderSpawn {
+            position: Point::new(0x70, i16::from(SOURCE_PLAYFIELD_Y_MIN)),
+            source: Some(ActorSourceLanderMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0xFFFF,
+                shot_timer: 8,
+                sleep_ticks: 0,
+                picture_frame: 0,
+                target_human_index: None,
+            }),
+        });
+        let swarmer = driver.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
+            position: Point::new(0x80, i16::from(SOURCE_PLAYFIELD_Y_MAX)),
+            source: Some(ActorSourceSwarmerMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0x0100,
+                acceleration: 0,
+                sleep_ticks: 0,
+                shot_timer: 3,
+            }),
+        });
+        let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
+            position: Point::new(0x90, i16::from(SOURCE_PLAYFIELD_Y_MIN)),
+            source: Some(ActorSourceBaiterMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0xFFFF,
+                shot_timer: 3,
+                sleep_ticks: 1,
+                picture_frame: 0,
+            }),
+        });
+
+        let report = driver.step(GameInput::NONE);
+
+        assert_eq!(
+            snapshot_for(&report, lander).position,
+            Point::new(0x70, i16::from(SOURCE_PLAYFIELD_Y_MAX))
+        );
+        assert_eq!(
+            snapshot_for(&report, lander).source_lander,
+            Some(ActorSourceLanderMetadata {
+                x_fraction: 0,
+                y_fraction: 0xFF,
+                x_velocity: 0,
+                y_velocity: 0xFFFF,
+                shot_timer: 7,
+                sleep_ticks: 0,
+                picture_frame: 0,
+                target_human_index: None,
+            })
+        );
+        assert_eq!(
+            snapshot_for(&report, swarmer).position,
+            Point::new(0x80, i16::from(SOURCE_PLAYFIELD_Y_MIN))
+        );
+        assert_eq!(
+            snapshot_for(&report, swarmer).source_swarmer,
+            Some(ActorSourceSwarmerMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0x0100,
+                acceleration: 0,
+                sleep_ticks: SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS,
+                shot_timer: 2,
+            })
+        );
+        assert_eq!(
+            snapshot_for(&report, baiter).position,
+            Point::new(0x90, i16::from(SOURCE_PLAYFIELD_Y_MAX))
+        );
+        assert_eq!(
+            snapshot_for(&report, baiter).source_baiter,
+            Some(ActorSourceBaiterMetadata {
+                x_fraction: 0,
+                y_fraction: 0xFF,
+                x_velocity: 0,
+                y_velocity: 0xFFFF,
+                shot_timer: 3,
+                sleep_ticks: 0,
+                picture_frame: 0,
             })
         );
     }
@@ -11401,7 +11508,7 @@ mod tests {
         let (x, x_fraction) =
             actor_source_axis_step(position.x, source.x_fraction, source.x_velocity);
         let (y, y_fraction) =
-            actor_source_axis_step(position.y, source.y_fraction, source.y_velocity);
+            actor_source_active_object_y_step(position.y, source.y_fraction, source.y_velocity);
         source.x_fraction = x_fraction;
         source.y_fraction = y_fraction;
         source.sleep_ticks = SOURCE_BOMBER_LOOP_SLEEP_TICKS;

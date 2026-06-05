@@ -4719,3 +4719,28 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780644711982029`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780645082637979`.
+- `2026-06-05 08:45 BST`: Completed the actor source hostile Y-bound wrapping
+  cycle. Source-backed lander, bomber, swarmer, and baiter Y motion now uses
+  the source active-object Y step, matching the source pod wrap behavior
+  through `SOURCE_PLAYFIELD_Y_MIN..=SOURCE_PLAYFIELD_Y_MAX` while preserving
+  fixed-point fractions. Updated the source bomber expected-motion helper to
+  model the same red-label vertical bounds. Added a focused regression covering
+  source lander, swarmer, and baiter top/bottom Y wrapping; source pod and
+  bomber filters stayed green. README, SPEC, and the actor architecture notes
+  now document source-hostile active-object Y wrapping. No legacy code, tests,
+  or scaffolding were safe to remove in this slice because clean
+  smoke/fidelity/oracle evidence still depends on clean runtime boundaries
+  outside the actor path. Validation passed with `cargo fmt --check`, focused
+  source hostile/pod/bomber tests,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite was not rerun in this cycle; the previously isolated
+  clean-game MAME window/post-game audio failures remain outside this slice.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780645175300049`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780645568844929`.
