@@ -5,7 +5,15 @@
 //! the driver prompts every asset once per step, gathers commands, resolves
 //! world rules in a stable order, and publishes a step description.
 
-use crate::game::SoundEvent;
+use crate::{
+    game::SoundEvent,
+    renderer::{
+        Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
+        push_source_text_bytes_sprites, source_attract_defender_appearance_pixels,
+        source_attract_williams_logo_operation_pixel_counts,
+        source_attract_williams_logo_pixel_path,
+    },
+};
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::mpsc::{self, Receiver, Sender},
@@ -13,6 +21,7 @@ use std::{
 };
 
 const PLAYER_SPEED: i16 = 2;
+const ACTOR_RENDER_SURFACE: SurfaceSize = SurfaceSize::new(292, 240);
 const INITIAL_SMART_BOMBS: u8 = 3;
 const PLAYER_LASER_COOLDOWN_STEPS: u8 = 8;
 const PLAYER_HYPERSPACE_HIDDEN_STEPS: u8 = 33;
@@ -42,9 +51,27 @@ const EXPLOSION_LIFETIME: u16 = 20;
 const SCORE_POPUP_LIFETIME: u16 = 50;
 const WILLIAMS_REVEAL_STEPS: u16 = 36;
 const WILLIAMS_COLOR_PERIOD: u16 = 8;
+const SOURCE_ATTRACT_WILLIAMS_LOGO_POSITION: Point = Point::new(108, 60);
+const SOURCE_ATTRACT_DEFENDER_WORDMARK_POSITION: Point = Point::new(96, 144);
 const DEFENDER_WORDMARK_START_STEP: u64 = 72;
 const DEFENDER_WORDMARK_SLOTS: u16 = 15;
 const DEFENDER_WORDMARK_ROW_PAIRS: u16 = 6;
+const SOURCE_ATTRACT_DEFENDER_APPEARANCE_FINAL_TICK: u8 = 0x2E;
+const WILLIAMS_LOGO_SCENE_SIZE: [f32; 2] = [92.0, 19.0];
+const DEFENDER_WORDMARK_SCENE_SIZE: [f32; 2] = [120.0, 24.0];
+const PLAYER_SHIP_SCENE_SIZE: [f32; 2] = [16.0, 6.0];
+const PLAYER_PROJECTILE_SCENE_SIZE: [f32; 2] = [16.0, 1.0];
+const LANDER_SCENE_SIZE: [f32; 2] = [10.0, 8.0];
+const HUMAN_SCENE_SIZE: [f32; 2] = [4.0, 8.0];
+const MUTANT_SCENE_SIZE: [f32; 2] = [10.0, 8.0];
+const BAITER_SCENE_SIZE: [f32; 2] = [12.0, 4.0];
+const BOMBER_SCENE_SIZE: [f32; 2] = [8.0, 8.0];
+const POD_SCENE_SIZE: [f32; 2] = [8.0, 8.0];
+const SWARMER_SCENE_SIZE: [f32; 2] = [6.0, 4.0];
+const ENEMY_BOMB_SCENE_SIZE: [f32; 2] = [4.0, 3.0];
+const EXPLOSION_SCENE_SIZE: [f32; 2] = [8.0, 8.0];
+const PLAYER_EXPLOSION_PIXEL_SCENE_SIZE: [f32; 2] = [1.0, 1.0];
+const SCORE_POPUP_SCENE_SIZE: [f32; 2] = [12.0, 6.0];
 const HUMAN_GROUND_Y: i16 = 214;
 const HUMAN_FALL_ACCELERATION: i16 = 1;
 const HUMAN_MAX_FALL_SPEED: i16 = 8;
@@ -2173,11 +2200,11 @@ impl AttractScript {
 
     pub fn red_label_title() -> Self {
         Self::new(vec![
-            AttractScriptEvent::williams_logo(1, None, Point::new(94, 34)),
+            AttractScriptEvent::williams_logo(1, None, SOURCE_ATTRACT_WILLIAMS_LOGO_POSITION),
             AttractScriptEvent::defender_wordmark(
                 DEFENDER_WORDMARK_START_STEP,
                 None,
-                Point::new(88, 78),
+                SOURCE_ATTRACT_DEFENDER_WORDMARK_POSITION,
             ),
             AttractScriptEvent::text(1, None, Point::new(78, 176), "HIGH SCORES"),
         ])
@@ -2662,6 +2689,342 @@ impl StepReport {
     pub fn sound_events(&self, bridge: &mut ActorSoundEventBridge) -> Vec<SoundEvent> {
         bridge.sound_events_for_report(self)
     }
+
+    pub fn render_scene(&self) -> RenderScene {
+        ActorRenderSceneBridge::new().render_scene_for_report(self)
+    }
+
+    pub fn render_scene_with(&self, bridge: &ActorRenderSceneBridge) -> RenderScene {
+        bridge.render_scene_for_report(self)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorRenderSceneBridge {
+    surface: SurfaceSize,
+}
+
+impl ActorRenderSceneBridge {
+    pub const fn new() -> Self {
+        Self {
+            surface: ACTOR_RENDER_SURFACE,
+        }
+    }
+
+    pub const fn with_surface(surface: SurfaceSize) -> Self {
+        Self { surface }
+    }
+
+    pub const fn surface(self) -> SurfaceSize {
+        self.surface
+    }
+
+    pub fn render_scene_for_report(&self, report: &StepReport) -> RenderScene {
+        let mut scene = RenderScene::empty(report.step, self.surface);
+        for draw in &report.draws {
+            self.push_draw(&mut scene, report.phase, draw);
+        }
+        scene
+    }
+
+    fn push_draw(&self, scene: &mut RenderScene, phase: Phase, draw: &DrawCommand) {
+        if let Some(text) = &draw.text {
+            let layer = if phase == Phase::Attract {
+                RenderLayer::Overlay
+            } else {
+                RenderLayer::Hud
+            };
+            push_source_text_bytes_sprites(
+                scene,
+                text.as_bytes(),
+                point_position(draw.position),
+                layer,
+            );
+            return;
+        }
+
+        match draw.effect {
+            VisualEffect::WilliamsReveal {
+                stroke_step,
+                color_phase,
+            } => self.push_williams_reveal(scene, draw.position, stroke_step, color_phase),
+            VisualEffect::DefenderCoalescence { slot, row_pair } => {
+                self.push_defender_coalescence(scene, slot, row_pair)
+            }
+            VisualEffect::ExplosionCloud { kind, .. } => {
+                self.push_explosion_sprite(scene, draw.position, kind)
+            }
+            VisualEffect::Static
+            | VisualEffect::SourceLanderFrame { .. }
+            | VisualEffect::SourceBomberFrame { .. }
+            | VisualEffect::SourcePod
+            | VisualEffect::SourceBaiterFrame { .. }
+            | VisualEffect::SourceHumanFrame { .. } => self.push_static_sprite(scene, draw),
+        }
+    }
+
+    fn push_williams_reveal(
+        &self,
+        scene: &mut RenderScene,
+        position: Point,
+        stroke_step: u16,
+        color_phase: u8,
+    ) {
+        let tint = williams_logo_phase_tint(color_phase);
+        let pixel_path = source_attract_williams_logo_pixel_path();
+        let visible_pixel_count =
+            williams_reveal_visible_pixel_count(stroke_step, pixel_path.len());
+        if visible_pixel_count < pixel_path.len() {
+            let origin = point_position(position);
+            for [pixel_x, pixel_y] in pixel_path.into_iter().take(visible_pixel_count) {
+                scene.push_sprite(SceneSprite {
+                    sprite: SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL,
+                    layer: RenderLayer::Overlay,
+                    position: [
+                        origin[0] + f32::from(pixel_x),
+                        origin[1] + f32::from(pixel_y),
+                    ],
+                    size: [1.0, 1.0],
+                    tint,
+                });
+            }
+            return;
+        }
+
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::ATTRACT_WILLIAMS_LOGO,
+            layer: RenderLayer::Overlay,
+            position: point_position(position),
+            size: WILLIAMS_LOGO_SCENE_SIZE,
+            tint,
+        });
+    }
+
+    fn push_defender_coalescence(&self, scene: &mut RenderScene, slot: u8, row_pair: u8) {
+        let progress = u16::from(slot)
+            .saturating_mul(DEFENDER_WORDMARK_ROW_PAIRS)
+            .saturating_add(u16::from(row_pair));
+        let total_steps = DEFENDER_WORDMARK_SLOTS.saturating_mul(DEFENDER_WORDMARK_ROW_PAIRS);
+        let appearance_tick = if total_steps == 0 {
+            0
+        } else {
+            progress
+                .saturating_mul(u16::from(SOURCE_ATTRACT_DEFENDER_APPEARANCE_FINAL_TICK))
+                .checked_div(total_steps)
+                .unwrap_or(0)
+        };
+        let appearance_tick = u8::try_from(appearance_tick)
+            .expect("Defender appearance tick fits")
+            .min(SOURCE_ATTRACT_DEFENDER_APPEARANCE_FINAL_TICK);
+
+        for pixel in source_attract_defender_appearance_pixels(scene.surface, appearance_tick) {
+            scene.push_sprite(SceneSprite {
+                sprite: SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL,
+                layer: RenderLayer::Overlay,
+                position: [f32::from(pixel.position[0]), f32::from(pixel.position[1])],
+                size: [1.0, 1.0],
+                tint: Color { rgba: pixel.color },
+            });
+        }
+    }
+
+    fn push_explosion_sprite(&self, scene: &mut RenderScene, position: Point, kind: ExplosionKind) {
+        let (sprite, size) = match kind {
+            ExplosionKind::Enemy => (SpriteId::SWARMER_EXPLOSION, EXPLOSION_SCENE_SIZE),
+            ExplosionKind::Bomb => (SpriteId::BOMB_EXPLOSION, EXPLOSION_SCENE_SIZE),
+            ExplosionKind::Human => (SpriteId::ASTRONAUT_EXPLOSION, EXPLOSION_SCENE_SIZE),
+            ExplosionKind::Player => (
+                SpriteId::PLAYER_EXPLOSION_PIXEL,
+                PLAYER_EXPLOSION_PIXEL_SCENE_SIZE,
+            ),
+        };
+        scene.push_sprite(SceneSprite {
+            sprite,
+            layer: RenderLayer::Objects,
+            position: point_position(position),
+            size,
+            tint: Color::WHITE,
+        });
+    }
+
+    fn push_static_sprite(&self, scene: &mut RenderScene, draw: &DrawCommand) {
+        let Some(sprite) = actor_scene_sprite(draw.sprite, draw.position) else {
+            return;
+        };
+        scene.push_sprite(sprite);
+    }
+}
+
+impl Default for ActorRenderSceneBridge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn point_position(point: Point) -> [f32; 2] {
+    [f32::from(point.x), f32::from(point.y)]
+}
+
+fn williams_reveal_visible_pixel_count(stroke_step: u16, total_pixels: usize) -> usize {
+    if total_pixels == 0 {
+        return 0;
+    }
+    if stroke_step >= WILLIAMS_REVEAL_STEPS {
+        return total_pixels;
+    }
+    if stroke_step == 0 {
+        return 0;
+    }
+
+    let operation_counts = source_attract_williams_logo_operation_pixel_counts();
+    let operation_index = usize::from(stroke_step)
+        .saturating_mul(operation_counts.len())
+        .checked_div(usize::from(WILLIAMS_REVEAL_STEPS))
+        .unwrap_or(0)
+        .saturating_sub(1);
+    operation_counts
+        .get(operation_index)
+        .copied()
+        .unwrap_or(total_pixels)
+        .clamp(1, total_pixels)
+}
+
+fn williams_logo_phase_tint(color_phase: u8) -> Color {
+    match color_phase % 4 {
+        0 => Color::from_rgba(0xFF, 0xFF, 0xFF, 0xFF),
+        1 => Color::from_rgba(0xFF, 0xD8, 0x40, 0xFF),
+        2 => Color::from_rgba(0x80, 0xE8, 0xFF, 0xFF),
+        _ => Color::from_rgba(0xFF, 0x80, 0xE8, 0xFF),
+    }
+}
+
+fn actor_scene_sprite(sprite: SpriteKey, position: Point) -> Option<SceneSprite> {
+    let (sprite, layer, size, tint) = match sprite {
+        SpriteKey::WilliamsLogo => (
+            SpriteId::ATTRACT_WILLIAMS_LOGO,
+            RenderLayer::Overlay,
+            WILLIAMS_LOGO_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::DefenderCoalescence => return None,
+        SpriteKey::DefenderWordmark | SpriteKey::DefenderLogo => (
+            SpriteId::HALL_OF_FAME_DEFENDER_LOGO,
+            RenderLayer::Overlay,
+            DEFENDER_WORDMARK_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::HighScoreText => (
+            SpriteId::STATUS_TEXT,
+            RenderLayer::Overlay,
+            [8.0, 8.0],
+            Color::WHITE,
+        ),
+        SpriteKey::PlayerRight => (
+            SpriteId::PLAYER_SHIP,
+            RenderLayer::Objects,
+            PLAYER_SHIP_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::PlayerLeft => (
+            SpriteId::PLAYER_SHIP_LEFT,
+            RenderLayer::Objects,
+            PLAYER_SHIP_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::Lander => (
+            SpriteId::ENEMY_LANDER,
+            RenderLayer::Objects,
+            LANDER_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::Mutant => (
+            SpriteId::ENEMY_MUTANT,
+            RenderLayer::Objects,
+            MUTANT_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::Bomber => (
+            SpriteId::ENEMY_BOMBER,
+            RenderLayer::Objects,
+            BOMBER_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::Bomb => (
+            SpriteId::ENEMY_BOMB,
+            RenderLayer::Projectiles,
+            ENEMY_BOMB_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::Pod => (
+            SpriteId::ENEMY_POD,
+            RenderLayer::Objects,
+            POD_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::Swarmer => (
+            SpriteId::ENEMY_SWARMER,
+            RenderLayer::Objects,
+            SWARMER_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::Baiter => (
+            SpriteId::ENEMY_BAITER,
+            RenderLayer::Objects,
+            BAITER_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::Human | SpriteKey::HumanFalling => (
+            SpriteId::HUMAN,
+            RenderLayer::Objects,
+            HUMAN_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::HumanCarried => (
+            SpriteId::HUMAN,
+            RenderLayer::Objects,
+            HUMAN_SCENE_SIZE,
+            Color::from_rgba(0xFF, 0xF8, 0x80, 0xFF),
+        ),
+        SpriteKey::Laser => (
+            SpriteId::PLAYER_PROJECTILE,
+            RenderLayer::Projectiles,
+            PLAYER_PROJECTILE_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::EnemyLaser => (
+            SpriteId::ENEMY_BOMB,
+            RenderLayer::Projectiles,
+            ENEMY_BOMB_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::Explosion => (
+            SpriteId::BOMB_EXPLOSION,
+            RenderLayer::Objects,
+            EXPLOSION_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::Score250 => (
+            SpriteId::SCORE_POPUP_250,
+            RenderLayer::Objects,
+            SCORE_POPUP_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::Score500 => (
+            SpriteId::SCORE_POPUP_500,
+            RenderLayer::Objects,
+            SCORE_POPUP_SCENE_SIZE,
+            Color::WHITE,
+        ),
+        SpriteKey::Text => return None,
+    };
+
+    Some(SceneSprite {
+        sprite,
+        layer,
+        position: point_position(position),
+        size,
+        tint,
+    })
 }
 
 pub struct ActorGameDriver {
@@ -5768,6 +6131,150 @@ mod tests {
     }
 
     #[test]
+    fn actor_render_scene_bridge_projects_attract_source_pixels() {
+        let mut driver = ActorGameDriver::new();
+
+        let williams = driver.step(GameInput::NONE);
+        let williams_scene = williams.render_scene();
+        assert_eq!(williams_scene.frame, williams.step);
+        assert_eq!(williams_scene.surface, ACTOR_RENDER_SURFACE);
+        assert!(williams_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL
+                && sprite.layer == RenderLayer::Overlay
+        }));
+        assert!(
+            !williams_scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO)
+        );
+        assert!(williams_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_H && sprite.layer == RenderLayer::Overlay
+        }));
+
+        let mut coalescing = None;
+        for _ in 0..DEFENDER_WORDMARK_START_STEP {
+            let report = driver.step(GameInput::NONE);
+            if report
+                .draws
+                .iter()
+                .any(|draw| draw.sprite == SpriteKey::DefenderCoalescence)
+            {
+                coalescing = Some(report);
+                break;
+            }
+        }
+        let coalescing = coalescing.expect("Defender wordmark should coalesce");
+        let coalescing_scene = coalescing.render_scene();
+        assert!(coalescing_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL
+                && sprite.layer == RenderLayer::Overlay
+        }));
+        assert!(
+            !coalescing_scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO)
+        );
+    }
+
+    #[test]
+    fn actor_render_scene_bridge_projects_playing_actors_and_status_text() {
+        let mut driver = started_driver();
+
+        let report = driver.step(GameInput::NONE);
+        let scene = report.render_scene();
+
+        assert_eq!(scene.frame, report.step);
+        assert!(scene.sprites.iter().any(|sprite| {
+            matches!(
+                sprite.sprite,
+                SpriteId::PLAYER_SHIP | SpriteId::PLAYER_SHIP_LEFT
+            ) && sprite.layer == RenderLayer::Objects
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_LANDER && sprite.layer == RenderLayer::Objects
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HUMAN && sprite.layer == RenderLayer::Objects
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            SpriteId::SCORE_DIGITS.contains(&sprite.sprite) && sprite.layer == RenderLayer::Hud
+        }));
+    }
+
+    #[test]
+    fn actor_render_scene_bridge_maps_projectiles_and_explosion_variants() {
+        let report = StepReport {
+            step: 99,
+            phase: Phase::Playing,
+            wave: 1,
+            score: 0,
+            credits: 0,
+            lives: 3,
+            smart_bombs: 3,
+            snapshots: Vec::new(),
+            draws: vec![
+                DrawCommand::sprite(ActorId(101), SpriteKey::Laser, Point::new(40, 80)),
+                DrawCommand::sprite(ActorId(102), SpriteKey::EnemyLaser, Point::new(90, 82)),
+                DrawCommand::sprite_with_effect(
+                    ActorId(103),
+                    SpriteKey::Explosion,
+                    Point::new(120, 90),
+                    VisualEffect::ExplosionCloud {
+                        kind: ExplosionKind::Bomb,
+                        age: 2,
+                    },
+                ),
+                DrawCommand::sprite_with_effect(
+                    ActorId(104),
+                    SpriteKey::Explosion,
+                    Point::new(124, 96),
+                    VisualEffect::ExplosionCloud {
+                        kind: ExplosionKind::Human,
+                        age: 1,
+                    },
+                ),
+                DrawCommand::sprite_with_effect(
+                    ActorId(105),
+                    SpriteKey::Explosion,
+                    Point::new(128, 100),
+                    VisualEffect::ExplosionCloud {
+                        kind: ExplosionKind::Player,
+                        age: 1,
+                    },
+                ),
+            ],
+            sounds: Vec::new(),
+            commands: Vec::new(),
+        };
+
+        let bridge = ActorRenderSceneBridge::with_surface(SurfaceSize::new(320, 240));
+        let scene = report.render_scene_with(&bridge);
+
+        assert_eq!(bridge.surface(), SurfaceSize::new(320, 240));
+        assert_eq!(scene.surface, SurfaceSize::new(320, 240));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_PROJECTILE
+                && sprite.layer == RenderLayer::Projectiles
+                && sprite.size == PLAYER_PROJECTILE_SCENE_SIZE
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_BOMB && sprite.layer == RenderLayer::Projectiles
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::BOMB_EXPLOSION && sprite.layer == RenderLayer::Objects
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ASTRONAUT_EXPLOSION && sprite.layer == RenderLayer::Objects
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
+                && sprite.layer == RenderLayer::Objects
+        }));
+    }
+
+    #[test]
     fn attract_actor_accepts_credit_and_start_commands() {
         let mut driver = ActorGameDriver::new();
 
@@ -8056,7 +8563,7 @@ mod tests {
     }
 
     #[test]
-    fn high_score_entry_is_a_phase_not_a_legacy_timeline_script() {
+    fn high_score_entry_is_driver_owned_phase() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.lives = 1;

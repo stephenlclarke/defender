@@ -66,6 +66,11 @@ each asset owns its motion, draw description, sound cues, and interactions.
 This branch is not display-frame driven: `ActorGameDriver::step` advances a
 simulation turn and emits a `StepReport`, while renderers are expected to draw
 the latest report at whatever cadence they own.
+`StepReport::render_scene` and `ActorRenderSceneBridge` now project actor draw
+commands into the clean `RenderScene` contract using renderer-owned source
+text, Williams logo, Defender coalescence, sprite atlas, projectile, and
+explosion assets; this keeps actor behavior separate from render cadence while
+making the actor report consumable by the native renderer path.
 The current slice includes same-contract keyboard profiles, `XYZZY` overlay
 state, thread-backed actors, a data-driven `AttractScript` for custom attract
 drivers, `ActorBehaviorScript` profiles for level-wide and per-actor movement
@@ -93,7 +98,9 @@ cues, source-paced baiter timer entry, baiter shots/scoring/hit cues, and
 stock-backed smart-bomb hostile clearing. `ActorSoundEventBridge` now converts
 actor `StepReport` sound cues into the clean `SoundEvent` surface consumed by
 the live audio runtime, deriving thrust start/stop edges from the actor cue
-stream. Player
+stream. `ActorRenderSceneBridge` likewise converts report draw commands into
+clean scene sprites for renderer-owned source text, attract graphics,
+projectiles, explosions, and sprite atlas families. Player
 actor hyperspace now emits separate launch/materialization cues and clears
 active hostile projectile actors without spending lives, smart-bomb stock,
 scoring points, or clearing hostile actor families; the player actor owns the

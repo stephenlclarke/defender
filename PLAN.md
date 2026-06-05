@@ -4025,3 +4025,24 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780627619924799`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780628000622989`.
+- `2026-06-05 04:03 BST`: Completed the actor clean-render scene bridge
+  cycle. Added `ActorRenderSceneBridge`, `StepReport::render_scene`, and
+  `StepReport::render_scene_with` so actor draw-command streams can be
+  projected into clean `RenderScene` sprites without making gameplay
+  display-frame driven. The bridge maps source text glyphs, Williams reveal
+  pixels, Defender coalescence pixels, atlas-backed actor families,
+  projectiles, score popups, and explosion variants, and the default actor
+  attract title now uses source screen positions for the Williams and Defender
+  logo effects. Added regressions for attract source pixels, playing
+  actor/status scene sprites, projectile layers, and explosion family mappings.
+  No legacy modules, tests, or scaffolding were safe to remove while the actor
+  runtime remains isolated from live play, but a stale legacy-timeline phrase
+  was removed from an actor test name. Validation passed with
+  `cargo fmt --check`, `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780628278846089`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780629112831999`.

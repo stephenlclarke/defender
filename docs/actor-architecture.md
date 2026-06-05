@@ -30,6 +30,12 @@ verified.
   `ActorSoundEventBridge` converts a stream of `StepReport` sound cues into the
   clean `SoundEvent` values consumed by the live audio runtime, including
   thrust start/stop edges derived from actor cue state.
+- Rendering is adapted after actor behavior resolves. `StepReport::render_scene`
+  and `ActorRenderSceneBridge` read actor draw commands and emit clean
+  `RenderScene` sprites for source text glyphs, Williams logo reveal pixels,
+  Defender coalescence pixels, atlas-backed actor families, projectile layers,
+  score popups, and explosion variants. Actors do not own renderer resources or
+  display cadence.
 
 ## C++ to Rust Mapping
 
@@ -185,6 +191,13 @@ Script actions currently cover:
   and row-pair metadata until the wordmark settles to
   `SpriteKey::DefenderWordmark`.
 
+`ActorRenderSceneBridge` maps the Williams reveal metadata through the
+renderer-owned source pixel walk and maps Defender coalescence metadata through
+the renderer-owned source appearance pixels. Static attract sprites still honor
+their script positions, so custom attract drivers can place their own text and
+non-source sprite events while the default red-label title uses source screen
+positions.
+
 This is intentionally a Rust data script first. A later text parser or
 MAME-table translator can target the same `AttractScript` API without changing
 actor ownership.
@@ -252,5 +265,6 @@ The actor driver now owns a first Defender gameplay loop:
   driver-owned data.
 
 These mechanics are still intentionally compact. The next fidelity slices
-should port the remaining source restore positions and bind the draw/sound
-descriptions to the source sprite and Williams sound-board assets.
+should port the remaining source restore positions and wire the actor
+render/audio bridges into the live runtime once actor gameplay parity is high
+enough to retire isolated scaffolding.

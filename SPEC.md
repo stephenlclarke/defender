@@ -182,7 +182,9 @@ tree:
   `SoundCue::source_sound_command` metadata for red-label Williams sound-board
   command bytes where source evidence exists. `ActorSoundEventBridge` adapts
   report sound cues into clean `SoundEvent` batches for the existing audio
-  runtime contract. The actor game is not wired into the live runtime yet.
+  runtime contract. `ActorRenderSceneBridge` adapts report draw commands into
+  clean `RenderScene` sprites for the existing native renderer contract. The
+  actor game is not wired into the live runtime yet.
 - `src/game_smoke.rs`: the crate-private clean game smoke command that steps
   `Game` through scripted controls, verifies sprite plus native pipeline and
   draw-instance coverage, verifies sprite buffer upload-plan, render-pass plan,
@@ -693,9 +695,14 @@ reintroduce legacy implementation terminology.
   driver-owned `StepPrompt`/`StepReport` model, thread-backed asset actors,
   same-contract keyboard profiles, `XYZZY` overlay state, data-driven
   `AttractScript` support for custom attract drivers, Williams title reveal
-  metadata, and Defender wordmark coalescence metadata. The actor slice is
-  simulation-step driven rather than display-frame driven: render cadence is
-  outside actor behavior, and attract scripts use actor-local elapsed steps.
+  metadata, and Defender wordmark coalescence metadata. `StepReport` can now
+  project into the clean `RenderScene` contract through
+  `ActorRenderSceneBridge`, mapping actor draw commands to renderer-owned
+  source text glyphs, Williams logo reveal pixels, Defender appearance pixels,
+  sprite atlas families, projectile layers, and explosion families. The actor
+  slice is simulation-step driven rather than display-frame driven: render
+  cadence is outside actor behavior, and attract scripts use actor-local
+  elapsed steps.
   Actor movement and behavior are scriptable through `ActorBehaviorScript`,
   which resolves default, actor-kind, and actor-id profiles into each prompt;
   level scripts can tune speeds, fire cadence, pickup/conversion bands,
