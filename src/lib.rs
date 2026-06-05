@@ -398,6 +398,7 @@ mod public_api_tests {
         assert!(runtime_rs.contains("RuntimeCommand::VerifyRoms { path }"));
         assert!(runtime_rs.contains("RuntimeCommand::GameSmoke"));
         assert!(runtime_rs.contains("RuntimeCommand::ActorSmoke"));
+        assert!(runtime_rs.contains("RuntimeCommand::ActorWgpuSmoke"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityTrace { frame_count }"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityTraceInputs { script }"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityTraceInputsFile { path }"));
@@ -413,6 +414,7 @@ mod public_api_tests {
         assert!(runtime_rs.contains("pub(crate) fn run_verify_roms"));
         assert!(runtime_rs.contains("pub(crate) fn run_game_smoke"));
         assert!(runtime_rs.contains("pub(crate) fn run_actor_smoke"));
+        assert!(runtime_rs.contains("pub(crate) fn run_actor_wgpu_smoke"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_trace"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_trace_inputs"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_trace_inputs_file"));
@@ -425,6 +427,7 @@ mod public_api_tests {
         assert!(runtime_rs.contains("run_verify_roms_command(path)"));
         assert!(runtime_rs.contains("crate::game_smoke::run()"));
         assert!(runtime_rs.contains("crate::actor_smoke::run()"));
+        assert!(runtime_rs.contains("crate::live_wgpu::run_actor_wgpu_smoke()"));
         assert!(runtime_rs.contains("run_fidelity_trace_command(frame_count)"));
         assert!(runtime_rs.contains("run_fidelity_trace_inputs_command(script)"));
         assert!(runtime_rs.contains("run_fidelity_trace_inputs_file_command(path)"));

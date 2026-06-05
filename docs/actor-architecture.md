@@ -48,6 +48,11 @@ verified.
   required actor sprite families, projectiles, HUD text, overlays, native
   draw-command pipelines, and frame-level `wgpu` command plans while keeping
   live play on the current clean `Game` runtime.
+- `--actor-wgpu-smoke` reuses that actor smoke sequence but sends the resulting
+  actor `RenderScene` values through the offscreen `wgpu` texture/readback path.
+  It requires every actor frame to render nonblank pixels and produce dynamic
+  readback signatures before actor frames are considered for interactive live
+  play.
 
 ## C++ to Rust Mapping
 

@@ -109,6 +109,7 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
         CliClassification::Help => crate::runtime::run_help(),
         CliClassification::Error(error) => Err(error.into()),
         CliClassification::ActorSmoke => crate::runtime::run_actor_smoke(),
+        CliClassification::ActorWgpuSmoke => crate::runtime::run_actor_wgpu_smoke(),
     }
 }
 
@@ -127,6 +128,7 @@ enum CliClassification {
     Runtime(RuntimeConfig),
     GameSmoke,
     ActorSmoke,
+    ActorWgpuSmoke,
     Help,
     Error(CleanCliError),
 }
@@ -224,6 +226,7 @@ impl RuntimeCliClassifier {
                 }
                 ArgClassification::GameSmoke => return CliClassification::GameSmoke,
                 ArgClassification::ActorSmoke => return CliClassification::ActorSmoke,
+                ArgClassification::ActorWgpuSmoke => return CliClassification::ActorWgpuSmoke,
                 ArgClassification::Help => return CliClassification::Help,
                 ArgClassification::Error(error) => {
                     return CliClassification::Error(error);
@@ -269,6 +272,17 @@ impl RuntimeCliClassifier {
                     return ArgClassification::Error(CleanCliError::TooManyActorSmokeArgs);
                 }
                 ArgClassification::ActorSmoke
+            }
+            "--actor-wgpu-smoke" => {
+                if live_option_seen {
+                    return ArgClassification::Error(CleanCliError::LiveOptionsWithCommand(
+                        "--actor-wgpu-smoke",
+                    ));
+                }
+                if args.next().is_some() {
+                    return ArgClassification::Error(CleanCliError::TooManyActorWgpuSmokeArgs);
+                }
+                ArgClassification::ActorWgpuSmoke
             }
             "--help" | "-h" => ArgClassification::Help,
             "--renderer" | "--presentation" => {
@@ -497,6 +511,7 @@ enum ArgClassification {
     FidelityScenarioInputWriter(ScenarioInputWriterRequest),
     GameSmoke,
     ActorSmoke,
+    ActorWgpuSmoke,
     Runtime,
     Help,
     Error(CleanCliError),
@@ -516,6 +531,7 @@ enum CleanCliError {
     TooManyVerifyRomsArgs,
     TooManyGameSmokeArgs,
     TooManyActorSmokeArgs,
+    TooManyActorWgpuSmokeArgs,
     InvalidFidelityTraceFrameCount { value: String, error: String },
     NonPositiveFidelityTraceFrameCount,
     TooManyFidelityTraceArgs,
@@ -582,6 +598,12 @@ impl fmt::Display for CleanCliError {
                 write!(
                     formatter,
                     "--actor-smoke does not accept additional arguments"
+                )
+            }
+            Self::TooManyActorWgpuSmokeArgs => {
+                write!(
+                    formatter,
+                    "--actor-wgpu-smoke does not accept additional arguments"
                 )
             }
             Self::InvalidFidelityTraceFrameCount { value, error } => {
@@ -795,6 +817,14 @@ mod tests {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--actor-smoke"])),
             CliClassification::ActorSmoke
+        );
+    }
+
+    #[test]
+    fn clean_cli_owns_actor_wgpu_smoke_command() {
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&["--actor-wgpu-smoke"])),
+            CliClassification::ActorWgpuSmoke
         );
     }
 
@@ -1046,6 +1076,25 @@ mod tests {
             (
                 vec!["--actor-smoke", "--mute"],
                 CleanCliError::TooManyActorSmokeArgs,
+            ),
+        ] {
+            assert_eq!(
+                RuntimeCliClassifier::classify(args(&values)),
+                CliClassification::Error(error)
+            );
+        }
+    }
+
+    #[test]
+    fn clean_cli_rejects_malformed_actor_wgpu_smoke_args() {
+        for (values, error) in [
+            (
+                vec!["--mute", "--actor-wgpu-smoke"],
+                CleanCliError::LiveOptionsWithCommand("--actor-wgpu-smoke"),
+            ),
+            (
+                vec!["--actor-wgpu-smoke", "--mute"],
+                CleanCliError::TooManyActorWgpuSmokeArgs,
             ),
         ] {
             assert_eq!(
@@ -1339,6 +1388,10 @@ mod tests {
             "--actor-smoke does not accept additional arguments"
         );
         assert_eq!(
+            CleanCliError::TooManyActorWgpuSmokeArgs.to_string(),
+            "--actor-wgpu-smoke does not accept additional arguments"
+        );
+        assert_eq!(
             CleanCliError::InvalidFidelityTraceFrameCount {
                 value: String::from("wat"),
                 error: String::from("invalid digit found in string"),
@@ -1449,6 +1502,12 @@ mod tests {
     fn actor_smoke_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&["--actor-smoke"]))
             .expect("actor smoke CLI should run through configured runtime");
+    }
+
+    #[test]
+    fn actor_wgpu_smoke_cli_entrypoint_accepts_supported_args() {
+        super::run_with_args(args(&["--actor-wgpu-smoke"]))
+            .expect("actor wgpu smoke CLI should run through configured runtime");
     }
 
     #[test]

@@ -4092,3 +4092,34 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780630016184139`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780630483183789`.
+- `2026-06-05 04:45 BST`: Completed the actor `wgpu` smoke preflight cycle.
+  Added `--actor-wgpu-smoke` as an explicit actor-frame offscreen render gate.
+  The command reuses the crate-private actor smoke input sequence, steps
+  `ActorRuntimeAdapter`, renders each actor `RenderScene` through the actual
+  offscreen `wgpu` texture/readback path, and reports actor frame-source
+  evidence separately from clean `Game` frames. The binary run rendered `96`
+  actor frames, all `96` were nonblank, and the readback produced `94` distinct
+  signatures with first signature `103ef08d4c30595a` and last signature
+  `78c5cf50f60b5ce1`; no temporary raster fallback was used. Interactive live
+  play and `--live-smoke` remain on the current clean `Game` frame source. No
+  legacy code, tests, or scaffolding were safe to remove because this is still a
+  preflight evidence path rather than the live actor runtime. Validation passed
+  with `cargo fmt --check`, `cargo run -- --actor-wgpu-smoke`,
+  `cargo test actor_wgpu_smoke --lib`,
+  `cargo test actor_wgpu_smoke --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --lib`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo test live_smoke --lib`,
+  `cargo test live_smoke --all-targets --features legacy-tools`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test clean_cli_error_messages_are_stable --lib`,
+  `cargo test clean_help_text_preserves_current_cli_contract --lib`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The earlier full unfiltered
+  `cargo test --all-targets --features legacy-tools` failure remains isolated to
+  existing clean-game MAME window/post-game audio tests outside this slice.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780630546987929`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780631138579499`.

@@ -194,6 +194,10 @@ tree:
   projectile/HUD/overlay layers, native draw-command pipeline coverage, and
   frame-level `wgpu` command plans without replacing the live clean `Game`
   runtime.
+- `src/live_wgpu.rs`: also owns `--actor-wgpu-smoke`, which reuses the actor
+  smoke input sequence, renders actor `RenderScene` frames through the offscreen
+  `wgpu` texture/readback path, and checks nonblank dynamic readback evidence
+  without changing the interactive live frame source.
 - `src/game_smoke.rs`: the crate-private clean game smoke command that steps
   `Game` through scripted controls, verifies sprite plus native pipeline and
   draw-instance coverage, verifies sprite buffer upload-plan, render-pass plan,
@@ -693,6 +697,8 @@ reintroduce legacy implementation terminology.
   actor sprite families, projectile/HUD/overlay layers, native draw-command
   pipeline coverage, and frame-level `wgpu` command plans without replacing
   live play's current clean `Game` frame source.
+- `--actor-wgpu-smoke` renders the same actor smoke frames through the actual
+  offscreen `wgpu` readback path and verifies nonblank dynamic frame signatures.
 - Runtime renderer selection has been removed.
 - `--input-profile planetoid` is the default input profile.
 - `--input-profile cabinet` exposes a MAME-style cabinet keyboard profile.

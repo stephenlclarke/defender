@@ -209,6 +209,14 @@ pub(crate) fn default_smoke_report() -> anyhow::Result<ActorSmokeReport> {
     smoke_report(ACTOR_SMOKE_FRAMES)
 }
 
+pub(crate) fn smoke_frame_count() -> u32 {
+    ACTOR_SMOKE_FRAMES
+}
+
+pub(crate) fn smoke_actor_input(frame_index: u32) -> GameInput {
+    smoke_input(frame_index).value
+}
+
 pub(crate) fn smoke_report(frames: u32) -> anyhow::Result<ActorSmokeReport> {
     if frames == 0 {
         bail!("actor smoke frame count must be positive");
@@ -466,7 +474,10 @@ fn record_unique_label(labels: &mut Vec<String>, label: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::{ACTOR_SMOKE_FRAMES, ActorSmokeReport, smoke_input, smoke_report};
+    use super::{
+        ACTOR_SMOKE_FRAMES, ActorSmokeReport, smoke_actor_input, smoke_frame_count, smoke_input,
+        smoke_report,
+    };
 
     #[test]
     fn smoke_report_exercises_actor_runtime_and_native_draw_plans() {
@@ -572,6 +583,15 @@ mod tests {
         assert_eq!(smoke_input(6).value, crate::actor_game::GameInput::NONE);
         assert!(smoke_input(7).value.thrust);
         assert_eq!(smoke_input(8).value, crate::actor_game::GameInput::NONE);
+    }
+
+    #[test]
+    fn smoke_script_helpers_match_current_actor_smoke_contract() {
+        assert_eq!(smoke_frame_count(), ACTOR_SMOKE_FRAMES);
+        assert!(smoke_actor_input(1).coin);
+        assert!(smoke_actor_input(3).start_one);
+        assert!(smoke_actor_input(5).fire);
+        assert_eq!(smoke_actor_input(6), crate::actor_game::GameInput::NONE);
     }
 
     #[test]

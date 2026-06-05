@@ -78,7 +78,10 @@ state parity exists. `--actor-smoke` exercises that actor frame path through a
 scripted attract/play input sequence and the native draw planner, proving actor
 events, audio, sprites, projectiles, HUD text, overlays, and `wgpu` command-plan
 coverage without switching interactive live play away from the current clean
-`Game` runtime.
+`Game` runtime. `--actor-wgpu-smoke` uses the same actor input sequence and
+renders actor `RenderScene` frames through the offscreen `wgpu` readback path,
+proving nonblank dynamic WGPU output before actor frames replace interactive
+live play.
 The current slice includes same-contract keyboard profiles, `XYZZY` overlay
 state, thread-backed actors, a data-driven `AttractScript` for custom attract
 drivers, `ActorBehaviorScript` profiles for level-wide and per-actor movement
@@ -160,6 +163,7 @@ cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin
 cargo run -- --live-smoke
 cargo run -- --game-smoke
 cargo run -- --actor-smoke
+cargo run -- --actor-wgpu-smoke
 cargo run -- --mute
 cargo run --features legacy-tools -- --rom-report
 cargo run --features legacy-tools -- --rom-report /path/to/roms
@@ -696,7 +700,10 @@ actor-runtime counterpart: it steps `ActorRuntimeAdapter`, verifies attract,
 credited attract, playing, clean gameplay/audio events, required actor sprite
 families, projectile/HUD/overlay layers, native sprite draw commands, native
 pipelines, and frame-level `wgpu` command plans without entering the legacy
-presenter or replacing the live `Game` runtime.
+presenter or replacing the live `Game` runtime. `--actor-wgpu-smoke` then
+renders actor scenes through the actual offscreen `wgpu` texture/readback path
+and requires every actor smoke frame to produce nonblank output plus dynamic
+readback signatures.
 The clean `Game` world seeds terrain, starfield, source-profile active enemy
 batches, human, and projectile snapshots for playing waves and renders them as
 atlas-backed scene sprites. Operator controls are
