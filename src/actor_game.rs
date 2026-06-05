@@ -12,6 +12,7 @@ use std::{
 };
 
 const PLAYER_SPEED: i16 = 2;
+const INITIAL_SMART_BOMBS: u8 = 3;
 const PLAYER_LASER_COOLDOWN_STEPS: u8 = 8;
 const PLAYER_BOUNDS: Rect = Rect::new(0, 18, 255, 220);
 const LASER_SPEED: i16 = 8;
@@ -56,6 +57,7 @@ const STATUS_SCORE_POSITION: Point = Point::new(8, 6);
 const STATUS_HIGH_SCORE_POSITION: Point = Point::new(94, 6);
 const STATUS_WAVE_POSITION: Point = Point::new(8, 18);
 const STATUS_LIVES_POSITION: Point = Point::new(86, 18);
+const STATUS_SMART_BOMBS_POSITION: Point = Point::new(140, 18);
 const STATUS_CREDITS_POSITION: Point = Point::new(176, 226);
 const STATUS_FINAL_SCORE_POSITION: Point = Point::new(56, 92);
 const STATUS_HIGH_SCORE_TABLE_TITLE_POSITION: Point = Point::new(78, 112);
@@ -313,8 +315,8 @@ impl GameInput {
         self.fire || self.xyzzy.auto_fire
     }
 
-    fn wants_smart_bomb(self) -> bool {
-        self.smart_bomb || self.xyzzy.overlay_smart_bomb
+    fn wants_stock_smart_bomb(self) -> bool {
+        self.smart_bomb && !self.xyzzy.overlay_smart_bomb
     }
 }
 
@@ -2149,7 +2151,9 @@ pub enum GameCommand {
         human: ActorId,
         position: Point,
     },
-    SmartBomb,
+    SmartBomb {
+        consume_stock: bool,
+    },
     HumanLost(ActorId),
     AddScore(u32),
     PlaySound(SoundCue),
@@ -2169,6 +2173,7 @@ pub struct StepPrompt {
     pub score: u32,
     pub credits: u8,
     pub lives: u8,
+    pub smart_bombs: u8,
     pub high_scores: [u32; 5],
     pub snapshots: Vec<ActorSnapshot>,
     pub behavior_script: ActorBehaviorScript,
@@ -2290,6 +2295,7 @@ pub struct StepReport {
     pub score: u32,
     pub credits: u8,
     pub lives: u8,
+    pub smart_bombs: u8,
     pub snapshots: Vec<ActorSnapshot>,
     pub draws: Vec<DrawCommand>,
     pub sounds: Vec<SoundCue>,
@@ -2303,6 +2309,7 @@ pub struct ActorGameDriver {
     score: u32,
     credits: u8,
     lives: u8,
+    smart_bombs: u8,
     next_actor_id: u64,
     actors: BTreeMap<ActorId, ThreadedAsset>,
     snapshots: BTreeMap<ActorId, ActorSnapshot>,
@@ -2337,6 +2344,7 @@ impl ActorGameDriver {
             score: 0,
             credits: 0,
             lives: 3,
+            smart_bombs: 0,
             next_actor_id: 1,
             actors: BTreeMap::new(),
             snapshots: BTreeMap::new(),
@@ -2369,6 +2377,7 @@ impl ActorGameDriver {
             score: self.score,
             credits: self.credits,
             lives: self.lives,
+            smart_bombs: self.smart_bombs,
             high_scores: self.high_scores.entries(),
             snapshots: self.snapshots.values().cloned().collect(),
             behavior_script: behavior_script.clone(),
@@ -2411,6 +2420,7 @@ impl ActorGameDriver {
             score: self.score,
             credits: self.credits,
             lives: self.lives,
+            smart_bombs: self.smart_bombs,
             snapshots: self.snapshots.values().cloned().collect(),
             draws,
             sounds,
@@ -2780,8 +2790,8 @@ impl ActorGameDriver {
                         source,
                     ));
                 }
-                GameCommand::SmartBomb => {
-                    self.detonate_smart_bomb(&mut sounds);
+                GameCommand::SmartBomb { consume_stock } => {
+                    self.detonate_smart_bomb(&mut sounds, consume_stock);
                 }
                 GameCommand::HumanLost(id) => {
                     self.snapshots.remove(&id);
@@ -2816,6 +2826,7 @@ impl ActorGameDriver {
 
     fn enter_game_over(&mut self, sounds: &mut Vec<SoundCue>) {
         self.lives = 0;
+        self.smart_bombs = 0;
         self.wave = 0;
         self.high_scores.record(self.score);
         self.phase = if self.high_scores.qualifies(self.score) {
@@ -2832,6 +2843,7 @@ impl ActorGameDriver {
         self.wave = 1;
         self.score = 0;
         self.lives = 3;
+        self.smart_bombs = INITIAL_SMART_BOMBS;
         self.apply_wave_profile();
         self.spawn_player();
         self.spawn_wave_hostiles();
@@ -2990,7 +3002,14 @@ impl ActorGameDriver {
         }
     }
 
-    fn detonate_smart_bomb(&mut self, sounds: &mut Vec<SoundCue>) {
+    fn detonate_smart_bomb(&mut self, sounds: &mut Vec<SoundCue>, consume_stock: bool) {
+        if consume_stock {
+            if self.smart_bombs == 0 {
+                return;
+            }
+            self.smart_bombs = self.smart_bombs.saturating_sub(1);
+        }
+
         let targets = self
             .snapshots
             .values()
@@ -3344,6 +3363,11 @@ impl StatusDisplay {
             ),
             DrawCommand::text(
                 self.id,
+                STATUS_SMART_BOMBS_POSITION,
+                format!("BOMBS {:02}", prompt.smart_bombs.min(99)),
+            ),
+            DrawCommand::text(
+                self.id,
                 STATUS_CREDITS_POSITION,
                 format!("CREDIT {:02}", prompt.credits.min(99)),
             ),
@@ -3484,8 +3508,15 @@ impl AssetActor for PlayerShip {
                 }));
                 commands.push(GameCommand::PlaySound(SoundCue::Laser));
             }
-            if prompt.input.wants_smart_bomb() {
-                commands.push(GameCommand::SmartBomb);
+            if prompt.input.xyzzy.overlay_smart_bomb {
+                commands.push(GameCommand::SmartBomb {
+                    consume_stock: false,
+                });
+                commands.push(GameCommand::PlaySound(SoundCue::SmartBomb));
+            } else if prompt.input.wants_stock_smart_bomb() && prompt.smart_bombs > 0 {
+                commands.push(GameCommand::SmartBomb {
+                    consume_stock: true,
+                });
                 commands.push(GameCommand::PlaySound(SoundCue::SmartBomb));
             }
             draws.push(DrawCommand::sprite(
@@ -5277,6 +5308,7 @@ mod tests {
         driver.score = 9_875;
         driver.wave = 7;
         driver.lives = 2;
+        driver.smart_bombs = 1;
         driver.credits = 3;
 
         let report = driver.step(GameInput::NONE);
@@ -5291,6 +5323,7 @@ mod tests {
         assert_text(&report, "HIGH 010000");
         assert_text(&report, "WAVE 07");
         assert_text(&report, "LIVES 02");
+        assert_text(&report, "BOMBS 01");
         assert_text(&report, "CREDIT 03");
     }
 
@@ -5454,10 +5487,60 @@ mod tests {
         });
 
         assert_eq!(report.score, LANDER_SCORE * 5);
+        assert_eq!(report.smart_bombs, INITIAL_SMART_BOMBS - 1);
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
         assert_eq!(driver.snapshot_count(ActorKind::Human), 10);
         assert!(report.sounds.contains(&SoundCue::SmartBomb));
         assert!(report.sounds.contains(&SoundCue::Explosion));
+        assert!(report.commands.contains(&GameCommand::SmartBomb {
+            consume_stock: true,
+        }));
+    }
+
+    #[test]
+    fn smart_bomb_input_without_stock_does_not_clear_hostiles() {
+        let mut driver = started_driver();
+        driver.smart_bombs = 0;
+
+        let report = driver.step(GameInput {
+            smart_bomb: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(report.score, 0);
+        assert_eq!(report.smart_bombs, 0);
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 5);
+        assert!(!report.sounds.contains(&SoundCue::SmartBomb));
+        assert!(!report.sounds.contains(&SoundCue::Explosion));
+        assert!(
+            !report
+                .commands
+                .iter()
+                .any(|command| matches!(command, GameCommand::SmartBomb { .. }))
+        );
+    }
+
+    #[test]
+    fn xyzzy_overlay_smart_bomb_does_not_consume_stock() {
+        let mut driver = started_driver();
+        driver.smart_bombs = 0;
+
+        let report = driver.step(GameInput {
+            xyzzy: XyzzyMode {
+                active: true,
+                overlay_smart_bomb: true,
+                ..XyzzyMode::INACTIVE
+            },
+            ..GameInput::NONE
+        });
+
+        assert_eq!(report.score, LANDER_SCORE * 5);
+        assert_eq!(report.smart_bombs, 0);
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
+        assert!(report.sounds.contains(&SoundCue::SmartBomb));
+        assert!(report.commands.contains(&GameCommand::SmartBomb {
+            consume_stock: false,
+        }));
     }
 
     #[test]
@@ -6923,6 +7006,7 @@ mod tests {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 2;
+        driver.smart_bombs = INITIAL_SMART_BOMBS;
         driver.spawn_player();
         driver.spawn_pod_for_test(Point::new(120, 120));
 

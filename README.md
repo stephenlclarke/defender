@@ -80,19 +80,20 @@ Source-backed landers, bombers, pods, swarmers, baiters, and first-wave humans
 publish their fixed-point metadata through snapshots and advance that fraction
 state during active motion. It also includes Williams title animation
 metadata, the coalescing Defender wordmark surface, lander target-slot seeking,
-an actor-owned status display for score, high score, wave, lives, credits, and
-high-score-entry rows, pickup/carry/conversion, falling-human rescue and safe
-landing scores, score popups, hostile projectile actors for lander shots,
-bomber/pod hit scoring and sound cues, bomber-laid bomb actors with source
-bomb-collision cues, pod laser-hit swarmer spawning, swarmer scoring and shot
-cues, source-paced baiter timer entry, baiter shots/scoring/hit cues, and
-smart-bomb hostile clearing. Player hazard collisions now decrement driver-owned
-life stock and respawn a replacement player when lives remain, while final-life
-hits still enter game-over/high-score flow. Baiters do not block wave
-completion once source-counted wave enemies are gone, and explosion draws carry
+an actor-owned status display for score, high score, wave, lives, smart-bomb
+stock, credits, and high-score-entry rows, pickup/carry/conversion,
+falling-human rescue and safe landing scores, score popups, hostile projectile
+actors for lander shots, bomber/pod hit scoring and sound cues, bomber-laid bomb
+actors with source bomb-collision cues, pod laser-hit swarmer spawning, swarmer
+scoring and shot cues, source-paced baiter timer entry, baiter
+shots/scoring/hit cues, and stock-backed smart-bomb hostile clearing. Player
+hazard collisions now decrement driver-owned life stock and respawn a
+replacement player when lives remain, while final-life hits still enter
+game-over/high-score flow. Baiters do not block wave completion once
+source-counted wave enemies are gone, and explosion draws carry
 enemy/bomb/player/human variant metadata for later source sprite mapping.
-`XYZZY` invincibility is applied as the same driver-controlled behavior override
-used by scripts. See
+`XYZZY` invincibility and overlay smart bombs are applied through the same
+driver-controlled behavior and command paths used by scripts. See
 `docs/actor-architecture.md` for the C++-to-Rust mapping and migration shape.
 
 ![Defender gameplay frame](docs/defender.png)

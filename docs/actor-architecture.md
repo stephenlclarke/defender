@@ -167,9 +167,9 @@ The actor driver now owns a first Defender gameplay loop:
   target-list slot and picture-frame metadata. Source-backed grounded humans
   update their own walk frame and fixed-point X fraction.
 - A persistent `StatusDisplay` actor emits play-state text for score, high
-  score, wave, lives, credits, and high-score-entry rows from the same
-  simulation prompt as every other actor. It stays inert during attract so a
-  custom attract script can own that screen.
+  score, wave, lives, smart-bomb stock, credits, and high-score-entry rows from
+  the same simulation prompt as every other actor. It stays inert during attract
+  so a custom attract script can own that screen.
 - Landers seek the nearest grounded human, attach it through an
   `AttachHuman` command, carry it upward, and convert into a mutant when the
   carried human reaches the upper conversion band. Source-backed landers prefer
@@ -205,8 +205,11 @@ The actor driver now owns a first Defender gameplay loop:
   250-point popup. Fast impacts destroy the human and spawn an explosion.
 - Explosion actors publish variant metadata for enemy, bomb, player, and human
   explosion clouds while retaining actor-owned lifetime state.
-- Smart bomb is now a real driver command: it removes active hostile actors,
-  awards enemy scores, and spawns explosions while preserving human actors.
+- Smart bomb is now a real driver command: normal player requests consume the
+  driver-owned stock before clearing active hostile actors, awarding enemy
+  scores, and spawning explosions while preserving human actors. Exhausted stock
+  leaves hostiles alive. The `XYZZY` overlay smart bomb uses the same command
+  path without consuming stock.
 - Player hazard collisions destroy the current player actor, decrement the
   driver-owned life stock, and spawn a replacement player when lives remain.
   Final-life collisions enter the game-over/high-score path.

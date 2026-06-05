@@ -45,9 +45,10 @@ verification tools.
   actor-owned fraction state during active motion, and source landers prefer
   configured target slots before falling back to nearest-human seeking. The
   actor rewrite now has a persistent `StatusDisplay` actor that draws
-  score, high score, wave, lives, credits, and high-score-entry rows from the
-  same `StepPrompt` state as gameplay actors while staying inert during attract
-  so custom attract scripts retain control of that screen. Lander
+  score, high score, wave, lives, smart-bomb stock, credits, and
+  high-score-entry rows from the same `StepPrompt` state as gameplay actors
+  while staying inert during attract so custom attract scripts retain control of
+  that screen. Lander
   shot timers now spawn hostile projectile actors that use the same player
   damage policy as other hazards, including `XYZZY` invincibility overrides;
   bomber, pod, swarmer, and baiter laser hits award source scores and emit
@@ -56,7 +57,10 @@ verification tools.
   swarmers now emit hostile projectiles and distinct shot cues from actor-owned
   timers, and source-paced baiter timer entry now spawns source-backed baiter
   actors that can shoot and pursue the player without blocking wave completion
-  after source-counted enemies are gone. Player hazard collisions now decrement
+  after source-counted enemies are gone. Smart bombs now use driver-owned stock:
+  normal player requests consume stock before clearing hostile actors, exhausted
+  stock leaves hostiles alive, and `XYZZY` overlay smart bombs use the same
+  command path without consuming stock. Player hazard collisions now decrement
   driver-owned life stock and spawn a replacement player while lives remain,
   with final-life collisions entering the game-over/high-score path. Explosion
   draws now carry enemy/bomb/player/human variant metadata for later source
@@ -3832,3 +3836,20 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780622275185529`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780622548085959`.
+- `2026-06-05 02:30 BST`: Completed the actor smart-bomb stock cycle. Added
+  driver-owned smart-bomb stock to `StepPrompt` and `StepReport`, reset stock
+  on play start, cleared it on game over, surfaced stock through
+  `StatusDisplay`, made normal smart-bomb requests consume stock before
+  clearing hostiles, kept exhausted-stock requests from clearing enemies, and
+  routed `XYZZY` overlay smart bombs through the same command path without
+  consuming stock. Added regressions for stock consumption, exhausted-stock
+  guarding, and overlay bypass. No legacy code, tests, or scaffolding were safe
+  to remove because the actor runtime remains isolated from the live clean
+  runtime. Validation passed with `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780622665248849`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780623042708869`.
