@@ -4290,3 +4290,21 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780634778441109`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780635370459349`.
+- `2026-06-05 06:02 BST`: Completed the actor live alias cleanup cycle.
+  Removed the redundant `RunMode::ActorInteractive` mode after actor live
+  became the default runtime. `--actor-live` remains supported as a CLI alias,
+  but now resolves to the normal interactive actor live config. Updated focused
+  runtime/platform tests for the single interactive actor-live path. Validation
+  passed with focused alias/default tests,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test runtime --all-targets --features legacy-tools`,
+  `cargo test platform --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Cleanup scan found no
+  remaining `ActorInteractive` references. The full unfiltered `legacy-tools`
+  suite still has the previously isolated clean-game MAME window/post-game
+  audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780635425370539`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780635728580809`.

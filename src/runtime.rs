@@ -160,7 +160,7 @@ pub(crate) enum RuntimeCommand {
 impl RuntimeCommand {
     fn from_config(config: &RuntimeConfig) -> Self {
         match config.mode {
-            RunMode::Interactive | RunMode::ActorInteractive => Self::ActorWgpuLive {
+            RunMode::Interactive => Self::ActorWgpuLive {
                 input_profile: input_profile(config.controls),
                 audio_mode: audio_mode(config.audio),
                 cmos_path: config.cmos_path.clone(),
@@ -774,11 +774,11 @@ mod tests {
     }
 
     #[test]
-    fn actor_live_config_uses_actor_wgpu_live_launch() {
+    fn interactive_config_uses_actor_wgpu_live_launch() {
         let config = RuntimeConfig {
             controls: ControlProfile::Cabinet,
             audio: AudioOutput::Disabled,
-            mode: RunMode::ActorInteractive,
+            mode: RunMode::Interactive,
             cmos_path: Some(PathBuf::from("actor_cmos.bin")),
         };
 
@@ -835,12 +835,12 @@ mod tests {
     }
 
     #[test]
-    fn installed_backend_runs_config_driven_actor_wgpu_live() {
+    fn installed_backend_runs_config_driven_actor_wgpu_live_with_test_profile() {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
             .run(&RuntimeConfig {
                 controls: ControlProfile::Test,
                 audio: AudioOutput::Null,
-                mode: RunMode::ActorInteractive,
+                mode: RunMode::Interactive,
                 cmos_path: None,
             })
             .expect("installed backend should run config-driven actor live");

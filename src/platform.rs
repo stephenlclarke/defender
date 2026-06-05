@@ -22,7 +22,6 @@ pub enum AudioOutput {
 pub enum RunMode {
     #[default]
     Interactive,
-    ActorInteractive,
     Smoke,
 }
 
@@ -253,7 +252,7 @@ impl RuntimeCliClassifier {
                 ArgClassification::Runtime
             }
             "--actor-live" => {
-                config.mode = RunMode::ActorInteractive;
+                config.mode = RunMode::Interactive;
                 ArgClassification::Runtime
             }
             "--game-smoke" => {
@@ -810,13 +809,10 @@ mod tests {
     }
 
     #[test]
-    fn clean_cli_owns_actor_live_launch() {
+    fn clean_cli_treats_actor_live_as_interactive_alias() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--actor-live"])),
-            CliClassification::Runtime(RuntimeConfig {
-                mode: RunMode::ActorInteractive,
-                ..RuntimeConfig::default()
-            })
+            CliClassification::Runtime(RuntimeConfig::default())
         );
     }
 
@@ -865,7 +861,7 @@ mod tests {
     }
 
     #[test]
-    fn clean_cli_owns_actor_live_configuration_flags() {
+    fn clean_cli_keeps_actor_live_configuration_flags_as_interactive_alias() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&[
                 "--input-profile",
@@ -878,7 +874,7 @@ mod tests {
             CliClassification::Runtime(RuntimeConfig {
                 controls: ControlProfile::Cabinet,
                 audio: AudioOutput::Disabled,
-                mode: RunMode::ActorInteractive,
+                mode: RunMode::Interactive,
                 cmos_path: Some(PathBuf::from("actor-scores.bin")),
             })
         );
