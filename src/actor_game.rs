@@ -14,6 +14,9 @@ use std::{
 const PLAYER_SPEED: i16 = 2;
 const INITIAL_SMART_BOMBS: u8 = 3;
 const PLAYER_LASER_COOLDOWN_STEPS: u8 = 8;
+const PLAYER_HYPERSPACE_HIDDEN_STEPS: u8 = 12;
+const PLAYER_HYPERSPACE_REMATERIALIZE_X: i16 = 128;
+const PLAYER_HYPERSPACE_REMATERIALIZE_Y: i16 = 120;
 const PLAYER_BOUNDS: Rect = Rect::new(0, 18, 255, 220);
 const LASER_SPEED: i16 = 8;
 const LASER_LIFETIME: u16 = 34;
@@ -788,6 +791,9 @@ pub enum HostileMovementMode {
 pub struct ActorBehaviorProfile {
     pub player_speed: i16,
     pub player_laser_cooldown_steps: u8,
+    pub player_hyperspace_hidden_steps: u8,
+    pub player_hyperspace_rematerialize_x: i16,
+    pub player_hyperspace_rematerialize_y: i16,
     pub player_takes_enemy_collision_damage: bool,
     pub laser_speed: i16,
     pub laser_lifetime_steps: u16,
@@ -830,6 +836,9 @@ impl ActorBehaviorProfile {
     pub const DEFAULT: Self = Self {
         player_speed: PLAYER_SPEED,
         player_laser_cooldown_steps: PLAYER_LASER_COOLDOWN_STEPS,
+        player_hyperspace_hidden_steps: PLAYER_HYPERSPACE_HIDDEN_STEPS,
+        player_hyperspace_rematerialize_x: PLAYER_HYPERSPACE_REMATERIALIZE_X,
+        player_hyperspace_rematerialize_y: PLAYER_HYPERSPACE_REMATERIALIZE_Y,
         player_takes_enemy_collision_damage: true,
         laser_speed: LASER_SPEED,
         laser_lifetime_steps: LASER_LIFETIME,
@@ -3475,6 +3484,7 @@ struct PlayerShip {
     position: Point,
     direction: Direction,
     laser_cooldown: u8,
+    hyperspace_steps_remaining: u8,
 }
 
 impl PlayerShip {
@@ -3484,11 +3494,34 @@ impl PlayerShip {
             position,
             direction: Direction::Right,
             laser_cooldown: 0,
+            hyperspace_steps_remaining: 0,
         }
     }
 
     fn bounds(&self) -> Rect {
         Rect::from_center(self.position, 18, 10)
+    }
+
+    fn is_hidden_for_hyperspace(&self) -> bool {
+        self.hyperspace_steps_remaining > 0
+    }
+
+    fn enter_hyperspace(&mut self, behavior: ActorBehaviorProfile) {
+        self.hyperspace_steps_remaining = behavior.player_hyperspace_hidden_steps;
+    }
+
+    fn advance_hyperspace(&mut self, behavior: ActorBehaviorProfile) {
+        if self.hyperspace_steps_remaining == 0 {
+            return;
+        }
+
+        self.hyperspace_steps_remaining = self.hyperspace_steps_remaining.saturating_sub(1);
+        if self.hyperspace_steps_remaining == 0 {
+            self.position = PLAYER_BOUNDS.clamp_point(Point::new(
+                behavior.player_hyperspace_rematerialize_x,
+                behavior.player_hyperspace_rematerialize_y,
+            ));
+        }
     }
 }
 
@@ -3502,60 +3535,67 @@ impl AssetActor for PlayerShip {
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Player);
-            let mut velocity = Velocity::default();
-            if prompt.input.altitude_up {
-                velocity.dy -= behavior.player_speed;
+            let was_hidden = self.is_hidden_for_hyperspace();
+            self.advance_hyperspace(behavior);
+            if !was_hidden {
+                let mut velocity = Velocity::default();
+                if prompt.input.altitude_up {
+                    velocity.dy -= behavior.player_speed;
+                }
+                if prompt.input.altitude_down {
+                    velocity.dy += behavior.player_speed;
+                }
+                if prompt.input.thrust {
+                    velocity.dx += self.direction.sign() * behavior.player_speed;
+                    commands.push(GameCommand::PlaySound(SoundCue::Thrust));
+                }
+                if prompt.input.reverse {
+                    self.direction = match self.direction {
+                        Direction::Left => Direction::Right,
+                        Direction::Right => Direction::Left,
+                    };
+                }
+                self.position = PLAYER_BOUNDS.clamp_point(self.position.offset(velocity));
+                self.laser_cooldown = self.laser_cooldown.saturating_sub(1);
+                if prompt.input.wants_fire() && self.laser_cooldown == 0 {
+                    self.laser_cooldown = behavior.player_laser_cooldown_steps;
+                    let muzzle = self
+                        .position
+                        .offset(Velocity::new(self.direction.sign() * 12, 0));
+                    commands.push(GameCommand::Spawn(SpawnRequest::Laser {
+                        position: muzzle,
+                        direction: self.direction,
+                        owner: self.id,
+                    }));
+                    commands.push(GameCommand::PlaySound(SoundCue::Laser));
+                }
+                if prompt.input.xyzzy.overlay_smart_bomb {
+                    commands.push(GameCommand::SmartBomb {
+                        consume_stock: false,
+                    });
+                    commands.push(GameCommand::PlaySound(SoundCue::SmartBomb));
+                } else if prompt.input.wants_stock_smart_bomb() && prompt.smart_bombs > 0 {
+                    commands.push(GameCommand::SmartBomb {
+                        consume_stock: true,
+                    });
+                    commands.push(GameCommand::PlaySound(SoundCue::SmartBomb));
+                }
+                if prompt.input.hyperspace {
+                    commands.push(GameCommand::Hyperspace);
+                    commands.push(GameCommand::PlaySound(SoundCue::Hyperspace));
+                    self.enter_hyperspace(behavior);
+                }
             }
-            if prompt.input.altitude_down {
-                velocity.dy += behavior.player_speed;
+            if !self.is_hidden_for_hyperspace() {
+                draws.push(DrawCommand::sprite(
+                    self.id,
+                    match self.direction {
+                        Direction::Left => SpriteKey::PlayerLeft,
+                        Direction::Right => SpriteKey::PlayerRight,
+                    },
+                    self.position,
+                ));
             }
-            if prompt.input.thrust {
-                velocity.dx += self.direction.sign() * behavior.player_speed;
-                commands.push(GameCommand::PlaySound(SoundCue::Thrust));
-            }
-            if prompt.input.reverse {
-                self.direction = match self.direction {
-                    Direction::Left => Direction::Right,
-                    Direction::Right => Direction::Left,
-                };
-            }
-            self.position = PLAYER_BOUNDS.clamp_point(self.position.offset(velocity));
-            self.laser_cooldown = self.laser_cooldown.saturating_sub(1);
-            if prompt.input.wants_fire() && self.laser_cooldown == 0 {
-                self.laser_cooldown = behavior.player_laser_cooldown_steps;
-                let muzzle = self
-                    .position
-                    .offset(Velocity::new(self.direction.sign() * 12, 0));
-                commands.push(GameCommand::Spawn(SpawnRequest::Laser {
-                    position: muzzle,
-                    direction: self.direction,
-                    owner: self.id,
-                }));
-                commands.push(GameCommand::PlaySound(SoundCue::Laser));
-            }
-            if prompt.input.xyzzy.overlay_smart_bomb {
-                commands.push(GameCommand::SmartBomb {
-                    consume_stock: false,
-                });
-                commands.push(GameCommand::PlaySound(SoundCue::SmartBomb));
-            } else if prompt.input.wants_stock_smart_bomb() && prompt.smart_bombs > 0 {
-                commands.push(GameCommand::SmartBomb {
-                    consume_stock: true,
-                });
-                commands.push(GameCommand::PlaySound(SoundCue::SmartBomb));
-            }
-            if prompt.input.hyperspace {
-                commands.push(GameCommand::Hyperspace);
-                commands.push(GameCommand::PlaySound(SoundCue::Hyperspace));
-            }
-            draws.push(DrawCommand::sprite(
-                self.id,
-                match self.direction {
-                    Direction::Left => SpriteKey::PlayerLeft,
-                    Direction::Right => SpriteKey::PlayerRight,
-                },
-                self.position,
-            ));
         }
         ActorReply {
             id: self.id,
@@ -3563,7 +3603,11 @@ impl AssetActor for PlayerShip {
                 id: self.id,
                 kind: ActorKind::Player,
                 position: self.position,
-                bounds: Some(self.bounds()),
+                bounds: if prompt.phase == Phase::Playing && !self.is_hidden_for_hyperspace() {
+                    Some(self.bounds())
+                } else {
+                    None
+                },
                 alive: prompt.phase == Phase::Playing,
                 source_lander: None,
                 source_bomber: None,
@@ -6035,6 +6079,57 @@ mod tests {
         assert_eq!(driver.snapshot_count(ActorKind::Laser), 1);
         assert_eq!(report.score, 0);
         assert_eq!(report.smart_bombs, INITIAL_SMART_BOMBS);
+    }
+
+    #[test]
+    fn hyperspace_hides_player_until_scripted_rematerialization() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let player = driver.spawn_player();
+        driver.set_actor_behavior(
+            player,
+            ActorBehaviorProfile {
+                player_hyperspace_hidden_steps: 2,
+                player_hyperspace_rematerialize_x: 150,
+                player_hyperspace_rematerialize_y: 92,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+
+        let entered = driver.step(GameInput {
+            hyperspace: true,
+            ..GameInput::NONE
+        });
+
+        let hidden_player = snapshot_for(&entered, player);
+        assert_eq!(hidden_player.bounds, None);
+        assert!(!entered.draws.iter().any(|draw| draw.actor == player));
+
+        let still_hidden = driver.step(GameInput {
+            thrust: true,
+            fire: true,
+            ..GameInput::NONE
+        });
+
+        let hidden_player = snapshot_for(&still_hidden, player);
+        assert_eq!(hidden_player.bounds, None);
+        assert!(!still_hidden.draws.iter().any(|draw| draw.actor == player));
+        assert!(!still_hidden.sounds.contains(&SoundCue::Thrust));
+        assert!(
+            !still_hidden.commands.iter().any(|command| {
+                matches!(command, GameCommand::Spawn(SpawnRequest::Laser { .. }))
+            })
+        );
+
+        let rematerialized = driver.step(GameInput::NONE);
+        let player_snapshot = snapshot_for(&rematerialized, player);
+        assert_eq!(player_snapshot.position, Point::new(150, 92));
+        assert!(player_snapshot.bounds.is_some());
+        assert!(rematerialized.draws.iter().any(|draw| {
+            draw.actor == player
+                && draw.position == Point::new(150, 92)
+                && matches!(draw.sprite, SpriteKey::PlayerRight)
+        }));
     }
 
     #[test]

@@ -3870,3 +3870,21 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780623279783919`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780623737610639`.
+- `2026-06-05 02:50 BST`: Completed the actor hyperspace
+  disappearance/rematerialization cycle. Added behavior-profile fields for
+  player hyperspace hidden duration and rematerialization coordinates, kept the
+  player actor alive but without draw output, collision bounds, or input-driven
+  actions while hidden, and rematerialized at the scripted point. Added
+  regression coverage for hidden-player bounds/draw suppression, ignored
+  thrust/fire while hidden, and scripted rematerialization. No legacy code,
+  tests, or scaffolding were safe to remove because `legacy-tools` still owns
+  ROM reports, trace/media helpers, and oracle-equivalence evidence while the
+  actor runtime remains isolated. Validation passed with
+  `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780623815440299`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780624217020799`.

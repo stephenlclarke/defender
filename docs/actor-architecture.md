@@ -73,10 +73,11 @@ numbers.
 
 Actor movement and behavior are configurable data owned by the driver.
 `ActorBehaviorProfile` holds tunable attributes for player movement and laser
-cooldown, laser speed and lifetime, lander seek/carry/fire behavior, mutant
-movement, bomber movement/bomb cadence, pod movement, swarmer movement/fire
-behavior, baiter movement/fire behavior, bomb lifetime, human fall/landing
-behavior, and timed effect lifetimes. It also holds behavior modes such as
+cooldown, player hyperspace hiding/rematerialization, laser speed and lifetime,
+lander seek/carry/fire behavior, mutant movement, bomber movement/bomb cadence,
+pod movement, swarmer movement/fire behavior, baiter movement/fire behavior,
+bomb lifetime, human fall/landing behavior, and timed effect lifetimes. It also
+holds behavior modes such as
 `LanderBehaviorMode` and `HostileMovementMode`, allowing scripts to choose
 whether a lander seeks humans, chases the player, or simply drifts, and whether
 non-source mutant, bomber, pod, swarmer, and baiter actors drift or chase the
@@ -103,8 +104,12 @@ Hyperspace is represented as a driver-applied gameplay command rather than a
 render frame effect. The player actor emits `GameCommand::Hyperspace` and
 `SoundCue::Hyperspace` from the mapped `H` input; the driver clears active
 `EnemyLaser` projectile actors while leaving player lasers, hostile actor
-families, score, lives, and smart-bomb stock unchanged. The later MAME
-rematerialization and death-risk tail remains a separate porting slice.
+families, score, lives, and smart-bomb stock unchanged. `PlayerShip` then owns
+the hidden interval: while its hyperspace timer is active it remains alive but
+publishes no collision bounds, no player draw, and no input-driven actions.
+`ActorBehaviorProfile` configures the hidden step count and rematerialization
+coordinates. The later MAME source RNG and death-risk branch remains a separate
+porting slice.
 
 `XYZZY` invincibility uses the same mechanism. When invincibility is active,
 the driver applies a temporary player behavior override that disables enemy

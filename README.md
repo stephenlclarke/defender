@@ -89,11 +89,14 @@ scoring and shot cues, source-paced baiter timer entry, baiter
 shots/scoring/hit cues, and stock-backed smart-bomb hostile clearing. Player
 actor hyperspace now emits a dedicated cue and clears active hostile projectile
 actors without spending lives, smart-bomb stock, scoring points, or clearing
-hostile actor families. Player hazard collisions now decrement driver-owned
-life stock and respawn a replacement player when lives remain, while final-life
-hits still enter game-over/high-score flow. Baiters do not block wave
-completion once source-counted wave enemies are gone, and explosion draws carry
-enemy/bomb/player/human variant metadata for later source sprite mapping.
+hostile actor families; the player actor owns the hidden hyperspace interval
+and rematerializes at behavior-scripted coordinates with no draw, collision
+bounds, or input actions while hidden. Player hazard collisions now decrement
+driver-owned life stock and respawn a replacement player when lives remain,
+while final-life hits still enter game-over/high-score flow. Baiters do not
+block wave completion once source-counted wave enemies are gone, and explosion
+draws carry enemy/bomb/player/human variant metadata for later source sprite
+mapping.
 `XYZZY` invincibility and overlay smart bombs are applied through the same
 driver-controlled behavior and command paths used by scripts. See
 `docs/actor-architecture.md` for the C++-to-Rust mapping and migration shape.
