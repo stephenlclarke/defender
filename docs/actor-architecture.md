@@ -264,6 +264,21 @@ handling.
 `ActorGameDriver::script_manifest()` includes the immutable attract-event
 manifest so custom drivers can verify or serialize the installed sequence
 without inspecting the thread-backed attract actor.
+`AttractScript::parse_text(...)` and `str::parse::<AttractScript>()` accept the
+same event model from checked text script lines:
+
+```text
+# action start duration x y ...
+text 1 forever 10 10 PRESS START
+sprite 2 forever defender_logo 40 44
+williams_logo 5 - 108 60
+defender_wordmark 72 - 96 144
+```
+
+Blank lines and `#` comments are ignored. `duration` can be a step count or
+`-`, `none`, `forever`, or `infinite` for an unbounded event. Parser errors
+include the source line number so custom driver tooling can reject malformed
+scripts before the actor runtime starts.
 
 Script actions currently cover:
 

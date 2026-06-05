@@ -736,8 +736,10 @@ reintroduce legacy implementation terminology.
   driver-owned `StepPrompt`/`StepReport` model, thread-backed asset actors,
   same-contract keyboard profiles, `XYZZY` overlay state, data-driven
   `AttractScript` support for custom attract drivers, Williams title reveal
-  metadata, and Defender wordmark coalescence metadata. `StepReport` can now
-  project into the clean `RenderScene` contract through
+  metadata, and Defender wordmark coalescence metadata. `AttractScript` can be
+  built from Rust event constructors or checked text script lines before being
+  installed in a custom driver. `StepReport` can now project into the clean
+  `RenderScene` contract through
   `ActorRenderSceneBridge`, mapping actor draw commands to renderer-owned
   source text glyphs, Williams logo reveal pixels, Defender appearance pixels,
   sprite atlas families, projectile layers, and explosion families. The actor

@@ -105,6 +105,9 @@ and pod actor families alongside landers instead of remaining lander-only.
 Later-wave
 actor landers now restore from source RNG placement/shot/velocity state, and
 later-wave humans restore from the source target-list distribution.
+Custom attract drivers can construct scripts in Rust or parse checked text
+lines for text, static sprites, Williams reveal, and Defender wordmark
+coalescence events before passing the script to `ActorGameDriver`.
 Source-backed landers, bombers, pods, swarmers, baiters, and humans publish
 their fixed-point metadata through snapshots, publish per-step movement/facing
 metadata for the clean state bridge, and advance fraction state during active
