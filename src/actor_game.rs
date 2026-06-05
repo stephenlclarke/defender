@@ -4573,7 +4573,7 @@ impl ActorGameDriver {
         let targets = self
             .snapshots
             .values()
-            .filter(|snapshot| snapshot.kind == ActorKind::EnemyLaser)
+            .filter(|snapshot| is_source_shell_kind(snapshot.kind))
             .map(|snapshot| snapshot.id)
             .collect::<Vec<_>>();
         for id in targets {
@@ -8653,13 +8653,14 @@ mod tests {
     }
 
     #[test]
-    fn hyperspace_clears_enemy_lasers_without_spending_stock_or_life() {
+    fn hyperspace_clears_source_shells_without_spending_stock_or_life() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.lives = 3;
         driver.smart_bombs = INITIAL_SMART_BOMBS;
         driver.spawn_player();
         driver.spawn_enemy_laser(Point::new(42, 120), Velocity::new(0, 0));
+        driver.spawn_bomb_for_test(Point::new(90, 120));
 
         let report = driver.step(GameInput {
             hyperspace: true,
@@ -8674,6 +8675,7 @@ mod tests {
         assert!(report.sounds.contains(&SoundCue::Hyperspace));
         assert!(!report.sounds.contains(&SoundCue::GameOver));
         assert_eq!(driver.snapshot_count(ActorKind::EnemyLaser), 0);
+        assert_eq!(driver.snapshot_count(ActorKind::Bomb), 0);
         assert_eq!(driver.snapshot_count(ActorKind::Player), 1);
     }
 
@@ -8687,6 +8689,7 @@ mod tests {
         driver.spawn_lander_for_test(Point::new(90, 120));
         driver.spawn_laser(Point::new(10, 40), Direction::Right, player);
         driver.spawn_enemy_laser(Point::new(70, 120), Velocity::new(0, 0));
+        driver.spawn_bomb_for_test(Point::new(120, 120));
 
         let report = driver.step(GameInput {
             hyperspace: true,
@@ -8701,6 +8704,7 @@ mod tests {
             .any(|command| matches!(command, GameCommand::SmartBomb { .. }));
         assert!(!emitted_smart_bomb);
         assert_eq!(driver.snapshot_count(ActorKind::EnemyLaser), 0);
+        assert_eq!(driver.snapshot_count(ActorKind::Bomb), 0);
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 1);
         assert_eq!(driver.snapshot_count(ActorKind::Laser), 1);
         assert_eq!(report.score, 0);

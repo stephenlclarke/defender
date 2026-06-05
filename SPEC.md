@@ -778,8 +778,9 @@ reintroduce legacy implementation terminology.
   emission, smart-bomb pod scoring without swarmer spawning, source-paced baiter
   timer entry with non-wave-blocking baiters, baiter shots/scores/hit cues,
   stock-backed smart-bomb hostile clearing with exhausted-stock guards and a
-  non-consuming `XYZZY` overlay path, hyperspace hostile-projectile cleanup and
-  separate launch/materialization cue emission, actor-owned hidden hyperspace
+  non-consuming `XYZZY` overlay path, hyperspace source-shell cleanup for enemy
+  shots and bomb shells, separate launch/materialization cue emission,
+  actor-owned hidden hyperspace
   interval plus behavior-scripted rematerialization point or source
   `SEED`/`HSEED`/`LSEED` snapshot, driver-owned source hyperspace RNG
   advancement and default/kind player-behavior injection, life-stock decrement

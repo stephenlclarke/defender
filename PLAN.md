@@ -4431,3 +4431,24 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780637986496859`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780638267918669`.
+- `2026-06-05 06:50 BST`: Completed the actor hyperspace shell-list cleanup
+  cycle. Hyperspace cleanup now uses the shared source-shell predicate, so it
+  clears both `EnemyLaser` and `Bomb` actors instead of enemy lasers only.
+  Expanded regressions to cover enemy-shot plus bomb-shell cleanup while
+  preserving player lasers, hostile actor families, lives, smart-bomb stock, and
+  score. README, SPEC, and the actor architecture notes now describe
+  hyperspace as source-shell cleanup. No legacy code, tests, or scaffolding were
+  safe to remove in this slice because clean smoke/fidelity/oracle evidence
+  still depends on clean runtime boundaries outside the actor path. Validation
+  passed with `cargo fmt --check`, focused hyperspace tests,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780638390591659`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780638648247009`.

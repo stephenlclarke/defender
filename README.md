@@ -134,10 +134,11 @@ combines those bridges into actor `ActorFrame` values with clean event batches
 for future runtime selection while keeping the actor game separate from the
 full clean `GameState` contract. Player
 actor hyperspace now emits separate launch/materialization cues and clears
-active hostile projectile actors without spending lives, smart-bomb stock,
-scoring points, or clearing hostile actor families; the player actor owns the
-hidden hyperspace interval and rematerializes at behavior-scripted coordinates
-with no draw, collision bounds, or input actions while hidden. The driver owns
+active source shell actors, including enemy shots and bomb shells, without
+spending lives, smart-bomb stock, scoring points, or clearing hostile actor
+families; the player actor owns the hidden hyperspace interval and
+rematerializes at behavior-scripted coordinates with no draw, collision bounds,
+or input actions while hidden. The driver owns
 and advances the source hyperspace RNG during play, injects that
 `SEED`/`HSEED`/`LSEED` snapshot into default/kind player behavior, and still
 lets actor-specific scripts override the snapshot; rematerialization uses the

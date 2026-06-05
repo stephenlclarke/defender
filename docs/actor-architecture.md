@@ -145,10 +145,11 @@ invincibility have been applied.
 Hyperspace is represented as a driver-applied gameplay command rather than a
 render frame effect. The player actor emits `GameCommand::Hyperspace` and
 `SoundCue::Hyperspace` from the mapped `H` input; the driver clears active
-`EnemyLaser` projectile actors while leaving player lasers, hostile actor
-families, score, lives, and smart-bomb stock unchanged. `PlayerShip` then owns
-the hidden interval: while its hyperspace timer is active it remains alive but
-publishes no collision bounds, no player draw, and no input-driven actions.
+source shell actors, including enemy shots and bomb shells, while leaving player
+lasers, hostile actor families, score, lives, and smart-bomb stock unchanged.
+`PlayerShip` then owns the hidden interval: while its hyperspace timer is active
+it remains alive but publishes no collision bounds, no player draw, and no
+input-driven actions.
 `ActorBehaviorProfile` configures the hidden step count and fallback
 rematerialization coordinates, and the actor emits
 `SoundCue::HyperspaceMaterialize` when it returns. `ActorGameDriver` owns the
