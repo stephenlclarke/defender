@@ -69,13 +69,13 @@ the latest report at whatever cadence they own.
 The current slice includes same-contract keyboard profiles, `XYZZY` overlay
 state, thread-backed actors, a data-driven `AttractScript` for custom attract
 drivers, `ActorBehaviorScript` profiles for level-wide and per-actor movement
-and behavior tuning, script-selectable lander behavior modes, and named
-`ActorWaveScript` progression backed by `assets/red-label/wave-table.tsv` for
-active wave size, lander and bomber movement speed, lander fire cadence, baiter
-entry/shot/seek timing, and scripted hostile/human spawn records. The default
-actor wave allocator now uses the source active-family shape, so later waves can
-introduce bomber and pod actor families alongside landers instead of remaining
-lander-only.
+and behavior tuning, script-selectable lander behavior modes, script-selectable
+non-source hostile drift/chase modes, and named `ActorWaveScript` progression
+backed by `assets/red-label/wave-table.tsv` for active wave size, lander and
+bomber movement speed, lander fire cadence, baiter entry/shot/seek timing, and
+scripted hostile/human spawn records. The default actor wave allocator now uses
+the source active-family shape, so later waves can introduce bomber and pod
+actor families alongside landers instead of remaining lander-only.
 Source-backed landers, bombers, pods, swarmers, baiters, and first-wave humans
 publish their fixed-point metadata through snapshots and advance that fraction
 state during active motion. It also includes Williams title animation

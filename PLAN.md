@@ -30,9 +30,12 @@ verification tools.
   Actor movement and behavior are now scriptable through
   `ActorBehaviorScript`, with default, actor-kind, and actor-id behavior
   profiles plus script-selectable behavior modes for level difficulty and
-  `XYZZY` damage overrides. `ActorWaveScript` now names per-wave progression
-  data and applies behavior scripts plus hostile and initial-human spawn
-  records as play starts and waves are cleared. Default actor wave progression
+  `XYZZY` damage overrides. Non-source mutant, bomber, pod, swarmer, and
+  baiter fallback motion can now be script-selected between drift and
+  player-chase behavior while source-backed fixed-point metadata remains the
+  higher-priority movement source. `ActorWaveScript` now names per-wave
+  progression data and applies behavior scripts plus hostile and initial-human
+  spawn records as play starts and waves are cleared. Default actor wave progression
   now reads
   `assets/red-label/wave-table.tsv` for active wave size, lander and bomber
   speed, lander fire cadence, and source bomber/pod counts. The actor wave
@@ -3795,3 +3798,19 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780620981457319`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780621603216479`.
+- `2026-06-05 02:16 BST`: Completed the actor hostile movement modes cycle.
+  Added `HostileMovementMode` to `ActorBehaviorProfile` so non-source mutant,
+  bomber, pod, swarmer, and baiter fallback motion can be script-selected
+  between drift and player chase while source-backed fixed-point metadata
+  remains the higher-priority movement source. Added regressions for mutant
+  drift, bomber/pod chase, and swarmer/baiter drift modes. No legacy code,
+  tests, or scaffolding were safe to remove because the actor runtime remains
+  isolated from the live clean runtime. Validation passed with
+  `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780621667926539`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780622203322009`.

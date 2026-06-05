@@ -74,11 +74,13 @@ numbers.
 Actor movement and behavior are configurable data owned by the driver.
 `ActorBehaviorProfile` holds tunable attributes for player movement and laser
 cooldown, laser speed and lifetime, lander seek/carry/fire behavior, mutant
-pursuit, bomber drift/bomb cadence, pod drift, swarmer pursuit/fire behavior,
-baiter pursuit/fire behavior, bomb lifetime, human fall/landing behavior, and
-timed effect lifetimes. It also holds behavior modes such as
-`LanderBehaviorMode`, allowing scripts to choose whether a lander seeks humans,
-chases the player, or simply drifts.
+movement, bomber movement/bomb cadence, pod movement, swarmer movement/fire
+behavior, baiter movement/fire behavior, bomb lifetime, human fall/landing
+behavior, and timed effect lifetimes. It also holds behavior modes such as
+`LanderBehaviorMode` and `HostileMovementMode`, allowing scripts to choose
+whether a lander seeks humans, chases the player, or simply drifts, and whether
+non-source mutant, bomber, pod, swarmer, and baiter actors drift or chase the
+player.
 
 `ActorBehaviorScript` resolves those profiles in this order:
 
@@ -94,7 +96,8 @@ are the current script API. A level script can use those calls to make later
 waves faster, shorten laser cooldowns, change human fall gravity, or alter one
 specific actor without changing the actor struct. Scripts can also choose
 movement behavior modes, for example making a later-wave lander ignore humans
-and chase the player.
+and chase the player, or making a specific bomber chase the player instead of
+using its fallback drift.
 
 `XYZZY` invincibility uses the same mechanism. When invincibility is active,
 the driver applies a temporary player behavior override that disables enemy

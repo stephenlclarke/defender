@@ -693,7 +693,8 @@ reintroduce legacy implementation terminology.
   which resolves default, actor-kind, and actor-id profiles into each prompt;
   level scripts can tune speeds, fire cadence, pickup/conversion bands,
   gravity, timed effects, damage policy, and behavior modes such as human
-  seeking versus player chasing without rewriting actor structs.
+  seeking versus player chasing or non-source hostile drift versus player chase
+  without rewriting actor structs.
   `ActorWaveScript` names a driver-owned progression script whose wave profiles
   apply behavior scripts plus hostile and initial-human spawn records when play
   starts and when hostile snapshots are cleared. The default actor wave

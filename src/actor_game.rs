@@ -777,6 +777,12 @@ pub enum LanderBehaviorMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HostileMovementMode {
+    Drift,
+    ChasePlayer,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorBehaviorProfile {
     pub player_speed: i16,
     pub player_laser_cooldown_steps: u8,
@@ -794,15 +800,20 @@ pub struct ActorBehaviorProfile {
     pub lander_shot_lifetime_steps: u16,
     pub lander_mode: LanderBehaviorMode,
     pub mutant_seek_speed: i16,
+    pub mutant_mode: HostileMovementMode,
     pub bomber_drift_speed: i16,
     pub bomber_bomb_period_steps: u64,
+    pub bomber_mode: HostileMovementMode,
     pub pod_drift_speed: i16,
+    pub pod_mode: HostileMovementMode,
     pub swarmer_seek_speed: i16,
     pub swarmer_fire_period_steps: u64,
     pub swarmer_shot_speed: i16,
+    pub swarmer_mode: HostileMovementMode,
     pub baiter_seek_speed: i16,
     pub baiter_fire_period_steps: u64,
     pub baiter_shot_speed: i16,
+    pub baiter_mode: HostileMovementMode,
     pub bomb_lifetime_steps: u16,
     pub human_ground_y: i16,
     pub human_fall_acceleration: i16,
@@ -831,15 +842,20 @@ impl ActorBehaviorProfile {
         lander_shot_lifetime_steps: LANDER_SHOT_LIFETIME,
         lander_mode: LanderBehaviorMode::SeekNearestHuman,
         mutant_seek_speed: MUTANT_SEEK_SPEED,
+        mutant_mode: HostileMovementMode::ChasePlayer,
         bomber_drift_speed: BOMBER_DRIFT_SPEED,
         bomber_bomb_period_steps: BOMBER_BOMB_PERIOD,
+        bomber_mode: HostileMovementMode::Drift,
         pod_drift_speed: POD_DRIFT_SPEED,
+        pod_mode: HostileMovementMode::Drift,
         swarmer_seek_speed: SWARMER_SEEK_SPEED,
         swarmer_fire_period_steps: SWARMER_FIRE_PERIOD,
         swarmer_shot_speed: SWARMER_SHOT_SPEED,
+        swarmer_mode: HostileMovementMode::ChasePlayer,
         baiter_seek_speed: BAITER_SEEK_SPEED,
         baiter_fire_period_steps: BAITER_FIRE_PERIOD,
         baiter_shot_speed: BAITER_SHOT_SPEED,
+        baiter_mode: HostileMovementMode::ChasePlayer,
         bomb_lifetime_steps: BOMB_LIFETIME,
         human_ground_y: HUMAN_GROUND_Y,
         human_fall_acceleration: HUMAN_FALL_ACCELERATION,
@@ -3828,15 +3844,35 @@ fn axis_step(delta: i16, speed: i16) -> i16 {
     }
 }
 
+fn move_by_hostile_mode(
+    position: Point,
+    mode: HostileMovementMode,
+    prompt: &StepPrompt,
+    speed: i16,
+    drift: i16,
+) -> Option<Point> {
+    match mode {
+        HostileMovementMode::Drift => Some(position.offset(Velocity::new(drift * speed.max(0), 0))),
+        HostileMovementMode::ChasePlayer => prompt
+            .player_position()
+            .map(|player| step_toward(position, player, speed)),
+    }
+}
+
 #[derive(Debug)]
 struct Mutant {
     id: ActorId,
     position: Point,
+    drift: i16,
 }
 
 impl Mutant {
     fn new(id: ActorId, position: Point) -> Self {
-        Self { id, position }
+        Self {
+            id,
+            position,
+            drift: -1,
+        }
     }
 
     fn bounds(&self) -> Rect {
@@ -3853,8 +3889,14 @@ impl AssetActor for Mutant {
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Mutant);
-            if let Some(player) = prompt.player_position() {
-                self.position = step_toward(self.position, player, behavior.mutant_seek_speed);
+            if let Some(position) = move_by_hostile_mode(
+                self.position,
+                behavior.mutant_mode,
+                prompt,
+                behavior.mutant_seek_speed,
+                self.drift,
+            ) {
+                self.position = position;
             }
             draws.push(DrawCommand::sprite(
                 self.id,
@@ -3982,11 +4024,16 @@ impl AssetActor for Bomber {
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Bomber);
-            if !self.advance_source_motion() {
-                self.position = self.position.offset(Velocity::new(
-                    self.drift * behavior.bomber_drift_speed.max(0),
-                    0,
-                ));
+            if !self.advance_source_motion()
+                && let Some(position) = move_by_hostile_mode(
+                    self.position,
+                    behavior.bomber_mode,
+                    prompt,
+                    behavior.bomber_drift_speed,
+                    self.drift,
+                )
+            {
+                self.position = position;
             }
             self.maybe_spawn_bomb(prompt, behavior, &mut commands);
             draws.push(DrawCommand::sprite_with_effect(
@@ -4126,11 +4173,16 @@ impl AssetActor for Pod {
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Pod);
-            if !self.advance_source_motion() {
-                self.position = self.position.offset(Velocity::new(
-                    self.drift * behavior.pod_drift_speed.max(0),
-                    0,
-                ));
+            if !self.advance_source_motion()
+                && let Some(position) = move_by_hostile_mode(
+                    self.position,
+                    behavior.pod_mode,
+                    prompt,
+                    behavior.pod_drift_speed,
+                    self.drift,
+                )
+            {
+                self.position = position;
             }
             draws.push(DrawCommand::sprite_with_effect(
                 self.id,
@@ -4165,6 +4217,7 @@ impl AssetActor for Pod {
 struct Swarmer {
     id: ActorId,
     position: Point,
+    drift: i16,
     source: Option<ActorSourceSwarmerMetadata>,
 }
 
@@ -4177,6 +4230,7 @@ impl Swarmer {
         Self {
             id,
             position: spawn.position,
+            drift: -1,
             source: spawn.source,
         }
     }
@@ -4236,12 +4290,20 @@ impl AssetActor for Swarmer {
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Swarmer);
-            if !self.advance_source_motion(prompt, behavior, &mut commands)
-                && let Some(player) = prompt.player_position()
-            {
-                self.position = step_toward(self.position, player, behavior.swarmer_seek_speed);
+            if !self.advance_source_motion(prompt, behavior, &mut commands) {
+                if let Some(position) = move_by_hostile_mode(
+                    self.position,
+                    behavior.swarmer_mode,
+                    prompt,
+                    behavior.swarmer_seek_speed,
+                    self.drift,
+                ) {
+                    self.position = position;
+                }
                 let fire_period = behavior.swarmer_fire_period_steps.max(1);
-                if prompt.step % fire_period == self.id.value() % fire_period {
+                let can_fire = behavior.swarmer_mode == HostileMovementMode::Drift
+                    || prompt.player_position().is_some();
+                if can_fire && prompt.step % fire_period == self.id.value() % fire_period {
                     push_swarmer_shot(self.position, prompt, behavior, &mut commands);
                 }
             }
@@ -4294,6 +4356,7 @@ fn clamped_source_swarmer_shot_reset(profile: ActorSourceWaveProfile) -> u8 {
 struct Baiter {
     id: ActorId,
     position: Point,
+    drift: i16,
     source: Option<ActorSourceBaiterMetadata>,
 }
 
@@ -4306,6 +4369,7 @@ impl Baiter {
         Self {
             id,
             position: spawn.position,
+            drift: -1,
             source: spawn.source,
         }
     }
@@ -4416,12 +4480,20 @@ impl AssetActor for Baiter {
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Baiter);
-            if !self.advance_source_motion(prompt, behavior, &mut commands)
-                && let Some(player) = prompt.player_position()
-            {
-                self.position = step_toward(self.position, player, behavior.baiter_seek_speed);
+            if !self.advance_source_motion(prompt, behavior, &mut commands) {
+                if let Some(position) = move_by_hostile_mode(
+                    self.position,
+                    behavior.baiter_mode,
+                    prompt,
+                    behavior.baiter_seek_speed,
+                    self.drift,
+                ) {
+                    self.position = position;
+                }
                 let fire_period = behavior.baiter_fire_period_steps.max(1);
-                if prompt.step % fire_period == self.id.value() % fire_period {
+                let can_fire = behavior.baiter_mode == HostileMovementMode::Drift
+                    || prompt.player_position().is_some();
+                if can_fire && prompt.step % fire_period == self.id.value() % fire_period {
                     push_baiter_shot(self.position, prompt, behavior, &mut commands);
                 }
             }
@@ -5950,6 +6022,57 @@ mod tests {
     }
 
     #[test]
+    fn behavior_script_can_choose_mutant_drift_mode() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.set_kind_behavior(
+            ActorKind::Mutant,
+            ActorBehaviorProfile {
+                mutant_seek_speed: 4,
+                mutant_mode: HostileMovementMode::Drift,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        let mutant = driver.spawn_mutant(Point::new(100, 100));
+
+        let report = driver.step(GameInput::NONE);
+
+        assert_eq!(snapshot_for(&report, mutant).position, Point::new(96, 100));
+    }
+
+    #[test]
+    fn behavior_script_can_choose_bomber_and_pod_targeting_modes() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_player();
+        driver.step(GameInput::NONE);
+        driver.set_kind_behavior(
+            ActorKind::Bomber,
+            ActorBehaviorProfile {
+                bomber_drift_speed: 5,
+                bomber_bomb_period_steps: u64::MAX,
+                bomber_mode: HostileMovementMode::ChasePlayer,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        driver.set_kind_behavior(
+            ActorKind::Pod,
+            ActorBehaviorProfile {
+                pod_drift_speed: 6,
+                pod_mode: HostileMovementMode::ChasePlayer,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        let bomber = driver.spawn_bomber_for_test(Point::new(70, 80));
+        let pod = driver.spawn_pod_for_test(Point::new(70, 88));
+
+        let report = driver.step(GameInput::NONE);
+
+        assert_eq!(snapshot_for(&report, bomber).position, Point::new(65, 85));
+        assert_eq!(snapshot_for(&report, pod).position, Point::new(64, 94));
+    }
+
+    #[test]
     fn bomber_actor_lays_scripted_bomb_actor() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
@@ -6018,6 +6141,37 @@ mod tests {
         let report = driver.step(GameInput::NONE);
 
         assert_eq!(snapshot_for(&report, baiter).position, Point::new(64, 120));
+    }
+
+    #[test]
+    fn behavior_script_can_choose_swarmer_and_baiter_drift_modes() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.set_kind_behavior(
+            ActorKind::Swarmer,
+            ActorBehaviorProfile {
+                swarmer_seek_speed: 4,
+                swarmer_fire_period_steps: u64::MAX,
+                swarmer_mode: HostileMovementMode::Drift,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        driver.set_kind_behavior(
+            ActorKind::Baiter,
+            ActorBehaviorProfile {
+                baiter_seek_speed: 5,
+                baiter_fire_period_steps: u64::MAX,
+                baiter_mode: HostileMovementMode::Drift,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        let swarmer = driver.spawn_swarmer_for_test(Point::new(70, 120));
+        let baiter = driver.spawn_baiter_for_test(Point::new(80, 124));
+
+        let report = driver.step(GameInput::NONE);
+
+        assert_eq!(snapshot_for(&report, swarmer).position, Point::new(66, 120));
+        assert_eq!(snapshot_for(&report, baiter).position, Point::new(75, 124));
     }
 
     #[test]
