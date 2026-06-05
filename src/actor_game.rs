@@ -272,6 +272,7 @@ const SOURCE_MINI_SWARMER_MAX_Y_VELOCITY: u16 = 0x0200;
 const SOURCE_MINI_SWARMER_MIN_Y_VELOCITY: u16 = 0xFE00;
 const SOURCE_MINI_SWARMER_TURN_WINDOW: u16 = 300 * 32;
 const SOURCE_MINI_SWARMER_TURN_WINDOW_HALF: u16 = 150 * 32;
+const SOURCE_MINI_SWARMER_RESTORE_X_LOW: u8 = 0x07;
 const SOURCE_BAITER_INITIAL_SHOT_TIMER: u8 = 8;
 const SOURCE_BAITER_LOOP_SLEEP_TICKS: u8 = 6;
 const SOURCE_BAITER_X_SEEK_SPEED: u8 = 0x40;
@@ -1959,6 +1960,7 @@ pub struct ActorSourceWaveProfile {
     pub landers: u8,
     pub bombers: u8,
     pub pods: u8,
+    pub swarmers: u8,
     pub wave_size: u8,
     pub lander_x_velocity: u8,
     pub lander_y_velocity_msb: u8,
@@ -2371,6 +2373,43 @@ impl ActorSwarmerSpawn {
             }),
         }
     }
+
+    fn source_restore_batch(
+        source_rng: &mut ActorSourceRng,
+        profile: ActorSourceWaveProfile,
+        count: usize,
+    ) -> Vec<Self> {
+        if count == 0 {
+            return Vec::new();
+        }
+
+        let y16 = u16::from_be_bytes([
+            source_rng
+                .seed
+                .wrapping_shr(1)
+                .wrapping_add(SOURCE_PLAYFIELD_Y_MIN),
+            0,
+        ]);
+        let placement_rand = source_rng.advance();
+        let x16 = u16::from_be_bytes([
+            (placement_rand.seed & 0x3F).wrapping_add(0x80),
+            SOURCE_MINI_SWARMER_RESTORE_X_LOW,
+        ]);
+        let [x, x_fraction] = x16.to_be_bytes();
+        let [y, y_fraction] = y16.to_be_bytes();
+        let position = Point::new(i16::from(x), i16::from(y));
+
+        (0..count)
+            .map(|_| {
+                let mut spawn = Self::source_from_pod(source_rng, profile, position);
+                if let Some(source) = &mut spawn.source {
+                    source.x_fraction = x_fraction;
+                    source.y_fraction = y_fraction;
+                }
+                spawn
+            })
+            .collect()
+    }
 }
 
 impl ActorBaiterSpawn {
@@ -2605,6 +2644,7 @@ impl ActorSourceWaveProfile {
             landers: actor_source_wave_u8("landers", wave),
             bombers: actor_source_wave_u8("bombers", wave),
             pods: actor_source_wave_u8("pods", wave),
+            swarmers: actor_source_wave_u8("swarmers", wave),
             wave_size: actor_source_wave_u8("wave_size", wave),
             lander_x_velocity: actor_source_wave_u8("lander_x_velocity", wave),
             lander_y_velocity_msb: actor_source_wave_u8("lander_y_velocity_msb", wave),
@@ -2693,6 +2733,7 @@ impl ActorSourceWaveProfile {
             landers: self.landers,
             bombers: self.bombers,
             pods: self.pods,
+            swarmers: self.swarmers,
             ..EnemyReserveSnapshot::default()
         };
         for slot in self.active_family_slots() {
@@ -2706,6 +2747,7 @@ impl ActorSourceWaveProfile {
             landers: self.landers,
             bombers: self.bombers,
             pods: self.pods,
+            swarmers: 0,
         };
         let target = usize::from(self.wave_size)
             .min(SOURCE_MAX_ACTIVE_WAVE_ENEMIES)
@@ -2759,6 +2801,7 @@ enum ActorSourceEnemyKind {
     Lander,
     Bomber,
     Pod,
+    Swarmer,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2766,6 +2809,7 @@ struct ActorSourceEnemyCounts {
     landers: u8,
     bombers: u8,
     pods: u8,
+    swarmers: u8,
 }
 
 impl ActorSourceEnemyCounts {
@@ -2773,6 +2817,7 @@ impl ActorSourceEnemyCounts {
         self.landers
             .saturating_add(self.bombers)
             .saturating_add(self.pods)
+            .saturating_add(self.swarmers)
     }
 
     fn take(&mut self, kind: ActorSourceEnemyKind) -> bool {
@@ -2780,6 +2825,7 @@ impl ActorSourceEnemyCounts {
             ActorSourceEnemyKind::Lander => &mut self.landers,
             ActorSourceEnemyKind::Bomber => &mut self.bombers,
             ActorSourceEnemyKind::Pod => &mut self.pods,
+            ActorSourceEnemyKind::Swarmer => &mut self.swarmers,
         };
         if *count == 0 {
             return false;
@@ -2805,6 +2851,7 @@ fn actor_enemy_reserve_total(reserve: EnemyReserveSnapshot) -> u8 {
         .landers
         .saturating_add(reserve.bombers)
         .saturating_add(reserve.pods)
+        .saturating_add(reserve.swarmers)
 }
 
 fn actor_enemy_reserve_is_empty(reserve: EnemyReserveSnapshot) -> bool {
@@ -2819,6 +2866,7 @@ fn actor_enemy_reserve_take(
         ActorSourceEnemyKind::Lander => &mut reserve.landers,
         ActorSourceEnemyKind::Bomber => &mut reserve.bombers,
         ActorSourceEnemyKind::Pod => &mut reserve.pods,
+        ActorSourceEnemyKind::Swarmer => &mut reserve.swarmers,
     };
     if *count == 0 {
         return false;
@@ -2851,6 +2899,7 @@ fn actor_source_reserve_enemy_kinds(
         ActorSourceEnemyKind::Lander,
         ActorSourceEnemyKind::Bomber,
         ActorSourceEnemyKind::Pod,
+        ActorSourceEnemyKind::Swarmer,
     ] {
         push_actor_reserve_kind(&mut kinds, reserve, target, kind);
     }
@@ -2859,6 +2908,7 @@ fn actor_source_reserve_enemy_kinds(
         ActorSourceEnemyKind::Lander,
         ActorSourceEnemyKind::Bomber,
         ActorSourceEnemyKind::Pod,
+        ActorSourceEnemyKind::Swarmer,
     ] {
         while kinds.len() < target && actor_enemy_reserve_take(reserve, kind) {
             kinds.push(kind);
@@ -3383,11 +3433,17 @@ impl ParsedActorWaveScript {
                 let landers = parse_wave_u8(line_number, parts.next(), "reserve landers")?;
                 let bombers = parse_wave_u8(line_number, parts.next(), "reserve bombers")?;
                 let pods = parse_wave_u8(line_number, parts.next(), "reserve pods")?;
+                let swarmers = parts
+                    .next()
+                    .map(|field| parse_wave_u8(line_number, Some(field), "reserve swarmers"))
+                    .transpose()?
+                    .unwrap_or(0);
                 reject_extra_wave_fields(line_number, parts)?;
                 self.current_profile_mut(line_number)?.enemy_reserve = EnemyReserveSnapshot {
                     landers,
                     bombers,
                     pods,
+                    swarmers,
                     ..EnemyReserveSnapshot::default()
                 };
                 Ok(())
@@ -9348,6 +9404,24 @@ impl ActorGameDriver {
                     }));
                     self.spawn_pod_from_spawn(spawn);
                     index += 1;
+                }
+                ActorSourceEnemyKind::Swarmer => {
+                    let swarmer_count = reserve_kinds[index..]
+                        .iter()
+                        .take_while(|&&kind| kind == ActorSourceEnemyKind::Swarmer)
+                        .count();
+                    for spawn in ActorSwarmerSpawn::source_restore_batch(
+                        &mut self.source_rng,
+                        source_profile,
+                        swarmer_count,
+                    ) {
+                        commands.push(GameCommand::Spawn(SpawnRequest::Swarmer {
+                            position: spawn.position,
+                            source: spawn.source,
+                        }));
+                        self.spawn_swarmer_from_spawn(spawn);
+                    }
+                    index += swarmer_count;
                 }
             }
         }
@@ -17456,6 +17530,66 @@ mod tests {
     }
 
     #[test]
+    fn actor_source_swarmer_reserves_use_plres_restore_state() {
+        let (mut driver, seeded) = started_source_wave_driver(2);
+        destroy_source_counted_hostiles(&mut driver, &seeded);
+        driver.enemy_reserve = EnemyReserveSnapshot {
+            swarmers: 4,
+            ..EnemyReserveSnapshot::default()
+        };
+        driver.source_rng = ActorSourceRng {
+            seed: 0x20,
+            hseed: 0x41,
+            lseed: 0xC0,
+        };
+        let profile = ActorSourceWaveProfile::for_wave(2);
+        let mut expected_rng = driver.source_rng;
+        let expected_spawns =
+            ActorSwarmerSpawn::source_restore_batch(&mut expected_rng, profile, 4);
+
+        let restored = driver.step(GameInput::NONE);
+
+        assert_eq!(restored.enemy_reserve, EnemyReserveSnapshot::default());
+        assert_eq!(
+            restored
+                .commands
+                .iter()
+                .filter(|command| matches!(
+                    command,
+                    GameCommand::Spawn(SpawnRequest::Swarmer { .. })
+                ))
+                .count(),
+            4
+        );
+        assert_eq!(
+            restored
+                .source_rng
+                .expect("playing report should carry source rng"),
+            expected_rng.advance().snapshot()
+        );
+
+        let mut source_swarmers = restored
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::Swarmer)
+            .collect::<Vec<_>>();
+        source_swarmers.sort_by_key(|snapshot| snapshot.id);
+        assert_eq!(source_swarmers.len(), 4);
+        for (snapshot, spawn) in source_swarmers.iter().zip(expected_spawns) {
+            let mut expected_source = spawn.source.expect("source swarmer restore metadata");
+            expected_source.sleep_ticks = expected_source.sleep_ticks.saturating_sub(1);
+            assert_eq!(snapshot.position, spawn.position);
+            assert_eq!(snapshot.source_swarmer, Some(expected_source));
+        }
+        assert!(source_swarmers.iter().all(|snapshot| {
+            let source = snapshot.source_swarmer.expect("source swarmer");
+            snapshot.position == source_swarmers[0].position
+                && source.x_fraction == SOURCE_MINI_SWARMER_RESTORE_X_LOW
+                && source.y_fraction == 0
+        }));
+    }
+
+    #[test]
     fn source_pod_y_motion_wraps_through_source_playfield_bounds() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
@@ -20213,12 +20347,12 @@ mod tests {
             lander 100 100\n\
             bomber 120 80\n\
             pod 160 88\n\
-            reserve 2 1 1\n\
+            reserve 2 1 1 4\n\
             human 32 214 grounded\n\
             wave 1\n\
             behavior kind lander lander_mode chase_player\n\
             behavior kind lander lander_seek_speed 6\n\
-            enemy_reserve 3 0 0\n\
+            enemy_reserve 3 0 0 2\n\
             spawn_behavior lander 0 lander_seek_speed 8\n\
             lander 80 96\n\
             human 40 214 falling -1\n",
@@ -20248,6 +20382,7 @@ mod tests {
             manifest.waves[0].enemy_reserve,
             EnemyReserveSnapshot {
                 landers: 3,
+                swarmers: 2,
                 ..EnemyReserveSnapshot::default()
             }
         );
@@ -20284,6 +20419,7 @@ mod tests {
                 landers: 2,
                 bombers: 1,
                 pods: 1,
+                swarmers: 4,
                 ..EnemyReserveSnapshot::default()
             }
         );

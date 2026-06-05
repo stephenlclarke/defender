@@ -267,7 +267,7 @@ current actor mapping uses source-backed
 `wave_size`, `lander_x_velocity`, `bomber_x_velocity`, `lander_shot_time`,
 `mutant_random_y`, `mutant_y_velocity_msb`, `mutant_y_velocity_lsb`,
 `mutant_x_velocity`, `mutant_shot_time`, `baiter_time`, `baiter_shot_time`,
-`baiter_seek_probability`, `bombers`, and `pods` to set active family
+`baiter_seek_probability`, `bombers`, `pods`, and `swarmers` to set active family
 allocation, movement speed, fire cadence, mutant hop/shot behavior, and baiter
 entry pacing. Wave `1` remains lander-only; later source waves seed one
 lander, one bomber, and one pod when those reserve counts are available before
@@ -277,11 +277,14 @@ reserve counts left after that active batch. The driver publishes those counts
 through `StepReport::enemy_reserve` and the clean `WorldSnapshot`, arms reserve
 activation only after the current active batch has reported once, and restores
 the next source batch before survivor-bonus wave clear can start. Lander
-reserves fill active slots first; once no landers remain, bomber and pod
-reserves restore in the source wave-size batch shape. If no source human target
-remains while lander reserves are selected, the actor driver follows the source
-schizoid fallback and restores those rows as source-shaped mutants with source
-placement, shot-timer, and hop-RNG metadata. Wave `1` uses the source first-wave
+reserves fill active slots first; once no landers remain, bomber, pod, and
+swarmer reserves restore in the source wave-size batch shape. Source swarmer
+reserves use the source `PLRES`/`RSW0` phony-object placement/fraction state
+before entering the same mini-swarmer runtime used by pod destruction. If no
+source human target remains while lander reserves are selected, the actor
+driver follows the source schizoid fallback and restores those rows as
+source-shaped mutants with source placement, shot-timer, and hop-RNG metadata.
+Wave `1` uses the source first-wave
 lander restore metadata from the existing clean evidence, including fixed-point
 fractions, velocities, shot timer, sleep ticks, picture frame, and target-human
 index. Later source waves restore landers from the source RNG placement, `RMAX`
@@ -328,12 +331,13 @@ current wave/kind behavior at the point where the line is parsed and are then
 installed as actor-id behavior profiles when that spawn index is allocated.
 `lander`, `bomber`, `pod`, and `human` lines add clean scripted spawn records;
 humans default to `grounded` and can also be declared as `falling <velocity>` or
-`carried <actor-id>`. `reserve <landers> <bombers> <pods>` or
-`enemy_reserve <landers> <bombers> <pods>` sets script-owned reserve counts for
-custom waves. `source_wave <wave>` and `source_waves <first> <last>` expand
-source-backed wave-table profiles, including source reserve counts, into the
-same checked script, so the production default and custom level scripts use the
-same parser surface. The parser sorts wave profiles by wave number, rejects
+`carried <actor-id>`. `reserve <landers> <bombers> <pods> [swarmers]` or
+`enemy_reserve <landers> <bombers> <pods> [swarmers]` sets script-owned reserve
+counts for custom waves. `source_wave <wave>` and
+`source_waves <first> <last>` expand source-backed wave-table profiles,
+including source reserve counts, into the same checked script, so the
+production default and custom level scripts use the same parser surface. The
+parser sorts wave profiles by wave number, rejects
 duplicate waves, and reports malformed lines with source line numbers.
 
 Hostile projectile actors publish source-shaped shell metadata too: enemy

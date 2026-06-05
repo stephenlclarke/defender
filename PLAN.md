@@ -75,7 +75,7 @@ verification tools.
   become actor-id profiles after the driver allocates those actors. Default
   actor wave progression expands the checked wave script through
   `assets/red-label/wave-table.tsv` for active wave size, lander and bomber
-  speed, lander fire cadence, and source bomber/pod counts. The actor wave
+  speed, lander fire cadence, and source bomber/pod/swarmer counts. The actor wave
   allocator follows the source active-family shape, so later waves now seed
   bomber and pod actors beside landers. Source-backed landers, bombers, pods,
   swarmers, and initial humans publish fixed-point metadata and advance
@@ -88,8 +88,10 @@ verification tools.
   report. When source-counted hostiles are gone, the driver restores source
   reserve batches before wave clear: lander reserves fill active slots first,
   no-human lander reserve rows restore as source-shaped mutants through the
-  source schizoid fallback, then bomber and pod reserves use source
-  placement/fraction restore paths once landers are exhausted. Source
+  source schizoid fallback, then bomber, pod, and swarmer reserves use source
+  placement/fraction restore paths once landers are exhausted. Source swarmer
+  reserves use `PLRES`/`RSW0` phony-object placement before the same
+  mini-swarmer runtime used by pod destruction. Source
   lander/human conversions now spawn mutant actors with source-shaped mutant
   fractions, wave-derived shot timer, driver-owned hop RNG, and clean
   `SourceMutantSnapshot` bridge metadata.
@@ -830,6 +832,40 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 19:34 BST`: Completed the actor source swarmer reserve
+  activation cycle. Actor reserve accounting and selection now include
+  `EnemyReserveSnapshot::swarmers`, so source swarmer reserves can no longer
+  be stranded outside actor reserve activation. Source swarmer reserve batches
+  now restore through the actor path with the red-label `PLRES`/`RSW0`
+  phony-object placement shape: the batch shares one restored position plus
+  source X/Y fractions, then each `Swarmer` actor receives source RNG-derived
+  velocity, acceleration, sleep, and shot-timer metadata before entering the
+  same source mini-swarmer runtime used by pod destruction. Checked wave
+  scripts now accept `reserve <landers> <bombers> <pods> [swarmers]` and
+  `enemy_reserve <landers> <bombers> <pods> [swarmers]`, preserving existing
+  three-field scripts with a zero swarmer reserve. Focused regressions cover
+  source swarmer reserve placement/fractions/RNG advancement and parser
+  manifest output. README, SPEC, and actor architecture docs now document
+  actor-side source swarmer reserve activation and the optional script field.
+  No legacy code, tests, or scaffolding were safe to remove in this slice
+  because clean smoke/fidelity/oracle evidence still depends on clean runtime
+  boundaries outside the actor path. Validation passed with `cargo fmt
+  --check`, `cargo check --all-targets --features legacy-tools`, `cargo test
+  source_swarmer --lib --features legacy-tools`, `cargo test
+  actor_source_swarmer_reserves_use_plres_restore_state --lib --features
+  legacy-tools`, `cargo test
+  wave_script_text_parser_builds_sorted_profiles_and_spawns --lib --features
+  legacy-tools`, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, the actor-game/smoke/live/runtime/wgpu all-target
+  `legacy-tools` filters, and the actor smoke CLI commands (`--actor-smoke`,
+  `--actor-attract-smoke`, `--actor-post-game-smoke`, and
+  `--actor-wgpu-smoke`). The full unfiltered `legacy-tools` suite was not
+  rerun in this cycle; the previously isolated clean-game MAME
+  window/post-game audio failures remain outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780683723348219`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780684485661219`.
 - `2026-06-05 19:19 BST`: Completed the actor source baiter fireball
   projection cycle. Source-backed baiter shots now use the red-label shared
   `SHOOT` fireball setup instead of the generic hostile-shot helper: source
