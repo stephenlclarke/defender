@@ -25,7 +25,7 @@ use crate::{
         Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
         push_source_text_bytes_sprites, source_attract_defender_appearance_pixels,
         source_attract_williams_logo_operation_pixel_counts,
-        source_attract_williams_logo_pixel_path,
+        source_attract_williams_logo_pixel_path, source_message_text,
     },
     systems::{HighScoreEntrySystem, HighScoreInitialsState, ScreenPosition, ScreenVelocity},
 };
@@ -132,6 +132,7 @@ const STATUS_WAVE_POSITION: Point = Point::new(8, 18);
 const STATUS_LIVES_POSITION: Point = Point::new(86, 18);
 const STATUS_SMART_BOMBS_POSITION: Point = Point::new(140, 18);
 const STATUS_CREDITS_POSITION: Point = Point::new(176, 226);
+const SOURCE_CREDITS_MESSAGE_LABEL: &str = "CREDV";
 const STATUS_FINAL_SCORE_POSITION: Point = Point::new(56, 92);
 const STATUS_HIGH_SCORE_TABLE_TITLE_POSITION: Point = Point::new(78, 112);
 const STATUS_HIGH_SCORE_TABLE_START_Y: i16 = 128;
@@ -4086,7 +4087,7 @@ impl AttractScriptAction {
                 label_position,
                 count_position,
             } => vec![
-                DrawCommand::text(actor, *label_position, "CREDITS:"),
+                DrawCommand::text(actor, *label_position, source_credits_label_text()),
                 DrawCommand::text(actor, *count_position, format!("{:02}", credits.min(99))),
             ],
         }
@@ -4138,6 +4139,10 @@ impl AttractScriptAction {
             },
         }
     }
+}
+
+fn source_credits_label_text() -> &'static str {
+    source_message_text(SOURCE_CREDITS_MESSAGE_LABEL).unwrap_or("CREDITS:")
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -11212,10 +11217,13 @@ mod tests {
             .parse::<AttractScript>()
             .expect("credit script action should parse");
         let mut driver = ActorGameDriver::with_attract_script(script);
+        let source_credits_label = source_message_text(SOURCE_CREDITS_MESSAGE_LABEL)
+            .expect("CREDV source message should be checked in");
 
         let first = driver.step(GameInput::NONE);
         assert!(first.draws.iter().any(|draw| {
-            draw.position == Point::new(12, 228) && draw.text.as_deref() == Some("CREDITS:")
+            draw.position == Point::new(12, 228)
+                && draw.text.as_deref() == Some(source_credits_label)
         }));
         assert!(first.draws.iter().any(|draw| {
             draw.position == Point::new(82, 228) && draw.text.as_deref() == Some("00")

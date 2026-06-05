@@ -771,9 +771,9 @@ reintroduce legacy implementation terminology.
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and
   `assets/red-label/actor-waves.script`. The attract script can draw
-  prompt-backed high-score table rows and credits label/count in addition to
-  Williams reveal and Defender wordmark coalescence. The default actor wave
-  progression expands
+  prompt-backed high-score table rows and source `CREDV` credits label/count in
+  addition to Williams reveal and Defender wordmark coalescence. The default
+  actor wave progression expands
   that wave script through `assets/red-label/wave-table.tsv` for active
   wave size, lander and bomber movement speed, lander fire cadence, baiter
   entry/shot/seek timing, and source bomber/pod counts. The actor allocator

@@ -344,7 +344,7 @@ scripts before the actor runtime starts. `high_scores` lines use
 `x y row-height rows` after the timing fields and draw rows from the
 driver-owned high-score table carried in `StepPrompt`. `credits` lines use
 `label-x label-y count-x count-y` after the timing fields and draw the
-source-backed `CREDITS:` label plus the visible credit count from
+source-backed `CREDV` / `CREDITS:` label plus the visible credit count from
 `StepPrompt.credits`.
 
 Script actions currently cover:

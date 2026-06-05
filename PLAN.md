@@ -42,8 +42,9 @@ verification tools.
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and
   `assets/red-label/actor-waves.script` through the same parser path. The
-  attract script now draws prompt-backed high-score table rows and credits
-  label/count alongside the Williams reveal and Defender wordmark coalescence.
+  attract script now draws prompt-backed high-score table rows and source
+  `CREDV` credits label/count alongside the Williams reveal and Defender
+  wordmark coalescence.
   `ActorWaveScript` now names per-wave progression data and applies behavior
   scripts plus hostile and initial-human spawn records as play starts and waves
   are cleared. Wave scripts can now attach spawn-index behavior profiles that
@@ -755,6 +756,23 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 12:27 BST`: Completed the actor source-message credits slice.
+  Actor attract credits now resolve the label through the checked red-label
+  message table `CREDV` via `source_message_text` instead of relying on an
+  actor-side literal. The checked `credits` script action and prompt-backed
+  credit count behavior remain unchanged, while docs now name `CREDV` as the
+  source for the label. Added a focused regression comparing the attract credit
+  label draw against `source_message_text("CREDV")`. Validation passed with
+  `cargo fmt --check`, `cargo test
+  parsed_attract_script_draws_prompt_credit_count --lib`, `cargo test
+  default_sprite_atlas_uses_message_glyph_regions --lib`, `cargo test
+  actor_game --all-targets --features legacy-tools`, `cargo check
+  --all-targets --features legacy-tools`, `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`, touched-doc markdownlint, and `git
+  diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780658570631689`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780658874724369`.
 - `2026-06-05 12:21 BST`: Completed the actor attract credits script slice.
   `AttractScript` now accepts checked
   `credits <start> <duration> <label-x> <label-y> <count-x> <count-y>` lines,
