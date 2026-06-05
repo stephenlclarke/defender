@@ -61,6 +61,8 @@ const MUTANT_SEEK_SPEED: i16 = 1;
 const BOMBER_DRIFT_SPEED: i16 = 1;
 const POD_DRIFT_SPEED: i16 = 1;
 const SWARMER_SEEK_SPEED: i16 = 2;
+const SWARMER_FIRE_PERIOD: u64 = 58;
+const SWARMER_SHOT_SPEED: i16 = 3;
 const BAITER_SEEK_SPEED: i16 = 3;
 const BAITER_FIRE_PERIOD: u64 = 42;
 const BAITER_SHOT_SPEED: i16 = 4;
@@ -781,6 +783,8 @@ pub struct ActorBehaviorProfile {
     pub bomber_drift_speed: i16,
     pub pod_drift_speed: i16,
     pub swarmer_seek_speed: i16,
+    pub swarmer_fire_period_steps: u64,
+    pub swarmer_shot_speed: i16,
     pub baiter_seek_speed: i16,
     pub baiter_fire_period_steps: u64,
     pub baiter_shot_speed: i16,
@@ -814,6 +818,8 @@ impl ActorBehaviorProfile {
         bomber_drift_speed: BOMBER_DRIFT_SPEED,
         pod_drift_speed: POD_DRIFT_SPEED,
         swarmer_seek_speed: SWARMER_SEEK_SPEED,
+        swarmer_fire_period_steps: SWARMER_FIRE_PERIOD,
+        swarmer_shot_speed: SWARMER_SHOT_SPEED,
         baiter_seek_speed: BAITER_SEEK_SPEED,
         baiter_fire_period_steps: BAITER_FIRE_PERIOD,
         baiter_shot_speed: BAITER_SHOT_SPEED,
@@ -1745,6 +1751,7 @@ pub enum SoundCue {
     BomberHit,
     PodHit,
     SwarmerHit,
+    SwarmerShot,
     BaiterHit,
     BaiterShot,
     AttractPulse,
@@ -3895,7 +3902,12 @@ impl Swarmer {
         Rect::from_center(self.position, 6, 4)
     }
 
-    fn advance_source_motion(&mut self, prompt: &StepPrompt) -> bool {
+    fn advance_source_motion(
+        &mut self,
+        prompt: &StepPrompt,
+        behavior: ActorBehaviorProfile,
+        commands: &mut Vec<GameCommand>,
+    ) -> bool {
         let Some(source) = &mut self.source else {
             return false;
         };
@@ -3921,6 +3933,11 @@ impl Swarmer {
         source.x_fraction = x_fraction;
         source.y_fraction = y_fraction;
         source.shot_timer = source.shot_timer.saturating_sub(1);
+        if source.shot_timer == 0 {
+            let profile = ActorSourceWaveProfile::for_wave(prompt.wave.max(1));
+            source.shot_timer = clamped_source_swarmer_shot_reset(profile);
+            push_swarmer_shot(self.position, prompt, behavior, commands);
+        }
         source.sleep_ticks = SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS;
         true
     }
@@ -3932,13 +3949,18 @@ impl AssetActor for Swarmer {
     }
 
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
+        let mut commands = Vec::new();
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Swarmer);
-            if !self.advance_source_motion(prompt)
+            if !self.advance_source_motion(prompt, behavior, &mut commands)
                 && let Some(player) = prompt.player_position()
             {
                 self.position = step_toward(self.position, player, behavior.swarmer_seek_speed);
+                let fire_period = behavior.swarmer_fire_period_steps.max(1);
+                if prompt.step % fire_period == self.id.value() % fire_period {
+                    push_swarmer_shot(self.position, prompt, behavior, &mut commands);
+                }
             }
             draws.push(DrawCommand::sprite(
                 self.id,
@@ -3962,10 +3984,27 @@ impl AssetActor for Swarmer {
                 source_baiter: None,
                 source_human: None,
             },
-            commands: Vec::new(),
+            commands,
             draws,
         }
     }
+}
+
+fn push_swarmer_shot(
+    position: Point,
+    prompt: &StepPrompt,
+    behavior: ActorBehaviorProfile,
+    commands: &mut Vec<GameCommand>,
+) {
+    commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
+        position,
+        velocity: hostile_shot_velocity(position, prompt, behavior.swarmer_shot_speed),
+    }));
+    commands.push(GameCommand::PlaySound(SoundCue::SwarmerShot));
+}
+
+fn clamped_source_swarmer_shot_reset(profile: ActorSourceWaveProfile) -> u8 {
+    profile.swarmer_shot_time.max(1).min(u32::from(u8::MAX)) as u8
 }
 
 #[derive(Debug)]
@@ -4069,7 +4108,11 @@ fn baiter_shot_velocity(
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
 ) -> Velocity {
-    let speed = behavior.baiter_shot_speed.max(1);
+    hostile_shot_velocity(position, prompt, behavior.baiter_shot_speed)
+}
+
+fn hostile_shot_velocity(position: Point, prompt: &StepPrompt, speed: i16) -> Velocity {
+    let speed = speed.max(1);
     if let Some(player) = prompt.player_position() {
         return Velocity::new(
             axis_step(player.x - position.x, speed),
@@ -5669,6 +5712,99 @@ mod tests {
             draw.sprite == SpriteKey::Baiter
                 && matches!(draw.effect, VisualEffect::SourceBaiterFrame { frame: 1 })
         }));
+    }
+
+    #[test]
+    fn source_swarmer_shot_timer_spawns_hostile_projectile() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 2;
+        driver.spawn_player();
+        driver.step(GameInput::NONE);
+        let swarmer = driver.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
+            position: Point::new(70, 120),
+            source: Some(ActorSourceSwarmerMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                acceleration: 0,
+                sleep_ticks: 0,
+                shot_timer: 1,
+            }),
+        });
+
+        let report = driver.step(GameInput::NONE);
+
+        assert!(report.sounds.contains(&SoundCue::SwarmerShot));
+        assert!(report.commands.iter().any(|command| {
+            matches!(
+                command,
+                GameCommand::Spawn(SpawnRequest::EnemyLaser {
+                    position: Point { x: 69, y: 120 },
+                    velocity: Velocity { dx: -3, dy: 0 },
+                })
+            )
+        }));
+        assert_eq!(
+            snapshot_for(&report, swarmer).source_swarmer,
+            Some(ActorSourceSwarmerMetadata {
+                x_fraction: 0xE0,
+                y_fraction: 0,
+                x_velocity: 0xFFE0,
+                y_velocity: 0,
+                acceleration: 0,
+                sleep_ticks: SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS,
+                shot_timer: 20,
+            })
+        );
+    }
+
+    #[test]
+    fn source_baiter_shot_timer_spawns_hostile_projectile() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 1;
+        driver.spawn_player();
+        driver.step(GameInput::NONE);
+        driver.wave = 1;
+        let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
+            position: Point::new(70, 120),
+            source: Some(ActorSourceBaiterMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                shot_timer: 1,
+                sleep_ticks: 0,
+                picture_frame: 0,
+            }),
+        });
+
+        let report = driver.step(GameInput::NONE);
+
+        assert!(report.sounds.contains(&SoundCue::BaiterShot));
+        assert!(report.commands.iter().any(|command| {
+            matches!(
+                command,
+                GameCommand::Spawn(SpawnRequest::EnemyLaser {
+                    position: Point { x: 70, y: 120 },
+                    velocity: Velocity { dx: -4, dy: 0 },
+                })
+            )
+        }));
+        assert_eq!(
+            snapshot_for(&report, baiter).source_baiter,
+            Some(ActorSourceBaiterMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                shot_timer: 10,
+                sleep_ticks: SOURCE_BAITER_LOOP_SLEEP_TICKS,
+                picture_frame: 1,
+            })
+        );
     }
 
     #[test]

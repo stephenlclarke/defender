@@ -82,10 +82,10 @@ state during active motion. It also includes Williams title animation
 metadata, the coalescing Defender wordmark surface, lander target-slot seeking,
 pickup/carry/conversion, falling-human rescue and safe landing scores, score
 popups, hostile projectile actors for lander shots, bomber/pod hit scoring and
-sound cues, pod laser-hit swarmer spawning, swarmer scoring, source-paced
-baiter timer entry, baiter shots/scoring/hit cues, and smart-bomb hostile
-clearing. Baiters do not block wave completion once source-counted wave enemies
-are gone. `XYZZY` invincibility is applied as the same
+sound cues, pod laser-hit swarmer spawning, swarmer scoring and shot cues,
+source-paced baiter timer entry, baiter shots/scoring/hit cues, and smart-bomb
+hostile clearing. Baiters do not block wave completion once source-counted wave
+enemies are gone. `XYZZY` invincibility is applied as the same
 driver-controlled behavior override used by scripts. See
 `docs/actor-architecture.md` for the C++-to-Rust mapping and migration shape.
 

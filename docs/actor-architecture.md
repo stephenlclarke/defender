@@ -71,10 +71,10 @@ numbers.
 Actor movement and behavior are configurable data owned by the driver.
 `ActorBehaviorProfile` holds tunable attributes for player movement and laser
 cooldown, laser speed and lifetime, lander seek/carry/fire behavior, mutant
-pursuit, bomber/pod drift, swarmer pursuit, baiter pursuit/fire behavior, human
-fall/landing behavior, and timed effect lifetimes. It also holds behavior modes
-such as `LanderBehaviorMode`, allowing scripts to choose whether a lander seeks
-humans, chases the player, or simply drifts.
+pursuit, bomber/pod drift, swarmer pursuit/fire behavior, baiter pursuit/fire
+behavior, human fall/landing behavior, and timed effect lifetimes. It also holds
+behavior modes such as `LanderBehaviorMode`, allowing scripts to choose whether
+a lander seeks humans, chases the player, or simply drifts.
 
 `ActorBehaviorScript` resolves those profiles in this order:
 
@@ -172,8 +172,10 @@ The actor driver now owns a first Defender gameplay loop:
   actor-owned source fixed-point metadata when source-backed, and remain
   script-tunable through their behavior profiles.
 - Projectile-killed pods spawn a bounded mini-swarmer actor batch using the
-  source request count. Smart-bomb pod scoring intentionally does not spawn
-  swarmers, matching the clean source behavior.
+  source request count. Source-backed swarmers decrement their actor-owned shot
+  timer into hostile projectile commands with a distinct swarmer shot cue.
+  Smart-bomb pod scoring intentionally does not spawn swarmers, matching the
+  clean source behavior.
 - The driver advances a source-paced baiter timer while source-counted wave
   enemies remain. Expired timers spawn source-backed baiter actors up to the
   source active cap. Baiters pursue and shoot through actor-owned metadata,
