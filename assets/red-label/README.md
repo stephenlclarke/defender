@@ -16,6 +16,16 @@ Rules:
 
 Current files:
 
+- `actor-attract.script`: embedded actor-runtime title/attract script that
+  drives the Williams reveal, Defender wordmark coalescence, and high-score
+  title text through the checked `AttractScript` parser.
+- `actor-behavior.script`: embedded actor-runtime baseline behavior profile
+  parsed by `ActorBehaviorScript`, including player, laser, hostile, human,
+  explosion, and score-popup timing/tuning defaults.
+- `actor-waves.script`: embedded actor-runtime wave progression script parsed
+  by `ActorWaveScript`; its `source_waves` directive expands through
+  `wave-table.tsv` so the default actor driver is configured from checked text
+  while retaining source-table wave values.
 - `audit-adjustments.tsv`: red-label `romc8.src` `AUDITG` / `MSGAUD`
   operator audit and adjustment message table, including the source CMOS cell
   offsets and display widths used by `DISAUD`.

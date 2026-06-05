@@ -183,6 +183,11 @@ const SWARMER_SCORE: u32 = 150;
 const BAITER_SCORE: u32 = 200;
 const HUMAN_RESCUE_SCORE: u32 = 500;
 const HUMAN_SAFE_LANDING_SCORE: u32 = 250;
+const ACTOR_RED_LABEL_ATTRACT_SCRIPT: &str =
+    include_str!("../assets/red-label/actor-attract.script");
+const ACTOR_RED_LABEL_BEHAVIOR_SCRIPT: &str =
+    include_str!("../assets/red-label/actor-behavior.script");
+const ACTOR_RED_LABEL_WAVE_SCRIPT: &str = include_str!("../assets/red-label/actor-waves.script");
 const ACTOR_SOURCE_WAVE_TABLE_TSV: &str = include_str!("../assets/red-label/wave-table.tsv");
 const ACTOR_SOURCE_WAVE_TABLE_HEADER: &str =
     "key\tceiling\tfloor\tintra_delta\tinter_delta\twave1\twave2\twave3\twave4";
@@ -1134,6 +1139,15 @@ impl ActorBehaviorScript {
         }
     }
 
+    pub fn from_arcade_profile() -> Self {
+        Self::new(ActorBehaviorProfile::DEFAULT)
+    }
+
+    pub fn red_label_default() -> Self {
+        Self::parse_text(ACTOR_RED_LABEL_BEHAVIOR_SCRIPT)
+            .unwrap_or_else(|error| panic!("embedded actor behavior script is invalid: {error}"))
+    }
+
     pub fn default_profile(&self) -> ActorBehaviorProfile {
         self.default_profile
     }
@@ -1245,7 +1259,7 @@ impl FromStr for ActorBehaviorScript {
     type Err = ActorBehaviorScriptParseError;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        let mut script = Self::default();
+        let mut script = Self::from_arcade_profile();
         for (line_index, raw_line) in source.lines().enumerate() {
             let line_number = line_index + 1;
             let line = raw_line
@@ -1767,7 +1781,7 @@ fn parse_behavior_i64(
 
 impl Default for ActorBehaviorScript {
     fn default() -> Self {
-        Self::new(ActorBehaviorProfile::DEFAULT)
+        Self::red_label_default()
     }
 }
 
@@ -2728,6 +2742,11 @@ impl ActorWaveScript {
     }
 
     pub fn default_progression() -> Self {
+        Self::parse_text(ACTOR_RED_LABEL_WAVE_SCRIPT)
+            .unwrap_or_else(|error| panic!("embedded actor wave script is invalid: {error}"))
+    }
+
+    pub fn source_table_progression() -> Self {
         let waves = (1..=ACTOR_SOURCE_BACKED_WAVES)
             .map(Self::source_backed_profile)
             .collect::<Vec<_>>();
@@ -2739,7 +2758,7 @@ impl ActorWaveScript {
         let human_spawns = source.human_spawns(wave);
         ActorWaveProfile::with_family_spawns(
             wave,
-            ActorBehaviorScript::default()
+            ActorBehaviorScript::from_arcade_profile()
                 .with_kind_behavior(ActorKind::Lander, source.lander_behavior())
                 .with_kind_behavior(
                     ActorKind::Bomber,
@@ -2868,13 +2887,26 @@ impl ParsedActorWaveScript {
             "wave" => {
                 let wave = parse_wave_u16(line_number, parts.next(), "wave")?;
                 reject_extra_wave_fields(line_number, parts)?;
-                if self.waves.iter().any(|profile| profile.wave == wave.max(1)) {
+                self.push_profile(line_number, ParsedActorWaveProfile::new(wave))
+            }
+            "source_wave" | "source_backed_wave" => {
+                let wave = parse_wave_u16(line_number, parts.next(), "wave")?;
+                reject_extra_wave_fields(line_number, parts)?;
+                self.push_profile(line_number, ParsedActorWaveProfile::source_backed(wave))
+            }
+            "source_waves" | "source_backed_waves" => {
+                let first = parse_wave_u16(line_number, parts.next(), "first wave")?.max(1);
+                let last = parse_wave_u16(line_number, parts.next(), "last wave")?.max(1);
+                reject_extra_wave_fields(line_number, parts)?;
+                if last < first {
                     return Err(ActorWaveScriptParseError::new(
                         line_number,
-                        format!("duplicate wave `{}`", wave.max(1)),
+                        format!("source wave range `{first}..{last}` is invalid"),
                     ));
                 }
-                self.waves.push(ParsedActorWaveProfile::new(wave));
+                for wave in first..=last {
+                    self.push_profile(line_number, ParsedActorWaveProfile::source_backed(wave))?;
+                }
                 Ok(())
             }
             "behavior" => {
@@ -2941,6 +2973,25 @@ impl ParsedActorWaveScript {
         })
     }
 
+    fn push_profile(
+        &mut self,
+        line_number: usize,
+        profile: ParsedActorWaveProfile,
+    ) -> Result<(), ActorWaveScriptParseError> {
+        if self
+            .waves
+            .iter()
+            .any(|candidate| candidate.wave == profile.wave)
+        {
+            return Err(ActorWaveScriptParseError::new(
+                line_number,
+                format!("duplicate wave `{}`", profile.wave),
+            ));
+        }
+        self.waves.push(profile);
+        Ok(())
+    }
+
     fn finish(self) -> Result<ActorWaveScript, ActorWaveScriptParseError> {
         if self.waves.is_empty() {
             return Err(ActorWaveScriptParseError::new(
@@ -2972,11 +3023,23 @@ impl ParsedActorWaveProfile {
     fn new(wave: u16) -> Self {
         Self {
             wave: wave.max(1),
-            behavior_script: ActorBehaviorScript::default(),
+            behavior_script: ActorBehaviorScript::from_arcade_profile(),
             lander_spawns: Vec::new(),
             bomber_spawns: Vec::new(),
             pod_spawns: Vec::new(),
             human_spawns: Vec::new(),
+        }
+    }
+
+    fn source_backed(wave: u16) -> Self {
+        let profile = ActorWaveScript::source_backed_profile(wave);
+        Self {
+            wave: profile.wave,
+            behavior_script: profile.behavior_script,
+            lander_spawns: profile.lander_spawns,
+            bomber_spawns: profile.bomber_spawns,
+            pod_spawns: profile.pod_spawns,
+            human_spawns: profile.human_spawns,
         }
     }
 
@@ -3362,6 +3425,11 @@ impl AttractScript {
     }
 
     pub fn red_label_title() -> Self {
+        Self::parse_text(ACTOR_RED_LABEL_ATTRACT_SCRIPT)
+            .unwrap_or_else(|error| panic!("embedded actor attract script is invalid: {error}"))
+    }
+
+    pub fn red_label_title_from_events() -> Self {
         Self::new(vec![
             AttractScriptEvent::williams_logo(1, None, SOURCE_ATTRACT_WILLIAMS_LOGO_POSITION),
             AttractScriptEvent::defender_wordmark(
@@ -10611,6 +10679,29 @@ mod tests {
     }
 
     #[test]
+    fn embedded_actor_attract_script_matches_red_label_constructor_fallback() {
+        let parsed = AttractScript::parse_text(ACTOR_RED_LABEL_ATTRACT_SCRIPT)
+            .expect("embedded actor attract script should parse");
+
+        assert_eq!(
+            AttractScript::red_label_title().manifest(),
+            parsed.manifest()
+        );
+        assert_eq!(
+            AttractScript::red_label_title_from_events().manifest(),
+            parsed.manifest()
+        );
+        assert!(parsed.manifest().events.iter().any(|event| matches!(
+            event.action,
+            AttractScriptActionManifest::WilliamsLogo { .. }
+        )));
+        assert!(parsed.manifest().events.iter().any(|event| matches!(
+            event.action,
+            AttractScriptActionManifest::DefenderWordmark { .. }
+        )));
+    }
+
+    #[test]
     fn custom_driver_can_script_its_own_attract_screen() {
         let script = AttractScript::new(vec![
             AttractScriptEvent::text(2, Some(5), Point::new(12, 20), "CUSTOM ATTRACT"),
@@ -11327,6 +11418,29 @@ mod tests {
             .behavior_for(ActorId::new(1), ActorKind::Lander);
         assert_eq!(fifth_lander.lander_seek_speed, 3);
         assert_eq!(fifth_lander.lander_fire_period_steps, 30);
+    }
+
+    #[test]
+    fn embedded_actor_wave_script_expands_source_wave_range() {
+        let parsed = ActorWaveScript::parse_text(ACTOR_RED_LABEL_WAVE_SCRIPT)
+            .expect("embedded actor wave script should parse");
+
+        assert_eq!(
+            ActorWaveScript::default_progression().manifest(),
+            parsed.manifest()
+        );
+        assert_eq!(
+            ActorWaveScript::source_table_progression().manifest(),
+            parsed.manifest()
+        );
+        assert_eq!(parsed.name(), "actor-source-wave-table");
+        assert_eq!(
+            parsed.manifest().waves.len(),
+            usize::from(ACTOR_SOURCE_BACKED_WAVES)
+        );
+        assert_eq!(parsed.profile_for_wave(1).lander_spawns.len(), 5);
+        assert_eq!(parsed.profile_for_wave(2).bomber_spawns.len(), 1);
+        assert_eq!(parsed.profile_for_wave(2).pod_spawns.len(), 1);
     }
 
     #[test]
@@ -13592,6 +13706,49 @@ mod tests {
             .expect_err("unknown actor kind should fail");
         assert_eq!(error.line, 1);
         assert!(error.to_string().contains("unknown actor kind"));
+    }
+
+    #[test]
+    fn embedded_actor_behavior_script_matches_arcade_profile_defaults() {
+        let parsed = ActorBehaviorScript::parse_text(ACTOR_RED_LABEL_BEHAVIOR_SCRIPT)
+            .expect("embedded actor behavior script should parse");
+
+        assert_eq!(ActorBehaviorScript::default().manifest(), parsed.manifest());
+        assert_eq!(
+            ActorBehaviorScript::from_arcade_profile().manifest(),
+            parsed.manifest()
+        );
+        assert_eq!(
+            parsed.manifest().default_profile,
+            ActorBehaviorProfile::arcade_default()
+        );
+        assert!(parsed.manifest().kind_profiles.is_empty());
+        assert!(parsed.manifest().actor_profiles.is_empty());
+    }
+
+    #[test]
+    fn default_driver_exposes_embedded_actor_script_manifests() {
+        let driver = ActorGameDriver::new();
+        let manifest = driver.script_manifest();
+
+        assert_eq!(
+            manifest.attract_script,
+            AttractScript::parse_text(ACTOR_RED_LABEL_ATTRACT_SCRIPT)
+                .expect("embedded attract script should parse")
+                .manifest()
+        );
+        assert_eq!(
+            manifest.behavior_script,
+            ActorBehaviorScript::parse_text(ACTOR_RED_LABEL_BEHAVIOR_SCRIPT)
+                .expect("embedded behavior script should parse")
+                .manifest()
+        );
+        assert_eq!(
+            manifest.wave_script,
+            ActorWaveScript::parse_text(ACTOR_RED_LABEL_WAVE_SCRIPT)
+                .expect("embedded wave script should parse")
+                .manifest()
+        );
     }
 
     #[test]

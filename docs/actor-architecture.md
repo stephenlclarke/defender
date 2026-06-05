@@ -159,6 +159,10 @@ kind player player_takes_enemy_collision_damage false
 an `ActorKind`, and `actor` lines update one actor id. Numeric values accept
 decimal or `0x` hex notation, mode fields accept names such as `drift` and
 `chase_player`, and parser errors include the source line number.
+The built-in baseline profile is the embedded checked script
+`assets/red-label/actor-behavior.script`; `ActorBehaviorScript::default()`
+parses that asset at startup and the raw arcade profile remains available as
+the parser fallback.
 
 `AttractScript::manifest`, `ActorBehaviorScript::manifest`,
 `ActorWaveScript::manifest`, and `ActorGameDriver::script_manifest` expose
@@ -203,8 +207,10 @@ records. The driver applies wave `1` when play starts, carries the wave number
 in `StepPrompt` and `StepReport`, and advances to the next configured profile
 when the current hostile snapshots are cleared.
 
-The default actor progression reads `assets/red-label/wave-table.tsv` through
-an actor-owned adapter. The current actor mapping uses source-backed
+The default actor progression is the embedded checked script
+`assets/red-label/actor-waves.script`, whose `source_waves` directive expands
+through `assets/red-label/wave-table.tsv` via an actor-owned adapter. The
+current actor mapping uses source-backed
 `wave_size`, `lander_x_velocity`, `bomber_x_velocity`, `lander_shot_time`,
 `mutant_random_y`, `mutant_y_velocity_msb`, `mutant_y_velocity_lsb`,
 `mutant_x_velocity`, `mutant_shot_time`, `baiter_time`, `baiter_shot_time`,
@@ -245,13 +251,17 @@ behavior kind lander lander_drift_speed 5
 lander 100 100
 bomber 120 80
 pod 160 88
+source_waves 3 16
 ```
 
 `behavior` lines reuse the `ActorBehaviorScript` parser for the current wave.
 `lander`, `bomber`, `pod`, and `human` lines add clean scripted spawn records;
 humans default to `grounded` and can also be declared as `falling <velocity>` or
-`carried <actor-id>`. The parser sorts wave profiles by wave number, rejects
-duplicate waves, and reports malformed lines with source line numbers.
+`carried <actor-id>`. `source_wave <wave>` and `source_waves <first> <last>`
+expand source-backed wave-table profiles into the same checked script, so the
+production default and custom level scripts use the same parser surface. The
+parser sorts wave profiles by wave number, rejects duplicate waves, and reports
+malformed lines with source line numbers.
 
 Hostile projectile actors publish source-shaped shell metadata too: enemy
 lasers own and advance fixed-point velocity, fraction, and lifetime values,
@@ -299,10 +309,13 @@ player death command path.
 The attract screen is data-driven. `AttractScript` contains ordered
 `AttractScriptEvent` records, and `ScriptedAttractProgram` turns the active
 events for its own current script step into draw commands. The default
-`AttractScript::red_label_title()` recreates the current Williams/logo/high
-score opening sequence, while `ActorGameDriver::with_attract_script(...)` lets
-a custom driver provide its own sequence without replacing coin/start control
-handling.
+`AttractScript::red_label_title()` parses
+`assets/red-label/actor-attract.script`, recreating the current
+Williams/logo/high score opening sequence from checked text while the older
+Rust event constructor remains available as a fallback. Custom drivers can pass
+their own parsed or constructed sequence through
+`ActorGameDriver::with_attract_script(...)` without replacing coin/start
+control handling.
 `ActorGameDriver::script_manifest()` includes the immutable attract-event
 manifest so custom drivers can verify or serialize the installed sequence
 without inspecting the thread-backed attract actor.

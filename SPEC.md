@@ -755,18 +755,24 @@ reintroduce legacy implementation terminology.
   gravity, timed effects, damage policy, and behavior modes such as human
   seeking versus player chasing or non-source hostile drift versus player chase
   without rewriting actor structs. `ActorBehaviorScript` can be built from Rust
-  profile constructors or checked text profile updates. Read-only script
-  manifests expose persistent attract event, driver behavior, and wave-profile
-  configuration, and every `StepReport` includes the effective behavior
-  manifest after transient input overrides such as `XYZZY` invincibility.
+  profile constructors or checked text profile updates. The built-in baseline
+  behavior is embedded from `assets/red-label/actor-behavior.script`.
+  Read-only script manifests expose persistent attract event, driver behavior,
+  and wave-profile configuration, and every `StepReport` includes the effective
+  behavior manifest after transient input overrides such as `XYZZY`
+  invincibility.
   `ActorWaveScript` names a driver-owned progression script whose wave profiles
   apply behavior scripts plus hostile and initial-human spawn records when play
   starts and when hostile snapshots are cleared. `ActorWaveScript` can be built
   from Rust profile constructors or checked text wave/spawn records. The
-  default actor wave progression reads
-  `assets/red-label/wave-table.tsv` for active wave size, lander and bomber
-  movement speed, lander fire cadence, baiter entry/shot/seek timing, and
-  source bomber/pod counts. The actor allocator follows the source active-family
+  built-in actor attract, behavior, and wave scripts are embedded from
+  `assets/red-label/actor-attract.script`,
+  `assets/red-label/actor-behavior.script`, and
+  `assets/red-label/actor-waves.script`. The default actor wave progression
+  expands that wave script through `assets/red-label/wave-table.tsv` for active
+  wave size, lander and bomber movement speed, lander fire cadence, baiter
+  entry/shot/seek timing, and source bomber/pod counts. The actor allocator
+  follows the source active-family
   shape, so wave `1` remains lander-only while later waves can seed bomber and
   pod actors beside source-RNG-restored landers. Later-wave humans restore from
   the source target-list distribution instead of reusing first-wave starts.

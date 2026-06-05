@@ -37,13 +37,16 @@ verification tools.
   configured attract events, behavior profiles, and wave profiles so custom
   drivers can inspect their installed scripts without actor-thread
   introspection. Attract, behavior, and wave scripts can now be parsed from
-  checked text lines before installation in a custom driver. `ActorWaveScript`
-  now names per-wave
-  progression data and applies behavior scripts plus hostile and initial-human
-  spawn records as play starts and waves are cleared. Default actor wave progression
-  now reads
-  `assets/red-label/wave-table.tsv` for active wave size, lander and bomber
-  speed, lander fire cadence, and source bomber/pod counts. The actor wave
+  checked text lines before installation in a custom driver, and the built-in
+  actor attract, behavior, and wave scripts are embedded from
+  `assets/red-label/actor-attract.script`,
+  `assets/red-label/actor-behavior.script`, and
+  `assets/red-label/actor-waves.script` through the same parser path.
+  `ActorWaveScript` now names per-wave progression data and applies behavior
+  scripts plus hostile and initial-human spawn records as play starts and waves
+  are cleared. Default actor wave progression expands the checked wave script
+  through `assets/red-label/wave-table.tsv` for active wave size, lander and
+  bomber speed, lander fire cadence, and source bomber/pod counts. The actor wave
   allocator follows the source active-family shape, so later waves now seed
   bomber and pod actors beside landers. Source-backed landers, bombers, pods,
   swarmers, and initial humans publish fixed-point metadata and advance
@@ -748,6 +751,30 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 11:52 BST`: Completed the embedded actor default-script slice.
+  Added `assets/red-label/actor-attract.script`,
+  `assets/red-label/actor-behavior.script`, and
+  `assets/red-label/actor-waves.script` as production embedded checked text
+  assets. `AttractScript::red_label_title`,
+  `ActorBehaviorScript::default`, and `ActorWaveScript::default_progression`
+  now parse those assets through the same checked parsers that custom drivers
+  use, while Rust constructor/source-table fallbacks remain available for
+  focused tests and generated source-backed wave profiles. Added
+  `source_wave` / `source_waves` parser directives so checked wave scripts can
+  expand source-backed wave-table profiles without copying generated restore
+  rows into text. Added focused regressions proving the embedded
+  attract/behavior/wave assets match the fallback manifests and that the
+  default driver exposes those parsed script manifests. Validation passed with
+  `cargo fmt --check`, focused embedded-script and wave-parser tests,
+  `cargo test actor_game --all-targets --features legacy-tools`, `cargo test
+  actor_live --all-targets --features legacy-tools`, `cargo test actor_smoke
+  --all-targets --features legacy-tools`, `cargo check --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features
+  legacy-tools -- -D warnings`, touched-doc markdownlint, and `git diff
+  --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780656289569319`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780656786767659`.
 - `2026-06-05 11:42 BST`: Completed the actor wave-script text parser slice.
   `ActorWaveScript::parse_text` and `str::parse::<ActorWaveScript>()` now
   accept checked text records for named wave scripts, per-wave behavior updates,
