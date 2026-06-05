@@ -74,7 +74,11 @@ making the actor report consumable by the native renderer path.
 `ActorRuntimeAdapter` bundles each actor step into an `ActorFrame` containing
 the original report, clean gameplay/audio `GameEvents`, and the clean
 `RenderScene`, without fabricating the full clean `GameState` before actor
-state parity exists.
+state parity exists. `--actor-smoke` exercises that actor frame path through a
+scripted attract/play input sequence and the native draw planner, proving actor
+events, audio, sprites, projectiles, HUD text, overlays, and `wgpu` command-plan
+coverage without switching interactive live play away from the current clean
+`Game` runtime.
 The current slice includes same-contract keyboard profiles, `XYZZY` overlay
 state, thread-backed actors, a data-driven `AttractScript` for custom attract
 drivers, `ActorBehaviorScript` profiles for level-wide and per-actor movement
@@ -155,6 +159,7 @@ cargo run -- --input-profile cabinet
 cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin
 cargo run -- --live-smoke
 cargo run -- --game-smoke
+cargo run -- --actor-smoke
 cargo run -- --mute
 cargo run --features legacy-tools -- --rom-report
 cargo run --features legacy-tools -- --rom-report /path/to/roms
@@ -686,7 +691,12 @@ gameplay frames and executes the native sprite draw plans through `wgpu`
 buffers, bind groups, and indexed draws. `--live-smoke` reuses that clean frame
 source, renders the smoke frames through an offscreen `wgpu` target, reads back
 pixel signatures, checks the selected first/last signatures, and reports
-live-smoke evidence with `legacy_presenter_used: false`.
+live-smoke evidence with `legacy_presenter_used: false`. `--actor-smoke` is the
+actor-runtime counterpart: it steps `ActorRuntimeAdapter`, verifies attract,
+credited attract, playing, clean gameplay/audio events, required actor sprite
+families, projectile/HUD/overlay layers, native sprite draw commands, native
+pipelines, and frame-level `wgpu` command plans without entering the legacy
+presenter or replacing the live `Game` runtime.
 The clean `Game` world seeds terrain, starfield, source-profile active enemy
 batches, human, and projectile snapshots for playing waves and renders them as
 atlas-backed scene sprites. Operator controls are

@@ -4065,3 +4065,30 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780629215257879`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780629633502359`.
+- `2026-06-05 04:34 BST`: Completed the actor smoke/runtime command cycle.
+  Added crate-private `src/actor_smoke.rs` and wired `--actor-smoke` through the
+  clean platform/runtime boundary. The command steps `ActorRuntimeAdapter`
+  through a scripted attract/play input sequence, prepares each actor
+  `RenderScene` through `NativeSceneRenderer`, and verifies actor-origin
+  gameplay/audio events, attract, credited attract, playing, required actor
+  sprite families, projectile/HUD/overlay layers, native draw-command pipeline
+  coverage, frame-level `wgpu` command plans, no temporary raster fallback, and
+  no missing atlas regions. Added CLI/runtime regressions and structural guards
+  so the actor smoke module remains private crate wiring rather than a public
+  API. No legacy code, tests, or scaffolding were safe to remove because live
+  play still uses the current clean `Game` runtime while actor frames remain an
+  isolated runtime evidence path. Validation passed with `cargo fmt --check`,
+  `cargo run -- --actor-smoke`, `cargo test actor_smoke --lib`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `cargo test --all-targets --features legacy-tools` was also run and failed in
+  existing clean-game MAME window/post-game audio tests; this slice did not
+  touch `src/game.rs`, and the actor-smoke/actor-game/runtime gates above passed.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780630016184139`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780630483183789`.

@@ -108,6 +108,7 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
         CliClassification::Runtime(config) => crate::runtime::run(&config),
         CliClassification::Help => crate::runtime::run_help(),
         CliClassification::Error(error) => Err(error.into()),
+        CliClassification::ActorSmoke => crate::runtime::run_actor_smoke(),
     }
 }
 
@@ -125,6 +126,7 @@ enum CliClassification {
     FidelityScenarioInputWriter(ScenarioInputWriterRequest),
     Runtime(RuntimeConfig),
     GameSmoke,
+    ActorSmoke,
     Help,
     Error(CleanCliError),
 }
@@ -221,6 +223,7 @@ impl RuntimeCliClassifier {
                     return CliClassification::FidelityScenarioInputWriter(request);
                 }
                 ArgClassification::GameSmoke => return CliClassification::GameSmoke,
+                ArgClassification::ActorSmoke => return CliClassification::ActorSmoke,
                 ArgClassification::Help => return CliClassification::Help,
                 ArgClassification::Error(error) => {
                     return CliClassification::Error(error);
@@ -255,6 +258,17 @@ impl RuntimeCliClassifier {
                     return ArgClassification::Error(CleanCliError::TooManyGameSmokeArgs);
                 }
                 ArgClassification::GameSmoke
+            }
+            "--actor-smoke" => {
+                if live_option_seen {
+                    return ArgClassification::Error(CleanCliError::LiveOptionsWithCommand(
+                        "--actor-smoke",
+                    ));
+                }
+                if args.next().is_some() {
+                    return ArgClassification::Error(CleanCliError::TooManyActorSmokeArgs);
+                }
+                ArgClassification::ActorSmoke
             }
             "--help" | "-h" => ArgClassification::Help,
             "--renderer" | "--presentation" => {
@@ -482,6 +496,7 @@ enum ArgClassification {
     FidelityScenarioList,
     FidelityScenarioInputWriter(ScenarioInputWriterRequest),
     GameSmoke,
+    ActorSmoke,
     Runtime,
     Help,
     Error(CleanCliError),
@@ -500,6 +515,7 @@ enum CleanCliError {
     MissingVerifyRomsPath,
     TooManyVerifyRomsArgs,
     TooManyGameSmokeArgs,
+    TooManyActorSmokeArgs,
     InvalidFidelityTraceFrameCount { value: String, error: String },
     NonPositiveFidelityTraceFrameCount,
     TooManyFidelityTraceArgs,
@@ -560,6 +576,12 @@ impl fmt::Display for CleanCliError {
                 write!(
                     formatter,
                     "--game-smoke does not accept additional arguments"
+                )
+            }
+            Self::TooManyActorSmokeArgs => {
+                write!(
+                    formatter,
+                    "--actor-smoke does not accept additional arguments"
                 )
             }
             Self::InvalidFidelityTraceFrameCount { value, error } => {
@@ -765,6 +787,14 @@ mod tests {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--game-smoke"])),
             CliClassification::GameSmoke
+        );
+    }
+
+    #[test]
+    fn clean_cli_owns_actor_smoke_command() {
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&["--actor-smoke"])),
+            CliClassification::ActorSmoke
         );
     }
 
@@ -997,6 +1027,25 @@ mod tests {
             (
                 vec!["--game-smoke", "--mute"],
                 CleanCliError::TooManyGameSmokeArgs,
+            ),
+        ] {
+            assert_eq!(
+                RuntimeCliClassifier::classify(args(&values)),
+                CliClassification::Error(error)
+            );
+        }
+    }
+
+    #[test]
+    fn clean_cli_rejects_malformed_actor_smoke_args() {
+        for (values, error) in [
+            (
+                vec!["--mute", "--actor-smoke"],
+                CleanCliError::LiveOptionsWithCommand("--actor-smoke"),
+            ),
+            (
+                vec!["--actor-smoke", "--mute"],
+                CleanCliError::TooManyActorSmokeArgs,
             ),
         ] {
             assert_eq!(
@@ -1286,6 +1335,10 @@ mod tests {
             "--game-smoke does not accept additional arguments"
         );
         assert_eq!(
+            CleanCliError::TooManyActorSmokeArgs.to_string(),
+            "--actor-smoke does not accept additional arguments"
+        );
+        assert_eq!(
             CleanCliError::InvalidFidelityTraceFrameCount {
                 value: String::from("wat"),
                 error: String::from("invalid digit found in string"),
@@ -1390,6 +1443,12 @@ mod tests {
     fn game_smoke_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&["--game-smoke"]))
             .expect("clean game-smoke CLI should run through configured runtime");
+    }
+
+    #[test]
+    fn actor_smoke_cli_entrypoint_accepts_supported_args() {
+        super::run_with_args(args(&["--actor-smoke"]))
+            .expect("actor smoke CLI should run through configured runtime");
     }
 
     #[test]

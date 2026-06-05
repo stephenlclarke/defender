@@ -42,6 +42,12 @@ verified.
   truthful runtime-facing adapter, not a premature `GameFrame` implementation,
   because the actor driver does not yet publish the full clean `GameState`
   snapshot.
+- `src/actor_smoke.rs` exercises `ActorRuntimeAdapter` through a scripted
+  attract/play sequence and the native draw planner. The smoke report verifies
+  attract, credited attract, playing actor frames, clean gameplay/audio events,
+  required actor sprite families, projectiles, HUD text, overlays, native
+  draw-command pipelines, and frame-level `wgpu` command plans while keeping
+  live play on the current clean `Game` runtime.
 
 ## C++ to Rust Mapping
 

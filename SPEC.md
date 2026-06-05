@@ -188,6 +188,12 @@ tree:
   `RenderScene` values into actor `ActorFrame` values without claiming full
   clean `GameFrame`/`GameState` parity. The actor game is not wired into the
   live runtime yet.
+- `src/actor_smoke.rs`: the crate-private actor smoke command that steps
+  `ActorRuntimeAdapter` through scripted attract/play inputs, verifies
+  actor-origin clean gameplay/audio events, required actor sprite coverage,
+  projectile/HUD/overlay layers, native draw-command pipeline coverage, and
+  frame-level `wgpu` command plans without replacing the live clean `Game`
+  runtime.
 - `src/game_smoke.rs`: the crate-private clean game smoke command that steps
   `Game` through scripted controls, verifies sprite plus native pipeline and
   draw-instance coverage, verifies sprite buffer upload-plan, render-pass plan,
@@ -682,6 +688,11 @@ reintroduce legacy implementation terminology.
   frame-plan ordered sprite-only begin-pass/viewport/projection and sprite
   command/draw/instance evidence, and GPU resource-plan smoke without the
   legacy live presenter.
+- `--actor-smoke` runs the actor runtime adapter through attract, credited
+  attract, and playing actor steps, verifies clean gameplay/audio events,
+  actor sprite families, projectile/HUD/overlay layers, native draw-command
+  pipeline coverage, and frame-level `wgpu` command plans without replacing
+  live play's current clean `Game` frame source.
 - Runtime renderer selection has been removed.
 - `--input-profile planetoid` is the default input profile.
 - `--input-profile cabinet` exposes a MAME-style cabinet keyboard profile.

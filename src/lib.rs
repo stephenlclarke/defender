@@ -8,6 +8,7 @@
 mod accepted;
 
 pub mod actor_game;
+mod actor_smoke;
 pub mod audio;
 #[cfg(all(test, feature = "legacy-tools"))]
 mod clean_fidelity;
@@ -396,6 +397,7 @@ mod public_api_tests {
         assert!(runtime_rs.contains("RuntimeCommand::RomReport { path }"));
         assert!(runtime_rs.contains("RuntimeCommand::VerifyRoms { path }"));
         assert!(runtime_rs.contains("RuntimeCommand::GameSmoke"));
+        assert!(runtime_rs.contains("RuntimeCommand::ActorSmoke"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityTrace { frame_count }"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityTraceInputs { script }"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityTraceInputsFile { path }"));
@@ -410,6 +412,7 @@ mod public_api_tests {
         assert!(runtime_rs.contains("pub(crate) fn run_rom_report"));
         assert!(runtime_rs.contains("pub(crate) fn run_verify_roms"));
         assert!(runtime_rs.contains("pub(crate) fn run_game_smoke"));
+        assert!(runtime_rs.contains("pub(crate) fn run_actor_smoke"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_trace"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_trace_inputs"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_trace_inputs_file"));
@@ -421,6 +424,7 @@ mod public_api_tests {
         assert!(runtime_rs.contains("run_rom_report_command(path)"));
         assert!(runtime_rs.contains("run_verify_roms_command(path)"));
         assert!(runtime_rs.contains("crate::game_smoke::run()"));
+        assert!(runtime_rs.contains("crate::actor_smoke::run()"));
         assert!(runtime_rs.contains("run_fidelity_trace_command(frame_count)"));
         assert!(runtime_rs.contains("run_fidelity_trace_inputs_command(script)"));
         assert!(runtime_rs.contains("run_fidelity_trace_inputs_file_command(path)"));
@@ -449,6 +453,7 @@ mod public_api_tests {
         let public_fidelity_trace_engine_module = format!("pub mod {};", "fidelity_trace_engine");
         let public_fidelity_traces_module = format!("pub mod {};", "fidelity_traces");
         let public_game_smoke_module = format!("pub mod {};", "game_smoke");
+        let public_actor_smoke_module = format!("pub mod {};", "actor_smoke");
         let public_live_wgpu_module = format!("pub mod {};", "live_wgpu");
         assert!(lib_rs.contains("#[cfg(feature = \"legacy-tools\")]\nmod rom_report;"));
         assert!(!lib_rs.contains(&public_rom_report_module));
@@ -464,6 +469,8 @@ mod public_api_tests {
         assert!(!lib_rs.contains(&public_fidelity_traces_module));
         assert!(lib_rs.contains("mod game_smoke;"));
         assert!(!lib_rs.contains(&public_game_smoke_module));
+        assert!(lib_rs.contains("mod actor_smoke;"));
+        assert!(!lib_rs.contains(&public_actor_smoke_module));
         assert!(lib_rs.contains("mod live_wgpu;"));
         assert!(!lib_rs.contains(&public_live_wgpu_module));
 
@@ -754,6 +761,7 @@ mod public_api_tests {
                 include_str!("fidelity_trace_engine.rs"),
             ),
             ("src/game.rs", include_str!("game.rs")),
+            ("src/actor_smoke.rs", include_str!("actor_smoke.rs")),
             ("src/game_smoke.rs", include_str!("game_smoke.rs")),
             (
                 "src/fidelity_scenarios.rs",
