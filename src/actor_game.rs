@@ -66,6 +66,20 @@ const SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS: u8 = 6;
 const SOURCE_SHELL_SCAN_CADENCE_STEPS: u8 = 8;
 const SOURCE_SHELL_LIMIT: usize = 20;
 const SOURCE_SHELL_LIFETIME_TICKS: u8 = 20;
+const SOURCE_SMART_BOMB_DETONATION_DELAY_STEPS: u8 = 3;
+const SOURCE_SMART_BOMB_FLASH_STEPS: u8 = 5;
+const SOURCE_SMART_BOMB_RESERVE_DELAY_STEPS: u16 = 240;
+const SOURCE_SBSND_SOUND_COMMAND: u8 = 0xEE;
+const SOURCE_CANNON_SOUND_COMMAND: u8 = 0xE8;
+const SOURCE_SMART_BOMB_SOUND_SEQUENCE: [(u8, u8); 7] = [
+    (4, SOURCE_SBSND_SOUND_COMMAND),
+    (8, SOURCE_SBSND_SOUND_COMMAND),
+    (12, SOURCE_SBSND_SOUND_COMMAND),
+    (16, SOURCE_SBSND_SOUND_COMMAND),
+    (20, SOURCE_SBSND_SOUND_COMMAND),
+    (24, SOURCE_SBSND_SOUND_COMMAND),
+    (28, SOURCE_CANNON_SOUND_COMMAND),
+];
 const SOURCE_PLAYER_SWITCH_SLEEP_STEPS: u8 = 0x60;
 const SOURCE_START_SOUND_DELAY_STEPS: u8 = 1;
 const SOURCE_START_PLAYFIELD_DELAY_STEPS: u8 = 138;
@@ -3915,6 +3929,7 @@ pub enum SoundCue {
     BaiterShot,
     AttractPulse,
     GameOver,
+    SourceCommand(u8),
 }
 
 impl SoundCue {
@@ -3949,6 +3964,7 @@ impl SoundCue {
             Self::BaiterShot => Some(0xFC),
             Self::AttractPulse => None,
             Self::GameOver => Some(0xEC),
+            Self::SourceCommand(command) => Some(command),
         }
     }
 
@@ -5446,6 +5462,7 @@ pub struct StepPrompt {
     pub credits: u8,
     pub lives: u8,
     pub smart_bombs: u8,
+    pub smart_bomb_pending: bool,
     pub player_stocks: [PlayerStockSnapshot; 2],
     pub game_over_hall_of_fame_stall_remaining: Option<u8>,
     pub player_switch: Option<PlayerSwitchReport>,
@@ -5586,6 +5603,7 @@ pub struct StepReport {
     pub credits: u8,
     pub lives: u8,
     pub smart_bombs: u8,
+    pub smart_bomb_flash_steps_remaining: u8,
     pub player_stocks: [PlayerStockSnapshot; 2],
     pub next_bonus: u32,
     pub game_over_hall_of_fame_stall_remaining: Option<u8>,
@@ -6144,6 +6162,9 @@ impl ActorRenderSceneBridge {
 
     pub fn render_scene_for_report(&self, report: &StepReport) -> RenderScene {
         let mut scene = RenderScene::empty(report.step, self.surface);
+        if report.phase == Phase::Playing && report.smart_bomb_flash_steps_remaining > 0 {
+            scene.clear_color = Color::WHITE;
+        }
         for draw in &report.draws {
             self.push_draw(&mut scene, report.phase, draw);
         }
@@ -8132,6 +8153,12 @@ impl PendingPlayerStart {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PendingActorSoundCommand {
+    steps_remaining: u8,
+    command: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SurvivorBonusStep {
     Waiting,
     Award(u32),
@@ -8242,11 +8269,15 @@ pub struct ActorGameDriver {
     enemy_reserve: EnemyReserveSnapshot,
     source_target_cursor: Option<usize>,
     source_reserve_activation_ready: bool,
+    source_reserve_activation_cooldown_steps: u16,
     source_background_left: u16,
     baiter_timer_steps: Option<u32>,
     baiter_pacing_steps_remaining: u8,
     source_rng: ActorSourceRng,
     source_shell_scan_steps_remaining: u8,
+    pending_smart_bomb_detonation_steps: Option<u8>,
+    smart_bomb_flash_steps_remaining: u8,
+    pending_sound_commands: Vec<PendingActorSoundCommand>,
     game_over_hall_of_fame_stall_remaining: Option<u8>,
     pending_survivor_bonus: Option<PendingSurvivorBonus>,
     pending_player_switch: Option<PendingPlayerSwitch>,
@@ -8296,11 +8327,15 @@ impl ActorGameDriver {
             enemy_reserve: EnemyReserveSnapshot::default(),
             source_target_cursor: None,
             source_reserve_activation_ready: false,
+            source_reserve_activation_cooldown_steps: 0,
             source_background_left: 0,
             baiter_timer_steps: None,
             baiter_pacing_steps_remaining: ACTOR_BAITER_TIMER_PACING_STEPS,
             source_rng: SOURCE_PLAYFIELD_START_RNG,
             source_shell_scan_steps_remaining: SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS,
+            pending_smart_bomb_detonation_steps: None,
+            smart_bomb_flash_steps_remaining: 0,
+            pending_sound_commands: Vec::new(),
             game_over_hall_of_fame_stall_remaining: None,
             pending_survivor_bonus: None,
             pending_player_switch: None,
@@ -8320,13 +8355,18 @@ impl ActorGameDriver {
         self.step = self.step.saturating_add(1);
         let mut step_commands = Vec::new();
         let mut delayed_sounds = self.advance_pending_start_sound();
+        delayed_sounds.extend(self.advance_pending_sound_commands());
+        self.advance_smart_bomb_flash();
+        let smart_bomb_replay_awarded =
+            self.advance_pending_smart_bomb_detonation(&mut step_commands);
         let mut survivor_bonus_awarded_points = None;
-        let mut survivor_bonus_replay_awarded = false;
+        let mut survivor_bonus_replay_awarded = smart_bomb_replay_awarded;
         if let PlayerStartStep::StartPlayfield = self.advance_pending_player_start() {
             step_commands.push(GameCommand::AdvanceWave { wave: self.wave });
             delayed_sounds.push(SoundCue::PlayerAppear);
         }
         self.advance_pending_player_switch();
+        self.advance_source_reserve_activation_cooldown();
         self.activate_enemy_reserve_if_ready(&mut step_commands);
         match self.advance_pending_survivor_bonus() {
             SurvivorBonusStep::StartNextWave => {
@@ -8397,6 +8437,7 @@ impl ActorGameDriver {
             credits: prompt_credits,
             lives: self.active_stock().lives,
             smart_bombs: self.active_stock().smart_bombs,
+            smart_bomb_pending: self.pending_smart_bomb_detonation_steps.is_some(),
             player_stocks: self.player_stocks(),
             game_over_hall_of_fame_stall_remaining: self.game_over_hall_of_fame_stall_remaining,
             player_switch: prompt_player_switch,
@@ -8473,6 +8514,7 @@ impl ActorGameDriver {
             credits: self.credits,
             lives: self.active_stock().lives,
             smart_bombs: self.active_stock().smart_bombs,
+            smart_bomb_flash_steps_remaining: self.smart_bomb_flash_steps_remaining,
             player_stocks: self.player_stocks(),
             next_bonus: self.next_bonus,
             game_over_hall_of_fame_stall_remaining: self.game_over_hall_of_fame_stall_remaining,
@@ -8961,9 +9003,7 @@ impl ActorGameDriver {
                     ));
                 }
                 GameCommand::SmartBomb { consume_stock } => {
-                    if self.detonate_smart_bomb(&mut applied.sounds, consume_stock) {
-                        applied.bonus_awarded = true;
-                    }
+                    self.start_smart_bomb(consume_stock);
                 }
                 GameCommand::Hyperspace => {
                     self.clear_enemy_projectiles_for_hyperspace();
@@ -9094,9 +9134,11 @@ impl ActorGameDriver {
         self.pending_player_switch = Some(PendingPlayerSwitch::new(from_player, to_player));
         self.pending_player_start = None;
         self.pending_start_sound_steps = None;
+        self.clear_pending_smart_bomb();
         self.enemy_reserve = EnemyReserveSnapshot::default();
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
+        self.source_reserve_activation_cooldown_steps = 0;
         self.source_background_left = 0;
         self.baiter_timer_steps = None;
         self.clear_turn_playfield_actors();
@@ -9128,8 +9170,10 @@ impl ActorGameDriver {
         self.pending_player_switch = None;
         self.pending_player_start = Some(PendingPlayerStart::new(player));
         self.pending_start_sound_steps = None;
+        self.clear_pending_smart_bomb();
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.source_background_left = 0;
+        self.source_reserve_activation_cooldown_steps = 0;
         self.reset_source_shell_scan();
         self.clear_turn_playfield_actors();
         self.apply_wave_profile();
@@ -9148,6 +9192,78 @@ impl ActorGameDriver {
             self.pending_start_sound_steps = None;
             vec![SoundCue::Start]
         }
+    }
+
+    fn advance_pending_sound_commands(&mut self) -> Vec<SoundCue> {
+        let mut sounds = Vec::new();
+        let mut pending = Vec::new();
+        for mut command in self.pending_sound_commands.drain(..) {
+            command.steps_remaining = command.steps_remaining.saturating_sub(1);
+            if command.steps_remaining == 0 {
+                sounds.push(SoundCue::SourceCommand(command.command));
+            } else {
+                pending.push(command);
+            }
+        }
+        self.pending_sound_commands = pending;
+        sounds
+    }
+
+    fn queue_smart_bomb_sound_sequence(&mut self) {
+        self.pending_sound_commands
+            .extend(SOURCE_SMART_BOMB_SOUND_SEQUENCE.iter().copied().map(
+                |(steps_remaining, command)| PendingActorSoundCommand {
+                    steps_remaining,
+                    command,
+                },
+            ));
+    }
+
+    fn advance_smart_bomb_flash(&mut self) {
+        self.smart_bomb_flash_steps_remaining =
+            self.smart_bomb_flash_steps_remaining.saturating_sub(1);
+    }
+
+    fn clear_pending_smart_bomb(&mut self) {
+        self.pending_smart_bomb_detonation_steps = None;
+        self.smart_bomb_flash_steps_remaining = 0;
+        self.pending_sound_commands.clear();
+    }
+
+    fn start_smart_bomb(&mut self, consume_stock: bool) -> bool {
+        if self.pending_smart_bomb_detonation_steps.is_some() {
+            return false;
+        }
+
+        if consume_stock {
+            let mut stock = self.active_stock();
+            if stock.smart_bombs == 0 {
+                return false;
+            }
+            stock.smart_bombs = stock.smart_bombs.saturating_sub(1);
+            self.set_active_stock(stock);
+        }
+
+        self.pending_smart_bomb_detonation_steps = Some(SOURCE_SMART_BOMB_DETONATION_DELAY_STEPS);
+        self.source_reserve_activation_cooldown_steps = SOURCE_SMART_BOMB_RESERVE_DELAY_STEPS;
+        self.queue_smart_bomb_sound_sequence();
+        true
+    }
+
+    fn advance_pending_smart_bomb_detonation(&mut self, commands: &mut Vec<GameCommand>) -> bool {
+        let Some(mut remaining) = self.pending_smart_bomb_detonation_steps else {
+            return false;
+        };
+
+        remaining = remaining.saturating_sub(1);
+        if remaining > 0 {
+            self.pending_smart_bomb_detonation_steps = Some(remaining);
+            return false;
+        }
+
+        self.pending_smart_bomb_detonation_steps = None;
+        self.smart_bomb_flash_steps_remaining = SOURCE_SMART_BOMB_FLASH_STEPS;
+        self.detonate_smart_bomb_targets(commands)
     }
 
     fn advance_pending_player_start(&mut self) -> PlayerStartStep {
@@ -9187,9 +9303,11 @@ impl ActorGameDriver {
         self.pending_player_switch = None;
         self.pending_player_start = None;
         self.pending_start_sound_steps = None;
+        self.clear_pending_smart_bomb();
         self.enemy_reserve = EnemyReserveSnapshot::default();
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
+        self.source_reserve_activation_cooldown_steps = 0;
         self.high_scores.record(active_score);
         self.phase = if self.high_scores.qualifies(active_score) {
             Phase::HighScoreEntry
@@ -9240,9 +9358,11 @@ impl ActorGameDriver {
         self.pending_player_switch = None;
         self.pending_player_start = None;
         self.pending_start_sound_steps = None;
+        self.clear_pending_smart_bomb();
         self.enemy_reserve = EnemyReserveSnapshot::default();
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
+        self.source_reserve_activation_cooldown_steps = 0;
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.source_background_left = 0;
         self.reset_source_shell_scan();
@@ -9257,8 +9377,10 @@ impl ActorGameDriver {
         self.pending_player_switch = None;
         self.pending_player_start = None;
         self.pending_start_sound_steps = None;
+        self.clear_pending_smart_bomb();
         self.clear_wave_playfield_actors();
         self.apply_wave_profile();
+        self.source_reserve_activation_cooldown_steps = 0;
         self.spawn_wave_hostiles();
         self.spawn_initial_humans();
     }
@@ -9319,6 +9441,12 @@ impl ActorGameDriver {
         self.source_shell_scan_steps_remaining = SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS;
     }
 
+    fn advance_source_reserve_activation_cooldown(&mut self) {
+        self.source_reserve_activation_cooldown_steps = self
+            .source_reserve_activation_cooldown_steps
+            .saturating_sub(1);
+    }
+
     fn advance_game_over_hall_of_fame_return(&mut self) {
         if self.phase != Phase::GameOver {
             return;
@@ -9354,6 +9482,7 @@ impl ActorGameDriver {
         self.enemy_reserve = wave_profile.enemy_reserve;
         self.source_target_cursor = Some(0);
         self.source_reserve_activation_ready = false;
+        self.source_reserve_activation_cooldown_steps = 0;
         if self.phase == Phase::Playing {
             self.reset_baiter_timer();
         }
@@ -9372,6 +9501,7 @@ impl ActorGameDriver {
             || self.pending_player_switch.is_some()
             || self.pending_player_start.is_some()
             || !self.source_reserve_activation_ready
+            || self.source_reserve_activation_cooldown_steps > 0
             || self.has_hostile_snapshots()
             || actor_enemy_reserve_is_empty(self.enemy_reserve)
         {
@@ -9675,16 +9805,7 @@ impl ActorGameDriver {
         }
     }
 
-    fn detonate_smart_bomb(&mut self, sounds: &mut Vec<SoundCue>, consume_stock: bool) -> bool {
-        if consume_stock {
-            let mut stock = self.active_stock();
-            if stock.smart_bombs == 0 {
-                return false;
-            }
-            stock.smart_bombs = stock.smart_bombs.saturating_sub(1);
-            self.set_active_stock(stock);
-        }
-
+    fn detonate_smart_bomb_targets(&mut self, commands: &mut Vec<GameCommand>) -> bool {
         let mut bonus_awarded = false;
         let targets = self
             .snapshots
@@ -9696,13 +9817,20 @@ impl ActorGameDriver {
             self.snapshots.remove(&id);
             self.actors.remove(&id);
             self.behavior_script.remove_actor_behavior(id);
+            commands.push(GameCommand::Destroy(id));
             if let Some(explosion_kind) = explosion_kind_for_target(kind) {
                 self.spawn_explosion(position, explosion_kind);
+                commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
+                    position,
+                    kind: explosion_kind,
+                    source_center: None,
+                }));
             }
-            if self.award_points(score_for_hostile(kind)) {
+            let points = score_for_hostile(kind);
+            commands.push(GameCommand::AddScore(points));
+            if self.award_points(points) {
                 bonus_awarded = true;
             }
-            sounds.push(SoundCue::Explosion);
         }
         bonus_awarded
     }
@@ -10538,16 +10666,17 @@ impl AssetActor for PlayerShip {
                     }));
                     commands.push(GameCommand::PlaySound(SoundCue::Laser));
                 }
-                if prompt.input.xyzzy.overlay_smart_bomb {
+                if prompt.input.xyzzy.overlay_smart_bomb && !prompt.smart_bomb_pending {
                     commands.push(GameCommand::SmartBomb {
                         consume_stock: false,
                     });
-                    commands.push(GameCommand::PlaySound(SoundCue::SmartBomb));
-                } else if prompt.input.wants_stock_smart_bomb() && prompt.smart_bombs > 0 {
+                } else if prompt.input.wants_stock_smart_bomb()
+                    && prompt.smart_bombs > 0
+                    && !prompt.smart_bomb_pending
+                {
                     commands.push(GameCommand::SmartBomb {
                         consume_stock: true,
                     });
-                    commands.push(GameCommand::PlaySound(SoundCue::SmartBomb));
                 }
                 if prompt.input.hyperspace {
                     commands.push(GameCommand::Hyperspace);
@@ -13663,6 +13792,7 @@ mod tests {
             (SoundCue::BaiterHit, 0xF8),
             (SoundCue::BaiterShot, 0xFC),
             (SoundCue::GameOver, 0xEC),
+            (SoundCue::SourceCommand(0xE8), 0xE8),
         ];
 
         for (cue, command) in expected {
@@ -13704,6 +13834,10 @@ mod tests {
             SoundCue::MutantShot.sound_event(),
             Some(SoundEvent::UnmappedSoundCommand { command: 0xF6 })
         );
+        assert_eq!(
+            SoundCue::SourceCommand(0xE8).sound_event(),
+            Some(SoundEvent::UnmappedSoundCommand { command: 0xE8 })
+        );
         assert_eq!(SoundCue::Hyperspace.sound_event(), None);
         assert_eq!(SoundCue::HumanReleased.sound_event(), None);
     }
@@ -13733,6 +13867,10 @@ mod tests {
         assert_eq!(
             ActorSoundEventBridge::new().sound_events_for_cues(&[SoundCue::MutantShot]),
             [SoundEvent::UnmappedSoundCommand { command: 0xF6 }]
+        );
+        assert_eq!(
+            ActorSoundEventBridge::new().sound_events_for_cues(&[SoundCue::SourceCommand(0xE8)]),
+            [SoundEvent::UnmappedSoundCommand { command: 0xE8 }]
         );
         assert_eq!(
             bridge.sound_events_for_cues(&[SoundCue::HumanReleased]),
@@ -13891,10 +14029,21 @@ mod tests {
         });
         step_until_player_start_completes(&mut runtime, 1);
 
-        let cleared = runtime.step(GameInput {
+        let pressed = runtime.step(GameInput {
             smart_bomb: true,
             ..GameInput::NONE
         });
+        assert_eq!(pressed.report.score, 0);
+        assert!(
+            pressed
+                .events
+                .gameplay()
+                .contains(&GameEvent::SmartBombPressed)
+        );
+        assert!(!pressed.events.gameplay().contains(&GameEvent::WaveCleared));
+        assert_eq!(pressed.state.world.enemies.len(), 1);
+
+        let cleared = step_until_smart_bomb_detonates(&mut runtime);
 
         assert_eq!(cleared.state.wave, 1);
         assert!(cleared.state.world.enemies.is_empty());
@@ -14181,6 +14330,7 @@ mod tests {
             credits: 0,
             lives: 3,
             smart_bombs: 3,
+            smart_bomb_flash_steps_remaining: 0,
             player_stocks: [PlayerStockSnapshot::new(3, 3); 2],
             next_bonus: SOURCE_REPLAY_SCORE,
             game_over_hall_of_fame_stall_remaining: None,
@@ -14389,6 +14539,7 @@ mod tests {
             credits: 0,
             lives: 3,
             smart_bombs: 3,
+            smart_bomb_flash_steps_remaining: 0,
             player_stocks: [PlayerStockSnapshot::new(3, 3); 2],
             next_bonus: SOURCE_REPLAY_SCORE,
             game_over_hall_of_fame_stall_remaining: None,
@@ -14504,6 +14655,7 @@ mod tests {
             credits: 1,
             lives: 2,
             smart_bombs: 1,
+            smart_bomb_flash_steps_remaining: 0,
             player_stocks: [
                 PlayerStockSnapshot::new(2, 1),
                 PlayerStockSnapshot::new(3, 3),
@@ -14672,6 +14824,7 @@ mod tests {
             credits: 0,
             lives: 3,
             smart_bombs: 3,
+            smart_bomb_flash_steps_remaining: 0,
             player_stocks: [PlayerStockSnapshot::new(3, 3); 2],
             next_bonus: SOURCE_REPLAY_SCORE,
             game_over_hall_of_fame_stall_remaining: None,
@@ -16856,30 +17009,68 @@ mod tests {
     fn smart_bomb_clears_hostiles_with_explosions_and_score() {
         let mut driver = started_driver();
 
-        let report = driver.step(GameInput {
+        let pressed = driver.step(GameInput {
             smart_bomb: true,
             ..GameInput::NONE
         });
 
-        assert_eq!(report.score, LANDER_SCORE * 5);
-        assert_eq!(report.smart_bombs, INITIAL_SMART_BOMBS - 1);
+        assert_eq!(pressed.score, 0);
+        assert_eq!(pressed.smart_bombs, INITIAL_SMART_BOMBS - 1);
         assert_eq!(
-            report.enemy_reserve,
+            pressed.enemy_reserve,
             EnemyReserveSnapshot {
                 landers: 10,
                 ..EnemyReserveSnapshot::default()
             }
         );
-        assert!(report.survivor_bonus.is_none());
-        assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
+        assert!(pressed.survivor_bonus.is_none());
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 5);
         assert_eq!(driver.snapshot_count(ActorKind::Human), 10);
-        assert!(report.sounds.contains(&SoundCue::SmartBomb));
-        assert!(report.sounds.contains(&SoundCue::Explosion));
-        assert!(report.commands.contains(&GameCommand::SmartBomb {
+        assert!(pressed.sounds.is_empty());
+        assert!(pressed.commands.contains(&GameCommand::SmartBomb {
             consume_stock: true,
         }));
 
-        let restored = driver.step(GameInput::NONE);
+        let held_during_delay = driver.step(GameInput {
+            smart_bomb: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(held_during_delay.score, 0);
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 5);
+        assert!(
+            !held_during_delay
+                .commands
+                .iter()
+                .any(|command| matches!(command, GameCommand::SmartBomb { .. }))
+        );
+
+        let detonated = step_until_driver_smart_bomb_detonates(&mut driver);
+        assert_eq!(detonated.score, LANDER_SCORE * 5);
+        assert_eq!(
+            detonated.smart_bomb_flash_steps_remaining,
+            SOURCE_SMART_BOMB_FLASH_STEPS
+        );
+        assert_eq!(detonated.render_scene().clear_color, Color::WHITE);
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
+        assert_eq!(driver.snapshot_count(ActorKind::Human), 10);
+        assert_eq!(
+            detonated
+                .commands
+                .iter()
+                .filter(|command| matches!(command, GameCommand::Destroy(_)))
+                .count(),
+            5
+        );
+
+        let blocked_restore = driver.step(GameInput::NONE);
+        let mut sounds = blocked_restore.sounds.clone();
+        assert_eq!(blocked_restore.enemy_reserve, detonated.enemy_reserve);
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
+
+        sounds.extend(collect_driver_smart_bomb_sound_sequence(&mut driver));
+        assert_eq!(sounds, source_smart_bomb_sound_cues());
+
+        let restored = step_until_driver_source_reserve_activates(&mut driver);
         assert_eq!(
             restored.enemy_reserve,
             EnemyReserveSnapshot {
@@ -16914,8 +17105,7 @@ mod tests {
         assert_eq!(report.score, 0);
         assert_eq!(report.smart_bombs, 0);
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 5);
-        assert!(!report.sounds.contains(&SoundCue::SmartBomb));
-        assert!(!report.sounds.contains(&SoundCue::Explosion));
+        assert!(report.sounds.is_empty());
         assert!(
             !report
                 .commands
@@ -16929,7 +17119,7 @@ mod tests {
         let mut driver = started_driver();
         driver.smart_bombs = 0;
 
-        let report = driver.step(GameInput {
+        let pressed = driver.step(GameInput {
             xyzzy: XyzzyMode {
                 active: true,
                 overlay_smart_bomb: true,
@@ -16938,23 +17128,36 @@ mod tests {
             ..GameInput::NONE
         });
 
-        assert_eq!(report.score, LANDER_SCORE * 5);
-        assert_eq!(report.smart_bombs, 0);
+        assert_eq!(pressed.score, 0);
+        assert_eq!(pressed.smart_bombs, 0);
         assert_eq!(
-            report.enemy_reserve,
+            pressed.enemy_reserve,
             EnemyReserveSnapshot {
                 landers: 10,
                 ..EnemyReserveSnapshot::default()
             }
         );
-        assert!(report.survivor_bonus.is_none());
-        assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
-        assert!(report.sounds.contains(&SoundCue::SmartBomb));
-        assert!(report.commands.contains(&GameCommand::SmartBomb {
+        assert!(pressed.survivor_bonus.is_none());
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 5);
+        assert!(pressed.sounds.is_empty());
+        assert!(pressed.commands.contains(&GameCommand::SmartBomb {
             consume_stock: false,
         }));
 
-        let restored = driver.step(GameInput::NONE);
+        let detonated = step_until_driver_smart_bomb_detonates(&mut driver);
+        assert_eq!(detonated.score, LANDER_SCORE * 5);
+        assert_eq!(detonated.smart_bombs, 0);
+        assert_eq!(
+            detonated.smart_bomb_flash_steps_remaining,
+            SOURCE_SMART_BOMB_FLASH_STEPS
+        );
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
+
+        let blocked_restore = driver.step(GameInput::NONE);
+        assert_eq!(blocked_restore.enemy_reserve, detonated.enemy_reserve);
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
+
+        let restored = step_until_driver_source_reserve_activates(&mut driver);
         assert_eq!(
             restored.enemy_reserve,
             EnemyReserveSnapshot {
@@ -18170,6 +18373,7 @@ mod tests {
             credits: 0,
             lives: 3,
             smart_bombs: 3,
+            smart_bomb_pending: false,
             player_stocks: [PlayerStockSnapshot::new(3, 3); 2],
             game_over_hall_of_fame_stall_remaining: None,
             player_switch: None,
@@ -20652,10 +20856,16 @@ mod tests {
             .expect("wave 1 should spawn a lander");
         assert_eq!(lander.position, Point::new(74, 209));
 
-        let cleared = driver.step(GameInput {
+        let pressed = driver.step(GameInput {
             smart_bomb: true,
             ..GameInput::NONE
         });
+        assert!(
+            !pressed
+                .commands
+                .contains(&GameCommand::WaveCleared { next_wave: 2 })
+        );
+        let cleared = step_until_driver_smart_bomb_detonates(&mut driver);
         assert_eq!(cleared.wave, 1);
         assert!(
             cleared
@@ -20777,10 +20987,16 @@ mod tests {
         });
         step_until_driver_player_start_completes(&mut driver, 1);
 
-        let cleared = driver.step(GameInput {
+        let pressed = driver.step(GameInput {
             smart_bomb: true,
             ..GameInput::NONE
         });
+        assert!(
+            !pressed
+                .commands
+                .contains(&GameCommand::WaveCleared { next_wave: 2 })
+        );
+        let cleared = step_until_driver_smart_bomb_detonates(&mut driver);
         assert_eq!(cleared.wave, 1);
         assert!(
             cleared
@@ -21841,11 +22057,14 @@ mod tests {
         driver.spawn_player();
         driver.spawn_pod_for_test(Point::new(120, 120));
 
-        let report = driver.step(GameInput {
+        let pressed = driver.step(GameInput {
             smart_bomb: true,
             ..GameInput::NONE
         });
 
+        assert_eq!(pressed.score, 0);
+        assert_eq!(driver.snapshot_count(ActorKind::Pod), 1);
+        let report = step_until_driver_smart_bomb_detonates(&mut driver);
         assert_eq!(report.score, POD_SCORE);
         assert_eq!(driver.snapshot_count(ActorKind::Pod), 0);
         assert!(!report.commands.iter().any(|command| {
@@ -21998,6 +22217,17 @@ mod tests {
         panic!("player {player} start should complete after source delay");
     }
 
+    fn step_until_driver_smart_bomb_detonates(driver: &mut ActorGameDriver) -> StepReport {
+        for _ in 0..=SOURCE_SMART_BOMB_DETONATION_DELAY_STEPS {
+            let report = driver.step(GameInput::NONE);
+            if report.smart_bomb_flash_steps_remaining == SOURCE_SMART_BOMB_FLASH_STEPS {
+                return report;
+            }
+        }
+
+        panic!("source smart bomb should detonate after the source delay");
+    }
+
     fn step_until_player_switch_completes(
         runtime: &mut ActorRuntimeAdapter,
         to_player: u8,
@@ -22081,6 +22311,51 @@ mod tests {
         }
 
         panic!("player {player} start should complete after source delay");
+    }
+
+    fn step_until_smart_bomb_detonates(runtime: &mut ActorRuntimeAdapter) -> ActorFrame {
+        for _ in 0..=SOURCE_SMART_BOMB_DETONATION_DELAY_STEPS {
+            let frame = runtime.step(GameInput::NONE);
+            if frame.report.smart_bomb_flash_steps_remaining == SOURCE_SMART_BOMB_FLASH_STEPS {
+                return frame;
+            }
+        }
+
+        panic!("source smart bomb should detonate after the source delay");
+    }
+
+    fn source_smart_bomb_sound_cues() -> Vec<SoundCue> {
+        SOURCE_SMART_BOMB_SOUND_SEQUENCE
+            .iter()
+            .map(|(_, command)| SoundCue::SourceCommand(*command))
+            .collect()
+    }
+
+    fn collect_driver_smart_bomb_sound_sequence(driver: &mut ActorGameDriver) -> Vec<SoundCue> {
+        let mut sounds = Vec::new();
+        let last_step = SOURCE_SMART_BOMB_SOUND_SEQUENCE
+            .last()
+            .expect("source smart bomb sound sequence should not be empty")
+            .0;
+        for _ in 0..last_step {
+            sounds.extend(driver.step(GameInput::NONE).sounds);
+        }
+        sounds
+    }
+
+    fn step_until_driver_source_reserve_activates(driver: &mut ActorGameDriver) -> StepReport {
+        for _ in 0..=SOURCE_SMART_BOMB_RESERVE_DELAY_STEPS {
+            let report = driver.step(GameInput::NONE);
+            if report
+                .commands
+                .iter()
+                .any(|command| matches!(command, GameCommand::Spawn(SpawnRequest::Lander { .. })))
+            {
+                return report;
+            }
+        }
+
+        panic!("source enemy reserve should reactivate after smart-bomb cooldown");
     }
 
     fn snapshot_for(report: &StepReport, id: ActorId) -> &ActorSnapshot {
@@ -22207,6 +22482,7 @@ mod tests {
             credits: 0,
             lives: 3,
             smart_bombs: INITIAL_SMART_BOMBS,
+            smart_bomb_pending: false,
             player_stocks: [PlayerStockSnapshot::new(3, INITIAL_SMART_BOMBS); 2],
             game_over_hall_of_fame_stall_remaining: None,
             player_switch: None,

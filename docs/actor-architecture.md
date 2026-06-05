@@ -608,10 +608,14 @@ The actor driver now owns a first Defender gameplay loop:
   mutant, bomber, pod, swarmer, and baiter clouds through source pixels with
   optional source-center metadata instead of static atlas sprites.
 - Smart bomb is now a real driver command: normal player requests consume the
-  driver-owned stock before clearing active hostile actors, awarding enemy
-  scores, and spawning explosions while preserving human actors. Exhausted stock
-  leaves hostiles alive. The `XYZZY` overlay smart bomb uses the same command
-  path without consuming stock.
+  driver-owned stock, then the driver waits the source three-step detonation
+  delay before clearing active hostile actors, awarding enemy scores, and
+  spawning explosions while preserving human actors. Accepted smart bombs queue
+  the source `SBSND` / cannon command-byte sequence, publish a five-step flash
+  countdown that the render bridge consumes as a white clear color, and hold
+  source reserve activation behind the source smart-bomb cooldown. Exhausted
+  stock leaves hostiles alive. The `XYZZY` overlay smart bomb uses the same
+  delayed command path without consuming stock.
 - Actor scoring uses the clean replay-bonus threshold model. Enemy, rescue, and
   safe-landing awards update driver-owned life/smart-bomb stock when a threshold
   is crossed, carry the new `next_bonus` into `GameState`, and emit

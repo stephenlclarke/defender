@@ -900,7 +900,10 @@ reintroduce legacy implementation terminology.
   source RNG velocity/player-velocity contribution, shell-cap suppression,
   shots/scores/hit cues,
   stock-backed smart-bomb hostile clearing with exhausted-stock guards and a
-  non-consuming `XYZZY` overlay path, hyperspace source-shell cleanup for enemy
+  non-consuming `XYZZY` overlay path, source three-step smart-bomb detonation
+  delay, five-step white flash report/render state, source `SBSND` / cannon
+  command-byte sequence, source reserve cooldown before post-bomb reserve
+  activation, hyperspace source-shell cleanup for enemy
   shots and bomb shells, separate launch/materialization cue emission,
   actor-owned hidden hyperspace
   interval plus behavior-scripted rematerialization point or source

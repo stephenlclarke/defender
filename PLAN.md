@@ -167,9 +167,12 @@ verification tools.
   succeeds, without blocking wave completion after source-counted enemies are
   gone. Smart bombs
   now use driver-owned stock: normal player requests consume stock before
-  clearing hostile actors, exhausted
-  stock leaves hostiles alive, and `XYZZY` overlay smart bombs use the same
-  command path without consuming stock. Player hazard collisions now decrement
+  the source three-step detonation delay clears hostile actors, exhausted stock
+  leaves hostiles alive, and `XYZZY` overlay smart bombs use the same delayed
+  command path without consuming stock. Accepted actor smart bombs queue the
+  source `SBSND` / cannon command-byte sequence, publish a five-step white
+  flash through report/render state, and hold source reserve activation behind
+  the source smart-bomb cooldown. Player hazard collisions now decrement
   driver-owned life stock and spawn a replacement player while lives remain,
   with final-life collisions entering the game-over/high-score path. Actor wave
   clear now publishes a separate interstitial `StepReport` with `WaveCleared`,
@@ -836,6 +839,37 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 20:20 BST`: Completed the actor source smart-bomb cadence
+  cycle. Accepted actor smart bombs now consume driver-owned stock on the
+  input report, wait the source three-step detonation delay before clearing
+  hostile actors, publish a five-step white flash through
+  `StepReport::smart_bomb_flash_steps_remaining` and the render bridge, and
+  queue the source `SBSND` / cannon command-byte sequence instead of a generic
+  explosion sound. Held smart-bomb input is suppressed while the pending source
+  detonation is armed. `XYZZY` overlay smart bombs now use the same delayed
+  command path without consuming stock, and source reserve activation is held
+  behind the source smart-bomb cooldown so reserves do not refill during the
+  detonation flash. README, SPEC, and actor architecture docs now document the
+  delayed source smart-bomb path, flash state, sound sequence, and reserve
+  cooldown. No legacy code, tests, or scaffolding were safe to remove in this
+  slice because the remaining clean smoke/fidelity/oracle evidence still
+  depends on those boundaries. Validation passed with `cargo fmt --check`,
+  `cargo check --all-targets --features legacy-tools`, `cargo test smart_bomb
+  --lib --features legacy-tools`, `cargo test actor_game --all-targets
+  --features legacy-tools`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo test actor_live --all-targets --features
+  legacy-tools`, `cargo test runtime --all-targets --features legacy-tools`,
+  `cargo test actor_wgpu --all-targets --features legacy-tools`, `cargo clippy
+  --all-targets --features legacy-tools -- -D warnings`, the actor smoke CLI
+  commands (`--actor-smoke`, `--actor-attract-smoke`,
+  `--actor-post-game-smoke`, and `--actor-wgpu-smoke`), `markdownlint
+  README.md SPEC.md PLAN.md docs/actor-architecture.md`, and `git diff
+  --check`. The full unfiltered `legacy-tools` suite was not rerun in this
+  cycle; the previously isolated clean-game MAME window/post-game audio
+  failures remain outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780686216653429`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780687204889539`.
 - `2026-06-05 19:59 BST`: Completed the actor source-background restore
   placement cycle. Actor `StepPrompt` and `StepReport` now carry a
   driver-owned source background word, and `PlayerShip` publishes the

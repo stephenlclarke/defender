@@ -235,7 +235,13 @@ vertical acceleration/damping, `SWBMB` fireball direction/shell-cap
 suppression, and shot cues, source-paced baiter timer entry, baiter
 source `SHOOT` fireball projection with source RNG velocity/player-velocity
 contribution, shell-cap suppression, shot/scoring/hit cues, and stock-backed
-smart-bomb hostile clearing.
+smart-bomb hostile clearing. Accepted actor smart bombs now consume stock on
+the input report, wait the source three-step detonation delay before clearing
+hostiles/scoring/spawning explosions, publish a five-step white flash through
+`StepReport::render_scene`, emit the source `SBSND` / cannon command-byte
+sequence on its own cadence, and hold source reserve activation behind the
+source smart-bomb cooldown. `XYZZY` overlay smart bombs use the same delayed
+command path without consuming stock.
 Actor score awards now use the same replay-bonus threshold model as the clean
 score system, so threshold crossings add life/smart-bomb stock and emit
 `BonusAwarded` through the actor event bridge. Score and replay-bonus stock
