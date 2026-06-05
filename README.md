@@ -190,10 +190,13 @@ motion. Source-backed hostile actors now wrap Y motion through the source
 active-object playfield bounds instead of drifting outside the red-label
 vertical range.
 Source-backed bombers now update seeded picture-frame and Y-velocity
-metadata, including cruise-altitude and player-relative Y adjustments, during
-active source motion from the driver-provided source RNG snapshot carried in
-`StepPrompt`/`StepReport`, and source-backed baiters gate their picture-wrap
-retargeting through that same source RNG snapshot before applying
+metadata, including cruise-altitude and player-relative Y adjustments, only
+when the driver-provided source RNG selects their TIE slot, while every
+source-backed bomber still advances actor-owned fixed-point position each
+playing step. Source-backed bomber bomb requests use the same source RNG
+snapshot for the `LSEED & 0x07` drop gate, pre-move shell position/fractions,
+and `(SEED & 0x1F) + 1` source lifetime ticks. Source-backed baiters gate their
+picture-wrap retargeting through that same source RNG snapshot before applying
 `baiter_seek_probability` and adding player velocity to the source-shaped seek
 velocity. Hostile projectile actors also publish source-shaped shell metadata:
 enemy lasers own and advance fixed-point source velocity, fraction, and
@@ -202,8 +205,9 @@ commands can carry source fractions, velocities, and lifetime ticks from
 scripted drivers and source-backed lander, swarmer, and baiter AI shots.
 Source-backed bomber bomb actors carry stationary source bomb-shell fraction
 and source-cadenced lifetime state into the clean `EnemyProjectileSnapshot`
-contract, with nonzero scripted source lifetime ticks preserved at spawn. The
-driver enforces the shared 20-slot source shell cap across
+contract, with source bomber spawns preserving the source RNG lifetime and
+nonzero scripted source lifetime ticks preserved at spawn. The driver enforces
+the shared 20-slot source shell cap across
 enemy-shot and bomb spawn commands plus the red-label 10-slot bomber bomb shell
 cap. Source-backed bomb-shell spawn commands also honor the source `GETSHL`
 X/Y placement bounds at X `0x98` and Y `0x2A`, while non-source scripted bombs

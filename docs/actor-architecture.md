@@ -563,17 +563,20 @@ The actor driver now owns a first Defender gameplay loop:
   movement/facing metadata, and remain script-tunable through their behavior
   profiles. Source-backed hostile actors wrap Y motion through the source
   active-object playfield bounds. Source-backed bombers derive picture-frame
-  and Y-velocity updates from the driver-provided source RNG snapshot, including
-  cruise-altitude and player-relative Y adjustments.
-- Bomber actors can lay first-class `Bomb` actors on a scriptable cadence with
-  the source ten-bomb active cap and source `GETSHL` placement bounds. Bombs
-  draw their own sprite, expire through actor-owned lifetime state, act as
-  player hazards, and emit a bomb collision cue when they hit the player.
-  Source-backed bomber bombs snapshot the bomber source fractions as stationary
-  bomb-shell fraction metadata and decrement actor-owned lifetime metadata on
-  the source shell-scan cadence. Custom source bomb spawns can provide nonzero
-  source lifetime ticks directly; otherwise the behavior profile supplies the
-  fallback lifetime.
+  and Y-velocity updates from the driver-provided source RNG snapshot only when
+  `(SEED & 0x06) >> 1` selects their source slot; all source-backed bomber
+  actors still advance fixed-point position from their current velocity.
+- Bomber actors can lay first-class `Bomb` actors on a scriptable cadence when
+  they are not source-backed. Source-backed bombers instead use the source TIE
+  slot selection, `LSEED & 0x07` drop gate, source ten-bomb active cap, shared
+  20-shell cap, and source `GETSHL` placement bounds. Bombs draw their own
+  sprite, expire through actor-owned lifetime state, act as player hazards, and
+  emit a bomb collision cue when they hit the player. Source-backed bomber
+  bombs snapshot the bomber's pre-move source fractions as stationary
+  bomb-shell fraction metadata, start with `(SEED & 0x1F) + 1` source lifetime
+  ticks, and decrement actor-owned lifetime metadata on the source shell-scan
+  cadence. Custom source bomb spawns can provide nonzero source lifetime ticks
+  directly; otherwise the behavior profile supplies the fallback lifetime.
 - Projectile-killed pods spawn a bounded mini-swarmer actor batch using the
   source request count. Those actor spawns now consume the driver source RNG for
   initial X/Y velocity, acceleration, sleep, and shot-timer metadata instead of

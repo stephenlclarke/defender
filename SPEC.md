@@ -363,8 +363,14 @@ timers, picture frame, and X/Y velocity, then advance through a bounded source
 `LANDS0` orbit/shot loop with picture cycling and source-shaped fireball
 projection; initial active pods retain deterministic source fixed-point
 fractions and bounded signed X velocity before entering source fixed-point X/Y
-motion. Active source enemy Y motion now uses the source `VELO` `YMIN`/`YMAX`
-wrap for landers, pods, bombers, mutants, swarmers, and baiters. Remaining
+motion. Actor source bombers update TIE picture-frame, Y velocity, sleep, and
+bomb-drop state only for the source RNG-selected slot, then all source bombers
+advance fixed-point position from their current velocity. Source-backed bomber
+bomb drops use the source `LSEED & 0x07` gate, pre-move source fractions, the
+shared source shell cap, the ten-bomb shell cap, `GETSHL` bounds, and source
+`(SEED & 0x1F) + 1` shell lifetime ticks. Active source enemy Y motion now uses
+the source `VELO` `YMIN`/`YMAX` wrap for landers, pods, bombers, mutants,
+swarmers, and baiters. Remaining
 source-profile enemies stay in `EnemyReserveSnapshot`, flow
 into inactive object-evidence counts plus bounded inactive source-detail rows,
 and activate as the next clean batch before `WaveCleared`. The inactive rows

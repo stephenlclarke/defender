@@ -161,7 +161,12 @@ verification tools.
   perform the source entry seek and fixed-point vertical acceleration/damping
   loop before using the source `SWBMB` fireball projection with pass-player and
   shell-cap suppression, source shell lifetime metadata, and distinct shot
-  cues, and source-paced baiter timer entry now spawns
+  cues. Source-backed bomber actors now follow the source TIE selected-slot
+  picture/velocity/sleep branch, advance fixed-point position separately, and
+  emit bomb-shell commands only through the source `LSEED & 0x07` gate,
+  pre-move shell position/fractions, `GETSHL` bounds, shared shell cap,
+  ten-bomb shell cap, and `(SEED & 0x1F) + 1` lifetime ticks. Source-paced
+  baiter timer entry now spawns
   source-backed baiter actors that can pursue the player and fire source
   `SHOOT` fireballs with source RNG velocity/player-velocity contribution,
   source shell-cap suppression, and `USHSND` evidence only when allocation
@@ -846,6 +851,36 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 21:08 BST`: Completed the actor source bomber bomb-shell
+  fidelity cycle. Source-backed bomber actors now split the source TIE
+  selected-slot picture/velocity/sleep branch from fixed-point movement, so
+  only the RNG-selected source slot updates TIE metadata while all
+  source-backed bombers still advance position from current velocity. Bomber
+  bomb-shell commands now use the source `LSEED & 0x07` drop gate, pre-move
+  shell position/fractions, shared source shell cap, ten-bomb shell cap,
+  `GETSHL` bounds, and `(SEED & 0x1F) + 1` lifetime ticks; non-source bomber
+  actors remain script-cadence driven. README, SPEC, and actor architecture
+  docs now document the source TIE slot and bomb-shell contract. No legacy
+  code, tests, or scaffolding were safe to remove in this slice because the
+  remaining clean smoke/fidelity/oracle evidence still depends on those
+  boundaries. Validation passed with `cargo fmt --check`, focused
+  `source_bomber_bomb`, `source_bomber`, `source_bomb`, and `source_shell`
+  filters, `cargo check --all-targets --features legacy-tools`, `cargo test
+  actor_game --all-targets --features legacy-tools`, `cargo test actor_smoke
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test runtime --all-targets --features
+  legacy-tools`, `cargo test actor_wgpu --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, actor smoke CLI commands (`--actor-smoke`,
+  `--actor-attract-smoke`, `--actor-post-game-smoke`, and
+  `--actor-wgpu-smoke`), `markdownlint README.md SPEC.md PLAN.md
+  docs/actor-architecture.md`, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite was not rerun in this cycle; the previously isolated
+  clean-game MAME window/post-game audio failures remain outside this slice.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780689105561129`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780690109210469`.
 - `2026-06-05 20:49 BST`: Completed the actor astronaut source-audio cadence
   cycle. Actor `HumanReleased` now maps through `ActorSoundEventBridge` to the
   source `ASCSND` command byte `0xE5`, and actor `HumanRescued` queues the

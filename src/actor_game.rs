@@ -12237,6 +12237,22 @@ fn actor_source_shell_count(prompt: &StepPrompt) -> usize {
         .count()
 }
 
+fn actor_source_bomb_shell_count(prompt: &StepPrompt) -> usize {
+    prompt
+        .snapshots
+        .iter()
+        .filter(|snapshot| snapshot.kind == ActorKind::Bomb)
+        .count()
+}
+
+fn actor_source_bomber_bomb_lifetime_ticks(source_rng: ActorSourceRngSnapshot) -> u8 {
+    (source_rng.seed & 0x1F).wrapping_add(1)
+}
+
+fn actor_source_tie_selected_slot(seed: u8) -> u8 {
+    (seed & 0x06) >> 1
+}
+
 fn actor_source_target6_mutant_fire2524_forced_shot(
     position: Point,
     source: ActorSourceMutantMetadata,
@@ -12450,34 +12466,10 @@ impl Bomber {
         Rect::from_center(self.position, 8, 8)
     }
 
-    fn advance_source_motion(&mut self, prompt: &StepPrompt) -> bool {
+    fn advance_source_motion(&mut self) -> bool {
         let Some(source) = &mut self.source else {
             return false;
         };
-        if source.sleep_ticks > 0 {
-            source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
-            return true;
-        }
-
-        let seed = prompt
-            .source_rng
-            .map(|source_rng| source_rng.seed)
-            .unwrap_or_else(|| actor_source_motion_seed(prompt.step, self.id));
-        source.picture_frame = actor_source_bomber_picture_frame(seed, source.picture_frame);
-        source.y_velocity = actor_source_bomber_random_y_velocity(source.y_velocity, seed);
-        if self.position.y == 0 {
-            source.y_velocity = actor_source_bomber_cruise_y_velocity(
-                source.y_velocity,
-                &mut source.cruise_altitude,
-                self.position.y,
-                seed,
-            );
-        } else if let Some(player) = prompt.player_position()
-            && let Some(delta) =
-                actor_source_bomber_onscreen_y_velocity_delta(self.position.y, player.y)
-        {
-            source.y_velocity = source.y_velocity.wrapping_add(delta);
-        }
 
         let (x, x_fraction) =
             actor_source_axis_step(self.position.x, source.x_fraction, source.x_velocity);
@@ -12489,9 +12481,41 @@ impl Bomber {
         self.position = Point::new(x, y);
         source.x_fraction = x_fraction;
         source.y_fraction = y_fraction;
-        source.sleep_ticks = SOURCE_BOMBER_LOOP_SLEEP_TICKS;
         self.drift = actor_source_drift_from_velocity(source.x_velocity);
         true
+    }
+
+    fn advance_source_tie_step(&mut self, prompt: &StepPrompt, source_rng: ActorSourceRngSnapshot) {
+        let Some(source) = &mut self.source else {
+            return;
+        };
+        if source.source_slot != actor_source_tie_selected_slot(source_rng.seed) {
+            return;
+        }
+        if source.sleep_ticks > 0 {
+            source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
+            return;
+        }
+
+        source.picture_frame =
+            actor_source_bomber_picture_frame(source_rng.seed, source.picture_frame);
+        source.y_velocity =
+            actor_source_bomber_random_y_velocity(source.y_velocity, source_rng.seed);
+        if self.position.y == 0 {
+            source.y_velocity = actor_source_bomber_cruise_y_velocity(
+                source.y_velocity,
+                &mut source.cruise_altitude,
+                self.position.y,
+                source_rng.seed,
+            );
+        } else if let Some(player) = prompt.player_position()
+            && let Some(delta) =
+                actor_source_bomber_onscreen_y_velocity_delta(self.position.y, player.y)
+        {
+            source.y_velocity = source.y_velocity.wrapping_add(delta);
+        }
+
+        source.sleep_ticks = SOURCE_BOMBER_LOOP_SLEEP_TICKS;
     }
 
     fn draw_effect(&self) -> VisualEffect {
@@ -12508,6 +12532,34 @@ impl Bomber {
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) {
+        if let Some(source) = self.source {
+            let Some(source_rng) = prompt.source_rng else {
+                return;
+            };
+            if source.source_slot != actor_source_tie_selected_slot(source_rng.seed)
+                || source.sleep_ticks > 0
+                || self.position.y == 0
+                || source_rng.lseed & 0x07 != 0
+                || actor_source_bomb_shell_count(prompt) >= SOURCE_ACTIVE_BOMBER_BOMB_LIMIT
+                || actor_source_shell_count(prompt) >= SOURCE_SHELL_LIMIT
+                || !source_shell_spawn_in_bounds(self.position)
+            {
+                return;
+            }
+
+            commands.push(GameCommand::Spawn(SpawnRequest::Bomb {
+                position: self.position,
+                source: Some(ActorSourceEnemyProjectileMetadata {
+                    x_fraction: source.x_fraction,
+                    y_fraction: source.y_fraction,
+                    x_velocity: 0,
+                    y_velocity: 0,
+                    lifetime_ticks: actor_source_bomber_bomb_lifetime_ticks(source_rng),
+                }),
+            }));
+            return;
+        }
+
         let active_bombs = prompt
             .snapshots
             .iter()
@@ -12516,27 +12568,13 @@ impl Bomber {
         if active_bombs >= SOURCE_ACTIVE_BOMBER_BOMB_LIMIT {
             return;
         }
-        if self.source.is_some() && !source_shell_spawn_in_bounds(self.position) {
-            return;
-        }
 
         let bomb_period = behavior.bomber_bomb_period_steps.max(1);
-        let phase = self
-            .source
-            .map(|source| u64::from(source.source_slot))
-            .unwrap_or_else(|| self.id.value());
+        let phase = self.id.value();
         if prompt.step % bomb_period == phase % bomb_period {
             commands.push(GameCommand::Spawn(SpawnRequest::Bomb {
                 position: self.position,
-                source: self
-                    .source
-                    .map(|source| ActorSourceEnemyProjectileMetadata {
-                        x_fraction: source.x_fraction,
-                        y_fraction: source.y_fraction,
-                        x_velocity: 0,
-                        y_velocity: 0,
-                        lifetime_ticks: 0,
-                    }),
+                source: None,
             }));
         }
     }
@@ -12613,18 +12651,22 @@ impl AssetActor for Bomber {
         let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Bomber);
-            if !self.advance_source_motion(prompt)
-                && let Some(position) = move_by_hostile_mode(
-                    self.position,
-                    behavior.bomber_mode,
-                    prompt,
-                    behavior.bomber_drift_speed,
-                    self.drift,
-                )
-            {
+            if self.source.is_some() {
+                self.maybe_spawn_bomb(prompt, behavior, &mut commands);
+                if let Some(source_rng) = prompt.source_rng {
+                    self.advance_source_tie_step(prompt, source_rng);
+                }
+                self.advance_source_motion();
+            } else if let Some(position) = move_by_hostile_mode(
+                self.position,
+                behavior.bomber_mode,
+                prompt,
+                behavior.bomber_drift_speed,
+                self.drift,
+            ) {
                 self.position = position;
+                self.maybe_spawn_bomb(prompt, behavior, &mut commands);
             }
-            self.maybe_spawn_bomb(prompt, behavior, &mut commands);
             draws.push(DrawCommand::sprite_with_effect(
                 self.id,
                 SpriteKey::Bomber,
@@ -19407,6 +19449,11 @@ mod tests {
     fn source_bomber_bomb_spawn_carries_source_shell_fractions() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
+        driver.source_rng = ActorSourceRng {
+            seed: 0,
+            hseed: 0,
+            lseed: 0,
+        };
         driver.set_kind_behavior(
             ActorKind::Bomber,
             ActorBehaviorProfile {
@@ -19446,6 +19493,13 @@ mod tests {
             report.source_rng,
             None,
         );
+        let expected_lifetime_ticks = report
+            .source_rng
+            .map(actor_source_bomber_bomb_lifetime_ticks)
+            .expect("playing report should carry source rng");
+        let bomber_snapshot = snapshot_for(&report, bomber);
+        assert_eq!(bomber_snapshot.position, expected_position);
+        assert_eq!(bomber_snapshot.source_bomber, Some(expected_source));
 
         assert!(report.commands.iter().any(|command| {
             matches!(
@@ -19457,11 +19511,12 @@ mod tests {
                         y_fraction,
                         x_velocity: 0,
                         y_velocity: 0,
-                        lifetime_ticks: 0,
+                        lifetime_ticks,
                     }),
-                }) if *position == expected_position
-                    && *x_fraction == expected_source.x_fraction
-                    && *y_fraction == expected_source.y_fraction
+                }) if *position == Point::new(100, 80)
+                    && *x_fraction == initial_source.x_fraction
+                    && *y_fraction == initial_source.y_fraction
+                    && *lifetime_ticks == expected_lifetime_ticks
             )
         }));
 
@@ -19471,8 +19526,8 @@ mod tests {
             .iter()
             .find(|snapshot| {
                 snapshot.source_enemy_projectile.is_some_and(|source| {
-                    source.x_fraction == expected_source.x_fraction
-                        && source.y_fraction == expected_source.y_fraction
+                    source.x_fraction == initial_source.x_fraction
+                        && source.y_fraction == initial_source.y_fraction
                 })
             })
             .expect("source-backed bomber bomb should publish source shell fractions");
@@ -19480,11 +19535,55 @@ mod tests {
         assert_eq!(
             bomb.source_enemy_projectile,
             Some(ActorSourceEnemyProjectileMetadata {
-                x_fraction: expected_source.x_fraction,
-                y_fraction: expected_source.y_fraction,
+                x_fraction: initial_source.x_fraction,
+                y_fraction: initial_source.y_fraction,
                 x_velocity: 0,
                 y_velocity: 0,
-                lifetime_ticks: 5,
+                lifetime_ticks: expected_lifetime_ticks,
+            })
+        );
+    }
+
+    #[test]
+    fn source_bomber_bomb_spawn_uses_source_rng_gate() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.source_rng = ActorSourceRng {
+            seed: 0,
+            hseed: 0,
+            lseed: 14,
+        };
+        driver.set_kind_behavior(
+            ActorKind::Bomber,
+            ActorBehaviorProfile {
+                bomber_drift_speed: 0,
+                bomber_bomb_period_steps: 1,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        driver.spawn_bomber_from_spawn(ActorBomberSpawn {
+            position: Point::new(100, 80),
+            source: Some(ActorSourceBomberMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                picture_frame: 0,
+                cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
+                sleep_ticks: 0,
+                source_slot: 0,
+            }),
+        });
+
+        let report = driver.step(GameInput::NONE);
+        let source_rng = report
+            .source_rng
+            .expect("playing report should carry source rng");
+
+        assert_ne!(source_rng.lseed & 0x07, 0);
+        assert!(
+            !report.commands.iter().any(|command| {
+                matches!(command, GameCommand::Spawn(SpawnRequest::Bomb { .. }))
             })
         );
     }
@@ -19493,6 +19592,11 @@ mod tests {
     fn source_bomber_bomb_spawn_respects_getshl_bounds() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
+        driver.source_rng = ActorSourceRng {
+            seed: 0,
+            hseed: 0,
+            lseed: 0,
+        };
         driver.set_kind_behavior(
             ActorKind::Bomber,
             ActorBehaviorProfile {
@@ -19524,7 +19628,7 @@ mod tests {
                 picture_frame: 0,
                 cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
                 sleep_ticks: 0,
-                source_slot: 1,
+                source_slot: 0,
             }),
         });
 
@@ -19558,6 +19662,11 @@ mod tests {
             .find(|snapshot| snapshot.kind == ActorKind::Player)
             .map(|snapshot| snapshot.position)
             .expect("player should publish a prompt snapshot");
+        driver.source_rng = ActorSourceRng {
+            seed: 0,
+            hseed: 0,
+            lseed: 10,
+        };
         let initial_source = ActorSourceBomberMetadata {
             x_fraction: 0x10,
             y_fraction: 0x20,
@@ -19610,7 +19719,7 @@ mod tests {
         driver.source_rng = ActorSourceRng {
             seed: 0,
             hseed: 0,
-            lseed: 0,
+            lseed: 13,
         };
         driver.set_kind_behavior(
             ActorKind::Bomber,
@@ -22842,32 +22951,36 @@ mod tests {
     fn expected_source_bomber_after_motion(
         position: Point,
         mut source: ActorSourceBomberMetadata,
-        step: u64,
-        id: ActorId,
+        _step: u64,
+        _id: ActorId,
         source_rng: Option<ActorSourceRngSnapshot>,
         player_position: Option<Point>,
     ) -> (Point, ActorSourceBomberMetadata) {
-        if source.sleep_ticks > 0 {
-            source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
-            return (position, source);
-        }
-
-        let seed = source_rng
-            .map(|source_rng| source_rng.seed)
-            .unwrap_or_else(|| actor_source_motion_seed(step, id));
-        source.picture_frame = actor_source_bomber_picture_frame(seed, source.picture_frame);
-        source.y_velocity = actor_source_bomber_random_y_velocity(source.y_velocity, seed);
-        if position.y == 0 {
-            source.y_velocity = actor_source_bomber_cruise_y_velocity(
-                source.y_velocity,
-                &mut source.cruise_altitude,
-                position.y,
-                seed,
-            );
-        } else if let Some(player) = player_position
-            && let Some(delta) = actor_source_bomber_onscreen_y_velocity_delta(position.y, player.y)
+        if let Some(source_rng) = source_rng
+            && source.source_slot == actor_source_tie_selected_slot(source_rng.seed)
         {
-            source.y_velocity = source.y_velocity.wrapping_add(delta);
+            if source.sleep_ticks > 0 {
+                source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
+            } else {
+                source.picture_frame =
+                    actor_source_bomber_picture_frame(source_rng.seed, source.picture_frame);
+                source.y_velocity =
+                    actor_source_bomber_random_y_velocity(source.y_velocity, source_rng.seed);
+                if position.y == 0 {
+                    source.y_velocity = actor_source_bomber_cruise_y_velocity(
+                        source.y_velocity,
+                        &mut source.cruise_altitude,
+                        position.y,
+                        source_rng.seed,
+                    );
+                } else if let Some(player) = player_position
+                    && let Some(delta) =
+                        actor_source_bomber_onscreen_y_velocity_delta(position.y, player.y)
+                {
+                    source.y_velocity = source.y_velocity.wrapping_add(delta);
+                }
+                source.sleep_ticks = SOURCE_BOMBER_LOOP_SLEEP_TICKS;
+            }
         }
 
         let (x, x_fraction) =
@@ -22876,7 +22989,6 @@ mod tests {
             actor_source_active_object_y_step(position.y, source.y_fraction, source.y_velocity);
         source.x_fraction = x_fraction;
         source.y_fraction = y_fraction;
-        source.sleep_ticks = SOURCE_BOMBER_LOOP_SLEEP_TICKS;
         (Point::new(x, y), source)
     }
 
