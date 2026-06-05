@@ -23,7 +23,8 @@ use crate::{
     },
     renderer::{
         Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
-        push_source_text_bytes_sprites, source_attract_defender_appearance_pixels,
+        push_source_controlled_message_sprites, push_source_text_bytes_sprites,
+        source_attract_defender_appearance_pixels,
         source_attract_williams_logo_operation_pixel_counts,
         source_attract_williams_logo_pixel_path, source_message_text,
     },
@@ -3346,6 +3347,9 @@ pub enum SpriteKey {
 pub enum VisualEffect {
     #[default]
     Static,
+    SourceMessage {
+        top_left_screen_address: u16,
+    },
     WilliamsReveal {
         stroke_step: u16,
         color_phase: u8,
@@ -3639,6 +3643,18 @@ fn parse_attract_script_event(
                 value,
             ))
         }
+        "message" | "source_message" => {
+            let label = parse_attract_source_message_label(line_number, parts.next())?;
+            let top_left_screen_address =
+                parse_attract_u16(line_number, parts.next(), "top-left screen address")?;
+            reject_extra_attract_fields(line_number, parts)?;
+            Ok(AttractScriptEvent::source_message(
+                start_after_steps,
+                duration_steps,
+                label,
+                top_left_screen_address,
+            ))
+        }
         "sprite" => {
             let sprite_token = parts.next().ok_or_else(|| {
                 AttractScriptParseError::new(line_number, "sprite action needs a sprite key")
@@ -3775,6 +3791,43 @@ fn parse_attract_usize(
     })
 }
 
+fn parse_attract_u16(
+    line_number: usize,
+    token: Option<&str>,
+    field: &str,
+) -> Result<u16, AttractScriptParseError> {
+    let token = token
+        .ok_or_else(|| AttractScriptParseError::new(line_number, format!("missing {field}")))?;
+    let parsed = token
+        .strip_prefix("0x")
+        .or_else(|| token.strip_prefix("0X"))
+        .map_or_else(|| token.parse::<u16>(), |hex| u16::from_str_radix(hex, 16))
+        .map_err(|error| {
+            AttractScriptParseError::new(
+                line_number,
+                format!("{field} `{token}` is invalid: {error}"),
+            )
+        })?;
+    Ok(parsed)
+}
+
+fn parse_attract_source_message_label(
+    line_number: usize,
+    token: Option<&str>,
+) -> Result<String, AttractScriptParseError> {
+    let token = token.ok_or_else(|| {
+        AttractScriptParseError::new(line_number, "message action needs a source label")
+    })?;
+    let label = token.to_ascii_uppercase();
+    if source_message_text(&label).is_none() {
+        return Err(AttractScriptParseError::new(
+            line_number,
+            format!("unknown source message label `{token}`"),
+        ));
+    }
+    Ok(label)
+}
+
 fn parse_attract_sprite_key(
     line_number: usize,
     token: &str,
@@ -3853,6 +3906,22 @@ impl AttractScriptEvent {
             action: AttractScriptAction::Text {
                 position,
                 value: value.into(),
+            },
+        }
+    }
+
+    pub fn source_message(
+        start_after_steps: u64,
+        duration_steps: Option<u64>,
+        label: impl Into<String>,
+        top_left_screen_address: u16,
+    ) -> Self {
+        Self {
+            start_after_steps,
+            duration_steps,
+            action: AttractScriptAction::SourceMessage {
+                label: label.into(),
+                top_left_screen_address,
             },
         }
     }
@@ -3977,6 +4046,10 @@ pub enum AttractScriptAction {
         position: Point,
         value: String,
     },
+    SourceMessage {
+        label: String,
+        top_left_screen_address: u16,
+    },
     Sprite {
         sprite: SpriteKey,
         position: Point,
@@ -4014,6 +4087,16 @@ impl AttractScriptAction {
             Self::Text { position, value } => {
                 vec![DrawCommand::text(actor, *position, value.clone())]
             }
+            Self::SourceMessage {
+                label,
+                top_left_screen_address,
+            } => source_message_text(label).map_or_else(Vec::new, |text| {
+                vec![DrawCommand::source_message(
+                    actor,
+                    text,
+                    *top_left_screen_address,
+                )]
+            }),
             Self::Sprite { sprite, position } => {
                 vec![DrawCommand::sprite(actor, *sprite, *position)]
             }
@@ -4099,6 +4182,13 @@ impl AttractScriptAction {
                 position: *position,
                 value: value.clone(),
             },
+            Self::SourceMessage {
+                label,
+                top_left_screen_address,
+            } => AttractScriptActionManifest::SourceMessage {
+                label: label.clone(),
+                top_left_screen_address: *top_left_screen_address,
+            },
             Self::Sprite { sprite, position } => AttractScriptActionManifest::Sprite {
                 sprite: *sprite,
                 position: *position,
@@ -4162,6 +4252,10 @@ pub enum AttractScriptActionManifest {
     Text {
         position: Point,
         value: String,
+    },
+    SourceMessage {
+        label: String,
+        top_left_screen_address: u16,
     },
     Sprite {
         sprite: SpriteKey,
@@ -4280,6 +4374,22 @@ impl DrawCommand {
             sprite: SpriteKey::Text,
             position,
             effect: VisualEffect::Static,
+            text: Some(value.into()),
+        }
+    }
+
+    pub fn source_message(
+        actor: ActorId,
+        value: impl Into<String>,
+        top_left_screen_address: u16,
+    ) -> Self {
+        Self {
+            actor,
+            sprite: SpriteKey::Text,
+            position: Point::new(0, 0),
+            effect: VisualEffect::SourceMessage {
+                top_left_screen_address,
+            },
             text: Some(value.into()),
         }
     }
@@ -5023,6 +5133,13 @@ impl ActorRenderSceneBridge {
             } else {
                 RenderLayer::Hud
             };
+            if let VisualEffect::SourceMessage {
+                top_left_screen_address,
+            } = draw.effect
+            {
+                push_source_controlled_message_sprites(scene, text, top_left_screen_address, layer);
+                return;
+            }
             push_source_text_bytes_sprites(
                 scene,
                 text.as_bytes(),
@@ -5046,6 +5163,7 @@ impl ActorRenderSceneBridge {
                 source_center,
             } => self.push_explosion_sprite(scene, draw.position, kind, age, source_center),
             VisualEffect::Static
+            | VisualEffect::SourceMessage { .. }
             | VisualEffect::SourceLanderFrame { .. }
             | VisualEffect::SourceBomberFrame { .. }
             | VisualEffect::SourcePod
@@ -11240,6 +11358,46 @@ mod tests {
     }
 
     #[test]
+    fn parsed_attract_script_draws_source_message_with_controls() {
+        let script = "message 1 forever ELECV 0x3258"
+            .parse::<AttractScript>()
+            .expect("source message script action should parse");
+        assert_eq!(
+            script.manifest().events[0].action,
+            AttractScriptActionManifest::SourceMessage {
+                label: "ELECV".to_string(),
+                top_left_screen_address: 0x3258,
+            }
+        );
+        let mut driver = ActorGameDriver::with_attract_script(script);
+        let source_text = source_message_text("ELECV").expect("ELECV source message");
+
+        let report = driver.step(GameInput::NONE);
+        assert!(report.draws.iter().any(|draw| {
+            draw.text.as_deref() == Some(source_text)
+                && matches!(
+                    draw.effect,
+                    VisualEffect::SourceMessage {
+                        top_left_screen_address: 0x3258
+                    }
+                )
+        }));
+
+        let scene = ActorRenderSceneBridge::new().render_scene_for_report(&report);
+        assert_eq!(scene.sprites.len(), 23);
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_E
+                && sprite.position == [100.0, 88.0]
+                && sprite.layer == RenderLayer::Overlay
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_P
+                && sprite.position == [124.0, 108.0]
+                && sprite.layer == RenderLayer::Overlay
+        }));
+    }
+
+    #[test]
     fn attract_script_text_parser_reports_line_errors() {
         let error = AttractScript::parse_text("text 1 forever 10\n")
             .expect_err("missing text y coordinate should fail");
@@ -11250,6 +11408,11 @@ mod tests {
             .expect_err("unknown sprite key should fail");
         assert_eq!(error.line, 1);
         assert!(error.to_string().contains("unknown sprite key"));
+
+        let error = AttractScript::parse_text("message 1 forever NO_SUCH_MESSAGE 0x3258\n")
+            .expect_err("unknown source message label should fail");
+        assert_eq!(error.line, 1);
+        assert!(error.to_string().contains("unknown source message label"));
     }
 
     #[test]

@@ -44,7 +44,8 @@ verification tools.
   `assets/red-label/actor-waves.script` through the same parser path. The
   attract script now draws prompt-backed high-score table rows and source
   `CREDV` credits label/count alongside the Williams reveal and Defender
-  wordmark coalescence.
+  wordmark coalescence, and custom attract scripts can draw checked
+  `messages.tsv` labels through source cursor controls.
   `ActorWaveScript` now names per-wave progression data and applies behavior
   scripts plus hostile and initial-human spawn records as play starts and waves
   are cleared. Wave scripts can now attach spawn-index behavior profiles that
@@ -756,6 +757,27 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 12:37 BST`: Completed the actor attract source-message script
+  slice. `AttractScript` now accepts checked
+  `message <start> <duration> <label> <top-left-screen-address>` and
+  `source_message ...` lines, validates labels against
+  `assets/red-label/messages.tsv`, and exposes source-message actions in
+  attract manifests. Actor draw commands now carry `VisualEffect::SourceMessage`
+  metadata with the source top-left screen address, and
+  `ActorRenderSceneBridge` routes those draws through
+  `push_source_controlled_message_sprites` so red-label `[RLF]` and
+  `[HMC:...]` cursor controls affect glyph placement instead of becoming
+  visible text. Added focused parser/render regressions proving parsed `ELECV`
+  renders through the controlled source glyph path at the expected positions.
+  Validation passed with `cargo fmt --check`, focused source-message/parser
+  tests, `cargo test actor_game --all-targets --features legacy-tools`, `cargo
+  test actor_smoke --all-targets --features legacy-tools`, `cargo check
+  --all-targets --features legacy-tools`, `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`, touched-doc markdownlint, and `git
+  diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780659006168409`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780659448333319`.
 - `2026-06-05 12:27 BST`: Completed the actor source-message credits slice.
   Actor attract credits now resolve the label through the checked red-label
   message table `CREDV` via `source_message_text` instead of relying on an

@@ -20,7 +20,8 @@ Current files:
   drives the Williams reveal, Defender wordmark coalescence, and high-score
   title/table plus source `CREDV` credits label/count text through the checked
   `AttractScript` parser using the driver-owned high-score table and credit
-  count carried in `StepPrompt`.
+  count carried in `StepPrompt`. Custom attract scripts can also use checked
+  `messages.tsv` labels through the script parser's `message` action.
 - `actor-behavior.script`: embedded actor-runtime baseline behavior profile
   parsed by `ActorBehaviorScript`, including player, laser, hostile, human,
   explosion, and score-popup timing/tuning defaults.

@@ -330,6 +330,7 @@ same event model from checked text script lines:
 ```text
 # action start duration x y ...
 text 1 forever 10 10 PRESS START
+message 1 forever ELECV 0x3258
 sprite 2 forever defender_logo 40 44
 high_scores 1 forever 82 188 10 5
 credits 1 forever 176 226 248 226
@@ -345,11 +346,17 @@ scripts before the actor runtime starts. `high_scores` lines use
 driver-owned high-score table carried in `StepPrompt`. `credits` lines use
 `label-x label-y count-x count-y` after the timing fields and draw the
 source-backed `CREDV` / `CREDITS:` label plus the visible credit count from
-`StepPrompt.credits`.
+`StepPrompt.credits`. `message` / `source_message` lines use
+`label top-left-screen-address` after the timing fields, validate `label`
+against `assets/red-label/messages.tsv`, and render through the source
+controlled-message glyph path so red-label cursor tokens such as `[RLF]` and
+`[HMC:...]` affect layout instead of becoming visible text.
 
 Script actions currently cover:
 
 - `Text`, for scripted title/status lines.
+- `SourceMessage`, for checked red-label message-table labels rendered through
+  source cursor controls.
 - `Sprite`, for static sprite placement.
 - `HighScores`, for prompt-backed high-score table rows in attract/game-over.
 - `Credits`, for the prompt-backed credit label/count in attract/game-over.

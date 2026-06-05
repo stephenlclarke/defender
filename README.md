@@ -111,8 +111,9 @@ behavior, and wave scripts are embedded from
 `assets/red-label/actor-waves.script`, so the default driver and custom drivers
 share the same checked script parser path. The attract script now includes
 prompt-backed high-score table rows and source `CREDV` credits label/count
-alongside Williams reveal and Defender wordmark coalescence. The default actor
-wave allocator now
+alongside Williams reveal and Defender wordmark coalescence, and custom attract
+scripts can draw checked `messages.tsv` labels through source cursor controls.
+The default actor wave allocator now
 uses the source active-family
 shape, so later waves can introduce bomber and pod actor families alongside
 landers instead of remaining lander-only. Later-wave
@@ -120,8 +121,8 @@ actor landers now restore from source RNG placement/shot/velocity state, and
 later-wave humans restore from the source target-list distribution.
 Custom attract drivers can construct scripts in Rust or parse checked text
 lines for text, static sprites, Williams reveal, Defender wordmark coalescence,
-high-score rows, and credit-count events before passing the script to
-`ActorGameDriver`.
+red-label message-table labels, high-score rows, and credit-count events before
+passing the script to `ActorGameDriver`.
 Source-backed landers, bombers, pods, swarmers, baiters, and humans publish
 their fixed-point metadata through snapshots, publish per-step movement/facing
 metadata for the clean state bridge, and advance fraction state during active

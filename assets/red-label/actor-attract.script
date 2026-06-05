@@ -1,5 +1,6 @@
 # Actor runtime red-label attract title script.
 # Format: <action> <start-step> <duration|forever> <x> <y> [text]
+# message uses: <label> <top-left-screen-address>
 # high_scores adds: <row-height> <rows>
 # credits uses: <label-x> <label-y> <count-x> <count-y>
 
