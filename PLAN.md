@@ -56,8 +56,11 @@ verification tools.
   swarmers now emit hostile projectiles and distinct shot cues from actor-owned
   timers, and source-paced baiter timer entry now spawns source-backed baiter
   actors that can shoot and pursue the player without blocking wave completion
-  after source-counted enemies are gone. Explosion draws now carry
-  enemy/bomb/player/human variant metadata for later source sprite mapping.
+  after source-counted enemies are gone. Player hazard collisions now decrement
+  driver-owned life stock and spawn a replacement player while lives remain,
+  with final-life collisions entering the game-over/high-score path. Explosion
+  draws now carry enemy/bomb/player/human variant metadata for later source
+  sprite mapping.
 - Primary runtime source is `src/`; the converted implementation is parked in
   `src_legacy/` and should remain optional oracle/tooling evidence only.
 - Normal live play uses clean `Game` frames through clean platform, audio, and
@@ -3814,3 +3817,18 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780621667926539`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780622203322009`.
+- `2026-06-05 02:22 BST`: Completed the actor life-stock respawn cycle.
+  Player hazard collisions now destroy the current player actor, decrement
+  driver-owned life stock, and spawn a replacement player when lives remain;
+  final-life hits still enter the game-over/high-score path. Added regressions
+  for life-loss respawn and final-life game over, and updated bomb/high-score
+  tests to be explicit final-life cases. No legacy code, tests, or scaffolding
+  were safe to remove because the actor runtime remains isolated from the live
+  clean runtime. Validation passed with `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780622275185529`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780622548085959`.

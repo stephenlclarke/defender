@@ -719,9 +719,10 @@ reintroduce legacy implementation terminology.
   spawning with the source request bound, swarmer shot timer projectile/cue
   emission, smart-bomb pod scoring without swarmer spawning, source-paced baiter
   timer entry with non-wave-blocking baiters, baiter shots/scores/hit cues,
-  smart-bomb hostile clearing, enemy/bomb/player/human explosion variant draw
-  metadata, and mutant spawn handoff, but it has not replaced the live `Game`
-  runtime yet.
+  smart-bomb hostile clearing, life-stock decrement and replacement-player
+  respawn on non-final player hazard collisions, final-life game-over/high-score
+  handoff, enemy/bomb/player/human explosion variant draw metadata, and mutant
+  spawn handoff, but it has not replaced the live `Game` runtime yet.
 
 ## Compatibility Features
 

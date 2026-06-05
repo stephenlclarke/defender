@@ -207,6 +207,9 @@ The actor driver now owns a first Defender gameplay loop:
   explosion clouds while retaining actor-owned lifetime state.
 - Smart bomb is now a real driver command: it removes active hostile actors,
   awards enemy scores, and spawns explosions while preserving human actors.
+- Player hazard collisions destroy the current player actor, decrement the
+  driver-owned life stock, and spawn a replacement player when lives remain.
+  Final-life collisions enter the game-over/high-score path.
 - Player laser hits now resolve lander, mutant, bomber, pod, swarmer, and baiter
   targets through the driver, awarding source scores and family hit cues for
   bomber, pod, swarmer, and baiter families.

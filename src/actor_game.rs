@@ -2153,6 +2153,7 @@ pub enum GameCommand {
     HumanLost(ActorId),
     AddScore(u32),
     PlaySound(SoundCue),
+    PlayerKilled,
     AdvanceWave {
         wave: u16,
     },
@@ -2681,13 +2682,14 @@ impl ActorGameDriver {
                 continue;
             }
             if player.bounds.intersects(enemy.bounds) {
+                commands.push(GameCommand::Destroy(player.owner));
                 commands.push(GameCommand::Destroy(enemy.owner));
                 commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
                     position: center_of(player.bounds),
                     kind: player_hazard_explosion_kind(enemy.kind),
                 }));
                 commands.push(GameCommand::PlaySound(player_hazard_sound(enemy.kind)));
-                commands.push(GameCommand::EnterGameOver);
+                commands.push(GameCommand::PlayerKilled);
                 break;
             }
         }
@@ -2790,22 +2792,39 @@ impl ActorGameDriver {
                     self.score = self.score.saturating_add(points);
                 }
                 GameCommand::PlaySound(sound) => sounds.push(sound),
+                GameCommand::PlayerKilled => {
+                    self.lose_player_life(&mut sounds);
+                }
                 GameCommand::AdvanceWave { .. } => {}
                 GameCommand::EnterGameOver => {
-                    self.lives = 0;
-                    self.wave = 0;
-                    self.high_scores.record(self.score);
-                    self.phase = if self.high_scores.qualifies(self.score) {
-                        Phase::HighScoreEntry
-                    } else {
-                        Phase::GameOver
-                    };
-                    self.baiter_timer_steps = None;
-                    sounds.push(SoundCue::GameOver);
+                    self.enter_game_over(&mut sounds);
                 }
             }
         }
         sounds
+    }
+
+    fn lose_player_life(&mut self, sounds: &mut Vec<SoundCue>) {
+        if self.lives > 1 {
+            self.lives = self.lives.saturating_sub(1);
+            self.spawn_player();
+            return;
+        }
+
+        self.enter_game_over(sounds);
+    }
+
+    fn enter_game_over(&mut self, sounds: &mut Vec<SoundCue>) {
+        self.lives = 0;
+        self.wave = 0;
+        self.high_scores.record(self.score);
+        self.phase = if self.high_scores.qualifies(self.score) {
+            Phase::HighScoreEntry
+        } else {
+            Phase::GameOver
+        };
+        self.baiter_timer_steps = None;
+        sounds.push(SoundCue::GameOver);
     }
 
     fn start_play(&mut self) {
@@ -5279,6 +5298,7 @@ mod tests {
     fn status_display_actor_draws_high_score_entry_state() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
+        driver.lives = 1;
         driver.score = 12_000;
         driver.spawn_player();
         driver.spawn_lander_for_test(Point::new(42, 120));
@@ -5813,9 +5833,32 @@ mod tests {
     }
 
     #[test]
-    fn enemy_laser_collision_enters_game_over() {
+    fn enemy_laser_collision_consumes_life_and_respawns_player() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
+        driver.spawn_player();
+        driver.spawn_enemy_laser(Point::new(42, 120), Velocity::new(0, 0));
+
+        let report = driver.step(GameInput::NONE);
+
+        assert_eq!(report.phase, Phase::Playing);
+        assert_eq!(report.lives, 2);
+        assert!(report.sounds.contains(&SoundCue::Explosion));
+        assert!(!report.sounds.contains(&SoundCue::GameOver));
+        assert!(report.commands.contains(&GameCommand::PlayerKilled));
+        assert_eq!(driver.snapshot_count(ActorKind::Player), 0);
+
+        let respawned = driver.step(GameInput::NONE);
+        assert_eq!(respawned.phase, Phase::Playing);
+        assert_eq!(respawned.lives, 2);
+        assert_eq!(driver.snapshot_count(ActorKind::Player), 1);
+    }
+
+    #[test]
+    fn enemy_laser_collision_on_final_life_enters_game_over() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.lives = 1;
         driver.spawn_player();
         driver.spawn_enemy_laser(Point::new(42, 120), Velocity::new(0, 0));
 
@@ -6834,6 +6877,7 @@ mod tests {
     fn bomb_collision_enters_game_over_with_source_bomb_sound() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
+        driver.lives = 1;
         driver.spawn_player();
         driver.spawn_bomb_for_test(Point::new(42, 120));
 
@@ -6898,6 +6942,7 @@ mod tests {
     fn high_score_entry_is_a_phase_not_a_legacy_timeline_script() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
+        driver.lives = 1;
         driver.score = 12_000;
         driver.spawn_player();
         driver.spawn_lander_for_test(Point::new(42, 120));
