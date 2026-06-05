@@ -42,10 +42,11 @@ verification tools.
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and
   `assets/red-label/actor-waves.script` through the same parser path. The
-  attract script now draws prompt-backed high-score table rows and source
-  `CREDV` credits label/count alongside the Williams reveal and Defender
-  wordmark coalescence, and custom attract scripts can draw checked
-  `messages.tsv` labels through source cursor controls.
+  attract script now draws the source `ELECV` presents message,
+  prompt-backed high-score table rows, and source `CREDV` credits label/count
+  alongside the Williams reveal and Defender wordmark coalescence, and custom
+  attract scripts can draw checked `messages.tsv` labels through source cursor
+  controls.
   `ActorWaveScript` now names per-wave progression data and applies behavior
   scripts plus hostile and initial-human spawn records as play starts and waves
   are cleared. Wave scripts can now attach spawn-index behavior profiles that
@@ -757,6 +758,23 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 12:44 BST`: Completed the actor default `ELECV` attract slice.
+  The embedded `assets/red-label/actor-attract.script` now draws the red-label
+  `ELECV` `ELECTRONICS INC. / PRESENTS` source message at source screen address
+  `0x3258` during the default actor title sequence. The Rust fallback
+  constructor stays manifest-equivalent to the checked script through named
+  `ELECV` label/address constants. Extended focused attract regressions prove
+  the default actor title report carries `VisualEffect::SourceMessage` for
+  `ELECV` and renders controlled source glyphs at the expected overlay
+  position. Validation passed with `cargo fmt --check`, focused default
+  attract/source-message tests, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, touched-doc
+  markdownlint, and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780659558377039`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780659869307209`.
 - `2026-06-05 12:37 BST`: Completed the actor attract source-message script
   slice. `AttractScript` now accepts checked
   `message <start> <duration> <label> <top-left-screen-address>` and

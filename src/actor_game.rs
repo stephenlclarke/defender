@@ -134,6 +134,8 @@ const STATUS_LIVES_POSITION: Point = Point::new(86, 18);
 const STATUS_SMART_BOMBS_POSITION: Point = Point::new(140, 18);
 const STATUS_CREDITS_POSITION: Point = Point::new(176, 226);
 const SOURCE_CREDITS_MESSAGE_LABEL: &str = "CREDV";
+const SOURCE_PRESENTS_MESSAGE_LABEL: &str = "ELECV";
+const SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN: u16 = 0x3258;
 const STATUS_FINAL_SCORE_POSITION: Point = Point::new(56, 92);
 const STATUS_HIGH_SCORE_TABLE_TITLE_POSITION: Point = Point::new(78, 112);
 const STATUS_HIGH_SCORE_TABLE_START_Y: i16 = 128;
@@ -3532,6 +3534,12 @@ impl AttractScript {
     pub fn red_label_title_from_events() -> Self {
         Self::new(vec![
             AttractScriptEvent::williams_logo(1, None, SOURCE_ATTRACT_WILLIAMS_LOGO_POSITION),
+            AttractScriptEvent::source_message(
+                1,
+                None,
+                SOURCE_PRESENTS_MESSAGE_LABEL,
+                SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
+            ),
             AttractScriptEvent::defender_wordmark(
                 DEFENDER_WORDMARK_START_STEP,
                 None,
@@ -11032,6 +11040,23 @@ mod tests {
                 .iter()
                 .any(|draw| draw.text.as_deref() == Some("1. 010000"))
         );
+        let presents_text =
+            source_message_text(SOURCE_PRESENTS_MESSAGE_LABEL).expect("ELECV source message");
+        assert!(williams.draws.iter().any(|draw| {
+            draw.text.as_deref() == Some(presents_text)
+                && matches!(
+                    draw.effect,
+                    VisualEffect::SourceMessage {
+                        top_left_screen_address: SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN
+                    }
+                )
+        }));
+        let williams_scene = ActorRenderSceneBridge::new().render_scene_for_report(&williams);
+        assert!(williams_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_E
+                && sprite.position == [100.0, 88.0]
+                && sprite.layer == RenderLayer::Overlay
+        }));
 
         let mut coalescing = None;
         for _ in 0..DEFENDER_WORDMARK_START_STEP {
@@ -11088,6 +11113,13 @@ mod tests {
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
             AttractScriptActionManifest::WilliamsLogo { .. }
+        )));
+        assert!(parsed.manifest().events.iter().any(|event| matches!(
+            event.action,
+            AttractScriptActionManifest::SourceMessage {
+                ref label,
+                top_left_screen_address: SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
+            } if label == SOURCE_PRESENTS_MESSAGE_LABEL
         )));
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,

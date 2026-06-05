@@ -110,10 +110,11 @@ behavior, and wave scripts are embedded from
 `assets/red-label/actor-behavior.script`, and
 `assets/red-label/actor-waves.script`, so the default driver and custom drivers
 share the same checked script parser path. The attract script now includes
-prompt-backed high-score table rows and source `CREDV` credits label/count
-alongside Williams reveal and Defender wordmark coalescence, and custom attract
-scripts can draw checked `messages.tsv` labels through source cursor controls.
-The default actor wave allocator now
+the source `ELECV` presents message, prompt-backed high-score table rows, and
+source `CREDV` credits label/count alongside Williams reveal and Defender
+wordmark coalescence, and custom attract scripts can draw checked
+`messages.tsv` labels through source cursor controls. The default actor wave
+allocator now
 uses the source active-family
 shape, so later waves can introduce bomber and pod actor families alongside
 landers instead of remaining lander-only. Later-wave

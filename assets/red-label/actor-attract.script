@@ -5,6 +5,7 @@
 # credits uses: <label-x> <label-y> <count-x> <count-y>
 
 williams_logo 1 forever 108 60
+message 1 forever ELECV 0x3258
 defender_wordmark 72 forever 96 144
 text 1 forever 78 176 HIGH SCORES
 high_scores 1 forever 82 188 10 5
