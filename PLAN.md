@@ -99,9 +99,11 @@ verification tools.
   lander/human conversions now spawn mutant actors with source-shaped mutant
   fractions, wave-derived shot timer, driver-owned hop RNG, and clean
   `SourceMutantSnapshot` bridge metadata.
-  Grounded source-backed humans now consume the driver-provided source RNG seed
-  for the astronaut turn branch, step X through their fixed-point fraction, and
-  step Y toward terrain-relative source targets.
+  The actor driver now owns the source astronaut process cadence/cursor: one
+  grounded source-backed human target-list slot receives the source RNG seed
+  per process tick, walks fixed-point X, and steps Y toward terrain-relative
+  source targets, while first-wave inactive slots stay suppressed until the
+  human count changes.
   Source-backed mutant actors now
   consume that metadata to select wave-table X/Y velocities, advance
   actor-owned hop RNG and fixed-point fractions, and emit source-shaped
@@ -854,6 +856,39 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 21:33 BST`: Completed the actor source astronaut process
+  cadence cycle. The actor driver now owns the source astronaut process
+  cursor/sleep cadence and passes one selected target-list slot through
+  `StepPrompt`, so only that grounded source-backed human walks on a source
+  process tick. Human actors no longer carry their own source-walk sleep state;
+  they still apply the source low-seed turn branch, fixed-point X update, and
+  terrain-relative Y step when the driver selects their slot. The process uses
+  the source 16-entry astronaut cursor wrap and suppresses first-wave inactive
+  slots `>= 2` while all ten source humans remain. Focused tests now cover the
+  selected-slot-only cadence, source process sleep hold, inactive-slot
+  suppression, high-seed walk/Y-target branch, and low-seed turn/no-Y-step
+  branch. README, SPEC, PLAN, and actor architecture docs now document the
+  driver-owned source astronaut process contract. No legacy code, tests, or
+  scaffolding were safe to remove beyond the actor-owned source-walk sleep
+  field because the remaining clean smoke/fidelity/oracle evidence still
+  depends on those boundaries. Validation passed with `cargo fmt --check`,
+  `cargo test source_human_walk --lib --features legacy-tools`, `cargo test
+  actor_game --all-targets --features legacy-tools`, `cargo check
+  --all-targets --features legacy-tools`, `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`, `cargo test actor_smoke
+  --all-targets --features legacy-tools`, `cargo test actor_live
+  --all-targets --features legacy-tools`, `cargo test runtime --all-targets
+  --features legacy-tools`, `cargo test actor_wgpu --all-targets --features
+  legacy-tools`, the actor smoke CLI commands (`--actor-smoke`,
+  `--actor-attract-smoke`, `--actor-post-game-smoke`, and
+  `--actor-wgpu-smoke`), `markdownlint README.md SPEC.md PLAN.md
+  docs/actor-architecture.md`, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite was not rerun in this cycle; the previously isolated
+  clean-game MAME window/post-game audio failures remain outside this slice.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780691136829819`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780691628648459`.
 - `2026-06-05 21:16 BST`: Completed the actor astronaut source-walk cadence
   cycle. Grounded source-backed human actors now consume the driver-provided
   source RNG seed for the Williams astronaut turn branch, step fixed-point X

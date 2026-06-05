@@ -369,10 +369,12 @@ still available for custom drivers.
 Initial humans are source-backed: wave `1` uses the captured first-wave starts,
 while later source waves restore humans through the source target-list RNG
 distribution. Their actor spawns carry fixed-point fractions, picture frame,
-and source target-list slot metadata. Grounded source humans advance their own
-walk cadence, picture frame, and fixed-point X fraction after the initial
-source sleep ticks, use the driver source RNG seed for the astronaut turn
-branch, and step Y toward terrain-relative source targets.
+and source target-list slot metadata. The driver owns the source astronaut
+process cadence/cursor and prompts one grounded source human target-list slot
+per process tick; the selected human applies the driver source RNG seed,
+updates picture frame, steps fixed-point X, and steps Y toward
+terrain-relative source targets. First-wave inactive source human slots `>= 2`
+stay suppressed while all ten source humans remain.
 Source-backed landers ask the prompt for their configured target slot first and
 only fall back to nearest-human seeking when that target is unavailable.
 When a source-backed lander completes a human conversion, the spawn command for
@@ -530,9 +532,10 @@ actor ownership.
 The actor driver now owns a first Defender gameplay loop:
 
 - Starts seed the playfield with ten source first-wave human actors carrying
-  target-list slot and picture-frame metadata. Source-backed grounded humans
-  update their own walk frame, fixed-point X fraction, source-seeded turn
-  branch, and terrain-relative Y step.
+  target-list slot and picture-frame metadata. The driver prompts one
+  source-backed grounded human target-list slot per source astronaut process
+  tick; that actor updates walk frame, fixed-point X fraction, source-seeded
+  turn branch, and terrain-relative Y step.
 - A persistent `StatusDisplay` actor emits play-state text for score, high
   score, wave, lives, smart-bomb stock, credits, and high-score-entry rows from
   the same simulation prompt as every other actor. It stays inert during attract

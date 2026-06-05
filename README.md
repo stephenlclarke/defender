@@ -186,11 +186,13 @@ passing the script to `ActorGameDriver`.
 Source-backed landers, bombers, pods, swarmers, baiters, and humans publish
 their fixed-point metadata through snapshots, publish per-step movement/facing
 metadata for the clean state bridge, and advance fraction state during active
-motion. Grounded source-backed humans now use the driver-provided source RNG
-seed for their astronaut turn branch, step X through their fixed-point
-fraction, and nudge Y toward terrain-relative source targets. Source-backed
-hostile actors now wrap Y motion through the source active-object playfield
-bounds instead of drifting outside the red-label vertical range.
+motion. The actor driver now owns the source astronaut process cadence/cursor:
+one grounded source-backed human target-list slot receives the source RNG seed
+per process tick, walks fixed-point X, and nudges Y toward terrain-relative
+source targets, while first-wave inactive slots remain suppressed until the
+human count changes. Source-backed hostile actors now wrap Y motion through the
+source active-object playfield bounds instead of drifting outside the red-label
+vertical range.
 Source-backed bombers now update seeded picture-frame and Y-velocity
 metadata, including cruise-altitude and player-relative Y adjustments, only
 when the driver-provided source RNG selects their TIE slot, while every

@@ -290,8 +290,9 @@ const HUMAN_FALL_ACCELERATION: i16 = 1;
 const HUMAN_MAX_FALL_SPEED: i16 = 8;
 const HUMAN_SAFE_LANDING_SPEED: i16 = 3;
 const HUMAN_CARRIED_OFFSET_Y: i16 = 8;
-const SOURCE_HUMAN_WALK_SLEEP_TICKS: u8 = 2;
 const SOURCE_ASTRO_RESTORE_Y: u8 = 0xE0;
+const SOURCE_ASTRONAUT_TARGET_CURSOR_ENTRY_COUNT: usize = 16;
+const SOURCE_ASTRONAUT_PROCESS_SLEEP_TICKS: u8 = 2;
 const SOURCE_HUMAN_TURN_SEED_MAX: u8 = 8;
 const SOURCE_HUMAN_LEFT_TARGET_Y_OFFSET: u8 = 4;
 const SOURCE_HUMAN_RIGHT_TARGET_Y_OFFSET: u8 = 15;
@@ -2641,6 +2642,14 @@ fn actor_source_select_lander_target_index(
 
 const fn actor_source_target_list_next_slot_index(slot_index: usize) -> usize {
     if slot_index + 1 < SOURCE_TARGET_LIST_ENTRY_COUNT {
+        slot_index + 1
+    } else {
+        0
+    }
+}
+
+const fn actor_source_astronaut_next_slot_index(slot_index: usize) -> usize {
+    if slot_index + 1 < SOURCE_ASTRONAUT_TARGET_CURSOR_ENTRY_COUNT {
         slot_index + 1
     } else {
         0
@@ -5496,6 +5505,7 @@ pub struct StepPrompt {
     pub behavior_script: ActorBehaviorScript,
     pub source_background_left: u16,
     pub source_rng: Option<ActorSourceRngSnapshot>,
+    pub source_human_walk_target_slot: Option<usize>,
     pub source_shell_scan_tick: bool,
 }
 
@@ -8387,6 +8397,8 @@ pub struct ActorGameDriver {
     wave_script: ActorWaveScript,
     enemy_reserve: EnemyReserveSnapshot,
     source_target_cursor: Option<usize>,
+    source_astronaut_cursor: Option<usize>,
+    source_astronaut_sleep_ticks: u8,
     source_reserve_activation_ready: bool,
     source_reserve_activation_cooldown_steps: u16,
     source_background_left: u16,
@@ -8446,6 +8458,8 @@ impl ActorGameDriver {
             wave_script,
             enemy_reserve: EnemyReserveSnapshot::default(),
             source_target_cursor: None,
+            source_astronaut_cursor: Some(0),
+            source_astronaut_sleep_ticks: 0,
             source_reserve_activation_ready: false,
             source_reserve_activation_cooldown_steps: 0,
             source_background_left: 0,
@@ -8535,6 +8549,7 @@ impl ActorGameDriver {
             behavior_script =
                 behavior_script.with_hyperspace_source_seed(source_rng.hyperspace_seed());
         }
+        let source_human_walk_target_slot = self.advance_source_astronaut_process(source_rng);
         let source_shell_scan_tick = if self.phase == Phase::Playing
             && !survivor_bonus_interstitial
             && !player_switch_interstitial
@@ -8570,6 +8585,7 @@ impl ActorGameDriver {
             behavior_script: behavior_script.clone(),
             source_background_left: self.source_background_left,
             source_rng,
+            source_human_walk_target_slot,
             source_shell_scan_tick,
         };
 
@@ -9742,6 +9758,40 @@ impl ActorGameDriver {
         self.source_shell_scan_steps_remaining = SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS;
     }
 
+    fn reset_source_astronaut_process(&mut self) {
+        self.source_astronaut_cursor = Some(0);
+        self.source_astronaut_sleep_ticks = 0;
+    }
+
+    fn advance_source_astronaut_process(
+        &mut self,
+        source_rng: Option<ActorSourceRngSnapshot>,
+    ) -> Option<usize> {
+        if source_rng.is_none() || !self.has_source_human_snapshots() {
+            return None;
+        }
+        if self.source_astronaut_sleep_ticks > 0 {
+            self.source_astronaut_sleep_ticks = self.source_astronaut_sleep_ticks.saturating_sub(1);
+            return None;
+        }
+
+        let current_cursor = self
+            .source_astronaut_cursor
+            .filter(|slot| *slot < SOURCE_ASTRONAUT_TARGET_CURSOR_ENTRY_COUNT)
+            .unwrap_or(0);
+        let next_cursor = actor_source_astronaut_next_slot_index(current_cursor);
+        self.source_astronaut_cursor = Some(next_cursor);
+        self.source_astronaut_sleep_ticks = SOURCE_ASTRONAUT_PROCESS_SLEEP_TICKS;
+
+        let source_human_count = self.source_human_snapshot_count();
+        self.snapshots.values().find_map(|snapshot| {
+            let source = snapshot.source_human?;
+            (source.target_slot_index == next_cursor
+                && actor_source_astronaut_walk_targetable(source_human_count, snapshot))
+            .then_some(next_cursor)
+        })
+    }
+
     fn advance_source_reserve_activation_cooldown(&mut self) {
         self.source_reserve_activation_cooldown_steps = self
             .source_reserve_activation_cooldown_steps
@@ -9782,6 +9832,7 @@ impl ActorGameDriver {
         self.behavior_script = wave_profile.behavior_script.clone();
         self.enemy_reserve = wave_profile.enemy_reserve;
         self.source_target_cursor = Some(0);
+        self.reset_source_astronaut_process();
         self.source_reserve_activation_ready = false;
         self.source_reserve_activation_cooldown_steps = 0;
         if self.phase == Phase::Playing {
@@ -9937,10 +9988,25 @@ impl ActorGameDriver {
             .map(|snapshot| snapshot.position)
     }
 
-    fn select_next_source_lander_target_index(&mut self) -> Option<usize> {
-        if !self.snapshots.values().any(|snapshot| {
+    fn has_source_human_snapshots(&self) -> bool {
+        self.snapshots.values().any(|snapshot| {
             snapshot.kind == ActorKind::Human && snapshot.alive && snapshot.source_human.is_some()
-        }) {
+        })
+    }
+
+    fn source_human_snapshot_count(&self) -> usize {
+        self.snapshots
+            .values()
+            .filter(|snapshot| {
+                snapshot.kind == ActorKind::Human
+                    && snapshot.alive
+                    && snapshot.source_human.is_some()
+            })
+            .count()
+    }
+
+    fn select_next_source_lander_target_index(&mut self) -> Option<usize> {
+        if !self.has_source_human_snapshots() {
             return None;
         }
 
@@ -13539,7 +13605,6 @@ struct Human {
     position: Point,
     mode: HumanMode,
     safe_landing_awarded: bool,
-    source_walk_sleep_ticks: u8,
     source: Option<ActorSourceHumanMetadata>,
 }
 
@@ -13563,11 +13628,6 @@ impl Human {
             position,
             mode,
             safe_landing_awarded: false,
-            source_walk_sleep_ticks: if source.is_some() {
-                SOURCE_HUMAN_WALK_SLEEP_TICKS
-            } else {
-                0
-            },
             source,
         }
     }
@@ -13576,18 +13636,20 @@ impl Human {
         Rect::from_center(self.position, 4, 8)
     }
 
-    fn update_grounded(&mut self, source_rng: Option<ActorSourceRngSnapshot>) {
-        if self.source.is_none() {
+    fn update_grounded(
+        &mut self,
+        source_rng: Option<ActorSourceRngSnapshot>,
+        source_walk_target_slot: Option<usize>,
+    ) {
+        let Some(source) = self.source else {
             return;
-        }
-        if self.source_walk_sleep_ticks > 0 {
-            self.source_walk_sleep_ticks = self.source_walk_sleep_ticks.saturating_sub(1);
+        };
+        if source_walk_target_slot != Some(source.target_slot_index) {
             return;
         }
 
         if let Some(source_rng) = source_rng {
             self.advance_source_walk(source_rng.seed);
-            self.source_walk_sleep_ticks = SOURCE_HUMAN_WALK_SLEEP_TICKS;
         }
     }
 
@@ -13718,7 +13780,7 @@ impl AssetActor for Human {
             let behavior = prompt.behavior_for(self.id, ActorKind::Human);
             commands.extend(match self.mode {
                 HumanMode::Grounded => {
-                    self.update_grounded(prompt.source_rng);
+                    self.update_grounded(prompt.source_rng, prompt.source_human_walk_target_slot);
                     Vec::new()
                 }
                 HumanMode::Falling { velocity } => self.update_falling(velocity, prompt, behavior),
@@ -13779,6 +13841,15 @@ fn human_collision_bounds(mode: HumanMode, position: Point) -> Option<Rect> {
         HumanMode::CarriedBy(_) => None,
         HumanMode::Grounded | HumanMode::Falling { .. } => Some(Rect::from_center(position, 4, 8)),
     }
+}
+
+fn actor_source_astronaut_walk_targetable(human_count: usize, snapshot: &ActorSnapshot) -> bool {
+    snapshot.kind == ActorKind::Human
+        && snapshot.alive
+        && snapshot.bounds.is_some()
+        && snapshot.source_human.is_some_and(|source| {
+            human_count != usize::from(SOURCE_START_HUMAN_COUNT) || source.target_slot_index < 2
+        })
 }
 
 #[derive(Debug)]
@@ -18773,6 +18844,7 @@ mod tests {
                 .with_kind_behavior(ActorKind::EnemyLaser, behavior),
             source_background_left: 0,
             source_rng: None,
+            source_human_walk_target_slot: None,
             source_shell_scan_tick: false,
         };
         let mut shot = EnemyLaserShot::new(
@@ -19272,17 +19344,8 @@ mod tests {
     fn source_human_walk_uses_seeded_left_branch_and_terrain_y_target() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
-        let human_id = driver.spawn_human_from_spawn(ActorHumanSpawn {
-            position: Point::new(64, 220),
-            mode: HumanMode::Grounded,
-            source: Some(ActorSourceHumanMetadata {
-                x_fraction: 0,
-                y_fraction: 0,
-                picture_frame: 0,
-                target_slot_index: 1,
-            }),
-        });
-        driver.step(GameInput::NONE);
+        let human_id =
+            driver.spawn_human_from_spawn(source_human_spawn_for_test(Point::new(64, 220), 1, 0));
         driver.step(GameInput::NONE);
         driver.source_rng = ActorSourceRng {
             seed: 0,
@@ -19310,17 +19373,8 @@ mod tests {
     fn source_human_walk_turns_on_low_source_seed_without_y_step() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
-        let human_id = driver.spawn_human_from_spawn(ActorHumanSpawn {
-            position: Point::new(64, 220),
-            mode: HumanMode::Grounded,
-            source: Some(ActorSourceHumanMetadata {
-                x_fraction: 0,
-                y_fraction: 0,
-                picture_frame: 0,
-                target_slot_index: 1,
-            }),
-        });
-        driver.step(GameInput::NONE);
+        let human_id =
+            driver.spawn_human_from_spawn(source_human_spawn_for_test(Point::new(64, 220), 1, 0));
         driver.step(GameInput::NONE);
         driver.source_rng = ActorSourceRng {
             seed: 0,
@@ -19338,6 +19392,80 @@ mod tests {
                 .source_human
                 .map(|source| (source.x_fraction, source.picture_frame)),
             Some((0x20, 2))
+        );
+    }
+
+    #[test]
+    fn source_human_walk_process_moves_only_selected_target_slot() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let slot0 =
+            driver.spawn_human_from_spawn(source_human_spawn_for_test(Point::new(48, 220), 0, 0));
+        let slot1 =
+            driver.spawn_human_from_spawn(source_human_spawn_for_test(Point::new(64, 220), 1, 0));
+        let slot2 =
+            driver.spawn_human_from_spawn(source_human_spawn_for_test(Point::new(80, 220), 2, 0));
+
+        driver.step(GameInput::NONE);
+        driver.source_rng = ActorSourceRng {
+            seed: 0,
+            hseed: 0,
+            lseed: 0,
+        };
+        let walked = driver.step(GameInput::NONE);
+
+        assert_eq!(driver.source_astronaut_cursor, Some(1));
+        assert_eq!(
+            driver.source_astronaut_sleep_ticks,
+            SOURCE_ASTRONAUT_PROCESS_SLEEP_TICKS
+        );
+        assert_eq!(snapshot_for(&walked, slot0).position, Point::new(48, 220));
+        assert_eq!(snapshot_for(&walked, slot1).position, Point::new(63, 221));
+        assert_eq!(snapshot_for(&walked, slot2).position, Point::new(80, 220));
+
+        let sleeping = driver.step(GameInput::NONE);
+        assert_eq!(driver.source_astronaut_sleep_ticks, 1);
+        assert_eq!(snapshot_for(&sleeping, slot1).position, Point::new(63, 221));
+        assert_eq!(snapshot_for(&sleeping, slot2).position, Point::new(80, 220));
+    }
+
+    #[test]
+    fn source_human_walk_process_suppresses_inactive_first_wave_slots() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let mut human_ids = Vec::new();
+        for slot in 0..usize::from(SOURCE_START_HUMAN_COUNT) {
+            human_ids.push(driver.spawn_human_from_spawn(source_human_spawn_for_test(
+                Point::new(40 + i16::try_from(slot).expect("slot fits i16") * 8, 220),
+                slot,
+                0,
+            )));
+        }
+
+        driver.step(GameInput::NONE);
+        driver.source_rng = ActorSourceRng {
+            seed: 0,
+            hseed: 0,
+            lseed: 0,
+        };
+        let slot1_walked = driver.step(GameInput::NONE);
+        assert_eq!(
+            snapshot_for(&slot1_walked, human_ids[1]).position,
+            Point::new(47, 221)
+        );
+
+        driver.source_astronaut_sleep_ticks = 0;
+        driver.source_rng = ActorSourceRng {
+            seed: 0,
+            hseed: 0,
+            lseed: 0,
+        };
+        let slot2_suppressed = driver.step(GameInput::NONE);
+
+        assert_eq!(driver.source_astronaut_cursor, Some(2));
+        assert_eq!(
+            snapshot_for(&slot2_suppressed, human_ids[2]).position,
+            Point::new(56, 220)
         );
     }
 
@@ -23030,6 +23158,23 @@ mod tests {
             .expect("actor snapshot should be present")
     }
 
+    fn source_human_spawn_for_test(
+        position: Point,
+        target_slot_index: usize,
+        picture_frame: u8,
+    ) -> ActorHumanSpawn {
+        ActorHumanSpawn {
+            position,
+            mode: HumanMode::Grounded,
+            source: Some(ActorSourceHumanMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                picture_frame,
+                target_slot_index,
+            }),
+        }
+    }
+
     fn expected_source_bomber_after_motion(
         position: Point,
         mut source: ActorSourceBomberMetadata,
@@ -23165,6 +23310,7 @@ mod tests {
             behavior_script: ActorBehaviorScript::default(),
             source_background_left: 0,
             source_rng: Some(source_rng),
+            source_human_walk_target_slot: None,
             source_shell_scan_tick: false,
         }
     }
