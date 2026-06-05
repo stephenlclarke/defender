@@ -195,11 +195,12 @@ metadata in snapshots and advance active motion by updating their own
 fixed-point position/fraction state.
 Hostile projectile actors publish source-shaped shell metadata too: enemy
 lasers own and advance fixed-point velocity, fraction, and lifetime values,
-with lifetime decrementing on the source shell-scan cadence. Source-backed
-bomber bomb actors carry stationary bomb-shell fraction and source-cadenced
-lifetime values into the clean state bridge, preserving nonzero scripted source
-lifetime ticks as the initial actor shell-scan lifetime. Driver spawn-command
-handling
+with lifetime decrementing on the source shell-scan cadence. Enemy-shot spawn
+commands can also carry scripted source fractions, velocities, and lifetime
+ticks for custom drivers. Source-backed bomber bomb actors carry stationary
+bomb-shell fraction and source-cadenced lifetime values into the clean state
+bridge, preserving nonzero scripted source lifetime ticks as the initial actor
+shell-scan lifetime. Driver spawn-command handling
 enforces the shared 20-slot source shell cap across enemy shots and bombs plus
 the red-label 10-slot bomber bomb shell cap. Source-backed bomb-shell spawn
 commands and enemy-shot spawn commands also honor the source `GETSHL` X/Y

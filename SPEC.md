@@ -765,9 +765,11 @@ reintroduce legacy implementation terminology.
   snapshots now carry source-shaped shell velocity/lifetime metadata into the
   clean state bridge; enemy-shot actors advance their own fixed-point fraction
   state every actor step while decrementing lifetime on the source shell-scan
-  cadence, and source-backed bomber bomb actors publish stationary bomb-shell
-  fraction plus source-cadenced lifetime state, preserving nonzero scripted
-  source lifetime ticks at spawn. Actor spawn command handling
+  cadence, and enemy-shot spawn commands can carry scripted source fractions,
+  velocities, and lifetime ticks. Source-backed bomber bomb actors publish
+  stationary bomb-shell fraction plus source-cadenced lifetime state,
+  preserving nonzero scripted source lifetime ticks at spawn. Actor spawn
+  command handling
   enforces the shared 20-slot source shell cap for enemy shots and bombs plus
   the red-label 10-slot bomber bomb shell cap, and source-backed bomb-shell
   plus enemy-shot spawns honor the source `GETSHL` X/Y placement bounds at

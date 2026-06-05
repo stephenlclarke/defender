@@ -2637,6 +2637,7 @@ pub enum SpawnRequest {
     EnemyLaser {
         position: Point,
         velocity: Velocity,
+        source: Option<ActorSourceEnemyProjectileMetadata>,
     },
     Lander {
         position: Point,
@@ -4100,9 +4101,14 @@ impl ActorGameDriver {
         id
     }
 
-    fn spawn_enemy_laser(&mut self, position: Point, velocity: Velocity) -> ActorId {
+    fn spawn_enemy_laser_from_spawn(
+        &mut self,
+        position: Point,
+        velocity: Velocity,
+        source: Option<ActorSourceEnemyProjectileMetadata>,
+    ) -> ActorId {
         let id = self.allocate_actor_id();
-        self.spawn_actor(EnemyLaserShot::new(id, position, velocity));
+        self.spawn_actor(EnemyLaserShot::new(id, position, velocity, source));
         id
     }
 
@@ -4221,11 +4227,15 @@ impl ActorGameDriver {
                 }) => {
                     self.spawn_laser(position, direction, owner);
                 }
-                GameCommand::Spawn(SpawnRequest::EnemyLaser { position, velocity }) => {
+                GameCommand::Spawn(SpawnRequest::EnemyLaser {
+                    position,
+                    velocity,
+                    source,
+                }) => {
                     if source_shell_spawn_in_bounds(position)
                         && reserve_source_shell_slot(&mut active_source_shells)
                     {
-                        self.spawn_enemy_laser(position, velocity);
+                        self.spawn_enemy_laser_from_spawn(position, velocity, source);
                     }
                 }
                 GameCommand::Spawn(SpawnRequest::Lander { position }) => {
@@ -5572,6 +5582,7 @@ impl Lander {
         commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
             position: self.position,
             velocity: self.lander_shot_velocity(prompt, behavior),
+            source: None,
         }));
         commands.push(GameCommand::PlaySound(SoundCue::LanderShot));
     }
@@ -6248,6 +6259,7 @@ fn push_swarmer_shot(
     commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
         position,
         velocity: hostile_shot_velocity(position, prompt, behavior.swarmer_shot_speed),
+        source: None,
     }));
     commands.push(GameCommand::PlaySound(SoundCue::SwarmerShot));
 }
@@ -6350,6 +6362,7 @@ fn push_baiter_shot(
     commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
         position,
         velocity: baiter_shot_velocity(position, prompt, behavior),
+        source: None,
     }));
     commands.push(GameCommand::PlaySound(SoundCue::BaiterShot));
 }
@@ -6880,18 +6893,29 @@ struct EnemyLaserShot {
 }
 
 impl EnemyLaserShot {
-    fn new(id: ActorId, position: Point, velocity: Velocity) -> Self {
+    fn new(
+        id: ActorId,
+        position: Point,
+        velocity: Velocity,
+        source: Option<ActorSourceEnemyProjectileMetadata>,
+    ) -> Self {
+        let source = source.unwrap_or(ActorSourceEnemyProjectileMetadata {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: actor_source_projectile_velocity_component(velocity.dx),
+            y_velocity: actor_source_projectile_velocity_component(velocity.dy),
+            lifetime_ticks: 0,
+        });
+        let lifetime_steps = if source.lifetime_ticks == 0 {
+            None
+        } else {
+            Some(u16::from(source.lifetime_ticks))
+        };
         Self {
             id,
             position,
-            source: ActorSourceEnemyProjectileMetadata {
-                x_fraction: 0,
-                y_fraction: 0,
-                x_velocity: actor_source_projectile_velocity_component(velocity.dx),
-                y_velocity: actor_source_projectile_velocity_component(velocity.dy),
-                lifetime_ticks: 0,
-            },
-            lifetime_steps: None,
+            source,
+            lifetime_steps,
         }
     }
 
@@ -8594,8 +8618,12 @@ mod tests {
                 .with_kind_behavior(ActorKind::EnemyLaser, behavior),
             source_shell_scan_tick: false,
         };
-        let mut shot =
-            EnemyLaserShot::new(ActorId::new(101), Point::new(10, 80), Velocity::new(1, -1));
+        let mut shot = EnemyLaserShot::new(
+            ActorId::new(101),
+            Point::new(10, 80),
+            Velocity::new(1, -1),
+            None,
+        );
         shot.source.x_velocity = 0x0180;
         shot.source.y_velocity = 0xFF80;
 
@@ -8643,7 +8671,8 @@ mod tests {
                 ..ActorBehaviorProfile::default()
             },
         );
-        let shot = driver.spawn_enemy_laser(Point::new(80, 120), Velocity::new(0, 0));
+        let shot =
+            driver.spawn_enemy_laser_from_spawn(Point::new(80, 120), Velocity::new(0, 0), None);
 
         let lifetimes = (0..=SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS)
             .map(|_| {
@@ -8663,7 +8692,7 @@ mod tests {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
-        driver.spawn_enemy_laser(Point::new(42, 120), Velocity::new(0, 0));
+        driver.spawn_enemy_laser_from_spawn(Point::new(42, 120), Velocity::new(0, 0), None);
 
         let report = driver.step(GameInput::NONE);
 
@@ -8686,7 +8715,7 @@ mod tests {
         driver.phase = Phase::Playing;
         driver.lives = 1;
         driver.spawn_player();
-        driver.spawn_enemy_laser(Point::new(42, 120), Velocity::new(0, 0));
+        driver.spawn_enemy_laser_from_spawn(Point::new(42, 120), Velocity::new(0, 0), None);
 
         let report = driver.step(GameInput::NONE);
 
@@ -8703,7 +8732,7 @@ mod tests {
         driver.lives = 3;
         driver.smart_bombs = INITIAL_SMART_BOMBS;
         driver.spawn_player();
-        driver.spawn_enemy_laser(Point::new(42, 120), Velocity::new(0, 0));
+        driver.spawn_enemy_laser_from_spawn(Point::new(42, 120), Velocity::new(0, 0), None);
         driver.spawn_bomb_for_test(Point::new(90, 120));
 
         let report = driver.step(GameInput {
@@ -8732,7 +8761,7 @@ mod tests {
         let player = driver.spawn_player();
         driver.spawn_lander_for_test(Point::new(90, 120));
         driver.spawn_laser(Point::new(10, 40), Direction::Right, player);
-        driver.spawn_enemy_laser(Point::new(70, 120), Velocity::new(0, 0));
+        driver.spawn_enemy_laser_from_spawn(Point::new(70, 120), Velocity::new(0, 0), None);
         driver.spawn_bomb_for_test(Point::new(120, 120));
 
         let report = driver.step(GameInput {
@@ -9004,7 +9033,7 @@ mod tests {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
-        driver.spawn_enemy_laser(Point::new(42, 120), Velocity::new(0, 0));
+        driver.spawn_enemy_laser_from_spawn(Point::new(42, 120), Velocity::new(0, 0), None);
 
         let report = driver.step(GameInput {
             xyzzy: XyzzyMode {
@@ -9499,14 +9528,17 @@ mod tests {
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position: Point::new(SOURCE_SHELL_X_MAX, 100),
                 velocity: Velocity::new(0, 0),
+                source: None,
             }),
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position: Point::new(SOURCE_SHELL_X_MAX - 1, i16::from(SOURCE_PLAYFIELD_Y_MIN)),
                 velocity: Velocity::new(0, 0),
+                source: None,
             }),
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position: Point::new(SOURCE_SHELL_X_MAX - 1, 100),
                 velocity: Velocity::new(0, 0),
+                source: None,
             }),
         ]);
         let report = driver.step(GameInput::NONE);
@@ -9521,11 +9553,66 @@ mod tests {
     }
 
     #[test]
+    fn source_enemy_laser_spawn_preserves_scripted_projectile_metadata() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.set_kind_behavior(
+            ActorKind::EnemyLaser,
+            ActorBehaviorProfile {
+                lander_shot_lifetime_steps: 40,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        driver.apply_commands(&[GameCommand::Spawn(SpawnRequest::EnemyLaser {
+            position: Point::new(80, 100),
+            velocity: Velocity::new(0, 0),
+            source: Some(ActorSourceEnemyProjectileMetadata {
+                x_fraction: 0x55,
+                y_fraction: 0x66,
+                x_velocity: 0,
+                y_velocity: 0,
+                lifetime_ticks: 7,
+            }),
+        })]);
+
+        let mut first_source = None;
+        let lifetimes = (0..=SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS)
+            .map(|_| {
+                let report = driver.step(GameInput::NONE);
+                let source = report
+                    .snapshots
+                    .iter()
+                    .find(|snapshot| snapshot.kind == ActorKind::EnemyLaser)
+                    .and_then(|snapshot| snapshot.source_enemy_projectile)
+                    .expect("scripted enemy laser should publish source metadata");
+                first_source.get_or_insert(source);
+                source.lifetime_ticks
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            first_source,
+            Some(ActorSourceEnemyProjectileMetadata {
+                x_fraction: 0x55,
+                y_fraction: 0x66,
+                x_velocity: 0,
+                y_velocity: 0,
+                lifetime_ticks: 7,
+            })
+        );
+        assert_eq!(lifetimes, vec![7, 7, 7, 7, 7, 7, 6]);
+    }
+
+    #[test]
     fn source_shell_cap_blocks_and_releases_hostile_projectile_slots() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         for index in 0..SOURCE_SHELL_LIMIT {
-            driver.spawn_enemy_laser(Point::new(40 + index as i16, 120), Velocity::new(0, 0));
+            driver.spawn_enemy_laser_from_spawn(
+                Point::new(40 + index as i16, 120),
+                Velocity::new(0, 0),
+                None,
+            );
         }
         let filled = driver.step(GameInput::NONE);
         assert_eq!(source_shell_snapshot_count(&filled), SOURCE_SHELL_LIMIT);
@@ -9534,6 +9621,7 @@ mod tests {
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position: Point::new(96, 96),
                 velocity: Velocity::new(0, 0),
+                source: None,
             }),
             GameCommand::Spawn(SpawnRequest::Bomb {
                 position: Point::new(100, 100),
@@ -9598,6 +9686,7 @@ mod tests {
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position: Point::new(116, 100),
                 velocity: Velocity::new(0, 0),
+                source: None,
             }),
         ]);
         let capped = driver.step(GameInput::NONE);
@@ -9795,6 +9884,7 @@ mod tests {
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
                     position: Point { x: 69, y: 120 },
                     velocity: Velocity { dx: -3, dy: 0 },
+                    source: None,
                 })
             )
         }));
@@ -9842,6 +9932,7 @@ mod tests {
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
                     position: Point { x: 70, y: 120 },
                     velocity: Velocity { dx: -4, dy: 0 },
+                    source: None,
                 })
             )
         }));

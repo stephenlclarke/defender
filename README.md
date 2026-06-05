@@ -109,9 +109,10 @@ their fixed-point metadata through snapshots, publish per-step movement/facing
 metadata for the clean state bridge, and advance fraction state during active
 motion. Hostile projectile actors also publish source-shaped shell metadata:
 enemy lasers own and advance fixed-point source velocity, fraction, and
-lifetime state with the red-label shell-scan cadence, while source-backed
-bomber bomb actors carry stationary source bomb-shell fraction and
-source-cadenced lifetime state into the clean `EnemyProjectileSnapshot`
+lifetime state with the red-label shell-scan cadence, and enemy-shot spawn
+commands can carry scripted source fractions, velocities, and lifetime ticks.
+Source-backed bomber bomb actors carry stationary source bomb-shell fraction
+and source-cadenced lifetime state into the clean `EnemyProjectileSnapshot`
 contract, with nonzero scripted source lifetime ticks preserved at spawn. The
 driver enforces the shared 20-slot source shell cap across
 enemy-shot and bomb spawn commands plus the red-label 10-slot bomber bomb shell

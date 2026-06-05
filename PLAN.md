@@ -4543,3 +4543,28 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780640100003009`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780640315297079`.
+- `2026-06-05 07:32 BST`: Completed the actor scripted enemy-shot metadata
+  cycle. `SpawnRequest::EnemyLaser` now carries optional source projectile
+  metadata, so custom/scripted drivers can define exact source fractions,
+  fixed-point velocities, and shell lifetime ticks for enemy shots while
+  existing lander, swarmer, and baiter actor shots continue to emit ordinary
+  enemy-shot commands with `source: None`. Source-backed scripted enemy lasers
+  preserve nonzero lifetime ticks and decrement them on the source shell-scan
+  cadence. Removed the stale no-source enemy-laser helper after the source-aware
+  spawn path became the single driver boundary. README, SPEC, and the actor
+  architecture notes now document scripted enemy-shot metadata. No legacy code,
+  tests, or scaffolding were safe to remove in this slice because clean
+  smoke/fidelity/oracle evidence still depends on clean runtime boundaries
+  outside the actor path. Validation passed with `cargo fmt --check`, focused
+  scripted enemy-shot/bounds/lifetime and lander/swarmer/baiter shot tests,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780640384287429`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780641115599679`.
