@@ -1547,6 +1547,7 @@ impl ActorBaiterSpawn {
             position,
             profile,
             player_position,
+            Velocity::default(),
             false,
             u8::MAX,
         );
@@ -2751,6 +2752,13 @@ impl StepPrompt {
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive)
             .map(|snapshot| snapshot.position)
+    }
+
+    pub fn player_velocity(&self) -> Option<Velocity> {
+        self.snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive)
+            .map(|snapshot| snapshot.velocity)
     }
 
     fn snapshot(&self, id: ActorId) -> Option<&ActorSnapshot> {
@@ -6464,7 +6472,15 @@ impl Baiter {
                     .source_rng
                     .map(|source_rng| source_rng.seed)
                     .unwrap_or_else(|| actor_source_motion_seed(prompt.step, self.id));
-                source_baiter_velocity_update(source, self.position, profile, player, true, seed);
+                source_baiter_velocity_update(
+                    source,
+                    self.position,
+                    profile,
+                    player,
+                    prompt.player_velocity().unwrap_or_default(),
+                    true,
+                    seed,
+                );
             }
             source.sleep_ticks = SOURCE_BAITER_LOOP_SLEEP_TICKS;
         }
@@ -6612,6 +6628,7 @@ fn source_baiter_velocity_update(
     position: Point,
     profile: ActorSourceWaveProfile,
     player_position: Point,
+    player_velocity: Velocity,
     honor_seek_probability: bool,
     seed: u8,
 ) -> bool {
@@ -6626,7 +6643,10 @@ fn source_baiter_velocity_update(
         } else {
             SOURCE_BAITER_X_SEEK_SPEED
         };
-        source.x_velocity = actor_sign_extend_u8_to_u16(x_seek_byte);
+        let player_x_velocity =
+            actor_arithmetic_shift_right_word(actor_source_velocity_word(player_velocity.dx), 2);
+        source.x_velocity =
+            actor_sign_extend_u8_to_u16(x_seek_byte).wrapping_add(player_x_velocity);
     }
 
     let y_delta = position.y - player_position.y;
@@ -6636,8 +6656,11 @@ fn source_baiter_velocity_update(
         } else {
             SOURCE_BAITER_Y_SEEK_BYTE
         };
-        source.y_velocity =
-            actor_arithmetic_shift_right_word(u16::from_be_bytes([y_seek_byte, 0]), 1);
+        source.y_velocity = actor_arithmetic_shift_right_word(
+            u16::from_be_bytes([y_seek_byte, 0])
+                .wrapping_add(actor_source_velocity_word(player_velocity.dy)),
+            1,
+        );
     }
 
     true
@@ -6645,6 +6668,10 @@ fn source_baiter_velocity_update(
 
 fn actor_arithmetic_shift_right_word(value: u16, shift: u8) -> u16 {
     ((value as i16) >> shift.min(15)) as u16
+}
+
+fn actor_source_velocity_word(value: i16) -> u16 {
+    value as u16
 }
 
 fn actor_source_motion_seed(step: u64, id: ActorId) -> u8 {
@@ -10389,6 +10416,54 @@ mod tests {
                 y_fraction: 0,
                 x_velocity: 0xFFC0,
                 y_velocity: 0,
+                shot_timer: 1,
+                sleep_ticks: SOURCE_BAITER_LOOP_SLEEP_TICKS,
+                picture_frame: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn source_baiter_retarget_adds_player_velocity() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 1;
+        driver.source_rng = ActorSourceRng {
+            seed: 70,
+            hseed: 0,
+            lseed: 0,
+        };
+        let player_id = ActorId::new(90);
+        let mut player = actor_snapshot(player_id.value(), ActorKind::Player, Point::new(42, 112));
+        player.velocity = Velocity::new(8, 4);
+        driver.snapshots.insert(player_id, player);
+        let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
+            position: Point::new(70, 140),
+            source: Some(ActorSourceBaiterMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                shot_timer: 2,
+                sleep_ticks: 0,
+                picture_frame: 2,
+            }),
+        });
+
+        let report = driver.step(GameInput::NONE);
+
+        assert_eq!(
+            report.source_rng.map(|source_rng| source_rng.seed),
+            Some(227)
+        );
+        assert_eq!(snapshot_for(&report, baiter).position, Point::new(69, 139));
+        assert_eq!(
+            snapshot_for(&report, baiter).source_baiter,
+            Some(ActorSourceBaiterMetadata {
+                x_fraction: 0x08,
+                y_fraction: 0x82,
+                x_velocity: 0xFFC2,
+                y_velocity: 0xFF82,
                 shot_timer: 1,
                 sleep_ticks: SOURCE_BAITER_LOOP_SLEEP_TICKS,
                 picture_frame: 0,

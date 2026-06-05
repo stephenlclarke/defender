@@ -199,7 +199,8 @@ fixed-point position/fraction state. Source-backed bomber actors also update
 seeded picture-frame and Y-velocity metadata, including cruise-altitude and
 player-relative Y adjustments, from the driver-provided source RNG snapshot.
 Source-backed baiter actors use that same source RNG snapshot to gate
-picture-wrap retargeting against the wave's `baiter_seek_probability`.
+picture-wrap retargeting against the wave's `baiter_seek_probability` and add
+player velocity into the source-shaped seek velocity.
 Hostile projectile actors publish source-shaped shell metadata too: enemy
 lasers own and advance fixed-point velocity, fraction, and lifetime values,
 with lifetime decrementing on the source shell-scan cadence. Enemy-shot spawn
@@ -309,9 +310,9 @@ The actor driver now owns a first Defender gameplay loop:
   enemies remain. Expired timers spawn source-backed baiter actors up to the
   source active cap. Baiters pursue and shoot through actor-owned metadata,
   publish three-frame source animation state, gate picture-wrap retargeting
-  through the driver-provided source RNG snapshot, score 200 points on laser
-  hit, and do not block wave completion once lander/bomber/pod/swarmer
-  snapshots are gone.
+  through the driver-provided source RNG snapshot, fold player velocity into
+  source-shaped seek velocity, score 200 points on laser hit, and do not block
+  wave completion once lander/bomber/pod/swarmer snapshots are gone.
 - Carried humans follow their lander. If the carrier disappears, the human
   falls under a simple acceleration model and emits the release sound cue.
 - Falling humans caught by the player award 500 points, emit the rescue sound
