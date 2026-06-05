@@ -4243,3 +4243,27 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780633699455039`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780634282448509`.
+- `2026-06-05 05:45 BST`: Completed the actor script manifest cycle. Added
+  read-only manifests for `ActorBehaviorScript`, `ActorWaveScript`, wave
+  profiles, and the driver current script state so custom drivers and tests can
+  inspect configured behavior/wave data without mutating actor internals.
+  `StepReport` now carries the effective per-step behavior manifest, making
+  transient input overrides such as `XYZZY` invincibility visible through the
+  same behavior-profile mechanism as persistent scripts. Added focused
+  regressions for manifest resolution order, driver/wave export, and effective
+  `XYZZY` behavior versus persistent driver script state. README, SPEC, and the
+  actor architecture notes now document the manifest boundary. No legacy code,
+  tests, or scaffolding were safe to remove because default live play still uses
+  clean `Game`, and legacy tooling still backs ROM reports, trace/media
+  helpers, and oracle evidence. Validation passed with focused manifest tests,
+  `cargo fmt --check`, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780634355717309`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780634724324509`.

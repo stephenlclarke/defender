@@ -1031,6 +1031,47 @@ pub struct ActorBehaviorScript {
     actor_profiles: BTreeMap<ActorId, ActorBehaviorProfile>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorKindBehaviorProfile {
+    pub kind: ActorKind,
+    pub profile: ActorBehaviorProfile,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorInstanceBehaviorProfile {
+    pub actor: ActorId,
+    pub profile: ActorBehaviorProfile,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorBehaviorScriptManifest {
+    pub default_profile: ActorBehaviorProfile,
+    pub kind_profiles: Vec<ActorKindBehaviorProfile>,
+    pub actor_profiles: Vec<ActorInstanceBehaviorProfile>,
+}
+
+impl ActorBehaviorScriptManifest {
+    pub fn kind_profile(&self, kind: ActorKind) -> Option<ActorBehaviorProfile> {
+        self.kind_profiles
+            .iter()
+            .find(|entry| entry.kind == kind)
+            .map(|entry| entry.profile)
+    }
+
+    pub fn actor_profile(&self, actor: ActorId) -> Option<ActorBehaviorProfile> {
+        self.actor_profiles
+            .iter()
+            .find(|entry| entry.actor == actor)
+            .map(|entry| entry.profile)
+    }
+
+    pub fn behavior_for(&self, actor: ActorId, kind: ActorKind) -> ActorBehaviorProfile {
+        self.actor_profile(actor)
+            .or_else(|| self.kind_profile(kind))
+            .unwrap_or(self.default_profile)
+    }
+}
+
 impl ActorBehaviorScript {
     pub fn new(default_profile: ActorBehaviorProfile) -> Self {
         Self {
@@ -1076,6 +1117,28 @@ impl ActorBehaviorScript {
             .copied()
             .or_else(|| self.kind_profiles.get(&kind).copied())
             .unwrap_or(self.default_profile)
+    }
+
+    pub fn manifest(&self) -> ActorBehaviorScriptManifest {
+        ActorBehaviorScriptManifest {
+            default_profile: self.default_profile,
+            kind_profiles: self
+                .kind_profiles
+                .iter()
+                .map(|(kind, profile)| ActorKindBehaviorProfile {
+                    kind: *kind,
+                    profile: *profile,
+                })
+                .collect(),
+            actor_profiles: self
+                .actor_profiles
+                .iter()
+                .map(|(actor, profile)| ActorInstanceBehaviorProfile {
+                    actor: *actor,
+                    profile: *profile,
+                })
+                .collect(),
+        }
     }
 
     fn with_hyperspace_source_seed(&self, seed: ActorHyperspaceSourceSeed) -> Self {
@@ -1966,6 +2029,27 @@ impl ActorWaveProfile {
     pub fn pod_spawn_points(&self) -> Vec<Point> {
         self.pod_spawns.iter().map(|spawn| spawn.position).collect()
     }
+
+    pub fn manifest(&self) -> ActorWaveProfileManifest {
+        ActorWaveProfileManifest {
+            wave: self.wave,
+            behavior_script: self.behavior_script.manifest(),
+            lander_spawns: self.lander_spawns.clone(),
+            bomber_spawns: self.bomber_spawns.clone(),
+            pod_spawns: self.pod_spawns.clone(),
+            human_spawns: self.human_spawns.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorWaveProfileManifest {
+    pub wave: u16,
+    pub behavior_script: ActorBehaviorScriptManifest,
+    pub lander_spawns: Vec<ActorLanderSpawn>,
+    pub bomber_spawns: Vec<ActorBomberSpawn>,
+    pub pod_spawns: Vec<ActorPodSpawn>,
+    pub human_spawns: Vec<ActorHumanSpawn>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2038,6 +2122,19 @@ impl ActorWaveScript {
             .find(|profile| wave >= profile.wave)
             .unwrap_or(&self.waves[0])
     }
+
+    pub fn manifest(&self) -> ActorWaveScriptManifest {
+        ActorWaveScriptManifest {
+            name: self.name.clone(),
+            waves: self.waves.iter().map(ActorWaveProfile::manifest).collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorWaveScriptManifest {
+    pub name: String,
+    pub waves: Vec<ActorWaveProfileManifest>,
 }
 
 impl Default for ActorWaveScript {
@@ -2725,6 +2822,7 @@ pub struct StepReport {
     pub smart_bombs: u8,
     pub high_scores: [u32; 5],
     pub high_score_initials: HighScoreInitialsState,
+    pub behavior_script: ActorBehaviorScriptManifest,
     pub snapshots: Vec<ActorSnapshot>,
     pub draws: Vec<DrawCommand>,
     pub sounds: Vec<SoundCue>,
@@ -3546,6 +3644,16 @@ impl Default for ActorRuntimeAdapter {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorDriverScriptManifest {
+    pub step: u64,
+    pub phase: Phase,
+    pub wave: u16,
+    pub behavior_script: ActorBehaviorScriptManifest,
+    pub wave_script: ActorWaveScriptManifest,
+    pub current_wave_profile: ActorWaveProfileManifest,
+}
+
 fn actor_gameplay_events_for_report(report: &StepReport) -> Vec<GameEvent> {
     let mut events = Vec::new();
     for command in &report.commands {
@@ -3720,6 +3828,7 @@ impl ActorGameDriver {
             smart_bombs: self.smart_bombs,
             high_scores: self.high_scores.entries(),
             high_score_initials: self.high_score_initials,
+            behavior_script: behavior_script.manifest(),
             snapshots: self.snapshots.values().cloned().collect(),
             draws,
             sounds,
@@ -3749,6 +3858,18 @@ impl ActorGameDriver {
 
     pub fn behavior_script_mut(&mut self) -> &mut ActorBehaviorScript {
         &mut self.behavior_script
+    }
+
+    pub fn script_manifest(&self) -> ActorDriverScriptManifest {
+        let current_wave = self.wave.max(1);
+        ActorDriverScriptManifest {
+            step: self.step,
+            phase: self.phase,
+            wave: self.wave,
+            behavior_script: self.behavior_script.manifest(),
+            wave_script: self.wave_script.manifest(),
+            current_wave_profile: self.wave_script.profile_for_wave(current_wave).manifest(),
+        }
     }
 
     pub fn set_default_behavior(&mut self, profile: ActorBehaviorProfile) {
@@ -6909,6 +7030,7 @@ mod tests {
             smart_bombs: 3,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
             high_score_initials: HighScoreInitialsState::EMPTY,
+            behavior_script: ActorBehaviorScript::default().manifest(),
             snapshots: Vec::new(),
             draws: vec![
                 DrawCommand::sprite(ActorId(101), SpriteKey::Laser, Point::new(40, 80)),
@@ -7014,6 +7136,7 @@ mod tests {
                 initials: [Some('R'), None, None],
                 cursor: 1,
             },
+            behavior_script: ActorBehaviorScript::default().manifest(),
             snapshots: vec![
                 player,
                 lander,
@@ -9016,6 +9139,162 @@ mod tests {
             cleared
                 .commands
                 .contains(&GameCommand::AdvanceWave { wave: 2 })
+        );
+    }
+
+    #[test]
+    fn behavior_script_manifest_exports_resolution_order() {
+        let default_behavior = ActorBehaviorProfile {
+            player_speed: 3,
+            ..ActorBehaviorProfile::default()
+        };
+        let lander_behavior = ActorBehaviorProfile {
+            lander_drift_speed: 4,
+            lander_fire_period_steps: u64::MAX,
+            ..ActorBehaviorProfile::default()
+        };
+        let actor = ActorId::new(42);
+        let actor_behavior = ActorBehaviorProfile {
+            lander_drift_speed: 7,
+            lander_fire_period_steps: u64::MAX,
+            ..ActorBehaviorProfile::default()
+        };
+        let script = ActorBehaviorScript::new(default_behavior)
+            .with_kind_behavior(ActorKind::Lander, lander_behavior)
+            .with_actor_behavior(actor, actor_behavior);
+
+        let manifest = script.manifest();
+
+        assert_eq!(manifest.default_profile, default_behavior);
+        assert_eq!(
+            manifest.kind_profiles,
+            [ActorKindBehaviorProfile {
+                kind: ActorKind::Lander,
+                profile: lander_behavior
+            }]
+        );
+        assert_eq!(
+            manifest.actor_profiles,
+            [ActorInstanceBehaviorProfile {
+                actor,
+                profile: actor_behavior
+            }]
+        );
+        assert_eq!(
+            manifest.behavior_for(actor, ActorKind::Lander),
+            actor_behavior
+        );
+        assert_eq!(
+            manifest.behavior_for(ActorId::new(99), ActorKind::Lander),
+            lander_behavior
+        );
+        assert_eq!(
+            manifest.behavior_for(ActorId::new(99), ActorKind::Bomber),
+            default_behavior
+        );
+    }
+
+    #[test]
+    fn driver_script_manifest_exports_current_wave_and_spawns() {
+        let lander_behavior = ActorBehaviorProfile {
+            lander_seek_speed: 6,
+            lander_fire_period_steps: u64::MAX,
+            lander_mode: LanderBehaviorMode::ChasePlayer,
+            ..ActorBehaviorProfile::default()
+        };
+        let wave_script = ActorWaveScript::new(
+            "manifest-test",
+            vec![ActorWaveProfile::with_family_spawns(
+                1,
+                ActorBehaviorScript::default()
+                    .with_kind_behavior(ActorKind::Lander, lander_behavior),
+                vec![ActorLanderSpawn::new(Point::new(80, 96))],
+                vec![ActorBomberSpawn::new(Point::new(120, 80))],
+                vec![ActorPodSpawn::new(Point::new(160, 88))],
+                vec![ActorHumanSpawn::new(
+                    Point::new(32, HUMAN_GROUND_Y),
+                    HumanMode::Grounded,
+                )],
+            )],
+        );
+        let mut driver = ActorGameDriver::with_wave_script(wave_script);
+
+        let attract_manifest = driver.script_manifest();
+        assert_eq!(attract_manifest.phase, Phase::Attract);
+        assert_eq!(attract_manifest.wave_script.name, "manifest-test");
+        assert_eq!(
+            attract_manifest.current_wave_profile.lander_spawns[0].position,
+            Point::new(80, 96)
+        );
+        assert_eq!(
+            attract_manifest
+                .current_wave_profile
+                .bomber_spawns
+                .first()
+                .map(|spawn| spawn.position),
+            Some(Point::new(120, 80))
+        );
+        assert_eq!(
+            attract_manifest
+                .behavior_script
+                .kind_profile(ActorKind::Lander),
+            None
+        );
+
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        let playing_manifest = driver.script_manifest();
+
+        assert_eq!(playing_manifest.phase, Phase::Playing);
+        assert_eq!(playing_manifest.wave, 1);
+        assert_eq!(
+            playing_manifest
+                .behavior_script
+                .kind_profile(ActorKind::Lander),
+            Some(lander_behavior)
+        );
+        assert_eq!(
+            playing_manifest
+                .current_wave_profile
+                .behavior_script
+                .kind_profile(ActorKind::Lander),
+            Some(lander_behavior)
+        );
+    }
+
+    #[test]
+    fn step_report_manifest_carries_effective_xyzzy_behavior_override() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let player = driver.spawn_player();
+
+        let report = driver.step(GameInput {
+            xyzzy: XyzzyMode {
+                active: true,
+                invincible: true,
+                ..XyzzyMode::INACTIVE
+            },
+            ..GameInput::NONE
+        });
+
+        assert!(
+            !report
+                .behavior_script
+                .behavior_for(player, ActorKind::Player)
+                .player_takes_enemy_collision_damage
+        );
+        assert!(
+            driver
+                .script_manifest()
+                .behavior_script
+                .behavior_for(player, ActorKind::Player)
+                .player_takes_enemy_collision_damage
         );
     }
 

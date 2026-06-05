@@ -137,6 +137,13 @@ movement behavior modes, for example making a later-wave lander ignore humans
 and chase the player, or making a specific bomber chase the player instead of
 using its fallback drift.
 
+`ActorBehaviorScript::manifest`, `ActorWaveScript::manifest`, and
+`ActorGameDriver::script_manifest` expose read-only snapshots of configured
+driver behavior and wave scripts for custom drivers and test tooling.
+`StepReport::behavior_script` carries the effective behavior manifest used for
+that simulation step, after transient input overrides such as `XYZZY`
+invincibility have been applied.
+
 Hyperspace is represented as a driver-applied gameplay command rather than a
 render frame effect. The player actor emits `GameCommand::Hyperspace` and
 `SoundCue::Hyperspace` from the mapped `H` input; the driver clears active
