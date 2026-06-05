@@ -2454,6 +2454,10 @@ fn source_explosion_lifetime_frames(kind: ExplosionKind) -> u8 {
     }
 }
 
+pub(crate) fn source_explosion_size_for_age(age: u16) -> u16 {
+    SOURCE_EXPLOSION_INITIAL_SIZE.wrapping_add(SOURCE_EXPLOSION_SIZE_DELTA.wrapping_mul(age))
+}
+
 fn source_terrain_explosion_size_for_age(age: u8) -> u16 {
     let step_index = usize::from(
         SOURCE_TERRAIN_EXPLOSION_GROWTH_STEPS
@@ -2465,8 +2469,7 @@ fn source_terrain_explosion_size_for_age(age: u8) -> u16 {
                     .expect("terrain explosion growth table is non-empty")
             }),
     );
-    SOURCE_EXPLOSION_INITIAL_SIZE
-        .wrapping_add(SOURCE_EXPLOSION_SIZE_DELTA.wrapping_mul(step_index as u16))
+    source_explosion_size_for_age(step_index as u16)
 }
 
 fn source_explosion_display_size(explosion: ExplosionSnapshot) -> u16 {
@@ -14930,6 +14933,25 @@ fn source_expanded_object_uses_pixel_cloud(detail: &ExpandedObjectDetailSnapshot
     }
 }
 
+pub(crate) fn push_source_explosion_cloud_pixels(
+    scene: &mut RenderScene,
+    kind: ExplosionKind,
+    position: ScreenPosition,
+    source_center: Option<ScreenPosition>,
+    source_size: u16,
+) -> bool {
+    let mut explosion = ExplosionSnapshot::source_spawn(kind, position);
+    explosion.source_center = source_center;
+    explosion.source_size = source_size;
+    let detail = explosion.expanded_object_detail();
+    if !source_expanded_object_uses_pixel_cloud(&detail) {
+        return false;
+    }
+
+    push_expanded_object_explosion_pixels(scene, &detail);
+    true
+}
+
 fn push_expanded_object_explosion_pixels(
     scene: &mut RenderScene,
     detail: &ExpandedObjectDetailSnapshot,
@@ -16376,9 +16398,10 @@ mod tests {
         ScorePopupKind, SoundEvent, SourceBaiterSnapshot, SourceBomberSnapshot,
         SourceLanderSnapshot, SourceMutantSnapshot, SourcePodSnapshot, SourceRandSnapshot,
         SourceSwarmerSnapshot, TerrainBlowStage, WaveProfileSnapshot, WorldSnapshot, WorldVector,
-        source_astronaut_catch_sound_event, source_astronaut_hit_sound_event,
-        source_astronaut_safe_landing_sound_event, source_bomb_collision_sound_event,
-        source_enemy_hit_sound_event, source_enemy_shot_sound_event,
+        push_source_explosion_cloud_pixels, source_astronaut_catch_sound_event,
+        source_astronaut_hit_sound_event, source_astronaut_safe_landing_sound_event,
+        source_bomb_collision_sound_event, source_enemy_hit_sound_event,
+        source_enemy_shot_sound_event, source_explosion_size_for_age,
         source_hyperspace_appearance_sound_event, source_lander_pickup_sound_event,
         source_lander_suck_sound_event, source_laser_fire_sound_event,
         source_player_death_sound_event, source_terrain_blow_complete_sound_event,
@@ -27768,6 +27791,46 @@ mod tests {
                 .iter()
                 .any(|sprite| sprite.sprite == SpriteId::BOMB_EXPLOSION)
         );
+    }
+
+    #[test]
+    fn source_explosion_cloud_helper_projects_family_pixels() {
+        let mut scene = RenderScene::empty(0, SurfaceSize::new(320, 240));
+
+        assert!(push_source_explosion_cloud_pixels(
+            &mut scene,
+            ExplosionKind::Lander,
+            ScreenPosition::new(30, 40),
+            None,
+            source_explosion_size_for_age(2),
+        ));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
+                && sprite.layer == RenderLayer::Objects
+        }));
+        assert!(!scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_LANDER && sprite.layer == RenderLayer::Objects
+        }));
+
+        let mut hidden_scene = RenderScene::empty(1, SurfaceSize::new(320, 240));
+        assert!(push_source_explosion_cloud_pixels(
+            &mut hidden_scene,
+            ExplosionKind::Lander,
+            ScreenPosition::new(30, 40),
+            None,
+            source_explosion_size_for_age(1),
+        ));
+        assert!(hidden_scene.sprites.is_empty());
+
+        let mut unsupported_scene = RenderScene::empty(2, SurfaceSize::new(320, 240));
+        assert!(!push_source_explosion_cloud_pixels(
+            &mut unsupported_scene,
+            ExplosionKind::Bomb,
+            ScreenPosition::new(30, 40),
+            None,
+            source_explosion_size_for_age(2),
+        ));
+        assert!(unsupported_scene.sprites.is_empty());
     }
 
     #[test]

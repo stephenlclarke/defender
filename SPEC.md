@@ -818,8 +818,9 @@ reintroduce legacy implementation terminology.
   `HYP2` `LSEED > 0xC0` delayed death-risk routing through the same player
   death path, final-life game-over/high-score handoff, source-family explosion
   variant draw metadata for hostile families, bomb, player, and human clouds,
-  age-based source explosion-size scaling in the actor render bridge, and
-  mutant spawn handoff. Default
+  age-based source explosion-size scaling in the actor render bridge,
+  descriptor-backed enemy-family source explosion pixel clouds, and mutant
+  spawn handoff. Default
   interactive play now reaches this actor path through `ActorRuntimeAdapter`.
 
 ## Compatibility Features

@@ -89,7 +89,8 @@ verification tools.
   draws now carry lander, mutant, bomber, pod, swarmer, baiter, bomb, player,
   and human variant metadata through the actor render and clean-state bridges,
   and actor render output now uses draw age with the clean source
-  explosion-size curve so those clouds expand around their source centers.
+  explosion-size curve; descriptor-backed enemy-family clouds route through the
+  clean source expanded-object pixel renderer instead of static atlas sprites.
 - Primary runtime source is `src/`; the converted implementation is parked in
   `src_legacy/` and should remain optional oracle/tooling evidence only.
 - Normal interactive live play now uses the actor runtime through
@@ -740,6 +741,28 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 10:54 BST`: Completed the actor source explosion pixel-cloud
+  routing slice. Added a clean crate-private `push_source_explosion_cloud_pixels`
+  helper that builds source explosion descriptor detail and reuses the clean
+  expanded-object explosion pixel renderer, including hidden pre-visible frames
+  and descriptor-backed family ownership. `ActorRenderSceneBridge` now tries
+  that helper for source-screen explosion draw positions before falling back to
+  the scaled sprite path, so lander, mutant, bomber, pod, swarmer, and baiter
+  explosion clouds render as source pixels instead of static family atlas
+  sprites while bomb, human, and player clouds keep their existing fallback
+  sprite behavior. Added focused regressions for actor render-scene source
+  pixel-cloud projection and the clean helper's handled/hidden/unsupported
+  cases. Validation passed with `cargo fmt --check`, focused actor render and
+  clean source-explosion tests, `cargo test actor_game::tests::target6 --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`, `cargo test
+  actor_live --all-targets --features legacy-tools`, `cargo test actor_smoke
+  --all-targets --features legacy-tools`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools -- -D
+  warnings`, touched-doc markdownlint, and `git diff --check`. Slack cycle
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780652751573369`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780653243724269`.
 - `2026-06-05 10:43 BST`: Completed the actor source-sized explosion growth
   slice. `ActorRenderSceneBridge` now consumes `VisualEffect::ExplosionCloud`
   age metadata, derives the source explosion size from the clean red-label

@@ -14,12 +14,12 @@ use crate::{
         GameInput as CleanGameInput, GameOverSnapshot, GamePhase, GameState,
         HighScoreEntrySnapshot, HighScoreTableEntrySnapshot, HighScoreTablesSnapshot,
         HumanSnapshot as CleanHumanSnapshot, PlayerSnapshot, PlayerStockSnapshot,
-        ProjectileSnapshot as CleanProjectileSnapshot, SOURCE_EXPLOSION_INITIAL_SIZE,
-        SOURCE_EXPLOSION_SIZE_DELTA, ScorePopupKind as CleanScorePopupKind,
+        ProjectileSnapshot as CleanProjectileSnapshot, ScorePopupKind as CleanScorePopupKind,
         ScorePopupSnapshot as CleanScorePopupSnapshot, ScoreSnapshot, SoundEvent,
         SourceBaiterSnapshot, SourceBomberSnapshot, SourceLanderSnapshot, SourceMutantSnapshot,
         SourcePodSnapshot, SourceRandSnapshot, SourceSwarmerSnapshot, WaveProfileSnapshot,
-        WorldSnapshot, WorldVector, source_explosion_render_scale,
+        WorldSnapshot, WorldVector, push_source_explosion_cloud_pixels,
+        source_explosion_render_scale, source_explosion_size_for_age,
     },
     renderer::{
         Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
@@ -3383,6 +3383,13 @@ fn screen_position(point: Point) -> ScreenPosition {
     ScreenPosition::new(screen_coordinate(point.x), screen_coordinate(point.y))
 }
 
+fn try_screen_position(point: Point) -> Option<ScreenPosition> {
+    Some(ScreenPosition::new(
+        u8::try_from(point.x).ok()?,
+        u8::try_from(point.y).ok()?,
+    ))
+}
+
 fn screen_velocity(velocity: Velocity) -> ScreenVelocity {
     ScreenVelocity::new(
         screen_velocity_component(velocity.dx),
@@ -3583,7 +3590,20 @@ impl ActorRenderSceneBridge {
                 PLAYER_EXPLOSION_PIXEL_SCENE_SIZE,
             ),
         };
-        let scale = actor_source_explosion_render_scale(age);
+        let source_size = source_explosion_size_for_age(age);
+        if let Some(source_position) = try_screen_position(position)
+            && push_source_explosion_cloud_pixels(
+                scene,
+                clean_explosion_kind(kind),
+                source_position,
+                None,
+                source_size,
+            )
+        {
+            return;
+        }
+
+        let scale = actor_source_explosion_render_scale(source_size);
         let size = [base_size[0] * scale, base_size[1] * scale];
         let origin = point_position(position);
         let centered_position = [
@@ -3613,9 +3633,7 @@ impl Default for ActorRenderSceneBridge {
     }
 }
 
-fn actor_source_explosion_render_scale(age: u16) -> f32 {
-    let source_size =
-        SOURCE_EXPLOSION_INITIAL_SIZE.wrapping_add(SOURCE_EXPLOSION_SIZE_DELTA.wrapping_mul(age));
+fn actor_source_explosion_render_scale(source_size: u16) -> f32 {
     source_explosion_render_scale(source_size)
         .map(f32::from)
         .unwrap_or(1.0)
@@ -8625,7 +8643,7 @@ mod tests {
                     Point::new(104, 82),
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Lander,
-                        age: 1,
+                        age: 2,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -8634,7 +8652,7 @@ mod tests {
                     Point::new(108, 84),
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Mutant,
-                        age: 1,
+                        age: 2,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -8643,7 +8661,7 @@ mod tests {
                     Point::new(112, 86),
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Bomber,
-                        age: 1,
+                        age: 2,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -8652,7 +8670,7 @@ mod tests {
                     Point::new(116, 88),
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Pod,
-                        age: 1,
+                        age: 2,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -8661,7 +8679,7 @@ mod tests {
                     Point::new(120, 90),
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Swarmer,
-                        age: 1,
+                        age: 2,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -8670,7 +8688,7 @@ mod tests {
                     Point::new(122, 92),
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Baiter,
-                        age: 1,
+                        age: 2,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -8727,12 +8745,24 @@ mod tests {
             SpriteId::ENEMY_BAITER,
         ] {
             assert!(
-                scene.sprites.iter().any(
+                !scene.sprites.iter().any(
                     |sprite| sprite.sprite == sprite_id && sprite.layer == RenderLayer::Objects
                 ),
-                "missing actor explosion sprite {sprite_id:?}"
+                "source-family explosion should use pixel cloud, not {sprite_id:?}"
             );
         }
+        let source_cloud_pixels = scene
+            .sprites
+            .iter()
+            .filter(|sprite| {
+                sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
+                    && sprite.layer == RenderLayer::Objects
+            })
+            .count();
+        assert!(
+            source_cloud_pixels > 1,
+            "source-family explosions should project expanded-object pixels"
+        );
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::BOMB_EXPLOSION && sprite.layer == RenderLayer::Objects
         }));
@@ -8754,10 +8784,22 @@ mod tests {
 
     #[test]
     fn actor_source_explosion_render_scale_uses_source_size_curve() {
-        assert_eq!(actor_source_explosion_render_scale(0), 1.0);
-        assert_eq!(actor_source_explosion_render_scale(1), 1.0);
-        assert_eq!(actor_source_explosion_render_scale(2), 2.0);
-        assert_eq!(actor_source_explosion_render_scale(18), 3.0);
+        assert_eq!(
+            actor_source_explosion_render_scale(source_explosion_size_for_age(0)),
+            1.0
+        );
+        assert_eq!(
+            actor_source_explosion_render_scale(source_explosion_size_for_age(1)),
+            1.0
+        );
+        assert_eq!(
+            actor_source_explosion_render_scale(source_explosion_size_for_age(2)),
+            2.0
+        );
+        assert_eq!(
+            actor_source_explosion_render_scale(source_explosion_size_for_age(18)),
+            3.0
+        );
     }
 
     #[test]
