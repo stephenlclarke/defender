@@ -331,6 +331,7 @@ same event model from checked text script lines:
 # action start duration x y ...
 text 1 forever 10 10 PRESS START
 sprite 2 forever defender_logo 40 44
+high_scores 1 forever 82 188 10 5
 williams_logo 5 - 108 60
 defender_wordmark 72 - 96 144
 ```
@@ -338,12 +339,15 @@ defender_wordmark 72 - 96 144
 Blank lines and `#` comments are ignored. `duration` can be a step count or
 `-`, `none`, `forever`, or `infinite` for an unbounded event. Parser errors
 include the source line number so custom driver tooling can reject malformed
-scripts before the actor runtime starts.
+scripts before the actor runtime starts. `high_scores` lines use
+`x y row-height rows` after the timing fields and draw rows from the
+driver-owned high-score table carried in `StepPrompt`.
 
 Script actions currently cover:
 
 - `Text`, for scripted title/status lines.
 - `Sprite`, for static sprite placement.
+- `HighScores`, for prompt-backed high-score table rows in attract/game-over.
 - `WilliamsLogo`, which emits `SpriteKey::WilliamsLogo` with
   `VisualEffect::WilliamsReveal` metadata for handwriting reveal and title
   color phase.

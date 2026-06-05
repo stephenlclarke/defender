@@ -3533,14 +3533,15 @@ impl AttractScript {
                 SOURCE_ATTRACT_DEFENDER_WORDMARK_POSITION,
             ),
             AttractScriptEvent::text(1, None, Point::new(78, 176), "HIGH SCORES"),
+            AttractScriptEvent::high_scores(1, None, Point::new(82, 188), 10, 5),
         ])
     }
 
-    fn draws_for(&self, actor: ActorId, step: u64) -> Vec<DrawCommand> {
+    fn draws_for(&self, actor: ActorId, step: u64, high_scores: &[u32; 5]) -> Vec<DrawCommand> {
         self.events
             .iter()
             .filter(|event| event.active_at(step))
-            .map(|event| event.draw(actor, step))
+            .flat_map(|event| event.draws(actor, step, high_scores))
             .collect()
     }
 
@@ -3662,6 +3663,19 @@ fn parse_attract_script_event(
                 position,
             ))
         }
+        "high_scores" | "high_score_table" => {
+            let position = parse_attract_point(line_number, &mut parts)?;
+            let row_height = parse_attract_i16(line_number, parts.next(), "row height")?;
+            let rows = parse_attract_usize(line_number, parts.next(), "rows")?;
+            reject_extra_attract_fields(line_number, parts)?;
+            Ok(AttractScriptEvent::high_scores(
+                start_after_steps,
+                duration_steps,
+                position,
+                row_height,
+                rows,
+            ))
+        }
         _ => Err(AttractScriptParseError::new(
             line_number,
             format!("unknown action `{action}`"),
@@ -3720,6 +3734,21 @@ fn parse_attract_i16(
     let token = token
         .ok_or_else(|| AttractScriptParseError::new(line_number, format!("missing {field}")))?;
     token.parse::<i16>().map_err(|error| {
+        AttractScriptParseError::new(
+            line_number,
+            format!("{field} `{token}` is invalid: {error}"),
+        )
+    })
+}
+
+fn parse_attract_usize(
+    line_number: usize,
+    token: Option<&str>,
+    field: &str,
+) -> Result<usize, AttractScriptParseError> {
+    let token = token
+        .ok_or_else(|| AttractScriptParseError::new(line_number, format!("missing {field}")))?;
+    token.parse::<usize>().map_err(|error| {
         AttractScriptParseError::new(
             line_number,
             format!("{field} `{token}` is invalid: {error}"),
@@ -3854,6 +3883,24 @@ impl AttractScriptEvent {
         }
     }
 
+    pub fn high_scores(
+        start_after_steps: u64,
+        duration_steps: Option<u64>,
+        position: Point,
+        row_height: i16,
+        rows: usize,
+    ) -> Self {
+        Self {
+            start_after_steps,
+            duration_steps,
+            action: AttractScriptAction::HighScores {
+                position,
+                row_height,
+                rows,
+            },
+        }
+    }
+
     fn active_at(&self, step: u64) -> bool {
         if step < self.start_after_steps {
             return false;
@@ -3864,8 +3911,8 @@ impl AttractScriptEvent {
         }
     }
 
-    fn draw(&self, actor: ActorId, step: u64) -> DrawCommand {
-        self.action.draw(actor, self.age(step))
+    fn draws(&self, actor: ActorId, step: u64, high_scores: &[u32; 5]) -> Vec<DrawCommand> {
+        self.action.draws(actor, self.age(step), high_scores)
     }
 
     fn age(&self, step: u64) -> u64 {
@@ -3902,13 +3949,22 @@ pub enum AttractScriptAction {
         slots: u16,
         row_pairs: u16,
     },
+    HighScores {
+        position: Point,
+        row_height: i16,
+        rows: usize,
+    },
 }
 
 impl AttractScriptAction {
-    fn draw(&self, actor: ActorId, age: u64) -> DrawCommand {
+    fn draws(&self, actor: ActorId, age: u64, high_scores: &[u32; 5]) -> Vec<DrawCommand> {
         match self {
-            Self::Text { position, value } => DrawCommand::text(actor, *position, value.clone()),
-            Self::Sprite { sprite, position } => DrawCommand::sprite(actor, *sprite, *position),
+            Self::Text { position, value } => {
+                vec![DrawCommand::text(actor, *position, value.clone())]
+            }
+            Self::Sprite { sprite, position } => {
+                vec![DrawCommand::sprite(actor, *sprite, *position)]
+            }
             Self::WilliamsLogo {
                 position,
                 reveal_steps,
@@ -3916,7 +3972,7 @@ impl AttractScriptAction {
             } => {
                 let color_period = (*color_period).max(1);
                 let color_phase = ((age.saturating_sub(1) / u64::from(color_period)) % 4) as u8;
-                DrawCommand::sprite_with_effect(
+                vec![DrawCommand::sprite_with_effect(
                     actor,
                     SpriteKey::WilliamsLogo,
                     *position,
@@ -3924,7 +3980,7 @@ impl AttractScriptAction {
                         stroke_step: (age as u16).min(*reveal_steps),
                         color_phase,
                     },
-                )
+                )]
             }
             Self::DefenderWordmark {
                 position,
@@ -3935,9 +3991,13 @@ impl AttractScriptAction {
                 let progress = age.saturating_sub(1) as u16;
                 let total_steps = slots.saturating_mul(row_pairs);
                 if progress >= total_steps {
-                    DrawCommand::sprite(actor, SpriteKey::DefenderWordmark, *position)
+                    vec![DrawCommand::sprite(
+                        actor,
+                        SpriteKey::DefenderWordmark,
+                        *position,
+                    )]
                 } else {
-                    DrawCommand::sprite_with_effect(
+                    vec![DrawCommand::sprite_with_effect(
                         actor,
                         SpriteKey::DefenderCoalescence,
                         *position,
@@ -3945,9 +4005,32 @@ impl AttractScriptAction {
                             slot: (progress / row_pairs) as u8,
                             row_pair: (progress % row_pairs) as u8,
                         },
-                    )
+                    )]
                 }
             }
+            Self::HighScores {
+                position,
+                row_height,
+                rows,
+            } => high_scores
+                .iter()
+                .copied()
+                .take((*rows).min(high_scores.len()))
+                .enumerate()
+                .map(|(index, score)| {
+                    DrawCommand::text(
+                        actor,
+                        Point::new(
+                            position.x,
+                            position.y
+                                + i16::try_from(index)
+                                    .unwrap_or(i16::MAX)
+                                    .saturating_mul(*row_height),
+                        ),
+                        format!("{}. {}", index + 1, format_status_score(score)),
+                    )
+                })
+                .collect(),
         }
     }
 
@@ -3978,6 +4061,15 @@ impl AttractScriptAction {
                 position: *position,
                 slots: *slots,
                 row_pairs: *row_pairs,
+            },
+            Self::HighScores {
+                position,
+                row_height,
+                rows,
+            } => AttractScriptActionManifest::HighScores {
+                position: *position,
+                row_height: *row_height,
+                rows: *rows,
             },
         }
     }
@@ -4014,6 +4106,11 @@ pub enum AttractScriptActionManifest {
         position: Point,
         slots: u16,
         row_pairs: u16,
+    },
+    HighScores {
+        position: Point,
+        row_height: i16,
+        rows: usize,
     },
 }
 
@@ -6591,7 +6688,8 @@ impl AssetActor for ScriptedAttractProgram {
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let draws = if matches!(prompt.phase, Phase::Attract | Phase::GameOver) {
             self.elapsed_steps = self.elapsed_steps.saturating_add(1);
-            self.script.draws_for(self.id, self.elapsed_steps)
+            self.script
+                .draws_for(self.id, self.elapsed_steps, &prompt.high_scores)
         } else {
             self.elapsed_steps = 0;
             Vec::new()
@@ -10731,6 +10829,12 @@ mod tests {
                     }
                 )
         }));
+        assert!(
+            williams
+                .draws
+                .iter()
+                .any(|draw| draw.text.as_deref() == Some("1. 010000"))
+        );
 
         let mut coalescing = None;
         for _ in 0..DEFENDER_WORDMARK_START_STEP {
@@ -10791,6 +10895,14 @@ mod tests {
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
             AttractScriptActionManifest::DefenderWordmark { .. }
+        )));
+        assert!(parsed.manifest().events.iter().any(|event| matches!(
+            event.action,
+            AttractScriptActionManifest::HighScores {
+                position: Point { x: 82, y: 188 },
+                row_height: 10,
+                rows: 5,
+            }
         )));
     }
 
@@ -10901,6 +11013,7 @@ mod tests {
             # Custom attract script\n\
             defender_wordmark 9 12 70 80\n\
             text 2 5 12 20 CUSTOM ATTRACT\n\
+            high_scores 4 forever 80 100 9 3\n\
             sprite 6 forever defender_logo 40 44\n\
             williams_logo 5 - 18 44\n",
         )
@@ -10914,7 +11027,7 @@ mod tests {
                 .iter()
                 .map(|event| event.start_after_steps)
                 .collect::<Vec<_>>(),
-            vec![2, 5, 6, 9]
+            vec![2, 4, 5, 6, 9]
         );
         assert_eq!(
             manifest.events[0].action,
@@ -10924,14 +11037,22 @@ mod tests {
             }
         );
         assert_eq!(
-            manifest.events[2].action,
+            manifest.events[1].action,
+            AttractScriptActionManifest::HighScores {
+                position: Point::new(80, 100),
+                row_height: 9,
+                rows: 3,
+            }
+        );
+        assert_eq!(
+            manifest.events[3].action,
             AttractScriptActionManifest::Sprite {
                 sprite: SpriteKey::DefenderLogo,
                 position: Point::new(40, 44),
             }
         );
         assert_eq!(
-            manifest.events[3].action,
+            manifest.events[4].action,
             AttractScriptActionManifest::DefenderWordmark {
                 position: Point::new(70, 80),
                 slots: DEFENDER_WORDMARK_SLOTS,
@@ -10973,6 +11094,27 @@ mod tests {
                 .iter()
                 .any(|command| matches!(command, GameCommand::StartOnePlayer))
         );
+    }
+
+    #[test]
+    fn parsed_attract_script_draws_prompt_high_score_rows() {
+        let script = "high_scores 1 forever 20 40 8 3"
+            .parse::<AttractScript>()
+            .expect("high-score script action should parse");
+        let mut driver = ActorGameDriver::with_attract_script(script);
+        driver.high_scores.record(12_000);
+
+        let report = driver.step(GameInput::NONE);
+
+        assert!(report.draws.iter().any(|draw| {
+            draw.position == Point::new(20, 40) && draw.text.as_deref() == Some("1. 012000")
+        }));
+        assert!(report.draws.iter().any(|draw| {
+            draw.position == Point::new(20, 48) && draw.text.as_deref() == Some("2. 010000")
+        }));
+        assert!(report.draws.iter().any(|draw| {
+            draw.position == Point::new(20, 56) && draw.text.as_deref() == Some("3. 007500")
+        }));
     }
 
     #[test]

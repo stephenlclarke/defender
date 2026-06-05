@@ -109,7 +109,9 @@ behavior, and wave scripts are embedded from
 `assets/red-label/actor-attract.script`,
 `assets/red-label/actor-behavior.script`, and
 `assets/red-label/actor-waves.script`, so the default driver and custom drivers
-share the same checked script parser path. The default actor wave allocator now
+share the same checked script parser path. The attract script now includes
+prompt-backed high-score table rows alongside Williams reveal and Defender
+wordmark coalescence. The default actor wave allocator now
 uses the source active-family
 shape, so later waves can introduce bomber and pod actor families alongside
 landers instead of remaining lander-only. Later-wave
@@ -1031,8 +1033,9 @@ Clean runtime data lives under `assets/red-label/` and is embedded in the
 binary. The active assets include ROM metadata, MAME memory/input maps,
 red-label RAM/CMOS layouts, linked lists, routine addresses, switch tables,
 object pictures and images, terrain data, wave data, high-score/default data,
-actor attract/behavior/wave scripts, sound command timelines, the live-audio
-acceptance matrix, and fidelity trace schemas.
+actor attract/behavior/wave scripts, including prompt-backed attract
+high-score rows, sound command timelines, the live-audio acceptance matrix, and
+fidelity trace schemas.
 
 Local ROM files are optional verification inputs for `--rom-report` and
 `--verify-roms` when built with `--features legacy-tools`. They are not needed

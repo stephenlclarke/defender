@@ -41,7 +41,9 @@ verification tools.
   actor attract, behavior, and wave scripts are embedded from
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and
-  `assets/red-label/actor-waves.script` through the same parser path.
+  `assets/red-label/actor-waves.script` through the same parser path. The
+  attract script now draws prompt-backed high-score table rows alongside the
+  Williams reveal and Defender wordmark coalescence.
   `ActorWaveScript` now names per-wave progression data and applies behavior
   scripts plus hostile and initial-human spawn records as play starts and waves
   are cleared. Wave scripts can now attach spawn-index behavior profiles that
@@ -753,6 +755,27 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 12:09 BST`: Completed the actor attract high-score script slice.
+  `AttractScript` now accepts checked
+  `high_scores <start> <duration> <x> <y> <row-height> <rows>` lines, exposes
+  high-score-table events in manifests, and draws rows from
+  `StepPrompt.high_scores` through the script actor instead of baking static
+  score text into the attract sequence. The embedded
+  `assets/red-label/actor-attract.script` now owns the default high-score table
+  rows alongside the Williams reveal and Defender wordmark coalescence. Added
+  focused parser/runtime regressions proving parsed custom scripts draw updated
+  driver high-score rows and the default attract sequence still renders source
+  title/coalescence metadata. Validation passed with `cargo fmt --check`,
+  focused attract parser/runtime tests, `cargo test actor_game --all-targets
+  --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test actor_smoke --all-targets
+  --features legacy-tools`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools -- -D
+  warnings`, touched-doc markdownlint, and `git diff --check`. Slack cycle
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780657339814109`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780657754060619`.
 - `2026-06-05 12:00 BST`: Completed the per-spawn actor behavior script
   slice. `ActorWaveScript` now accepts
   `spawn_behavior <kind> <index> <field> <value>` checked text lines, carries
