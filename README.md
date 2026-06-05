@@ -137,8 +137,10 @@ source-shaped `0xF6` hostile shots. First-wave target6 conversions carry the
 source X-correction into actor metadata, project target6 mutant draw/collision
 positions through source-backed dive/visual anchors, defer the visible entry
 shot when MAME does, and emit the exact source-shaped target6 fire2524
-projectile metadata for the forced converted-mutant shots. It also includes
-Williams title animation
+projectile metadata for the forced converted-mutant shots. Actor collision now
+also honors the target6 fire2524 wait window, projected collision position,
+source-positioned enemy explosion, hit sound, and scoring on player contact.
+It also includes Williams title animation
 metadata, the coalescing Defender wordmark surface, lander target-slot seeking,
 an actor-owned
 status display for score, high score, wave, lives, smart-bomb stock, credits,

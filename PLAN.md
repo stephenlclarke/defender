@@ -56,6 +56,10 @@ verification tools.
   target6 dive/visual projection anchors, deferred visible-entry shot state,
   source-shaped target6 dive shot-position overrides, and exact fire2524
   projectile fractions/velocities through the actor source-mutant command path.
+  The actor collision resolver also suppresses the pending target6 fire2524
+  collision window, uses target6 projected collision positions, and emits the
+  source-positioned enemy explosion, mutant-hit cue, and score award before the
+  normal player-death command path.
   It also has a persistent `StatusDisplay` actor that draws
   score, high score, wave, lives, smart-bomb stock, credits, and
   high-score-entry rows from the same `StepPrompt` state as gameplay actors
@@ -732,6 +736,28 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 10:13 BST`: Completed the actor target6
+  converted-mutant collision fidelity slice. The actor `CollisionBody` now
+  carries raw actor position plus source-mutant metadata, target6 mutant bounds
+  use the source-projected collision position, pending fire2524 target6 rows
+  suppress player/enemy contact until the source collision window, and the
+  fire2524 collision row emits the source-positioned enemy explosion, mutant
+  hit cue, score award, and normal player-death command path. The status
+  display high-score-entry regression now uses an enemy-laser death so it
+  remains focused on display output while source-shaped enemy contact can
+  award enemy score. Added focused actor regressions for target6 collision
+  projection, pending fire2524 collision suppression, and fire2524
+  source-positioned enemy explosion/scoring. Validation passed with `cargo fmt
+  --check`, `cargo test actor_game::tests::target6 --lib`, `cargo test
+  source_mutant --lib`, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo test actor_live --all-targets --features
+  legacy-tools`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, and
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`.
+  Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780650250437919`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780650848367269`.
 - `2026-06-05 10:01 BST`: Completed the actor target6
   converted-mutant source path slice. Source-backed first-wave target6 lander
   conversions now carry the source X-correction into actor mutant metadata;

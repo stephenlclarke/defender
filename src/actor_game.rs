@@ -155,6 +155,9 @@ const SOURCE_TARGET6_MUTANT_DIVE_FIRST_SHOT_RAW: (u16, u16) = (0x088C, 0x61B0);
 const SOURCE_TARGET6_MUTANT_DIVE_SECOND_SHOT_RAW: (u16, u16) = (0x07FC, 0x7800);
 const SOURCE_TARGET6_MUTANT_FIRE2524_FIRST_SHOT_RAW: (u16, u16) = (0x082C, 0x5160);
 const SOURCE_TARGET6_MUTANT_FIRE2524_SECOND_SHOT_RAW: (u16, u16) = (0x07FC, 0x8150);
+const SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MIN: u16 = 0xA400;
+const SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MAX: u16 = 0xA600;
+const SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER: Point = Point::new(0x21, 0xA9);
 const SOURCE_TARGET6_MUTANT_VISUAL_X_CORRECTION: u16 = 0x0168;
 const SOURCE_OBJECT_SCREEN_X_SHIFT: u8 = 6;
 const SOURCE_OBJECT_VISIBLE_WIDTH: u16 = 292;
@@ -2643,7 +2646,9 @@ impl AttractScriptAction {
 pub struct CollisionBody {
     pub owner: ActorId,
     pub kind: ActorKind,
+    pub position: Point,
     pub bounds: Rect,
+    pub source_mutant: Option<ActorSourceMutantMetadata>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2670,7 +2675,9 @@ impl ActorSnapshot {
         Some(CollisionBody {
             owner: self.id,
             kind: self.kind,
+            position: self.position,
             bounds: self.bounds?,
+            source_mutant: self.source_mutant,
         })
     }
 }
@@ -4348,9 +4355,23 @@ impl ActorGameDriver {
             if hyperspace_clears_enemy_lasers && enemy.kind == ActorKind::EnemyLaser {
                 continue;
             }
+            if actor_source_target6_mutant_waits_for_fire2524_collision(
+                enemy.position,
+                enemy.source_mutant,
+            ) {
+                continue;
+            }
             if player.bounds.intersects(enemy.bounds) {
                 commands.push(GameCommand::Destroy(player.owner));
                 commands.push(GameCommand::Destroy(enemy.owner));
+                if is_player_enemy_collision_target(enemy.kind) {
+                    commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
+                        position: actor_player_enemy_collision_explosion_position(enemy),
+                        kind: explosion_kind_for_target(enemy.kind),
+                    }));
+                    commands.push(GameCommand::AddScore(score_for_hostile(enemy.kind)));
+                    commands.push(GameCommand::PlaySound(hit_sound_for_hostile(enemy.kind)));
+                }
                 commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
                     position: center_of(player.bounds),
                     kind: player_hazard_explosion_kind(enemy.kind),
@@ -4871,6 +4892,18 @@ fn is_player_hazard(kind: ActorKind) -> bool {
             | ActorKind::Swarmer
             | ActorKind::Baiter
             | ActorKind::EnemyLaser
+    )
+}
+
+fn is_player_enemy_collision_target(kind: ActorKind) -> bool {
+    matches!(
+        kind,
+        ActorKind::Lander
+            | ActorKind::Mutant
+            | ActorKind::Bomber
+            | ActorKind::Pod
+            | ActorKind::Swarmer
+            | ActorKind::Baiter
     )
 }
 
@@ -5938,11 +5971,15 @@ impl Mutant {
     }
 
     fn bounds(&self) -> Rect {
-        Rect::from_center(self.scene_position(), 14, 12)
+        Rect::from_center(self.collision_position(), 14, 12)
     }
 
     fn scene_position(&self) -> Point {
         actor_source_target6_mutant_scene_position(self.position, self.source)
+    }
+
+    fn collision_position(&self) -> Point {
+        actor_source_target6_mutant_collision_position(self.position, self.source)
     }
 
     fn advance_source_motion(
@@ -6611,6 +6648,64 @@ fn actor_source_target6_mutant_scene_position(
     actor_source_target6_mutant_dive_position(position, source)
         .or_else(|| actor_source_target6_mutant_visual_position(position, source))
         .unwrap_or(position)
+}
+
+fn actor_source_target6_mutant_collision_position(
+    position: Point,
+    source: Option<ActorSourceMutantMetadata>,
+) -> Point {
+    let Some(source) = source else {
+        return position;
+    };
+    if let Some(position) = actor_source_target6_mutant_dive_position(position, source) {
+        return position.offset(Velocity::new(0, 1));
+    }
+    actor_source_target6_mutant_visual_position(position, source).unwrap_or(position)
+}
+
+fn actor_source_target6_mutant_waits_for_fire2524_collision(
+    position: Point,
+    source: Option<ActorSourceMutantMetadata>,
+) -> bool {
+    let Some(source) = source else {
+        return false;
+    };
+    if !actor_source_target6_mutant_uses_dive_projection(source) {
+        return false;
+    }
+
+    let (_, raw_y16) = actor_source_world_position(position, source.x_fraction, source.y_fraction);
+    source.shot_timer >= 0x80
+        && (0x9000..SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MIN).contains(&raw_y16)
+}
+
+fn actor_source_target6_mutant_uses_fire2524_collision_projection(
+    position: Point,
+    source: Option<ActorSourceMutantMetadata>,
+) -> bool {
+    let Some(source) = source else {
+        return false;
+    };
+    if !actor_source_target6_mutant_uses_dive_projection(source) {
+        return false;
+    }
+
+    let (_, raw_y16) = actor_source_world_position(position, source.x_fraction, source.y_fraction);
+    source.shot_timer >= 0x80
+        && (SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MIN
+            ..SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MAX)
+            .contains(&raw_y16)
+}
+
+fn actor_player_enemy_collision_explosion_position(enemy: &CollisionBody) -> Point {
+    if actor_source_target6_mutant_uses_fire2524_collision_projection(
+        enemy.position,
+        enemy.source_mutant,
+    ) {
+        SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER
+    } else {
+        center_of(enemy.bounds)
+    }
 }
 
 fn actor_source_target6_mutant_shot_position(
@@ -9051,7 +9146,7 @@ mod tests {
         driver.lives = 1;
         driver.score = 12_000;
         driver.spawn_player();
-        driver.spawn_lander_for_test(Point::new(42, 120));
+        driver.spawn_enemy_laser_from_spawn(Point::new(42, 120), Velocity::default(), None);
 
         let game_over = driver.step(GameInput::NONE);
         assert_eq!(game_over.phase, Phase::HighScoreEntry);
@@ -12527,6 +12622,152 @@ mod tests {
     }
 
     #[test]
+    fn target6_source_mutant_collision_position_offsets_dive_projection() {
+        let source = ActorSourceMutantMetadata {
+            x_fraction: 0x8C,
+            y_fraction: 0xB0,
+            x_velocity: 0,
+            y_velocity: 0x0090,
+            shot_timer: 0,
+            sleep_ticks: 0,
+            hop_rng: ActorSourceRngSnapshot {
+                seed: 0,
+                hseed: 0,
+                lseed: 0,
+            },
+            render_x_correction: SOURCE_TARGET6_MUTANT_CONVERSION_X_CORRECTION,
+            target6_first_shot_deferred: true,
+        };
+
+        assert_eq!(
+            actor_source_target6_mutant_scene_position(Point::new(0x08, 0x61), Some(source)),
+            Point::new(0x1E, 0x71)
+        );
+        assert_eq!(
+            actor_source_target6_mutant_collision_position(Point::new(0x08, 0x61), Some(source)),
+            Point::new(0x1E, 0x72)
+        );
+    }
+
+    #[test]
+    fn target6_source_mutant_waits_for_fire2524_collision_window() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let player_id = ActorId::new(100);
+        let mutant_id = ActorId::new(101);
+        let raw_position = Point::new(0x08, 0x99);
+        let source = ActorSourceMutantMetadata {
+            x_fraction: 0x5C,
+            y_fraction: 0xE0,
+            x_velocity: 0x0030,
+            y_velocity: 0x0090,
+            shot_timer: 0x80,
+            sleep_ticks: 0,
+            hop_rng: ActorSourceRngSnapshot {
+                seed: 0,
+                hseed: 0,
+                lseed: 0,
+            },
+            render_x_correction: SOURCE_TARGET6_MUTANT_CONVERSION_X_CORRECTION,
+            target6_first_shot_deferred: true,
+        };
+        let collision_position =
+            actor_source_target6_mutant_collision_position(raw_position, Some(source));
+        driver.snapshots.insert(
+            player_id,
+            actor_snapshot_with_bounds(
+                player_id,
+                ActorKind::Player,
+                collision_position,
+                Rect::from_center(collision_position, 18, 10),
+            ),
+        );
+        driver.snapshots.insert(
+            mutant_id,
+            source_mutant_snapshot_with_bounds(
+                mutant_id,
+                raw_position,
+                source,
+                Rect::from_center(collision_position, 14, 12),
+            ),
+        );
+
+        let mut commands = Vec::new();
+        driver.resolve_collisions(&ActorBehaviorScript::default(), &mut commands);
+
+        assert!(
+            commands.is_empty(),
+            "pending fire2524 target6 mutant should not collide yet: {commands:?}"
+        );
+    }
+
+    #[test]
+    fn target6_source_mutant_fire2524_collision_projects_enemy_explosion() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let player_id = ActorId::new(100);
+        let mutant_id = ActorId::new(101);
+        let raw_position = Point::new(0x08, 0xA5);
+        let player_position = SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER;
+        let source = ActorSourceMutantMetadata {
+            x_fraction: 0x00,
+            y_fraction: 0x00,
+            x_velocity: 0x0030,
+            y_velocity: 0x0090,
+            shot_timer: 0x80,
+            sleep_ticks: 0,
+            hop_rng: ActorSourceRngSnapshot {
+                seed: 0,
+                hseed: 0,
+                lseed: 0,
+            },
+            render_x_correction: SOURCE_TARGET6_MUTANT_CONVERSION_X_CORRECTION,
+            target6_first_shot_deferred: true,
+        };
+        driver.snapshots.insert(
+            player_id,
+            actor_snapshot_with_bounds(
+                player_id,
+                ActorKind::Player,
+                player_position,
+                Rect::from_center(player_position, 18, 10),
+            ),
+        );
+        driver.snapshots.insert(
+            mutant_id,
+            source_mutant_snapshot_with_bounds(
+                mutant_id,
+                raw_position,
+                source,
+                Rect::from_center(player_position, 14, 12),
+            ),
+        );
+
+        let mut commands = Vec::new();
+        driver.resolve_collisions(&ActorBehaviorScript::default(), &mut commands);
+
+        assert!(commands.contains(&GameCommand::Destroy(player_id)));
+        assert!(commands.contains(&GameCommand::Destroy(mutant_id)));
+        assert!(commands.contains(&GameCommand::AddScore(MUTANT_SCORE)));
+        assert!(commands.contains(&GameCommand::PlaySound(SoundCue::MutantHit)));
+        assert!(commands.contains(&GameCommand::PlayerKilled));
+        let explosions = commands
+            .iter()
+            .filter_map(|command| match command {
+                GameCommand::Spawn(SpawnRequest::Explosion { position, kind }) => {
+                    Some((*position, *kind))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert!(explosions.contains(&(
+            SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER,
+            ExplosionKind::Enemy,
+        )));
+        assert!(explosions.contains(&(player_position, ExplosionKind::Player)));
+    }
+
+    #[test]
     fn source_mutant_shot_timer_spawns_source_projectile() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
@@ -12935,13 +13176,27 @@ mod tests {
     }
 
     fn actor_snapshot(id: u64, kind: ActorKind, position: Point) -> ActorSnapshot {
+        actor_snapshot_with_bounds(
+            ActorId(id),
+            kind,
+            position,
+            Rect::from_center(position, 4, 4),
+        )
+    }
+
+    fn actor_snapshot_with_bounds(
+        id: ActorId,
+        kind: ActorKind,
+        position: Point,
+        bounds: Rect,
+    ) -> ActorSnapshot {
         ActorSnapshot {
-            id: ActorId(id),
+            id,
             kind,
             position,
             velocity: Velocity::default(),
             direction: None,
-            bounds: Some(Rect::from_center(position, 4, 4)),
+            bounds: Some(bounds),
             alive: true,
             source_lander: None,
             source_bomber: None,
@@ -12952,6 +13207,17 @@ mod tests {
             source_human: None,
             source_enemy_projectile: None,
         }
+    }
+
+    fn source_mutant_snapshot_with_bounds(
+        id: ActorId,
+        position: Point,
+        source: ActorSourceMutantMetadata,
+        bounds: Rect,
+    ) -> ActorSnapshot {
+        let mut snapshot = actor_snapshot_with_bounds(id, ActorKind::Mutant, position, bounds);
+        snapshot.source_mutant = Some(source);
+        snapshot
     }
 
     fn actor_snapshot_with_velocity(

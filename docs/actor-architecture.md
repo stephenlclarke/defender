@@ -240,7 +240,11 @@ target6 converted mutants also carry the source conversion X correction through
 actor metadata, use source-backed dive/visual projection anchors for
 draw/collision positions, preserve the deferred first-shot flag, and emit the
 exact source-shaped fire2524 projectile metadata for the forced target6 shot
-rows.
+rows. The actor driver also uses that metadata during player/enemy collision:
+pending fire2524 target6 rows suppress contact, collision boxes use the
+projected target6 position, and the fire2524 collision row produces a
+source-positioned enemy explosion, mutant-hit cue, and score before the normal
+player death command path.
 
 ## Attract Graphics
 
@@ -303,7 +307,10 @@ The actor driver now owns a first Defender gameplay loop:
   command boundary as other hostile shots. The first-wave target6 branch now
   applies the MAME-backed conversion correction, projected draw/collision
   anchors, deferred visible-entry shot, dive-shot anchor overrides, and exact
-  fire2524 projectile fractions/velocities inside the actor source path.
+  fire2524 projectile fractions/velocities inside the actor source path. The
+  driver-side collision resolver also suppresses the pending fire2524 target6
+  collision interval and projects the eventual target6 enemy explosion to the
+  source collision center.
 - Lander shot timers emit the source `0xFC` lander-shot cue and an `EnemyLaser`
   actor.
   Enemy lasers are player hazards, smart-bomb targets with no score value, and

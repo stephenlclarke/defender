@@ -193,7 +193,10 @@ tree:
   converted-mutant metadata now preserves the source conversion X correction,
   projected draw/collision anchors, deferred first-shot state, target6 dive
   shot-position overrides, and exact fire2524 projectile fractions/velocities
-  in the actor source path.
+  in the actor source path. Actor player/enemy collision now also preserves the
+  target6 fire2524 wait window, projected collision position,
+  source-positioned enemy explosion, hit cue, and score award before routing
+  through the normal player death command path.
   `ActorRuntimeAdapter` bundles reports, clean `GameState`, clean `GameEvents`,
   and clean `RenderScene` values into actor `ActorFrame` values. Normal
   interactive play uses the actor live runtime, with explicit actor smoke and
