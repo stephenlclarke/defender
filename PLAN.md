@@ -33,7 +33,10 @@ verification tools.
   `XYZZY` damage overrides. Non-source mutant, bomber, pod, swarmer, and
   baiter fallback motion can now be script-selected between drift and
   player-chase behavior while source-backed fixed-point metadata remains the
-  higher-priority movement source. `ActorWaveScript` now names per-wave
+  higher-priority movement source. Read-only script manifests now expose the
+  configured attract events, behavior profiles, and wave profiles so custom
+  drivers can inspect their installed scripts without actor-thread
+  introspection. `ActorWaveScript` now names per-wave
   progression data and applies behavior scripts plus hostile and initial-human
   spawn records as play starts and waves are cleared. Default actor wave progression
   now reads
@@ -743,6 +746,23 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 11:16 BST`: Completed the actor attract-script manifest slice.
+  `AttractScript` now exposes a read-only manifest of sorted event timing and
+  action metadata, and `ActorGameDriver::script_manifest` includes the
+  installed attract script beside behavior and wave manifests. Custom drivers
+  can now verify or serialize their attract-screen scripts without inspecting
+  the thread-backed attract actor. Added focused regressions for custom
+  attract event manifest ordering/action metadata and default red-label
+  Williams/Defender manifest exposure. Validation passed with
+  `cargo fmt --check`, focused manifest tests, `cargo test actor_game
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, touched-doc
+  markdownlint, and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780654202430719`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780654588680689`.
 - `2026-06-05 11:06 BST`: Completed the actor source explosion top-left/center
   metadata slice. Actor `ExplosionCloud` draw effects and
   `SpawnRequest::Explosion` commands now carry optional source-center metadata,

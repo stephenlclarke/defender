@@ -97,11 +97,12 @@ non-source hostile drift/chase modes, and named `ActorWaveScript` progression
 backed by `assets/red-label/wave-table.tsv` for active wave size, lander and
 bomber movement speed, lander fire cadence, baiter entry/shot/seek timing, and
 scripted hostile/human spawn records. Read-only script manifests expose the
-configured driver behavior and wave profiles, while each `StepReport` carries
-the effective per-step behavior manifest after transient input overrides such
-as `XYZZY` invincibility. The default actor wave allocator now uses the source
-active-family shape, so later waves can introduce bomber and pod actor families
-alongside landers instead of remaining lander-only. Later-wave
+configured attract events, driver behavior, and wave profiles, while each
+`StepReport` carries the effective per-step behavior manifest after transient
+input overrides such as `XYZZY` invincibility. The default actor wave allocator
+now uses the source active-family shape, so later waves can introduce bomber
+and pod actor families alongside landers instead of remaining lander-only.
+Later-wave
 actor landers now restore from source RNG placement/shot/velocity state, and
 later-wave humans restore from the source target-list distribution.
 Source-backed landers, bombers, pods, swarmers, baiters, and humans publish

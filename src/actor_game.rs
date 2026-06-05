@@ -2483,6 +2483,16 @@ impl AttractScript {
             .map(|event| event.draw(actor, step))
             .collect()
     }
+
+    pub fn manifest(&self) -> AttractScriptManifest {
+        AttractScriptManifest {
+            events: self
+                .events
+                .iter()
+                .map(AttractScriptEvent::manifest)
+                .collect(),
+        }
+    }
 }
 
 impl Default for AttractScript {
@@ -2578,6 +2588,14 @@ impl AttractScriptEvent {
         step.saturating_sub(self.start_after_steps)
             .saturating_add(1)
     }
+
+    fn manifest(&self) -> AttractScriptEventManifest {
+        AttractScriptEventManifest {
+            start_after_steps: self.start_after_steps,
+            duration_steps: self.duration_steps,
+            action: self.action.manifest(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2648,6 +2666,71 @@ impl AttractScriptAction {
             }
         }
     }
+
+    fn manifest(&self) -> AttractScriptActionManifest {
+        match self {
+            Self::Text { position, value } => AttractScriptActionManifest::Text {
+                position: *position,
+                value: value.clone(),
+            },
+            Self::Sprite { sprite, position } => AttractScriptActionManifest::Sprite {
+                sprite: *sprite,
+                position: *position,
+            },
+            Self::WilliamsLogo {
+                position,
+                reveal_steps,
+                color_period,
+            } => AttractScriptActionManifest::WilliamsLogo {
+                position: *position,
+                reveal_steps: *reveal_steps,
+                color_period: *color_period,
+            },
+            Self::DefenderWordmark {
+                position,
+                slots,
+                row_pairs,
+            } => AttractScriptActionManifest::DefenderWordmark {
+                position: *position,
+                slots: *slots,
+                row_pairs: *row_pairs,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttractScriptManifest {
+    pub events: Vec<AttractScriptEventManifest>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttractScriptEventManifest {
+    pub start_after_steps: u64,
+    pub duration_steps: Option<u64>,
+    pub action: AttractScriptActionManifest,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AttractScriptActionManifest {
+    Text {
+        position: Point,
+        value: String,
+    },
+    Sprite {
+        sprite: SpriteKey,
+        position: Point,
+    },
+    WilliamsLogo {
+        position: Point,
+        reveal_steps: u16,
+        color_period: u16,
+    },
+    DefenderWordmark {
+        position: Point,
+        slots: u16,
+        row_pairs: u16,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -3923,6 +4006,7 @@ pub struct ActorDriverScriptManifest {
     pub step: u64,
     pub phase: Phase,
     pub wave: u16,
+    pub attract_script: AttractScriptManifest,
     pub behavior_script: ActorBehaviorScriptManifest,
     pub wave_script: ActorWaveScriptManifest,
     pub current_wave_profile: ActorWaveProfileManifest,
@@ -3984,6 +4068,7 @@ pub struct ActorGameDriver {
     snapshots: BTreeMap<ActorId, ActorSnapshot>,
     high_scores: HighScoreTable,
     high_score_initials: HighScoreInitialsState,
+    attract_script: AttractScript,
     behavior_script: ActorBehaviorScript,
     wave_script: ActorWaveScript,
     baiter_timer_steps: Option<u32>,
@@ -4022,6 +4107,7 @@ impl ActorGameDriver {
             snapshots: BTreeMap::new(),
             high_scores: HighScoreTable::default(),
             high_score_initials: HighScoreInitialsState::EMPTY,
+            attract_script: attract_script.clone(),
             behavior_script: ActorBehaviorScript::default(),
             wave_script,
             baiter_timer_steps: None,
@@ -4155,6 +4241,7 @@ impl ActorGameDriver {
             step: self.step,
             phase: self.phase,
             wave: self.wave,
+            attract_script: self.attract_script.manifest(),
             behavior_script: self.behavior_script.manifest(),
             wave_script: self.wave_script.manifest(),
             current_wave_profile: self.wave_script.profile_for_wave(current_wave).manifest(),
@@ -9454,6 +9541,55 @@ mod tests {
     }
 
     #[test]
+    fn attract_script_manifest_exposes_custom_driver_events() {
+        let script = AttractScript::new(vec![
+            AttractScriptEvent::defender_wordmark(9, Some(12), Point::new(70, 80)),
+            AttractScriptEvent::text(2, Some(5), Point::new(12, 20), "CUSTOM ATTRACT"),
+            AttractScriptEvent::williams_logo(5, None, Point::new(18, 44)),
+        ]);
+        let mut driver = ActorGameDriver::with_attract_script(script.clone());
+
+        let manifest = driver.script_manifest();
+
+        assert_eq!(manifest.attract_script, script.manifest());
+        assert_eq!(
+            manifest
+                .attract_script
+                .events
+                .iter()
+                .map(|event| event.start_after_steps)
+                .collect::<Vec<_>>(),
+            vec![2, 5, 9]
+        );
+        assert_eq!(
+            manifest.attract_script.events[0].action,
+            AttractScriptActionManifest::Text {
+                position: Point::new(12, 20),
+                value: "CUSTOM ATTRACT".to_string(),
+            }
+        );
+        assert_eq!(
+            manifest.attract_script.events[1].action,
+            AttractScriptActionManifest::WilliamsLogo {
+                position: Point::new(18, 44),
+                reveal_steps: WILLIAMS_REVEAL_STEPS,
+                color_period: WILLIAMS_COLOR_PERIOD,
+            }
+        );
+        assert_eq!(
+            manifest.attract_script.events[2].action,
+            AttractScriptActionManifest::DefenderWordmark {
+                position: Point::new(70, 80),
+                slots: DEFENDER_WORDMARK_SLOTS,
+                row_pairs: DEFENDER_WORDMARK_ROW_PAIRS,
+            }
+        );
+
+        driver.step(GameInput::NONE);
+        assert_eq!(driver.script_manifest().attract_script, script.manifest());
+    }
+
+    #[test]
     fn custom_attract_script_keeps_coin_and_start_controls() {
         let script = AttractScript::new(vec![AttractScriptEvent::text(
             1,
@@ -12180,6 +12316,20 @@ mod tests {
 
         let attract_manifest = driver.script_manifest();
         assert_eq!(attract_manifest.phase, Phase::Attract);
+        assert!(matches!(
+            attract_manifest.attract_script.events[0].action,
+            AttractScriptActionManifest::WilliamsLogo { .. }
+        ));
+        assert!(
+            attract_manifest
+                .attract_script
+                .events
+                .iter()
+                .any(|event| matches!(
+                    event.action,
+                    AttractScriptActionManifest::DefenderWordmark { .. }
+                ))
+        );
         assert_eq!(attract_manifest.wave_script.name, "manifest-test");
         assert_eq!(
             attract_manifest.current_wave_profile.lander_spawns[0].position,

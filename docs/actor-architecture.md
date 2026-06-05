@@ -143,9 +143,10 @@ movement behavior modes, for example making a later-wave lander ignore humans
 and chase the player, or making a specific bomber chase the player instead of
 using its fallback drift.
 
-`ActorBehaviorScript::manifest`, `ActorWaveScript::manifest`, and
-`ActorGameDriver::script_manifest` expose read-only snapshots of configured
-driver behavior and wave scripts for custom drivers and test tooling.
+`AttractScript::manifest`, `ActorBehaviorScript::manifest`,
+`ActorWaveScript::manifest`, and `ActorGameDriver::script_manifest` expose
+read-only snapshots of configured attract events, driver behavior, and wave
+scripts for custom drivers and test tooling.
 `StepReport::behavior_script` carries the effective behavior manifest used for
 that simulation step, after transient input overrides such as `XYZZY`
 invincibility have been applied.
@@ -260,6 +261,9 @@ events for its own current script step into draw commands. The default
 score opening sequence, while `ActorGameDriver::with_attract_script(...)` lets
 a custom driver provide its own sequence without replacing coin/start control
 handling.
+`ActorGameDriver::script_manifest()` includes the immutable attract-event
+manifest so custom drivers can verify or serialize the installed sequence
+without inspecting the thread-backed attract actor.
 
 Script actions currently cover:
 
