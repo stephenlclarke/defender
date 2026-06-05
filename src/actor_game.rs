@@ -2747,6 +2747,7 @@ impl ActorSourceWaveProfile {
             landers: self.landers,
             bombers: self.bombers,
             pods: self.pods,
+            mutants: 0,
             swarmers: 0,
         };
         let target = usize::from(self.wave_size)
@@ -2801,6 +2802,7 @@ enum ActorSourceEnemyKind {
     Lander,
     Bomber,
     Pod,
+    Mutant,
     Swarmer,
 }
 
@@ -2809,6 +2811,7 @@ struct ActorSourceEnemyCounts {
     landers: u8,
     bombers: u8,
     pods: u8,
+    mutants: u8,
     swarmers: u8,
 }
 
@@ -2817,6 +2820,7 @@ impl ActorSourceEnemyCounts {
         self.landers
             .saturating_add(self.bombers)
             .saturating_add(self.pods)
+            .saturating_add(self.mutants)
             .saturating_add(self.swarmers)
     }
 
@@ -2825,6 +2829,7 @@ impl ActorSourceEnemyCounts {
             ActorSourceEnemyKind::Lander => &mut self.landers,
             ActorSourceEnemyKind::Bomber => &mut self.bombers,
             ActorSourceEnemyKind::Pod => &mut self.pods,
+            ActorSourceEnemyKind::Mutant => &mut self.mutants,
             ActorSourceEnemyKind::Swarmer => &mut self.swarmers,
         };
         if *count == 0 {
@@ -2851,6 +2856,7 @@ fn actor_enemy_reserve_total(reserve: EnemyReserveSnapshot) -> u8 {
         .landers
         .saturating_add(reserve.bombers)
         .saturating_add(reserve.pods)
+        .saturating_add(reserve.mutants)
         .saturating_add(reserve.swarmers)
 }
 
@@ -2866,6 +2872,7 @@ fn actor_enemy_reserve_take(
         ActorSourceEnemyKind::Lander => &mut reserve.landers,
         ActorSourceEnemyKind::Bomber => &mut reserve.bombers,
         ActorSourceEnemyKind::Pod => &mut reserve.pods,
+        ActorSourceEnemyKind::Mutant => &mut reserve.mutants,
         ActorSourceEnemyKind::Swarmer => &mut reserve.swarmers,
     };
     if *count == 0 {
@@ -2899,6 +2906,7 @@ fn actor_source_reserve_enemy_kinds(
         ActorSourceEnemyKind::Lander,
         ActorSourceEnemyKind::Bomber,
         ActorSourceEnemyKind::Pod,
+        ActorSourceEnemyKind::Mutant,
         ActorSourceEnemyKind::Swarmer,
     ] {
         push_actor_reserve_kind(&mut kinds, reserve, target, kind);
@@ -2908,6 +2916,7 @@ fn actor_source_reserve_enemy_kinds(
         ActorSourceEnemyKind::Lander,
         ActorSourceEnemyKind::Bomber,
         ActorSourceEnemyKind::Pod,
+        ActorSourceEnemyKind::Mutant,
         ActorSourceEnemyKind::Swarmer,
     ] {
         while kinds.len() < target && actor_enemy_reserve_take(reserve, kind) {
@@ -3445,6 +3454,22 @@ impl ParsedActorWaveScript {
                     pods,
                     swarmers,
                     ..EnemyReserveSnapshot::default()
+                };
+                Ok(())
+            }
+            "enemy_reserve_full" | "reserve_full" => {
+                let landers = parse_wave_u8(line_number, parts.next(), "reserve landers")?;
+                let bombers = parse_wave_u8(line_number, parts.next(), "reserve bombers")?;
+                let pods = parse_wave_u8(line_number, parts.next(), "reserve pods")?;
+                let mutants = parse_wave_u8(line_number, parts.next(), "reserve mutants")?;
+                let swarmers = parse_wave_u8(line_number, parts.next(), "reserve swarmers")?;
+                reject_extra_wave_fields(line_number, parts)?;
+                self.current_profile_mut(line_number)?.enemy_reserve = EnemyReserveSnapshot {
+                    landers,
+                    bombers,
+                    pods,
+                    mutants,
+                    swarmers,
                 };
                 Ok(())
             }
@@ -9403,6 +9428,16 @@ impl ActorGameDriver {
                         position: spawn.position,
                     }));
                     self.spawn_pod_from_spawn(spawn);
+                    index += 1;
+                }
+                ActorSourceEnemyKind::Mutant => {
+                    let spawn =
+                        ActorMutantSpawn::source_restore(&mut self.source_rng, source_profile, 0);
+                    commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
+                        position: spawn.position,
+                        source: spawn.source,
+                    }));
+                    self.spawn_mutant_from_spawn(spawn);
                     index += 1;
                 }
                 ActorSourceEnemyKind::Swarmer => {
@@ -17417,6 +17452,93 @@ mod tests {
     }
 
     #[test]
+    fn actor_source_mutant_reserves_use_restore_state() {
+        let (mut driver, seeded) = started_source_wave_driver(2);
+        let player_position = seeded
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Player)
+            .expect("seed step should publish the player")
+            .position;
+        destroy_source_counted_hostiles(&mut driver, &seeded);
+        driver.enemy_reserve = EnemyReserveSnapshot {
+            mutants: 2,
+            ..EnemyReserveSnapshot::default()
+        };
+        driver.source_rng = ActorSourceRng {
+            seed: 0x37,
+            hseed: 0x5A,
+            lseed: 0x91,
+        };
+        let profile = ActorSourceWaveProfile::for_wave(2);
+        let mut expected_rng = driver.source_rng;
+        let first_spawn = ActorMutantSpawn::source_restore(&mut expected_rng, profile, 0);
+        let second_spawn = ActorMutantSpawn::source_restore(&mut expected_rng, profile, 0);
+
+        let restored = driver.step(GameInput::NONE);
+
+        assert_eq!(restored.enemy_reserve, EnemyReserveSnapshot::default());
+        assert_eq!(
+            restored
+                .commands
+                .iter()
+                .filter(|command| matches!(
+                    command,
+                    GameCommand::Spawn(SpawnRequest::Mutant { .. })
+                ))
+                .count(),
+            2
+        );
+        assert_eq!(
+            restored
+                .commands
+                .iter()
+                .filter(|command| matches!(
+                    command,
+                    GameCommand::Spawn(SpawnRequest::Lander { .. })
+                ))
+                .count(),
+            0
+        );
+        assert_eq!(
+            restored
+                .source_rng
+                .expect("playing report should carry source rng"),
+            expected_rng.advance().snapshot()
+        );
+
+        let prompt = source_mutant_prompt_for_test(
+            restored.step,
+            restored.wave,
+            restored
+                .source_rng
+                .expect("playing report should carry source rng"),
+            player_position,
+            Velocity::default(),
+        );
+        let behavior = ActorBehaviorProfile::default();
+        let mut source_mutants = restored
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::Mutant)
+            .collect::<Vec<_>>();
+        source_mutants.sort_by_key(|snapshot| snapshot.id);
+        assert_eq!(source_mutants.len(), 2);
+        for (snapshot, spawn) in source_mutants.iter().zip([first_spawn, second_spawn]) {
+            let (expected_position, expected_source, _) = expected_source_mutant_after_motion(
+                spawn.position,
+                spawn.source.expect("source mutant restore metadata"),
+                snapshot.id,
+                &prompt,
+                behavior,
+            );
+            assert_eq!(snapshot.position, expected_position);
+            assert_eq!(snapshot.source_mutant, Some(expected_source));
+            assert!(snapshot.source_lander.is_none());
+        }
+    }
+
+    #[test]
     fn actor_source_bomber_and_pod_reserves_use_restore_state() {
         let (mut driver, seeded) = started_source_wave_driver(2);
         let player_position = seeded
@@ -20347,7 +20469,7 @@ mod tests {
             lander 100 100\n\
             bomber 120 80\n\
             pod 160 88\n\
-            reserve 2 1 1 4\n\
+            reserve_full 2 1 1 3 4\n\
             human 32 214 grounded\n\
             wave 1\n\
             behavior kind lander lander_mode chase_player\n\
@@ -20419,8 +20541,8 @@ mod tests {
                 landers: 2,
                 bombers: 1,
                 pods: 1,
+                mutants: 3,
                 swarmers: 4,
-                ..EnemyReserveSnapshot::default()
             }
         );
         let wave_two_lander = manifest.waves[1]

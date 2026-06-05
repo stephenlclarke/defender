@@ -166,10 +166,13 @@ landers instead of remaining lander-only. Source wave profiles now retain the
 source enemy reserve counts after the active batch, expose those counts through
 `StepReport` and the clean state bridge, and activate source-restored reserve
 batches before the driver can publish `WaveCleared`. Lander reserves fill the
-next active batch first; once landers are exhausted, bomber, pod, and swarmer
-reserves use their source restore placement/fraction metadata. When no source
-human targets remain, actor reserve lander rows now follow the source schizoid
-fallback and restore as source-shaped mutants instead of targetless landers.
+next active batch first; once landers are exhausted, bomber, pod, direct mutant,
+and swarmer reserves use their source restore placement/fraction metadata. When
+no source human targets remain, actor reserve lander rows now follow the source
+schizoid fallback and restore as source-shaped mutants instead of targetless
+landers. Checked wave scripts keep the compatible
+`reserve <landers> <bombers> <pods> [swarmers]` form and add
+`reserve_full` / `enemy_reserve_full` for custom all-family reserve batches.
 Later-wave actor landers now restore from source RNG placement/shot/velocity
 state, and later-wave humans restore from the source target-list distribution.
 Custom attract drivers can construct scripts in Rust or parse checked text
@@ -904,9 +907,11 @@ fixed-point fractions, shot-timer RNG, velocity bytes, and then advance through
 a bounded source `LANDS0` orbit/shot loop with picture cycling and
 source-shaped fireball projection. When no humans remain, the reserve lander
 path follows the source `LANDST` schizoid fallback and restores source-shaped
-mutants directly. Reserve pods now use source `PRBST`/`PRBRES` placement,
-fixed-point fractions, and signed velocity bytes before entering source
-fixed-point X/Y motion. Active source enemy Y motion now uses the source
+mutants directly; direct mutant reserve rows now use the same source mutant
+restore placement, shot-timer RNG, and hop-RNG metadata. Reserve pods now use
+source `PRBST`/`PRBRES` placement, fixed-point fractions, and signed velocity
+bytes before entering source fixed-point X/Y motion. Active source enemy Y
+motion now uses the source
 `VELO` `YMIN`/`YMAX` wrap for landers, pods, bombers, mutants, swarmers, and
 baiters. Destroyed pods now spawn a
 deterministic clean mini-swarmer batch using the source request bound and

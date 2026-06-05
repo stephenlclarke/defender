@@ -277,13 +277,15 @@ reserve counts left after that active batch. The driver publishes those counts
 through `StepReport::enemy_reserve` and the clean `WorldSnapshot`, arms reserve
 activation only after the current active batch has reported once, and restores
 the next source batch before survivor-bonus wave clear can start. Lander
-reserves fill active slots first; once no landers remain, bomber, pod, and
-swarmer reserves restore in the source wave-size batch shape. Source swarmer
-reserves use the source `PLRES`/`RSW0` phony-object placement/fraction state
-before entering the same mini-swarmer runtime used by pod destruction. If no
-source human target remains while lander reserves are selected, the actor
-driver follows the source schizoid fallback and restores those rows as
-source-shaped mutants with source placement, shot-timer, and hop-RNG metadata.
+reserves fill active slots first; once no landers remain, bomber, pod, direct
+mutant, and swarmer reserves restore in the source wave-size batch shape.
+Direct mutant reserve rows use source placement, shot-timer, and hop-RNG
+metadata, while source swarmer reserves use the source `PLRES`/`RSW0`
+phony-object placement/fraction state before entering the same mini-swarmer
+runtime used by pod destruction. If no source human target remains while lander
+reserves are selected, the actor driver follows the source schizoid fallback
+and restores those rows as source-shaped mutants with source placement,
+shot-timer, and hop-RNG metadata.
 Wave `1` uses the source first-wave
 lander restore metadata from the existing clean evidence, including fixed-point
 fractions, velocities, shot timer, sleep ticks, picture frame, and target-human
@@ -331,9 +333,10 @@ current wave/kind behavior at the point where the line is parsed and are then
 installed as actor-id behavior profiles when that spawn index is allocated.
 `lander`, `bomber`, `pod`, and `human` lines add clean scripted spawn records;
 humans default to `grounded` and can also be declared as `falling <velocity>` or
-`carried <actor-id>`. `reserve <landers> <bombers> <pods> [swarmers]` or
-`enemy_reserve <landers> <bombers> <pods> [swarmers]` sets script-owned reserve
-counts for custom waves. `source_wave <wave>` and
+`carried <actor-id>`. The compatible `reserve` and `enemy_reserve` forms take
+`<landers> <bombers> <pods> [swarmers]`; `reserve_full` and
+`enemy_reserve_full` take `<landers> <bombers> <pods> <mutants> <swarmers>` and
+set all five reserve families explicitly. `source_wave <wave>` and
 `source_waves <first> <last>` expand source-backed wave-table profiles,
 including source reserve counts, into the same checked script, so the
 production default and custom level scripts use the same parser surface. The

@@ -368,6 +368,8 @@ Reserve landers now use source `LANDST` placement, fixed-point fractions,
 shot-timer RNG, and velocity bytes, then enter the same bounded `LANDS0`
 runtime; when no humans remain, the same reserve lander path follows the
 source `LANDST` schizoid fallback and restores source-shaped mutants directly.
+Direct mutant reserve rows restore through the same source mutant placement,
+shot-timer RNG, and hop-RNG metadata.
 Destroyed pods now spawn a deterministic clean
 mini-swarmer batch using the source spawn request bound and active-swarmer cap,
 including projectile and smart-bomb destruction paths. Spawned mini-swarmers
@@ -834,16 +836,17 @@ reintroduce legacy implementation terminology.
   shape, so wave `1` remains lander-only while later waves can seed bomber and
   pod actors beside source-RNG-restored landers. Source-backed wave profiles
   retain the post-active-batch enemy reserve counts, script wave profiles can
-  set those counts with `reserve` / `enemy_reserve`, and
-  `StepReport::enemy_reserve` maps them into the clean world snapshot. Reserve
+  set those counts with `reserve` / `enemy_reserve` or the all-family
+  `reserve_full` / `enemy_reserve_full` form, and `StepReport::enemy_reserve`
+  maps them into the clean world snapshot. Reserve
   activation is armed only after the active batch has published a report; when
   source-counted hostiles are gone, the driver restores a source-shaped reserve
   batch before allowing the survivor-bonus `WaveCleared` path. Lander reserves
-  fill active slots first, then bomber, pod, and swarmer reserves restore from
-  their source placement/fraction state once landers are exhausted. Source
-  swarmer reserves use the source `PLRES`/`RSW0` phony-object placement before
-  entering the same source mini-swarmer runtime. If no source human targets
-  remain, actor reserve lander rows use the source schizoid fallback and
+  fill active slots first, then bomber, pod, direct mutant, and swarmer reserves
+  restore from their source placement/fraction state once landers are exhausted.
+  Source swarmer reserves use the source `PLRES`/`RSW0` phony-object placement
+  before entering the same source mini-swarmer runtime. If no source human
+  targets remain, actor reserve lander rows use the source schizoid fallback and
   restore source-shaped mutants directly. Later-wave humans restore from the
   source target-list distribution instead of reusing first-wave starts.
   A persistent `StatusDisplay` actor draws score, high score, wave, lives,

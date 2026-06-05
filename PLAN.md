@@ -82,13 +82,14 @@ verification tools.
   actor-owned fraction state during active motion, and source landers prefer
   configured target slots before falling back to nearest-human seeking. Source
   wave profiles now retain post-active-batch enemy reserve counts, parsed wave
-  scripts can set custom reserves with `reserve` / `enemy_reserve`, and
-  `StepReport` maps the current reserve counts into the clean world snapshot.
-  Reserve activation is armed only after the active source batch has published a
-  report. When source-counted hostiles are gone, the driver restores source
-  reserve batches before wave clear: lander reserves fill active slots first,
-  no-human lander reserve rows restore as source-shaped mutants through the
-  source schizoid fallback, then bomber, pod, and swarmer reserves use source
+  scripts can set custom reserves with `reserve` / `enemy_reserve` or the
+  all-family `reserve_full` / `enemy_reserve_full` form, and `StepReport` maps
+  the current reserve counts into the clean world snapshot. Reserve activation
+  is armed only after the active source batch has published a report. When
+  source-counted hostiles are gone, the driver restores source reserve batches
+  before wave clear: lander reserves fill active slots first, no-human lander
+  reserve rows restore as source-shaped mutants through the source schizoid
+  fallback, then bomber, pod, direct mutant, and swarmer reserves use source
   placement/fraction restore paths once landers are exhausted. Source swarmer
   reserves use `PLRES`/`RSW0` phony-object placement before the same
   mini-swarmer runtime used by pod destruction. Source
@@ -832,6 +833,39 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 19:48 BST`: Completed the actor direct mutant reserve
+  activation cycle. Actor reserve accounting, empty checks, selection, and
+  source-family take logic now include `EnemyReserveSnapshot::mutants`, so
+  direct mutant reserve rows can no longer strand wave progression outside the
+  actor path. Mixed reserve selection now follows the clean source family order
+  after lander priority: bomber, pod, mutant, then swarmer. Direct mutant
+  reserves spawn through `ActorMutantSpawn::source_restore`, carrying source
+  placement, shot-timer RNG, hop-RNG, and `SourceMutantSnapshot` metadata into
+  actor snapshots and clean bridge state. Checked wave scripts keep the
+  existing compatible `reserve` / `enemy_reserve` form and add
+  `reserve_full` / `enemy_reserve_full` for all five source reserve families.
+  Focused regressions cover direct mutant reserve restoration and all-family
+  parser manifest output. README, SPEC, and actor architecture docs now
+  document direct mutant reserve activation and the new script form. No legacy
+  code, tests, or scaffolding were safe to remove in this slice because the
+  remaining clean smoke/fidelity/oracle evidence still depends on those
+  boundaries. Validation passed with `cargo fmt --check`, `cargo check
+  --all-targets --features legacy-tools`, `cargo test
+  actor_source_mutant_reserves_use_restore_state --lib --features
+  legacy-tools`, `cargo test
+  wave_script_text_parser_builds_sorted_profiles_and_spawns --lib --features
+  legacy-tools`, `cargo test source_mutant --lib --features legacy-tools`,
+  `cargo test actor_game --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, the
+  actor-smoke/live/runtime/wgpu all-target `legacy-tools` filters, and the
+  actor smoke CLI commands (`--actor-smoke`, `--actor-attract-smoke`,
+  `--actor-post-game-smoke`, and `--actor-wgpu-smoke`). The full unfiltered
+  `legacy-tools` suite was not rerun in this cycle; the previously isolated
+  clean-game MAME window/post-game audio failures remain outside this slice.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780684737041449`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780685300920039`.
 - `2026-06-05 19:34 BST`: Completed the actor source swarmer reserve
   activation cycle. Actor reserve accounting and selection now include
   `EnemyReserveSnapshot::swarmers`, so source swarmer reserves can no longer
