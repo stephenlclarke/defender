@@ -129,9 +129,12 @@ the source top scanner frame/marker bars, `MTERR` mini-terrain records,
 source-shaped rescue-demo player/human/lander object sprites, scanner blips,
 source-shaped rescue laser pixels, lander explosion fragments, the 500-point
 rescue popup, and the `ENMYTB` enemy legend transfer/materialization/reveal
-objects. Custom attract scripts can draw checked `messages.tsv` labels through
-source cursor controls with optional visual offsets, and the older one-column
-`high_scores` action remains available for custom screens.
+objects before the default script cycles back to the first Williams reveal step
+at source step 3367. Custom attract scripts can draw checked `messages.tsv`
+labels through source cursor controls with optional visual offsets, can opt
+into looping with `cycle <step-count>`, and otherwise remain unbounded linear
+scripts; the older one-column `high_scores` action remains available for custom
+screens.
 The default actor wave allocator now
 uses the source active-family
 shape, so later waves can introduce bomber and pod actor families alongside

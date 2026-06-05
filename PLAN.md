@@ -62,9 +62,12 @@ verification tools.
   rescue-demo player/human/lander object sprites, scanner blips,
   source-shaped rescue laser pixels, lander explosion fragments, the 500-point
   rescue popup, and the `ENMYTB` enemy legend transfer/materialization/reveal
-  objects. Custom attract scripts can draw checked `messages.tsv` labels
-  through source cursor controls with optional visual offsets, and the
-  older one-column `high_scores` action remains available for custom screens.
+  objects before the embedded script cycles back to the first Williams reveal
+  step at source step 3367. Custom attract scripts can draw checked
+  `messages.tsv` labels through source cursor controls with optional visual
+  offsets, can opt into looping with `cycle <step-count>`, and otherwise remain
+  linear; the older one-column `high_scores` action remains available for
+  custom screens.
   `ActorWaveScript` now names per-wave progression data and applies behavior
   scripts plus hostile and initial-human spawn records as play starts and waves
   are cleared. Wave scripts can now attach spawn-index behavior profiles that
@@ -776,6 +779,32 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 15:03 BST`: Completed the actor attract default-cycle slice.
+  `AttractScript` now exposes an optional script-level cycle count in its
+  manifest, the checked parser accepts `cycle`, `loop`, or `repeat`
+  directives with positive step counts, and custom attract scripts remain
+  linear unless they opt in. The embedded red-label attract script declares
+  `cycle 3367`, matching the source scoring-demo boundary and returning the
+  default actor attract sequence to the first Williams reveal step after the
+  scoring page. Focused regressions now prove checked-script/fallback parity,
+  parser manifest exposure, parser errors for zero and duplicate cycle
+  directives, default wrap behavior, and the custom-script opt-in rule. README,
+  SPEC, the actor architecture notes, and the red-label asset README now
+  document the cycle directive and default boundary. No legacy code, tests, or
+  scaffolding were safe to remove because legacy tooling still backs ROM
+  reports, trace/media helpers, and oracle-equivalence evidence while the
+  actor runtime continues closing fidelity gaps. Validation passed with the
+  focused default-loop/title/parser tests, `cargo test actor_game
+  --all-targets --features legacy-tools`, `cargo test actor_smoke
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test actor_wgpu --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, `cargo fmt
+  --check`, touched-doc markdownlint, and `git diff --check`. Slack cycle
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780667628613419`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780668195168989`.
 - `2026-06-05 14:50 BST`: Completed the actor attract scoring
   instruction-label cadence slice. The embedded actor attract script and Rust
   fallback keep `scoring_surface` at source step `1088`, reveal `SCANV`

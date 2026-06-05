@@ -24,7 +24,9 @@ Current files:
   `AttractScript` parser using source page-start steps for the title messages:
   Williams from step 1, `ELECV` from step 236, the Defender wordmark from step
   365, the high-score/zero-credit Hall-of-Fame page from step 488 for the source
-  60-tick stall window, and scoring/instruction labels from step 1088. A
+  60-tick stall window, and scoring/instruction labels from step 1088. The
+  checked script declares `cycle 3367` so the scoring demo returns to the first
+  Williams reveal step after the final source scoring-card window. A
   `credits_nonzero` title-page event suppresses the zero-credit line while
   still showing a real inserted credit. The Hall-of-Fame page also draws
   source-offset `HALLD_*` headings and the source Defender logo; `hall_scores`
@@ -37,7 +39,8 @@ Current files:
   500-point rescue popup. It also uses the driver-owned high-score table and
   credit count carried in `StepPrompt`. Custom attract scripts can also use
   checked `messages.tsv` labels through the script parser's `message` action
-  with optional visual offsets.
+  with optional visual offsets and can opt into looping with their own
+  `cycle <step-count>` directive.
 - `actor-behavior.script`: embedded actor-runtime baseline behavior profile
   parsed by `ActorBehaviorScript`, including player, laser, hostile, human,
   explosion, and score-popup timing/tuning defaults.

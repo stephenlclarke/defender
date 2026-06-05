@@ -81,6 +81,8 @@ const SOURCE_ATTRACT_PRESENTS_START_STEP: u64 = 236;
 const SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP: u64 = 365;
 const SOURCE_ATTRACT_HALL_OF_FAME_START_STEP: u64 = 488;
 const SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP: u64 = ATTRACT_SCORING_SEQUENCE_START_FRAME as u64;
+const SOURCE_ATTRACT_CYCLE_STEPS: u64 =
+    SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP + ATTRACT_SCORING_DEMO_TOTAL_STEPS as u64;
 const SOURCE_ATTRACT_WILLIAMS_LOGO_DURATION_STEPS: u64 = SOURCE_ATTRACT_HALL_OF_FAME_START_STEP - 1;
 const SOURCE_ATTRACT_PRESENTS_DURATION_STEPS: u64 =
     SOURCE_ATTRACT_HALL_OF_FAME_START_STEP - SOURCE_ATTRACT_PRESENTS_START_STEP;
@@ -3649,12 +3651,20 @@ impl ActorSoundEventBridge {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttractScript {
     events: Vec<AttractScriptEvent>,
+    cycle_steps: Option<u64>,
 }
 
 impl AttractScript {
-    pub fn new(mut events: Vec<AttractScriptEvent>) -> Self {
+    pub fn new(events: Vec<AttractScriptEvent>) -> Self {
+        Self::with_cycle_steps(events, None)
+    }
+
+    pub fn with_cycle_steps(mut events: Vec<AttractScriptEvent>, cycle_steps: Option<u64>) -> Self {
         events.sort_by_key(|event| event.start_after_steps);
-        Self { events }
+        Self {
+            events,
+            cycle_steps: cycle_steps.filter(|steps| *steps > 0),
+        }
     }
 
     pub fn parse_text(source: &str) -> Result<Self, AttractScriptParseError> {
@@ -3762,7 +3772,7 @@ impl AttractScript {
                 SOURCE_ATTRACT_SCORING_VISUAL_OFFSET,
             ));
         }
-        Self::new(events)
+        Self::with_cycle_steps(events, Some(SOURCE_ATTRACT_CYCLE_STEPS))
     }
 
     fn draws_for(
@@ -3772,6 +3782,7 @@ impl AttractScript {
         high_scores: &[u32; 5],
         credits: u8,
     ) -> Vec<DrawCommand> {
+        let step = self.cycled_step(step);
         self.events
             .iter()
             .filter(|event| event.active_at(step))
@@ -3781,12 +3792,21 @@ impl AttractScript {
 
     pub fn manifest(&self) -> AttractScriptManifest {
         AttractScriptManifest {
+            cycle_steps: self.cycle_steps,
             events: self
                 .events
                 .iter()
                 .map(AttractScriptEvent::manifest)
                 .collect(),
         }
+    }
+
+    fn cycled_step(&self, step: u64) -> u64 {
+        let Some(cycle_steps) = self.cycle_steps else {
+            return step;
+        };
+        let wrapped = step % cycle_steps;
+        if wrapped == 0 { 1 } else { wrapped }
     }
 }
 
@@ -3795,6 +3815,7 @@ impl FromStr for AttractScript {
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
         let mut events = Vec::new();
+        let mut cycle_steps = None;
         for (line_index, raw_line) in source.lines().enumerate() {
             let line_number = line_index + 1;
             let line = raw_line
@@ -3804,9 +3825,18 @@ impl FromStr for AttractScript {
             if line.is_empty() {
                 continue;
             }
+            if let Some(cycle) = parse_attract_script_cycle_directive(line_number, line)? {
+                if cycle_steps.replace(cycle).is_some() {
+                    return Err(AttractScriptParseError::new(
+                        line_number,
+                        "duplicate cycle directive",
+                    ));
+                }
+                continue;
+            }
             events.push(parse_attract_script_event(line_number, line)?);
         }
-        Ok(Self::new(events))
+        Ok(Self::with_cycle_steps(events, cycle_steps))
     }
 }
 
@@ -3836,6 +3866,32 @@ impl fmt::Display for AttractScriptParseError {
 }
 
 impl std::error::Error for AttractScriptParseError {}
+
+fn parse_attract_script_cycle_directive(
+    line_number: usize,
+    line: &str,
+) -> Result<Option<u64>, AttractScriptParseError> {
+    let mut parts = line.split_whitespace();
+    let action = parts
+        .next()
+        .ok_or_else(|| AttractScriptParseError::new(line_number, "missing action"))?;
+    if !matches!(
+        normalize_script_token(action).as_str(),
+        "cycle" | "loop" | "repeat"
+    ) {
+        return Ok(None);
+    }
+
+    let cycle_steps = parse_attract_u64(line_number, parts.next(), "cycle steps")?;
+    if cycle_steps == 0 {
+        return Err(AttractScriptParseError::new(
+            line_number,
+            "cycle steps must be greater than zero",
+        ));
+    }
+    reject_extra_attract_fields(line_number, parts)?;
+    Ok(Some(cycle_steps))
+}
 
 fn parse_attract_script_event(
     line_number: usize,
@@ -4762,6 +4818,7 @@ fn hall_score_text(score: u32) -> String {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttractScriptManifest {
+    pub cycle_steps: Option<u64>,
     pub events: Vec<AttractScriptEventManifest>,
 }
 
@@ -13336,6 +13393,10 @@ mod tests {
             .expect("embedded actor attract script should parse");
 
         assert_eq!(
+            parsed.manifest().cycle_steps,
+            Some(SOURCE_ATTRACT_CYCLE_STEPS)
+        );
+        assert_eq!(
             AttractScript::red_label_title().manifest(),
             parsed.manifest()
         );
@@ -13486,6 +13547,60 @@ mod tests {
     }
 
     #[test]
+    fn default_actor_attract_script_loops_after_source_scoring_cycle() {
+        let script = AttractScript::red_label_title();
+        let high_scores = HighScoreTable::default().entries;
+
+        assert_eq!(
+            script.manifest().cycle_steps,
+            Some(SOURCE_ATTRACT_CYCLE_STEPS)
+        );
+        assert_eq!(SOURCE_ATTRACT_CYCLE_STEPS, 3367);
+
+        let final_scoring_draws = script.draws_for(
+            ActorId::new(99),
+            SOURCE_ATTRACT_CYCLE_STEPS - 1,
+            &high_scores,
+            0,
+        );
+        assert!(
+            final_scoring_draws
+                .iter()
+                .any(|draw| { matches!(draw.effect, VisualEffect::AttractScoringSurface { .. }) })
+        );
+        assert!(
+            !final_scoring_draws
+                .iter()
+                .any(|draw| draw.sprite == SpriteKey::WilliamsLogo)
+        );
+
+        let wrapped_draws = script.draws_for(
+            ActorId::new(99),
+            SOURCE_ATTRACT_CYCLE_STEPS,
+            &high_scores,
+            0,
+        );
+        assert!(wrapped_draws.iter().any(|draw| {
+            draw.sprite == SpriteKey::WilliamsLogo
+                && matches!(
+                    draw.effect,
+                    VisualEffect::WilliamsReveal { stroke_step: 1, .. }
+                )
+        }));
+        assert!(
+            !wrapped_draws
+                .iter()
+                .any(|draw| { matches!(draw.effect, VisualEffect::AttractScoringSurface { .. }) })
+        );
+        let scan_text = source_message_text("SCANV").expect("SCANV source message");
+        assert!(
+            !wrapped_draws
+                .iter()
+                .any(|draw| draw.text.as_deref() == Some(scan_text))
+        );
+    }
+
+    #[test]
     fn actor_source_scanner_mini_terrain_records_match_reference_slice() {
         let records = source_scanner_mini_terrain_records();
 
@@ -13595,6 +13710,7 @@ mod tests {
 
         let manifest = driver.script_manifest();
 
+        assert_eq!(manifest.attract_script.cycle_steps, None);
         assert_eq!(manifest.attract_script, script.manifest());
         assert_eq!(
             manifest
@@ -13638,6 +13754,7 @@ mod tests {
         let script = AttractScript::parse_text(
             "\
             # Custom attract script\n\
+            cycle 12\n\
             defender_wordmark 9 12 70 80\n\
             text 2 5 12 20 CUSTOM ATTRACT\n\
             high_scores 4 forever 80 100 9 3\n\
@@ -13652,6 +13769,7 @@ mod tests {
 
         let manifest = script.manifest();
 
+        assert_eq!(manifest.cycle_steps, Some(12));
         assert_eq!(
             manifest
                 .events
@@ -13718,6 +13836,38 @@ mod tests {
                 slots: DEFENDER_WORDMARK_SLOTS,
                 row_pairs: DEFENDER_WORDMARK_ROW_PAIRS,
             }
+        );
+    }
+
+    #[test]
+    fn custom_attract_scripts_only_loop_when_cycle_is_declared() {
+        let high_scores = HighScoreTable::default().entries;
+        let unlooped = AttractScript::parse_text("text 2 forever 12 20 UNBOUNDED")
+            .expect("custom unlooped script should parse");
+        let unlooped_draws = unlooped.draws_for(ActorId::new(1), 12, &high_scores, 0);
+        assert!(
+            unlooped_draws
+                .iter()
+                .any(|draw| draw.text.as_deref() == Some("UNBOUNDED"))
+        );
+
+        let looped = AttractScript::parse_text(
+            "\
+            cycle 5\n\
+            text 2 forever 12 20 LOOPED\n",
+        )
+        .expect("custom looped script should parse");
+        let wrapped_to_first_step = looped.draws_for(ActorId::new(1), 5, &high_scores, 0);
+        assert!(
+            wrapped_to_first_step
+                .iter()
+                .all(|draw| draw.text.as_deref() != Some("LOOPED"))
+        );
+        let wrapped_to_second_step = looped.draws_for(ActorId::new(1), 7, &high_scores, 0);
+        assert!(
+            wrapped_to_second_step
+                .iter()
+                .any(|draw| draw.text.as_deref() == Some("LOOPED"))
         );
     }
 
@@ -13899,6 +14049,20 @@ mod tests {
             .expect_err("unknown source message label should fail");
         assert_eq!(error.line, 1);
         assert!(error.to_string().contains("unknown source message label"));
+
+        let error =
+            AttractScript::parse_text("cycle 0\n").expect_err("zero cycle length should fail");
+        assert_eq!(error.line, 1);
+        assert!(
+            error
+                .to_string()
+                .contains("cycle steps must be greater than zero")
+        );
+
+        let error = AttractScript::parse_text("cycle 12\ncycle 13\n")
+            .expect_err("duplicate cycle directive should fail");
+        assert_eq!(error.line, 2);
+        assert!(error.to_string().contains("duplicate cycle directive"));
     }
 
     #[test]

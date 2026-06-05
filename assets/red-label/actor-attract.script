@@ -4,7 +4,9 @@
 # high_scores adds: <row-height> <rows>
 # hall_scores uses: <todays-screen-address> <all-time-screen-address> <offset-x> <offset-y>
 # credits and credits_nonzero use: <label-x> <label-y> <count-x> <count-y>
+# cycle uses: <step-count>
 
+cycle 3367
 williams_logo 1 487 108 60
 message 236 252 ELECV 0x3258
 defender_wordmark 365 123 96 144

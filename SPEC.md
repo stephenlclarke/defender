@@ -791,7 +791,10 @@ reintroduce legacy implementation terminology.
   top scanner frame/marker bars, `MTERR` mini-terrain records, source-shaped
   rescue-demo player/human/lander object sprites, scanner blips, and the
   source-shaped rescue laser, lander explosion fragments, 500-point rescue
-  popup, and `ENMYTB` enemy legend transfer/materialization/reveal objects.
+  popup, and `ENMYTB` enemy legend transfer/materialization/reveal objects
+  before the embedded script cycles back to the first Williams reveal step at
+  source step 3367. Custom attract scripts can opt into looping with
+  `cycle <step-count>` and otherwise stay linear.
   Custom attract scripts can draw checked `messages.tsv` labels through source
   cursor controls with optional visual offsets, and the older one-column
   `high_scores` action remains available for custom screens. The

@@ -337,8 +337,11 @@ It also projects the source-shaped rescue-demo player, human, and lander object
 sprites, matching scanner blips, source-shaped rescue laser pixels, lander
 explosion fragments, the 500-point rescue popup, and the `ENMYTB` enemy legend
 transfer/materialization/reveal objects from the surface's actor-local
-`scoring_tick`. The older Rust event constructor remains available as a
-fallback. Custom drivers can pass their own parsed or
+`scoring_tick`. The default checked script declares `cycle 3367`, so the
+sequence returns to the first Williams reveal step after the source scoring
+demo; custom scripts stay linear unless they declare their own cycle. The older
+Rust event constructor remains available as a fallback. Custom drivers can pass
+their own parsed or
 constructed sequence through
 `ActorGameDriver::with_attract_script(...)` without replacing coin/start
 control handling.
@@ -350,6 +353,7 @@ same event model from checked text script lines:
 
 ```text
 # action start duration x y ...
+cycle 3367
 text 1 forever 10 10 PRESS START
 williams_logo 1 487 108 60
 message 236 252 ELECV 0x3258
@@ -377,7 +381,10 @@ message 2417 forever SWARMV 0x5CA8 -11 -7
 Blank lines and `#` comments are ignored. `duration` can be a step count or
 `-`, `none`, `forever`, or `infinite` for an unbounded event. Parser errors
 include the source line number so custom driver tooling can reject malformed
-scripts before the actor runtime starts. `high_scores` lines use
+scripts before the actor runtime starts. `cycle`, `loop`, or `repeat` declares
+an optional positive script step count that wraps draw selection back to the
+first visible actor script step at the boundary; scripts without it do not
+loop. `high_scores` lines use
 `x y row-height rows` after the timing fields and draw rows from the
 driver-owned high-score table carried in `StepPrompt`. `hall_scores` lines use
 `todays-screen-address all-time-screen-address offset-x offset-y` and draw
