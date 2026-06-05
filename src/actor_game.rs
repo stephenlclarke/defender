@@ -3534,14 +3534,21 @@ impl AttractScript {
             ),
             AttractScriptEvent::text(1, None, Point::new(78, 176), "HIGH SCORES"),
             AttractScriptEvent::high_scores(1, None, Point::new(82, 188), 10, 5),
+            AttractScriptEvent::credits(1, None, Point::new(176, 226), Point::new(248, 226)),
         ])
     }
 
-    fn draws_for(&self, actor: ActorId, step: u64, high_scores: &[u32; 5]) -> Vec<DrawCommand> {
+    fn draws_for(
+        &self,
+        actor: ActorId,
+        step: u64,
+        high_scores: &[u32; 5],
+        credits: u8,
+    ) -> Vec<DrawCommand> {
         self.events
             .iter()
             .filter(|event| event.active_at(step))
-            .flat_map(|event| event.draws(actor, step, high_scores))
+            .flat_map(|event| event.draws(actor, step, high_scores, credits))
             .collect()
     }
 
@@ -3674,6 +3681,17 @@ fn parse_attract_script_event(
                 position,
                 row_height,
                 rows,
+            ))
+        }
+        "credits" | "credit_count" => {
+            let label_position = parse_attract_point(line_number, &mut parts)?;
+            let count_position = parse_attract_point(line_number, &mut parts)?;
+            reject_extra_attract_fields(line_number, parts)?;
+            Ok(AttractScriptEvent::credits(
+                start_after_steps,
+                duration_steps,
+                label_position,
+                count_position,
             ))
         }
         _ => Err(AttractScriptParseError::new(
@@ -3901,6 +3919,22 @@ impl AttractScriptEvent {
         }
     }
 
+    pub fn credits(
+        start_after_steps: u64,
+        duration_steps: Option<u64>,
+        label_position: Point,
+        count_position: Point,
+    ) -> Self {
+        Self {
+            start_after_steps,
+            duration_steps,
+            action: AttractScriptAction::Credits {
+                label_position,
+                count_position,
+            },
+        }
+    }
+
     fn active_at(&self, step: u64) -> bool {
         if step < self.start_after_steps {
             return false;
@@ -3911,8 +3945,15 @@ impl AttractScriptEvent {
         }
     }
 
-    fn draws(&self, actor: ActorId, step: u64, high_scores: &[u32; 5]) -> Vec<DrawCommand> {
-        self.action.draws(actor, self.age(step), high_scores)
+    fn draws(
+        &self,
+        actor: ActorId,
+        step: u64,
+        high_scores: &[u32; 5],
+        credits: u8,
+    ) -> Vec<DrawCommand> {
+        self.action
+            .draws(actor, self.age(step), high_scores, credits)
     }
 
     fn age(&self, step: u64) -> u64 {
@@ -3954,10 +3995,20 @@ pub enum AttractScriptAction {
         row_height: i16,
         rows: usize,
     },
+    Credits {
+        label_position: Point,
+        count_position: Point,
+    },
 }
 
 impl AttractScriptAction {
-    fn draws(&self, actor: ActorId, age: u64, high_scores: &[u32; 5]) -> Vec<DrawCommand> {
+    fn draws(
+        &self,
+        actor: ActorId,
+        age: u64,
+        high_scores: &[u32; 5],
+        credits: u8,
+    ) -> Vec<DrawCommand> {
         match self {
             Self::Text { position, value } => {
                 vec![DrawCommand::text(actor, *position, value.clone())]
@@ -4031,6 +4082,13 @@ impl AttractScriptAction {
                     )
                 })
                 .collect(),
+            Self::Credits {
+                label_position,
+                count_position,
+            } => vec![
+                DrawCommand::text(actor, *label_position, "CREDITS:"),
+                DrawCommand::text(actor, *count_position, format!("{:02}", credits.min(99))),
+            ],
         }
     }
 
@@ -4070,6 +4128,13 @@ impl AttractScriptAction {
                 position: *position,
                 row_height: *row_height,
                 rows: *rows,
+            },
+            Self::Credits {
+                label_position,
+                count_position,
+            } => AttractScriptActionManifest::Credits {
+                label_position: *label_position,
+                count_position: *count_position,
             },
         }
     }
@@ -4111,6 +4176,10 @@ pub enum AttractScriptActionManifest {
         position: Point,
         row_height: i16,
         rows: usize,
+    },
+    Credits {
+        label_position: Point,
+        count_position: Point,
     },
 }
 
@@ -5526,13 +5595,14 @@ impl ActorGameDriver {
         } else {
             false
         };
+        let prompt_credits = self.credits.saturating_add(input.coin_insertions());
         let base_prompt = StepPrompt {
             step: self.step,
             phase: self.phase,
             input,
             wave: self.wave,
             score: self.score,
-            credits: self.credits,
+            credits: prompt_credits,
             lives: self.lives,
             smart_bombs: self.smart_bombs,
             high_scores: self.high_scores.entries(),
@@ -6688,8 +6758,12 @@ impl AssetActor for ScriptedAttractProgram {
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let draws = if matches!(prompt.phase, Phase::Attract | Phase::GameOver) {
             self.elapsed_steps = self.elapsed_steps.saturating_add(1);
-            self.script
-                .draws_for(self.id, self.elapsed_steps, &prompt.high_scores)
+            self.script.draws_for(
+                self.id,
+                self.elapsed_steps,
+                &prompt.high_scores,
+                prompt.credits,
+            )
         } else {
             self.elapsed_steps = 0;
             Vec::new()
@@ -10904,6 +10978,13 @@ mod tests {
                 rows: 5,
             }
         )));
+        assert!(parsed.manifest().events.iter().any(|event| matches!(
+            event.action,
+            AttractScriptActionManifest::Credits {
+                label_position: Point { x: 176, y: 226 },
+                count_position: Point { x: 248, y: 226 },
+            }
+        )));
     }
 
     #[test]
@@ -11014,6 +11095,7 @@ mod tests {
             defender_wordmark 9 12 70 80\n\
             text 2 5 12 20 CUSTOM ATTRACT\n\
             high_scores 4 forever 80 100 9 3\n\
+            credits 4 forever 12 228 82 228\n\
             sprite 6 forever defender_logo 40 44\n\
             williams_logo 5 - 18 44\n",
         )
@@ -11027,7 +11109,7 @@ mod tests {
                 .iter()
                 .map(|event| event.start_after_steps)
                 .collect::<Vec<_>>(),
-            vec![2, 4, 5, 6, 9]
+            vec![2, 4, 4, 5, 6, 9]
         );
         assert_eq!(
             manifest.events[0].action,
@@ -11045,14 +11127,21 @@ mod tests {
             }
         );
         assert_eq!(
-            manifest.events[3].action,
+            manifest.events[2].action,
+            AttractScriptActionManifest::Credits {
+                label_position: Point::new(12, 228),
+                count_position: Point::new(82, 228),
+            }
+        );
+        assert_eq!(
+            manifest.events[4].action,
             AttractScriptActionManifest::Sprite {
                 sprite: SpriteKey::DefenderLogo,
                 position: Point::new(40, 44),
             }
         );
         assert_eq!(
-            manifest.events[4].action,
+            manifest.events[5].action,
             AttractScriptActionManifest::DefenderWordmark {
                 position: Point::new(70, 80),
                 slots: DEFENDER_WORDMARK_SLOTS,
@@ -11114,6 +11203,31 @@ mod tests {
         }));
         assert!(report.draws.iter().any(|draw| {
             draw.position == Point::new(20, 56) && draw.text.as_deref() == Some("3. 007500")
+        }));
+    }
+
+    #[test]
+    fn parsed_attract_script_draws_prompt_credit_count() {
+        let script = "credits 1 forever 12 228 82 228"
+            .parse::<AttractScript>()
+            .expect("credit script action should parse");
+        let mut driver = ActorGameDriver::with_attract_script(script);
+
+        let first = driver.step(GameInput::NONE);
+        assert!(first.draws.iter().any(|draw| {
+            draw.position == Point::new(12, 228) && draw.text.as_deref() == Some("CREDITS:")
+        }));
+        assert!(first.draws.iter().any(|draw| {
+            draw.position == Point::new(82, 228) && draw.text.as_deref() == Some("00")
+        }));
+
+        let credited = driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(credited.credits, 1);
+        assert!(credited.draws.iter().any(|draw| {
+            draw.position == Point::new(82, 228) && draw.text.as_deref() == Some("01")
         }));
     }
 

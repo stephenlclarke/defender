@@ -42,8 +42,8 @@ verification tools.
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and
   `assets/red-label/actor-waves.script` through the same parser path. The
-  attract script now draws prompt-backed high-score table rows alongside the
-  Williams reveal and Defender wordmark coalescence.
+  attract script now draws prompt-backed high-score table rows and credits
+  label/count alongside the Williams reveal and Defender wordmark coalescence.
   `ActorWaveScript` now names per-wave progression data and applies behavior
   scripts plus hostile and initial-human spawn records as play starts and waves
   are cleared. Wave scripts can now attach spawn-index behavior profiles that
@@ -755,6 +755,27 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 12:21 BST`: Completed the actor attract credits script slice.
+  `AttractScript` now accepts checked
+  `credits <start> <duration> <label-x> <label-y> <count-x> <count-y>` lines,
+  exposes credit events in manifests, and draws the source-backed `CREDITS:`
+  label plus visible credit count from `StepPrompt.credits`. The actor driver
+  now includes current-step coin insertions in prompt credits so attract/status
+  text matches the report credit count while durable credit mutation and credit
+  audio remain owned by `GameCommand::Credit`. The embedded
+  `assets/red-label/actor-attract.script` now owns the default credits
+  label/count beside Williams reveal, Defender wordmark coalescence, and
+  high-score rows. Added focused parser/runtime regressions for parsed credit
+  scripts and embedded default manifest parity. Validation passed with `cargo
+  fmt --check`, focused attract parser/runtime tests, `cargo test actor_game
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, touched-doc
+  markdownlint, and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780657867078129`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780658478228899`.
 - `2026-06-05 12:09 BST`: Completed the actor attract high-score script slice.
   `AttractScript` now accepts checked
   `high_scores <start> <duration> <x> <y> <row-height> <rows>` lines, exposes

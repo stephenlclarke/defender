@@ -1,8 +1,10 @@
 # Actor runtime red-label attract title script.
 # Format: <action> <start-step> <duration|forever> <x> <y> [text]
 # high_scores adds: <row-height> <rows>
+# credits uses: <label-x> <label-y> <count-x> <count-y>
 
 williams_logo 1 forever 108 60
 defender_wordmark 72 forever 96 144
 text 1 forever 78 176 HIGH SCORES
 high_scores 1 forever 82 188 10 5
+credits 1 forever 176 226 248 226

@@ -18,8 +18,9 @@ Current files:
 
 - `actor-attract.script`: embedded actor-runtime title/attract script that
   drives the Williams reveal, Defender wordmark coalescence, and high-score
-  title/table text through the checked `AttractScript` parser using the
-  driver-owned high-score table carried in `StepPrompt`.
+  title/table plus credits label/count text through the checked
+  `AttractScript` parser using the driver-owned high-score table and credit
+  count carried in `StepPrompt`.
 - `actor-behavior.script`: embedded actor-runtime baseline behavior profile
   parsed by `ActorBehaviorScript`, including player, laser, hostile, human,
   explosion, and score-popup timing/tuning defaults.

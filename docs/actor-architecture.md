@@ -315,9 +315,9 @@ The attract screen is data-driven. `AttractScript` contains ordered
 `AttractScriptEvent` records, and `ScriptedAttractProgram` turns the active
 events for its own current script step into draw commands. The default
 `AttractScript::red_label_title()` parses
-`assets/red-label/actor-attract.script`, recreating the current
-Williams/logo/high score opening sequence from checked text while the older
-Rust event constructor remains available as a fallback. Custom drivers can pass
+`assets/red-label/actor-attract.script`, recreating the current Williams/logo,
+high-score, and credits opening sequence from checked text while the older Rust
+event constructor remains available as a fallback. Custom drivers can pass
 their own parsed or constructed sequence through
 `ActorGameDriver::with_attract_script(...)` without replacing coin/start
 control handling.
@@ -332,6 +332,7 @@ same event model from checked text script lines:
 text 1 forever 10 10 PRESS START
 sprite 2 forever defender_logo 40 44
 high_scores 1 forever 82 188 10 5
+credits 1 forever 176 226 248 226
 williams_logo 5 - 108 60
 defender_wordmark 72 - 96 144
 ```
@@ -341,13 +342,17 @@ Blank lines and `#` comments are ignored. `duration` can be a step count or
 include the source line number so custom driver tooling can reject malformed
 scripts before the actor runtime starts. `high_scores` lines use
 `x y row-height rows` after the timing fields and draw rows from the
-driver-owned high-score table carried in `StepPrompt`.
+driver-owned high-score table carried in `StepPrompt`. `credits` lines use
+`label-x label-y count-x count-y` after the timing fields and draw the
+source-backed `CREDITS:` label plus the visible credit count from
+`StepPrompt.credits`.
 
 Script actions currently cover:
 
 - `Text`, for scripted title/status lines.
 - `Sprite`, for static sprite placement.
 - `HighScores`, for prompt-backed high-score table rows in attract/game-over.
+- `Credits`, for the prompt-backed credit label/count in attract/game-over.
 - `WilliamsLogo`, which emits `SpriteKey::WilliamsLogo` with
   `VisualEffect::WilliamsReveal` metadata for handwriting reveal and title
   color phase.
