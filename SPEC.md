@@ -768,7 +768,8 @@ reintroduce legacy implementation terminology.
   cadence, and source-backed bomber bomb actors publish stationary bomb-shell
   fraction plus source-cadenced lifetime state. Actor spawn command handling
   enforces the shared 20-slot source shell cap for enemy shots and bombs plus
-  the red-label 10-slot bomber bomb shell cap.
+  the red-label 10-slot bomber bomb shell cap, and source-backed bomb-shell
+  spawns honor the source `GETSHL` X bound at `0x98`.
   `XYZZY` invincibility is represented as the same
   temporary player behavior override. The slice now also models source landers
   preferring their configured human target slot, lander pickup/carry/conversion,

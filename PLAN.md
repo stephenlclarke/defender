@@ -4475,3 +4475,25 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780638714321579`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780639193179469`.
+- `2026-06-05 07:08 BST`: Completed the actor bomber `GETSHL` bounds cycle.
+  Source-backed bomber bombs now honor the red-label shell-allocation X bound:
+  source bomb-shell spawns at X `0x98` or beyond are suppressed. The guard runs
+  both when source bomber actors decide whether to emit a bomb spawn command and
+  when custom/scripted driver commands request source-backed bomb actors, while
+  non-source scripted bomb actors remain available. Added focused regressions
+  for actor-emitted and direct command paths, and updated README, SPEC, and the
+  actor architecture notes for the bound. No legacy code, tests, or scaffolding
+  were safe to remove in this slice because clean smoke/fidelity/oracle
+  evidence still depends on clean runtime boundaries outside the actor path.
+  Validation passed with `cargo fmt --check`, focused GETSHL/fraction/cap tests,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780639336869439`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780639677266069`.

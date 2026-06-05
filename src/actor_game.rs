@@ -47,6 +47,7 @@ const SOURCE_PLAYFIELD_Y_MIN: u8 = 42;
 const SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS: u8 = 6;
 const SOURCE_SHELL_SCAN_CADENCE_STEPS: u8 = 8;
 const SOURCE_SHELL_LIMIT: usize = 20;
+const SOURCE_SHELL_X_MAX: i16 = 0x98;
 const SOURCE_PLAYFIELD_START_RNG: ActorSourceRng = ActorSourceRng {
     seed: 0x52,
     hseed: 0x62,
@@ -4235,7 +4236,8 @@ impl ActorGameDriver {
                     self.spawn_bomber(position);
                 }
                 GameCommand::Spawn(SpawnRequest::Bomb { position, source }) => {
-                    if source_shell_slot_available(active_source_shells)
+                    if bomb_shell_spawn_in_source_bounds(position, source)
+                        && source_shell_slot_available(active_source_shells)
                         && bomb_shell_slot_available(active_bomb_shells)
                     {
                         active_source_shells += 1;
@@ -4657,6 +4659,13 @@ fn source_shell_slot_available(active_source_shells: usize) -> bool {
 
 fn bomb_shell_slot_available(active_bomb_shells: usize) -> bool {
     active_bomb_shells < SOURCE_ACTIVE_BOMBER_BOMB_LIMIT
+}
+
+fn bomb_shell_spawn_in_source_bounds(
+    position: Point,
+    source: Option<ActorSourceEnemyProjectileMetadata>,
+) -> bool {
+    source.is_none() || position.x < SOURCE_SHELL_X_MAX
 }
 
 fn reserve_source_shell_slot(active_source_shells: &mut usize) -> bool {
@@ -5822,6 +5831,9 @@ impl Bomber {
             .filter(|snapshot| snapshot.kind == ActorKind::Bomb && snapshot.alive)
             .count();
         if active_bombs >= SOURCE_ACTIVE_BOMBER_BOMB_LIMIT {
+            return;
+        }
+        if self.source.is_some() && self.position.x >= SOURCE_SHELL_X_MAX {
             return;
         }
 
@@ -9335,6 +9347,75 @@ mod tests {
                 lifetime_ticks: 5,
             })
         );
+    }
+
+    #[test]
+    fn source_bomber_bomb_spawn_respects_getshl_x_bound() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.set_kind_behavior(
+            ActorKind::Bomber,
+            ActorBehaviorProfile {
+                bomber_drift_speed: 0,
+                bomber_bomb_period_steps: 1,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        driver.spawn_bomber_from_spawn(ActorBomberSpawn {
+            position: Point::new(SOURCE_SHELL_X_MAX, 80),
+            source: Some(ActorSourceBomberMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                picture_frame: 0,
+                cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
+                sleep_ticks: 0,
+                source_slot: 0,
+            }),
+        });
+
+        let report = driver.step(GameInput::NONE);
+
+        assert!(
+            report.commands.iter().all(|command| {
+                !matches!(command, GameCommand::Spawn(SpawnRequest::Bomb { .. }))
+            })
+        );
+        let live = driver.step(GameInput::NONE);
+        assert_eq!(bomb_shell_snapshot_count(&live), 0);
+    }
+
+    #[test]
+    fn source_bomb_spawn_commands_respect_getshl_x_bound() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+
+        driver.apply_commands(&[
+            GameCommand::Spawn(SpawnRequest::Bomb {
+                position: Point::new(SOURCE_SHELL_X_MAX, 100),
+                source: Some(ActorSourceEnemyProjectileMetadata {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0,
+                    y_velocity: 0,
+                    lifetime_ticks: 0,
+                }),
+            }),
+            GameCommand::Spawn(SpawnRequest::Bomb {
+                position: Point::new(SOURCE_SHELL_X_MAX, 108),
+                source: None,
+            }),
+        ]);
+        let report = driver.step(GameInput::NONE);
+
+        let bombs = report
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::Bomb)
+            .collect::<Vec<_>>();
+        assert_eq!(bombs.len(), 1);
+        assert_eq!(bombs[0].position, Point::new(SOURCE_SHELL_X_MAX, 108));
     }
 
     #[test]

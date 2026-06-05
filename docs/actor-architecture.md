@@ -199,7 +199,9 @@ with lifetime decrementing on the source shell-scan cadence. Source-backed
 bomber bomb actors carry stationary bomb-shell fraction and source-cadenced
 lifetime values into the clean state bridge. Driver spawn-command handling
 enforces the shared 20-slot source shell cap across enemy shots and bombs plus
-the red-label 10-slot bomber bomb shell cap.
+the red-label 10-slot bomber bomb shell cap. Source-backed bomb-shell spawn
+commands also honor the source `GETSHL` X bound at `0x98`; non-source scripted
+bomb actors are still available for custom drivers.
 
 Initial humans are source-backed: wave `1` uses the captured first-wave starts,
 while later source waves restore humans through the source target-list RNG
@@ -276,11 +278,12 @@ The actor driver now owns a first Defender gameplay loop:
   movement/facing metadata, and remain script-tunable through their behavior
   profiles.
 - Bomber actors can lay first-class `Bomb` actors on a scriptable cadence with
-  the source ten-bomb active cap. Bombs draw their own sprite, expire through
-  actor-owned lifetime state, act as player hazards, and emit a bomb collision
-  cue when they hit the player. Source-backed bomber bombs snapshot the bomber
-  source fractions as stationary bomb-shell fraction metadata and decrement
-  actor-owned lifetime metadata on the source shell-scan cadence.
+  the source ten-bomb active cap and source `GETSHL` X bound. Bombs draw their
+  own sprite, expire through actor-owned lifetime state, act as player hazards,
+  and emit a bomb collision cue when they hit the player. Source-backed bomber
+  bombs snapshot the bomber source fractions as stationary bomb-shell fraction
+  metadata and decrement actor-owned lifetime metadata on the source shell-scan
+  cadence.
 - Projectile-killed pods spawn a bounded mini-swarmer actor batch using the
   source request count. Source-backed swarmers decrement their actor-owned shot
   timer into hostile projectile commands with a distinct swarmer shot cue.
