@@ -560,10 +560,14 @@ The actor driver now owns a first Defender gameplay loop:
   source lifetime ticks directly; otherwise the behavior profile supplies the
   fallback lifetime.
 - Projectile-killed pods spawn a bounded mini-swarmer actor batch using the
-  source request count. Source-backed swarmers decrement their actor-owned shot
-  timer into hostile projectile commands with a distinct swarmer shot cue.
-  Smart-bomb pod scoring intentionally does not spawn swarmers, matching the
-  clean source behavior.
+  source request count. Those actor spawns now consume the driver source RNG for
+  initial X/Y velocity, acceleration, sleep, and shot-timer metadata instead of
+  deriving spread from the local spawn index. Source-backed swarmers carry an
+  entry horizontal-seek flag, then advance actor-owned fixed-point fractions
+  with source-shaped vertical acceleration/damping, turn-window reseek, and
+  source `RMAX` shot-timer reset before emitting hostile projectile commands
+  with a distinct swarmer shot cue. Smart-bomb pod scoring intentionally does
+  not spawn swarmers, matching the clean source behavior.
 - The driver advances a source-paced baiter timer while source-counted wave
   enemies remain. Expired timers spawn source-backed baiter actors up to the
   source active cap. Baiters pursue and shoot through actor-owned metadata,

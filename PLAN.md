@@ -149,9 +149,11 @@ verification tools.
   `StepReport` cue streams into the clean `SoundEvent` surface used by live
   audio, including thrust start/stop edges derived from actor cue state. Bomber
   actors now lay first-class bomb hazards with source bomb-collision cues, pod
-  laser kills spawn bounded swarmer actors, source swarmers now emit hostile
-  projectiles and distinct shot cues from actor-owned timers, and source-paced
-  baiter timer entry now spawns
+  laser kills spawn bounded mini-swarmer actors with source RNG-derived
+  velocity, acceleration, sleep, and shot-timer metadata, source swarmers now
+  perform the source entry seek and fixed-point vertical acceleration/damping
+  loop before emitting hostile projectiles and distinct shot cues, and
+  source-paced baiter timer entry now spawns
   source-backed baiter actors that can shoot and pursue the player without
   blocking wave completion after source-counted enemies are gone. Smart bombs
   now use driver-owned stock: normal player requests consume stock before
@@ -824,6 +826,36 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 18:50 BST`: Completed the actor source mini-swarmer RNG-state
+  cycle. Pod laser kills now seed the bounded mini-swarmer actor batch from the
+  driver source RNG for initial X/Y velocity, acceleration, sleep ticks, and
+  shot-timer metadata instead of deriving spread from the local spawn index.
+  Source-backed swarmers carry the clean bridge's horizontal-seek-pending flag,
+  perform the source entry horizontal seek on their first prompt, then advance
+  actor-owned fixed-point fractions with source-shaped vertical
+  acceleration/damping, turn-window reseek, and `RMAX` shot-timer resets before
+  emitting swarmer projectile commands and the swarmer shot cue. The pod
+  collision regression now verifies source RNG consumption across the full
+  swarmer request batch, and the swarmer shot regression calculates expected
+  movement, timer reset, projectile velocity, and source projectile metadata
+  from the same source helpers. README, SPEC, and actor architecture docs now
+  document the actor-side source mini-swarmer shape. No legacy code, tests, or
+  scaffolding were safe to remove in this slice because clean
+  smoke/fidelity/oracle evidence still depends on clean runtime boundaries
+  outside the actor path. Validation passed with `cargo fmt --check`,
+  `cargo check --all-targets --features legacy-tools`, focused source-swarmer
+  and pod-collision regressions, `cargo test actor_game --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features
+  legacy-tools -- -D warnings`, the actor-game/smoke/live/runtime/wgpu
+  all-target `legacy-tools` filters, the actor smoke CLI commands
+  (`--actor-smoke`, `--actor-attract-smoke`, `--actor-post-game-smoke`, and
+  `--actor-wgpu-smoke`), touched-doc markdownlint, and `git diff --check`. The
+  full unfiltered `legacy-tools` suite was not rerun in this cycle; the
+  previously isolated clean-game MAME window/post-game audio failures remain
+  outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780680988590699`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780681987628239`.
 - `2026-06-05 18:29 BST`: Completed the actor no-human reserve mutant
   fallback cycle. Source reserve lander rows now follow the red-label
   no-human schizoid fallback in the actor driver: when no source human target

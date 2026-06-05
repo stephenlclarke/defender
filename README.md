@@ -222,8 +222,10 @@ falling-human rescue and safe landing scores, score popups, hostile projectile
 actors for lander shots, source-command-backed sound cues for player laser,
 lander and mutant hits, non-lander family hits, hostile shots, human
 rescue/loss, and safe landing, bomber-laid bomb actors with source
-bomb-collision cues and seeded source Y-motion metadata, pod laser-hit swarmer
-spawning, swarmer scoring and shot cues, source-paced baiter timer entry,
+bomb-collision cues and seeded source Y-motion metadata, pod laser-hit
+mini-swarmer spawning with source RNG-derived velocity, acceleration, sleep,
+and shot-timer metadata, source mini-swarmer entry seek plus fixed-point
+vertical acceleration/damping and shot cues, source-paced baiter timer entry,
 baiter shots/scoring/hit cues, and stock-backed smart-bomb hostile clearing.
 Actor score awards now use the same replay-bonus threshold model as the clean
 score system, so threshold crossings add life/smart-bomb stock and emit

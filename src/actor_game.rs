@@ -267,6 +267,10 @@ const SOURCE_POD_SWARMER_REQUEST_LIMIT: usize = 6;
 const SOURCE_ACTIVE_SWARMER_LIMIT: usize = 20;
 const SOURCE_ACTIVE_BAITER_LIMIT: usize = 12;
 const SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS: u8 = 3;
+const SOURCE_MINI_SWARMER_MAX_Y_VELOCITY: u16 = 0x0200;
+const SOURCE_MINI_SWARMER_MIN_Y_VELOCITY: u16 = 0xFE00;
+const SOURCE_MINI_SWARMER_TURN_WINDOW: u16 = 300 * 32;
+const SOURCE_MINI_SWARMER_TURN_WINDOW_HALF: u16 = 150 * 32;
 const SOURCE_BAITER_INITIAL_SHOT_TIMER: u8 = 8;
 const SOURCE_BAITER_LOOP_SLEEP_TICKS: u8 = 6;
 const SOURCE_BAITER_X_SEEK_SPEED: u8 = 0x40;
@@ -2014,6 +2018,7 @@ pub struct ActorSourceSwarmerMetadata {
     pub acceleration: u8,
     pub sleep_ticks: u8,
     pub shot_timer: u8,
+    pub horizontal_seek_pending: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2337,23 +2342,31 @@ impl ActorSwarmerSpawn {
         }
     }
 
-    fn source_from_pod(position: Point, profile: ActorSourceWaveProfile, index: usize) -> Self {
-        let x_velocity_low = if index.is_multiple_of(2) {
-            profile.swarmer_x_velocity
-        } else {
-            0u8.wrapping_sub(profile.swarmer_x_velocity)
-        };
-        let y_velocity_low = swarmer_spawn_y_velocity_low(index);
+    fn source_from_pod(
+        source_rng: &mut ActorSourceRng,
+        profile: ActorSourceWaveProfile,
+        position: Point,
+    ) -> Self {
+        let velocity_rand = source_rng.advance();
+        let y_velocity = actor_sign_extend_u8_to_u16(velocity_rand.seed).wrapping_shl(1);
+        let x_velocity =
+            actor_sign_extend_u8_to_u16((velocity_rand.lseed & 0x3F).wrapping_sub(0x20));
+        let acceleration = velocity_rand.lseed & profile.swarmer_acceleration_mask;
+        let sleep_ticks = velocity_rand.hseed & 0x1F;
+        let shot_timer =
+            source_rng.advance_rmax(profile.swarmer_shot_time.min(u32::from(u8::MAX)) as u8);
+
         Self {
             position,
             source: Some(ActorSourceSwarmerMetadata {
                 x_fraction: 0,
                 y_fraction: 0,
-                x_velocity: actor_sign_extend_u8_to_u16(x_velocity_low),
-                y_velocity: actor_sign_extend_u8_to_u16(y_velocity_low),
-                acceleration: ((index as u8).wrapping_mul(7)) & profile.swarmer_acceleration_mask,
-                sleep_ticks: 0,
-                shot_timer: profile.swarmer_shot_time.min(u32::from(u8::MAX)) as u8,
+                x_velocity,
+                y_velocity,
+                acceleration,
+                sleep_ticks,
+                shot_timer,
+                horizontal_seek_pending: true,
             }),
         }
     }
@@ -2450,17 +2463,6 @@ impl ActorMutantSpawn {
                 target6_first_shot_deferred: false,
             }),
         }
-    }
-}
-
-fn swarmer_spawn_y_velocity_low(index: usize) -> u8 {
-    match index % SOURCE_POD_SWARMER_REQUEST_LIMIT {
-        0 => 0x20,
-        1 => 0xE0,
-        2 => 0x18,
-        3 => 0xE8,
-        4 => 0x10,
-        _ => 0xF0,
     }
 }
 
@@ -5808,7 +5810,7 @@ fn clean_source_swarmer(source: ActorSourceSwarmerMetadata) -> SourceSwarmerSnap
         acceleration: source.acceleration,
         shot_timer: source.shot_timer,
         sleep_ticks: source.sleep_ticks,
-        horizontal_seek_pending: false,
+        horizontal_seek_pending: source.horizontal_seek_pending,
     }
 }
 
@@ -8658,7 +8660,7 @@ impl ActorGameDriver {
     }
 
     fn resolve_collisions(
-        &self,
+        &mut self,
         behavior_script: &ActorBehaviorScript,
         commands: &mut Vec<GameCommand>,
     ) {
@@ -9458,7 +9460,7 @@ impl ActorGameDriver {
             .any(|snapshot| is_hostile(snapshot.kind))
     }
 
-    fn pod_swarmer_spawn_commands(&self, position: Point) -> Vec<GameCommand> {
+    fn pod_swarmer_spawn_commands(&mut self, position: Point) -> Vec<GameCommand> {
         let active_swarmers = self
             .snapshots
             .values()
@@ -9469,8 +9471,12 @@ impl ActorGameDriver {
         let source_profile = ActorSourceWaveProfile::for_wave(self.wave.max(1));
 
         (0..spawn_count)
-            .map(|index| {
-                let spawn = ActorSwarmerSpawn::source_from_pod(position, source_profile, index);
+            .map(|_| {
+                let spawn = ActorSwarmerSpawn::source_from_pod(
+                    &mut self.source_rng,
+                    source_profile,
+                    position,
+                );
                 GameCommand::Spawn(SpawnRequest::Swarmer {
                     position: spawn.position,
                     source: spawn.source,
@@ -12323,15 +12329,48 @@ impl Swarmer {
             return true;
         }
 
-        if let Some(player) = prompt.player_position() {
-            source.x_velocity =
-                swarmer_seek_velocity(source.x_velocity, player.x - self.position.x);
-            source.y_velocity = swarmer_accelerated_velocity(
+        let Some(player) = prompt.player_position() else {
+            return false;
+        };
+        let profile = ActorSourceWaveProfile::for_wave(prompt.wave.max(1));
+        let mut horizontal_seek_only = false;
+        if source.horizontal_seek_pending {
+            source.x_velocity = source_mini_swarmer_seek_velocity(
+                profile.swarmer_x_velocity,
+                player.x,
+                self.position.x,
+            );
+            source.horizontal_seek_pending = false;
+            source.sleep_ticks = SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS;
+            horizontal_seek_only = true;
+        }
+
+        let in_shot_window = if horizontal_seek_only {
+            false
+        } else {
+            source.y_velocity = source_mini_swarmer_y_velocity(
                 source.y_velocity,
                 source.acceleration,
-                player.y - self.position.y,
+                player.y,
+                self.position.y,
+                prompt.source_rng.map(|rng| rng.seed).unwrap_or(0),
             );
-        }
+            let player_absolute_x = actor_source_absolute_x(player, 0);
+            let object_absolute_x = actor_source_absolute_x(self.position, source.x_fraction);
+            let past_window = player_absolute_x
+                .wrapping_sub(object_absolute_x)
+                .wrapping_add(SOURCE_MINI_SWARMER_TURN_WINDOW_HALF);
+            let in_shot_window = past_window <= SOURCE_MINI_SWARMER_TURN_WINDOW;
+            if !in_shot_window {
+                source.x_velocity = source_mini_swarmer_seek_velocity(
+                    profile.swarmer_x_velocity,
+                    player.x,
+                    self.position.x,
+                );
+            }
+            in_shot_window
+        };
+
         let (x, x_fraction) =
             actor_source_axis_step(self.position.x, source.x_fraction, source.x_velocity);
         let (y, y_fraction) = actor_source_active_object_y_step(
@@ -12342,11 +12381,15 @@ impl Swarmer {
         self.position = Point::new(x, y);
         source.x_fraction = x_fraction;
         source.y_fraction = y_fraction;
-        source.shot_timer = source.shot_timer.saturating_sub(1);
-        if source.shot_timer == 0 {
-            let profile = ActorSourceWaveProfile::for_wave(prompt.wave.max(1));
-            source.shot_timer = clamped_source_swarmer_shot_reset(profile);
-            push_swarmer_shot(self.position, prompt, behavior, Some(*source), commands);
+        if in_shot_window {
+            source.shot_timer = source.shot_timer.wrapping_sub(1);
+            if source.shot_timer == 0 {
+                source.shot_timer = prompt
+                    .source_rng
+                    .map(|rng| source_rmax(clamped_source_swarmer_shot_reset(profile), rng.seed))
+                    .unwrap_or_else(|| clamped_source_swarmer_shot_reset(profile));
+                push_swarmer_shot(self.position, prompt, behavior, Some(*source), commands);
+            }
         }
         source.sleep_ticks = SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS;
         true
@@ -12710,26 +12753,50 @@ fn actor_source_motion_seed(step: u64, id: ActorId) -> u8 {
     (step as u8).wrapping_mul(17).wrapping_add(id.value() as u8)
 }
 
-fn swarmer_seek_velocity(current_velocity: u16, delta: i16) -> u16 {
-    if delta == 0 {
-        current_velocity
-    } else if delta > 0 {
-        actor_sign_extend_u8_to_u16(0x20)
+fn source_mini_swarmer_seek_velocity(source_x_velocity: u8, player_x: i16, swarmer_x: i16) -> u16 {
+    if player_x >= swarmer_x {
+        actor_sign_extend_u8_to_u16(source_x_velocity)
     } else {
-        actor_sign_extend_u8_to_u16(0u8.wrapping_sub(0x20))
+        actor_sign_extend_u8_to_u16(0u8.wrapping_sub(source_x_velocity))
     }
 }
 
-fn swarmer_accelerated_velocity(current_velocity: u16, acceleration: u8, delta: i16) -> u16 {
-    if delta == 0 || acceleration == 0 {
-        return current_velocity;
-    }
-    let adjustment = if delta > 0 {
-        actor_sign_extend_u8_to_u16(acceleration.max(1))
+fn source_mini_swarmer_y_velocity(
+    previous_y_velocity: u16,
+    acceleration: u8,
+    player_y: i16,
+    swarmer_y: i16,
+    seed: u8,
+) -> u16 {
+    let acceleration_low = if player_y > swarmer_y {
+        acceleration
     } else {
-        actor_sign_extend_u8_to_u16(0u8.wrapping_sub(acceleration.max(1)))
+        0u8.wrapping_sub(acceleration)
     };
-    current_velocity.wrapping_add(adjustment)
+    let mut y_velocity =
+        actor_sign_extend_u8_to_u16(acceleration_low).wrapping_add(previous_y_velocity);
+    if (y_velocity as i16) >= (SOURCE_MINI_SWARMER_MAX_Y_VELOCITY as i16) {
+        y_velocity = SOURCE_MINI_SWARMER_MAX_Y_VELOCITY;
+    }
+    if (y_velocity as i16) <= (SOURCE_MINI_SWARMER_MIN_Y_VELOCITY as i16) {
+        y_velocity = SOURCE_MINI_SWARMER_MIN_Y_VELOCITY;
+    }
+    y_velocity = y_velocity.wrapping_add(source_mini_swarmer_damping_adjustment(y_velocity));
+    y_velocity.wrapping_add(actor_sign_extend_u8_to_u16(
+        (seed & 0x1F).wrapping_sub(0x10),
+    ))
+}
+
+fn source_mini_swarmer_damping_adjustment(value: u16) -> u16 {
+    let [mut a, mut b] = value.to_be_bytes();
+    a = !a;
+    b = !b;
+    for _ in 0..2 {
+        let carry = b & 0x80 != 0;
+        b = b.wrapping_shl(1);
+        a = a.wrapping_shl(1) | u8::from(carry);
+    }
+    actor_sign_extend_u8_to_u16(a)
 }
 
 #[derive(Debug)]
@@ -17330,6 +17397,11 @@ mod tests {
     fn source_hostile_y_motion_wraps_through_source_playfield_bounds() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
+        let player = driver.spawn_player();
+        driver.snapshots.insert(
+            player,
+            actor_snapshot(player.value(), ActorKind::Player, Point::new(42, 120)),
+        );
         let lander = driver.spawn_lander_from_spawn(ActorLanderSpawn {
             position: Point::new(0x70, i16::from(SOURCE_PLAYFIELD_Y_MIN)),
             source: Some(ActorSourceLanderMetadata {
@@ -17353,6 +17425,7 @@ mod tests {
                 acceleration: 0,
                 sleep_ticks: 0,
                 shot_timer: 3,
+                horizontal_seek_pending: true,
             }),
         });
         let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
@@ -17389,18 +17462,19 @@ mod tests {
         );
         assert_eq!(
             snapshot_for(&report, swarmer).position,
-            Point::new(0x80, i16::from(SOURCE_PLAYFIELD_Y_MIN))
+            Point::new(0x7F, i16::from(SOURCE_PLAYFIELD_Y_MIN))
         );
         assert_eq!(
             snapshot_for(&report, swarmer).source_swarmer,
             Some(ActorSourceSwarmerMetadata {
-                x_fraction: 0,
+                x_fraction: 0xE0,
                 y_fraction: 0,
-                x_velocity: 0,
+                x_velocity: 0xFFE0,
                 y_velocity: 0x0100,
                 acceleration: 0,
                 sleep_ticks: SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS,
-                shot_timer: 2,
+                shot_timer: 3,
+                horizontal_seek_pending: false,
             })
         );
         assert_eq!(
@@ -19069,22 +19143,66 @@ mod tests {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 2;
-        driver.spawn_player();
-        driver.step(GameInput::NONE);
+        let player = driver.spawn_player();
+        driver.snapshots.insert(
+            player,
+            actor_snapshot(player.value(), ActorKind::Player, Point::new(42, 120)),
+        );
+        let start = Point::new(25, 100);
+        let source = ActorSourceSwarmerMetadata {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            acceleration: 0,
+            sleep_ticks: 0,
+            shot_timer: 1,
+            horizontal_seek_pending: false,
+        };
         let swarmer = driver.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
-            position: Point::new(70, 120),
-            source: Some(ActorSourceSwarmerMetadata {
-                x_fraction: 0,
-                y_fraction: 0,
-                x_velocity: 0,
-                y_velocity: 0,
-                acceleration: 0,
-                sleep_ticks: 0,
-                shot_timer: 1,
-            }),
+            position: start,
+            source: Some(source),
         });
 
         let report = driver.step(GameInput::NONE);
+        let report_source_rng = report
+            .source_rng
+            .expect("playing report should carry source rng");
+        let prompt = source_mutant_prompt_for_test(
+            report.step,
+            report.wave,
+            report_source_rng,
+            Point::new(42, 120),
+            Velocity::default(),
+        );
+        let mut expected_source = source;
+        expected_source.y_velocity = source_mini_swarmer_y_velocity(
+            source.y_velocity,
+            source.acceleration,
+            120,
+            start.y,
+            report_source_rng.seed,
+        );
+        let (expected_x, expected_x_fraction) =
+            actor_source_axis_step(start.x, source.x_fraction, expected_source.x_velocity);
+        let (expected_y, expected_y_fraction) = actor_source_active_object_y_step(
+            start.y,
+            source.y_fraction,
+            expected_source.y_velocity,
+        );
+        let expected_position = Point::new(expected_x, expected_y);
+        expected_source.x_fraction = expected_x_fraction;
+        expected_source.y_fraction = expected_y_fraction;
+        expected_source.shot_timer = source_rmax(
+            clamped_source_swarmer_shot_reset(ActorSourceWaveProfile::for_wave(report.wave)),
+            report_source_rng.seed,
+        );
+        expected_source.sleep_ticks = SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS;
+        let expected_velocity = hostile_shot_velocity(
+            expected_position,
+            &prompt,
+            ActorBehaviorProfile::default().swarmer_shot_speed,
+        );
 
         assert!(report.sounds.contains(&SoundCue::SwarmerShot));
         let swarmer_shot = report
@@ -19102,28 +19220,20 @@ mod tests {
         assert_eq!(
             swarmer_shot,
             (
-                Point::new(69, 120),
-                Velocity::new(-3, 0),
+                expected_position,
+                expected_velocity,
                 Some(ActorSourceEnemyProjectileMetadata {
-                    x_fraction: 0xE0,
-                    y_fraction: 0,
-                    x_velocity: actor_source_projectile_velocity_component(-3),
-                    y_velocity: actor_source_projectile_velocity_component(0),
+                    x_fraction: expected_source.x_fraction,
+                    y_fraction: expected_source.y_fraction,
+                    x_velocity: actor_source_projectile_velocity_component(expected_velocity.dx),
+                    y_velocity: actor_source_projectile_velocity_component(expected_velocity.dy),
                     lifetime_ticks: actor_source_projectile_lifetime_ticks(LANDER_SHOT_LIFETIME),
                 })
             )
         );
         assert_eq!(
             snapshot_for(&report, swarmer).source_swarmer,
-            Some(ActorSourceSwarmerMetadata {
-                x_fraction: 0xE0,
-                y_fraction: 0,
-                x_velocity: 0xFFE0,
-                y_velocity: 0,
-                acceleration: 0,
-                sleep_ticks: SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS,
-                shot_timer: 20,
-            })
+            Some(expected_source)
         );
     }
 
@@ -20896,6 +21006,20 @@ mod tests {
             fire: true,
             ..GameInput::NONE
         });
+        let mut expected_rng = driver.source_rng;
+        expected_rng.advance();
+        let expected_first_swarmer = ActorSwarmerSpawn::source_from_pod(
+            &mut expected_rng,
+            ActorSourceWaveProfile::for_wave(2),
+            Point::new(64, 120),
+        );
+        for _ in 1..SOURCE_POD_SWARMER_REQUEST_LIMIT {
+            ActorSwarmerSpawn::source_from_pod(
+                &mut expected_rng,
+                ActorSourceWaveProfile::for_wave(2),
+                Point::new(64, 120),
+            );
+        }
         let collision = driver.step(GameInput::NONE);
 
         assert_eq!(collision.score, POD_SCORE);
@@ -20920,18 +21044,11 @@ mod tests {
         assert_eq!(
             swarmer_spawns[0],
             (
-                Point::new(64, 120),
-                Some(ActorSourceSwarmerMetadata {
-                    x_fraction: 0,
-                    y_fraction: 0,
-                    x_velocity: 0x0028,
-                    y_velocity: 0x0020,
-                    acceleration: 0,
-                    sleep_ticks: 0,
-                    shot_timer: 20,
-                })
+                expected_first_swarmer.position,
+                expected_first_swarmer.source
             )
         );
+        assert_eq!(driver.source_rng, expected_rng);
 
         let live = driver.step(GameInput::NONE);
         assert_eq!(
