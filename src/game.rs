@@ -162,7 +162,15 @@ const SOURCE_POST_GAME_ENEMY_DEATH_SOUND_SEQUENCE: [(u16, u8); 9] = [
     (351, SOURCE_BACKGROUND_END_SOUND_COMMAND),
     (351, SOURCE_BACKGROUND_END_SOUND_COMMAND),
 ];
-const SOURCE_POST_GAME_TARGET4_SMARTMIX_TERMINAL_SOUND_SEQUENCE: [(u16, u8); 5] = [
+const SOURCE_POST_GAME_TARGET4_SMARTMIX_TERMINAL_SOUND_SEQUENCE: [(u16, u8); 13] = [
+    (1029, SOURCE_LSKSND_SOUND_COMMAND),
+    (1030, SOURCE_LSKSND_SOUND_COMMAND),
+    (1031, SOURCE_LSKSND_SOUND_COMMAND),
+    (1032, SOURCE_LSKSND_SOUND_COMMAND),
+    (1033, SOURCE_LSKSND_SOUND_COMMAND),
+    (1034, SOURCE_LSKSND_SOUND_COMMAND),
+    (1035, SOURCE_LSKSND_SOUND_COMMAND),
+    (1036, SOURCE_THRUST_SOUND_COMMAND),
     (1044, SOURCE_AHSND_SOUND_COMMAND),
     (1048, SOURCE_AHSND_SOUND_COMMAND),
     (1052, SOURCE_AHSND_SOUND_COMMAND),
@@ -657,6 +665,7 @@ const SOURCE_CANNON_SOUND_COMMAND: u8 = 0xE8;
 const SOURCE_PDSND_SOUND_COMMAND: u8 = 0xEE;
 const SOURCE_BACKGROUND_END_SOUND_COMMAND: u8 = 0xEC;
 const SOURCE_APSND_SOUND_COMMAND: u8 = 0xEA;
+const SOURCE_THRUST_SOUND_COMMAND: u8 = 0xE9;
 const SOURCE_ACSND_SOUND_COMMAND: u8 = 0xF7;
 const SOURCE_ALSND_SOUND_COMMAND: u8 = 0xE0;
 const SOURCE_AHSND_SOUND_COMMAND: u8 = 0xEE;
@@ -16781,9 +16790,9 @@ mod tests {
         ObjectEvidenceCategory, ObjectEvidenceDetailSnapshot, ObjectEvidenceList,
         ObjectEvidenceSnapshot, PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES, PLAYER_EXPLOSION_PIECE_LIMIT,
         PLAYER_SWITCH_SLEEP_FRAMES, PlayerExplosionCloudSnapshot, PlayerExplosionPieceSnapshot,
-        ProjectileSnapshot, ReferenceCaptureSteer, SOURCE_ACTIVE_BAITER_LIMIT,
-        SOURCE_ACTIVE_SWARMER_LIMIT, SOURCE_AHSND_SOUND_COMMAND, SOURCE_BAITER_LOOP_SLEEP_TICKS,
-        SOURCE_CANNON_SOUND_COMMAND, SOURCE_EXPLOSION_INITIAL_SIZE,
+        PostGamePlayfieldSnapshot, PostGameSoundProfile, ProjectileSnapshot, ReferenceCaptureSteer,
+        SOURCE_ACTIVE_BAITER_LIMIT, SOURCE_ACTIVE_SWARMER_LIMIT, SOURCE_AHSND_SOUND_COMMAND,
+        SOURCE_BAITER_LOOP_SLEEP_TICKS, SOURCE_CANNON_SOUND_COMMAND, SOURCE_EXPLOSION_INITIAL_SIZE,
         SOURCE_EXPLOSION_LIFETIME_FRAMES, SOURCE_EXPLOSION_SIZE_DELTA,
         SOURCE_GAME_EXEC_SLEEP_FRAMES, SOURCE_LANDER_ORBIT_SLEEP_TICKS, SOURCE_LHSND_SOUND_COMMAND,
         SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS, SOURCE_MUTANT_LOOP_SLEEP_TICKS,
@@ -16792,16 +16801,16 @@ mod tests {
         SOURCE_SMART_BOMB_SOUND_SEQUENCE, SOURCE_SWHSND_SOUND_COMMAND, SOURCE_SWSSND_SOUND_COMMAND,
         SOURCE_TERRAIN_BLOW_COMPLETE_FRAME, SOURCE_TERRAIN_BLOW_FLASH_COLOR_BYTES,
         SOURCE_TERRAIN_BLOW_ITERATION_LIMIT, SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER,
-        SOURCE_TERRAIN_BLOW_START_SOUND_FRAMES, SOURCE_TIHSND_SOUND_COMMAND,
-        SOURCE_UFHSND_SOUND_COMMAND, SOURCE_VISUAL_STATE, START_PLAYFIELD_DELAY_FRAMES,
-        START_SOUND_DELAY_FRAMES, ScannerRadarBlipKind, ScannerRadarSnapshot, ScannerRadarStage,
-        ScorePopupKind, SoundEvent, SourceBaiterSnapshot, SourceBomberSnapshot,
-        SourceLanderSnapshot, SourceMutantSnapshot, SourcePodSnapshot, SourceRandSnapshot,
-        SourceSwarmerSnapshot, TerrainBlowStage, WaveProfileSnapshot, WorldSnapshot, WorldVector,
-        push_source_explosion_cloud_pixels, source_astronaut_catch_sound_event,
-        source_astronaut_hit_sound_event, source_astronaut_safe_landing_sound_event,
-        source_bomb_collision_sound_event, source_enemy_hit_sound_event,
-        source_enemy_shot_sound_event, source_explosion_size_for_age,
+        SOURCE_TERRAIN_BLOW_START_SOUND_FRAMES, SOURCE_THRUST_BACKGROUND_END_RESUME_DELAY_FRAMES,
+        SOURCE_TIHSND_SOUND_COMMAND, SOURCE_UFHSND_SOUND_COMMAND, SOURCE_VISUAL_STATE,
+        START_PLAYFIELD_DELAY_FRAMES, START_SOUND_DELAY_FRAMES, ScannerRadarBlipKind,
+        ScannerRadarSnapshot, ScannerRadarStage, ScorePopupKind, SoundEvent, SourceBaiterSnapshot,
+        SourceBomberSnapshot, SourceLanderSnapshot, SourceMutantSnapshot, SourcePodSnapshot,
+        SourceRandSnapshot, SourceSwarmerSnapshot, TerrainBlowStage, WaveProfileSnapshot,
+        WorldSnapshot, WorldVector, push_source_explosion_cloud_pixels,
+        source_astronaut_catch_sound_event, source_astronaut_hit_sound_event,
+        source_astronaut_safe_landing_sound_event, source_bomb_collision_sound_event,
+        source_enemy_hit_sound_event, source_enemy_shot_sound_event, source_explosion_size_for_age,
         source_hyperspace_appearance_sound_event, source_lander_pickup_sound_event,
         source_lander_suck_sound_event, source_laser_fire_sound_event,
         source_player_death_sound_event, source_terrain_blow_complete_sound_event,
@@ -25954,7 +25963,7 @@ mod tests {
             }
             if matches!(
                 state_frame,
-                4781 | 4782 | 4790 | 4798 | 4927 | 5991 | 5995 | 5999 | 6003 | 6007
+                4781 | 4782 | 4790 | 4798 | 4927 | 5976..=5983 | 5991 | 5995 | 5999 | 6003 | 6007
             ) {
                 sound_samples.push((state_frame, frame.events.sounds().to_vec()));
             }
@@ -25965,6 +25974,10 @@ mod tests {
         };
         let background_end = SoundEvent::UnmappedSoundCommand {
             command: super::SOURCE_BACKGROUND_END_SOUND_COMMAND,
+        };
+        let lander_pull = source_lander_suck_sound_event();
+        let thrust = SoundEvent::UnmappedSoundCommand {
+            command: super::SOURCE_THRUST_SOUND_COMMAND,
         };
 
         assert_eq!(
@@ -26087,6 +26100,14 @@ mod tests {
                 (4790, vec![source_player_death_sound_event()]),
                 (4798, vec![cannon]),
                 (4927, vec![background_end]),
+                (5976, vec![lander_pull]),
+                (5977, vec![lander_pull]),
+                (5978, vec![lander_pull]),
+                (5979, vec![lander_pull]),
+                (5980, vec![lander_pull]),
+                (5981, vec![lander_pull]),
+                (5982, vec![lander_pull]),
+                (5983, vec![thrust]),
                 (5991, vec![source_bomb_collision_sound_event()]),
                 (5995, vec![source_bomb_collision_sound_event()]),
                 (5999, vec![source_bomb_collision_sound_event()]),
@@ -26099,20 +26120,33 @@ mod tests {
     #[test]
     fn clean_game_post_game_duplicate_background_end_does_not_resume_thrust() {
         let mut game = Game::new();
-        let mut observed = Vec::new();
-
-        for input_frame in 0..=7000u16 {
-            let frame = game.step(organic_prbp1_up_thrust_input(input_frame));
-            if input_frame >= 4666 && !frame.events.sounds().is_empty() {
-                observed.push((input_frame, frame.events.sounds().to_vec()));
-            }
-        }
+        game.state.phase = GamePhase::Attract;
+        game.state.post_game_playfield = Some(PostGamePlayfieldSnapshot { frame: 350 });
+        game.post_game_sound_profile = PostGameSoundProfile::EnemyCollisionDeath;
 
         let background_end = SoundEvent::UnmappedSoundCommand {
             command: super::SOURCE_BACKGROUND_END_SOUND_COMMAND,
         };
+        let held_thrust = GameInput {
+            thrust: true,
+            ..GameInput::NONE
+        };
 
-        assert_eq!(observed, vec![(4666, vec![background_end, background_end])]);
+        let duplicate_frame = game.step(held_thrust);
+        assert_eq!(
+            duplicate_frame.events.sounds(),
+            &[background_end, background_end]
+        );
+
+        for _ in 0..=SOURCE_THRUST_BACKGROUND_END_RESUME_DELAY_FRAMES {
+            let frame = game.step(held_thrust);
+            assert!(!frame.events.sounds().contains(&SoundEvent::ThrustStarted));
+        }
+        assert!(
+            game.pending_sound_commands
+                .iter()
+                .all(|command| command.event != SoundEvent::ThrustStarted)
+        );
     }
 
     #[test]
@@ -29823,23 +29857,6 @@ mod tests {
             1454..=4053 => GameInput {
                 altitude_up: true,
                 thrust: true,
-                ..GameInput::NONE
-            },
-            _ => long_delayed_start_input(input_frame),
-        }
-    }
-
-    fn organic_prbp1_up_thrust_input(input_frame: u16) -> GameInput {
-        match input_frame {
-            1274..=1673 | 1714..=10000 => GameInput {
-                altitude_up: true,
-                thrust: true,
-                ..GameInput::NONE
-            },
-            1674..=1713 => GameInput {
-                altitude_up: true,
-                thrust: true,
-                fire: true,
                 ..GameInput::NONE
             },
             _ => long_delayed_start_input(input_frame),
