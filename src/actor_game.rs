@@ -76,6 +76,8 @@ const SOURCE_SMART_BOMB_RESERVE_DELAY_STEPS: u16 = 240;
 const SOURCE_SBSND_SOUND_COMMAND: u8 = 0xEE;
 const SOURCE_CANNON_SOUND_COMMAND: u8 = 0xE8;
 const SOURCE_TBSND_SOUND_COMMAND: u8 = 0xEB;
+const SOURCE_ACSND_SOUND_COMMAND: u8 = 0xF7;
+const SOURCE_ASCSND_SOUND_COMMAND: u8 = 0xE5;
 const SOURCE_SMART_BOMB_SOUND_SEQUENCE: [(u8, u8); 7] = [
     (4, SOURCE_SBSND_SOUND_COMMAND),
     (8, SOURCE_SBSND_SOUND_COMMAND),
@@ -90,6 +92,10 @@ const SOURCE_TERRAIN_BLOW_SOUND_TAIL_SEQUENCE: [(u8, u8); 4] = [
     (10, SOURCE_SBSND_SOUND_COMMAND),
     (16, SOURCE_CANNON_SOUND_COMMAND),
     (26, SOURCE_CANNON_SOUND_COMMAND),
+];
+const SOURCE_ACSND_SOUND_TAIL_SEQUENCE: [(u8, u8); 2] = [
+    (10, SOURCE_ACSND_SOUND_COMMAND),
+    (20, SOURCE_ACSND_SOUND_COMMAND),
 ];
 const SOURCE_PLAYER_SWITCH_SLEEP_STEPS: u8 = 0x60;
 const SOURCE_START_SOUND_DELAY_STEPS: u8 = 1;
@@ -3959,8 +3965,8 @@ impl SoundCue {
             Self::LanderHit => Some(0xF9),
             Self::LanderPickup => Some(0xF4),
             Self::HumanPulled => Some(0xF1),
-            Self::HumanReleased => None,
-            Self::HumanRescued => Some(0xF7),
+            Self::HumanReleased => Some(SOURCE_ASCSND_SOUND_COMMAND),
+            Self::HumanRescued => Some(SOURCE_ACSND_SOUND_COMMAND),
             Self::HumanSafeLanding => Some(0xE0),
             Self::HumanLost => Some(0xEE),
             Self::MutantSpawn => Some(0xEE),
@@ -8238,6 +8244,7 @@ struct PendingActorSoundCommand {
 enum PendingActorSoundSource {
     SmartBomb,
     TerrainBlow,
+    AstronautRescue,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -9118,6 +9125,9 @@ impl ActorGameDriver {
                 GameCommand::PlaySound(sound) => {
                     if !(terrain_blow_started_this_batch && sound == SoundCue::HumanLost) {
                         applied.sounds.push(sound);
+                        if sound == SoundCue::HumanRescued {
+                            self.queue_astronaut_rescue_sound_tail();
+                        }
                     }
                 }
                 GameCommand::PlayerKilled => {
@@ -9237,6 +9247,7 @@ impl ActorGameDriver {
         self.pending_start_sound_steps = None;
         self.clear_pending_smart_bomb();
         self.clear_terrain_blow();
+        self.clear_pending_astronaut_rescue();
         self.enemy_reserve = EnemyReserveSnapshot::default();
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
@@ -9274,6 +9285,7 @@ impl ActorGameDriver {
         self.pending_start_sound_steps = None;
         self.clear_pending_smart_bomb();
         self.clear_terrain_blow();
+        self.clear_pending_astronaut_rescue();
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.source_background_left = 0;
         self.source_reserve_activation_cooldown_steps = 0;
@@ -9333,6 +9345,17 @@ impl ActorGameDriver {
                 },
             ),
         );
+    }
+
+    fn queue_astronaut_rescue_sound_tail(&mut self) {
+        self.pending_sound_commands
+            .extend(SOURCE_ACSND_SOUND_TAIL_SEQUENCE.iter().copied().map(
+                |(steps_remaining, command)| PendingActorSoundCommand {
+                    steps_remaining,
+                    command,
+                    source: PendingActorSoundSource::AstronautRescue,
+                },
+            ));
     }
 
     fn advance_smart_bomb_flash(&mut self) {
@@ -9467,6 +9490,11 @@ impl ActorGameDriver {
             .retain(|command| command.source != PendingActorSoundSource::TerrainBlow);
     }
 
+    fn clear_pending_astronaut_rescue(&mut self) {
+        self.pending_sound_commands
+            .retain(|command| command.source != PendingActorSoundSource::AstronautRescue);
+    }
+
     fn start_smart_bomb(&mut self, consume_stock: bool) -> bool {
         if self.pending_smart_bomb_detonation_steps.is_some() {
             return false;
@@ -9542,6 +9570,7 @@ impl ActorGameDriver {
         self.pending_start_sound_steps = None;
         self.clear_pending_smart_bomb();
         self.clear_terrain_blow();
+        self.clear_pending_astronaut_rescue();
         self.enemy_reserve = EnemyReserveSnapshot::default();
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
@@ -9598,6 +9627,7 @@ impl ActorGameDriver {
         self.pending_start_sound_steps = None;
         self.clear_pending_smart_bomb();
         self.clear_terrain_blow();
+        self.clear_pending_astronaut_rescue();
         self.enemy_reserve = EnemyReserveSnapshot::default();
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
@@ -9618,6 +9648,7 @@ impl ActorGameDriver {
         self.pending_start_sound_steps = None;
         self.clear_pending_smart_bomb();
         self.clear_terrain_blow();
+        self.clear_pending_astronaut_rescue();
         self.clear_wave_playfield_actors();
         self.apply_wave_profile();
         self.source_reserve_activation_cooldown_steps = 0;
@@ -14026,6 +14057,7 @@ mod tests {
             (SoundCue::LanderHit, 0xF9),
             (SoundCue::LanderPickup, 0xF4),
             (SoundCue::HumanPulled, 0xF1),
+            (SoundCue::HumanReleased, 0xE5),
             (SoundCue::HumanRescued, 0xF7),
             (SoundCue::HumanSafeLanding, 0xE0),
             (SoundCue::HumanLost, 0xEE),
@@ -14047,11 +14079,7 @@ mod tests {
         for (cue, command) in expected {
             assert_eq!(cue.source_sound_command(), Some(command), "{cue:?}");
         }
-        for cue in [
-            SoundCue::Hyperspace,
-            SoundCue::HumanReleased,
-            SoundCue::AttractPulse,
-        ] {
+        for cue in [SoundCue::Hyperspace, SoundCue::AttractPulse] {
             assert_eq!(cue.source_sound_command(), None, "{cue:?}");
         }
     }
@@ -14087,8 +14115,11 @@ mod tests {
             SoundCue::SourceCommand(0xE8).sound_event(),
             Some(SoundEvent::UnmappedSoundCommand { command: 0xE8 })
         );
+        assert_eq!(
+            SoundCue::HumanReleased.sound_event(),
+            Some(SoundEvent::UnmappedSoundCommand { command: 0xE5 })
+        );
         assert_eq!(SoundCue::Hyperspace.sound_event(), None);
-        assert_eq!(SoundCue::HumanReleased.sound_event(), None);
     }
 
     #[test]
@@ -14123,7 +14154,10 @@ mod tests {
         );
         assert_eq!(
             bridge.sound_events_for_cues(&[SoundCue::HumanReleased]),
-            [SoundEvent::ThrustStopped]
+            [
+                SoundEvent::UnmappedSoundCommand { command: 0xE5 },
+                SoundEvent::ThrustStopped,
+            ]
         );
         assert!(bridge.sound_events_for_cues(&[]).is_empty());
     }
@@ -21414,6 +21448,12 @@ mod tests {
         let released = driver.step(GameInput::NONE);
 
         assert!(released.sounds.contains(&SoundCue::HumanReleased));
+        assert_eq!(
+            released.sound_events(&mut ActorSoundEventBridge::new()),
+            [SoundEvent::UnmappedSoundCommand {
+                command: SOURCE_ASCSND_SOUND_COMMAND,
+            }]
+        );
         assert!(
             released
                 .draws
@@ -21448,6 +21488,41 @@ mod tests {
                 })
             )
         }));
+    }
+
+    #[test]
+    fn falling_human_rescue_queues_source_acsnd_tail() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_player();
+        driver.spawn_falling_human_for_test(Point::new(42, 120), 0);
+        driver.spawn_human_for_test(Point::new(200, HUMAN_GROUND_Y));
+        driver.step(GameInput::NONE);
+
+        let rescued = driver.step(GameInput::NONE);
+        assert_eq!(rescued.sounds, [SoundCue::HumanRescued]);
+
+        let mut observed_tail = Vec::new();
+        for offset in 1..=20u8 {
+            let report = driver.step(GameInput::NONE);
+            if !report.sounds.is_empty() {
+                observed_tail.push((offset, report.sounds.clone()));
+            }
+        }
+
+        assert_eq!(
+            observed_tail,
+            vec![
+                (
+                    10,
+                    vec![SoundCue::SourceCommand(SOURCE_ACSND_SOUND_COMMAND)]
+                ),
+                (
+                    20,
+                    vec![SoundCue::SourceCommand(SOURCE_ACSND_SOUND_COMMAND)]
+                ),
+            ]
+        );
     }
 
     #[test]

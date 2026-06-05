@@ -150,8 +150,9 @@ verification tools.
   and emit a distinct source-command-backed lander-shot cue. Actor sound cues
   now expose their red-label Williams sound-board command byte where existing
   source evidence pins one, including player laser, lander/mutant/non-lander
-  family hits, hostile shots, human rescue/loss, and safe landing; unproven
-  semantic cues remain unmapped. `ActorSoundEventBridge` now converts actor
+  family hits, hostile shots, human release/rescue/loss, and safe landing, and
+  actor rescue now queues the repeated source `ACSND` tail; unproven semantic
+  cues remain unmapped. `ActorSoundEventBridge` now converts actor
   `StepReport` cue streams into the clean `SoundEvent` surface used by live
   audio, including thrust start/stop edges derived from actor cue state. Bomber
   actors now lay first-class bomb hazards with source bomb-collision cues, pod
@@ -845,6 +846,33 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 20:49 BST`: Completed the actor astronaut source-audio cadence
+  cycle. Actor `HumanReleased` now maps through `ActorSoundEventBridge` to the
+  source `ASCSND` command byte `0xE5`, and actor `HumanRescued` queues the
+  repeated source `ACSND` tail at the source `+10` and `+20` step offsets after
+  the immediate rescue cue. Pending rescue-tail commands are tagged separately
+  from smart-bomb and terrain-blow tails so turn/game reset boundaries can
+  clear them without disturbing unrelated source command sequences. README,
+  SPEC, and actor architecture docs now document actor source release audio and
+  repeated rescue audio. No legacy code, tests, or scaffolding were safe to
+  remove in this slice because the remaining clean smoke/fidelity/oracle
+  evidence still depends on those boundaries. Validation passed with focused
+  actor sound/release/rescue tests, `cargo check --all-targets --features
+  legacy-tools`, `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`, `cargo test
+  actor_live --all-targets --features legacy-tools`, `cargo test actor_wgpu
+  --all-targets --features legacy-tools`, `cargo test runtime --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features
+  legacy-tools -- -D warnings`, the actor smoke CLI commands (`--actor-smoke`,
+  `--actor-attract-smoke`, `--actor-post-game-smoke`, and
+  `--actor-wgpu-smoke`), `cargo fmt --check`, `markdownlint README.md SPEC.md
+  PLAN.md docs/actor-architecture.md`, and `git diff --check`. The full
+  unfiltered `legacy-tools` suite was not rerun in this cycle; the previously
+  isolated clean-game MAME window/post-game audio failures remain outside this
+  slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780688597112389`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780688984566839`.
 - `2026-06-05 20:40 BST`: Completed the actor source terrain and terrain-blow
   cycle. Actor playing reports now publish clean terrain segments and render
   the playfield from source `BGOUT` records while no terrain blow is active.

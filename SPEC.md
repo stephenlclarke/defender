@@ -905,7 +905,8 @@ reintroduce legacy implementation terminology.
   swarmer spawning, source-paced baiter timer entry with
   non-wave-blocking baiters, baiter source `SHOOT` fireball projection with
   source RNG velocity/player-velocity contribution, shell-cap suppression,
-  shots/scores/hit cues,
+  shots/scores/hit cues, source `ASCSND` passenger-release audio, repeated
+  source `ACSND` rescue audio,
   stock-backed smart-bomb hostile clearing with exhausted-stock guards and a
   non-consuming `XYZZY` overlay path, source three-step smart-bomb detonation
   delay, five-step white flash report/render state, source `SBSND` / cannon

@@ -228,8 +228,9 @@ converted-mutant metadata,
 falling-human rescue and safe landing scores, score popups, hostile projectile
 actors for lander shots, source-command-backed sound cues for player laser,
 lander and mutant hits, non-lander family hits, hostile shots, human
-rescue/loss, and safe landing, bomber-laid bomb actors with source
-bomb-collision cues and seeded source Y-motion metadata, pod laser-hit
+release/rescue/loss, and safe landing, including the source repeated `ACSND`
+rescue cadence and `ASCSND` release command, bomber-laid bomb actors with
+source bomb-collision cues and seeded source Y-motion metadata, pod laser-hit
 mini-swarmer spawning with source RNG-derived velocity, acceleration, sleep,
 and shot-timer metadata, source mini-swarmer entry seek plus fixed-point
 vertical acceleration/damping, `SWBMB` fireball direction/shell-cap

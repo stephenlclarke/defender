@@ -598,9 +598,11 @@ The actor driver now owns a first Defender gameplay loop:
   laser hit, and do not block wave completion once lander/bomber/pod/swarmer
   snapshots are gone.
 - Carried humans follow their lander. If the carrier disappears, the human
-  falls under a simple acceleration model and emits the release sound cue.
+  falls under a simple acceleration model and emits the source `ASCSND`
+  release command.
 - Falling humans caught by the player award 500 points, emit the rescue sound
-  cue, and spawn a 500-point popup actor.
+  cue, queue the source repeated `ACSND` tail, and spawn a 500-point popup
+  actor.
 - Slow falling humans settle safely on the terrain line for 250 points and a
   250-point popup. Fast impacts destroy the human and spawn an explosion.
 - When the last human is removed, the driver starts a source
