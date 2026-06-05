@@ -369,7 +369,9 @@ shot-timer RNG, and velocity bytes, then enter the same bounded `LANDS0`
 runtime; when no humans remain, the same reserve lander path follows the
 source `LANDST` schizoid fallback and restores source-shaped mutants directly.
 Direct mutant reserve rows restore through the same source mutant placement,
-shot-timer RNG, and hop-RNG metadata.
+shot-timer RNG, and hop-RNG metadata. Actor-side direct and schizoid-fallback
+mutant restores use the driver-owned source background word carried in
+`StepPrompt` / `StepReport`, matching the clean placement input surface.
 Destroyed pods now spawn a deterministic clean
 mini-swarmer batch using the source spawn request bound and active-swarmer cap,
 including projectile and smart-bomb destruction paths. Spawned mini-swarmers
@@ -403,7 +405,9 @@ clean hyperspace inputs clear active enemy projectiles through the source
 that shell-object list. They then reload source rematerialization state from
 the current clean source `SEED`/`HSEED`: the clean camera/background word,
 player X/facing branch, player Y high byte, cleared velocity, and source
-`APSND` appearance command. Their clean `HYP2` tail follows the source
+`APSND` appearance command. The actor runtime now publishes the same source
+background word from source-backed hyperspace rematerialization through its
+driver-owned prompt/report state. Their clean `HYP2` tail follows the source
 `LSEED > 0xC0` death-risk branch into the existing player damage path with
 source `PDSND` command evidence, while `0xC0` and below complete safely.
 Clean landers now abduct aligned humans, can carry explicit selected-human

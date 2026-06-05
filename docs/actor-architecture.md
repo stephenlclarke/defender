@@ -230,10 +230,12 @@ source hyperspace RNG, advances it once per playing step, and injects that
 `ActorHyperspaceSourceSeed` into default and kind-level player behavior when a
 script has not provided a seed. Actor-id profiles remain explicit overrides. In
 the source-backed path `HSEED` selects the source X/facing branch and Y high
-byte, while the entry-frame `LSEED` drives the death-risk threshold. Without a
-seed snapshot the actor uses the direct scripted rematerialization coordinates
-and effective `LSEED` byte. Values above `0xC0` arm the source `HYP2`
-death-risk branch and route through the normal player death/life-stock path
+byte, and `SEED/HSEED` publishes the source background word through the driver
+prompt/report state, while the entry-frame `LSEED` drives the death-risk
+threshold. Without a seed snapshot the actor uses the direct scripted
+rematerialization coordinates and effective `LSEED` byte without changing the
+source background word. Values above `0xC0` arm the source `HYP2` death-risk
+branch and route through the normal player death/life-stock path
 after the delay.
 
 `XYZZY` invincibility uses the same mechanism. When invincibility is active,
@@ -279,13 +281,13 @@ activation only after the current active batch has reported once, and restores
 the next source batch before survivor-bonus wave clear can start. Lander
 reserves fill active slots first; once no landers remain, bomber, pod, direct
 mutant, and swarmer reserves restore in the source wave-size batch shape.
-Direct mutant reserve rows use source placement, shot-timer, and hop-RNG
-metadata, while source swarmer reserves use the source `PLRES`/`RSW0`
-phony-object placement/fraction state before entering the same mini-swarmer
-runtime used by pod destruction. If no source human target remains while lander
-reserves are selected, the actor driver follows the source schizoid fallback
-and restores those rows as source-shaped mutants with source placement,
-shot-timer, and hop-RNG metadata.
+Direct mutant reserve rows use source placement, shot-timer, hop-RNG metadata,
+and the driver-owned source background word. Source swarmer reserves use the
+source `PLRES`/`RSW0` phony-object placement/fraction state before entering the
+same mini-swarmer runtime used by pod destruction. If no source human target
+remains while lander reserves are selected, the actor driver follows the source
+schizoid fallback and restores those rows as source-shaped mutants with source
+placement, shot-timer, hop-RNG metadata, and the same source background word.
 Wave `1` uses the source first-wave
 lander restore metadata from the existing clean evidence, including fixed-point
 fractions, velocities, shot timer, sleep ticks, picture frame, and target-human

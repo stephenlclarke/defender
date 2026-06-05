@@ -170,7 +170,10 @@ next active batch first; once landers are exhausted, bomber, pod, direct mutant,
 and swarmer reserves use their source restore placement/fraction metadata. When
 no source human targets remain, actor reserve lander rows now follow the source
 schizoid fallback and restore as source-shaped mutants instead of targetless
-landers. Checked wave scripts keep the compatible
+landers. Direct mutant restores consume the driver-owned source background word
+published through `StepPrompt` / `StepReport`, so source rematerialization and
+future camera-backed custom drivers can influence the same placement window as
+the clean path. Checked wave scripts keep the compatible
 `reserve <landers> <bombers> <pods> [swarmers]` form and add
 `reserve_full` / `enemy_reserve_full` for custom all-family reserve batches.
 Later-wave actor landers now restore from source RNG placement/shot/velocity
@@ -1043,6 +1046,9 @@ shell-list cleanup while leaving player projectiles outside that shell-object
 list. They then reload source rematerialization state from the current clean
 source `SEED`/`HSEED`: the clean camera/background word, player X/facing branch,
 player Y high byte, cleared velocity, and source `APSND` appearance command.
+The actor path now publishes the same source background word from source-backed
+hyperspace rematerialization and keeps it in the driver-owned prompt/report
+state used by restore placement.
 Their clean `HYP2` tail follows the source `LSEED > 0xC0` death-risk branch
 into the existing player damage path with source `PDSND` command evidence,
 while `0xC0` and below complete safely.

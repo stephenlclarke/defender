@@ -93,6 +93,9 @@ verification tools.
   placement/fraction restore paths once landers are exhausted. Source swarmer
   reserves use `PLRES`/`RSW0` phony-object placement before the same
   mini-swarmer runtime used by pod destruction. Source
+  rematerialization now publishes the `SEED/HSEED` background word into
+  driver-owned `StepPrompt` / `StepReport` state, and actor mutant reserve
+  restore paths consume that background word instead of a fixed zero. Source
   lander/human conversions now spawn mutant actors with source-shaped mutant
   fractions, wave-derived shot timer, driver-owned hop RNG, and clean
   `SourceMutantSnapshot` bridge metadata.
@@ -833,6 +836,39 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 19:59 BST`: Completed the actor source-background restore
+  placement cycle. Actor `StepPrompt` and `StepReport` now carry a
+  driver-owned source background word, and `PlayerShip` publishes the
+  `SEED/HSEED` background word through `GameCommand::SetSourceBackgroundLeft`
+  when source-backed hyperspace rematerialization completes. The command is
+  applied inside the driver and intentionally maps to no clean gameplay event.
+  Direct mutant reserves and no-human lander reserve schizoid fallback restores
+  now pass that source background word into `ActorMutantSpawn::source_restore`
+  instead of using fixed zero placement. Focused regressions cover source
+  hyperspace background publication, direct mutant reserve placement with a
+  nonzero background word, and no-human reserve mutant fallback placement with a
+  nonzero background word. README, SPEC, and actor architecture docs now
+  document the source-background prompt/report state and restore placement
+  usage. No legacy code, tests, or scaffolding were safe to remove in this
+  slice because clean smoke/fidelity/oracle evidence still depends on those
+  boundaries. Validation passed with `cargo fmt --check`, `cargo check
+  --all-targets --features legacy-tools`, `cargo test
+  hyperspace_source_seed_controls_rematerialization_position_and_direction
+  --lib --features legacy-tools`, `cargo test
+  actor_source_mutant_reserves_use_restore_state --lib --features
+  legacy-tools`, `cargo test
+  actor_source_reserve_landers_without_humans_restore_source_mutants --lib
+  --features legacy-tools`, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, the actor-smoke/live/runtime/wgpu all-target `legacy-tools`
+  filters, and the actor smoke CLI commands (`--actor-smoke`,
+  `--actor-attract-smoke`, `--actor-post-game-smoke`, and
+  `--actor-wgpu-smoke`). The full unfiltered `legacy-tools` suite was not
+  rerun in this cycle; the previously isolated clean-game MAME window/post-game
+  audio failures remain outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780685462133509`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780685967347399`.
 - `2026-06-05 19:48 BST`: Completed the actor direct mutant reserve
   activation cycle. Actor reserve accounting, empty checks, selection, and
   source-family take logic now include `EnemyReserveSnapshot::mutants`, so

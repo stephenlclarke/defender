@@ -5410,6 +5410,7 @@ pub enum GameCommand {
     StartTwoPlayer,
     Spawn(SpawnRequest),
     Destroy(ActorId),
+    SetSourceBackgroundLeft(u16),
     AttachHuman {
         lander: ActorId,
         human: ActorId,
@@ -5453,6 +5454,7 @@ pub struct StepPrompt {
     pub high_score_initials: HighScoreInitialsState,
     pub snapshots: Vec<ActorSnapshot>,
     pub behavior_script: ActorBehaviorScript,
+    pub source_background_left: u16,
     pub source_rng: Option<ActorSourceRngSnapshot>,
     pub source_shell_scan_tick: bool,
 }
@@ -5597,6 +5599,7 @@ pub struct StepReport {
     pub survivor_bonus: Option<SurvivorBonusReport>,
     pub behavior_script: ActorBehaviorScriptManifest,
     pub enemy_reserve: EnemyReserveSnapshot,
+    pub source_background_left: u16,
     pub source_rng: Option<ActorSourceRngSnapshot>,
     pub snapshots: Vec<ActorSnapshot>,
     pub draws: Vec<DrawCommand>,
@@ -8183,6 +8186,7 @@ fn actor_gameplay_events_for_report(report: &StepReport) -> Vec<GameEvent> {
             GameCommand::EnterGameOver => push_unique_game_event(&mut events, GameEvent::GameOver),
             GameCommand::Spawn(_)
             | GameCommand::Destroy(_)
+            | GameCommand::SetSourceBackgroundLeft(_)
             | GameCommand::AttachHuman { .. }
             | GameCommand::HumanLost(_)
             | GameCommand::AddScore(_)
@@ -8238,6 +8242,7 @@ pub struct ActorGameDriver {
     enemy_reserve: EnemyReserveSnapshot,
     source_target_cursor: Option<usize>,
     source_reserve_activation_ready: bool,
+    source_background_left: u16,
     baiter_timer_steps: Option<u32>,
     baiter_pacing_steps_remaining: u8,
     source_rng: ActorSourceRng,
@@ -8291,6 +8296,7 @@ impl ActorGameDriver {
             enemy_reserve: EnemyReserveSnapshot::default(),
             source_target_cursor: None,
             source_reserve_activation_ready: false,
+            source_background_left: 0,
             baiter_timer_steps: None,
             baiter_pacing_steps_remaining: ACTOR_BAITER_TIMER_PACING_STEPS,
             source_rng: SOURCE_PLAYFIELD_START_RNG,
@@ -8399,6 +8405,7 @@ impl ActorGameDriver {
             high_score_initials: self.high_score_initials,
             snapshots: self.snapshots.values().cloned().collect(),
             behavior_script: behavior_script.clone(),
+            source_background_left: self.source_background_left,
             source_rng,
             source_shell_scan_tick,
         };
@@ -8479,6 +8486,7 @@ impl ActorGameDriver {
             survivor_bonus,
             behavior_script: behavior_script.manifest(),
             enemy_reserve: self.enemy_reserve,
+            source_background_left: self.source_background_left,
             source_rng,
             snapshots: self.snapshots.values().cloned().collect(),
             draws,
@@ -8931,6 +8939,9 @@ impl ActorGameDriver {
                     self.actors.remove(&id);
                     self.behavior_script.remove_actor_behavior(id);
                 }
+                GameCommand::SetSourceBackgroundLeft(background_left) => {
+                    self.source_background_left = background_left;
+                }
                 GameCommand::AttachHuman {
                     lander,
                     human,
@@ -9086,6 +9097,7 @@ impl ActorGameDriver {
         self.enemy_reserve = EnemyReserveSnapshot::default();
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
+        self.source_background_left = 0;
         self.baiter_timer_steps = None;
         self.clear_turn_playfield_actors();
     }
@@ -9117,6 +9129,7 @@ impl ActorGameDriver {
         self.pending_player_start = Some(PendingPlayerStart::new(player));
         self.pending_start_sound_steps = None;
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
+        self.source_background_left = 0;
         self.reset_source_shell_scan();
         self.clear_turn_playfield_actors();
         self.apply_wave_profile();
@@ -9166,6 +9179,7 @@ impl ActorGameDriver {
         self.set_active_stock(PlayerStock::new(0, 0));
         self.wave = 0;
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
+        self.source_background_left = 0;
         self.reset_source_shell_scan();
         self.high_score_initials = HighScoreInitialsState::EMPTY;
         self.game_over_hall_of_fame_stall_remaining = None;
@@ -9230,6 +9244,7 @@ impl ActorGameDriver {
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
+        self.source_background_left = 0;
         self.reset_source_shell_scan();
         self.clear_turn_playfield_actors();
         self.apply_wave_profile();
@@ -9391,7 +9406,7 @@ impl ActorGameDriver {
                             let spawn = ActorMutantSpawn::source_restore(
                                 &mut self.source_rng,
                                 source_profile,
-                                0,
+                                self.source_background_left,
                             );
                             commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
                                 position: spawn.position,
@@ -9431,8 +9446,11 @@ impl ActorGameDriver {
                     index += 1;
                 }
                 ActorSourceEnemyKind::Mutant => {
-                    let spawn =
-                        ActorMutantSpawn::source_restore(&mut self.source_rng, source_profile, 0);
+                    let spawn = ActorMutantSpawn::source_restore(
+                        &mut self.source_rng,
+                        source_profile,
+                        self.source_background_left,
+                    );
                     commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
                         position: spawn.position,
                         source: spawn.source,
@@ -10387,7 +10405,10 @@ impl PlayerShip {
             })
     }
 
-    fn hyperspace_rematerialization(&self, behavior: ActorBehaviorProfile) -> (Point, Direction) {
+    fn hyperspace_rematerialization(
+        &self,
+        behavior: ActorBehaviorProfile,
+    ) -> (Point, Direction, Option<u16>) {
         if let Some(source) = behavior.player_hyperspace_source_seed {
             let (x, direction) = if source.hseed & 1 != 0 {
                 (0x20, Direction::Right)
@@ -10395,7 +10416,11 @@ impl PlayerShip {
                 (0x70, Direction::Left)
             };
             let y = (source.hseed >> 1).wrapping_add(SOURCE_PLAYFIELD_Y_MIN);
-            return (Point::new(x, i16::from(y)), direction);
+            return (
+                Point::new(x, i16::from(y)),
+                direction,
+                Some(actor_source_hyperspace_background_left(source)),
+            );
         }
 
         (
@@ -10404,19 +10429,28 @@ impl PlayerShip {
                 behavior.player_hyperspace_rematerialize_y,
             ),
             self.direction,
+            None,
         )
     }
 
-    fn advance_hyperspace(&mut self, behavior: ActorBehaviorProfile) -> bool {
+    fn advance_hyperspace(
+        &mut self,
+        behavior: ActorBehaviorProfile,
+        commands: &mut Vec<GameCommand>,
+    ) -> bool {
         if self.hyperspace_steps_remaining == 0 {
             return false;
         }
 
         self.hyperspace_steps_remaining = self.hyperspace_steps_remaining.saturating_sub(1);
         if self.hyperspace_steps_remaining == 0 {
-            let (position, direction) = self.hyperspace_rematerialization(behavior);
+            let (position, direction, source_background_left) =
+                self.hyperspace_rematerialization(behavior);
             self.position = PLAYER_BOUNDS.clamp_point(position);
             self.direction = direction;
+            if let Some(source_background_left) = source_background_left {
+                commands.push(GameCommand::SetSourceBackgroundLeft(source_background_left));
+            }
             let death_lseed = self
                 .hyperspace_entry_lseed
                 .take()
@@ -10468,7 +10502,7 @@ impl AssetActor for PlayerShip {
             let behavior = prompt.behavior_for(self.id, ActorKind::Player);
             death_due = self.advance_hyperspace_death(&mut commands);
             let was_hidden = self.is_hidden_for_hyperspace();
-            if self.advance_hyperspace(behavior) {
+            if self.advance_hyperspace(behavior, &mut commands) {
                 commands.push(GameCommand::PlaySound(SoundCue::HyperspaceMaterialize));
             }
             let input_blocked = was_hidden || self.hyperspace_death_steps_remaining.is_some();
@@ -11246,6 +11280,10 @@ impl AssetActor for Mutant {
 
 fn actor_source_absolute_x(position: Point, x_fraction: u8) -> u16 {
     u16::from_be_bytes([position.x as u8, x_fraction])
+}
+
+const fn actor_source_hyperspace_background_left(source: ActorHyperspaceSourceSeed) -> u16 {
+    u16::from_be_bytes([source.seed, source.hseed])
 }
 
 fn actor_source_world_position(position: Point, x_fraction: u8, y_fraction: u8) -> (u16, u16) {
@@ -14156,6 +14194,7 @@ mod tests {
             survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
             enemy_reserve: EnemyReserveSnapshot::default(),
+            source_background_left: 0,
             source_rng: None,
             snapshots: Vec::new(),
             draws: vec![
@@ -14363,6 +14402,7 @@ mod tests {
             survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
             enemy_reserve: EnemyReserveSnapshot::default(),
+            source_background_left: 0,
             source_rng: None,
             snapshots: Vec::new(),
             draws: vec![DrawCommand::sprite_with_effect(
@@ -14483,6 +14523,7 @@ mod tests {
             survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
             enemy_reserve: EnemyReserveSnapshot::default(),
+            source_background_left: 0,
             source_rng: None,
             snapshots: vec![player, lander, human, laser, enemy_laser, bomb],
             draws: vec![
@@ -14644,6 +14685,7 @@ mod tests {
             survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
             enemy_reserve: EnemyReserveSnapshot::default(),
+            source_background_left: 0,
             source_rng: None,
             snapshots: Vec::new(),
             draws,
@@ -17346,16 +17388,17 @@ mod tests {
             hseed: 0x66,
             lseed: 0x99,
         };
+        driver.source_background_left = 0x3400;
         let mut expected_rng = driver.source_rng;
         let first_spawn = ActorMutantSpawn::source_restore(
             &mut expected_rng,
             ActorSourceWaveProfile::for_wave(2),
-            0,
+            driver.source_background_left,
         );
         let second_spawn = ActorMutantSpawn::source_restore(
             &mut expected_rng,
             ActorSourceWaveProfile::for_wave(2),
-            0,
+            driver.source_background_left,
         );
 
         let restored = driver.step(GameInput::NONE);
@@ -17367,6 +17410,7 @@ mod tests {
                 ..EnemyReserveSnapshot::default()
             }
         );
+        assert_eq!(restored.source_background_left, 0x3400);
         assert_eq!(
             restored
                 .commands
@@ -17470,14 +17514,24 @@ mod tests {
             hseed: 0x5A,
             lseed: 0x91,
         };
+        driver.source_background_left = 0x5420;
         let profile = ActorSourceWaveProfile::for_wave(2);
         let mut expected_rng = driver.source_rng;
-        let first_spawn = ActorMutantSpawn::source_restore(&mut expected_rng, profile, 0);
-        let second_spawn = ActorMutantSpawn::source_restore(&mut expected_rng, profile, 0);
+        let first_spawn = ActorMutantSpawn::source_restore(
+            &mut expected_rng,
+            profile,
+            driver.source_background_left,
+        );
+        let second_spawn = ActorMutantSpawn::source_restore(
+            &mut expected_rng,
+            profile,
+            driver.source_background_left,
+        );
 
         let restored = driver.step(GameInput::NONE);
 
         assert_eq!(restored.enemy_reserve, EnemyReserveSnapshot::default());
+        assert_eq!(restored.source_background_left, 0x5420);
         assert_eq!(
             restored
                 .commands
@@ -18125,6 +18179,7 @@ mod tests {
             snapshots: Vec::new(),
             behavior_script: ActorBehaviorScript::default()
                 .with_kind_behavior(ActorKind::EnemyLaser, behavior),
+            source_background_left: 0,
             source_rng: None,
             source_shell_scan_tick: false,
         };
@@ -18492,6 +18547,12 @@ mod tests {
                 .sounds
                 .contains(&SoundCue::HyperspaceMaterialize)
         );
+        assert_eq!(rematerialized.source_background_left, 0x1234);
+        assert!(
+            rematerialized
+                .commands
+                .contains(&GameCommand::SetSourceBackgroundLeft(0x1234))
+        );
         assert!(!rematerialized.commands.contains(&GameCommand::PlayerKilled));
     }
 
@@ -18528,6 +18589,10 @@ mod tests {
         };
         let player_snapshot = snapshot_for(&rematerialized, player);
         assert_eq!(player_snapshot.position, expected_position);
+        assert_eq!(
+            rematerialized.source_background_left,
+            u16::from_be_bytes([expected_source.seed, expected_source.hseed])
+        );
         assert!(rematerialized.draws.iter().any(|draw| {
             draw.actor == player
                 && draw.position == expected_position
@@ -22155,6 +22220,7 @@ mod tests {
                 player_velocity,
             )],
             behavior_script: ActorBehaviorScript::default(),
+            source_background_left: 0,
             source_rng: Some(source_rng),
             source_shell_scan_tick: false,
         }
