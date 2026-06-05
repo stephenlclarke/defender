@@ -765,7 +765,9 @@ reintroduce legacy implementation terminology.
   actors now update seeded picture-frame and Y-velocity metadata, including
   cruise-altitude and player-relative Y adjustments, during active source motion
   from the driver-provided source RNG snapshot carried in
-  `StepPrompt`/`StepReport`. Hostile projectile
+  `StepPrompt`/`StepReport`; source-backed baiters use that same source RNG
+  snapshot to gate picture-wrap retargeting against `baiter_seek_probability`.
+  Hostile projectile
   snapshots now carry source-shaped shell velocity/lifetime metadata into the
   clean state bridge; enemy-shot actors advance their own fixed-point fraction
   state every actor step while decrementing lifetime on the source shell-scan

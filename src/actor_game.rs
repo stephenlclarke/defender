@@ -6460,14 +6460,11 @@ impl Baiter {
                 && let Some(player) = prompt.player_position()
             {
                 let profile = ActorSourceWaveProfile::for_wave(prompt.wave.max(1));
-                source_baiter_velocity_update(
-                    source,
-                    self.position,
-                    profile,
-                    player,
-                    true,
-                    actor_source_motion_seed(prompt.step, self.id),
-                );
+                let seed = prompt
+                    .source_rng
+                    .map(|source_rng| source_rng.seed)
+                    .unwrap_or_else(|| actor_source_motion_seed(prompt.step, self.id));
+                source_baiter_velocity_update(source, self.position, profile, player, true, seed);
             }
             source.sleep_ticks = SOURCE_BAITER_LOOP_SLEEP_TICKS;
         }
@@ -10324,6 +10321,77 @@ mod tests {
                 shot_timer: 10,
                 sleep_ticks: SOURCE_BAITER_LOOP_SLEEP_TICKS,
                 picture_frame: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn source_baiter_retarget_uses_driver_source_rng_snapshot() {
+        fn step_baiter_after_source_seed(seed: u8) -> (StepReport, ActorId) {
+            let mut driver = ActorGameDriver::new();
+            driver.phase = Phase::Playing;
+            driver.wave = 1;
+            driver.spawn_player();
+            driver.step(GameInput::NONE);
+            driver.source_rng = ActorSourceRng {
+                seed,
+                hseed: 0,
+                lseed: 0,
+            };
+            let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
+                position: Point::new(70, 120),
+                source: Some(ActorSourceBaiterMetadata {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0,
+                    y_velocity: 0,
+                    shot_timer: 2,
+                    sleep_ticks: 0,
+                    picture_frame: 2,
+                }),
+            });
+
+            (driver.step(GameInput::NONE), baiter)
+        }
+
+        let (held, held_baiter) = step_baiter_after_source_seed(0);
+        assert_eq!(held.source_rng.map(|source_rng| source_rng.seed), Some(17));
+        assert_eq!(
+            snapshot_for(&held, held_baiter).position,
+            Point::new(70, 120)
+        );
+        assert_eq!(
+            snapshot_for(&held, held_baiter).source_baiter,
+            Some(ActorSourceBaiterMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                shot_timer: 1,
+                sleep_ticks: SOURCE_BAITER_LOOP_SLEEP_TICKS,
+                picture_frame: 0,
+            })
+        );
+
+        let (retargeted, retargeted_baiter) = step_baiter_after_source_seed(70);
+        assert_eq!(
+            retargeted.source_rng.map(|source_rng| source_rng.seed),
+            Some(227)
+        );
+        assert_eq!(
+            snapshot_for(&retargeted, retargeted_baiter).position,
+            Point::new(69, 120)
+        );
+        assert_eq!(
+            snapshot_for(&retargeted, retargeted_baiter).source_baiter,
+            Some(ActorSourceBaiterMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0xFFC0,
+                y_velocity: 0,
+                shot_timer: 1,
+                sleep_ticks: SOURCE_BAITER_LOOP_SLEEP_TICKS,
+                picture_frame: 0,
             })
         );
     }

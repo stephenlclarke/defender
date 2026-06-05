@@ -4647,3 +4647,27 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780642856268849`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780643571704519`.
+- `2026-06-05 08:21 BST`: Completed the actor source baiter RNG prompt cycle.
+  Source-backed baiter picture-wrap retargeting now consumes the
+  driver-provided source RNG snapshot carried in `StepPrompt` for the source
+  `SEED > UFOSK` gate before applying `baiter_seek_probability`; the local
+  step/id seed remains only as the fallback for hand-built prompts without
+  source RNG. Added a focused driver regression proving low prompt `SEED` holds
+  baiter velocity while high prompt `SEED` retargets movement through the actor
+  boundary. README, SPEC, and the actor architecture notes now document the
+  baiter source RNG prompt boundary. No legacy code, tests, or scaffolding were
+  safe to remove in this slice because clean smoke/fidelity/oracle evidence
+  still depends on clean runtime boundaries outside the actor path. Validation
+  passed with `cargo fmt --check`, `cargo test source_baiter --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite was not rerun in this cycle; the previously isolated
+  clean-game MAME window/post-game audio failures remain outside this slice.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780643739247869`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780644108824289`.

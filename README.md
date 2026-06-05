@@ -110,7 +110,9 @@ metadata for the clean state bridge, and advance fraction state during active
 motion. Source-backed bombers now update seeded picture-frame and Y-velocity
 metadata, including cruise-altitude and player-relative Y adjustments, during
 active source motion from the driver-provided source RNG snapshot carried in
-`StepPrompt`/`StepReport`. Hostile projectile actors also publish source-shaped
+`StepPrompt`/`StepReport`, and source-backed baiters gate their picture-wrap
+retargeting through that same source RNG snapshot before applying
+`baiter_seek_probability`. Hostile projectile actors also publish source-shaped
 shell metadata:
 enemy lasers own and advance fixed-point source velocity, fraction, and
 lifetime state with the red-label shell-scan cadence, and enemy-shot spawn
