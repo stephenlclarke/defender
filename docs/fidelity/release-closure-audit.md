@@ -381,11 +381,13 @@ complete without owner review or more MAME evidence:
   still fails all-axis acceptance. The stale clean state mismatch is repaired:
   current clean reaches score `50`, enters terrain blow, keeps clean human
   snapshots empty once the destroyed-planet branch is active, starts visible
-  `TEREX` terrain explosions at the organic `TERBLO` sound boundary, and emits
-  the sampled `0xEE` tail. The remaining implementation gap is all-axis media
-  fidelity for that organic branch: current regenerated metrics are visual RMS
-  `90.26` / MAE `42.20` against thresholds `38.00` / `28.00`, and audio still
-  fails waveform correlation despite nonzero clean terrain-blow audio.
+  `TEREX` terrain explosions at the organic `TERBLO` sound boundary, projects
+  the MAME-observed six-lander/nine-mutant residual object mix before
+  `TERBLO`, and emits the sampled `0xEE` tail. The remaining implementation
+  gap is all-axis media fidelity for that organic branch: current regenerated
+  metrics are visual RMS `90.73` / MAE `42.59` against thresholds `38.00` /
+  `28.00`, and audio still fails waveform correlation despite nonzero clean
+  terrain-blow audio.
 - Owner review of graphics, audio, and playability. `PLAN.md` still requires
   owner signoff before protected reference media replacement and final closure.
 

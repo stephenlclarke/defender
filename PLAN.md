@@ -591,12 +591,13 @@ Exit gate:
    matches the terminal-death state rows through score `50`, terrain-blown
    status at frame `4927`, attract handoff at frame `4947`, no clean human
    snapshots once terrain blow is active, delayed visible `TEREX` progression
-   at the organic `TERBLO` sound boundary, and the sampled `0xEE` terrain-blow
-   tail at frames `5991`, `5995`, `5999`, `6003`, and `6007`. The current
-   regenerated report improves from stale no-audio/static-clean evidence but
-   still fails with visual RMS `90.26` / MAE `42.20` and audio waveform
-   correlation below threshold. The state-steered `TERBLO` clip remains the
-   accepted bounded
+   at the organic `TERBLO` sound boundary, the MAME-observed six-lander /
+   nine-mutant residual object mix before `TERBLO`, and the sampled `0xEE`
+   terrain-blow tail at frames `5991`, `5995`, `5999`, `6003`, and `6007`.
+   The current regenerated report improves from stale no-audio/static-clean
+   evidence but still fails with visual RMS `90.73` / MAE `42.59` and audio
+   waveform correlation below threshold. The state-steered `TERBLO` clip
+   remains the accepted bounded
    terrain-blow evidence, and the organic smartmix TERBLO cadence remains the
    concrete follow-up rather than a missing-evidence boundary. A follow-up
    non-lander trace inventory identified `extended_hold_up_7000`, frames
@@ -6305,3 +6306,25 @@ Exit gate:
   check/clippy, touched-doc `markdownlint`, and `git diff --check`. Slack
   start:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780695923761149`.
+- `2026-06-05 23:03 BST`: Completed the organic smartmix terminal residual
+  object projection cycle. The target4 terminal post-game branch now uses a
+  bounded source-object track table from the MAME rows at frames `5960`,
+  `5970`, `5980`, and `5990`, projecting the six `LNDP1`-`LNDP3` lander
+  objects and nine `SCZP1` mutant objects that MAME keeps active before the
+  organic `TERBLO` boundary. The focused organic regression now checks the
+  six-lander/nine-mutant mix and sampled mutant positions at state frames
+  `5981` and `5991`, alongside the existing score, no-human, terrain-blow,
+  `TEREX`, and `0xEE` cadence checks. Regenerating the ignored clean candidate
+  confirms the residual object mix is now present and animated before
+  `TERBLO`. The ignored all-axis report remains failed with visual RMS
+  `90.73`, visual MAE `42.59`, and audio envelope correlation `0.137`, so the
+  remaining work is still pixel/audio calibration rather than residual object
+  absence. No protected media was committed or accepted, and no legacy code,
+  tests, or scaffolding were safe to remove because this proof boundary still
+  depends on clean-vs-MAME reference tooling. Evidence runs included
+  `make reference-clean-capture ...` and `make reference-media-check ...`,
+  with the media check expectedly failing on the current all-axis metrics.
+  Validation passed with the focused organic regression, `cargo fmt --check`,
+  terrain-blow regression tests, Cargo check/clippy, touched-doc
+  `markdownlint`, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780696576650949`.

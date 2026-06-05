@@ -214,6 +214,157 @@ const SOURCE_POST_GAME_HUMAN_TRACKS: [[(u16, i16, i16); 5]; 2] = [
         (838, 96, 226),
     ],
 ];
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SourceTerminalObjectKind {
+    FixedLander,
+    CyclingLander,
+    Mutant,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SourceTarget4TerminalPostGameTrack {
+    kind: SourceTerminalObjectKind,
+    samples: [(u16, i16, i16); 4],
+}
+
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECT_TRACKS:
+    [SourceTarget4TerminalPostGameTrack; 15] = [
+    SourceTarget4TerminalPostGameTrack {
+        kind: SourceTerminalObjectKind::FixedLander,
+        samples: [
+            (1014, 110, 62),
+            (1024, 110, 56),
+            (1034, 110, 50),
+            (1044, 110, 50),
+        ],
+    },
+    SourceTarget4TerminalPostGameTrack {
+        kind: SourceTerminalObjectKind::CyclingLander,
+        samples: [
+            (1014, 90, 171),
+            (1024, 91, 171),
+            (1034, 92, 171),
+            (1044, 93, 171),
+        ],
+    },
+    SourceTarget4TerminalPostGameTrack {
+        kind: SourceTerminalObjectKind::CyclingLander,
+        samples: [
+            (1014, 245, 169),
+            (1024, 243, 169),
+            (1034, 242, 169),
+            (1044, 240, 169),
+        ],
+    },
+    SourceTarget4TerminalPostGameTrack {
+        kind: SourceTerminalObjectKind::CyclingLander,
+        samples: [
+            (1014, 128, 182),
+            (1024, 127, 176),
+            (1034, 126, 170),
+            (1044, 125, 164),
+        ],
+    },
+    SourceTarget4TerminalPostGameTrack {
+        kind: SourceTerminalObjectKind::CyclingLander,
+        samples: [
+            (1014, 239, 172),
+            (1024, 240, 172),
+            (1034, 241, 172),
+            (1044, 242, 172),
+        ],
+    },
+    SourceTarget4TerminalPostGameTrack {
+        kind: SourceTerminalObjectKind::Mutant,
+        samples: [
+            (1014, 48, 54),
+            (1024, 46, 53),
+            (1034, 44, 51),
+            (1044, 41, 49),
+        ],
+    },
+    SourceTarget4TerminalPostGameTrack {
+        kind: SourceTerminalObjectKind::CyclingLander,
+        samples: [
+            (1014, 155, 161),
+            (1024, 154, 161),
+            (1034, 153, 167),
+            (1044, 152, 167),
+        ],
+    },
+    SourceTarget4TerminalPostGameTrack {
+        kind: SourceTerminalObjectKind::Mutant,
+        samples: [
+            (1014, 242, 123),
+            (1024, 237, 122),
+            (1034, 234, 122),
+            (1044, 232, 122),
+        ],
+    },
+    SourceTarget4TerminalPostGameTrack {
+        kind: SourceTerminalObjectKind::Mutant,
+        samples: [
+            (1014, 27, 89),
+            (1024, 25, 88),
+            (1034, 23, 88),
+            (1044, 20, 88),
+        ],
+    },
+    SourceTarget4TerminalPostGameTrack {
+        kind: SourceTerminalObjectKind::Mutant,
+        samples: [
+            (1014, 28, 52),
+            (1024, 25, 51),
+            (1034, 23, 53),
+            (1044, 21, 53),
+        ],
+    },
+    SourceTarget4TerminalPostGameTrack {
+        kind: SourceTerminalObjectKind::Mutant,
+        samples: [
+            (1014, 0, 140),
+            (1024, 254, 139),
+            (1034, 249, 141),
+            (1044, 134, 141),
+        ],
+    },
+    SourceTarget4TerminalPostGameTrack {
+        kind: SourceTerminalObjectKind::Mutant,
+        samples: [
+            (1014, 245, 87),
+            (1024, 241, 86),
+            (1034, 238, 88),
+            (1044, 235, 88),
+        ],
+    },
+    SourceTarget4TerminalPostGameTrack {
+        kind: SourceTerminalObjectKind::Mutant,
+        samples: [
+            (1014, 235, 115),
+            (1024, 233, 114),
+            (1034, 230, 116),
+            (1044, 228, 115),
+        ],
+    },
+    SourceTarget4TerminalPostGameTrack {
+        kind: SourceTerminalObjectKind::Mutant,
+        samples: [
+            (1014, 237, 141),
+            (1024, 234, 140),
+            (1034, 231, 142),
+            (1044, 229, 141),
+        ],
+    },
+    SourceTarget4TerminalPostGameTrack {
+        kind: SourceTerminalObjectKind::Mutant,
+        samples: [
+            (1014, 236, 59),
+            (1024, 233, 58),
+            (1034, 230, 60),
+            (1044, 228, 59),
+        ],
+    },
+];
 const SOURCE_PLAYFIELD_START_RNG: SourceRandSnapshot = SourceRandSnapshot {
     seed: 0x52,
     hseed: 0x62,
@@ -2841,6 +2992,20 @@ impl WorldSnapshot {
         } else {
             self.explosions = source_post_game_explosions(frame);
         }
+        self.player_explosion = None;
+        self.refresh_object_evidence();
+    }
+
+    fn sync_target4_smartmix_terminal_post_game_playfield(&mut self, frame: u16) {
+        self.enemies = source_target4_smartmix_terminal_post_game_enemies(frame);
+        self.clear_terrain_blow_human_state();
+        self.enemy_reserve = EnemyReserveSnapshot::default();
+        self.projectiles.clear();
+        self.enemy_projectiles.clear();
+        self.enemy_appearances.clear();
+        self.score_popups.clear();
+        self.explosions
+            .retain(|explosion| explosion.kind == ExplosionKind::Terrain);
         self.player_explosion = None;
         self.refresh_object_evidence();
     }
@@ -6302,6 +6467,57 @@ fn source_post_game_landers(frame: u16) -> Vec<EnemySnapshot> {
             ))
         })
         .collect()
+}
+
+fn source_target4_smartmix_terminal_post_game_enemies(frame: u16) -> Vec<EnemySnapshot> {
+    SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECT_TRACKS
+        .iter()
+        .filter_map(|track| {
+            let position = interpolate_source_post_game_position(&track.samples, frame)?;
+            Some(match track.kind {
+                SourceTerminalObjectKind::FixedLander => {
+                    source_terminal_post_game_lander(position, 0, ScreenVelocity::new(0, 0))
+                }
+                SourceTerminalObjectKind::CyclingLander => source_terminal_post_game_lander(
+                    position,
+                    source_target4_smartmix_terminal_lander_picture_frame(frame),
+                    ScreenVelocity::new(0, 0),
+                ),
+                SourceTerminalObjectKind::Mutant => {
+                    EnemySnapshot::new(EnemyKind::Mutant, position, ScreenVelocity::new(0, 0))
+                }
+            })
+        })
+        .collect()
+}
+
+fn source_terminal_post_game_lander(
+    position: ScreenPosition,
+    picture_frame: u8,
+    velocity: ScreenVelocity,
+) -> EnemySnapshot {
+    EnemySnapshot::source_lander(
+        position,
+        velocity,
+        SourceLanderSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 0,
+            sleep_ticks: 0,
+            picture_frame,
+            target_human_index: None,
+        },
+    )
+}
+
+fn source_target4_smartmix_terminal_lander_picture_frame(frame: u16) -> u8 {
+    let first_frame = SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECT_TRACKS[0].samples[0].0;
+    u8::try_from(
+        ((frame.saturating_sub(first_frame)) / 10) % u16::from(SOURCE_LANDER_PICTURE_FRAME_COUNT),
+    )
+    .expect("lander picture frame fits u8")
 }
 
 fn source_post_game_humans(frame: u16) -> Vec<HumanSnapshot> {
@@ -9770,7 +9986,13 @@ impl Game {
                 .max(self.state.scores.player_one);
             gameplay_events.push(GameEvent::EnemyDestroyed);
         }
-        self.state.world.sync_post_game_playfield(post_game.frame);
+        if self.post_game_sound_profile == PostGameSoundProfile::Target4SmartmixTerminal {
+            self.state
+                .world
+                .sync_target4_smartmix_terminal_post_game_playfield(post_game.frame);
+        } else {
+            self.state.world.sync_post_game_playfield(post_game.frame);
+        }
         self.step_post_game_terrain_blow(post_game.frame);
 
         if post_game.frame >= post_game_playfield_duration(self.post_game_sound_profile) {
@@ -25491,10 +25713,40 @@ mod tests {
         let mut game = Game::new();
         let mut state_samples = Vec::new();
         let mut sound_samples = Vec::new();
+        let mut terminal_object_samples = Vec::new();
 
         for input_frame in 0..=6006u16 {
             let frame = game.step(organic_smartmix_input(input_frame));
             let state_frame = frame.state.frame;
+            if matches!(state_frame, 5981 | 5991) {
+                let lander_count = frame
+                    .state
+                    .world
+                    .enemies
+                    .iter()
+                    .filter(|enemy| enemy.kind == EnemyKind::Lander)
+                    .count();
+                let mutant_count = frame
+                    .state
+                    .world
+                    .enemies
+                    .iter()
+                    .filter(|enemy| enemy.kind == EnemyKind::Mutant)
+                    .count();
+                let first_mutant_position = frame
+                    .state
+                    .world
+                    .enemies
+                    .iter()
+                    .find(|enemy| enemy.kind == EnemyKind::Mutant)
+                    .map(|enemy| enemy.position);
+                terminal_object_samples.push((
+                    state_frame,
+                    lander_count,
+                    mutant_count,
+                    first_mutant_position,
+                ));
+            }
             if matches!(state_frame, 4779 | 4927 | 4947 | 5991 | 6007) {
                 state_samples.push((
                     state_frame,
@@ -25537,6 +25789,13 @@ mod tests {
             command: super::SOURCE_BACKGROUND_END_SOUND_COMMAND,
         };
 
+        assert_eq!(
+            terminal_object_samples,
+            vec![
+                (5981, 6, 9, Some(ScreenPosition::new(44, 51))),
+                (5991, 6, 9, Some(ScreenPosition::new(41, 49))),
+            ]
+        );
         assert_eq!(
             state_samples,
             vec![
