@@ -711,11 +711,12 @@ reintroduce legacy implementation terminology.
   preferring their configured human target slot, lander pickup/carry/conversion,
   falling-human rescue and safe landing scoring, score popups, hostile
   projectile actors for lander shots, bomber/pod hit scores and cues,
-  pod laser-hit swarmer spawning with the source request bound, swarmer shot
-  timer projectile/cue emission, smart-bomb pod scoring without swarmer
-  spawning, source-paced baiter timer entry with non-wave-blocking baiters,
-  baiter shots/scores/hit cues, smart-bomb hostile clearing, and mutant spawn
-  handoff, but it has not replaced the live `Game` runtime yet.
+  bomber-laid bomb actors with source bomb-collision cues, pod laser-hit swarmer
+  spawning with the source request bound, swarmer shot timer projectile/cue
+  emission, smart-bomb pod scoring without swarmer spawning, source-paced baiter
+  timer entry with non-wave-blocking baiters, baiter shots/scores/hit cues,
+  smart-bomb hostile clearing, and mutant spawn handoff, but it has not replaced
+  the live `Game` runtime yet.
 
 ## Compatibility Features
 

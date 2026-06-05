@@ -44,11 +44,12 @@ verification tools.
   shot timers now spawn hostile projectile actors that use the same player
   damage policy as other hazards, including `XYZZY` invincibility overrides;
   bomber, pod, swarmer, and baiter laser hits award source scores and emit
-  family hit cues, pod laser kills spawn bounded swarmer actors, source swarmers
-  now emit hostile projectiles and distinct shot cues from actor-owned timers,
-  and source-paced baiter timer entry now spawns source-backed baiter actors that
-  can shoot and pursue the player without blocking wave completion after
-  source-counted enemies are gone.
+  family hit cues, bomber actors now lay first-class bomb hazards with source
+  bomb-collision cues, pod laser kills spawn bounded swarmer actors, source
+  swarmers now emit hostile projectiles and distinct shot cues from actor-owned
+  timers, and source-paced baiter timer entry now spawns source-backed baiter
+  actors that can shoot and pursue the player without blocking wave completion
+  after source-counted enemies are gone.
 - Primary runtime source is `src/`; the converted implementation is parked in
   `src_legacy/` and should remain optional oracle/tooling evidence only.
 - Normal live play uses clean `Game` frames through clean platform, audio, and
@@ -3744,3 +3745,18 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780619644878979`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780619981042959`.
+- `2026-06-05 01:46 BST`: Completed the actor bomber bomb actors cycle. Added
+  first-class `Bomb` actors, scriptable bomber bomb cadence, the source ten-bomb
+  active cap, bomb sprite/lifetime behavior, bomb hazard/laser/smart-bomb
+  participation, and a source bomb-collision cue on player contact. Added
+  regressions for bomber-laid bomb actor spawning/draws and bomb/player
+  collision audio/game-over behavior. No legacy code or tests were safe to
+  remove because the actor runtime remains isolated. Validation passed with
+  `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780620038768129`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780620406992099`.

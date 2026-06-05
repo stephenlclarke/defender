@@ -11,7 +11,7 @@ verified.
   ids, actor threads, and the latest snapshots.
 - Each asset is a Rust struct implementing `AssetActor`. The current slice has
   `AttractDirector`, `ScriptedAttractProgram`, `PlayerShip`, `Lander`,
-  `Mutant`, `Bomber`, `Pod`, `Swarmer`, `Baiter`, `Human`, `LaserShot`,
+  `Mutant`, `Bomber`, `Bomb`, `Pod`, `Swarmer`, `Baiter`, `Human`, `LaserShot`,
   `EnemyLaserShot`, `Explosion`, and `ScorePopup`.
 - `ThreadedAsset` runs one actor on one Rust thread. The driver sends one
   `StepPrompt` per simulation step and waits for one `ActorReply`, keeping
@@ -71,10 +71,11 @@ numbers.
 Actor movement and behavior are configurable data owned by the driver.
 `ActorBehaviorProfile` holds tunable attributes for player movement and laser
 cooldown, laser speed and lifetime, lander seek/carry/fire behavior, mutant
-pursuit, bomber/pod drift, swarmer pursuit/fire behavior, baiter pursuit/fire
-behavior, human fall/landing behavior, and timed effect lifetimes. It also holds
-behavior modes such as `LanderBehaviorMode`, allowing scripts to choose whether
-a lander seeks humans, chases the player, or simply drifts.
+pursuit, bomber drift/bomb cadence, pod drift, swarmer pursuit/fire behavior,
+baiter pursuit/fire behavior, bomb lifetime, human fall/landing behavior, and
+timed effect lifetimes. It also holds behavior modes such as
+`LanderBehaviorMode`, allowing scripts to choose whether a lander seeks humans,
+chases the player, or simply drifts.
 
 `ActorBehaviorScript` resolves those profiles in this order:
 
@@ -171,6 +172,10 @@ The actor driver now owns a first Defender gameplay loop:
   exposes those counts. Bombers and pods draw their own sprites, move through
   actor-owned source fixed-point metadata when source-backed, and remain
   script-tunable through their behavior profiles.
+- Bomber actors can lay first-class `Bomb` actors on a scriptable cadence with
+  the source ten-bomb active cap. Bombs draw their own sprite, expire through
+  actor-owned lifetime state, act as player hazards, and emit a bomb collision
+  cue when they hit the player.
 - Projectile-killed pods spawn a bounded mini-swarmer actor batch using the
   source request count. Source-backed swarmers decrement their actor-owned shot
   timer into hostile projectile commands with a distinct swarmer shot cue.

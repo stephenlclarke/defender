@@ -50,6 +50,7 @@ const ACTOR_BAITER_TIMER_PACING_STEPS: u8 = 15;
 const SOURCE_BOMBER_LOOP_SLEEP_TICKS: u8 = 1;
 const SOURCE_BOMBER_PICTURE_FRAME_COUNT: u8 = 4;
 const SOURCE_BOMBER_CRUISE_ALTITUDE: i16 = 0x50;
+const SOURCE_ACTIVE_BOMBER_BOMB_LIMIT: usize = 10;
 const SOURCE_MAX_ACTIVE_WAVE_ENEMIES: usize = 5;
 const LANDER_SEEK_SPEED: i16 = 1;
 const LANDER_DRIFT_SPEED: i16 = 1;
@@ -59,6 +60,7 @@ const LANDER_PICKUP_RADIUS_Y: i16 = 8;
 const LANDER_CONVERSION_Y: i16 = 24;
 const MUTANT_SEEK_SPEED: i16 = 1;
 const BOMBER_DRIFT_SPEED: i16 = 1;
+const BOMBER_BOMB_PERIOD: u64 = 64;
 const POD_DRIFT_SPEED: i16 = 1;
 const SWARMER_SEEK_SPEED: i16 = 2;
 const SWARMER_FIRE_PERIOD: u64 = 58;
@@ -66,6 +68,7 @@ const SWARMER_SHOT_SPEED: i16 = 3;
 const BAITER_SEEK_SPEED: i16 = 3;
 const BAITER_FIRE_PERIOD: u64 = 42;
 const BAITER_SHOT_SPEED: i16 = 4;
+const BOMB_LIFETIME: u16 = 96;
 const LANDER_SCORE: u32 = 150;
 const MUTANT_SCORE: u32 = 150;
 const BOMBER_SCORE: u32 = 250;
@@ -744,6 +747,7 @@ pub enum ActorKind {
     Lander,
     Mutant,
     Bomber,
+    Bomb,
     Pod,
     Swarmer,
     Baiter,
@@ -781,6 +785,7 @@ pub struct ActorBehaviorProfile {
     pub lander_mode: LanderBehaviorMode,
     pub mutant_seek_speed: i16,
     pub bomber_drift_speed: i16,
+    pub bomber_bomb_period_steps: u64,
     pub pod_drift_speed: i16,
     pub swarmer_seek_speed: i16,
     pub swarmer_fire_period_steps: u64,
@@ -788,6 +793,7 @@ pub struct ActorBehaviorProfile {
     pub baiter_seek_speed: i16,
     pub baiter_fire_period_steps: u64,
     pub baiter_shot_speed: i16,
+    pub bomb_lifetime_steps: u16,
     pub human_ground_y: i16,
     pub human_fall_acceleration: i16,
     pub human_max_fall_speed: i16,
@@ -816,6 +822,7 @@ impl ActorBehaviorProfile {
         lander_mode: LanderBehaviorMode::SeekNearestHuman,
         mutant_seek_speed: MUTANT_SEEK_SPEED,
         bomber_drift_speed: BOMBER_DRIFT_SPEED,
+        bomber_bomb_period_steps: BOMBER_BOMB_PERIOD,
         pod_drift_speed: POD_DRIFT_SPEED,
         swarmer_seek_speed: SWARMER_SEEK_SPEED,
         swarmer_fire_period_steps: SWARMER_FIRE_PERIOD,
@@ -823,6 +830,7 @@ impl ActorBehaviorProfile {
         baiter_seek_speed: BAITER_SEEK_SPEED,
         baiter_fire_period_steps: BAITER_FIRE_PERIOD,
         baiter_shot_speed: BAITER_SHOT_SPEED,
+        bomb_lifetime_steps: BOMB_LIFETIME,
         human_ground_y: HUMAN_GROUND_Y,
         human_fall_acceleration: HUMAN_FALL_ACCELERATION,
         human_max_fall_speed: HUMAN_MAX_FALL_SPEED,
@@ -1689,6 +1697,7 @@ pub enum SpriteKey {
     Lander,
     Mutant,
     Bomber,
+    Bomb,
     Pod,
     Swarmer,
     Baiter,
@@ -1749,6 +1758,7 @@ pub enum SoundCue {
     HumanLost,
     MutantSpawn,
     BomberHit,
+    BombHit,
     PodHit,
     SwarmerHit,
     SwarmerShot,
@@ -2062,6 +2072,9 @@ pub enum SpawnRequest {
         position: Point,
     },
     Bomber {
+        position: Point,
+    },
+    Bomb {
         position: Point,
     },
     Pod {
@@ -2411,6 +2424,10 @@ impl ActorGameDriver {
         self.spawn_bomber(position)
     }
 
+    pub fn spawn_bomb_for_test(&mut self, position: Point) -> ActorId {
+        self.spawn_bomb(position)
+    }
+
     pub fn spawn_pod_for_test(&mut self, position: Point) -> ActorId {
         self.spawn_pod(position)
     }
@@ -2484,6 +2501,16 @@ impl ActorGameDriver {
     fn spawn_bomber_from_spawn(&mut self, spawn: ActorBomberSpawn) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(Bomber::from_spawn(id, spawn));
+        id
+    }
+
+    fn spawn_bomb(&mut self, position: Point) -> ActorId {
+        let id = self.allocate_actor_id();
+        let lifetime = self
+            .behavior_script
+            .behavior_for(id, ActorKind::Bomb)
+            .bomb_lifetime_steps;
+        self.spawn_actor(Bomb::new(id, position, lifetime));
         id
     }
 
@@ -2613,7 +2640,7 @@ impl ActorGameDriver {
                 commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
                     position: center_of(player.bounds),
                 }));
-                commands.push(GameCommand::PlaySound(SoundCue::Explosion));
+                commands.push(GameCommand::PlaySound(player_hazard_sound(enemy.kind)));
                 commands.push(GameCommand::EnterGameOver);
                 break;
             }
@@ -2660,6 +2687,9 @@ impl ActorGameDriver {
                 }
                 GameCommand::Spawn(SpawnRequest::Bomber { position }) => {
                     self.spawn_bomber(position);
+                }
+                GameCommand::Spawn(SpawnRequest::Bomb { position }) => {
+                    self.spawn_bomb(position);
                 }
                 GameCommand::Spawn(SpawnRequest::Pod { position }) => {
                     self.spawn_pod(position);
@@ -2955,6 +2985,7 @@ fn is_player_laser_target(kind: ActorKind) -> bool {
         ActorKind::Lander
             | ActorKind::Mutant
             | ActorKind::Bomber
+            | ActorKind::Bomb
             | ActorKind::Pod
             | ActorKind::Swarmer
             | ActorKind::Baiter
@@ -2968,6 +2999,7 @@ fn is_player_hazard(kind: ActorKind) -> bool {
         ActorKind::Lander
             | ActorKind::Mutant
             | ActorKind::Bomber
+            | ActorKind::Bomb
             | ActorKind::Pod
             | ActorKind::Swarmer
             | ActorKind::Baiter
@@ -2981,6 +3013,7 @@ fn is_smart_bomb_target(kind: ActorKind) -> bool {
         ActorKind::Lander
             | ActorKind::Mutant
             | ActorKind::Bomber
+            | ActorKind::Bomb
             | ActorKind::Pod
             | ActorKind::Swarmer
             | ActorKind::Baiter
@@ -3006,6 +3039,7 @@ fn score_for_hostile(kind: ActorKind) -> u32 {
         ActorKind::Lander => LANDER_SCORE,
         ActorKind::Mutant => MUTANT_SCORE,
         ActorKind::Bomber => BOMBER_SCORE,
+        ActorKind::Bomb => 0,
         ActorKind::Pod => POD_SCORE,
         ActorKind::Swarmer => SWARMER_SCORE,
         ActorKind::Baiter => BAITER_SCORE,
@@ -3016,9 +3050,17 @@ fn score_for_hostile(kind: ActorKind) -> u32 {
 fn hit_sound_for_hostile(kind: ActorKind) -> SoundCue {
     match kind {
         ActorKind::Bomber => SoundCue::BomberHit,
+        ActorKind::Bomb => SoundCue::BombHit,
         ActorKind::Pod => SoundCue::PodHit,
         ActorKind::Swarmer => SoundCue::SwarmerHit,
         ActorKind::Baiter => SoundCue::BaiterHit,
+        _ => SoundCue::Explosion,
+    }
+}
+
+fn player_hazard_sound(kind: ActorKind) -> SoundCue {
+    match kind {
+        ActorKind::Bomb => SoundCue::BombHit,
         _ => SoundCue::Explosion,
     }
 }
@@ -3743,6 +3785,33 @@ impl Bomber {
             })
             .unwrap_or(VisualEffect::Static)
     }
+
+    fn maybe_spawn_bomb(
+        &self,
+        prompt: &StepPrompt,
+        behavior: ActorBehaviorProfile,
+        commands: &mut Vec<GameCommand>,
+    ) {
+        let active_bombs = prompt
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::Bomb && snapshot.alive)
+            .count();
+        if active_bombs >= SOURCE_ACTIVE_BOMBER_BOMB_LIMIT {
+            return;
+        }
+
+        let bomb_period = behavior.bomber_bomb_period_steps.max(1);
+        let phase = self
+            .source
+            .map(|source| u64::from(source.source_slot))
+            .unwrap_or_else(|| self.id.value());
+        if prompt.step % bomb_period == phase % bomb_period {
+            commands.push(GameCommand::Spawn(SpawnRequest::Bomb {
+                position: self.position,
+            }));
+        }
+    }
 }
 
 impl AssetActor for Bomber {
@@ -3751,6 +3820,7 @@ impl AssetActor for Bomber {
     }
 
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
+        let mut commands = Vec::new();
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Bomber);
@@ -3760,6 +3830,7 @@ impl AssetActor for Bomber {
                     0,
                 ));
             }
+            self.maybe_spawn_bomb(prompt, behavior, &mut commands);
             draws.push(DrawCommand::sprite_with_effect(
                 self.id,
                 SpriteKey::Bomber,
@@ -3778,6 +3849,60 @@ impl AssetActor for Bomber {
                 alive: prompt.phase == Phase::Playing,
                 source_lander: None,
                 source_bomber: self.source,
+                source_pod: None,
+                source_swarmer: None,
+                source_baiter: None,
+                source_human: None,
+            },
+            commands,
+            draws,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Bomb {
+    id: ActorId,
+    position: Point,
+    lifetime_steps: u16,
+}
+
+impl Bomb {
+    fn new(id: ActorId, position: Point, lifetime_steps: u16) -> Self {
+        Self {
+            id,
+            position,
+            lifetime_steps,
+        }
+    }
+
+    fn bounds(&self) -> Rect {
+        Rect::from_center(self.position, 4, 6)
+    }
+}
+
+impl AssetActor for Bomb {
+    fn id(&self) -> ActorId {
+        self.id
+    }
+
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
+        let mut draws = Vec::new();
+        if prompt.phase == Phase::Playing && self.lifetime_steps > 0 {
+            self.lifetime_steps = self.lifetime_steps.saturating_sub(1);
+            draws.push(DrawCommand::sprite(self.id, SpriteKey::Bomb, self.position));
+        }
+
+        ActorReply {
+            id: self.id,
+            snapshot: ActorSnapshot {
+                id: self.id,
+                kind: ActorKind::Bomb,
+                position: self.position,
+                bounds: Some(self.bounds()),
+                alive: prompt.phase == Phase::Playing && self.lifetime_steps > 0,
+                source_lander: None,
+                source_bomber: None,
                 source_pod: None,
                 source_swarmer: None,
                 source_baiter: None,
@@ -5619,6 +5744,36 @@ mod tests {
     }
 
     #[test]
+    fn bomber_actor_lays_scripted_bomb_actor() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.set_kind_behavior(
+            ActorKind::Bomber,
+            ActorBehaviorProfile {
+                bomber_drift_speed: 0,
+                bomber_bomb_period_steps: 1,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        driver.spawn_bomber_for_test(Point::new(100, 80));
+
+        let report = driver.step(GameInput::NONE);
+
+        assert!(report.commands.iter().any(|command| {
+            matches!(
+                command,
+                GameCommand::Spawn(SpawnRequest::Bomb {
+                    position: Point { x: 100, y: 80 },
+                })
+            )
+        }));
+
+        let live = driver.step(GameInput::NONE);
+        assert_eq!(driver.snapshot_count(ActorKind::Bomb), 1);
+        assert!(live.draws.iter().any(|draw| draw.sprite == SpriteKey::Bomb));
+    }
+
+    #[test]
     fn behavior_script_can_define_swarmer_motion() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
@@ -6304,6 +6459,20 @@ mod tests {
                 .commands
                 .contains(&GameCommand::AddScore(BAITER_SCORE))
         );
+    }
+
+    #[test]
+    fn bomb_collision_enters_game_over_with_source_bomb_sound() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_player();
+        driver.spawn_bomb_for_test(Point::new(42, 120));
+
+        let report = driver.step(GameInput::NONE);
+
+        assert_eq!(report.phase, Phase::GameOver);
+        assert!(report.sounds.contains(&SoundCue::BombHit));
+        assert!(report.sounds.contains(&SoundCue::GameOver));
     }
 
     #[test]
