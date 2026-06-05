@@ -74,8 +74,9 @@ making the actor report consumable by the native renderer path.
 `ActorRuntimeAdapter` bundles each actor step into an `ActorFrame` containing
 the original report, an actor-derived clean `GameState`, clean gameplay/audio
 `GameEvents`, and the clean `RenderScene`. The state bridge maps actor phase,
-score, stock, high-score state, and published actor snapshots into the clean
-runtime contract without making actor behavior display-frame driven.
+score, stock, high-score state, and published actor snapshots with movement
+velocity/facing metadata into the clean runtime contract without making actor
+behavior display-frame driven.
 `--actor-smoke` exercises that actor frame path through a
 scripted attract/play input sequence and the native draw planner, proving actor
 events, audio, sprites, projectiles, HUD text, overlays, and `wgpu` command-plan
@@ -102,9 +103,10 @@ actor families alongside landers instead of remaining lander-only. Later-wave
 actor landers now restore from source RNG placement/shot/velocity state, and
 later-wave humans restore from the source target-list distribution.
 Source-backed landers, bombers, pods, swarmers, baiters, and humans publish
-their fixed-point metadata through snapshots and advance that fraction state
-during active motion. It also includes Williams title animation metadata, the
-coalescing Defender wordmark surface, lander target-slot seeking, an actor-owned
+their fixed-point metadata through snapshots, publish per-step movement/facing
+metadata for the clean state bridge, and advance fraction state during active
+motion. It also includes Williams title animation metadata, the coalescing
+Defender wordmark surface, lander target-slot seeking, an actor-owned
 status display for score, high score, wave, lives, smart-bomb stock, credits,
 and high-score-entry rows, pickup/carry/conversion,
 falling-human rescue and safe landing scores, score popups, hostile projectile

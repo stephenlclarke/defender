@@ -185,11 +185,11 @@ tree:
   runtime contract. `ActorRenderSceneBridge` adapts report draw commands into
   clean `RenderScene` sprites for the existing native renderer contract, and
   `ActorStateBridge` adapts report phase, score, stock, high-score state, and
-  actor snapshots into clean `GameState` values. `ActorRuntimeAdapter` bundles
-  reports, clean `GameState`, clean `GameEvents`, and clean `RenderScene`
-  values into actor `ActorFrame` values. The actor game is available through
-  explicit actor smoke/live preflight commands while default live play remains
-  on the clean `Game` runtime.
+  actor snapshots with velocity/facing metadata into clean `GameState` values.
+  `ActorRuntimeAdapter` bundles reports, clean `GameState`, clean `GameEvents`,
+  and clean `RenderScene` values into actor `ActorFrame` values. The actor game
+  is available through explicit actor smoke/live preflight commands while
+  default live play remains on the clean `Game` runtime.
 - `src/actor_smoke.rs`: the crate-private actor smoke command that steps
   `ActorRuntimeAdapter` through scripted attract/play inputs, verifies
   actor-origin clean gameplay/audio events, required actor sprite coverage,
@@ -758,8 +758,9 @@ reintroduce legacy implementation terminology.
   credits, and high-score-entry rows from `StepPrompt` state while staying
   inert during attract so custom attract scripts remain in control.
   Source-backed landers, bombers, pods, swarmers, baiters, and humans publish
-  fixed-point metadata in snapshots and advance their actor-owned fraction state
-  during active motion. `XYZZY` invincibility is represented as the same
+  fixed-point metadata plus movement/facing metadata in snapshots and advance
+  their actor-owned fraction state during active motion. `XYZZY` invincibility
+  is represented as the same
   temporary player behavior override. The slice now also models source landers
   preferring their configured human target slot, lander pickup/carry/conversion,
   falling-human rescue and safe landing scoring, score popups, hostile

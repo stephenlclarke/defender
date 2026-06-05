@@ -40,8 +40,9 @@ verified.
   actor-specific `ActorFrame`: the original `StepReport`, an actor-derived
   clean `GameState`, a clean gameplay/audio `GameEvents` batch, and the clean
   `RenderScene`. `ActorStateBridge` maps actor phase, score, stock,
-  high-score-entry state, and published actor snapshots into the clean state
-  contract without making the actor simulation display-frame driven.
+  high-score-entry state, and published actor snapshots with velocity/facing
+  metadata into the clean state contract without making the actor simulation
+  display-frame driven.
 - `src/actor_smoke.rs` exercises `ActorRuntimeAdapter` through a scripted
   attract/play sequence and the native draw planner. The smoke report verifies
   attract, credited attract, playing actor frames, clean gameplay/audio events,
@@ -256,8 +257,9 @@ The actor driver now owns a first Defender gameplay loop:
   respect the same player damage behavior profile used by `XYZZY` invincibility.
 - Later source waves seed bomber and pod actor families when the wave table
   exposes those counts. Bombers and pods draw their own sprites, move through
-  actor-owned source fixed-point metadata when source-backed, and remain
-  script-tunable through their behavior profiles.
+  actor-owned source fixed-point metadata when source-backed, publish per-step
+  movement/facing metadata, and remain script-tunable through their behavior
+  profiles.
 - Bomber actors can lay first-class `Bomb` actors on a scriptable cadence with
   the source ten-bomb active cap. Bombs draw their own sprite, expire through
   actor-owned lifetime state, act as player hazards, and emit a bomb collision

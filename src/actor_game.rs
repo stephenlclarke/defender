@@ -2437,6 +2437,8 @@ pub struct ActorSnapshot {
     pub id: ActorId,
     pub kind: ActorKind,
     pub position: Point,
+    pub velocity: Velocity,
+    pub direction: Option<Direction>,
     pub bounds: Option<Rect>,
     pub alive: bool,
     pub source_lander: Option<ActorSourceLanderMetadata>,
@@ -2812,18 +2814,32 @@ fn attract_snapshot_for_report(report: &StepReport) -> AttractPresentationSnapsh
 }
 
 fn player_snapshot_for_report(report: &StepReport) -> PlayerSnapshot {
-    let position = report
+    let snapshot = report
         .snapshots
         .iter()
-        .find(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive)
+        .find(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive);
+    let position = snapshot
         .map(|snapshot| snapshot.position)
+        .unwrap_or_default();
+    let velocity = snapshot
+        .map(|snapshot| snapshot.velocity)
         .unwrap_or_default();
     PlayerSnapshot {
         position: (world_vector(position.x), world_vector(position.y)),
-        velocity: (WorldVector::default(), WorldVector::default()),
-        direction: player_direction_for_report(report),
+        velocity: (world_vector(velocity.dx), world_vector(velocity.dy)),
+        direction: snapshot
+            .and_then(|snapshot| snapshot.direction)
+            .map(clean_direction)
+            .unwrap_or_else(|| player_direction_for_report(report)),
         lives: report.lives,
         smart_bombs: report.smart_bombs,
+    }
+}
+
+fn clean_direction(direction: Direction) -> CleanDirection {
+    match direction {
+        Direction::Left => CleanDirection::Left,
+        Direction::Right => CleanDirection::Right,
     }
 }
 
@@ -2906,7 +2922,7 @@ fn clean_enemy_snapshot(snapshot: &ActorSnapshot) -> Option<CleanEnemySnapshot> 
     let mut enemy = CleanEnemySnapshot::new(
         kind,
         screen_position(snapshot.position),
-        ScreenVelocity::default(),
+        screen_velocity(snapshot.velocity),
     );
     enemy.source_lander = snapshot.source_lander.map(clean_source_lander);
     enemy.source_bomber = snapshot.source_bomber.map(clean_source_bomber);
@@ -3006,7 +3022,7 @@ fn actor_projectiles_for_report(report: &StepReport) -> Vec<CleanProjectileSnaps
                 snapshot.position.x.saturating_sub(16),
                 snapshot.position.y,
             )),
-            velocity: ScreenVelocity::default(),
+            velocity: screen_velocity(snapshot.velocity),
         })
         .collect()
 }
@@ -3020,7 +3036,7 @@ fn actor_enemy_projectiles_for_report(report: &StepReport) -> Vec<CleanEnemyProj
         })
         .map(|snapshot| CleanEnemyProjectileSnapshot {
             position: screen_position(snapshot.position),
-            velocity: ScreenVelocity::default(),
+            velocity: screen_velocity(snapshot.velocity),
             source_kind: if snapshot.kind == ActorKind::Bomb {
                 EnemyProjectileSourceKind::BomberBombShell
             } else {
@@ -3084,6 +3100,18 @@ fn world_vector(value: i16) -> WorldVector {
 
 fn screen_position(point: Point) -> ScreenPosition {
     ScreenPosition::new(screen_coordinate(point.x), screen_coordinate(point.y))
+}
+
+fn screen_velocity(velocity: Velocity) -> ScreenVelocity {
+    ScreenVelocity::new(
+        screen_velocity_component(velocity.dx),
+        screen_velocity_component(velocity.dy),
+    )
+}
+
+fn screen_velocity_component(value: i16) -> i8 {
+    i8::try_from(value.clamp(i16::from(i8::MIN), i16::from(i8::MAX)))
+        .expect("screen velocity should be clamped to i8")
 }
 
 fn screen_coordinate(value: i16) -> u8 {
@@ -4578,6 +4606,8 @@ impl AssetActor for AttractDirector {
                 id: self.id,
                 kind: ActorKind::AttractDirector,
                 position: Point::new(0, 0),
+                velocity: Velocity::default(),
+                direction: None,
                 bounds: None,
                 alive: true,
                 source_lander: None,
@@ -4630,6 +4660,8 @@ impl AssetActor for ScriptedAttractProgram {
                 id: self.id,
                 kind: ActorKind::AttractScript,
                 position: Point::new(0, 0),
+                velocity: Velocity::default(),
+                direction: None,
                 bounds: None,
                 alive: true,
                 source_lander: None,
@@ -4731,6 +4763,8 @@ impl StatusDisplay {
             id: self.id,
             kind: ActorKind::StatusDisplay,
             position: Point::new(0, 0),
+            velocity: Velocity::default(),
+            direction: None,
             bounds: None,
             alive: true,
             source_lander: None,
@@ -4896,6 +4930,7 @@ impl AssetActor for PlayerShip {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
         let mut death_due = false;
+        let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Player);
             death_due = self.advance_hyperspace_death(&mut commands);
@@ -4970,6 +5005,12 @@ impl AssetActor for PlayerShip {
                 id: self.id,
                 kind: ActorKind::Player,
                 position: self.position,
+                velocity: if prompt.phase == Phase::Playing {
+                    observed_velocity(previous_position, self.position)
+                } else {
+                    Velocity::default()
+                },
+                direction: Some(self.direction),
                 bounds: if prompt.phase == Phase::Playing
                     && !self.is_hidden_for_hyperspace()
                     && !death_due
@@ -5041,6 +5082,7 @@ impl AssetActor for Lander {
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
+        let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Lander);
             if !self.tick_source_sleep() {
@@ -5062,12 +5104,18 @@ impl AssetActor for Lander {
                 self.draw_effect(),
             ));
         }
+        let movement_velocity = observed_velocity(previous_position, self.position);
         ActorReply {
             id: self.id,
             snapshot: ActorSnapshot {
                 id: self.id,
                 kind: ActorKind::Lander,
                 position: self.position,
+                velocity: movement_velocity,
+                direction: Some(direction_for_velocity(
+                    movement_velocity,
+                    drift_direction(self.drift),
+                )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
                 source_lander: self.source,
@@ -5299,6 +5347,14 @@ const fn actor_source_drift_from_velocity(x_velocity: u16) -> i16 {
     }
 }
 
+fn drift_direction(drift: i16) -> Direction {
+    if drift < 0 {
+        Direction::Left
+    } else {
+        Direction::Right
+    }
+}
+
 fn clamped_source_lander_shot_reset(behavior: ActorBehaviorProfile) -> u8 {
     let clamped = behavior
         .lander_fire_period_steps
@@ -5352,6 +5408,20 @@ fn move_by_hostile_mode(
     }
 }
 
+fn observed_velocity(previous: Point, current: Point) -> Velocity {
+    Velocity::new(current.x - previous.x, current.y - previous.y)
+}
+
+fn direction_for_velocity(velocity: Velocity, fallback: Direction) -> Direction {
+    if velocity.dx < 0 {
+        Direction::Left
+    } else if velocity.dx > 0 {
+        Direction::Right
+    } else {
+        fallback
+    }
+}
+
 #[derive(Debug)]
 struct Mutant {
     id: ActorId,
@@ -5380,6 +5450,7 @@ impl AssetActor for Mutant {
 
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut draws = Vec::new();
+        let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Mutant);
             if let Some(position) = move_by_hostile_mode(
@@ -5397,6 +5468,7 @@ impl AssetActor for Mutant {
                 self.position,
             ));
         }
+        let movement_velocity = observed_velocity(previous_position, self.position);
 
         ActorReply {
             id: self.id,
@@ -5404,6 +5476,11 @@ impl AssetActor for Mutant {
                 id: self.id,
                 kind: ActorKind::Mutant,
                 position: self.position,
+                velocity: movement_velocity,
+                direction: Some(direction_for_velocity(
+                    movement_velocity,
+                    drift_direction(self.drift),
+                )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
                 source_lander: None,
@@ -5515,6 +5592,7 @@ impl AssetActor for Bomber {
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
+        let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Bomber);
             if !self.advance_source_motion()
@@ -5536,6 +5614,7 @@ impl AssetActor for Bomber {
                 self.draw_effect(),
             ));
         }
+        let movement_velocity = observed_velocity(previous_position, self.position);
 
         ActorReply {
             id: self.id,
@@ -5543,6 +5622,11 @@ impl AssetActor for Bomber {
                 id: self.id,
                 kind: ActorKind::Bomber,
                 position: self.position,
+                velocity: movement_velocity,
+                direction: Some(direction_for_velocity(
+                    movement_velocity,
+                    drift_direction(self.drift),
+                )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
                 source_lander: None,
@@ -5597,6 +5681,8 @@ impl AssetActor for Bomb {
                 id: self.id,
                 kind: ActorKind::Bomb,
                 position: self.position,
+                velocity: Velocity::default(),
+                direction: None,
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing && self.lifetime_steps > 0,
                 source_lander: None,
@@ -5664,6 +5750,7 @@ impl AssetActor for Pod {
 
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut draws = Vec::new();
+        let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Pod);
             if !self.advance_source_motion()
@@ -5684,6 +5771,7 @@ impl AssetActor for Pod {
                 VisualEffect::SourcePod,
             ));
         }
+        let movement_velocity = observed_velocity(previous_position, self.position);
 
         ActorReply {
             id: self.id,
@@ -5691,6 +5779,11 @@ impl AssetActor for Pod {
                 id: self.id,
                 kind: ActorKind::Pod,
                 position: self.position,
+                velocity: movement_velocity,
+                direction: Some(direction_for_velocity(
+                    movement_velocity,
+                    drift_direction(self.drift),
+                )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
                 source_lander: None,
@@ -5781,6 +5874,7 @@ impl AssetActor for Swarmer {
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
+        let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Swarmer);
             if !self.advance_source_motion(prompt, behavior, &mut commands) {
@@ -5806,6 +5900,7 @@ impl AssetActor for Swarmer {
                 self.position,
             ));
         }
+        let movement_velocity = observed_velocity(previous_position, self.position);
 
         ActorReply {
             id: self.id,
@@ -5813,6 +5908,11 @@ impl AssetActor for Swarmer {
                 id: self.id,
                 kind: ActorKind::Swarmer,
                 position: self.position,
+                velocity: movement_velocity,
+                direction: Some(direction_for_velocity(
+                    movement_velocity,
+                    drift_direction(self.drift),
+                )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
                 source_lander: None,
@@ -5971,6 +6071,7 @@ impl AssetActor for Baiter {
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
+        let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Baiter);
             if !self.advance_source_motion(prompt, behavior, &mut commands) {
@@ -5997,6 +6098,7 @@ impl AssetActor for Baiter {
                 self.draw_effect(),
             ));
         }
+        let movement_velocity = observed_velocity(previous_position, self.position);
 
         ActorReply {
             id: self.id,
@@ -6004,6 +6106,11 @@ impl AssetActor for Baiter {
                 id: self.id,
                 kind: ActorKind::Baiter,
                 position: self.position,
+                velocity: movement_velocity,
+                direction: Some(direction_for_velocity(
+                    movement_velocity,
+                    drift_direction(self.drift),
+                )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
                 source_lander: None,
@@ -6249,6 +6356,7 @@ impl AssetActor for Human {
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
+        let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Human);
             commands.extend(match self.mode {
@@ -6266,6 +6374,7 @@ impl AssetActor for Human {
                 self.draw_effect(),
             ));
         }
+        let movement_velocity = observed_velocity(previous_position, self.position);
 
         ActorReply {
             id: self.id,
@@ -6273,6 +6382,8 @@ impl AssetActor for Human {
                 id: self.id,
                 kind: ActorKind::Human,
                 position: self.position,
+                velocity: movement_velocity,
+                direction: None,
                 bounds: human_collision_bounds(self.mode, self.position),
                 alive: prompt.phase == Phase::Playing,
                 source_lander: None,
@@ -6358,6 +6469,8 @@ impl AssetActor for ScorePopup {
                 id: self.id,
                 kind: ActorKind::ScorePopup,
                 position: self.position,
+                velocity: Velocity::default(),
+                direction: None,
                 bounds: None,
                 alive: self.age < behavior.score_popup_lifetime_steps,
                 source_lander: None,
@@ -6404,12 +6517,11 @@ impl AssetActor for LaserShot {
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
+        let mut movement_velocity = Velocity::default();
         let behavior = prompt.behavior_for(self.id, ActorKind::Laser);
         if prompt.phase == Phase::Playing && self.age < behavior.laser_lifetime_steps {
-            self.position = self.position.offset(Velocity::new(
-                self.direction.sign() * behavior.laser_speed,
-                0,
-            ));
+            movement_velocity = Velocity::new(self.direction.sign() * behavior.laser_speed, 0);
+            self.position = self.position.offset(movement_velocity);
             self.age = self.age.saturating_add(1);
             draws.push(DrawCommand::sprite(
                 self.id,
@@ -6427,6 +6539,8 @@ impl AssetActor for LaserShot {
                 id: self.id,
                 kind: ActorKind::Laser,
                 position: self.position,
+                velocity: movement_velocity,
+                direction: Some(self.direction),
                 bounds: Some(self.bounds()),
                 alive: self.age < behavior.laser_lifetime_steps,
                 source_lander: None,
@@ -6473,8 +6587,10 @@ impl AssetActor for EnemyLaserShot {
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
+        let mut movement_velocity = Velocity::default();
         let behavior = prompt.behavior_for(self.id, ActorKind::EnemyLaser);
         if prompt.phase == Phase::Playing && self.age < behavior.lander_shot_lifetime_steps {
+            movement_velocity = self.velocity;
             self.position = self.position.offset(self.velocity);
             self.age = self.age.saturating_add(1);
             draws.push(DrawCommand::sprite(
@@ -6497,6 +6613,8 @@ impl AssetActor for EnemyLaserShot {
                 id: self.id,
                 kind: ActorKind::EnemyLaser,
                 position: self.position,
+                velocity: movement_velocity,
+                direction: Some(direction_for_velocity(movement_velocity, Direction::Right)),
                 bounds: Some(self.bounds()),
                 alive: self.age < behavior.lander_shot_lifetime_steps,
                 source_lander: None,
@@ -6561,6 +6679,8 @@ impl AssetActor for Explosion {
                 id: self.id,
                 kind: ActorKind::Explosion,
                 position: self.position,
+                velocity: Velocity::default(),
+                direction: None,
                 bounds: None,
                 alive: self.age < behavior.explosion_lifetime_steps,
                 source_lander: None,
@@ -6854,7 +6974,10 @@ mod tests {
     fn actor_state_bridge_maps_report_snapshots_and_draw_effects_to_clean_state() {
         let mut player = actor_snapshot(11, ActorKind::Player, Point::new(40, 70));
         player.bounds = Some(Rect::from_center(player.position, 16, 6));
+        player.velocity = Velocity::new(3, -1);
+        player.direction = Some(Direction::Right);
         let mut lander = actor_snapshot(12, ActorKind::Lander, Point::new(0x3F, 0x2C));
+        lander.velocity = Velocity::new(-2, 1);
         lander.source_lander = Some(ActorSourceLanderMetadata {
             x_fraction: 0x4A,
             y_fraction: 0xE0,
@@ -6872,6 +6995,11 @@ mod tests {
             picture_frame: 3,
             target_slot_index: 1,
         });
+        let mut laser = actor_snapshot(14, ActorKind::Laser, Point::new(80, 72));
+        laser.velocity = Velocity::new(8, 0);
+        laser.direction = Some(Direction::Right);
+        let mut enemy_laser = actor_snapshot(15, ActorKind::EnemyLaser, Point::new(90, 80));
+        enemy_laser.velocity = Velocity::new(-3, 2);
 
         let report = StepReport {
             step: 77,
@@ -6890,8 +7018,8 @@ mod tests {
                 player,
                 lander,
                 human,
-                actor_snapshot(14, ActorKind::Laser, Point::new(80, 72)),
-                actor_snapshot(15, ActorKind::EnemyLaser, Point::new(90, 80)),
+                laser,
+                enemy_laser,
                 actor_snapshot(16, ActorKind::Bomb, Point::new(100, 84)),
             ],
             draws: vec![
@@ -6918,8 +7046,10 @@ mod tests {
         assert_eq!(state.phase, GamePhase::HighScoreEntry);
         assert_eq!(state.credits, 1);
         assert_eq!(state.wave, 2);
-        assert_eq!(state.player.direction, CleanDirection::Left);
+        assert_eq!(state.player.direction, CleanDirection::Right);
         assert_eq!(state.player.position.0.subpixels(), 40 * 256);
+        assert_eq!(state.player.velocity.0.subpixels(), 3 * 256);
+        assert_eq!(state.player.velocity.1.subpixels(), -256);
         assert_eq!(state.player_stocks[0], PlayerStockSnapshot::new(2, 1));
         assert_eq!(state.scores.player_one, 12_000);
         assert_eq!(state.scores.high_score, 12_000);
@@ -6935,6 +7065,7 @@ mod tests {
 
         assert_eq!(state.world.enemies.len(), 1);
         assert_eq!(state.world.enemies[0].kind, CleanEnemyKind::Lander);
+        assert_eq!(state.world.enemies[0].velocity, ScreenVelocity::new(-2, 1));
         assert_eq!(
             state.world.enemies[0].source_lander,
             Some(SourceLanderSnapshot {
@@ -6952,7 +7083,18 @@ mod tests {
         assert!(state.world.humans[0].carried);
         assert_eq!(state.world.humans[0].source_picture_frame, 3);
         assert_eq!(state.world.projectiles.len(), 1);
+        assert_eq!(
+            state.world.projectiles[0].velocity,
+            ScreenVelocity::new(8, 0)
+        );
         assert_eq!(state.world.enemy_projectiles.len(), 2);
+        assert!(
+            state
+                .world
+                .enemy_projectiles
+                .iter()
+                .any(|projectile| projectile.velocity == ScreenVelocity::new(-3, 2))
+        );
         assert!(state.world.enemy_projectiles.iter().any(|projectile| {
             projectile.source_kind == EnemyProjectileSourceKind::BomberBombShell
         }));
@@ -9534,6 +9676,8 @@ mod tests {
             id: ActorId(id),
             kind,
             position,
+            velocity: Velocity::default(),
+            direction: None,
             bounds: Some(Rect::from_center(position, 4, 4)),
             alive: true,
             source_lander: None,

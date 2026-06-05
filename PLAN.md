@@ -4220,3 +4220,26 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780633156656499`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780633611010569`.
+- `2026-06-05 05:38 BST`: Completed the actor snapshot velocity state cycle.
+  Extended `ActorSnapshot` with per-step velocity and optional facing direction,
+  populated that movement metadata from player, hostile, human, laser, and
+  enemy-shot actors, and kept static/effect actors reporting zero velocity with
+  no facing. `ActorStateBridge` now maps player, enemy, player-projectile, and
+  enemy-projectile velocities plus player facing into clean `GameState` instead
+  of publishing default movement fields. README, SPEC, and the actor
+  architecture notes now describe the actor snapshot movement/facing handoff. No
+  legacy code, tests, or scaffolding were safe to remove because default live
+  play still uses clean `Game`, and legacy tooling still backs ROM reports,
+  trace/media helpers, and oracle evidence. Validation passed with
+  `cargo fmt --check`, `cargo test actor_state --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780633699455039`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780634282448509`.
