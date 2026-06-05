@@ -177,7 +177,9 @@ and respawn a replacement player when lives remain, while final-life hits still
 enter game-over/high-score flow. Baiters do not block wave
 completion once source-counted wave enemies are gone, and explosion draws carry
 lander, mutant, bomber, pod, swarmer, baiter, bomb, player, and human variant
-metadata through the actor render and clean-state bridges.
+metadata through the actor render and clean-state bridges. Actor explosion
+rendering now uses draw age with the clean source explosion-size curve, keeping
+the source-family cloud centered as it expands.
 `XYZZY` invincibility and overlay smart bombs are applied through the same
 driver-controlled behavior and command paths used by scripts. See
 `docs/actor-architecture.md` for the C++-to-Rust mapping and migration shape.

@@ -87,11 +87,15 @@ verification tools.
   driver-owned life stock and spawn a replacement player while lives remain,
   with final-life collisions entering the game-over/high-score path. Explosion
   draws now carry lander, mutant, bomber, pod, swarmer, baiter, bomb, player,
-  and human variant metadata through the actor render and clean-state bridges.
+  and human variant metadata through the actor render and clean-state bridges,
+  and actor render output now uses draw age with the clean source
+  explosion-size curve so those clouds expand around their source centers.
 - Primary runtime source is `src/`; the converted implementation is parked in
   `src_legacy/` and should remain optional oracle/tooling evidence only.
-- Normal live play uses clean `Game` frames through clean platform, audio, and
-  `wgpu` renderer paths.
+- Normal interactive live play now uses the actor runtime through
+  `ActorRuntimeAdapter`, clean audio events, and the existing `wgpu` renderer
+  path; the clean `Game` path remains available for smoke, fidelity, and oracle
+  evidence commands.
 - MAME 0.287 is installed locally and verifies the repo ROM set:
   `assets/roms/defender/` reports `romset defender is good`.
 - The repeatable MAME capture target is available:
@@ -736,6 +740,27 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 10:43 BST`: Completed the actor source-sized explosion growth
+  slice. `ActorRenderSceneBridge` now consumes `VisualEffect::ExplosionCloud`
+  age metadata, derives the source explosion size from the clean red-label
+  initial-size and delta constants, applies the same capped render-scale helper
+  used by the clean expanded-object path, and recenters the visible sprite
+  around the original source object center as the cloud grows. This preserves
+  the existing source-family sprite identities for lander, mutant, bomber, pod,
+  swarmer, baiter, bomb, human, and player explosion draws while making the
+  actor render output progress through source-shaped growth instead of fixed
+  atlas dimensions. Added focused regressions for actor render-scene bomb
+  explosion growth/centering and the actor source-size scale curve. Validation
+  passed with `cargo fmt --check`, focused actor render/explosion tests,
+  `cargo test actor_game::tests::target6 --lib`, `cargo test actor_game
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, touched-doc
+  markdownlint, and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780652214304989`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780652623310609`.
 - `2026-06-05 10:27 BST`: Completed the actor source-family explosion fidelity
   slice. Actor `ExplosionKind` now preserves source-family identity for lander,
   mutant, bomber, pod, swarmer, baiter, bomb, player, and human explosion

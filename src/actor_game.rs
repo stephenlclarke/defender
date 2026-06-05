@@ -14,11 +14,12 @@ use crate::{
         GameInput as CleanGameInput, GameOverSnapshot, GamePhase, GameState,
         HighScoreEntrySnapshot, HighScoreTableEntrySnapshot, HighScoreTablesSnapshot,
         HumanSnapshot as CleanHumanSnapshot, PlayerSnapshot, PlayerStockSnapshot,
-        ProjectileSnapshot as CleanProjectileSnapshot, ScorePopupKind as CleanScorePopupKind,
+        ProjectileSnapshot as CleanProjectileSnapshot, SOURCE_EXPLOSION_INITIAL_SIZE,
+        SOURCE_EXPLOSION_SIZE_DELTA, ScorePopupKind as CleanScorePopupKind,
         ScorePopupSnapshot as CleanScorePopupSnapshot, ScoreSnapshot, SoundEvent,
         SourceBaiterSnapshot, SourceBomberSnapshot, SourceLanderSnapshot, SourceMutantSnapshot,
         SourcePodSnapshot, SourceRandSnapshot, SourceSwarmerSnapshot, WaveProfileSnapshot,
-        WorldSnapshot, WorldVector,
+        WorldSnapshot, WorldVector, source_explosion_render_scale,
     },
     renderer::{
         Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
@@ -3484,8 +3485,8 @@ impl ActorRenderSceneBridge {
             VisualEffect::DefenderCoalescence { slot, row_pair } => {
                 self.push_defender_coalescence(scene, slot, row_pair)
             }
-            VisualEffect::ExplosionCloud { kind, .. } => {
-                self.push_explosion_sprite(scene, draw.position, kind)
+            VisualEffect::ExplosionCloud { kind, age } => {
+                self.push_explosion_sprite(scene, draw.position, kind, age)
             }
             VisualEffect::Static
             | VisualEffect::SourceLanderFrame { .. }
@@ -3561,8 +3562,14 @@ impl ActorRenderSceneBridge {
         }
     }
 
-    fn push_explosion_sprite(&self, scene: &mut RenderScene, position: Point, kind: ExplosionKind) {
-        let (sprite, size) = match kind {
+    fn push_explosion_sprite(
+        &self,
+        scene: &mut RenderScene,
+        position: Point,
+        kind: ExplosionKind,
+        age: u16,
+    ) {
+        let (sprite, base_size) = match kind {
             ExplosionKind::Lander => (SpriteId::ENEMY_LANDER, LANDER_SCENE_SIZE),
             ExplosionKind::Mutant => (SpriteId::ENEMY_MUTANT, MUTANT_SCENE_SIZE),
             ExplosionKind::Bomber => (SpriteId::ENEMY_BOMBER, BOMBER_SCENE_SIZE),
@@ -3576,10 +3583,17 @@ impl ActorRenderSceneBridge {
                 PLAYER_EXPLOSION_PIXEL_SCENE_SIZE,
             ),
         };
+        let scale = actor_source_explosion_render_scale(age);
+        let size = [base_size[0] * scale, base_size[1] * scale];
+        let origin = point_position(position);
+        let centered_position = [
+            origin[0] + base_size[0] / 2.0 - size[0] / 2.0,
+            origin[1] + base_size[1] / 2.0 - size[1] / 2.0,
+        ];
         scene.push_sprite(SceneSprite {
             sprite,
             layer: RenderLayer::Objects,
-            position: point_position(position),
+            position: centered_position,
             size,
             tint: Color::WHITE,
         });
@@ -3597,6 +3611,14 @@ impl Default for ActorRenderSceneBridge {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn actor_source_explosion_render_scale(age: u16) -> f32 {
+    let source_size =
+        SOURCE_EXPLOSION_INITIAL_SIZE.wrapping_add(SOURCE_EXPLOSION_SIZE_DELTA.wrapping_mul(age));
+    source_explosion_render_scale(source_size)
+        .map(f32::from)
+        .unwrap_or(1.0)
 }
 
 fn point_position(point: Point) -> [f32; 2] {
@@ -8714,6 +8736,13 @@ mod tests {
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::BOMB_EXPLOSION && sprite.layer == RenderLayer::Objects
         }));
+        let bomb_explosion = scene
+            .sprites
+            .iter()
+            .find(|sprite| sprite.sprite == SpriteId::BOMB_EXPLOSION)
+            .expect("bomb explosion sprite should be projected");
+        assert_eq!(bomb_explosion.size, [16.0, 16.0]);
+        assert_eq!(bomb_explosion.position, [120.0, 90.0]);
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ASTRONAUT_EXPLOSION && sprite.layer == RenderLayer::Objects
         }));
@@ -8721,6 +8750,14 @@ mod tests {
             sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
                 && sprite.layer == RenderLayer::Objects
         }));
+    }
+
+    #[test]
+    fn actor_source_explosion_render_scale_uses_source_size_curve() {
+        assert_eq!(actor_source_explosion_render_scale(0), 1.0);
+        assert_eq!(actor_source_explosion_render_scale(1), 1.0);
+        assert_eq!(actor_source_explosion_render_scale(2), 2.0);
+        assert_eq!(actor_source_explosion_render_scale(18), 3.0);
     }
 
     #[test]

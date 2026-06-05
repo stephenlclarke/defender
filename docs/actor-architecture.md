@@ -25,7 +25,9 @@ evidence commands.
   lives, credits, and high-score-entry rows from `StepPrompt` state. Explosion
   draws carry `ExplosionKind` metadata for lander, mutant, bomber, pod,
   swarmer, baiter, bomb, player, and human clouds, so the actor render and
-  clean-state bridges preserve source family identity. Audio is
+  clean-state bridges preserve source family identity; the render bridge also
+  uses the draw age to apply the clean source explosion-size curve and keep the
+  growing cloud centered on the source object. Audio is
   described by `SoundCue`; source-backed cues expose their red-label Williams
   sound-board command byte through `SoundCue::source_sound_command`.
   `ActorSoundEventBridge` converts a stream of `StepReport` sound cues into the
@@ -355,7 +357,9 @@ The actor driver now owns a first Defender gameplay loop:
   250-point popup. Fast impacts destroy the human and spawn an explosion.
 - Explosion actors publish family-specific variant metadata for lander, mutant,
   bomber, pod, swarmer, baiter, bomb, player, and human clouds while retaining
-  actor-owned lifetime state.
+  actor-owned lifetime state. `ActorRenderSceneBridge` maps that age through
+  the clean source explosion-size curve, caps the render scale the same way as
+  the clean expanded-object path, and recenters the visible cloud as it grows.
 - Smart bomb is now a real driver command: normal player requests consume the
   driver-owned stock before clearing active hostile actors, awarding enemy
   scores, and spawning explosions while preserving human actors. Exhausted stock
