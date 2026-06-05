@@ -99,6 +99,9 @@ verification tools.
   lander/human conversions now spawn mutant actors with source-shaped mutant
   fractions, wave-derived shot timer, driver-owned hop RNG, and clean
   `SourceMutantSnapshot` bridge metadata.
+  Grounded source-backed humans now consume the driver-provided source RNG seed
+  for the astronaut turn branch, step X through their fixed-point fraction, and
+  step Y toward terrain-relative source targets.
   Source-backed mutant actors now
   consume that metadata to select wave-table X/Y velocities, advance
   actor-owned hop RNG and fixed-point fractions, and emit source-shaped
@@ -851,6 +854,33 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 21:16 BST`: Completed the actor astronaut source-walk cadence
+  cycle. Grounded source-backed human actors now consume the driver-provided
+  source RNG seed for the Williams astronaut turn branch, step fixed-point X
+  through their actor-owned fraction metadata, and nudge Y toward
+  terrain-relative source targets when the seed keeps the current walking
+  direction. Focused tests now cover both the high-seed walk/Y-target branch
+  and the low-seed turn/no-Y-step branch. README, SPEC, PLAN, and actor
+  architecture docs now document the actor source-walk contract. No legacy
+  code, tests, or scaffolding were safe to remove in this slice because the
+  remaining clean smoke/fidelity/oracle evidence still depends on those
+  boundaries. Validation passed with `cargo fmt --check`, `cargo test
+  source_human_walk --lib --features legacy-tools`, `cargo test actor_game
+  --all-targets --features legacy-tools`, `cargo check --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features
+  legacy-tools -- -D warnings`, `cargo test actor_smoke --all-targets
+  --features legacy-tools`, `cargo test actor_live --all-targets --features
+  legacy-tools`, `cargo test runtime --all-targets --features legacy-tools`,
+  `cargo test actor_wgpu --all-targets --features legacy-tools`, the actor
+  smoke CLI commands (`--actor-smoke`, `--actor-attract-smoke`,
+  `--actor-post-game-smoke`, and `--actor-wgpu-smoke`), `markdownlint
+  README.md SPEC.md PLAN.md docs/actor-architecture.md`, and
+  `git diff --check`. The full unfiltered `legacy-tools` suite was not rerun
+  in this cycle; the previously isolated clean-game MAME window/post-game audio
+  failures remain outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780690264696859`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780690932977329`.
 - `2026-06-05 21:08 BST`: Completed the actor source bomber bomb-shell
   fidelity cycle. Source-backed bomber actors now split the source TIE
   selected-slot picture/velocity/sleep branch from fixed-point movement, so

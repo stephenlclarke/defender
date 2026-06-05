@@ -871,9 +871,12 @@ reintroduce legacy implementation terminology.
   inert during attract so custom attract scripts remain in control.
   Source-backed landers, bombers, pods, swarmers, baiters, and humans publish
   fixed-point metadata plus movement/facing metadata in snapshots and advance
-  their actor-owned fraction state during active motion. Source-backed hostile
-  actors now wrap Y motion through the source active-object playfield bounds
-  instead of drifting outside the red-label vertical range. Source-backed
+  their actor-owned fraction state during active motion. Grounded source-backed
+  humans consume the driver-provided source RNG seed for the astronaut turn
+  branch, step X through their fixed-point fraction, and step Y toward
+  terrain-relative source targets. Source-backed hostile actors now wrap Y
+  motion through the source active-object playfield bounds instead of drifting
+  outside the red-label vertical range. Source-backed
   bomber actors now update seeded picture-frame and Y-velocity metadata,
   including
   cruise-altitude and player-relative Y adjustments, during active source motion

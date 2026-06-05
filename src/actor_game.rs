@@ -41,6 +41,7 @@ use crate::{
     },
 };
 use std::{
+    cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
     fmt,
     str::FromStr,
@@ -291,6 +292,10 @@ const HUMAN_SAFE_LANDING_SPEED: i16 = 3;
 const HUMAN_CARRIED_OFFSET_Y: i16 = 8;
 const SOURCE_HUMAN_WALK_SLEEP_TICKS: u8 = 2;
 const SOURCE_ASTRO_RESTORE_Y: u8 = 0xE0;
+const SOURCE_HUMAN_TURN_SEED_MAX: u8 = 8;
+const SOURCE_HUMAN_LEFT_TARGET_Y_OFFSET: u8 = 4;
+const SOURCE_HUMAN_RIGHT_TARGET_Y_OFFSET: u8 = 15;
+const SOURCE_HUMAN_MAX_TARGET_Y: u8 = 0xE8;
 const SOURCE_HUMAN_LEFT_X_VELOCITY: u16 = 0xFFE0;
 const SOURCE_HUMAN_RIGHT_X_VELOCITY: u16 = 0x0020;
 const SOURCE_INITIAL_POD_X_SPEED: u8 = 0x20;
@@ -5889,6 +5894,31 @@ fn source_playfield_terrain_segments() -> Vec<TerrainSegment> {
             size: (44, 8),
         },
     ]
+}
+
+fn actor_source_human_target_y(position_x: i16, offset: u8) -> Option<i16> {
+    actor_source_terrain_altitude(position_x)
+        .map(|altitude| i16::from(altitude.wrapping_add(offset).min(SOURCE_HUMAN_MAX_TARGET_Y)))
+}
+
+fn actor_source_terrain_altitude(position_x: i16) -> Option<u8> {
+    let object_x = u16::from(u8::try_from(position_x).ok()?);
+    source_playfield_terrain_segments()
+        .into_iter()
+        .find(|segment| {
+            let start = u16::from(segment.position.x);
+            let end = start.saturating_add(u16::from(segment.size.0));
+            object_x >= start && object_x < end
+        })
+        .map(|segment| segment.position.y)
+}
+
+fn actor_source_step_human_y(position_y: i16, target_y: i16) -> i16 {
+    match position_y.cmp(&target_y) {
+        Ordering::Less => position_y + 1,
+        Ordering::Equal => position_y,
+        Ordering::Greater => position_y - 1,
+    }
 }
 
 fn actor_enemies_for_report(report: &StepReport) -> Vec<CleanEnemySnapshot> {
@@ -13546,7 +13576,7 @@ impl Human {
         Rect::from_center(self.position, 4, 8)
     }
 
-    fn update_grounded(&mut self) {
+    fn update_grounded(&mut self, source_rng: Option<ActorSourceRngSnapshot>) {
         if self.source.is_none() {
             return;
         }
@@ -13555,20 +13585,43 @@ impl Human {
             return;
         }
 
-        self.advance_source_walk();
-        self.source_walk_sleep_ticks = SOURCE_HUMAN_WALK_SLEEP_TICKS;
+        if let Some(source_rng) = source_rng {
+            self.advance_source_walk(source_rng.seed);
+            self.source_walk_sleep_ticks = SOURCE_HUMAN_WALK_SLEEP_TICKS;
+        }
     }
 
-    fn advance_source_walk(&mut self) {
+    fn advance_source_walk(&mut self, source_seed: u8) {
         if let Some(source) = &mut self.source {
             let frame = source.picture_frame % 4;
-            let (next_frame, velocity) = if frame <= 1 {
-                (1 - frame, SOURCE_HUMAN_LEFT_X_VELOCITY)
-            } else if frame == 2 {
-                (3, SOURCE_HUMAN_RIGHT_X_VELOCITY)
+            let (next_frame, target_y, velocity) = if frame <= 1 {
+                if source_seed <= SOURCE_HUMAN_TURN_SEED_MAX {
+                    (2, None, SOURCE_HUMAN_RIGHT_X_VELOCITY)
+                } else {
+                    (
+                        1 - frame,
+                        actor_source_human_target_y(
+                            self.position.x,
+                            SOURCE_HUMAN_LEFT_TARGET_Y_OFFSET,
+                        ),
+                        SOURCE_HUMAN_LEFT_X_VELOCITY,
+                    )
+                }
+            } else if source_seed <= SOURCE_HUMAN_TURN_SEED_MAX {
+                (0, None, SOURCE_HUMAN_LEFT_X_VELOCITY)
             } else {
-                (2, SOURCE_HUMAN_RIGHT_X_VELOCITY)
+                (
+                    if frame == 2 { 3 } else { 2 },
+                    actor_source_human_target_y(
+                        self.position.x,
+                        SOURCE_HUMAN_RIGHT_TARGET_Y_OFFSET,
+                    ),
+                    SOURCE_HUMAN_RIGHT_X_VELOCITY,
+                )
             };
+            if let Some(target_y) = target_y {
+                self.position.y = actor_source_step_human_y(self.position.y, target_y);
+            }
             let (x, x_fraction) =
                 actor_source_axis_step(self.position.x, source.x_fraction, velocity);
             self.position.x = x;
@@ -13665,7 +13718,7 @@ impl AssetActor for Human {
             let behavior = prompt.behavior_for(self.id, ActorKind::Human);
             commands.extend(match self.mode {
                 HumanMode::Grounded => {
-                    self.update_grounded();
+                    self.update_grounded(prompt.source_rng);
                     Vec::new()
                 }
                 HumanMode::Falling { velocity } => self.update_falling(velocity, prompt, behavior),
@@ -19216,46 +19269,75 @@ mod tests {
     }
 
     #[test]
-    fn source_human_walk_cadence_advances_fraction_and_picture_frame() {
+    fn source_human_walk_uses_seeded_left_branch_and_terrain_y_target() {
         let mut driver = ActorGameDriver::new();
-        driver.step(GameInput {
-            coin: true,
-            ..GameInput::NONE
+        driver.phase = Phase::Playing;
+        let human_id = driver.spawn_human_from_spawn(ActorHumanSpawn {
+            position: Point::new(64, 220),
+            mode: HumanMode::Grounded,
+            source: Some(ActorSourceHumanMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                picture_frame: 0,
+                target_slot_index: 1,
+            }),
         });
-        driver.step(GameInput {
-            start_one: true,
-            ..GameInput::NONE
-        });
-
-        let first_live = step_until_driver_player_start_completes(&mut driver, 1);
-        let human = first_live
-            .snapshots
-            .iter()
-            .find(|snapshot| {
-                snapshot
-                    .source_human
-                    .is_some_and(|source| source.target_slot_index == 1)
-            })
-            .expect("source target-slot human should be visible");
-        let human_id = human.id;
-        assert_eq!(human.position, Point::new(0x1C, 0xE1));
-        assert_eq!(
-            human
-                .source_human
-                .map(|source| (source.x_fraction, source.picture_frame)),
-            Some((0x81, 3))
-        );
-
         driver.step(GameInput::NONE);
+        driver.step(GameInput::NONE);
+        driver.source_rng = ActorSourceRng {
+            seed: 0,
+            hseed: 0,
+            lseed: 0,
+        };
+
         let walked = driver.step(GameInput::NONE);
         let human = snapshot_for(&walked, human_id);
 
-        assert_eq!(human.position, Point::new(0x1C, 0xE1));
+        assert_eq!(
+            walked.source_rng.map(|source_rng| source_rng.seed),
+            Some(17)
+        );
+        assert_eq!(human.position, Point::new(63, 221));
         assert_eq!(
             human
                 .source_human
                 .map(|source| (source.x_fraction, source.picture_frame)),
-            Some((0xA1, 2))
+            Some((0xE0, 1))
+        );
+    }
+
+    #[test]
+    fn source_human_walk_turns_on_low_source_seed_without_y_step() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let human_id = driver.spawn_human_from_spawn(ActorHumanSpawn {
+            position: Point::new(64, 220),
+            mode: HumanMode::Grounded,
+            source: Some(ActorSourceHumanMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                picture_frame: 0,
+                target_slot_index: 1,
+            }),
+        });
+        driver.step(GameInput::NONE);
+        driver.step(GameInput::NONE);
+        driver.source_rng = ActorSourceRng {
+            seed: 0,
+            hseed: 0,
+            lseed: 222,
+        };
+
+        let turned = driver.step(GameInput::NONE);
+        let human = snapshot_for(&turned, human_id);
+
+        assert_eq!(turned.source_rng.map(|source_rng| source_rng.seed), Some(0));
+        assert_eq!(human.position, Point::new(64, 220));
+        assert_eq!(
+            human
+                .source_human
+                .map(|source| (source.x_fraction, source.picture_frame)),
+            Some((0x20, 2))
         );
     }
 
