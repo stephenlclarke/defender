@@ -4361,3 +4361,26 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780636652446429`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780637057215359`.
+- `2026-06-05 06:31 BST`: Completed the actor bomber bomb source-fraction
+  cycle. `SpawnRequest::Bomb` now carries optional source projectile metadata,
+  source-backed bomber actors pass their current source x/y fractions into
+  spawned `Bomb` actors, and bomb snapshots preserve those fractions while
+  decrementing actor-owned lifetime metadata. Non-source bomb helpers and tests
+  continue to use `source: None`. Added a regression covering source bomber
+  bomb spawn metadata and live `Bomb` snapshot fractions. README, SPEC, and the
+  actor architecture notes now document stationary source bomb-shell fraction
+  metadata. No legacy code, tests, or scaffolding were safe to remove in this
+  slice because clean smoke/fidelity/oracle evidence still depends on clean
+  runtime boundaries outside the actor path. Validation passed with
+  `cargo fmt --check`, focused bomber-bomb tests,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780637147066859`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780637479073989`.

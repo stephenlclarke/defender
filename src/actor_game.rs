@@ -2645,6 +2645,7 @@ pub enum SpawnRequest {
     },
     Bomb {
         position: Point,
+        source: Option<ActorSourceEnemyProjectileMetadata>,
     },
     Pod {
         position: Point,
@@ -3939,7 +3940,7 @@ impl ActorGameDriver {
     }
 
     pub fn spawn_bomb_for_test(&mut self, position: Point) -> ActorId {
-        self.spawn_bomb(position)
+        self.spawn_bomb(position, None)
     }
 
     pub fn spawn_pod_for_test(&mut self, position: Point) -> ActorId {
@@ -4018,13 +4019,17 @@ impl ActorGameDriver {
         id
     }
 
-    fn spawn_bomb(&mut self, position: Point) -> ActorId {
+    fn spawn_bomb(
+        &mut self,
+        position: Point,
+        source: Option<ActorSourceEnemyProjectileMetadata>,
+    ) -> ActorId {
         let id = self.allocate_actor_id();
         let lifetime = self
             .behavior_script
             .behavior_for(id, ActorKind::Bomb)
             .bomb_lifetime_steps;
-        self.spawn_actor(Bomb::new(id, position, lifetime));
+        self.spawn_actor(Bomb::new(id, position, lifetime, source));
         id
     }
 
@@ -4211,8 +4216,8 @@ impl ActorGameDriver {
                 GameCommand::Spawn(SpawnRequest::Bomber { position }) => {
                     self.spawn_bomber(position);
                 }
-                GameCommand::Spawn(SpawnRequest::Bomb { position }) => {
-                    self.spawn_bomb(position);
+                GameCommand::Spawn(SpawnRequest::Bomb { position, source }) => {
+                    self.spawn_bomb(position, source);
                 }
                 GameCommand::Spawn(SpawnRequest::Pod { position }) => {
                     self.spawn_pod(position);
@@ -5745,6 +5750,15 @@ impl Bomber {
         if prompt.step % bomb_period == phase % bomb_period {
             commands.push(GameCommand::Spawn(SpawnRequest::Bomb {
                 position: self.position,
+                source: self
+                    .source
+                    .map(|source| ActorSourceEnemyProjectileMetadata {
+                        x_fraction: source.x_fraction,
+                        y_fraction: source.y_fraction,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        lifetime_ticks: 0,
+                    }),
             }));
         }
     }
@@ -5814,14 +5828,29 @@ struct Bomb {
     id: ActorId,
     position: Point,
     lifetime_steps: u16,
+    source: ActorSourceEnemyProjectileMetadata,
 }
 
 impl Bomb {
-    fn new(id: ActorId, position: Point, lifetime_steps: u16) -> Self {
+    fn new(
+        id: ActorId,
+        position: Point,
+        lifetime_steps: u16,
+        source: Option<ActorSourceEnemyProjectileMetadata>,
+    ) -> Self {
+        let mut source = source.unwrap_or(ActorSourceEnemyProjectileMetadata {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            lifetime_ticks: 0,
+        });
+        source.lifetime_ticks = actor_source_projectile_lifetime_ticks(lifetime_steps);
         Self {
             id,
             position,
             lifetime_steps,
+            source,
         }
     }
 
@@ -5839,6 +5868,8 @@ impl AssetActor for Bomb {
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing && self.lifetime_steps > 0 {
             self.lifetime_steps = self.lifetime_steps.saturating_sub(1);
+            self.source.lifetime_ticks =
+                actor_source_projectile_lifetime_ticks(self.lifetime_steps);
             draws.push(DrawCommand::sprite(self.id, SpriteKey::Bomb, self.position));
         }
 
@@ -5858,13 +5889,7 @@ impl AssetActor for Bomb {
                 source_swarmer: None,
                 source_baiter: None,
                 source_human: None,
-                source_enemy_projectile: Some(ActorSourceEnemyProjectileMetadata {
-                    x_fraction: 0,
-                    y_fraction: 0,
-                    x_velocity: 0,
-                    y_velocity: 0,
-                    lifetime_ticks: actor_source_projectile_lifetime_ticks(self.lifetime_steps),
-                }),
+                source_enemy_projectile: Some(self.source),
             },
             commands: Vec::new(),
             draws,
@@ -9093,6 +9118,7 @@ mod tests {
                 command,
                 GameCommand::Spawn(SpawnRequest::Bomb {
                     position: Point { x: 100, y: 80 },
+                    source: None,
                 })
             )
         }));
@@ -9111,6 +9137,80 @@ mod tests {
         assert_eq!(source_projectile.y_velocity, 0);
         assert!(source_projectile.lifetime_ticks > 0);
         assert!(live.draws.iter().any(|draw| draw.sprite == SpriteKey::Bomb));
+    }
+
+    #[test]
+    fn source_bomber_bomb_spawn_carries_source_shell_fractions() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.set_kind_behavior(
+            ActorKind::Bomber,
+            ActorBehaviorProfile {
+                bomber_drift_speed: 0,
+                bomber_bomb_period_steps: 1,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        driver.set_kind_behavior(
+            ActorKind::Bomb,
+            ActorBehaviorProfile {
+                bomb_lifetime_steps: 5,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        driver.spawn_bomber_from_spawn(ActorBomberSpawn {
+            position: Point::new(100, 80),
+            source: Some(ActorSourceBomberMetadata {
+                x_fraction: 0x6D,
+                y_fraction: 0x7B,
+                x_velocity: 0,
+                y_velocity: 0,
+                picture_frame: 0,
+                cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
+                sleep_ticks: 0,
+                source_slot: 0,
+            }),
+        });
+
+        let report = driver.step(GameInput::NONE);
+
+        assert!(report.commands.iter().any(|command| {
+            matches!(
+                command,
+                GameCommand::Spawn(SpawnRequest::Bomb {
+                    position: Point { x: 100, y: 80 },
+                    source: Some(ActorSourceEnemyProjectileMetadata {
+                        x_fraction: 0x6D,
+                        y_fraction: 0x7B,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        lifetime_ticks: 0,
+                    }),
+                })
+            )
+        }));
+
+        let live = driver.step(GameInput::NONE);
+        let bomb = live
+            .snapshots
+            .iter()
+            .find(|snapshot| {
+                snapshot
+                    .source_enemy_projectile
+                    .is_some_and(|source| source.x_fraction == 0x6D && source.y_fraction == 0x7B)
+            })
+            .expect("source-backed bomber bomb should publish source shell fractions");
+
+        assert_eq!(
+            bomb.source_enemy_projectile,
+            Some(ActorSourceEnemyProjectileMetadata {
+                x_fraction: 0x6D,
+                y_fraction: 0x7B,
+                x_velocity: 0,
+                y_velocity: 0,
+                lifetime_ticks: 4,
+            })
+        );
     }
 
     #[test]
