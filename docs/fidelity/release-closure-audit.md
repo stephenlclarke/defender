@@ -376,19 +376,23 @@ complete without owner review or more MAME evidence:
   proves the routine window, and the latest scan now has organic evidence for
   the last-human `TERBLO` branch. The bounded organic smartmix report at
   `target/reference-media/organic-terrain-blow-smartmix-check/report.json`
-  currently fails all-axis acceptance: MAME reaches attract score `50`, starts
-  `TERBLO` at frame `5990`, and emits terrain-blow audio beginning at frame
-  `5991`, while clean reaches score `2675`, retains two residual humans, has
-  no clean `terrain_blow` state, and emits no audio. This is a concrete open
-  implementation mismatch outside the accepted terrain-blow proof set.
+  still fails all-axis acceptance because it contains stale clean evidence:
+  MAME reaches attract score `50`, starts `TERBLO` at frame `5990`, and emits
+  terrain-blow audio beginning at frame `5991`, while the recorded clean
+  artifact reaches score `2675`, retains two residual humans, has no
+  `terrain_blow` state, and emits no audio. Current clean guard coverage now
+  reaches score `50`, enters terrain blow, keeps clean human snapshots empty
+  once the destroyed-planet branch is active, and emits the sampled `0xEE`
+  tail. The remaining work is regenerating and reviewing the bounded organic
+  report outside the accepted terrain-blow proof set.
 - Owner review of graphics, audio, and playability. `PLAN.md` still requires
   owner signoff before protected reference media replacement and final closure.
 
 ## Owner Review Checklist
 
 The release gate and accepted reports are green, but final closure still
-requires owner review of the bounded proof set plus classification or repair of
-the organic smartmix terrain-blow mismatch. Use this checklist for that review:
+requires owner review of the bounded proof set plus regeneration and review of
+the organic smartmix terrain-blow report. Use this checklist for that review:
 
 - Review the current accepted media report set in
   `docs/fidelity/reference-report-gate.json`; it is the bounded MAME-vs-clean

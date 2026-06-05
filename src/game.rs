@@ -2823,7 +2823,14 @@ impl WorldSnapshot {
 
     fn sync_post_game_playfield(&mut self, frame: u16) {
         self.enemies = source_post_game_landers(frame);
-        self.humans = source_post_game_humans(frame);
+        if self.terrain_blow.is_some() {
+            self.humans.clear();
+            self.source_target_list_cursor_address = None;
+            self.source_astronaut_cursor_address = None;
+            self.source_astronaut_sleep_ticks = 0;
+        } else {
+            self.humans = source_post_game_humans(frame);
+        }
         self.enemy_reserve = EnemyReserveSnapshot::default();
         self.projectiles.clear();
         self.enemy_projectiles = source_post_game_enemy_projectiles(frame);
@@ -3947,6 +3954,10 @@ impl WorldSnapshot {
         }
 
         self.terrain.clear();
+        self.humans.clear();
+        self.source_target_list_cursor_address = None;
+        self.source_astronaut_cursor_address = None;
+        self.source_astronaut_sleep_ticks = 0;
         self.terrain_blow = Some(TerrainBlowSnapshot::source_started());
         for (_, position) in SOURCE_TERRAIN_BLOW_EXPLOSION_BIRTHS
             .iter()
@@ -19445,6 +19456,26 @@ mod tests {
     }
 
     #[test]
+    fn clean_reference_terrain_blow_steer_erases_humans_and_target_cursors() {
+        let mut game = Game::new();
+
+        let frame = game.seed_reference_capture_window(ReferenceCaptureSteer::TerrainBlow);
+
+        assert!(frame.state.world.terrain_blow.is_some());
+        assert!(frame.state.world.humans.is_empty());
+        assert_eq!(frame.state.world.source_target_list_cursor_address, None);
+        assert_eq!(frame.state.world.source_astronaut_cursor_address, None);
+        assert_eq!(frame.state.world.source_astronaut_sleep_ticks, 0);
+        assert!(
+            !frame
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::HUMAN)
+        );
+    }
+
+    #[test]
     fn clean_game_pod_swarmer_spawn_respects_source_active_limit() {
         let mut game = credited_started_game();
         game.state.wave = 2;
@@ -25423,6 +25454,7 @@ mod tests {
                     frame.state.scores.player_one,
                     frame.state.player.lives,
                     frame.state.world.terrain_blow.is_some(),
+                    frame.state.world.terrain_blow.is_none() || frame.state.world.humans.is_empty(),
                     frame
                         .state
                         .post_game_playfield
@@ -25454,6 +25486,7 @@ mod tests {
                     super::SOURCE_ENEMY_PROJECTILE_SCORE_POINTS * 2,
                     1,
                     false,
+                    true,
                     None,
                     vec![GameEvent::PlayerDestroyed],
                 ),
@@ -25462,6 +25495,7 @@ mod tests {
                     GamePhase::Playing,
                     super::SOURCE_ENEMY_PROJECTILE_SCORE_POINTS * 2,
                     1,
+                    true,
                     true,
                     None,
                     vec![],
@@ -25472,6 +25506,7 @@ mod tests {
                     super::SOURCE_ENEMY_PROJECTILE_SCORE_POINTS * 2,
                     0,
                     true,
+                    true,
                     Some(0),
                     vec![GameEvent::GameOver],
                 ),
@@ -25481,6 +25516,7 @@ mod tests {
                     super::SOURCE_ENEMY_PROJECTILE_SCORE_POINTS * 2,
                     0,
                     true,
+                    true,
                     Some(1044),
                     vec![],
                 ),
@@ -25489,6 +25525,7 @@ mod tests {
                     GamePhase::Attract,
                     super::SOURCE_ENEMY_PROJECTILE_SCORE_POINTS * 2,
                     0,
+                    true,
                     true,
                     Some(1060),
                     vec![],
@@ -28402,6 +28439,10 @@ mod tests {
         assert!(terrain_blow.scanner_terrain_erased());
         assert_eq!(terrain_blow.explosions_per_pass, 2);
         assert!(frame.state.world.terrain.is_empty());
+        assert!(frame.state.world.humans.is_empty());
+        assert_eq!(frame.state.world.source_target_list_cursor_address, None);
+        assert_eq!(frame.state.world.source_astronaut_cursor_address, None);
+        assert_eq!(frame.state.world.source_astronaut_sleep_ticks, 0);
         assert!(!frame.state.world.scanner.terrain_enabled);
         assert_eq!(frame.state.world.expanded_objects.detail_count, 1);
         assert!(

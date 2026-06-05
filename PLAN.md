@@ -589,9 +589,10 @@ Exit gate:
    `target/reference-media/organic-terrain-blow-smartmix-check/report.json`
    still needs regeneration and all-axis review, but the focused clean guard
    now matches the terminal-death state rows through score `50`, terrain-blown
-   status at frame `4927`, attract handoff at frame `4947`, and the sampled
-   `0xEE` terrain-blow tail at frames `5991`, `5995`, `5999`, `6003`, and
-   `6007`. The state-steered `TERBLO` clip remains the accepted bounded
+   status at frame `4927`, attract handoff at frame `4947`, no clean human
+   snapshots once terrain blow is active, and the sampled `0xEE` terrain-blow
+   tail at frames `5991`, `5995`, `5999`, `6003`, and `6007`. The
+   state-steered `TERBLO` clip remains the accepted bounded
    terrain-blow evidence, and the organic smartmix TERBLO cadence remains the
    concrete follow-up rather than a missing-evidence boundary. A follow-up
    non-lander trace inventory identified `extended_hold_up_7000`, frames
@@ -6242,3 +6243,33 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780678969677879`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780679884866769`.
+- `2026-06-05 22:43 BST`: Completed the organic smartmix terrain-blow cleanup
+  cycle. Clean terrain-blow entry now clears remaining human snapshots,
+  target-list cursors, astronaut cursors, and astronaut sleep metadata, and
+  post-game playfield sync no longer republishes post-game human tracks while
+  a destroyed-planet terrain-blow state is active. The focused organic
+  smartmix guard now asserts that once terrain blow is present, clean human
+  snapshots stay empty across the terminal-death, game-over handoff, and
+  sampled `0xEE` tail rows. A throwaway debug-only clean capture at
+  `target/reference-media/clean/organic-terrain-blow-smartmix-current-debug.debug.tsv`
+  reproduced score `50`, no humans, active terrain blow, and the `0xEE`
+  cadence at input frames `5990`, `5994`, `5998`, `6002`, and `6006`
+  (`state_frame` `5991`, `5995`, `5999`, `6003`, and `6007`). The protected
+  bounded report at
+  `target/reference-media/organic-terrain-blow-smartmix-check/report.json`
+  remains stale and still requires regeneration plus all-axis owner review; no
+  protected media was replaced in this slice. No legacy code, tests, or
+  scaffolding were safe to remove because the clean runtime and reference
+  evidence tooling still own this proof boundary. Validation passed with
+  `cargo fmt --check`, `cargo test
+  clean_reference_terrain_blow_steer_erases_humans_and_target_cursors --lib
+  --features legacy-tools`, `cargo test
+  clean_world_starts_source_terrain_blow_and_projects_terex --lib --features
+  legacy-tools`, `cargo test
+  clean_game_organic_smartmix_terminal_death_and_terrain_blow_match_mame_window
+  --lib --features legacy-tools`, `cargo test terrain_blow --lib --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `markdownlint PLAN.md docs/fidelity/release-closure-audit.md`, and
+  `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780695238307599`.
