@@ -58,7 +58,9 @@ verified.
   `ActorRuntimeAdapter`, forwards actor sound-event batches to the live audio
   runtime, and draws actor scenes with the existing `wgpu` presenter. The shared
   live input state carries the same key bindings and `XYZZY` mode into actor
-  steps.
+  steps. Actor high-score entry now consumes initials/backspace from that input
+  surface, updates driver-owned initials state, and returns to game-over after a
+  three-letter entry is submitted.
 
 ## C++ to Rust Mapping
 

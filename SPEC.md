@@ -200,7 +200,8 @@ tree:
   without changing the default interactive live frame source. It also owns the
   explicit `--actor-live` preflight mode, which steps `ActorRuntimeAdapter`,
   submits actor sound-event batches to the live audio queue, and draws actor
-  scenes with the existing `wgpu` presenter.
+  scenes with the existing `wgpu` presenter. The actor live input path carries
+  initials/backspace into actor high-score entry instead of dropping those keys.
 - `src/game_smoke.rs`: the crate-private clean game smoke command that steps
   `Game` through scripted controls, verifies sprite plus native pipeline and
   draw-instance coverage, verifies sprite buffer upload-plan, render-pass plan,
@@ -704,7 +705,8 @@ reintroduce legacy implementation terminology.
   offscreen `wgpu` readback path and verifies nonblank dynamic frame signatures.
 - `--actor-live` opens an explicit interactive actor-frame window using the
   existing `wgpu` presenter and live audio queue while preserving default
-  `cargo run` on clean `Game`.
+  `cargo run` on clean `Game`. It carries high-score initials/backspace through
+  actor input for the actor-owned high-score-entry phase.
 - Runtime renderer selection has been removed.
 - `--input-profile planetoid` is the default input profile.
 - `--input-profile cabinet` exposes a MAME-style cabinet keyboard profile.

@@ -13,6 +13,7 @@ use crate::{
         source_attract_williams_logo_operation_pixel_counts,
         source_attract_williams_logo_pixel_path,
     },
+    systems::{HighScoreEntrySystem, HighScoreInitialsState},
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -329,6 +330,8 @@ pub struct GameInput {
     pub hyperspace: bool,
     pub service_advance: bool,
     pub high_score_reset: bool,
+    pub high_score_initial: Option<char>,
+    pub high_score_backspace: bool,
     pub auto_up_manual_down: bool,
     pub tilt: bool,
     pub xyzzy: XyzzyMode,
@@ -350,6 +353,8 @@ impl GameInput {
         hyperspace: false,
         service_advance: false,
         high_score_reset: false,
+        high_score_initial: None,
+        high_score_backspace: false,
         auto_up_manual_down: false,
         tilt: false,
         xyzzy: XyzzyMode::INACTIVE,
@@ -371,6 +376,8 @@ impl GameInput {
             hyperspace: input.hyperspace,
             service_advance: input.service_advance,
             high_score_reset: input.high_score_reset,
+            high_score_initial: input.high_score_initial,
+            high_score_backspace: input.high_score_backspace,
             auto_up_manual_down: input.service_auto_up,
             tilt: input.tilt,
             xyzzy,
@@ -2580,6 +2587,7 @@ pub struct StepPrompt {
     pub lives: u8,
     pub smart_bombs: u8,
     pub high_scores: [u32; 5],
+    pub high_score_initials: HighScoreInitialsState,
     pub snapshots: Vec<ActorSnapshot>,
     pub behavior_script: ActorBehaviorScript,
 }
@@ -3187,6 +3195,7 @@ pub struct ActorGameDriver {
     actors: BTreeMap<ActorId, ThreadedAsset>,
     snapshots: BTreeMap<ActorId, ActorSnapshot>,
     high_scores: HighScoreTable,
+    high_score_initials: HighScoreInitialsState,
     behavior_script: ActorBehaviorScript,
     wave_script: ActorWaveScript,
     baiter_timer_steps: Option<u32>,
@@ -3223,6 +3232,7 @@ impl ActorGameDriver {
             actors: BTreeMap::new(),
             snapshots: BTreeMap::new(),
             high_scores: HighScoreTable::default(),
+            high_score_initials: HighScoreInitialsState::EMPTY,
             behavior_script: ActorBehaviorScript::default(),
             wave_script,
             baiter_timer_steps: None,
@@ -3241,6 +3251,7 @@ impl ActorGameDriver {
     pub fn step(&mut self, input: GameInput) -> StepReport {
         self.step = self.step.saturating_add(1);
         let was_playing = self.phase == Phase::Playing;
+        self.apply_high_score_entry_input(input);
         let mut behavior_script = self
             .behavior_script
             .with_input_overrides(input, self.snapshots.values().cloned());
@@ -3258,6 +3269,7 @@ impl ActorGameDriver {
             lives: self.lives,
             smart_bombs: self.smart_bombs,
             high_scores: self.high_scores.entries(),
+            high_score_initials: self.high_score_initials,
             snapshots: self.snapshots.values().cloned().collect(),
             behavior_script: behavior_script.clone(),
         };
@@ -3717,6 +3729,7 @@ impl ActorGameDriver {
         self.smart_bombs = 0;
         self.wave = 0;
         self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
+        self.high_score_initials = HighScoreInitialsState::EMPTY;
         self.high_scores.record(self.score);
         self.phase = if self.high_scores.qualifies(self.score) {
             Phase::HighScoreEntry
@@ -3727,12 +3740,29 @@ impl ActorGameDriver {
         sounds.push(SoundCue::GameOver);
     }
 
+    fn apply_high_score_entry_input(&mut self, input: GameInput) {
+        if self.phase != Phase::HighScoreEntry {
+            return;
+        }
+
+        let frame = HighScoreEntrySystem::enter_initial(
+            self.high_score_initials,
+            input.high_score_initial,
+            input.high_score_backspace,
+        );
+        self.high_score_initials = frame.state;
+        if frame.submitted {
+            self.phase = Phase::GameOver;
+        }
+    }
+
     fn start_play(&mut self) {
         self.phase = Phase::Playing;
         self.wave = 1;
         self.score = 0;
         self.lives = 3;
         self.smart_bombs = INITIAL_SMART_BOMBS;
+        self.high_score_initials = HighScoreInitialsState::EMPTY;
         self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.apply_wave_profile();
         self.spawn_player();
@@ -4292,6 +4322,14 @@ impl StatusDisplay {
                 STATUS_HIGH_SCORE_TABLE_TITLE_POSITION,
                 "HIGH SCORES",
             ),
+            DrawCommand::text(
+                self.id,
+                Point::new(66, 104),
+                format!(
+                    "INITIALS {}",
+                    format_high_score_initials(prompt.high_score_initials)
+                ),
+            ),
         ];
 
         for (index, score) in prompt.high_scores.iter().enumerate() {
@@ -4348,6 +4386,14 @@ impl AssetActor for StatusDisplay {
 
 fn format_status_score(score: u32) -> String {
     format!("{:06}", score.min(999_999))
+}
+
+fn format_high_score_initials(state: HighScoreInitialsState) -> String {
+    state
+        .initials
+        .iter()
+        .map(|initial| initial.unwrap_or('_'))
+        .collect()
 }
 
 #[derive(Debug)]
@@ -6468,6 +6514,8 @@ mod tests {
         assert!(input.hyperspace);
         assert!(input.service_advance);
         assert!(input.high_score_reset);
+        assert_eq!(input.high_score_initial, Some('A'));
+        assert!(input.high_score_backspace);
         assert!(input.auto_up_manual_down);
         assert!(input.tilt);
         assert_eq!(input.xyzzy, xyzzy);
@@ -6755,9 +6803,58 @@ mod tests {
         let entry = driver.step(GameInput::NONE);
         assert_text(&entry, "FINAL SCORE 012000");
         assert_text(&entry, "HIGH SCORES");
+        assert_text(&entry, "INITIALS ___");
         assert_text(&entry, "1. 012000");
         assert_text(&entry, "2. 010000");
         assert_text(&entry, "ENTER INITIALS");
+    }
+
+    #[test]
+    fn high_score_entry_accepts_initials_and_backspace_from_actor_input() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.lives = 1;
+        driver.score = 12_000;
+        driver.spawn_player();
+        driver.spawn_lander_for_test(Point::new(42, 120));
+
+        assert_eq!(driver.step(GameInput::NONE).phase, Phase::HighScoreEntry);
+
+        let first = driver.step(GameInput {
+            high_score_initial: Some('a'),
+            ..GameInput::NONE
+        });
+        assert_eq!(first.phase, Phase::HighScoreEntry);
+        assert_text(&first, "INITIALS A__");
+
+        let erased = driver.step(GameInput {
+            high_score_backspace: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(erased.phase, Phase::HighScoreEntry);
+        assert_text(&erased, "INITIALS ___");
+
+        let second = driver.step(GameInput {
+            high_score_initial: Some('B'),
+            ..GameInput::NONE
+        });
+        assert_text(&second, "INITIALS B__");
+        let third = driver.step(GameInput {
+            high_score_initial: Some('C'),
+            ..GameInput::NONE
+        });
+        assert_text(&third, "INITIALS BC_");
+        let submitted = driver.step(GameInput {
+            high_score_initial: Some('D'),
+            ..GameInput::NONE
+        });
+
+        assert_eq!(submitted.phase, Phase::GameOver);
+        assert!(!submitted.draws.iter().any(|draw| {
+            draw.text
+                .as_deref()
+                .is_some_and(|text| text.contains("INITIALS"))
+        }));
     }
 
     #[test]

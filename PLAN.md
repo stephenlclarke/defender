@@ -4150,3 +4150,25 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780631200808809`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780631731264419`.
+- `2026-06-05 05:07 BST`: Completed the actor high-score live input cycle.
+  Extended the actor input contract to carry high-score initials and backspace
+  from the clean live key-binding surface, including the opt-in `--actor-live`
+  path. The actor driver now owns `HighScoreInitialsState`, consumes initials
+  only while `Phase::HighScoreEntry` is active, handles backspace, draws the
+  in-progress `INITIALS` row from actor state, and returns to game-over after a
+  three-initial submission. README, SPEC, and the actor architecture notes now
+  describe the live actor high-score input handoff. No legacy code, tests, or
+  scaffolding were safe to remove because legacy tooling still backs ROM
+  reports, trace/media helpers, and oracle evidence. Validation passed with
+  `cargo fmt --check`, `cargo test high_score_entry --lib`,
+  `cargo test high_score_entry --all-targets --features legacy-tools`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780631835946159`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780632444002359`.

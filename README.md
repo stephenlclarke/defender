@@ -84,7 +84,9 @@ proving nonblank dynamic WGPU output before actor frames replace interactive
 live play. `--actor-live` is now available as an explicit interactive preflight
 mode that uses `ActorRuntimeAdapter`, actor scenes, actor sound events, the
 existing `wgpu` presenter, and the same live key bindings/XYZZY input state
-while leaving normal `cargo run` on the clean `Game` runtime.
+while leaving normal `cargo run` on the clean `Game` runtime. Actor high-score
+entry now accepts live initials/backspace through the actor input surface and
+draws the in-progress initials row from actor state.
 The current slice includes same-contract keyboard profiles, `XYZZY` overlay
 state, thread-backed actors, a data-driven `AttractScript` for custom attract
 drivers, `ActorBehaviorScript` profiles for level-wide and per-actor movement
@@ -709,7 +711,8 @@ renders actor scenes through the actual offscreen `wgpu` texture/readback path
 and requires every actor smoke frame to produce nonblank output plus dynamic
 readback signatures. `--actor-live` opens an interactive actor-frame window
 through the same `wgpu` presenter and live audio event queue while default
-interactive play remains clean `Game`.
+interactive play remains clean `Game`; actor high-score entry accepts the same
+initials/backspace keys through that path.
 The clean `Game` world seeds terrain, starfield, source-profile active enemy
 batches, human, and projectile snapshots for playing waves and renders them as
 atlas-backed scene sprites. Operator controls are
