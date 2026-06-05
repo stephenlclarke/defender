@@ -764,8 +764,10 @@ reintroduce legacy implementation terminology.
   `ActorWaveScript` names a driver-owned progression script whose wave profiles
   apply behavior scripts plus hostile and initial-human spawn records when play
   starts and when hostile snapshots are cleared. `ActorWaveScript` can be built
-  from Rust profile constructors or checked text wave/spawn records. The
-  built-in actor attract, behavior, and wave scripts are embedded from
+  from Rust profile constructors or checked text wave/spawn records, including
+  spawn-index behavior profiles that the driver installs as actor-id profiles
+  immediately after allocating wave actors. The built-in actor attract,
+  behavior, and wave scripts are embedded from
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and
   `assets/red-label/actor-waves.script`. The default actor wave progression

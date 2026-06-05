@@ -2604,6 +2604,7 @@ pub struct ActorWaveProfile {
     pub bomber_spawns: Vec<ActorBomberSpawn>,
     pub pod_spawns: Vec<ActorPodSpawn>,
     pub human_spawns: Vec<ActorHumanSpawn>,
+    pub spawn_behavior_profiles: Vec<ActorWaveSpawnBehaviorProfile>,
 }
 
 impl ActorWaveProfile {
@@ -2662,7 +2663,27 @@ impl ActorWaveProfile {
             bomber_spawns,
             pod_spawns,
             human_spawns,
+            spawn_behavior_profiles: Vec::new(),
         }
+    }
+
+    pub fn with_spawn_behavior_profiles(
+        mut self,
+        spawn_behavior_profiles: Vec<ActorWaveSpawnBehaviorProfile>,
+    ) -> Self {
+        self.spawn_behavior_profiles = spawn_behavior_profiles;
+        self
+    }
+
+    pub fn spawn_behavior_profile(
+        &self,
+        kind: ActorKind,
+        spawn_index: usize,
+    ) -> Option<ActorBehaviorProfile> {
+        self.spawn_behavior_profiles
+            .iter()
+            .find(|entry| entry.kind == kind && entry.spawn_index == spawn_index)
+            .map(|entry| entry.profile)
     }
 
     pub fn lander_spawn_points(&self) -> Vec<Point> {
@@ -2698,8 +2719,16 @@ impl ActorWaveProfile {
             bomber_spawns: self.bomber_spawns.clone(),
             pod_spawns: self.pod_spawns.clone(),
             human_spawns: self.human_spawns.clone(),
+            spawn_behavior_profiles: self.spawn_behavior_profiles.clone(),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorWaveSpawnBehaviorProfile {
+    pub kind: ActorKind,
+    pub spawn_index: usize,
+    pub profile: ActorBehaviorProfile,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2710,6 +2739,7 @@ pub struct ActorWaveProfileManifest {
     pub bomber_spawns: Vec<ActorBomberSpawn>,
     pub pod_spawns: Vec<ActorPodSpawn>,
     pub human_spawns: Vec<ActorHumanSpawn>,
+    pub spawn_behavior_profiles: Vec<ActorWaveSpawnBehaviorProfile>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2925,6 +2955,19 @@ impl ParsedActorWaveScript {
                 )
                 .map_err(|error| ActorWaveScriptParseError::new(error.line, error.message))
             }
+            "spawn_behavior" | "spawn_behaviour" => {
+                let kind = parse_wave_actor_kind(line_number, parts.next())?;
+                let spawn_index = parse_wave_usize(line_number, parts.next(), "spawn index")?;
+                let field = parts.next().ok_or_else(|| {
+                    ActorWaveScriptParseError::new(line_number, "missing behavior field")
+                })?;
+                let values = parts.collect::<Vec<_>>();
+                let profile = self
+                    .current_profile_mut(line_number)?
+                    .spawn_behavior_profile_mut(kind, spawn_index);
+                apply_behavior_profile_field(line_number, profile, field, &values)
+                    .map_err(|error| ActorWaveScriptParseError::new(error.line, error.message))
+            }
             "lander" => {
                 let position = parse_wave_point(line_number, &mut parts)?;
                 reject_extra_wave_fields(line_number, parts)?;
@@ -3017,6 +3060,7 @@ struct ParsedActorWaveProfile {
     bomber_spawns: Vec<ActorBomberSpawn>,
     pod_spawns: Vec<ActorPodSpawn>,
     human_spawns: Vec<ActorHumanSpawn>,
+    spawn_behavior_profiles: Vec<ActorWaveSpawnBehaviorProfile>,
 }
 
 impl ParsedActorWaveProfile {
@@ -3028,6 +3072,7 @@ impl ParsedActorWaveProfile {
             bomber_spawns: Vec::new(),
             pod_spawns: Vec::new(),
             human_spawns: Vec::new(),
+            spawn_behavior_profiles: Vec::new(),
         }
     }
 
@@ -3040,7 +3085,32 @@ impl ParsedActorWaveProfile {
             bomber_spawns: profile.bomber_spawns,
             pod_spawns: profile.pod_spawns,
             human_spawns: profile.human_spawns,
+            spawn_behavior_profiles: profile.spawn_behavior_profiles,
         }
+    }
+
+    fn spawn_behavior_profile_mut(
+        &mut self,
+        kind: ActorKind,
+        spawn_index: usize,
+    ) -> &mut ActorBehaviorProfile {
+        let entry_index = self
+            .spawn_behavior_profiles
+            .iter()
+            .position(|entry| entry.kind == kind && entry.spawn_index == spawn_index);
+        let entry_index = match entry_index {
+            Some(entry_index) => entry_index,
+            None => {
+                self.spawn_behavior_profiles
+                    .push(ActorWaveSpawnBehaviorProfile {
+                        kind,
+                        spawn_index,
+                        profile: self.behavior_script.behavior_for(ActorId::new(0), kind),
+                    });
+                self.spawn_behavior_profiles.len() - 1
+            }
+        };
+        &mut self.spawn_behavior_profiles[entry_index].profile
     }
 
     fn finish(self) -> ActorWaveProfile {
@@ -3052,6 +3122,7 @@ impl ParsedActorWaveProfile {
             self.pod_spawns,
             self.human_spawns,
         )
+        .with_spawn_behavior_profiles(self.spawn_behavior_profiles)
     }
 }
 
@@ -3091,6 +3162,30 @@ fn parse_wave_human_mode<'a>(
             format!("unknown human mode `{mode}`"),
         )),
     }
+}
+
+fn parse_wave_actor_kind(
+    line_number: usize,
+    token: Option<&str>,
+) -> Result<ActorKind, ActorWaveScriptParseError> {
+    let token =
+        token.ok_or_else(|| ActorWaveScriptParseError::new(line_number, "missing actor kind"))?;
+    parse_behavior_actor_kind(line_number, token)
+        .map_err(|error| ActorWaveScriptParseError::new(error.line, error.message))
+}
+
+fn parse_wave_usize(
+    line_number: usize,
+    token: Option<&str>,
+    field: &str,
+) -> Result<usize, ActorWaveScriptParseError> {
+    let value = parse_wave_u64(line_number, token, field)?;
+    usize::try_from(value).map_err(|error| {
+        ActorWaveScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is invalid: {error}"),
+        )
+    })
 }
 
 fn parse_wave_u16(
@@ -5992,29 +6087,30 @@ impl ActorGameDriver {
     }
 
     fn spawn_wave_hostiles(&mut self) {
-        let lander_spawns = self
-            .wave_script
-            .profile_for_wave(self.wave)
-            .lander_spawns
-            .clone();
-        for spawn in lander_spawns {
-            self.spawn_lander_from_spawn(spawn);
+        let wave_profile = self.wave_script.profile_for_wave(self.wave).clone();
+        for (spawn_index, spawn) in wave_profile.lander_spawns.iter().copied().enumerate() {
+            let actor = self.spawn_lander_from_spawn(spawn);
+            self.apply_wave_spawn_behavior(&wave_profile, ActorKind::Lander, spawn_index, actor);
         }
-        let bomber_spawns = self
-            .wave_script
-            .profile_for_wave(self.wave)
-            .bomber_spawns
-            .clone();
-        for spawn in bomber_spawns {
-            self.spawn_bomber_from_spawn(spawn);
+        for (spawn_index, spawn) in wave_profile.bomber_spawns.iter().copied().enumerate() {
+            let actor = self.spawn_bomber_from_spawn(spawn);
+            self.apply_wave_spawn_behavior(&wave_profile, ActorKind::Bomber, spawn_index, actor);
         }
-        let pod_spawns = self
-            .wave_script
-            .profile_for_wave(self.wave)
-            .pod_spawns
-            .clone();
-        for spawn in pod_spawns {
-            self.spawn_pod_from_spawn(spawn);
+        for (spawn_index, spawn) in wave_profile.pod_spawns.iter().copied().enumerate() {
+            let actor = self.spawn_pod_from_spawn(spawn);
+            self.apply_wave_spawn_behavior(&wave_profile, ActorKind::Pod, spawn_index, actor);
+        }
+    }
+
+    fn apply_wave_spawn_behavior(
+        &mut self,
+        wave_profile: &ActorWaveProfile,
+        kind: ActorKind,
+        spawn_index: usize,
+        actor: ActorId,
+    ) {
+        if let Some(profile) = wave_profile.spawn_behavior_profile(kind, spawn_index) {
+            self.behavior_script.set_actor_behavior(actor, profile);
         }
     }
 
@@ -6116,13 +6212,10 @@ impl ActorGameDriver {
     }
 
     fn spawn_initial_humans(&mut self) {
-        let human_spawns = self
-            .wave_script
-            .profile_for_wave(self.wave)
-            .human_spawns
-            .clone();
-        for spawn in human_spawns {
-            self.spawn_human_from_spawn(spawn);
+        let wave_profile = self.wave_script.profile_for_wave(self.wave).clone();
+        for (spawn_index, spawn) in wave_profile.human_spawns.iter().copied().enumerate() {
+            let actor = self.spawn_human_from_spawn(spawn);
+            self.apply_wave_spawn_behavior(&wave_profile, ActorKind::Human, spawn_index, actor);
         }
     }
 
@@ -13955,6 +14048,7 @@ mod tests {
             wave 1\n\
             behavior kind lander lander_mode chase_player\n\
             behavior kind lander lander_seek_speed 6\n\
+            spawn_behavior lander 0 lander_seek_speed 8\n\
             lander 80 96\n\
             human 40 214 falling -1\n",
         )
@@ -13985,6 +14079,18 @@ mod tests {
             .expect("wave 1 lander profile should parse");
         assert_eq!(wave_one_lander.lander_mode, LanderBehaviorMode::ChasePlayer);
         assert_eq!(wave_one_lander.lander_seek_speed, 6);
+        assert_eq!(manifest.waves[0].spawn_behavior_profiles.len(), 1);
+        assert_eq!(
+            manifest.waves[0].spawn_behavior_profiles[0].kind,
+            ActorKind::Lander
+        );
+        assert_eq!(manifest.waves[0].spawn_behavior_profiles[0].spawn_index, 0);
+        assert_eq!(
+            manifest.waves[0].spawn_behavior_profiles[0]
+                .profile
+                .lander_seek_speed,
+            8
+        );
 
         assert_eq!(
             manifest.waves[1].bomber_spawns[0].position,
@@ -14049,6 +14155,56 @@ mod tests {
             .find(|snapshot| snapshot.kind == ActorKind::Lander)
             .expect("wave 2 should spawn a lander");
         assert_eq!(lander.position, Point::new(95, 100));
+    }
+
+    #[test]
+    fn parsed_wave_script_applies_spawn_index_behavior_after_actor_allocation() {
+        let wave_script = "\
+            name spawn behavior\n\
+            wave 1\n\
+            behavior kind lander lander_mode drift\n\
+            behavior kind lander lander_drift_speed 1\n\
+            lander 80 214\n\
+            lander 120 214\n\
+            human 100 214\n\
+            spawn_behavior lander 0 lander_mode chase_player\n\
+            spawn_behavior lander 0 lander_seek_speed 5\n"
+            .parse::<ActorWaveScript>()
+            .expect("spawn behavior script should parse");
+        let mut driver = ActorGameDriver::with_wave_script(wave_script);
+
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        let report = driver.step(GameInput::NONE);
+        let landers = report
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::Lander)
+            .collect::<Vec<_>>();
+
+        assert_eq!(landers.len(), 2);
+        let first_behavior = driver
+            .script_manifest()
+            .behavior_script
+            .actor_profile(landers[0].id)
+            .expect("first spawn should receive actor-id behavior");
+        assert_eq!(first_behavior.lander_mode, LanderBehaviorMode::ChasePlayer);
+        assert_eq!(first_behavior.lander_seek_speed, 5);
+        assert!(
+            driver
+                .script_manifest()
+                .behavior_script
+                .actor_profile(landers[1].id)
+                .is_none()
+        );
+        assert!(landers[0].position.x < 80);
+        assert_eq!(landers[1].position, Point::new(119, 214));
     }
 
     #[test]

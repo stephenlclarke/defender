@@ -103,8 +103,10 @@ input overrides such as `XYZZY` invincibility. Behavior scripts can also be
 parsed from checked text lines that update default, actor-kind, or actor-id
 profiles. Wave scripts can be parsed from checked text lines that name wave
 profiles, per-wave behavior updates, and lander/bomber/pod/human spawn
-records. The built-in actor attract, behavior, and wave scripts are embedded
-from `assets/red-label/actor-attract.script`,
+records, including spawn-index behavior profiles that become actor-id profiles
+after the driver allocates those wave actors. The built-in actor attract,
+behavior, and wave scripts are embedded from
+`assets/red-label/actor-attract.script`,
 `assets/red-label/actor-behavior.script`, and
 `assets/red-label/actor-waves.script`, so the default driver and custom drivers
 share the same checked script parser path. The default actor wave allocator now

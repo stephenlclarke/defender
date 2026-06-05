@@ -44,9 +44,11 @@ verification tools.
   `assets/red-label/actor-waves.script` through the same parser path.
   `ActorWaveScript` now names per-wave progression data and applies behavior
   scripts plus hostile and initial-human spawn records as play starts and waves
-  are cleared. Default actor wave progression expands the checked wave script
-  through `assets/red-label/wave-table.tsv` for active wave size, lander and
-  bomber speed, lander fire cadence, and source bomber/pod counts. The actor wave
+  are cleared. Wave scripts can now attach spawn-index behavior profiles that
+  become actor-id profiles after the driver allocates those actors. Default
+  actor wave progression expands the checked wave script through
+  `assets/red-label/wave-table.tsv` for active wave size, lander and bomber
+  speed, lander fire cadence, and source bomber/pod counts. The actor wave
   allocator follows the source active-family shape, so later waves now seed
   bomber and pod actors beside landers. Source-backed landers, bombers, pods,
   swarmers, and initial humans publish fixed-point metadata and advance
@@ -751,6 +753,27 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 12:00 BST`: Completed the per-spawn actor behavior script
+  slice. `ActorWaveScript` now accepts
+  `spawn_behavior <kind> <index> <field> <value>` checked text lines, carries
+  those spawn-index profiles through wave manifests, and installs them as
+  actor-id behavior profiles immediately after the driver allocates wave
+  lander, bomber, pod, or human actors. This lets level scripts configure the
+  movement and behavior of individual spawned actors before their runtime ids
+  exist, while keeping the actor runtime simulation-step driven. Added focused
+  parser and runtime regressions proving a parsed wave script can make one
+  spawned lander chase the player while the next lander stays on the wave
+  kind-level drift profile. Validation passed with `cargo fmt --check`,
+  focused spawn-behavior and wave-parser tests, `cargo test actor_game
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test actor_smoke --all-targets
+  --features legacy-tools`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools -- -D
+  warnings`, touched-doc markdownlint, and `git diff --check`. Slack cycle
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780656893771729`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780657233038729`.
 - `2026-06-05 11:52 BST`: Completed the embedded actor default-script slice.
   Added `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and

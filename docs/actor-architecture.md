@@ -243,6 +243,7 @@ name hard opening
 wave 1
 behavior kind lander lander_mode chase_player
 behavior kind lander lander_seek_speed 6
+spawn_behavior lander 0 lander_seek_speed 8
 lander 80 96
 human 40 214
 wave 2
@@ -255,6 +256,10 @@ source_waves 3 16
 ```
 
 `behavior` lines reuse the `ActorBehaviorScript` parser for the current wave.
+`spawn_behavior <kind> <index> <field> <value>` lines configure one spawned
+actor before the driver has allocated its runtime actor id. They inherit the
+current wave/kind behavior at the point where the line is parsed and are then
+installed as actor-id behavior profiles when that spawn index is allocated.
 `lander`, `bomber`, `pod`, and `human` lines add clean scripted spawn records;
 humans default to `grounded` and can also be declared as `falling <velocity>` or
 `carried <actor-id>`. `source_wave <wave>` and `source_waves <first> <last>`
