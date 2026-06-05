@@ -242,6 +242,21 @@ struct SourceTarget4TerminalPostGameTrack {
     samples: [(u16, i16, i16); 4],
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SourceTarget4TerminalVisibleObject {
+    kind: SourceTerminalObjectKind,
+    position: ScreenPosition,
+}
+
+impl SourceTarget4TerminalVisibleObject {
+    const fn new(kind: SourceTerminalObjectKind, x: u8, y: u8) -> Self {
+        Self {
+            kind,
+            position: ScreenPosition::new(x, y),
+        }
+    }
+}
+
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECT_TRACKS:
     [SourceTarget4TerminalPostGameTrack; 15] = [
     SourceTarget4TerminalPostGameTrack {
@@ -380,6 +395,34 @@ const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECT_TRACKS:
         ],
     },
 ];
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_VISIBLE_OBJECT_FRAME: u16 = 1045;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECTS_1045:
+    [SourceTarget4TerminalVisibleObject; 6] = [
+    SourceTarget4TerminalVisibleObject::new(SourceTerminalObjectKind::Mutant, 0x3C, 0x58),
+    SourceTarget4TerminalVisibleObject::new(SourceTerminalObjectKind::FixedLander, 0x56, 0xA9),
+    SourceTarget4TerminalVisibleObject::new(SourceTerminalObjectKind::FixedLander, 0x5D, 0xAC),
+    SourceTarget4TerminalVisibleObject::new(SourceTerminalObjectKind::Mutant, 0x23, 0x72),
+    SourceTarget4TerminalVisibleObject::new(SourceTerminalObjectKind::Mutant, 0x25, 0x3A),
+    SourceTarget4TerminalVisibleObject::new(SourceTerminalObjectKind::Mutant, 0x2A, 0x8D),
+];
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECTS_1049:
+    [SourceTarget4TerminalVisibleObject; 4] = [
+    SourceTarget4TerminalVisibleObject::new(SourceTerminalObjectKind::Mutant, 0x50, 0xAE),
+    SourceTarget4TerminalVisibleObject::new(SourceTerminalObjectKind::Mutant, 0x1C, 0x70),
+    SourceTarget4TerminalVisibleObject::new(SourceTerminalObjectKind::Mutant, 0x1D, 0x38),
+    SourceTarget4TerminalVisibleObject::new(SourceTerminalObjectKind::Mutant, 0x22, 0x8A),
+];
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECTS_1053:
+    [SourceTarget4TerminalVisibleObject; 2] = [
+    SourceTarget4TerminalVisibleObject::new(SourceTerminalObjectKind::Mutant, 0x16, 0x39),
+    SourceTarget4TerminalVisibleObject::new(SourceTerminalObjectKind::Mutant, 0x1B, 0x89),
+];
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECTS_1057:
+    [SourceTarget4TerminalVisibleObject; 1] = [SourceTarget4TerminalVisibleObject::new(
+    SourceTerminalObjectKind::Mutant,
+    0x13,
+    0x88,
+)];
 const SOURCE_PLAYFIELD_START_RNG: SourceRandSnapshot = SourceRandSnapshot {
     seed: 0x52,
     hseed: 0x62,
@@ -6519,25 +6562,47 @@ fn source_post_game_landers(frame: u16) -> Vec<EnemySnapshot> {
 fn source_target4_smartmix_terminal_post_game_enemies(frame: u16) -> Vec<EnemySnapshot> {
     let object_frame = frame
         .saturating_add(SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECT_SAMPLE_ALIGNMENT_FRAMES);
+    if object_frame >= SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_VISIBLE_OBJECT_FRAME {
+        return source_target4_smartmix_terminal_visible_objects(object_frame)
+            .iter()
+            .copied()
+            .map(source_terminal_post_game_visible_object)
+            .collect();
+    }
+
     SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECT_TRACKS
         .iter()
         .filter_map(|track| {
             let position = interpolate_source_post_game_position(&track.samples, object_frame)?;
-            Some(match track.kind {
-                SourceTerminalObjectKind::FixedLander => {
-                    source_terminal_post_game_lander(position, 0, ScreenVelocity::new(0, 0))
-                }
-                SourceTerminalObjectKind::CyclingLander => source_terminal_post_game_lander(
-                    position,
-                    source_target4_smartmix_terminal_lander_picture_frame(object_frame),
-                    ScreenVelocity::new(0, 0),
-                ),
-                SourceTerminalObjectKind::Mutant => {
-                    EnemySnapshot::new(EnemyKind::Mutant, position, ScreenVelocity::new(0, 0))
-                }
-            })
+            Some(source_terminal_post_game_enemy_for_kind(
+                track.kind,
+                position,
+                object_frame,
+            ))
         })
         .collect()
+}
+
+fn source_target4_smartmix_terminal_visible_objects(
+    object_frame: u16,
+) -> &'static [SourceTarget4TerminalVisibleObject] {
+    match object_frame {
+        1045..=1048 => &SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECTS_1045,
+        1049..=1052 => &SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECTS_1049,
+        1053..=1056 => &SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECTS_1053,
+        1057..=1060 => &SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECTS_1057,
+        _ => &[],
+    }
+}
+
+fn source_terminal_post_game_visible_object(
+    object: SourceTarget4TerminalVisibleObject,
+) -> EnemySnapshot {
+    source_terminal_post_game_enemy_for_kind(
+        object.kind,
+        object.position,
+        SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_VISIBLE_OBJECT_FRAME,
+    )
 }
 
 fn source_target4_smartmix_terminal_post_game_background_left(frame: u16) -> Option<u16> {
@@ -6571,6 +6636,26 @@ fn source_terminal_post_game_lander(
             target_human_index: None,
         },
     )
+}
+
+fn source_terminal_post_game_enemy_for_kind(
+    kind: SourceTerminalObjectKind,
+    position: ScreenPosition,
+    frame: u16,
+) -> EnemySnapshot {
+    match kind {
+        SourceTerminalObjectKind::FixedLander => {
+            source_terminal_post_game_lander(position, 0, ScreenVelocity::new(0, 0))
+        }
+        SourceTerminalObjectKind::CyclingLander => source_terminal_post_game_lander(
+            position,
+            source_target4_smartmix_terminal_lander_picture_frame(frame),
+            ScreenVelocity::new(0, 0),
+        ),
+        SourceTerminalObjectKind::Mutant => {
+            EnemySnapshot::new(EnemyKind::Mutant, position, ScreenVelocity::new(0, 0))
+        }
+    }
 }
 
 fn source_target4_smartmix_terminal_lander_picture_frame(frame: u16) -> u8 {
@@ -25892,7 +25977,10 @@ mod tests {
         for input_frame in 0..=6006u16 {
             let frame = game.step(organic_smartmix_input(input_frame));
             let state_frame = frame.state.frame;
-            if matches!(state_frame, 5960 | 5981 | 5990 | 5991) {
+            if matches!(
+                state_frame,
+                5960 | 5981 | 5990 | 5991 | 5995 | 5999 | 6003 | 6007
+            ) {
                 let lander_count = frame
                     .state
                     .world
@@ -26014,10 +26102,35 @@ mod tests {
                     5991,
                     0xDC00,
                     Some(0x6EC0),
-                    6,
-                    9,
-                    Some(ScreenPosition::new(41, 49))
+                    2,
+                    4,
+                    Some(ScreenPosition::new(60, 88))
                 ),
+                (
+                    5995,
+                    0xDF00,
+                    Some(0x71C0),
+                    0,
+                    4,
+                    Some(ScreenPosition::new(80, 174))
+                ),
+                (
+                    5999,
+                    0xE200,
+                    Some(0x74C0),
+                    0,
+                    2,
+                    Some(ScreenPosition::new(22, 57))
+                ),
+                (
+                    6003,
+                    0xE500,
+                    Some(0x77C0),
+                    0,
+                    1,
+                    Some(ScreenPosition::new(19, 136))
+                ),
+                (6007, 0xE800, Some(0x7AC0), 0, 0, None),
             ]
         );
         assert_eq!(
