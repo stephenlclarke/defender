@@ -14,9 +14,12 @@ use std::{
 const PLAYER_SPEED: i16 = 2;
 const INITIAL_SMART_BOMBS: u8 = 3;
 const PLAYER_LASER_COOLDOWN_STEPS: u8 = 8;
-const PLAYER_HYPERSPACE_HIDDEN_STEPS: u8 = 12;
+const PLAYER_HYPERSPACE_HIDDEN_STEPS: u8 = 33;
 const PLAYER_HYPERSPACE_REMATERIALIZE_X: i16 = 128;
 const PLAYER_HYPERSPACE_REMATERIALIZE_Y: i16 = 120;
+const PLAYER_HYPERSPACE_DEATH_DELAY_STEPS: u8 = 39;
+const PLAYER_HYPERSPACE_DEATH_LSEED: u8 = 0x0C;
+const SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD: u8 = 0xC0;
 const PLAYER_BOUNDS: Rect = Rect::new(0, 18, 255, 220);
 const LASER_SPEED: i16 = 8;
 const LASER_LIFETIME: u16 = 34;
@@ -794,6 +797,8 @@ pub struct ActorBehaviorProfile {
     pub player_hyperspace_hidden_steps: u8,
     pub player_hyperspace_rematerialize_x: i16,
     pub player_hyperspace_rematerialize_y: i16,
+    pub player_hyperspace_death_delay_steps: u8,
+    pub player_hyperspace_death_lseed: u8,
     pub player_takes_enemy_collision_damage: bool,
     pub laser_speed: i16,
     pub laser_lifetime_steps: u16,
@@ -839,6 +844,8 @@ impl ActorBehaviorProfile {
         player_hyperspace_hidden_steps: PLAYER_HYPERSPACE_HIDDEN_STEPS,
         player_hyperspace_rematerialize_x: PLAYER_HYPERSPACE_REMATERIALIZE_X,
         player_hyperspace_rematerialize_y: PLAYER_HYPERSPACE_REMATERIALIZE_Y,
+        player_hyperspace_death_delay_steps: PLAYER_HYPERSPACE_DEATH_DELAY_STEPS,
+        player_hyperspace_death_lseed: PLAYER_HYPERSPACE_DEATH_LSEED,
         player_takes_enemy_collision_damage: true,
         laser_speed: LASER_SPEED,
         laser_lifetime_steps: LASER_LIFETIME,
@@ -3486,6 +3493,7 @@ struct PlayerShip {
     direction: Direction,
     laser_cooldown: u8,
     hyperspace_steps_remaining: u8,
+    hyperspace_death_steps_remaining: Option<u8>,
 }
 
 impl PlayerShip {
@@ -3496,6 +3504,7 @@ impl PlayerShip {
             direction: Direction::Right,
             laser_cooldown: 0,
             hyperspace_steps_remaining: 0,
+            hyperspace_death_steps_remaining: None,
         }
     }
 
@@ -3522,9 +3531,35 @@ impl PlayerShip {
                 behavior.player_hyperspace_rematerialize_x,
                 behavior.player_hyperspace_rematerialize_y,
             ));
+            if behavior.player_hyperspace_death_lseed > SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD {
+                self.hyperspace_death_steps_remaining =
+                    Some(behavior.player_hyperspace_death_delay_steps);
+            }
             return true;
         }
         false
+    }
+
+    fn advance_hyperspace_death(&mut self, commands: &mut Vec<GameCommand>) -> bool {
+        let Some(steps_remaining) = self.hyperspace_death_steps_remaining else {
+            return false;
+        };
+
+        let steps_remaining = steps_remaining.saturating_sub(1);
+        if steps_remaining > 0 {
+            self.hyperspace_death_steps_remaining = Some(steps_remaining);
+            return false;
+        }
+
+        self.hyperspace_death_steps_remaining = None;
+        commands.push(GameCommand::Destroy(self.id));
+        commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
+            position: self.position,
+            kind: ExplosionKind::Player,
+        }));
+        commands.push(GameCommand::PlaySound(SoundCue::Explosion));
+        commands.push(GameCommand::PlayerKilled);
+        true
     }
 }
 
@@ -3536,13 +3571,16 @@ impl AssetActor for PlayerShip {
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut commands = Vec::new();
         let mut draws = Vec::new();
+        let mut death_due = false;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Player);
+            death_due = self.advance_hyperspace_death(&mut commands);
             let was_hidden = self.is_hidden_for_hyperspace();
             if self.advance_hyperspace(behavior) {
                 commands.push(GameCommand::PlaySound(SoundCue::HyperspaceMaterialize));
             }
-            if !was_hidden {
+            let input_blocked = was_hidden || self.hyperspace_death_steps_remaining.is_some();
+            if !death_due && !input_blocked {
                 let mut velocity = Velocity::default();
                 if prompt.input.altitude_up {
                     velocity.dy -= behavior.player_speed;
@@ -3591,7 +3629,7 @@ impl AssetActor for PlayerShip {
                     self.enter_hyperspace(behavior);
                 }
             }
-            if !self.is_hidden_for_hyperspace() {
+            if !death_due && !self.is_hidden_for_hyperspace() {
                 draws.push(DrawCommand::sprite(
                     self.id,
                     match self.direction {
@@ -3608,7 +3646,10 @@ impl AssetActor for PlayerShip {
                 id: self.id,
                 kind: ActorKind::Player,
                 position: self.position,
-                bounds: if prompt.phase == Phase::Playing && !self.is_hidden_for_hyperspace() {
+                bounds: if prompt.phase == Phase::Playing
+                    && !self.is_hidden_for_hyperspace()
+                    && !death_due
+                {
                     Some(self.bounds())
                 } else {
                     None
@@ -6142,6 +6183,105 @@ mod tests {
                 && draw.position == Point::new(150, 92)
                 && matches!(draw.sprite, SpriteKey::PlayerRight)
         }));
+    }
+
+    #[test]
+    fn hyperspace_lseed_high_enters_delayed_player_death_path() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let player = driver.spawn_player();
+        driver.set_actor_behavior(
+            player,
+            ActorBehaviorProfile {
+                player_hyperspace_hidden_steps: 1,
+                player_hyperspace_death_delay_steps: 2,
+                player_hyperspace_death_lseed: SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD + 1,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+
+        let entered = driver.step(GameInput {
+            hyperspace: true,
+            ..GameInput::NONE
+        });
+        assert!(entered.commands.contains(&GameCommand::Hyperspace));
+        assert!(!entered.commands.contains(&GameCommand::PlayerKilled));
+
+        let rematerialized = driver.step(GameInput::NONE);
+        assert!(
+            rematerialized
+                .sounds
+                .contains(&SoundCue::HyperspaceMaterialize)
+        );
+        assert!(!rematerialized.commands.contains(&GameCommand::PlayerKilled));
+        assert_eq!(rematerialized.lives, 3);
+
+        let pending_death = driver.step(GameInput {
+            thrust: true,
+            fire: true,
+            ..GameInput::NONE
+        });
+        assert!(!pending_death.commands.contains(&GameCommand::PlayerKilled));
+        assert!(!pending_death.sounds.contains(&SoundCue::Thrust));
+        assert!(
+            !pending_death.commands.iter().any(|command| {
+                matches!(command, GameCommand::Spawn(SpawnRequest::Laser { .. }))
+            })
+        );
+
+        let destroyed = driver.step(GameInput::NONE);
+
+        assert_eq!(destroyed.phase, Phase::Playing);
+        assert_eq!(destroyed.lives, 2);
+        assert!(destroyed.commands.contains(&GameCommand::Destroy(player)));
+        assert!(destroyed.commands.contains(&GameCommand::PlayerKilled));
+        assert!(destroyed.sounds.contains(&SoundCue::Explosion));
+        assert!(destroyed.commands.iter().any(|command| {
+            matches!(
+                command,
+                GameCommand::Spawn(SpawnRequest::Explosion {
+                    kind: ExplosionKind::Player,
+                    ..
+                })
+            )
+        }));
+        assert_eq!(driver.snapshot_count(ActorKind::Player), 0);
+
+        driver.step(GameInput::NONE);
+        assert_eq!(driver.snapshot_count(ActorKind::Player), 1);
+    }
+
+    #[test]
+    fn hyperspace_lseed_at_source_threshold_survives() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let player = driver.spawn_player();
+        driver.set_actor_behavior(
+            player,
+            ActorBehaviorProfile {
+                player_hyperspace_hidden_steps: 1,
+                player_hyperspace_death_delay_steps: 1,
+                player_hyperspace_death_lseed: SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+
+        driver.step(GameInput {
+            hyperspace: true,
+            ..GameInput::NONE
+        });
+        let rematerialized = driver.step(GameInput::NONE);
+        let settled = driver.step(GameInput::NONE);
+
+        assert!(
+            rematerialized
+                .sounds
+                .contains(&SoundCue::HyperspaceMaterialize)
+        );
+        assert!(!rematerialized.commands.contains(&GameCommand::PlayerKilled));
+        assert!(!settled.commands.contains(&GameCommand::PlayerKilled));
+        assert_eq!(settled.lives, 3);
+        assert_eq!(driver.snapshot_count(ActorKind::Player), 1);
     }
 
     #[test]

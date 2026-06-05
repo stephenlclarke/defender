@@ -723,10 +723,11 @@ reintroduce legacy implementation terminology.
   non-consuming `XYZZY` overlay path, hyperspace hostile-projectile cleanup and
   separate launch/materialization cue emission, actor-owned hidden hyperspace
   interval plus behavior-scripted rematerialization point, life-stock decrement
-  and replacement-player respawn on non-final player hazard collisions,
-  final-life game-over/high-score handoff, enemy/bomb/player/human explosion
-  variant draw metadata, and mutant spawn handoff, but it has not replaced the
-  live `Game` runtime yet.
+  and replacement-player respawn on non-final player hazard collisions, source
+  `HYP2` `LSEED > 0xC0` delayed death-risk routing through the same player
+  death path, final-life game-over/high-score handoff, enemy/bomb/player/human
+  explosion variant draw metadata, and mutant spawn handoff, but it has not
+  replaced the live `Game` runtime yet.
 
 ## Compatibility Features
 

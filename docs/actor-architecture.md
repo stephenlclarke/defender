@@ -109,8 +109,10 @@ the hidden interval: while its hyperspace timer is active it remains alive but
 publishes no collision bounds, no player draw, and no input-driven actions.
 `ActorBehaviorProfile` configures the hidden step count and rematerialization
 coordinates, and the actor emits `SoundCue::HyperspaceMaterialize` when it
-returns. The later MAME source RNG and death-risk branch remains a separate
-porting slice.
+returns. The same profile carries the effective source `LSEED` byte and death
+delay; values above `0xC0` arm the source `HYP2` death-risk branch and route
+through the normal player death/life-stock path after the delay. Full source
+RNG advancement remains a separate porting slice.
 
 `XYZZY` invincibility uses the same mechanism. When invincibility is active,
 the driver applies a temporary player behavior override that disables enemy

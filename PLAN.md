@@ -3904,3 +3904,21 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780624273035349`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780624537685539`.
+- `2026-06-05 03:04 BST`: Completed the actor hyperspace death-risk cycle.
+  Added source-shaped hyperspace rematerialization/death timings plus
+  behavior-profile fields for effective source `LSEED` and delayed death
+  timing. `PlayerShip` now arms the source `HYP2` `LSEED > 0xC0` branch,
+  blocks input during the pending death tail, and emits the existing
+  destroy/explosion/player-life-loss command path when the delay expires.
+  Added regressions for lethal `0xC1` and safe threshold `0xC0` behavior. No
+  legacy code, tests, or scaffolding were safe to remove because `legacy-tools`
+  still owns ROM reports, trace/media helpers, and oracle-equivalence evidence
+  while the actor runtime remains isolated. Validation passed with
+  `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780624670527609`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780625085453599`.
