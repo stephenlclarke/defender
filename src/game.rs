@@ -162,7 +162,10 @@ const SOURCE_POST_GAME_ENEMY_DEATH_SOUND_SEQUENCE: [(u16, u8); 9] = [
     (351, SOURCE_BACKGROUND_END_SOUND_COMMAND),
     (351, SOURCE_BACKGROUND_END_SOUND_COMMAND),
 ];
-const SOURCE_POST_GAME_TARGET4_SMARTMIX_TERMINAL_SOUND_SEQUENCE: [(u16, u8); 13] = [
+const SOURCE_POST_GAME_TARGET4_SMARTMIX_TERMINAL_SOUND_SEQUENCE: [(u16, u8); 16] = [
+    (1026, SOURCE_LSKSND_SOUND_COMMAND),
+    (1027, SOURCE_LSKSND_SOUND_COMMAND),
+    (1028, SOURCE_LSKSND_SOUND_COMMAND),
     (1029, SOURCE_LSKSND_SOUND_COMMAND),
     (1030, SOURCE_LSKSND_SOUND_COMMAND),
     (1031, SOURCE_LSKSND_SOUND_COMMAND),
@@ -25963,7 +25966,7 @@ mod tests {
             }
             if matches!(
                 state_frame,
-                4781 | 4782 | 4790 | 4798 | 4927 | 5976..=5983 | 5991 | 5995 | 5999 | 6003 | 6007
+                4781 | 4782 | 4790 | 4798 | 4927 | 5973..=5983 | 5991 | 5995 | 5999 | 6003 | 6007
             ) {
                 sound_samples.push((state_frame, frame.events.sounds().to_vec()));
             }
@@ -26100,6 +26103,9 @@ mod tests {
                 (4790, vec![source_player_death_sound_event()]),
                 (4798, vec![cannon]),
                 (4927, vec![background_end]),
+                (5973, vec![lander_pull]),
+                (5974, vec![lander_pull]),
+                (5975, vec![lander_pull]),
                 (5976, vec![lander_pull]),
                 (5977, vec![lander_pull]),
                 (5978, vec![lander_pull]),
