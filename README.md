@@ -172,7 +172,11 @@ and swarmer reserves use their source restore placement/fraction metadata. When
 the first wave is still active, the actor driver now arms the source 449-step
 early reserve cadence, materializes the five MAME-observed early reserve lander
 rows with the `0xEA` appearance cue, preserves the target-list cursor/RNG reset,
-and keeps the remaining first-wave lander reserve for later refill behavior. When
+and keeps the remaining first-wave lander reserve for later refill behavior. The
+actor driver also schedules the source 47-step first-wave lander refill once
+active landers fall below the source threshold, restores the fixed refill rows,
+and keeps the four hidden lanes live without drawing or colliding while the
+target-3 lane materializes with the delayed `0xEA` cue. When
 no source human targets remain, actor reserve lander rows now follow the source
 schizoid fallback and restore as source-shaped mutants instead of targetless
 landers. Direct mutant restores consume the driver-owned source background word

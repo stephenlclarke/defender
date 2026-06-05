@@ -79,6 +79,7 @@ const SOURCE_CANNON_SOUND_COMMAND: u8 = 0xE8;
 const SOURCE_TBSND_SOUND_COMMAND: u8 = 0xEB;
 const SOURCE_ACSND_SOUND_COMMAND: u8 = 0xF7;
 const SOURCE_ASCSND_SOUND_COMMAND: u8 = 0xE5;
+const SOURCE_APPEAR_SOUND_COMMAND: u8 = 0xEA;
 const SOURCE_SMART_BOMB_SOUND_SEQUENCE: [(u8, u8); 7] = [
     (4, SOURCE_SBSND_SOUND_COMMAND),
     (8, SOURCE_SBSND_SOUND_COMMAND),
@@ -121,6 +122,9 @@ const SOURCE_FIRST_WAVE_EARLY_RESERVE_RNG: ActorSourceRng = ActorSourceRng {
     hseed: 0xDA,
     lseed: 0x1F,
 };
+const SOURCE_FIRST_WAVE_LANDER_REFILL_ACTIVE_THRESHOLD: usize = 8;
+const SOURCE_FIRST_WAVE_LANDER_REFILL_DELAY_STEPS: u8 = 47;
+const SOURCE_FIRST_WAVE_LANDER_REFILL_APPEAR_SOUND_DELAY_STEPS: u8 = 1;
 const PLAYER_BOUNDS: Rect = Rect::new(0, 18, 255, 220);
 const LASER_SPEED: i16 = 8;
 const LASER_LIFETIME: u16 = 34;
@@ -594,6 +598,58 @@ const ACTOR_SOURCE_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn; 5]
         sleep_ticks: 1,
         picture_frame: 0,
         target_human_index: Some(6),
+    }),
+];
+const ACTOR_SOURCE_FIRST_WAVE_REFILL_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
+    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
+        x16: 0xBC29,
+        y16: 0x2CFD,
+        x_velocity: 0x001C,
+        y_velocity: 0x0090,
+        shot_timer: 0x36,
+        sleep_ticks: 6,
+        picture_frame: 1,
+        target_human_index: Some(7),
+    }),
+    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
+        x16: 0xE14C,
+        y16: 0x2CAE,
+        x_velocity: 0x000E,
+        y_velocity: 0x0090,
+        shot_timer: 0x2F,
+        sleep_ticks: 0,
+        picture_frame: 0,
+        target_human_index: Some(4),
+    }),
+    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
+        x16: 0x0A63,
+        y16: 0x2CF0,
+        x_velocity: 0xFFF4,
+        y_velocity: 0x0090,
+        shot_timer: 0x23,
+        sleep_ticks: 1,
+        picture_frame: 0,
+        target_human_index: Some(3),
+    }),
+    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
+        x16: 0x531B,
+        y16: 0x2CC0,
+        x_velocity: 0xFFF6,
+        y_velocity: 0x0090,
+        shot_timer: 0x30,
+        sleep_ticks: 1,
+        picture_frame: 0,
+        target_human_index: Some(2),
+    }),
+    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
+        x16: 0x98D9,
+        y16: 0x2CB8,
+        x_velocity: 0x001A,
+        y_velocity: 0x0090,
+        shot_timer: 0x1F,
+        sleep_ticks: 1,
+        picture_frame: 0,
+        target_human_index: Some(1),
     }),
 ];
 const ACTOR_WAVE_ACTIVE_SPAWN_SLOTS: [Point; SOURCE_MAX_ACTIVE_WAVE_ENEMIES] = [
@@ -8365,6 +8421,7 @@ enum PendingActorSoundSource {
     SmartBomb,
     TerrainBlow,
     AstronautRescue,
+    FirstWaveLanderRefill,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -8482,6 +8539,7 @@ pub struct ActorGameDriver {
     source_reserve_activation_ready: bool,
     source_reserve_activation_cooldown_steps: u16,
     source_first_wave_early_reserve_steps_remaining: Option<u16>,
+    source_first_wave_lander_refill_steps_remaining: Option<u8>,
     source_background_left: u16,
     baiter_timer_steps: Option<u32>,
     baiter_pacing_steps_remaining: u8,
@@ -8544,6 +8602,7 @@ impl ActorGameDriver {
             source_reserve_activation_ready: false,
             source_reserve_activation_cooldown_steps: 0,
             source_first_wave_early_reserve_steps_remaining: None,
+            source_first_wave_lander_refill_steps_remaining: None,
             source_background_left: 0,
             baiter_timer_steps: None,
             baiter_pacing_steps_remaining: ACTOR_BAITER_TIMER_PACING_STEPS,
@@ -8586,6 +8645,7 @@ impl ActorGameDriver {
         self.advance_pending_player_switch();
         self.advance_source_reserve_activation_cooldown();
         delayed_sounds.extend(self.activate_enemy_reserve_if_ready(&mut step_commands));
+        self.advance_first_wave_lander_refill_if_ready(&mut step_commands);
         match self.advance_pending_survivor_bonus() {
             SurvivorBonusStep::StartNextWave => {
                 self.start_pending_wave();
@@ -8711,6 +8771,7 @@ impl ActorGameDriver {
                 }
             }
         }
+        self.schedule_first_wave_lander_refill_if_needed();
         let survivor_bonus = self
             .pending_survivor_bonus
             .map(|bonus| bonus.report(survivor_bonus_awarded_points));
@@ -9376,6 +9437,7 @@ impl ActorGameDriver {
         self.clear_pending_smart_bomb();
         self.clear_terrain_blow();
         self.clear_pending_astronaut_rescue();
+        self.clear_first_wave_lander_refill();
         self.enemy_reserve = EnemyReserveSnapshot::default();
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
@@ -9415,6 +9477,7 @@ impl ActorGameDriver {
         self.clear_pending_smart_bomb();
         self.clear_terrain_blow();
         self.clear_pending_astronaut_rescue();
+        self.clear_first_wave_lander_refill();
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.source_background_left = 0;
         self.source_reserve_activation_cooldown_steps = 0;
@@ -9486,6 +9549,14 @@ impl ActorGameDriver {
                     source: PendingActorSoundSource::AstronautRescue,
                 },
             ));
+    }
+
+    fn queue_first_wave_lander_refill_appearance_sound(&mut self) {
+        self.pending_sound_commands.push(PendingActorSoundCommand {
+            steps_remaining: SOURCE_FIRST_WAVE_LANDER_REFILL_APPEAR_SOUND_DELAY_STEPS,
+            command: SOURCE_APPEAR_SOUND_COMMAND,
+            source: PendingActorSoundSource::FirstWaveLanderRefill,
+        });
     }
 
     fn advance_smart_bomb_flash(&mut self) {
@@ -9625,6 +9696,12 @@ impl ActorGameDriver {
             .retain(|command| command.source != PendingActorSoundSource::AstronautRescue);
     }
 
+    fn clear_first_wave_lander_refill(&mut self) {
+        self.source_first_wave_lander_refill_steps_remaining = None;
+        self.pending_sound_commands
+            .retain(|command| command.source != PendingActorSoundSource::FirstWaveLanderRefill);
+    }
+
     fn start_smart_bomb(&mut self, consume_stock: bool) -> bool {
         if self.pending_smart_bomb_detonation_steps.is_some() {
             return false;
@@ -9641,6 +9718,8 @@ impl ActorGameDriver {
 
         self.pending_smart_bomb_detonation_steps = Some(SOURCE_SMART_BOMB_DETONATION_DELAY_STEPS);
         self.source_reserve_activation_cooldown_steps = SOURCE_SMART_BOMB_RESERVE_DELAY_STEPS;
+        self.source_first_wave_early_reserve_steps_remaining = None;
+        self.clear_first_wave_lander_refill();
         self.queue_smart_bomb_sound_sequence();
         true
     }
@@ -9702,6 +9781,7 @@ impl ActorGameDriver {
         self.clear_pending_smart_bomb();
         self.clear_terrain_blow();
         self.clear_pending_astronaut_rescue();
+        self.clear_first_wave_lander_refill();
         self.enemy_reserve = EnemyReserveSnapshot::default();
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
@@ -9760,6 +9840,7 @@ impl ActorGameDriver {
         self.clear_pending_smart_bomb();
         self.clear_terrain_blow();
         self.clear_pending_astronaut_rescue();
+        self.clear_first_wave_lander_refill();
         self.enemy_reserve = EnemyReserveSnapshot::default();
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
@@ -9782,6 +9863,7 @@ impl ActorGameDriver {
         self.clear_pending_smart_bomb();
         self.clear_terrain_blow();
         self.clear_pending_astronaut_rescue();
+        self.clear_first_wave_lander_refill();
         self.clear_wave_playfield_actors();
         self.apply_wave_profile();
         self.source_reserve_activation_cooldown_steps = 0;
@@ -9924,6 +10006,7 @@ impl ActorGameDriver {
         self.source_reserve_activation_ready = false;
         self.source_reserve_activation_cooldown_steps = 0;
         self.source_first_wave_early_reserve_steps_remaining = None;
+        self.clear_first_wave_lander_refill();
         if self.phase == Phase::Playing {
             self.reset_baiter_timer();
         }
@@ -9959,6 +10042,7 @@ impl ActorGameDriver {
         }
 
         self.source_first_wave_early_reserve_steps_remaining = None;
+        self.clear_first_wave_lander_refill();
         let source_profile = ActorSourceWaveProfile::for_wave(self.wave.max(1));
         let reserve_kinds =
             actor_source_reserve_enemy_kinds(&mut self.enemy_reserve, source_profile);
@@ -10062,10 +10146,62 @@ impl ActorGameDriver {
         Vec::new()
     }
 
+    fn advance_first_wave_lander_refill_if_ready(&mut self, commands: &mut Vec<GameCommand>) {
+        let Some(remaining) = self.source_first_wave_lander_refill_steps_remaining else {
+            return;
+        };
+        if self.phase != Phase::Playing
+            || self.wave != 1
+            || self.pending_survivor_bonus.is_some()
+            || self.pending_player_switch.is_some()
+            || self.pending_player_start.is_some()
+        {
+            self.clear_first_wave_lander_refill();
+            return;
+        }
+
+        let remaining = remaining.saturating_sub(1);
+        if remaining > 0 {
+            self.source_first_wave_lander_refill_steps_remaining = Some(remaining);
+            return;
+        }
+
+        self.source_first_wave_lander_refill_steps_remaining = None;
+        self.activate_first_wave_lander_refill(commands);
+    }
+
     fn arm_first_wave_early_lander_reserve_delay(&mut self) {
         self.source_first_wave_early_reserve_steps_remaining = (self.wave == 1
             && self.enemy_reserve.landers > 0)
             .then_some(SOURCE_FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS);
+    }
+
+    fn schedule_first_wave_lander_refill_if_needed(&mut self) {
+        if self
+            .source_first_wave_lander_refill_steps_remaining
+            .is_some()
+            || self.phase != Phase::Playing
+            || self.wave != 1
+            || self.pending_survivor_bonus.is_some()
+            || self.pending_player_switch.is_some()
+            || self.pending_player_start.is_some()
+            || self.pending_smart_bomb_detonation_steps.is_some()
+            || self.source_reserve_activation_cooldown_steps > 0
+        {
+            return;
+        }
+
+        let active_landers = self.source_counted_lander_snapshot_count();
+        if active_landers == 0
+            || active_landers >= SOURCE_FIRST_WAVE_LANDER_REFILL_ACTIVE_THRESHOLD
+            || self.enemy_reserve.landers == 0
+            || usize::from(self.enemy_reserve.landers) > SOURCE_MAX_ACTIVE_WAVE_ENEMIES
+        {
+            return;
+        }
+
+        self.source_first_wave_lander_refill_steps_remaining =
+            Some(SOURCE_FIRST_WAVE_LANDER_REFILL_DELAY_STEPS);
     }
 
     fn activate_first_wave_early_lander_reserve_if_ready(
@@ -10117,6 +10253,40 @@ impl ActorGameDriver {
             .saturating_sub(u8::try_from(reserve_count).expect("early reserve count fits u8"));
         self.source_rng = SOURCE_FIRST_WAVE_EARLY_RESERVE_RNG;
         self.source_target_cursor = Some(SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT);
+        true
+    }
+
+    fn activate_first_wave_lander_refill(&mut self, commands: &mut Vec<GameCommand>) -> bool {
+        if self.enemy_reserve.landers == 0 {
+            return false;
+        }
+
+        let reserve_count = ACTOR_SOURCE_FIRST_WAVE_REFILL_LANDER_SPAWNS
+            .len()
+            .min(usize::from(self.enemy_reserve.landers));
+        if reserve_count == 0 {
+            return false;
+        }
+
+        let mut materialized = false;
+        for spawn in ACTOR_SOURCE_FIRST_WAVE_REFILL_LANDER_SPAWNS
+            .iter()
+            .copied()
+            .take(reserve_count)
+        {
+            materialized |= spawn.source.is_some_and(source_lander_output_visible);
+            commands.push(GameCommand::Spawn(SpawnRequest::Lander {
+                position: spawn.position,
+            }));
+            self.spawn_lander_from_spawn(spawn);
+        }
+        self.enemy_reserve.landers = self
+            .enemy_reserve
+            .landers
+            .saturating_sub(u8::try_from(reserve_count).expect("refill count fits u8"));
+        if materialized {
+            self.queue_first_wave_lander_refill_appearance_sound();
+        }
         true
     }
 
@@ -10173,6 +10343,13 @@ impl ActorGameDriver {
         self.snapshots
             .values()
             .filter(|snapshot| is_hostile(snapshot.kind))
+            .count()
+    }
+
+    fn source_counted_lander_snapshot_count(&self) -> usize {
+        self.snapshots
+            .values()
+            .filter(|snapshot| snapshot.kind == ActorKind::Lander)
             .count()
     }
 
@@ -11276,6 +11453,7 @@ struct Lander {
     drift: i16,
     mode: LanderMode,
     source: Option<ActorSourceLanderMetadata>,
+    source_output: SourceLanderOutput,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -11285,6 +11463,13 @@ enum LanderMode {
         human_id: ActorId,
         pull_sound_sent: bool,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SourceLanderOutput {
+    Normal,
+    VisibleFirstWaveRefill,
+    HiddenFirstWaveRefill,
 }
 
 impl Lander {
@@ -11301,6 +11486,7 @@ impl Lander {
                 .map(|source| source_lander_drift_from_velocity(source.x_velocity))
                 .unwrap_or(-1),
             mode: LanderMode::Seeking,
+            source_output: source_lander_output(spawn.source),
             source: spawn.source,
         }
     }
@@ -11335,7 +11521,9 @@ impl AssetActor for Lander {
         let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Lander);
-            if !self.tick_source_sleep() {
+            if self.source_output != SourceLanderOutput::HiddenFirstWaveRefill
+                && !self.tick_source_sleep()
+            {
                 match self.mode {
                     LanderMode::Seeking => self.update_seeking(prompt, behavior, &mut commands),
                     LanderMode::Carrying {
@@ -11353,12 +11541,14 @@ impl AssetActor for Lander {
                 }
                 self.tick_fire_timer(prompt, behavior, &mut commands);
             }
-            draws.push(DrawCommand::sprite_with_effect(
-                self.id,
-                SpriteKey::Lander,
-                self.position,
-                self.draw_effect(),
-            ));
+            if self.output_visible() {
+                draws.push(DrawCommand::sprite_with_effect(
+                    self.id,
+                    SpriteKey::Lander,
+                    self.position,
+                    self.draw_effect(),
+                ));
+            }
         }
         let movement_velocity = observed_velocity(previous_position, self.position);
         ActorReply {
@@ -11372,7 +11562,7 @@ impl AssetActor for Lander {
                     movement_velocity,
                     drift_direction(self.drift),
                 )),
-                bounds: Some(self.bounds()),
+                bounds: self.output_visible().then_some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
                 source_lander: self.source,
                 source_bomber: None,
@@ -11390,6 +11580,10 @@ impl AssetActor for Lander {
 }
 
 impl Lander {
+    fn output_visible(&self) -> bool {
+        self.source_output != SourceLanderOutput::HiddenFirstWaveRefill
+    }
+
     fn update_seeking(
         &mut self,
         prompt: &StepPrompt,
@@ -11618,6 +11812,51 @@ impl Lander {
 
 const fn source_lander_drift_from_velocity(x_velocity: u16) -> i16 {
     actor_source_drift_from_velocity(x_velocity)
+}
+
+fn source_lander_output(source: Option<ActorSourceLanderMetadata>) -> SourceLanderOutput {
+    let Some(source) = source else {
+        return SourceLanderOutput::Normal;
+    };
+    source_first_wave_refill_lander_output(source).unwrap_or(SourceLanderOutput::Normal)
+}
+
+fn source_lander_output_visible(source: ActorSourceLanderMetadata) -> bool {
+    source_first_wave_refill_lander_output(source)
+        == Some(SourceLanderOutput::VisibleFirstWaveRefill)
+}
+
+fn source_first_wave_refill_lander_output(
+    source: ActorSourceLanderMetadata,
+) -> Option<SourceLanderOutput> {
+    ACTOR_SOURCE_FIRST_WAVE_REFILL_LANDER_SPAWNS
+        .iter()
+        .copied()
+        .filter_map(|spawn| spawn.source)
+        .enumerate()
+        .find_map(|(index, refill_source)| {
+            source_lander_metadata_matches_refill_row(source, refill_source).then_some(
+                if index == 2 {
+                    SourceLanderOutput::VisibleFirstWaveRefill
+                } else {
+                    SourceLanderOutput::HiddenFirstWaveRefill
+                },
+            )
+        })
+}
+
+fn source_lander_metadata_matches_refill_row(
+    source: ActorSourceLanderMetadata,
+    refill_source: ActorSourceLanderMetadata,
+) -> bool {
+    source.x_fraction == refill_source.x_fraction
+        && source.y_fraction == refill_source.y_fraction
+        && source.x_velocity == refill_source.x_velocity
+        && source.y_velocity == refill_source.y_velocity
+        && source.shot_timer == refill_source.shot_timer
+        && source.sleep_ticks == refill_source.sleep_ticks
+        && source.picture_frame == refill_source.picture_frame
+        && source.target_human_index == refill_source.target_human_index
 }
 
 const fn actor_source_drift_from_velocity(x_velocity: u16) -> i16 {
@@ -18054,6 +18293,28 @@ mod tests {
     }
 
     #[test]
+    fn first_wave_refill_lander_spawns_match_mame_rows() {
+        let rows = ACTOR_SOURCE_FIRST_WAVE_REFILL_LANDER_SPAWNS
+            .iter()
+            .copied()
+            .map(source_lander_spawn_row_for_test)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            rows,
+            vec![
+                (0xBC29, 0x2CFD, 0x001C, 0x0090, 0x36, 6, 1, Some(7)),
+                (0xE14C, 0x2CAE, 0x000E, 0x0090, 0x2F, 0, 0, Some(4)),
+                (0x0A63, 0x2CF0, 0xFFF4, 0x0090, 0x23, 1, 0, Some(3)),
+                (0x531B, 0x2CC0, 0xFFF6, 0x0090, 0x30, 1, 0, Some(2)),
+                (0x98D9, 0x2CB8, 0x001A, 0x0090, 0x1F, 1, 0, Some(1)),
+            ]
+        );
+        assert_eq!(SOURCE_FIRST_WAVE_LANDER_REFILL_DELAY_STEPS, 47);
+        assert_eq!(SOURCE_FIRST_WAVE_LANDER_REFILL_APPEAR_SOUND_DELAY_STEPS, 1);
+    }
+
+    #[test]
     fn embedded_actor_wave_script_expands_source_wave_range() {
         let parsed = ActorWaveScript::parse_text(ACTOR_RED_LABEL_WAVE_SCRIPT)
             .expect("embedded actor wave script should parse");
@@ -18331,6 +18592,154 @@ mod tests {
                         && source.y_velocity == 0
                 })
         }));
+    }
+
+    #[test]
+    fn actor_first_wave_lander_refill_keeps_hidden_lanes_suppressed() {
+        let mut driver = started_driver();
+        driver.set_kind_behavior(
+            ActorKind::Player,
+            ActorBehaviorProfile {
+                player_takes_enemy_collision_damage: false,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        driver.set_kind_behavior(
+            ActorKind::Lander,
+            ActorBehaviorProfile {
+                lander_mode: LanderBehaviorMode::Drift,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        let early_reserve = step_until_first_wave_early_reserve_materializes(&mut driver);
+        assert_eq!(
+            early_reserve.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 5,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+        assert_eq!(
+            early_reserve
+                .snapshots
+                .iter()
+                .filter(|snapshot| snapshot.kind == ActorKind::Lander)
+                .count(),
+            10
+        );
+
+        let destroy_three_landers = early_reserve
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::Lander)
+            .take(3)
+            .map(|snapshot| GameCommand::Destroy(snapshot.id))
+            .collect::<Vec<_>>();
+        driver.apply_commands(&destroy_three_landers);
+
+        let scheduled = driver.step(GameInput::NONE);
+        assert_eq!(
+            scheduled
+                .snapshots
+                .iter()
+                .filter(|snapshot| snapshot.kind == ActorKind::Lander)
+                .count(),
+            7
+        );
+        assert_eq!(
+            driver.source_first_wave_lander_refill_steps_remaining,
+            Some(SOURCE_FIRST_WAVE_LANDER_REFILL_DELAY_STEPS)
+        );
+
+        let mut materialized = None;
+        for offset in 1..=SOURCE_FIRST_WAVE_LANDER_REFILL_DELAY_STEPS {
+            let report = driver.step(GameInput::NONE);
+            let spawn_count = report
+                .commands
+                .iter()
+                .filter(|command| {
+                    matches!(command, GameCommand::Spawn(SpawnRequest::Lander { .. }))
+                })
+                .count();
+            if spawn_count > 0 {
+                materialized = Some((offset, report));
+                break;
+            }
+
+            assert_eq!(spawn_count, 0);
+        }
+
+        let (offset, report) =
+            materialized.expect("first-wave refill should materialize on source cadence");
+        assert_eq!(offset, SOURCE_FIRST_WAVE_LANDER_REFILL_DELAY_STEPS);
+        assert_eq!(
+            report
+                .commands
+                .iter()
+                .filter(|command| matches!(
+                    command,
+                    GameCommand::Spawn(SpawnRequest::Lander { .. })
+                ))
+                .count(),
+            ACTOR_SOURCE_FIRST_WAVE_REFILL_LANDER_SPAWNS.len()
+        );
+        assert_eq!(report.enemy_reserve, EnemyReserveSnapshot::default());
+
+        let refill_landers = report
+            .snapshots
+            .iter()
+            .filter(|snapshot| {
+                snapshot.kind == ActorKind::Lander
+                    && snapshot
+                        .source_lander
+                        .is_some_and(|source| source.y_velocity == 0x0090)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(refill_landers.len(), 5);
+        assert_eq!(
+            refill_landers
+                .iter()
+                .filter(|snapshot| snapshot.bounds.is_some())
+                .count(),
+            1
+        );
+        let visible_refill = refill_landers
+            .iter()
+            .find(|snapshot| snapshot.bounds.is_some())
+            .expect("target-3 refill lane should be visible");
+        assert_eq!(
+            visible_refill.source_lander,
+            Some(ActorSourceLanderMetadata {
+                x_fraction: 0x63,
+                y_fraction: 0xF0,
+                x_velocity: 0xFFF4,
+                y_velocity: 0x0090,
+                shot_timer: 0x23,
+                sleep_ticks: 0,
+                picture_frame: 0,
+                target_human_index: Some(3),
+            })
+        );
+
+        let refill_ids = refill_landers
+            .iter()
+            .map(|snapshot| snapshot.id)
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            report
+                .draws
+                .iter()
+                .filter(|draw| refill_ids.contains(&draw.actor) && draw.sprite == SpriteKey::Lander)
+                .count(),
+            1
+        );
+
+        let delayed_sound = driver.step(GameInput::NONE);
+        assert!(
+            delayed_sound
+                .sounds
+                .contains(&SoundCue::SourceCommand(SOURCE_APPEAR_SOUND_COMMAND))
+        );
     }
 
     #[test]
@@ -23518,6 +23927,19 @@ mod tests {
         }
 
         panic!("source enemy reserve should reactivate after smart-bomb cooldown");
+    }
+
+    fn step_until_first_wave_early_reserve_materializes(
+        driver: &mut ActorGameDriver,
+    ) -> StepReport {
+        for _ in 0..=SOURCE_FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS {
+            let report = driver.step(GameInput::NONE);
+            if report.sounds.contains(&SoundCue::HyperspaceMaterialize) {
+                return report;
+            }
+        }
+
+        panic!("first-wave early reserve should materialize on source cadence");
     }
 
     fn snapshot_for(report: &StepReport, id: ActorId) -> &ActorSnapshot {

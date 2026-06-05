@@ -95,7 +95,11 @@ verification tools.
   449-step early reserve cadence, materializes the five MAME-observed early
   reserve lander rows with the `0xEA` appearance cue, resets the source
   target-list cursor/RNG window, and leaves the later first-wave lander reserve
-  intact for refill behavior. Source swarmer
+  intact for refill behavior. Once active first-wave landers fall below the
+  source threshold, the actor driver now runs the source 47-step refill cadence,
+  restores the fixed refill rows, keeps the four hidden lanes live without
+  leaking draw/collision output, and materializes only the target-3 lane with
+  the delayed `0xEA` cue. Source swarmer
   reserves use `PLRES`/`RSW0` phony-object placement before the same
   mini-swarmer runtime used by pod destruction. Source
   rematerialization now publishes the `SEED/HSEED` background word into

@@ -207,7 +207,11 @@ tree:
   the five MAME-observed early reserve lander rows with the `0xEA` appearance
   cue while hostiles are still active, applies the source target-list cursor/RNG
   reset, and keeps normal reserve restoration available when source-counted
-  hostiles have already been cleared.
+  hostiles have already been cleared. It also owns the first-wave refill
+  scheduler: when active landers fall below the source threshold and five
+  landers remain reserved, it waits the source 47-step delay, restores the fixed
+  refill rows, keeps hidden lanes live without draw/collision output, and
+  materializes the target-3 lane with the delayed `0xEA` cue.
   Playing reports project the source `BGOUT` terrain into state/render output.
   Final-human removal starts a driver-owned source terrain-blow snapshot,
   erases clean terrain and scanner terrain, emits source flash windows,
