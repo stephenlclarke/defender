@@ -219,6 +219,16 @@ records. The driver applies wave `1` when play starts, carries the wave number
 in `StepPrompt` and `StepReport`, and advances to the next configured profile
 when the current hostile snapshots are cleared.
 
+Wave clear enters a driver-owned survivor-bonus interstitial instead of
+spawning the next wave immediately. `StepReport::survivor_bonus` exposes the
+active source-shaped cadence: the first surviving human is scored on the
+`WaveCleared` report, each later survivor waits four actor steps, every survivor
+awards `100 * min(wave, 5)` points through the same replay-stock scoring system,
+and the next wave waits through the source `0x80` wave-advance sleep before the
+driver emits `AdvanceWave`/`WaveStarted`. The render bridge draws only the
+source `ASTP3` icons whose awards have become visible, so rendering remains a
+consumer of actor reports rather than the source of the timing.
+
 The default actor progression is the embedded checked script
 `assets/red-label/actor-waves.script`, whose `source_waves` directive expands
 through `assets/red-label/wave-table.tsv` via an actor-owned adapter. The

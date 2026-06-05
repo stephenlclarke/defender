@@ -2,6 +2,15 @@
 
 This file records behavior that must not be guessed in arcade-core code.
 
+Actor-rewrite status as of `2026-06-05`: the isolated actor runtime now owns
+the source-shaped wave-clear survivor-bonus loop. `ActorGameDriver` awards one
+surviving human at a time for `100 * min(wave, 5)` points, draws each source
+`ASTP3` icon as the corresponding award becomes visible, waits four actor steps
+between survivor awards, and holds next-wave spawning through the source
+`0x80` wave-advance sleep. Earlier dated entries below that say a slice did not
+add the loop are retained as historical notes for those older clean/oracle
+slices.
+
 Status as of `2026-05-27`: the accepted red-label target remains the oracle for
 the rewrite. The profiled clean-fidelity gate matches all 12 embedded Phase 1
 scenario input programs, and the R9-E2 full validation gate has passed. Strict

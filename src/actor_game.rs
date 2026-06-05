@@ -100,6 +100,8 @@ const SOURCE_SURVIVOR_BONUS_FIRST_HUMAN_SCREEN: u16 = 0x3CA0;
 const SOURCE_SURVIVOR_BONUS_HUMAN_STEP: u8 = 0x04;
 const SOURCE_SURVIVOR_BONUS_HUMAN_LIMIT: usize = 10;
 const SOURCE_SURVIVOR_BONUS_HUMAN_SIZE: [f32; 2] = [4.0, 8.0];
+const SOURCE_SURVIVOR_BONUS_ASTRONAUT_SLEEP_STEPS: u8 = 4;
+const SOURCE_SURVIVOR_BONUS_WAVE_ADVANCE_SLEEP_STEPS: u8 = 0x80;
 const SOURCE_ATTRACT_DEFENDER_WORDMARK_DURATION_STEPS: u64 =
     SOURCE_ATTRACT_HALL_OF_FAME_START_STEP - SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP;
 const SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS: u64 =
@@ -5240,6 +5242,7 @@ pub struct StepReport {
     pub high_score_initial_accepted: bool,
     pub high_score_submitted: bool,
     pub bonus_awarded: bool,
+    pub survivor_bonus: Option<SurvivorBonusReport>,
     pub behavior_script: ActorBehaviorScriptManifest,
     pub source_rng: Option<ActorSourceRngSnapshot>,
     pub snapshots: Vec<ActorSnapshot>,
@@ -5264,6 +5267,18 @@ impl StepReport {
     pub fn game_state(&self) -> GameState {
         ActorStateBridge::new().state_for_report(self)
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SurvivorBonusReport {
+    pub next_wave: u16,
+    pub multiplier: u8,
+    pub total_survivors: u8,
+    pub visible_icons: u8,
+    pub remaining_awards: u8,
+    pub awarded_points: Option<u32>,
+    pub astronaut_sleep_steps_remaining: u8,
+    pub wave_advance_sleep_steps_remaining: Option<u8>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -5986,7 +6001,7 @@ fn push_actor_survivor_bonus_icon_sprites(scene: &mut RenderScene, report: &Step
         return;
     }
 
-    for index in 0..actor_surviving_human_count(report).min(SOURCE_SURVIVOR_BONUS_HUMAN_LIMIT) {
+    for index in 0..actor_visible_survivor_bonus_icon_count(report) {
         scene.push_sprite(SceneSprite {
             sprite: SpriteId::HUMAN,
             layer: RenderLayer::Overlay,
@@ -6003,22 +6018,22 @@ fn push_actor_survivor_bonus_icon_sprites(scene: &mut RenderScene, report: &Step
 
 fn should_show_actor_wave_completion_status(report: &StepReport) -> bool {
     report.phase == Phase::Playing
-        && report
-            .commands
-            .iter()
-            .any(|command| matches!(command, GameCommand::WaveCleared { .. }))
+        && (report.survivor_bonus.is_some()
+            || report
+                .commands
+                .iter()
+                .any(|command| matches!(command, GameCommand::WaveCleared { .. })))
         && report
             .snapshots
             .iter()
             .any(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive)
 }
 
-fn actor_surviving_human_count(report: &StepReport) -> usize {
+fn actor_visible_survivor_bonus_icon_count(report: &StepReport) -> usize {
     report
-        .snapshots
-        .iter()
-        .filter(|snapshot| snapshot.kind == ActorKind::Human && snapshot.alive)
-        .count()
+        .survivor_bonus
+        .map(|bonus| usize::from(bonus.visible_icons).min(SOURCE_SURVIVOR_BONUS_HUMAN_LIMIT))
+        .unwrap_or(0)
 }
 
 fn actor_visible_decimal_digits(value: u8) -> ([u8; 2], usize) {
@@ -7581,6 +7596,71 @@ struct AppliedCommands {
     bonus_awarded: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PendingSurvivorBonus {
+    next_wave: u16,
+    multiplier: u8,
+    total_survivors: u8,
+    visible_icons: u8,
+    remaining_awards: u8,
+    astronaut_sleep_steps_remaining: u8,
+    wave_advance_sleep_steps_remaining: Option<u8>,
+}
+
+impl PendingSurvivorBonus {
+    fn new(current_wave: u16, next_wave: u16, survivors: usize) -> Self {
+        let total_survivors = u8::try_from(survivors.min(SOURCE_SURVIVOR_BONUS_HUMAN_LIMIT))
+            .unwrap_or(SOURCE_SURVIVOR_BONUS_HUMAN_LIMIT as u8);
+        Self {
+            next_wave,
+            multiplier: clean_wave(current_wave).min(5),
+            total_survivors,
+            visible_icons: 0,
+            remaining_awards: total_survivors,
+            astronaut_sleep_steps_remaining: 0,
+            wave_advance_sleep_steps_remaining: None,
+        }
+    }
+
+    fn bonus_points(&self) -> u32 {
+        u32::from(self.multiplier) * 100
+    }
+
+    fn award_next_survivor(&mut self) -> Option<u32> {
+        if self.remaining_awards == 0 {
+            return None;
+        }
+
+        self.remaining_awards = self.remaining_awards.saturating_sub(1);
+        self.visible_icons = self
+            .visible_icons
+            .saturating_add(1)
+            .min(self.total_survivors);
+        self.astronaut_sleep_steps_remaining = SOURCE_SURVIVOR_BONUS_ASTRONAUT_SLEEP_STEPS;
+        Some(self.bonus_points())
+    }
+
+    fn report(self, awarded_points: Option<u32>) -> SurvivorBonusReport {
+        SurvivorBonusReport {
+            next_wave: self.next_wave,
+            multiplier: self.multiplier,
+            total_survivors: self.total_survivors,
+            visible_icons: self.visible_icons,
+            remaining_awards: self.remaining_awards,
+            awarded_points,
+            astronaut_sleep_steps_remaining: self.astronaut_sleep_steps_remaining,
+            wave_advance_sleep_steps_remaining: self.wave_advance_sleep_steps_remaining,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SurvivorBonusStep {
+    Waiting,
+    Award(u32),
+    StartNextWave,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorDriverScriptManifest {
     pub step: u64,
@@ -7671,7 +7751,7 @@ pub struct ActorGameDriver {
     source_rng: ActorSourceRng,
     source_shell_scan_steps_remaining: u8,
     game_over_hall_of_fame_stall_remaining: Option<u8>,
-    pending_wave_start: bool,
+    pending_survivor_bonus: Option<PendingSurvivorBonus>,
 }
 
 impl ActorGameDriver {
@@ -7713,7 +7793,7 @@ impl ActorGameDriver {
             source_rng: SOURCE_PLAYFIELD_START_RNG,
             source_shell_scan_steps_remaining: SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS,
             game_over_hall_of_fame_stall_remaining: None,
-            pending_wave_start: false,
+            pending_survivor_bonus: None,
         };
         let attract_id = driver.allocate_actor_id();
         let script_id = driver.allocate_actor_id();
@@ -7727,16 +7807,33 @@ impl ActorGameDriver {
     pub fn step(&mut self, input: GameInput) -> StepReport {
         self.step = self.step.saturating_add(1);
         let mut step_commands = Vec::new();
-        let started_pending_wave = self.start_pending_wave_if_needed();
-        if started_pending_wave {
-            step_commands.push(GameCommand::AdvanceWave { wave: self.wave });
+        let mut survivor_bonus_awarded_points = None;
+        let mut survivor_bonus_replay_awarded = false;
+        match self.advance_pending_survivor_bonus() {
+            SurvivorBonusStep::StartNextWave => {
+                self.start_pending_wave();
+                step_commands.push(GameCommand::AdvanceWave { wave: self.wave });
+            }
+            SurvivorBonusStep::Award(points) => {
+                survivor_bonus_awarded_points = Some(points);
+                if self.award_points(points) {
+                    survivor_bonus_replay_awarded = true;
+                }
+            }
+            SurvivorBonusStep::Waiting => {}
         }
+        let survivor_bonus_interstitial = self.pending_survivor_bonus.is_some();
         let was_playing = self.phase == Phase::Playing;
-        let high_score_entry_step = self.apply_high_score_entry_input(input);
+        let effective_input = if survivor_bonus_interstitial {
+            GameInput::NONE
+        } else {
+            input
+        };
+        let high_score_entry_step = self.apply_high_score_entry_input(effective_input);
         let mut behavior_script = self
             .behavior_script
-            .with_input_overrides(input, self.snapshots.values().cloned());
-        let source_rng = if self.phase == Phase::Playing {
+            .with_input_overrides(effective_input, self.snapshots.values().cloned());
+        let source_rng = if self.phase == Phase::Playing && !survivor_bonus_interstitial {
             Some(self.source_rng.advance().snapshot())
         } else {
             None
@@ -7745,16 +7842,19 @@ impl ActorGameDriver {
             behavior_script =
                 behavior_script.with_hyperspace_source_seed(source_rng.hyperspace_seed());
         }
-        let source_shell_scan_tick = if self.phase == Phase::Playing {
+        let source_shell_scan_tick = if self.phase == Phase::Playing && !survivor_bonus_interstitial
+        {
             self.advance_source_shell_scan_tick()
         } else {
             false
         };
-        let prompt_credits = self.credits.saturating_add(input.coin_insertions());
+        let prompt_credits = self
+            .credits
+            .saturating_add(effective_input.coin_insertions());
         let base_prompt = StepPrompt {
             step: self.step,
             phase: self.phase,
-            input,
+            input: effective_input,
             wave: self.wave,
             score: self.score,
             credits: prompt_credits,
@@ -7795,11 +7895,21 @@ impl ActorGameDriver {
         self.advance_baiter_timer(&mut commands);
         let applied_commands = self.apply_commands(&commands);
         self.remove_dead_actors(&dead_actor_ids);
-        if self.advance_wave_if_cleared(was_playing, &commands) {
+        survivor_bonus_replay_awarded |= applied_commands.bonus_awarded;
+        if self.start_survivor_bonus_if_wave_cleared(was_playing, &commands) {
             commands.push(GameCommand::WaveCleared {
                 next_wave: self.wave.saturating_add(1),
             });
+            if let SurvivorBonusStep::Award(points) = self.award_initial_survivor_bonus() {
+                survivor_bonus_awarded_points = Some(points);
+                if self.award_points(points) {
+                    survivor_bonus_replay_awarded = true;
+                }
+            }
         }
+        let survivor_bonus = self
+            .pending_survivor_bonus
+            .map(|bonus| bonus.report(survivor_bonus_awarded_points));
 
         let report = StepReport {
             step: self.step,
@@ -7815,7 +7925,8 @@ impl ActorGameDriver {
             high_score_initials: self.high_score_initials,
             high_score_initial_accepted: high_score_entry_step.accepted,
             high_score_submitted: high_score_entry_step.submitted,
-            bonus_awarded: applied_commands.bonus_awarded,
+            bonus_awarded: survivor_bonus_replay_awarded,
+            survivor_bonus,
             behavior_script: behavior_script.manifest(),
             source_rng,
             snapshots: self.snapshots.values().cloned().collect(),
@@ -8351,7 +8462,7 @@ impl ActorGameDriver {
         self.reset_source_shell_scan();
         self.high_score_initials = HighScoreInitialsState::EMPTY;
         self.game_over_hall_of_fame_stall_remaining = None;
-        self.pending_wave_start = false;
+        self.pending_survivor_bonus = None;
         self.high_scores.record(self.score);
         self.phase = if self.high_scores.qualifies(self.score) {
             Phase::HighScoreEntry
@@ -8392,7 +8503,7 @@ impl ActorGameDriver {
         self.next_bonus = SOURCE_REPLAY_SCORE;
         self.high_score_initials = HighScoreInitialsState::EMPTY;
         self.game_over_hall_of_fame_stall_remaining = None;
-        self.pending_wave_start = false;
+        self.pending_survivor_bonus = None;
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.reset_source_shell_scan();
         self.apply_wave_profile();
@@ -8401,18 +8512,65 @@ impl ActorGameDriver {
         self.spawn_initial_humans();
     }
 
-    fn start_pending_wave_if_needed(&mut self) -> bool {
-        if self.phase != Phase::Playing || !self.pending_wave_start {
-            return false;
-        }
-
+    fn start_pending_wave(&mut self) {
         self.wave = self.wave.saturating_add(1);
-        self.pending_wave_start = false;
+        self.pending_survivor_bonus = None;
         self.clear_wave_playfield_actors();
         self.apply_wave_profile();
         self.spawn_wave_hostiles();
         self.spawn_initial_humans();
-        true
+    }
+
+    fn advance_pending_survivor_bonus(&mut self) -> SurvivorBonusStep {
+        let Some(mut bonus) = self.pending_survivor_bonus else {
+            return SurvivorBonusStep::Waiting;
+        };
+
+        if let Some(wave_sleep) = bonus.wave_advance_sleep_steps_remaining {
+            let next_sleep = wave_sleep.saturating_sub(1);
+            if next_sleep == 0 {
+                self.pending_survivor_bonus = None;
+                return SurvivorBonusStep::StartNextWave;
+            }
+            bonus.wave_advance_sleep_steps_remaining = Some(next_sleep);
+            self.pending_survivor_bonus = Some(bonus);
+            return SurvivorBonusStep::Waiting;
+        }
+
+        if bonus.astronaut_sleep_steps_remaining > 0 {
+            bonus.astronaut_sleep_steps_remaining =
+                bonus.astronaut_sleep_steps_remaining.saturating_sub(1);
+            if bonus.astronaut_sleep_steps_remaining > 0 {
+                self.pending_survivor_bonus = Some(bonus);
+                return SurvivorBonusStep::Waiting;
+            }
+        }
+
+        if let Some(points) = bonus.award_next_survivor() {
+            self.pending_survivor_bonus = Some(bonus);
+            return SurvivorBonusStep::Award(points);
+        }
+
+        bonus.wave_advance_sleep_steps_remaining =
+            Some(SOURCE_SURVIVOR_BONUS_WAVE_ADVANCE_SLEEP_STEPS);
+        self.pending_survivor_bonus = Some(bonus);
+        SurvivorBonusStep::Waiting
+    }
+
+    fn award_initial_survivor_bonus(&mut self) -> SurvivorBonusStep {
+        let Some(mut bonus) = self.pending_survivor_bonus else {
+            return SurvivorBonusStep::Waiting;
+        };
+
+        if let Some(points) = bonus.award_next_survivor() {
+            self.pending_survivor_bonus = Some(bonus);
+            return SurvivorBonusStep::Award(points);
+        }
+
+        bonus.wave_advance_sleep_steps_remaining =
+            Some(SOURCE_SURVIVOR_BONUS_WAVE_ADVANCE_SLEEP_STEPS);
+        self.pending_survivor_bonus = Some(bonus);
+        SurvivorBonusStep::Waiting
     }
 
     fn reset_source_shell_scan(&mut self) {
@@ -8493,19 +8651,34 @@ impl ActorGameDriver {
         }
     }
 
-    fn advance_wave_if_cleared(&mut self, was_playing: bool, commands: &[GameCommand]) -> bool {
+    fn start_survivor_bonus_if_wave_cleared(
+        &mut self,
+        was_playing: bool,
+        commands: &[GameCommand],
+    ) -> bool {
         if !was_playing
             || self.phase != Phase::Playing
             || self.wave == 0
-            || self.pending_wave_start
+            || self.pending_survivor_bonus.is_some()
             || self.has_hostile_snapshots()
             || commands_spawn_hostiles(commands)
         {
             return false;
         }
 
-        self.pending_wave_start = true;
+        self.pending_survivor_bonus = Some(PendingSurvivorBonus::new(
+            self.wave,
+            self.wave.saturating_add(1),
+            self.surviving_human_count(),
+        ));
         true
+    }
+
+    fn surviving_human_count(&self) -> usize {
+        self.snapshots
+            .values()
+            .filter(|snapshot| snapshot.kind == ActorKind::Human && snapshot.alive)
+            .count()
     }
 
     fn has_hostile_snapshots(&self) -> bool {
@@ -12555,6 +12728,20 @@ mod tests {
         assert_eq!(cleared.state.wave, 1);
         assert!(cleared.state.world.enemies.is_empty());
         assert_eq!(cleared.state.world.humans.len(), 2);
+        assert_eq!(cleared.report.score, 250);
+        assert_eq!(
+            cleared.report.survivor_bonus,
+            Some(SurvivorBonusReport {
+                next_wave: 2,
+                multiplier: 1,
+                total_survivors: 2,
+                visible_icons: 1,
+                remaining_awards: 1,
+                awarded_points: Some(100),
+                astronaut_sleep_steps_remaining: SOURCE_SURVIVOR_BONUS_ASTRONAUT_SLEEP_STEPS,
+                wave_advance_sleep_steps_remaining: None,
+            })
+        );
         assert!(
             cleared
                 .report
@@ -12593,14 +12780,96 @@ mod tests {
                 && sprite.position == [176.0, 144.0]
                 && sprite.size == [6.0, 8.0]
         }));
-        for position in [[120.0, 160.0], [128.0, 160.0]] {
-            assert!(cleared.scene.sprites.iter().any(|sprite| {
-                sprite.sprite == SpriteId::HUMAN
-                    && sprite.layer == RenderLayer::Overlay
-                    && sprite.position == position
-                    && sprite.size == SOURCE_SURVIVOR_BONUS_HUMAN_SIZE
-                    && sprite.tint == Color::WHITE
-            }));
+        assert!(scene_has_survivor_bonus_icon(
+            &cleared.scene,
+            [120.0, 160.0]
+        ));
+        assert!(!scene_has_survivor_bonus_icon(
+            &cleared.scene,
+            [128.0, 160.0]
+        ));
+
+        for expected_sleep in [3, 2, 1] {
+            let sleep = runtime.step(GameInput::NONE);
+            assert_eq!(sleep.state.wave, 1);
+            assert_eq!(sleep.report.score, 250);
+            assert_eq!(
+                sleep
+                    .report
+                    .survivor_bonus
+                    .expect("survivor bonus should remain active")
+                    .astronaut_sleep_steps_remaining,
+                expected_sleep
+            );
+            assert!(!sleep.events.gameplay().contains(&GameEvent::WaveStarted));
+        }
+
+        let second_survivor = runtime.step(GameInput::NONE);
+
+        assert_eq!(second_survivor.state.wave, 1);
+        assert_eq!(second_survivor.report.score, 350);
+        assert_eq!(
+            second_survivor.report.survivor_bonus,
+            Some(SurvivorBonusReport {
+                next_wave: 2,
+                multiplier: 1,
+                total_survivors: 2,
+                visible_icons: 2,
+                remaining_awards: 0,
+                awarded_points: Some(100),
+                astronaut_sleep_steps_remaining: SOURCE_SURVIVOR_BONUS_ASTRONAUT_SLEEP_STEPS,
+                wave_advance_sleep_steps_remaining: None,
+            })
+        );
+        assert!(scene_has_survivor_bonus_icon(
+            &second_survivor.scene,
+            [120.0, 160.0]
+        ));
+        assert!(scene_has_survivor_bonus_icon(
+            &second_survivor.scene,
+            [128.0, 160.0]
+        ));
+
+        for expected_sleep in [3, 2, 1] {
+            let sleep = runtime.step(GameInput::NONE);
+            assert_eq!(
+                sleep
+                    .report
+                    .survivor_bonus
+                    .expect("survivor bonus should remain active")
+                    .astronaut_sleep_steps_remaining,
+                expected_sleep
+            );
+            assert!(!sleep.events.gameplay().contains(&GameEvent::WaveStarted));
+        }
+
+        let wave_sleep = runtime.step(GameInput::NONE);
+        assert_eq!(
+            wave_sleep
+                .report
+                .survivor_bonus
+                .expect("survivor bonus should enter wave sleep")
+                .wave_advance_sleep_steps_remaining,
+            Some(SOURCE_SURVIVOR_BONUS_WAVE_ADVANCE_SLEEP_STEPS)
+        );
+        assert!(
+            !wave_sleep
+                .events
+                .gameplay()
+                .contains(&GameEvent::WaveStarted)
+        );
+
+        for expected_sleep in (1..SOURCE_SURVIVOR_BONUS_WAVE_ADVANCE_SLEEP_STEPS).rev() {
+            let sleep = runtime.step(GameInput::NONE);
+            assert_eq!(
+                sleep
+                    .report
+                    .survivor_bonus
+                    .expect("survivor bonus wave sleep should remain active")
+                    .wave_advance_sleep_steps_remaining,
+                Some(expected_sleep)
+            );
+            assert!(!sleep.events.gameplay().contains(&GameEvent::WaveStarted));
         }
 
         let next_wave = runtime.step(GameInput::NONE);
@@ -12618,6 +12887,7 @@ mod tests {
                 .commands
                 .contains(&GameCommand::AdvanceWave { wave: 2 })
         );
+        assert_eq!(next_wave.report.survivor_bonus, None);
         assert_eq!(next_wave.state.world.humans.len(), 0);
         assert!(
             next_wave
@@ -12664,6 +12934,70 @@ mod tests {
     }
 
     #[test]
+    fn actor_survivor_bonus_uses_source_wave_multiplier_and_replay_stock() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 3;
+        driver.score = 9_700;
+        driver.next_bonus = SOURCE_REPLAY_SCORE;
+        driver.lives = 3;
+        driver.smart_bombs = 3;
+        driver.spawn_player();
+        driver.spawn_human_for_test(Point::new(40, HUMAN_GROUND_Y));
+        driver.spawn_human_for_test(Point::new(64, HUMAN_GROUND_Y));
+        let mut runtime = ActorRuntimeAdapter::with_driver(driver);
+
+        let cleared = runtime.step(GameInput::NONE);
+
+        assert!(
+            cleared
+                .report
+                .commands
+                .contains(&GameCommand::WaveCleared { next_wave: 4 })
+        );
+        assert_eq!(cleared.report.score, 10_000);
+        assert_eq!(cleared.report.next_bonus, 20_000);
+        assert!(cleared.report.bonus_awarded);
+        assert_eq!(
+            cleared.report.survivor_bonus,
+            Some(SurvivorBonusReport {
+                next_wave: 4,
+                multiplier: 3,
+                total_survivors: 2,
+                visible_icons: 1,
+                remaining_awards: 1,
+                awarded_points: Some(300),
+                astronaut_sleep_steps_remaining: SOURCE_SURVIVOR_BONUS_ASTRONAUT_SLEEP_STEPS,
+                wave_advance_sleep_steps_remaining: None,
+            })
+        );
+        assert_eq!(cleared.state.player.lives, 4);
+        assert_eq!(cleared.state.player.smart_bombs, 4);
+        assert!(cleared.events.gameplay().contains(&GameEvent::BonusAwarded));
+
+        for _ in 0..SOURCE_SURVIVOR_BONUS_ASTRONAUT_SLEEP_STEPS - 1 {
+            runtime.step(GameInput::NONE);
+        }
+        let second_survivor = runtime.step(GameInput::NONE);
+
+        assert_eq!(second_survivor.report.score, 10_300);
+        assert_eq!(
+            second_survivor.report.survivor_bonus,
+            Some(SurvivorBonusReport {
+                next_wave: 4,
+                multiplier: 3,
+                total_survivors: 2,
+                visible_icons: 2,
+                remaining_awards: 0,
+                awarded_points: Some(300),
+                astronaut_sleep_steps_remaining: SOURCE_SURVIVOR_BONUS_ASTRONAUT_SLEEP_STEPS,
+                wave_advance_sleep_steps_remaining: None,
+            })
+        );
+        assert!(!second_survivor.report.bonus_awarded);
+    }
+
+    #[test]
     fn actor_render_scene_bridge_maps_projectiles_and_explosion_variants() {
         let report = StepReport {
             step: 99,
@@ -12680,6 +13014,7 @@ mod tests {
             high_score_initial_accepted: false,
             high_score_submitted: false,
             bonus_awarded: false,
+            survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
             source_rng: None,
             snapshots: Vec::new(),
@@ -12879,6 +13214,7 @@ mod tests {
             high_score_initial_accepted: false,
             high_score_submitted: false,
             bonus_awarded: false,
+            survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
             source_rng: None,
             snapshots: Vec::new(),
@@ -12988,6 +13324,7 @@ mod tests {
             high_score_initial_accepted: false,
             high_score_submitted: false,
             bonus_awarded: false,
+            survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
             source_rng: None,
             snapshots: vec![player, lander, human, laser, enemy_laser, bomb],
@@ -13141,6 +13478,7 @@ mod tests {
             high_score_initial_accepted: false,
             high_score_submitted: false,
             bonus_awarded: false,
+            survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
             source_rng: None,
             snapshots: Vec::new(),
@@ -14819,8 +15157,15 @@ mod tests {
             ..GameInput::NONE
         });
 
-        assert_eq!(report.score, LANDER_SCORE * 5);
+        assert_eq!(report.score, LANDER_SCORE * 5 + 100);
         assert_eq!(report.smart_bombs, INITIAL_SMART_BOMBS - 1);
+        assert_eq!(
+            report
+                .survivor_bonus
+                .expect("smart-bomb wave clear should start survivor bonus")
+                .awarded_points,
+            Some(100)
+        );
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
         assert_eq!(driver.snapshot_count(ActorKind::Human), 10);
         assert!(report.sounds.contains(&SoundCue::SmartBomb));
@@ -14867,8 +15212,15 @@ mod tests {
             ..GameInput::NONE
         });
 
-        assert_eq!(report.score, LANDER_SCORE * 5);
+        assert_eq!(report.score, LANDER_SCORE * 5 + 100);
         assert_eq!(report.smart_bombs, 0);
+        assert_eq!(
+            report
+                .survivor_bonus
+                .expect("overlay smart-bomb wave clear should start survivor bonus")
+                .awarded_points,
+            Some(100)
+        );
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
         assert!(report.sounds.contains(&SoundCue::SmartBomb));
         assert!(report.commands.contains(&GameCommand::SmartBomb {
@@ -15125,7 +15477,7 @@ mod tests {
                 .contains(&GameCommand::WaveCleared { next_wave: 2 })
         );
 
-        let live = driver.step(GameInput::NONE);
+        let live = step_until_wave_started(&mut driver, 2);
         assert_eq!(live.wave, 2);
         assert!(
             live.commands
@@ -17109,6 +17461,7 @@ mod tests {
             driver.phase = Phase::Playing;
             driver.wave = 1;
             driver.spawn_player();
+            driver.spawn_lander_for_test(Point::new(220, 80));
             driver.step(GameInput::NONE);
             driver.source_rng = ActorSourceRng {
                 seed,
@@ -17239,7 +17592,7 @@ mod tests {
                 .contains(&GameCommand::WaveCleared { next_wave: 2 })
         );
 
-        let next_wave = driver.step(GameInput::NONE);
+        let next_wave = step_until_wave_started(&mut driver, 2);
         assert_eq!(next_wave.wave, 2);
         assert!(
             !next_wave
@@ -17743,7 +18096,7 @@ mod tests {
                 .contains(&GameCommand::WaveCleared { next_wave: 2 })
         );
 
-        let next_wave = driver.step(GameInput::NONE);
+        let next_wave = step_until_wave_started(&mut driver, 2);
         assert_eq!(next_wave.wave, 2);
         assert!(
             next_wave
@@ -17868,7 +18221,7 @@ mod tests {
                 .contains(&GameCommand::WaveCleared { next_wave: 2 })
         );
 
-        let next_wave = driver.step(GameInput::NONE);
+        let next_wave = step_until_wave_started(&mut driver, 2);
         assert_eq!(next_wave.wave, 2);
         assert!(
             next_wave
@@ -18991,6 +19344,27 @@ mod tests {
         });
         driver.step(GameInput::NONE);
         driver
+    }
+
+    fn scene_has_survivor_bonus_icon(scene: &RenderScene, position: [f32; 2]) -> bool {
+        scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HUMAN
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == position
+                && sprite.size == SOURCE_SURVIVOR_BONUS_HUMAN_SIZE
+                && sprite.tint == Color::WHITE
+        })
+    }
+
+    fn step_until_wave_started(driver: &mut ActorGameDriver, wave: u16) -> StepReport {
+        for _ in 0..=256 {
+            let report = driver.step(GameInput::NONE);
+            if report.commands.contains(&GameCommand::AdvanceWave { wave }) {
+                return report;
+            }
+        }
+
+        panic!("wave {wave} should start after survivor bonus cadence");
     }
 
     fn snapshot_for(report: &StepReport, id: ActorId) -> &ActorSnapshot {

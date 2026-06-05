@@ -626,13 +626,15 @@ frames. Replacement of `docs/start-sequence.gif` still requires owner
 acceptance of the candidate media.
 During a pending two-player start handoff, scenes draw the source-backed
 `PLYR1`/`PLYR2` player label at `0x3C80`. On the
-existing clean wave-cleared frame, scenes draw source-backed `ATWV`, `COMPV`,
+actor wave-cleared interstitial, scenes draw source-backed `ATWV`, `COMPV`,
 and `BONSX` status text at `0x3850`, `0x3D60`, and `0x3C90`, plus the wave
 number at `0x6550` and multiplier digit at `0x5890`; source numeric glyphs
 use the `NUMBR0`-`NUMBR9` column-major image records for score, credit,
-Hall of Fame, wave, multiplier, and scoring/action digits; surviving humans are
-also projected as source `ASTP3` bonus icons from `0x3CA0` with the source
-`+0x0400` step. While the isolated `HighScoreEntry` surface is active,
+Hall of Fame, wave, multiplier, and scoring/action digits. Surviving humans are
+projected as source `ASTP3` bonus icons from `0x3CA0` with the source
+`+0x0400` step as each survivor is scored on the source four-step cadence,
+then next-wave spawning waits through the source `0x80` wave-advance sleep.
+While the isolated `HighScoreEntry` surface is active,
 scenes draw the source-backed `PLYR1`/`PLYR2` player label at `0x3E38`,
 `HOFV1`-`HOFV4` instruction message lines from `0x1458` with source vertical
 offsets, entered initials from `0x46AC` with source horizontal offsets, and
@@ -876,9 +878,10 @@ reintroduce legacy implementation terminology.
   awards through actor scoring, and an
   actor wave-cleared interstitial report. On that report, the driver emits
   `WaveCleared`, keeps surviving humans visible for the source `ATWV` /
-  `COMPV` / `BONSX` status and survivor icon projection, and delays the next
-  wave's actor spawns plus `WaveStarted` event until the following simulation
-  step.
+  `COMPV` / `BONSX` status, awards one survivor at a time for
+  `100 * min(wave, 5)`, projects each source `ASTP3` icon as it is awarded, and
+  delays the next wave's actor spawns plus `WaveStarted` event until the source
+  four-step astronaut cadence and final `0x80` wave-advance sleep complete.
   variant draw metadata for hostile families, bomb, player, and human clouds,
   age-based source explosion-size scaling in the actor render bridge,
   descriptor-backed enemy-family source explosion pixel clouds, source

@@ -601,9 +601,12 @@ source-shaped terrain explosion growth cadence, source-backed per-family enemy
 hit sound-command evidence, source-backed
 enemy-projectile collision sound-command evidence, and source `BORDER`
 top-display frame geometry. R9 now treats exact per-scenario pixel/offscreen
-render parity, strict long-scenario sprite count/layer parity,
-and wave-completion survivor-bonus loop/cadence beyond current presentation as
-post-R9 audit follow-ups rather than active B01-B12 blockers. The former B13
+render parity and strict long-scenario sprite count/layer parity as post-R9
+audit follow-ups rather than active B01-B12 blockers. The actor runtime now
+owns the source-shaped wave-completion survivor-bonus loop: one survivor is
+scored and drawn at a time, awards use `100 * min(wave, 5)`, astronaut awards
+sleep for four actor steps, and next-wave spawning waits through the source
+`0x80` wave-advance sleep. The former B13
 visual rejection is now handled through the current owner-review checklist and
 accepted MAME-vs-clean media gate rather than as an open implementation defect.
 Player-one/player-two score digits, life/smart-bomb stock drawing, two-player
@@ -1117,10 +1120,12 @@ presentation evidence, expanded-object appearance/explosion slots as sprite
 presentation evidence, and source `BORDER` top-display frame geometry, but
 clean gameplay lifecycle behavior outside the source-backed score-popup
 surface, source expanded-object explosion timing, and source-backed
-player-death pixel-cloud and terrain-blow surfaces, and wave-completion
-survivor-bonus loop/cadence beyond current presentation remain source-backed
-audit residuals. R9-E1 records exact per-scenario pixel/offscreen render parity
-as audit evidence rather than another clean runtime surface.
+player-death pixel-cloud and terrain-blow surfaces remains a source-backed
+audit residual. The actor runtime now owns wave-completion survivor-bonus
+scoring/presentation cadence through a driver-owned interstitial state rather
+than the earlier one-frame icon projection. R9-E1 records exact per-scenario
+pixel/offscreen render parity as audit evidence rather than another clean
+runtime surface.
 Red-label message glyphs now back the
 two-player player-start `PLAYER ONE` / `PLAYER TWO` prompt, player-switch
 `PLAYER ONE` / `PLAYER TWO` plus `GAME OVER` prompt, the ordinary final

@@ -129,8 +129,10 @@ verification tools.
   with final-life collisions entering the game-over/high-score path. Actor wave
   clear now publishes a separate interstitial `StepReport` with `WaveCleared`,
   surviving human snapshots, source `ATTACK WAVE` / `COMPLETED` / `BONUS X`
-  text, and survivor bonus icons before the following actor step installs the
-  next wave's script, spawns its actors, and emits `WaveStarted`. Explosion
+  text, source-shaped survivor scoring at `100 * min(wave, 5)`, one visible
+  `ASTP3` survivor icon per awarded human on the source four-step cadence, and
+  the source `0x80` wave-advance sleep before the following wave installs its
+  script, spawns its actors, and emits `WaveStarted`. Explosion
   draws now carry lander, mutant, bomber, pod, swarmer, baiter, bomb, player,
   and human variant metadata through the actor render and clean-state bridges,
   and actor render output now uses draw age with the clean source
@@ -5507,3 +5509,29 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780647196072959`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780648443923729`.
+- `2026-06-05 16:19 BST`: Completed the actor survivor-bonus cadence cycle.
+  `ActorGameDriver` now owns a source-shaped wave-clear survivor-bonus
+  interstitial instead of spawning the next wave on the following actor step.
+  The first survivor scores on the `WaveCleared` report, later survivors wait
+  the source four-step astronaut sleep, each award uses `100 * min(wave, 5)`
+  through the existing replay-stock scoring system, visible source `ASTP3`
+  icons appear one at a time, and the next wave waits through the source `0x80`
+  wave-advance sleep before `AdvanceWave` / `WaveStarted`. Updated tests now
+  cover the icon cadence, score multiplier, replay-stock crossing, smart-bomb
+  wave-clear scoring, and next-wave delay. README, SPEC, the actor architecture
+  notes, and fidelity gaps now document the implemented cadence. No legacy code,
+  tests, or scaffolding were safe to remove in this slice because clean
+  smoke/fidelity/oracle evidence still depends on clean runtime boundaries
+  outside the actor path. Validation passed with focused survivor cadence and
+  multiplier tests, the actor-game/smoke/live/wgpu all-target `legacy-tools`
+  filters, the actor smoke CLI commands (`--actor-smoke`,
+  `--actor-attract-smoke`, `--actor-post-game-smoke`, and
+  `--actor-wgpu-smoke`), the runtime all-target `legacy-tools` filter,
+  `cargo check --all-targets --features legacy-tools`, clippy with warnings
+  denied, `cargo fmt --check`, touched-doc markdownlint, and the diff
+  whitespace check. The full unfiltered `legacy-tools` suite was not
+  rerun in this cycle; the previously isolated clean-game MAME window/post-game
+  audio failures remain outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780671863699699`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780672799324769`.
