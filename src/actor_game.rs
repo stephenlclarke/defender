@@ -21,10 +21,15 @@ const PLAYER_HYPERSPACE_DEATH_DELAY_STEPS: u8 = 39;
 const PLAYER_HYPERSPACE_DEATH_LSEED: u8 = 0x0C;
 const SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD: u8 = 0xC0;
 const SOURCE_PLAYFIELD_Y_MIN: u8 = 42;
-const SOURCE_PLAYFIELD_START_RNG: ActorHyperspaceSourceSeed = ActorHyperspaceSourceSeed {
+const SOURCE_PLAYFIELD_START_RNG: ActorSourceRng = ActorSourceRng {
     seed: 0x52,
     hseed: 0x62,
     lseed: 0x0C,
+};
+const SOURCE_DEFAULT_RNG: ActorSourceRng = ActorSourceRng {
+    seed: 0,
+    hseed: 0xA5,
+    lseed: 0x5A,
 };
 const PLAYER_BOUNDS: Rect = Rect::new(0, 18, 255, 220);
 const LASER_SPEED: i16 = 8;
@@ -45,6 +50,7 @@ const HUMAN_MAX_FALL_SPEED: i16 = 8;
 const HUMAN_SAFE_LANDING_SPEED: i16 = 3;
 const HUMAN_CARRIED_OFFSET_Y: i16 = 8;
 const SOURCE_HUMAN_WALK_SLEEP_TICKS: u8 = 2;
+const SOURCE_ASTRO_RESTORE_Y: u8 = 0xE0;
 const SOURCE_HUMAN_LEFT_X_VELOCITY: u16 = 0xFFE0;
 const SOURCE_HUMAN_RIGHT_X_VELOCITY: u16 = 0x0020;
 const SOURCE_INITIAL_POD_X_SPEED: u8 = 0x20;
@@ -65,6 +71,8 @@ const SOURCE_BOMBER_PICTURE_FRAME_COUNT: u8 = 4;
 const SOURCE_BOMBER_CRUISE_ALTITUDE: i16 = 0x50;
 const SOURCE_ACTIVE_BOMBER_BOMB_LIMIT: usize = 10;
 const SOURCE_MAX_ACTIVE_WAVE_ENEMIES: usize = 5;
+const SOURCE_START_HUMAN_COUNT: u8 = 10;
+const SOURCE_TARGET_LIST_ENTRY_COUNT: usize = 32;
 const STATUS_SCORE_POSITION: Point = Point::new(8, 6);
 const STATUS_HIGH_SCORE_POSITION: Point = Point::new(94, 6);
 const STATUS_WAVE_POSITION: Point = Point::new(8, 18);
@@ -803,7 +811,14 @@ pub struct ActorHyperspaceSourceSeed {
     pub lseed: u8,
 }
 
-impl ActorHyperspaceSourceSeed {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ActorSourceRng {
+    seed: u8,
+    hseed: u8,
+    lseed: u8,
+}
+
+impl ActorSourceRng {
     fn advance(&mut self) -> Self {
         let product_low = self.seed.wrapping_mul(3).wrapping_add(17);
         let mut a = self.lseed >> 3;
@@ -817,6 +832,19 @@ impl ActorHyperspaceSourceSeed {
         let (new_seed, _) = adc8(with_lseed, self.hseed, carry);
         self.seed = new_seed;
         *self
+    }
+
+    fn advance_rmax(&mut self, max: u8) -> u8 {
+        let state = self.advance();
+        source_rmax(max, state.seed)
+    }
+
+    const fn hyperspace_seed(self) -> ActorHyperspaceSourceSeed {
+        ActorHyperspaceSourceSeed {
+            seed: self.seed,
+            hseed: self.hseed,
+            lseed: self.lseed,
+        }
     }
 }
 
@@ -1041,6 +1069,8 @@ pub struct ActorSourceWaveProfile {
     pub pods: u8,
     pub wave_size: u8,
     pub lander_x_velocity: u8,
+    pub lander_y_velocity_msb: u8,
+    pub lander_y_velocity_lsb: u8,
     pub bomber_x_velocity: u8,
     pub swarmer_x_velocity: u8,
     pub swarmer_shot_time: u32,
@@ -1192,6 +1222,41 @@ impl ActorLanderSpawn {
             }),
         }
     }
+
+    fn source_restore(
+        source_rng: &mut ActorSourceRng,
+        profile: ActorSourceWaveProfile,
+        target_human_index: Option<usize>,
+    ) -> Self {
+        let placement_state = source_rng.advance();
+        let x = placement_state.hseed;
+        let x_fraction = placement_state.lseed;
+        let y = SOURCE_PLAYFIELD_Y_MIN.wrapping_add(2);
+        let y_velocity =
+            u16::from_be_bytes([profile.lander_y_velocity_msb, profile.lander_y_velocity_lsb]);
+        let shot_timer =
+            source_rng.advance_rmax(profile.lander_shot_time.min(u32::from(u8::MAX)) as u8);
+        let x_velocity_byte = source_rng.advance_rmax(profile.lander_x_velocity);
+        let x_velocity = if x_velocity_byte & 1 == 0 {
+            u16::from(x_velocity_byte)
+        } else {
+            !u16::from(x_velocity_byte)
+        };
+
+        Self {
+            position: Point::new(i16::from(x), i16::from(y)),
+            source: Some(ActorSourceLanderMetadata {
+                x_fraction,
+                y_fraction: 0,
+                x_velocity,
+                y_velocity,
+                shot_timer,
+                sleep_ticks: 0,
+                picture_frame: 0,
+                target_human_index,
+            }),
+        }
+    }
 }
 
 impl ActorBomberSpawn {
@@ -1338,6 +1403,111 @@ fn swarmer_spawn_y_velocity_low(index: usize) -> u8 {
     }
 }
 
+fn actor_source_initial_target_list_humans() -> Vec<ActorHumanSpawn> {
+    let mut source_rng = SOURCE_DEFAULT_RNG;
+    actor_source_target_list_restore_humans(&mut source_rng, SOURCE_START_HUMAN_COUNT)
+}
+
+fn actor_source_target_list_restore_humans(
+    source_rng: &mut ActorSourceRng,
+    target_count: u8,
+) -> Vec<ActorHumanSpawn> {
+    let mut humans = Vec::with_capacity(usize::from(target_count));
+    let mut slot_index = 0usize;
+    let mut remainder = target_count;
+
+    if target_count > 7 {
+        let quadrant_count = target_count >> 2;
+        for x_bank in [0x00, 0x40, 0x80, 0xC0] {
+            slot_index = actor_source_target_list_restore_human_group(
+                &mut humans,
+                source_rng,
+                quadrant_count,
+                x_bank,
+                slot_index,
+            );
+        }
+        remainder = target_count.wrapping_sub(quadrant_count << 2);
+    }
+
+    for _ in 0..remainder {
+        let x_bank = source_rng.hseed;
+        slot_index = actor_source_target_list_restore_human_group(
+            &mut humans,
+            source_rng,
+            1,
+            x_bank,
+            slot_index,
+        );
+    }
+
+    humans
+}
+
+fn actor_source_target_list_restore_human_group(
+    humans: &mut Vec<ActorHumanSpawn>,
+    source_rng: &mut ActorSourceRng,
+    count: u8,
+    x_bank: u8,
+    mut slot_index: usize,
+) -> usize {
+    for _ in 0..count {
+        let state = source_rng.advance();
+        let source_x = (state.hseed & 0x1F).wrapping_add(x_bank);
+        let picture_frame = if state.lseed & 0x01 != 0 { 2 } else { 0 };
+        humans.push(ActorHumanSpawn {
+            position: Point::new(i16::from(source_x), i16::from(SOURCE_ASTRO_RESTORE_Y)),
+            mode: HumanMode::Grounded,
+            source: Some(ActorSourceHumanMetadata {
+                x_fraction: state.lseed,
+                y_fraction: 0,
+                picture_frame,
+                target_slot_index: slot_index,
+            }),
+        });
+        slot_index += 1;
+    }
+    slot_index
+}
+
+fn actor_source_select_lander_target_index(
+    cursor: &mut Option<usize>,
+    humans: &[ActorHumanSpawn],
+) -> Option<usize> {
+    if !humans.iter().any(|human| human.source.is_some()) {
+        return None;
+    }
+
+    let original_cursor = cursor
+        .filter(|slot| *slot < SOURCE_TARGET_LIST_ENTRY_COUNT)
+        .unwrap_or(0);
+    let mut probe = original_cursor;
+    for _ in 0..SOURCE_TARGET_LIST_ENTRY_COUNT {
+        probe = actor_source_target_list_next_slot_index(probe);
+        if humans.iter().any(|human| {
+            human
+                .source
+                .is_some_and(|source| source.target_slot_index == probe)
+        }) {
+            *cursor = Some(probe);
+            return Some(probe);
+        }
+        if probe == original_cursor {
+            break;
+        }
+    }
+
+    None
+}
+
+const fn actor_source_target_list_next_slot_index(slot_index: usize) -> usize {
+    if slot_index + 1 < SOURCE_TARGET_LIST_ENTRY_COUNT {
+        slot_index + 1
+    } else {
+        0
+    }
+}
+
 impl ActorHumanSpawn {
     pub const fn new(position: Point, mode: HumanMode) -> Self {
         Self {
@@ -1373,6 +1543,8 @@ impl ActorSourceWaveProfile {
             pods: actor_source_wave_u8("pods", wave),
             wave_size: actor_source_wave_u8("wave_size", wave),
             lander_x_velocity: actor_source_wave_u8("lander_x_velocity", wave),
+            lander_y_velocity_msb: actor_source_wave_u8("lander_y_velocity_msb", wave),
+            lander_y_velocity_lsb: actor_source_wave_u8("lander_y_velocity_lsb", wave),
             bomber_x_velocity: actor_source_wave_u8("bomber_x_velocity", wave),
             swarmer_x_velocity: actor_source_wave_u8("swarmer_x_velocity", wave),
             swarmer_shot_time: actor_source_wave_u32("swarmer_shot_time", wave),
@@ -1393,8 +1565,10 @@ impl ActorSourceWaveProfile {
         }
     }
 
-    fn lander_spawns(self, wave: u16) -> Vec<ActorLanderSpawn> {
+    fn lander_spawns(self, wave: u16, humans: &[ActorHumanSpawn]) -> Vec<ActorLanderSpawn> {
         let mut source_lander_index = 0;
+        let mut source_rng = SOURCE_DEFAULT_RNG;
+        let mut target_cursor = Some(0usize);
         self.active_family_slots()
             .into_iter()
             .filter_map(|slot| {
@@ -1407,12 +1581,24 @@ impl ActorSourceWaveProfile {
                         .copied()
                         .unwrap_or_else(|| ActorLanderSpawn::new(slot.position))
                 } else {
-                    ActorLanderSpawn::new(slot.position)
+                    ActorLanderSpawn::source_restore(
+                        &mut source_rng,
+                        self,
+                        actor_source_select_lander_target_index(&mut target_cursor, humans),
+                    )
                 };
                 source_lander_index += 1;
                 Some(spawn)
             })
             .collect()
+    }
+
+    fn human_spawns(self, wave: u16) -> Vec<ActorHumanSpawn> {
+        if wave == 1 {
+            ACTOR_SOURCE_FIRST_WAVE_HUMAN_SPAWNS.to_vec()
+        } else {
+            actor_source_initial_target_list_humans()
+        }
     }
 
     fn bomber_spawns(self) -> Vec<ActorBomberSpawn> {
@@ -1543,6 +1729,13 @@ fn actor_velocity_pixels_from_source(velocity: u8) -> i16 {
 fn adc8(lhs: u8, rhs: u8, carry: bool) -> (u8, bool) {
     let sum = u16::from(lhs) + u16::from(rhs) + u16::from(u8::from(carry));
     ((sum & 0xFF) as u8, sum > 0xFF)
+}
+
+fn source_rmax(max: u8, mut seed: u8) -> u8 {
+    while seed > max {
+        seed >>= 1;
+    }
+    seed.wrapping_add(1)
 }
 
 const fn actor_sign_extend_u8_to_u16(value: u8) -> u16 {
@@ -1744,6 +1937,7 @@ impl ActorWaveScript {
 
     fn source_backed_profile(wave: u16) -> ActorWaveProfile {
         let source = ActorSourceWaveProfile::for_wave(wave);
+        let human_spawns = source.human_spawns(wave);
         ActorWaveProfile::with_family_spawns(
             wave,
             ActorBehaviorScript::default()
@@ -1757,10 +1951,10 @@ impl ActorWaveScript {
                         ..ActorBehaviorProfile::default()
                     },
                 ),
-            source.lander_spawns(wave),
+            source.lander_spawns(wave, &human_spawns),
             source.bomber_spawns(),
             source.pod_spawns(),
-            ACTOR_SOURCE_FIRST_WAVE_HUMAN_SPAWNS.to_vec(),
+            human_spawns,
         )
     }
 
@@ -2391,7 +2585,7 @@ pub struct ActorGameDriver {
     wave_script: ActorWaveScript,
     baiter_timer_steps: Option<u32>,
     baiter_pacing_steps_remaining: u8,
-    hyperspace_source_rng: ActorHyperspaceSourceSeed,
+    hyperspace_source_rng: ActorSourceRng,
 }
 
 impl ActorGameDriver {
@@ -2445,7 +2639,7 @@ impl ActorGameDriver {
             .behavior_script
             .with_input_overrides(input, self.snapshots.values().cloned());
         if self.phase == Phase::Playing {
-            let source_seed = self.hyperspace_source_rng.advance();
+            let source_seed = self.hyperspace_source_rng.advance().hyperspace_seed();
             behavior_script = behavior_script.with_hyperspace_source_seed(source_seed);
         }
         let base_prompt = StepPrompt {
@@ -5846,19 +6040,52 @@ mod tests {
             .behavior_script
             .behavior_for(ActorId::new(1), ActorKind::Bomber);
         assert_eq!(second.lander_spawns.len(), 3);
-        assert!(
-            second
-                .lander_spawns
-                .iter()
-                .all(|spawn| spawn.source.is_none())
-        );
         assert_eq!(
             second.lander_spawn_points(),
             vec![
-                Point::new(0xE4, 0x2A),
-                Point::new(148, 96),
-                Point::new(236, 66),
+                Point::new(0xD2, 0x2C),
+                Point::new(0x1A, 0x2C),
+                Point::new(0xE3, 0x2C),
             ]
+        );
+        assert_eq!(
+            second.lander_spawns[0].source,
+            Some(ActorSourceLanderMetadata {
+                x_fraction: 0xAD,
+                y_fraction: 0,
+                x_velocity: 0x001E,
+                y_velocity: 0x00B0,
+                shot_timer: 0x21,
+                sleep_ticks: 0,
+                picture_frame: 0,
+                target_human_index: Some(1),
+            })
+        );
+        assert_eq!(
+            second.lander_spawns[1].source,
+            Some(ActorSourceLanderMetadata {
+                x_fraction: 0x55,
+                y_fraction: 0,
+                x_velocity: 0xFFDE,
+                y_velocity: 0x00B0,
+                shot_timer: 0x2F,
+                sleep_ticks: 0,
+                picture_frame: 0,
+                target_human_index: Some(2),
+            })
+        );
+        assert_eq!(
+            second.lander_spawns[2].source,
+            Some(ActorSourceLanderMetadata {
+                x_fraction: 0x4A,
+                y_fraction: 0,
+                x_velocity: 0x0020,
+                y_velocity: 0x00B0,
+                shot_timer: 0x1D,
+                sleep_ticks: 0,
+                picture_frame: 0,
+                target_human_index: Some(3),
+            })
         );
         assert_eq!(second.bomber_spawns.len(), 1);
         assert_eq!(second.bomber_spawn_points(), vec![Point::new(228, 104)]);
@@ -5884,6 +6111,39 @@ mod tests {
                 y_fraction: 0,
                 x_velocity: 0x0020,
                 y_velocity: 0,
+            })
+        );
+        assert_eq!(
+            second.human_spawn_points(),
+            vec![
+                Point::new(0x12, 0xE0),
+                Point::new(0x09, 0xE0),
+                Point::new(0x54, 0xE0),
+                Point::new(0x5A, 0xE0),
+                Point::new(0x8D, 0xE0),
+                Point::new(0x86, 0xE0),
+                Point::new(0xC3, 0xE0),
+                Point::new(0xD1, 0xE0),
+                Point::new(0x09, 0xE0),
+                Point::new(0x14, 0xE0),
+            ]
+        );
+        assert_eq!(
+            second.human_spawns[0].source,
+            Some(ActorSourceHumanMetadata {
+                x_fraction: 0xAD,
+                y_fraction: 0,
+                picture_frame: 2,
+                target_slot_index: 0,
+            })
+        );
+        assert_eq!(
+            second.human_spawns[9].source,
+            Some(ActorSourceHumanMetadata {
+                x_fraction: 0x69,
+                y_fraction: 0,
+                picture_frame: 2,
+                target_slot_index: 9,
             })
         );
         assert_eq!(second_lander.lander_seek_speed, 2);
@@ -5918,6 +6178,21 @@ mod tests {
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 3);
         assert_eq!(driver.snapshot_count(ActorKind::Bomber), 1);
         assert_eq!(driver.snapshot_count(ActorKind::Pod), 1);
+        assert!(live.snapshots.iter().any(|snapshot| {
+            snapshot.kind == ActorKind::Lander
+                && snapshot.position == Point::new(0xD2, 0x2C)
+                && snapshot.source_lander
+                    == Some(ActorSourceLanderMetadata {
+                        x_fraction: 0xCB,
+                        y_fraction: 0xB0,
+                        x_velocity: 0x001E,
+                        y_velocity: 0x00B0,
+                        shot_timer: 0x20,
+                        sleep_ticks: 0,
+                        picture_frame: 0,
+                        target_human_index: Some(1),
+                    })
+        }));
         assert!(live.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Bomber
                 && snapshot.source_bomber

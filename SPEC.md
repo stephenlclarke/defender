@@ -703,14 +703,14 @@ reintroduce legacy implementation terminology.
   movement speed, lander fire cadence, baiter entry/shot/seek timing, and
   source bomber/pod counts. The actor allocator follows the source active-family
   shape, so wave `1` remains lander-only while later waves can seed bomber and
-  pod actors beside landers.
+  pod actors beside source-RNG-restored landers. Later-wave humans restore from
+  the source target-list distribution instead of reusing first-wave starts.
   A persistent `StatusDisplay` actor draws score, high score, wave, lives,
   credits, and high-score-entry rows from `StepPrompt` state while staying
   inert during attract so custom attract scripts remain in control.
-  Source-backed landers, bombers, pods, swarmers, baiters, and first-wave humans
-  publish fixed-point metadata in snapshots and advance their actor-owned
-  fraction state during active motion. `XYZZY` invincibility is represented as
-  the same
+  Source-backed landers, bombers, pods, swarmers, baiters, and humans publish
+  fixed-point metadata in snapshots and advance their actor-owned fraction state
+  during active motion. `XYZZY` invincibility is represented as the same
   temporary player behavior override. The slice now also models source landers
   preferring their configured human target slot, lander pickup/carry/conversion,
   falling-human rescue and safe landing scoring, score popups, hostile

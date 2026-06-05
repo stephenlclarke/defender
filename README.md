@@ -75,13 +75,15 @@ backed by `assets/red-label/wave-table.tsv` for active wave size, lander and
 bomber movement speed, lander fire cadence, baiter entry/shot/seek timing, and
 scripted hostile/human spawn records. The default actor wave allocator now uses
 the source active-family shape, so later waves can introduce bomber and pod
-actor families alongside landers instead of remaining lander-only.
-Source-backed landers, bombers, pods, swarmers, baiters, and first-wave humans
-publish their fixed-point metadata through snapshots and advance that fraction
-state during active motion. It also includes Williams title animation
-metadata, the coalescing Defender wordmark surface, lander target-slot seeking,
-an actor-owned status display for score, high score, wave, lives, smart-bomb
-stock, credits, and high-score-entry rows, pickup/carry/conversion,
+actor families alongside landers instead of remaining lander-only. Later-wave
+actor landers now restore from source RNG placement/shot/velocity state, and
+later-wave humans restore from the source target-list distribution.
+Source-backed landers, bombers, pods, swarmers, baiters, and humans publish
+their fixed-point metadata through snapshots and advance that fraction state
+during active motion. It also includes Williams title animation metadata, the
+coalescing Defender wordmark surface, lander target-slot seeking, an actor-owned
+status display for score, high score, wave, lives, smart-bomb stock, credits,
+and high-score-entry rows, pickup/carry/conversion,
 falling-human rescue and safe landing scores, score popups, hostile projectile
 actors for lander shots, bomber/pod hit scoring and sound cues, bomber-laid bomb
 actors with source bomb-collision cues, pod laser-hit swarmer spawning, swarmer

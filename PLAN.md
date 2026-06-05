@@ -44,7 +44,9 @@ verification tools.
   swarmers, and initial humans publish fixed-point metadata and advance
   actor-owned fraction state during active motion, and source landers prefer
   configured target slots before falling back to nearest-human seeking. The
-  actor rewrite now has a persistent `StatusDisplay` actor that draws
+  actor rewrite now has source-RNG-restored later-wave lander placement, shot
+  timers, X/Y velocity metadata, and later-wave human target-list restores. It
+  also has a persistent `StatusDisplay` actor that draws
   score, high score, wave, lives, smart-bomb stock, credits, and
   high-score-entry rows from the same `StepPrompt` state as gameplay actors
   while staying inert during attract so custom attract scripts retain control of
@@ -3963,3 +3965,21 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780625577116929`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780626199637959`.
+- `2026-06-05 03:35 BST`: Completed the actor source-backed later-wave restore
+  cycle. Added a private actor source RNG helper shared by hyperspace and wave
+  restore code, restored later-wave humans from the source target-list RNG
+  distribution, and restored later-wave landers from source RNG placement,
+  `RMAX` shot timer, X velocity, Y velocity, and target-list slot selection
+  instead of generic active-slot points. Updated default-wave and live wave-2
+  regressions to pin restored positions, fractions, velocities, shot timers,
+  and target slots. No legacy code, tests, or scaffolding were safe to remove
+  because `legacy-tools` still owns ROM reports, trace/media helpers, and
+  oracle-equivalence evidence while the actor runtime remains isolated.
+  Validation passed with `cargo fmt --check`, `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780626333478179`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780626918217929`.

@@ -145,14 +145,19 @@ lander, one bomber, and one pod when those reserve counts are available before
 filling the rest of the active batch, matching the clean source allocator's
 family order. Wave `1` uses the source first-wave lander restore metadata from
 the existing clean evidence, including fixed-point fractions, velocities, shot
-timer, sleep ticks, picture frame, and target-human index. Source-backed
-landers, bombers, pods, and baiters publish their metadata in snapshots and advance
-active motion by updating their own fixed-point position/fraction state.
+timer, sleep ticks, picture frame, and target-human index. Later source waves
+restore landers from the source RNG placement, `RMAX` shot timer, X velocity,
+and Y velocity path, then assign target-list slots from the restored human
+distribution. Source-backed landers, bombers, pods, and baiters publish their
+metadata in snapshots and advance active motion by updating their own
+fixed-point position/fraction state.
 
-Initial humans are source-backed for wave `1` as well. Their actor spawns carry
-fixed-point fractions, picture frame, and source target-list slot metadata.
-Grounded source humans advance their own walk cadence, picture frame, and
-fixed-point X fraction after the initial source sleep ticks.
+Initial humans are source-backed: wave `1` uses the captured first-wave starts,
+while later source waves restore humans through the source target-list RNG
+distribution. Their actor spawns carry fixed-point fractions, picture frame,
+and source target-list slot metadata. Grounded source humans advance their own
+walk cadence, picture frame, and fixed-point X fraction after the initial
+source sleep ticks.
 Source-backed landers ask the prompt for their configured target slot first and
 only fall back to nearest-human seeking when that target is unavailable.
 
