@@ -328,10 +328,11 @@ credit can still be shown immediately without drawing a zero-credit line. The
 same Hall-of-Fame boundary draws source-offset `HALLD_*` headings, the source
 Defender logo, and a `hall_scores` two-column table for the source 60-tick
 stall window. After that bounded Hall window, the script starts
-`scoring_surface` and scoring/instruction labels at step 1088 from the checked
-`SCANV`, `LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` message
-rows. The scoring surface draws the source top scanner frame/marker bars and
-the source `MTERR` mini-terrain records through an actor-local visual effect.
+`scoring_surface` at step 1088, draws `SCANV` immediately, then reveals
+`LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` on the source
+scoring-card process cadence from checked message rows. The scoring surface
+draws the source top scanner frame/marker bars and the source `MTERR`
+mini-terrain records through an actor-local visual effect.
 It also projects the source-shaped rescue-demo player, human, and lander object
 sprites, matching scanner blips, source-shaped rescue laser pixels, lander
 explosion fragments, the 500-point rescue popup, and the `ENMYTB` enemy legend
@@ -365,12 +366,12 @@ sprite 488 600 defender_logo 85 50
 hall_scores 488 600 0x1886 0x5986 -11 -6
 scoring_surface 1088 forever
 message 1088 forever SCANV 0x4330 -11 -7
-message 1088 forever LANDV 0x1C70 -11 -7
-message 1088 forever MUTV 0x3C70 -11 -7
-message 1088 forever BAITV 0x5F70 -11 -7
-message 1088 forever BOMBV 0x1CA8 -11 -7
-message 1088 forever SWRMPV 0x40A8 -11 -7
-message 1088 forever SWARMV 0x5CA8 -11 -7
+message 1505 forever LANDV 0x1C70 -11 -7
+message 1691 forever MUTV 0x3C70 -11 -7
+message 1871 forever BAITV 0x5F70 -11 -7
+message 2051 forever BOMBV 0x1CA8 -11 -7
+message 2237 forever SWRMPV 0x40A8 -11 -7
+message 2417 forever SWARMV 0x5CA8 -11 -7
 ```
 
 Blank lines and `#` comments are ignored. `duration` can be a step count or

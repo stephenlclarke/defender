@@ -49,18 +49,21 @@ verification tools.
   page-start steps are Williams from step 1,
   `ELECV` from step 236, the Defender wordmark from step 365, the
   high-score/zero-credit Hall-of-Fame page from step 488 for the source 60-tick
-  stall window, and scoring/instruction labels from step 1088. Title pages
+  stall window, and the scoring/instruction page from step 1088. Title pages
   suppress the zero-credit line but still show real inserted credits through a
   `credits_nonzero` script action. The Hall-of-Fame page also draws
   source-offset `HALLD_*` headings and the source Defender logo; `hall_scores`
   draws Today’s and All-Time table columns from driver scores plus embedded
-  red-label seed initials. The scoring/instruction page draws `SCANV`, `LANDV`,
-  `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` from checked `messages.tsv`
-  rows and source screen addresses, while `scoring_surface` draws the source top
+  red-label seed initials. The scoring/instruction page draws `SCANV` at step
+  1088, then reveals `LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV`
+  on the source scoring-card process cadence from checked `messages.tsv` rows
+  and source screen addresses, while `scoring_surface` draws the source top
   scanner frame/marker bars, `MTERR` mini-terrain records, source-shaped
-  rescue-demo player/human/lander object sprites, scanner blips, and the
-  500-point rescue popup. Custom attract scripts can draw checked `messages.tsv`
-  labels through source cursor controls with optional visual offsets, and the
+  rescue-demo player/human/lander object sprites, scanner blips,
+  source-shaped rescue laser pixels, lander explosion fragments, the 500-point
+  rescue popup, and the `ENMYTB` enemy legend transfer/materialization/reveal
+  objects. Custom attract scripts can draw checked `messages.tsv` labels
+  through source cursor controls with optional visual offsets, and the
   older one-column `high_scores` action remains available for custom screens.
   `ActorWaveScript` now names per-wave progression data and applies behavior
   scripts plus hostile and initial-human spawn records as play starts and waves
@@ -773,6 +776,30 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 14:50 BST`: Completed the actor attract scoring
+  instruction-label cadence slice. The embedded actor attract script and Rust
+  fallback keep `scoring_surface` at source step `1088`, reveal `SCANV`
+  immediately, then reveal `LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and
+  `SWARMV` at source scoring-card process steps `1505`, `1691`, `1871`,
+  `2051`, `2237`, and `2417` without adding a display-frame dependency.
+  Focused regressions now prove checked-script/fallback parity, the exact
+  reveal-step table, only `SCANV` at the scoring boundary, `LANDV` at its
+  reveal step, and all instruction labels by the final reveal. README, SPEC,
+  and the actor architecture notes now document the cadence and script lines.
+  No legacy code, tests, or scaffolding were safe to remove because legacy
+  tooling still backs ROM reports, trace/media helpers, and oracle-equivalence
+  evidence while the actor runtime continues closing fidelity gaps. Validation
+  passed with the focused cadence/script/title tests, `cargo test actor_game
+  --all-targets --features legacy-tools`, `cargo test actor_smoke
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test actor_wgpu --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, `cargo fmt
+  --check`, touched-doc markdownlint, and `git diff --check`. Slack cycle
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780667014030819`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780667420301369`.
 - `2026-06-05 14:37 BST`: Completed the actor attract scoring laser/explosion/
   materialization slice. `VisualEffect::AttractScoringSurface` now uses
   actor-local scoring stages to project source-shaped rescue laser pixels,

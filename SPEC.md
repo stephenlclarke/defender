@@ -586,9 +586,10 @@ appearance slots starting at object table `0xB304`, picture table `0xB3D6`,
 data `0xB412`, and screen address `0x3090` before the full `0x3C` by `0x18`
 wordmark descriptor refreshes, the source copyright strip appears at `0x3BD0`
 during the copyright wait gate, and the
-instruction-page `SCANV`, `LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and
-`SWARMV` labels appear at `0x4330`, `0x1C70`, `0x3C70`, `0x5F70`, `0x1CA8`,
-`0x40A8`, and `0x5CA8`. After the hall-of-fame display stall, the
+instruction-page labels use the source scoring-card cadence: `SCANV` appears
+first at `0x4330`, then `LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and
+`SWARMV` reveal at `0x1C70`, `0x3C70`, `0x5F70`, `0x1CA8`, `0x40A8`, and
+`0x5CA8`. After the hall-of-fame display stall, the
 scoring/action page replays the source instruction-page rescue sequence,
 scanner blips, player laser, 500-point rescue popup, and `ENMYTB` enemy
 score-card reveal before cycling back to the Williams page. This projection is
@@ -778,14 +779,15 @@ reintroduce legacy implementation terminology.
   page-start steps are Williams from step 1, `ELECV` from step 236, the
   Defender wordmark from step 365, the high-score/zero-credit Hall-of-Fame page
   from step 488 for the source 60-tick stall window, and the
-  scoring/instruction labels from step 1088. Title pages suppress the
-  zero-credit line but still show real inserted credits through a
-  `credits_nonzero` script action. The Hall-of-Fame page also draws
-  source-offset `HALLD_*` headings and the source Defender logo; `hall_scores`
-  draws Today’s and All-Time table columns from driver scores plus embedded
-  red-label seed initials. The scoring/instruction page draws `SCANV`, `LANDV`,
-  `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` from checked `messages.tsv`
-  rows and source screen addresses, while `scoring_surface` draws the source
+  scoring/instruction page from step 1088. Title pages suppress the zero-credit
+  line but still show real inserted credits through a `credits_nonzero` script
+  action. The Hall-of-Fame page also draws source-offset `HALLD_*` headings and
+  the source Defender logo; `hall_scores` draws Today’s and All-Time table
+  columns from driver scores plus embedded red-label seed initials. The
+  scoring/instruction page draws `SCANV` at step 1088, then reveals `LANDV`,
+  `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` on the source scoring-card
+  process cadence from checked `messages.tsv` rows and source screen
+  addresses, while `scoring_surface` draws the source
   top scanner frame/marker bars, `MTERR` mini-terrain records, source-shaped
   rescue-demo player/human/lander object sprites, scanner blips, and the
   source-shaped rescue laser, lander explosion fragments, 500-point rescue

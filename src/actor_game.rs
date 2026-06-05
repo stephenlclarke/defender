@@ -3749,9 +3749,13 @@ impl AttractScript {
             SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP,
             None,
         ));
-        for (label, screen_address) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES {
+        for (line_index, (label, screen_address)) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES
+            .iter()
+            .copied()
+            .enumerate()
+        {
             events.push(AttractScriptEvent::source_message_with_offset(
-                SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP,
+                actor_attract_scoring_instruction_text_start_step(line_index),
                 None,
                 label,
                 screen_address,
@@ -6077,14 +6081,12 @@ fn actor_attract_scoring_display_step(scoring_tick: u16) -> u16 {
         % ATTRACT_SCORING_DEMO_TOTAL_STEPS
 }
 
-#[cfg(test)]
 fn actor_attract_scoring_tick_for_display_step(display_step: u16) -> u16 {
     (display_step % ATTRACT_SCORING_DEMO_TOTAL_STEPS + ATTRACT_SCORING_DEMO_TOTAL_STEPS
         - ATTRACT_SCORING_PROTECTED_DEMO_STEP_OFFSET)
         % ATTRACT_SCORING_DEMO_TOTAL_STEPS
 }
 
-#[cfg(test)]
 fn actor_attract_scoring_display_step_for_stage(
     target_stage: ActorAttractScoringStage,
     local_step: u16,
@@ -6107,6 +6109,30 @@ fn actor_attract_scoring_display_step_for_stage(
     }
 
     elapsed + local_step.min(ATTRACT_SCORING_LEGEND_HOLD_STEPS.saturating_sub(1))
+}
+
+fn actor_attract_scoring_instruction_text_start_step(line_index: usize) -> u64 {
+    let Some(legend_index) = line_index.checked_sub(1) else {
+        return SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP;
+    };
+
+    let reveal_display_step = actor_attract_scoring_display_step_for_stage(
+        ActorAttractScoringStage::LegendReveal(legend_index),
+        0,
+    );
+    SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP
+        + u64::from(actor_attract_scoring_tick_for_display_step(
+            next_actor_attract_scoring_text_process_step(reveal_display_step),
+        ))
+}
+
+fn next_actor_attract_scoring_text_process_step(step: u16) -> u16 {
+    let remainder = step % 6;
+    if remainder == 0 {
+        step
+    } else {
+        step + (6 - remainder)
+    }
 }
 
 const ACTOR_ATTRACT_SCORING_RESCUE_TIMELINE: [(ActorAttractScoringStage, u16); 6] = [
@@ -13054,18 +13080,26 @@ mod tests {
                 .iter()
                 .all(|draw| draw.sprite != SpriteKey::DefenderLogo)
         );
-        for (label, screen_address) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES {
+        let scan_text = source_message_text("SCANV").expect("scanner instruction source message");
+        assert!(scoring.draws.iter().any(|draw| {
+            draw.text.as_deref() == Some(scan_text)
+                && matches!(
+                    draw.effect,
+                    VisualEffect::SourceMessage {
+                        top_left_screen_address: 0x4330,
+                        visual_offset: SOURCE_ATTRACT_SCORING_VISUAL_OFFSET,
+                    }
+                )
+        }));
+        for (label, _) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES.iter().skip(1) {
             let text = source_message_text(label).expect("instruction source message");
-            assert!(scoring.draws.iter().any(|draw| {
-                draw.text.as_deref() == Some(text)
-                    && matches!(
-                        draw.effect,
-                        VisualEffect::SourceMessage {
-                            top_left_screen_address,
-                            visual_offset: SOURCE_ATTRACT_SCORING_VISUAL_OFFSET,
-                        } if top_left_screen_address == screen_address
-                    )
-            }));
+            assert!(
+                !scoring
+                    .draws
+                    .iter()
+                    .any(|draw| draw.text.as_deref() == Some(text)),
+                "{label} should wait for the score-card reveal cadence"
+            );
         }
         assert!(scoring.draws.iter().any(|draw| {
             draw.sprite == SpriteKey::Text
@@ -13080,7 +13114,7 @@ mod tests {
                 && sprite.position == [123.0, 41.0]
                 && sprite.layer == RenderLayer::Overlay
         }));
-        assert!(scoring_scene.sprites.iter().any(|sprite| {
+        assert!(!scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_L
                 && sprite.position == [45.0, 105.0]
                 && sprite.layer == RenderLayer::Overlay
@@ -13150,6 +13184,59 @@ mod tests {
                 && sprite.position == [225.0, 134.0]
                 && sprite.size == SCORE_POPUP_SCENE_SIZE
         }));
+        let lander_label_start = actor_attract_scoring_instruction_text_start_step(1);
+        let mut lander_label = rescue_score;
+        while lander_label.step < lander_label_start {
+            lander_label = driver.step(GameInput::NONE);
+        }
+        assert_eq!(lander_label.step, lander_label_start);
+        let lander_text = source_message_text("LANDV").expect("lander instruction source message");
+        let mutant_text = source_message_text("MUTV").expect("mutant instruction source message");
+        assert!(lander_label.draws.iter().any(|draw| {
+            draw.text.as_deref() == Some(lander_text)
+                && matches!(
+                    draw.effect,
+                    VisualEffect::SourceMessage {
+                        top_left_screen_address: 0x1C70,
+                        visual_offset: SOURCE_ATTRACT_SCORING_VISUAL_OFFSET,
+                    }
+                )
+        }));
+        assert!(
+            !lander_label
+                .draws
+                .iter()
+                .any(|draw| draw.text.as_deref() == Some(mutant_text))
+        );
+        let lander_label_scene =
+            ActorRenderSceneBridge::new().render_scene_for_report(&lander_label);
+        assert!(lander_label_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_L
+                && sprite.position == [45.0, 105.0]
+                && sprite.layer == RenderLayer::Overlay
+        }));
+
+        let last_label_start = actor_attract_scoring_instruction_text_start_step(
+            SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES.len() - 1,
+        );
+        let mut last_label = lander_label;
+        while last_label.step < last_label_start {
+            last_label = driver.step(GameInput::NONE);
+        }
+        assert_eq!(last_label.step, last_label_start);
+        for (label, screen_address) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES {
+            let text = source_message_text(label).expect("instruction source message");
+            assert!(last_label.draws.iter().any(|draw| {
+                draw.text.as_deref() == Some(text)
+                    && matches!(
+                        draw.effect,
+                        VisualEffect::SourceMessage {
+                            top_left_screen_address,
+                            visual_offset: SOURCE_ATTRACT_SCORING_VISUAL_OFFSET,
+                        } if top_left_screen_address == screen_address
+                    )
+            }));
+        }
         assert!(!scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO
                 && sprite.position
@@ -13347,17 +13434,53 @@ mod tests {
                 if event.start_after_steps == SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP
                     && event.duration_steps.is_none()
         )));
-        for (label, screen_address) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES {
+        for (line_index, (label, screen_address)) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES
+            .iter()
+            .copied()
+            .enumerate()
+        {
             assert!(parsed.manifest().events.iter().any(|event| matches!(
                 event.action,
                 AttractScriptActionManifest::SourceMessage {
                     label: ref event_label,
                     top_left_screen_address,
                     visual_offset: SOURCE_ATTRACT_SCORING_VISUAL_OFFSET,
-                } if event.start_after_steps == SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP
+                } if event.start_after_steps
+                    == actor_attract_scoring_instruction_text_start_step(line_index)
                     && event.duration_steps.is_none()
                     && event_label == label
                     && top_left_screen_address == screen_address
+            )));
+        }
+    }
+
+    #[test]
+    fn actor_attract_scoring_instruction_labels_follow_source_reveal_cadence() {
+        assert_eq!(
+            SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES
+                .iter()
+                .enumerate()
+                .map(|(index, _)| actor_attract_scoring_instruction_text_start_step(index))
+                .collect::<Vec<_>>(),
+            vec![1088, 1505, 1691, 1871, 2051, 2237, 2417]
+        );
+
+        let parsed = AttractScript::parse_text(ACTOR_RED_LABEL_ATTRACT_SCRIPT)
+            .expect("embedded actor attract script should parse");
+        for (line_index, (label, _)) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES
+            .iter()
+            .copied()
+            .enumerate()
+        {
+            assert!(parsed.manifest().events.iter().any(|event| matches!(
+                event.action,
+                AttractScriptActionManifest::SourceMessage {
+                    label: ref event_label,
+                    ..
+                } if event_label == label
+                    && event.start_after_steps
+                        == actor_attract_scoring_instruction_text_start_step(line_index)
+                    && event.duration_steps.is_none()
             )));
         }
     }

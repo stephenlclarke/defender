@@ -116,13 +116,14 @@ label/count, and a scriptable scoring scanner surface alongside Williams reveal
 and Defender wordmark coalescence. Its source
 page-start steps are Williams from step 1, `ELECV` from step 236, the Defender
 wordmark from step 365, the high-score/zero-credit Hall-of-Fame page from step
-488 for the source 60-tick stall window, and the scoring/instruction labels
-from step 1088. Title pages suppress the zero-credit line but still show a real
+488 for the source 60-tick stall window, and the scoring/instruction page from
+step 1088. Title pages suppress the zero-credit line but still show a real
 inserted credit through a `credits_nonzero` script action. The Hall-of-Fame
 page also draws source-offset `HALLD_*` headings and the source Defender logo;
 `hall_scores` draws Today’s and All-Time table columns from driver scores plus
-embedded red-label seed initials. The scoring/instruction page draws `SCANV`,
-`LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` from checked
+embedded red-label seed initials. The scoring/instruction page draws `SCANV`
+at step 1088, then reveals `LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and
+`SWARMV` on the source scoring-card process cadence from checked
 `messages.tsv` rows and source screen addresses, while `scoring_surface` draws
 the source top scanner frame/marker bars, `MTERR` mini-terrain records,
 source-shaped rescue-demo player/human/lander object sprites, scanner blips,
