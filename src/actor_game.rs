@@ -23796,24 +23796,43 @@ mod tests {
             );
             assert!(!waiting.events.gameplay().contains(&GameEvent::GameOver));
             assert!(!waiting.report.sounds.contains(&SoundCue::GameOver));
-            if expected_sleep == SOURCE_PLAYER_SWITCH_SLEEP_STEPS - 1 {
-                assert_source_message(
-                    &waiting.report,
-                    player_source_message_label(from_player),
-                    SOURCE_PLAYER_SWITCH_LABEL_SCREEN,
-                );
-                assert_source_message(&waiting.report, "GO", SOURCE_PLAYER_SWITCH_GAME_OVER_SCREEN);
-                assert!(
-                    !waiting
-                        .report
-                        .draws
-                        .iter()
-                        .any(|draw| matches!(draw.effect, VisualEffect::WilliamsReveal { .. }))
-                );
-            }
+            assert_source_message(
+                &waiting.report,
+                player_source_message_label(from_player),
+                SOURCE_PLAYER_SWITCH_LABEL_SCREEN,
+            );
+            assert_source_message(&waiting.report, "GO", SOURCE_PLAYER_SWITCH_GAME_OVER_SCREEN);
+            assert_no_source_message(
+                &waiting.report,
+                player_source_message_label(to_player),
+                SOURCE_PLAYER_START_PROMPT_SCREEN,
+            );
+            assert!(
+                !waiting
+                    .report
+                    .draws
+                    .iter()
+                    .any(|draw| matches!(draw.effect, VisualEffect::WilliamsReveal { .. }))
+            );
         }
 
-        runtime.step(GameInput::NONE)
+        let switched = runtime.step(GameInput::NONE);
+        assert_no_source_message(
+            &switched.report,
+            player_source_message_label(from_player),
+            SOURCE_PLAYER_SWITCH_LABEL_SCREEN,
+        );
+        assert_no_source_message(
+            &switched.report,
+            "GO",
+            SOURCE_PLAYER_SWITCH_GAME_OVER_SCREEN,
+        );
+        assert_source_message(
+            &switched.report,
+            player_source_message_label(to_player),
+            SOURCE_PLAYER_START_PROMPT_SCREEN,
+        );
+        switched
     }
 
     fn step_until_player_start_completes(
@@ -23835,6 +23854,11 @@ mod tests {
                         player_source_message_label(player),
                         SOURCE_PLAYER_START_PROMPT_SCREEN,
                     );
+                    assert_no_source_message(
+                        &frame.report,
+                        "GO",
+                        SOURCE_PLAYER_SWITCH_GAME_OVER_SCREEN,
+                    );
                 } else {
                     assert_no_source_message(
                         &frame.report,
@@ -23847,6 +23871,12 @@ mod tests {
 
             assert_eq!(frame.report.phase, Phase::Playing);
             assert_eq!(frame.report.current_player, player);
+            assert_no_source_message(
+                &frame.report,
+                player_source_message_label(player),
+                SOURCE_PLAYER_START_PROMPT_SCREEN,
+            );
+            assert_no_source_message(&frame.report, "GO", SOURCE_PLAYER_SWITCH_GAME_OVER_SCREEN);
             assert!(frame.events.gameplay().contains(&GameEvent::WaveStarted));
             assert_eq!(
                 frame.events.sounds(),

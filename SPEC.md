@@ -592,11 +592,14 @@ active player enters the source-backed `PLE02` `0x60`-tick switch sleep when the
 other player still has stock, then hands off to that player and starts the clean
 playfield entry path. During that switch sleep, scenes draw source-backed
 `PLYR1`/`PLYR2` and `GO` message glyphs at the red-label screen addresses
-`0x3C78` and `0x3E88`; if no player has remaining stock, the clean game enters
-the final game-over return path. Non-final deaths with remaining stock enter a
-death-cloud pause and then respawn the next stocked player through the same
-clean player-start path; two-player games rotate to the other stocked player per
-the source `PLE02` loop, and one-player games wrap back to player one. After
+`0x3C78` and `0x3E88`; actor regressions now prove those glyphs persist across
+the whole switch sleep, clear at the handoff, and give way to the next
+player-start prompt before `WaveStarted`. If no player has remaining stock, the
+clean game enters the final game-over return path. Non-final deaths with
+remaining stock enter a death-cloud pause and then respawn the next stocked
+player through the same clean player-start path; two-player games rotate to the
+other stocked player per the source `PLE02` loop, and one-player games wrap back
+to player one. After
 rotation, score and replay bonus awards sync the active player's public stock
 snapshot, so player-one and player-two scores, lives, and smart-bomb stocks stay
 owned by the active player. The second-player final-life switch-back path follows

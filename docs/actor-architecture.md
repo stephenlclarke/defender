@@ -150,11 +150,14 @@ script output during the handoff, and starts the next stocked player's actor
 start delay after the countdown. The render bridge projects the source
 `PLAYER ONE` / `PLAYER TWO` plus `GAME OVER` switch prompt, then the next
 player's source start prompt. If no other player has stock, the normal
-game-over / high-score path runs instead.
+game-over / high-score path runs instead. Actor regressions prove the switch
+prompt persists for every step of the source `0x60` sleep, clears when the
+handoff frame starts the next player's delay, and does not leak into the
+eventual `WaveStarted` report.
 
 The current actor handoff deliberately keeps the remaining visual gap explicit:
-the bounded switch/start state and source-message glyph projection exist, but
-full MAME media proof and exact prompt pixel/timing parity remain a separate
+the bounded switch/start state and source-message glyph projection are locked,
+but full MAME media proof and exact prompt pixel/timing parity remain a separate
 fidelity boundary.
 
 ## Behavior Scripts

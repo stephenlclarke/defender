@@ -151,9 +151,12 @@ verification tools.
   stock, publish the switch through `GameOverSnapshot`, suppress the attract
   script during the handoff, render the source `PLAYER ONE` / `PLAYER TWO` plus
   `GAME OVER` switch prompts, and start the next stocked player's delayed
-  source-prompt actor turn when the switch sleep expires. The remaining
-  two-player fidelity boundary is MAME media proof and exact prompt pixel/timing
-  parity. Actor high-score initials
+  source-prompt actor turn when the switch sleep expires. Focused actor
+  regressions now lock the switch prompt across the full source sleep, prove it
+  clears at the handoff, and verify the next player-start prompt owns the
+  delayed start interval. The remaining two-player fidelity boundary is MAME
+  media proof and exact prompt pixel/timing parity beyond that source-message
+  report/render contract. Actor high-score initials
   submission now reports accepted and submitted initials through the clean event
   bridge, enters a finite 60-step
   Hall-of-Fame game-over stall through `GameOverSnapshot`, draws the source
@@ -865,6 +868,26 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 22:30 BST`: Completed the actor two-player prompt hardening
+  cycle. Focused actor regressions now prove the source `PLYR1`/`PLYR2` plus
+  `GO` switch prompt persists across every step of the source `0x60`
+  player-switch sleep, clears at the handoff frame, and gives way to the next
+  player's source start prompt for the delayed start interval without leaking
+  stale `GAME OVER` text into the `WaveStarted` report. README, SPEC, PLAN,
+  and actor architecture docs now distinguish that locked source-message
+  report/render contract from the remaining MAME media proof and exact
+  pixel/timing parity boundary. No runtime code path changed in this slice; the
+  implementation work was hardening the actor proof boundary around the existing
+  source-message render contract. Validation passed with `cargo fmt --check`,
+  `cargo test actor_two_player --lib`, `cargo test actor_game --lib`,
+  `cargo check --all-targets --features legacy-tools`, `cargo clippy
+  --all-targets --features legacy-tools -- -D warnings`, the actor smoke CLI
+  commands (`--actor-smoke`, `--actor-attract-smoke`,
+  `--actor-post-game-smoke`, and `--actor-wgpu-smoke`), `markdownlint
+  README.md SPEC.md PLAN.md docs/actor-architecture.md
+  docs/fidelity/mame-golden-clips.md docs/fidelity/release-closure-audit.md
+  assets/sounds/README.md`, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780694642820439`.
 - `2026-06-05 21:40 BST`: Completed the actor source astronaut human-count
   correction cycle. The actor source astronaut process now uses total live
   human snapshot count, not source-backed human count, for the source
