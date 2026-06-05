@@ -4190,7 +4190,9 @@ impl ActorGameDriver {
     fn apply_commands(&mut self, commands: &[GameCommand]) -> Vec<SoundCue> {
         let mut sounds = Vec::new();
         let mut active_source_shells = self.active_source_shell_count();
+        let mut active_bomb_shells = self.active_bomb_shell_count();
         let mut removed_source_shells = BTreeSet::new();
+        let mut removed_bomb_shells = BTreeSet::new();
         for command in commands {
             match *command {
                 GameCommand::Credit => {
@@ -4233,7 +4235,11 @@ impl ActorGameDriver {
                     self.spawn_bomber(position);
                 }
                 GameCommand::Spawn(SpawnRequest::Bomb { position, source }) => {
-                    if reserve_source_shell_slot(&mut active_source_shells) {
+                    if source_shell_slot_available(active_source_shells)
+                        && bomb_shell_slot_available(active_bomb_shells)
+                    {
+                        active_source_shells += 1;
+                        active_bomb_shells += 1;
                         self.spawn_bomb(position, source);
                     }
                 }
@@ -4256,13 +4262,13 @@ impl ActorGameDriver {
                     self.spawn_score_popup(position, points);
                 }
                 GameCommand::Destroy(id) => {
-                    if removed_source_shells.insert(id)
-                        && self
-                            .snapshots
-                            .get(&id)
-                            .is_some_and(|snapshot| is_source_shell_kind(snapshot.kind))
-                    {
-                        active_source_shells = active_source_shells.saturating_sub(1);
+                    if let Some(snapshot) = self.snapshots.get(&id) {
+                        if removed_source_shells.insert(id) && is_source_shell_kind(snapshot.kind) {
+                            active_source_shells = active_source_shells.saturating_sub(1);
+                        }
+                        if removed_bomb_shells.insert(id) && snapshot.kind == ActorKind::Bomb {
+                            active_bomb_shells = active_bomb_shells.saturating_sub(1);
+                        }
                     }
                     self.snapshots.remove(&id);
                     self.actors.remove(&id);
@@ -4317,6 +4323,13 @@ impl ActorGameDriver {
         self.snapshots
             .values()
             .filter(|snapshot| is_source_shell_kind(snapshot.kind) && snapshot.alive)
+            .count()
+    }
+
+    fn active_bomb_shell_count(&self) -> usize {
+        self.snapshots
+            .values()
+            .filter(|snapshot| snapshot.kind == ActorKind::Bomb && snapshot.alive)
             .count()
     }
 
@@ -4638,8 +4651,16 @@ fn is_source_shell_kind(kind: ActorKind) -> bool {
     matches!(kind, ActorKind::EnemyLaser | ActorKind::Bomb)
 }
 
+fn source_shell_slot_available(active_source_shells: usize) -> bool {
+    active_source_shells < SOURCE_SHELL_LIMIT
+}
+
+fn bomb_shell_slot_available(active_bomb_shells: usize) -> bool {
+    active_bomb_shells < SOURCE_ACTIVE_BOMBER_BOMB_LIMIT
+}
+
 fn reserve_source_shell_slot(active_source_shells: &mut usize) -> bool {
-    if *active_source_shells >= SOURCE_SHELL_LIMIT {
+    if !source_shell_slot_available(*active_source_shells) {
         return false;
     }
     *active_source_shells += 1;
@@ -9370,6 +9391,72 @@ mod tests {
     }
 
     #[test]
+    fn source_bomb_shell_cap_blocks_bombs_without_blocking_enemy_lasers() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        for index in 0..SOURCE_ACTIVE_BOMBER_BOMB_LIMIT {
+            driver.spawn_bomb_for_test(Point::new(40 + (index as i16 * 4), 120));
+        }
+        let filled = driver.step(GameInput::NONE);
+        assert_eq!(
+            bomb_shell_snapshot_count(&filled),
+            SOURCE_ACTIVE_BOMBER_BOMB_LIMIT
+        );
+        assert!(
+            source_shell_snapshot_count(&filled) < SOURCE_SHELL_LIMIT,
+            "bomb shell cap should fill before the shared source shell cap"
+        );
+
+        driver.apply_commands(&[
+            GameCommand::Spawn(SpawnRequest::Bomb {
+                position: Point::new(112, 100),
+                source: None,
+            }),
+            GameCommand::Spawn(SpawnRequest::EnemyLaser {
+                position: Point::new(116, 100),
+                velocity: Velocity::new(0, 0),
+            }),
+        ]);
+        let capped = driver.step(GameInput::NONE);
+        assert_eq!(
+            bomb_shell_snapshot_count(&capped),
+            SOURCE_ACTIVE_BOMBER_BOMB_LIMIT
+        );
+        assert_eq!(enemy_laser_snapshot_count(&capped), 1);
+        assert!(
+            capped
+                .snapshots
+                .iter()
+                .all(|snapshot| snapshot.kind != ActorKind::Bomb
+                    || snapshot.position != Point::new(112, 100))
+        );
+
+        let freed_bomb = capped
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Bomb)
+            .expect("filled source bomb list should contain bomb shells")
+            .id;
+        driver.apply_commands(&[
+            GameCommand::Destroy(freed_bomb),
+            GameCommand::Spawn(SpawnRequest::Bomb {
+                position: Point::new(112, 100),
+                source: None,
+            }),
+        ]);
+        let refilled = driver.step(GameInput::NONE);
+
+        assert_eq!(
+            bomb_shell_snapshot_count(&refilled),
+            SOURCE_ACTIVE_BOMBER_BOMB_LIMIT
+        );
+        assert_eq!(enemy_laser_snapshot_count(&refilled), 1);
+        assert!(refilled.snapshots.iter().any(|snapshot| {
+            snapshot.kind == ActorKind::Bomb && snapshot.position == Point::new(112, 100)
+        }));
+    }
+
+    #[test]
     fn behavior_script_can_define_swarmer_motion() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
@@ -10440,6 +10527,22 @@ mod tests {
             .snapshots
             .iter()
             .filter(|snapshot| is_source_shell_kind(snapshot.kind))
+            .count()
+    }
+
+    fn bomb_shell_snapshot_count(report: &StepReport) -> usize {
+        report
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::Bomb)
+            .count()
+    }
+
+    fn enemy_laser_snapshot_count(report: &StepReport) -> usize {
+        report
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::EnemyLaser)
             .count()
     }
 

@@ -113,7 +113,8 @@ lifetime state with the red-label shell-scan cadence, while source-backed
 bomber bomb actors carry stationary source bomb-shell fraction and
 source-cadenced lifetime state into the clean `EnemyProjectileSnapshot`
 contract. The driver enforces the shared 20-slot source shell cap across
-enemy-shot and bomb spawn commands. It also includes Williams title animation
+enemy-shot and bomb spawn commands plus the red-label 10-slot bomber bomb shell
+cap. It also includes Williams title animation
 metadata, the coalescing
 Defender wordmark surface, lander target-slot seeking, an actor-owned
 status display for score, high score, wave, lives, smart-bomb stock, credits,

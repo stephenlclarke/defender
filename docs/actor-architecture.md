@@ -198,7 +198,8 @@ lasers own and advance fixed-point velocity, fraction, and lifetime values,
 with lifetime decrementing on the source shell-scan cadence. Source-backed
 bomber bomb actors carry stationary bomb-shell fraction and source-cadenced
 lifetime values into the clean state bridge. Driver spawn-command handling
-enforces the shared 20-slot source shell cap across enemy shots and bombs.
+enforces the shared 20-slot source shell cap across enemy shots and bombs plus
+the red-label 10-slot bomber bomb shell cap.
 
 Initial humans are source-backed: wave `1` uses the captured first-wave starts,
 while later source waves restore humans through the source target-list RNG

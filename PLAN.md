@@ -4452,3 +4452,26 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780638390591659`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780638648247009`.
+- `2026-06-05 06:59 BST`: Completed the actor bomber bomb shell-limit cycle.
+  Driver command application now tracks the red-label 10-slot bomber bomb shell
+  list alongside the shared 20-slot source shell list, so scripted/custom
+  driver bomb spawns cannot exceed `BMBOUT` capacity while enemy-laser spawns
+  can still use remaining shared shell slots. Added a regression that fills the
+  bomb list, proves a blocked bomb spawn does not block an enemy shot, then
+  destroys one bomb and refills the bomb slot in the same command batch.
+  README, SPEC, and the actor architecture notes now document both source shell
+  caps. No legacy code, tests, or scaffolding were safe to remove in this slice
+  because clean smoke/fidelity/oracle evidence still depends on clean runtime
+  boundaries outside the actor path. Validation passed with `cargo fmt
+  --check`, focused bomb/shell/fraction tests,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780638714321579`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780639193179469`.
