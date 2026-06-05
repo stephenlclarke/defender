@@ -112,7 +112,8 @@ enemy lasers own and advance fixed-point source velocity, fraction, and
 lifetime state with the red-label shell-scan cadence, while source-backed
 bomber bomb actors carry stationary source bomb-shell fraction and
 source-cadenced lifetime state into the clean `EnemyProjectileSnapshot`
-contract. The driver enforces the shared 20-slot source shell cap across
+contract, with nonzero scripted source lifetime ticks preserved at spawn. The
+driver enforces the shared 20-slot source shell cap across
 enemy-shot and bomb spawn commands plus the red-label 10-slot bomber bomb shell
 cap. Source-backed bomb-shell spawn commands also honor the source `GETSHL`
 X/Y placement bounds at X `0x98` and Y `0x2A`, while non-source scripted bombs

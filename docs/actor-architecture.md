@@ -197,7 +197,9 @@ Hostile projectile actors publish source-shaped shell metadata too: enemy
 lasers own and advance fixed-point velocity, fraction, and lifetime values,
 with lifetime decrementing on the source shell-scan cadence. Source-backed
 bomber bomb actors carry stationary bomb-shell fraction and source-cadenced
-lifetime values into the clean state bridge. Driver spawn-command handling
+lifetime values into the clean state bridge, preserving nonzero scripted source
+lifetime ticks as the initial actor shell-scan lifetime. Driver spawn-command
+handling
 enforces the shared 20-slot source shell cap across enemy shots and bombs plus
 the red-label 10-slot bomber bomb shell cap. Source-backed bomb-shell spawn
 commands and enemy-shot spawn commands also honor the source `GETSHL` X/Y
@@ -284,7 +286,9 @@ The actor driver now owns a first Defender gameplay loop:
   player hazards, and emit a bomb collision cue when they hit the player.
   Source-backed bomber bombs snapshot the bomber source fractions as stationary
   bomb-shell fraction metadata and decrement actor-owned lifetime metadata on
-  the source shell-scan cadence.
+  the source shell-scan cadence. Custom source bomb spawns can provide nonzero
+  source lifetime ticks directly; otherwise the behavior profile supplies the
+  fallback lifetime.
 - Projectile-killed pods spawn a bounded mini-swarmer actor batch using the
   source request count. Source-backed swarmers decrement their actor-owned shot
   timer into hostile projectile commands with a distinct swarmer shot cue.

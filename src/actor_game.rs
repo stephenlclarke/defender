@@ -5946,6 +5946,11 @@ impl Bomb {
             y_velocity: 0,
             lifetime_ticks: 0,
         });
+        let lifetime_steps = if source.lifetime_ticks == 0 {
+            lifetime_steps
+        } else {
+            u16::from(source.lifetime_ticks)
+        };
         source.lifetime_ticks = actor_source_projectile_lifetime_ticks(lifetime_steps);
         Self {
             id,
@@ -9445,6 +9450,44 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(bombs.len(), 1);
         assert_eq!(bombs[0].position, Point::new(SOURCE_SHELL_X_MAX, 108));
+    }
+
+    #[test]
+    fn source_bomb_spawn_preserves_scripted_lifetime_ticks() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.set_kind_behavior(
+            ActorKind::Bomb,
+            ActorBehaviorProfile {
+                bomb_lifetime_steps: 40,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        driver.apply_commands(&[GameCommand::Spawn(SpawnRequest::Bomb {
+            position: Point::new(80, 100),
+            source: Some(ActorSourceEnemyProjectileMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                lifetime_ticks: 9,
+            }),
+        })]);
+
+        let lifetimes = (0..=SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS)
+            .map(|_| {
+                let report = driver.step(GameInput::NONE);
+                report
+                    .snapshots
+                    .iter()
+                    .find(|snapshot| snapshot.kind == ActorKind::Bomb)
+                    .and_then(|snapshot| snapshot.source_enemy_projectile)
+                    .expect("source-backed bomb should publish source projectile metadata")
+                    .lifetime_ticks
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(lifetimes, vec![9, 9, 9, 9, 9, 9, 8]);
     }
 
     #[test]

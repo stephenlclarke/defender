@@ -4520,3 +4520,26 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780639773324399`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780640013914859`.
+- `2026-06-05 07:18 BST`: Completed the actor bomb lifetime metadata cycle.
+  Source-backed `Bomb` actors now preserve nonzero
+  `source_enemy_projectile.lifetime_ticks` supplied by scripted/custom driver
+  spawns, using the behavior-profile `bomb_lifetime_steps` only when spawn
+  metadata carries zero. Added a regression proving scripted bomb-shell
+  lifetime ticks decrement on the source shell-scan cadence from the supplied
+  value rather than the fallback behavior lifetime. README, SPEC, and the actor
+  architecture notes now document scripted source bomb lifetime ownership. No
+  legacy code, tests, or scaffolding were safe to remove in this slice because
+  clean smoke/fidelity/oracle evidence still depends on clean runtime
+  boundaries outside the actor path. Validation passed with `cargo fmt
+  --check`, focused lifetime/fraction/bounds/cap tests,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780640100003009`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780640315297079`.
