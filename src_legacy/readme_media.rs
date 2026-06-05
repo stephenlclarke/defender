@@ -15,6 +15,11 @@ use crate::{
 
 pub const FRAME_RATE_MILLIHZ: u32 = FrameRate::CABINET.millihz();
 
+// MAME native snapshots are 4:3 output; clean sprites still use red-label
+// source screen coordinates, whose visible window starts on display row 7.
+const DEFENDER_NATIVE_MEDIA_SURFACE: SurfaceSize = SurfaceSize::new(320, 240);
+const DEFENDER_MEDIA_VISIBLE_Y_ORIGIN: f32 = 7.0;
+
 pub struct ReadmeMediaFrameSource {
     game: Game,
     current_frame: GameFrame,
@@ -86,8 +91,8 @@ impl ReadmeMediaRenderer {
         let mut pixels = vec![0; len];
         fill_target(&mut pixels, scene.clear_color);
 
-        let viewport = ViewportLayout::fit(scene.surface, self.target);
-        if viewport.is_empty() {
+        let projection = ReadmeMediaProjection::defender_native(self.target);
+        if scene.surface.is_empty() || projection.viewport.is_empty() {
             return Err(ReadmeMediaError::EmptyViewport {
                 scene: scene.surface,
                 target: self.target,
@@ -95,7 +100,7 @@ impl ReadmeMediaRenderer {
         }
 
         if let Some(raster) = scene.raster() {
-            blit_raster(&mut pixels, self.target, raster, viewport);
+            blit_raster(&mut pixels, self.target, raster, projection);
         }
 
         for layer in [
@@ -122,7 +127,7 @@ impl ReadmeMediaRenderer {
                     &self.atlas,
                     region,
                     sprite,
-                    viewport,
+                    projection,
                 );
             }
         }
@@ -132,6 +137,31 @@ impl ReadmeMediaRenderer {
             height: self.target.height,
             pixels,
         })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ReadmeMediaProjection {
+    viewport: ViewportLayout,
+    scene_origin: [f32; 2],
+}
+
+impl ReadmeMediaProjection {
+    fn defender_native(target: SurfaceSize) -> Self {
+        Self {
+            viewport: ViewportLayout::fit(DEFENDER_NATIVE_MEDIA_SURFACE, target),
+            scene_origin: [0.0, DEFENDER_MEDIA_VISIBLE_Y_ORIGIN],
+        }
+    }
+
+    fn target_to_scene(&self, target_axis: u32, axis: usize) -> f32 {
+        (target_axis as f32 + 0.5 - self.viewport.origin[axis] as f32) / self.viewport.scale
+            + self.scene_origin[axis]
+    }
+
+    fn scene_to_target(&self, scene_axis: f32, axis: usize) -> f32 {
+        self.viewport.origin[axis] as f32
+            + (scene_axis - self.scene_origin[axis]) * self.viewport.scale
     }
 }
 
@@ -149,22 +179,21 @@ fn blit_raster(
     target_pixels: &mut [u8],
     target: SurfaceSize,
     raster: &SceneRaster,
-    viewport: ViewportLayout,
+    projection: ReadmeMediaProjection,
 ) {
+    let viewport = projection.viewport;
     for target_y in viewport.origin[1]..viewport.origin[1] + viewport.size.height {
         for target_x in viewport.origin[0]..viewport.origin[0] + viewport.size.width {
-            let scene_x = scaled_target_to_scene(
-                target_x,
-                viewport.origin[0],
-                viewport.scale,
-                raster.surface.width,
-            );
-            let scene_y = scaled_target_to_scene(
-                target_y,
-                viewport.origin[1],
-                viewport.scale,
-                raster.surface.height,
-            );
+            let Some(scene_x) =
+                scaled_target_to_scene(&projection, target_x, 0, raster.surface.width)
+            else {
+                continue;
+            };
+            let Some(scene_y) =
+                scaled_target_to_scene(&projection, target_y, 1, raster.surface.height)
+            else {
+                continue;
+            };
             let source_index =
                 pixel_offset(raster.surface, scene_x, scene_y).min(raster.pixels().len());
             if source_index + 4 <= raster.pixels().len() {
@@ -182,21 +211,21 @@ fn blit_sprite(
     atlas: &TextureAtlas,
     region: AtlasRegion,
     sprite: SceneSprite,
-    viewport: ViewportLayout,
+    projection: ReadmeMediaProjection,
 ) {
     if sprite.size[0] <= 0.0 || sprite.size[1] <= 0.0 {
         return;
     }
 
-    let [min_x, min_y, max_x, max_y] = sprite_target_bounds(sprite, viewport, target);
+    let [min_x, min_y, max_x, max_y] = sprite_target_bounds(sprite, projection, target);
     if min_x >= max_x || min_y >= max_y {
         return;
     }
 
     for target_y in min_y..max_y {
         for target_x in min_x..max_x {
-            let scene_x = (target_x as f32 + 0.5 - viewport.origin[0] as f32) / viewport.scale;
-            let scene_y = (target_y as f32 + 0.5 - viewport.origin[1] as f32) / viewport.scale;
+            let scene_x = projection.target_to_scene(target_x, 0);
+            let scene_y = projection.target_to_scene(target_y, 1);
             let local_x = ((scene_x - sprite.position[0]) / sprite.size[0]).clamp(0.0, 0.999_999);
             let local_y = ((scene_y - sprite.position[1]) / sprite.size[1]).clamp(0.0, 0.999_999);
             let atlas_x = region.origin[0] + (local_x * region.size[0] as f32) as u32;
@@ -218,13 +247,13 @@ fn blit_sprite(
 
 fn sprite_target_bounds(
     sprite: SceneSprite,
-    viewport: ViewportLayout,
+    projection: ReadmeMediaProjection,
     target: SurfaceSize,
 ) -> [u32; 4] {
-    let x0 = viewport.origin[0] as f32 + sprite.position[0] * viewport.scale;
-    let y0 = viewport.origin[1] as f32 + sprite.position[1] * viewport.scale;
-    let x1 = viewport.origin[0] as f32 + (sprite.position[0] + sprite.size[0]) * viewport.scale;
-    let y1 = viewport.origin[1] as f32 + (sprite.position[1] + sprite.size[1]) * viewport.scale;
+    let x0 = projection.scene_to_target(sprite.position[0], 0);
+    let y0 = projection.scene_to_target(sprite.position[1], 1);
+    let x1 = projection.scene_to_target(sprite.position[0] + sprite.size[0], 0);
+    let y1 = projection.scene_to_target(sprite.position[1] + sprite.size[1], 1);
 
     [
         x0.floor().max(0.0).min(target.width as f32) as u32,
@@ -235,13 +264,16 @@ fn sprite_target_bounds(
 }
 
 fn scaled_target_to_scene(
+    projection: &ReadmeMediaProjection,
     target_axis: u32,
-    viewport_origin: u32,
-    scale: f32,
+    axis: usize,
     scene_extent: u32,
-) -> u32 {
-    (((target_axis as f32 + 0.5 - viewport_origin as f32) / scale).floor() as u32)
-        .min(scene_extent.saturating_sub(1))
+) -> Option<u32> {
+    let scene_axis = projection.target_to_scene(target_axis, axis).floor();
+    if !(0.0..scene_extent as f32).contains(&scene_axis) {
+        return None;
+    }
+    Some(scene_axis as u32)
 }
 
 fn tint_rgba(source: &[u8], tint: Color) -> [u8; 4] {
@@ -319,8 +351,12 @@ impl std::error::Error for ReadmeMediaError {}
 
 #[cfg(test)]
 mod tests {
-    use super::{FRAME_RATE_MILLIHZ, ReadmeMediaFrame, ReadmeMediaFrameSource};
+    use super::{
+        FRAME_RATE_MILLIHZ, ReadmeMediaFrame, ReadmeMediaFrameSource, ReadmeMediaProjection,
+        sprite_target_bounds,
+    };
     use crate::game::{ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES, AttractPresentationPage};
+    use crate::renderer::{Color, RenderLayer, SceneSprite, SpriteId, SurfaceSize};
 
     #[test]
     fn frame_rate_matches_clean_cabinet_refresh_contract() {
@@ -337,6 +373,24 @@ mod tests {
         assert_eq!(frame.height, 240);
         assert_eq!(frame.pixels.len(), 320 * 240 * 4);
         assert!(frame_has_visible_pixels(&frame));
+    }
+
+    #[test]
+    fn source_reference_media_uses_defender_native_visible_y_projection() {
+        let target = SurfaceSize::new(768, 576);
+        let projection = ReadmeMediaProjection::defender_native(target);
+        let sprite = SceneSprite {
+            sprite: SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL,
+            layer: RenderLayer::Hud,
+            position: [96.0, 28.0],
+            size: [1.0, 1.0],
+            tint: Color::WHITE,
+        };
+
+        assert_eq!(
+            sprite_target_bounds(sprite, projection, target),
+            [230, 50, 233, 53]
+        );
     }
 
     #[test]
