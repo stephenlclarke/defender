@@ -34,16 +34,16 @@ verification tools.
   data and applies behavior scripts plus hostile and initial-human spawn
   records as play starts and waves are cleared. Default actor wave progression
   now reads
-  `assets/red-label/wave-table.tsv` for active wave size, lander speed, and
-  lander fire cadence, and uses source first-wave lander restore metadata for
-  fixed-point fractions, velocities, shot timer, sleep ticks, picture frame,
-  and target-human index. Source-backed landers now advance active motion
-  through that fixed-point state. Initial humans now use source first-wave
-  restore metadata with target-list slots and actor-owned walk frame/fraction
-  updates, and source landers prefer those configured target slots before
-  falling back to nearest-human seeking. Lander shot timers now spawn hostile
-  projectile actors that use the same player damage policy as other hazards,
-  including `XYZZY` invincibility overrides.
+  `assets/red-label/wave-table.tsv` for active wave size, lander and bomber
+  speed, lander fire cadence, and source bomber/pod counts. The actor wave
+  allocator follows the source active-family shape, so later waves now seed
+  bomber and pod actors beside landers. Source-backed landers, bombers, pods,
+  and initial humans publish fixed-point metadata and advance actor-owned
+  fraction state during active motion, and source landers prefer configured
+  target slots before falling back to nearest-human seeking. Lander shot timers
+  now spawn hostile projectile actors that use the same player damage policy as
+  other hazards, including `XYZZY` invincibility overrides; bomber and pod
+  laser hits award source scores and emit family hit cues.
 - Primary runtime source is `src/`; the converted implementation is parked in
   `src_legacy/` and should remain optional oracle/tooling evidence only.
 - Normal live play uses clean `Game` frames through clean platform, audio, and
@@ -3675,3 +3675,20 @@ Exit gate:
   media verifier unit tests, touched-doc markdownlint, and `git diff --check`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779993355542589`.
+- `2026-06-05 00:58 BST`: Completed the actor source wave non-lander family
+  cycle. Added first-class actor `Bomber` and `Pod` structs with source-backed
+  spawn metadata, fixed-point motion, draw keys/effects, source scores,
+  family hit cues, smart-bomb/collision participation, and script-tunable
+  movement. The default actor wave progression now reads source bomber/pod
+  counts and uses the source active-family order so wave `2` and later seed
+  bomber and pod actors beside landers instead of remaining lander-only. Added
+  regressions for source wave table allocation, wave `2` bomber/pod snapshots
+  and draws, behavior-script bomber/pod motion, and laser-hit score/cue
+  handling. Validation passed with `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780617037548159`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780617817021029`.

@@ -698,19 +698,19 @@ reintroduce legacy implementation terminology.
   apply behavior scripts plus hostile and initial-human spawn records when play
   starts and when hostile snapshots are cleared. The default actor wave
   progression reads
-  `assets/red-label/wave-table.tsv` for active wave size, lander movement
-  speed, and lander fire cadence, and wave `1` uses source first-wave lander
-  restore metadata for fixed-point fractions, velocities, shot timer, sleep
-  ticks, picture frame, and target-human index. Source-backed landers advance
-  their active position through that fixed-point fraction/velocity state while
-  later-wave restore positions remain a known replacement target. `XYZZY`
+  `assets/red-label/wave-table.tsv` for active wave size, lander and bomber
+  movement speed, lander fire cadence, and source bomber/pod counts. The actor
+  allocator follows the source active-family shape, so wave `1` remains
+  lander-only while later waves can seed bomber and pod actors beside landers.
+  Source-backed landers, bombers, pods, and first-wave humans publish
+  fixed-point metadata in snapshots; landers, bombers, pods, and humans
+  advance their actor-owned fraction state during active motion. `XYZZY`
   invincibility is represented as the same temporary player behavior override.
-  The slice now also models source first-wave human restore metadata with
-  target-list slots and actor-owned walk frame/fraction updates, source landers
-  preferring their configured human target slot, lander pickup/carry/conversion,
-  falling-human rescue and safe landing scoring, score popups, hostile
-  projectile actors for lander shots, smart-bomb hostile clearing, and mutant
-  spawn handoff, but it has not replaced the live `Game` runtime yet.
+  The slice now also models source landers preferring their configured human
+  target slot, lander pickup/carry/conversion, falling-human rescue and safe
+  landing scoring, score popups, hostile projectile actors for lander shots,
+  bomber/pod hit scores and cues, smart-bomb hostile clearing, and mutant spawn
+  handoff, but it has not replaced the live `Game` runtime yet.
 
 ## Compatibility Features
 

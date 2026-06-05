@@ -11,7 +11,8 @@ verified.
   ids, actor threads, and the latest snapshots.
 - Each asset is a Rust struct implementing `AssetActor`. The current slice has
   `AttractDirector`, `ScriptedAttractProgram`, `PlayerShip`, `Lander`,
-  `Mutant`, `Human`, `LaserShot`, `Explosion`, and `ScorePopup`.
+  `Mutant`, `Bomber`, `Pod`, `Human`, `LaserShot`, `EnemyLaserShot`,
+  `Explosion`, and `ScorePopup`.
 - `ThreadedAsset` runs one actor on one Rust thread. The driver sends one
   `StepPrompt` per simulation step and waits for one `ActorReply`, keeping
   behavior deterministic while still matching the requested thread-per-asset
@@ -70,9 +71,10 @@ numbers.
 Actor movement and behavior are configurable data owned by the driver.
 `ActorBehaviorProfile` holds tunable attributes for player movement and laser
 cooldown, laser speed and lifetime, lander seek/carry/fire behavior, mutant
-pursuit, human fall/landing behavior, and timed effect lifetimes. It also holds
-behavior modes such as `LanderBehaviorMode`, allowing scripts to choose whether
-a lander seeks humans, chases the player, or simply drifts.
+pursuit, bomber/pod drift, human fall/landing behavior, and timed effect
+lifetimes. It also holds behavior modes such as `LanderBehaviorMode`, allowing
+scripts to choose whether a lander seeks humans, chases the player, or simply
+drifts.
 
 `ActorBehaviorScript` resolves those profiles in this order:
 
@@ -106,14 +108,16 @@ when the current hostile snapshots are cleared.
 
 The default actor progression reads `assets/red-label/wave-table.tsv` through
 an actor-owned adapter. The current actor mapping uses source-backed
-`wave_size`, `lander_x_velocity`, and `lander_shot_time` to set active lander
-count, lander movement speed, and lander fire cadence. Wave `1` uses the
-source first-wave lander restore metadata from the existing clean evidence,
-including fixed-point fractions, velocities, shot timer, sleep ticks, picture
-frame, and target-human index. Source-backed landers advance active motion by
-updating that fixed-point position/fraction state. Later waves still use
-deterministic actor slots until a later slice ports the remaining source
-restore positions.
+`wave_size`, `lander_x_velocity`, `bomber_x_velocity`, `lander_shot_time`,
+`bombers`, and `pods` to set active family allocation, movement speed, and
+lander fire cadence. Wave `1` remains lander-only; later source waves seed one
+lander, one bomber, and one pod when those reserve counts are available before
+filling the rest of the active batch, matching the clean source allocator's
+family order. Wave `1` uses the source first-wave lander restore metadata from
+the existing clean evidence, including fixed-point fractions, velocities, shot
+timer, sleep ticks, picture frame, and target-human index. Source-backed
+landers, bombers, and pods publish their metadata in snapshots and advance
+active motion by updating their own fixed-point position/fraction state.
 
 Initial humans are source-backed for wave `1` as well. Their actor spawns carry
 fixed-point fractions, picture frame, and source target-list slot metadata.
@@ -162,6 +166,10 @@ The actor driver now owns a first Defender gameplay loop:
 - Lander shot timers emit both the laser sound cue and an `EnemyLaser` actor.
   Enemy lasers are player hazards, smart-bomb targets with no score value, and
   respect the same player damage behavior profile used by `XYZZY` invincibility.
+- Later source waves seed bomber and pod actor families when the wave table
+  exposes those counts. Bombers and pods draw their own sprites, move through
+  actor-owned source fixed-point metadata when source-backed, and remain
+  script-tunable through their behavior profiles.
 - Carried humans follow their lander. If the carrier disappears, the human
   falls under a simple acceleration model and emits the release sound cue.
 - Falling humans caught by the player award 500 points, emit the rescue sound
@@ -170,6 +178,8 @@ The actor driver now owns a first Defender gameplay loop:
   250-point popup. Fast impacts destroy the human and spawn an explosion.
 - Smart bomb is now a real driver command: it removes active hostile actors,
   awards enemy scores, and spawns explosions while preserving human actors.
+- Player laser hits now resolve lander, mutant, bomber, and pod targets through
+  the driver, awarding source scores and family hit cues for bombers and pods.
 - Wave scripts now apply behavior profiles when play starts and when all
   hostile snapshots are cleared, allowing level difficulty to progress through
   driver-owned data.

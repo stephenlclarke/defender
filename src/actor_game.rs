@@ -34,6 +34,11 @@ const HUMAN_CARRIED_OFFSET_Y: i16 = 8;
 const SOURCE_HUMAN_WALK_SLEEP_TICKS: u8 = 2;
 const SOURCE_HUMAN_LEFT_X_VELOCITY: u16 = 0xFFE0;
 const SOURCE_HUMAN_RIGHT_X_VELOCITY: u16 = 0x0020;
+const SOURCE_INITIAL_POD_X_SPEED: u8 = 0x20;
+const SOURCE_BOMBER_LOOP_SLEEP_TICKS: u8 = 1;
+const SOURCE_BOMBER_PICTURE_FRAME_COUNT: u8 = 4;
+const SOURCE_BOMBER_CRUISE_ALTITUDE: i16 = 0x50;
+const SOURCE_MAX_ACTIVE_WAVE_ENEMIES: usize = 5;
 const LANDER_SEEK_SPEED: i16 = 1;
 const LANDER_DRIFT_SPEED: i16 = 1;
 const LANDER_CARRY_SPEED: i16 = 2;
@@ -41,8 +46,12 @@ const LANDER_PICKUP_RADIUS_X: i16 = 6;
 const LANDER_PICKUP_RADIUS_Y: i16 = 8;
 const LANDER_CONVERSION_Y: i16 = 24;
 const MUTANT_SEEK_SPEED: i16 = 1;
+const BOMBER_DRIFT_SPEED: i16 = 1;
+const POD_DRIFT_SPEED: i16 = 1;
 const LANDER_SCORE: u32 = 150;
 const MUTANT_SCORE: u32 = 150;
+const BOMBER_SCORE: u32 = 250;
+const POD_SCORE: u32 = 1000;
 const HUMAN_RESCUE_SCORE: u32 = 500;
 const HUMAN_SAFE_LANDING_SCORE: u32 = 250;
 const ACTOR_SOURCE_WAVE_TABLE_TSV: &str = include_str!("../assets/red-label/wave-table.tsv");
@@ -185,12 +194,12 @@ const ACTOR_SOURCE_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         target_human_index: Some(5),
     }),
 ];
-const ACTOR_WAVE_LANDER_SPAWN_SLOTS: [Point; 5] = [
-    Point::new(176, 80),
-    Point::new(210, 132),
-    Point::new(236, 184),
-    Point::new(198, 48),
-    Point::new(244, 170),
+const ACTOR_WAVE_ACTIVE_SPAWN_SLOTS: [Point; SOURCE_MAX_ACTIVE_WAVE_ENEMIES] = [
+    Point::new(0xE4, 0x2A),
+    Point::new(228, 104),
+    Point::new(184, 72),
+    Point::new(148, 96),
+    Point::new(236, 66),
 ];
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ActorId(u64);
@@ -714,6 +723,8 @@ pub enum ActorKind {
     Player,
     Lander,
     Mutant,
+    Bomber,
+    Pod,
     Human,
     Laser,
     EnemyLaser,
@@ -747,6 +758,8 @@ pub struct ActorBehaviorProfile {
     pub lander_shot_lifetime_steps: u16,
     pub lander_mode: LanderBehaviorMode,
     pub mutant_seek_speed: i16,
+    pub bomber_drift_speed: i16,
+    pub pod_drift_speed: i16,
     pub human_ground_y: i16,
     pub human_fall_acceleration: i16,
     pub human_max_fall_speed: i16,
@@ -774,6 +787,8 @@ impl ActorBehaviorProfile {
         lander_shot_lifetime_steps: LANDER_SHOT_LIFETIME,
         lander_mode: LanderBehaviorMode::SeekNearestHuman,
         mutant_seek_speed: MUTANT_SEEK_SPEED,
+        bomber_drift_speed: BOMBER_DRIFT_SPEED,
+        pod_drift_speed: POD_DRIFT_SPEED,
         human_ground_y: HUMAN_GROUND_Y,
         human_fall_acceleration: HUMAN_FALL_ACCELERATION,
         human_max_fall_speed: HUMAN_MAX_FALL_SPEED,
@@ -887,8 +902,11 @@ impl Default for ActorBehaviorScript {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorSourceWaveProfile {
     pub landers: u8,
+    pub bombers: u8,
+    pub pods: u8,
     pub wave_size: u8,
     pub lander_x_velocity: u8,
+    pub bomber_x_velocity: u8,
     pub lander_shot_time: u32,
 }
 
@@ -905,9 +923,41 @@ pub struct ActorSourceLanderMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceBomberMetadata {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub picture_frame: u8,
+    pub cruise_altitude: i16,
+    pub sleep_ticks: u8,
+    pub source_slot: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourcePodMetadata {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorLanderSpawn {
     pub position: Point,
     pub source: Option<ActorSourceLanderMetadata>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorBomberSpawn {
+    pub position: Point,
+    pub source: Option<ActorSourceBomberMetadata>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorPodSpawn {
+    pub position: Point,
+    pub source: Option<ActorSourcePodMetadata>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -969,6 +1019,62 @@ impl ActorLanderSpawn {
     }
 }
 
+impl ActorBomberSpawn {
+    pub const fn new(position: Point) -> Self {
+        Self {
+            position,
+            source: None,
+        }
+    }
+
+    const fn source_initial(position: Point, source_x_velocity: u8, spawn_index: usize) -> Self {
+        let velocity_low = if spawn_index < 2 {
+            0u8.wrapping_sub(source_x_velocity)
+        } else {
+            source_x_velocity
+        };
+        Self {
+            position,
+            source: Some(ActorSourceBomberMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: actor_sign_extend_u8_to_u16(velocity_low),
+                y_velocity: 0,
+                picture_frame: 0,
+                cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
+                sleep_ticks: 0,
+                source_slot: (spawn_index % 4) as u8,
+            }),
+        }
+    }
+}
+
+impl ActorPodSpawn {
+    pub const fn new(position: Point) -> Self {
+        Self {
+            position,
+            source: None,
+        }
+    }
+
+    const fn source_initial(position: Point, spawn_index: usize) -> Self {
+        let velocity_low = if spawn_index < 2 {
+            0u8.wrapping_sub(SOURCE_INITIAL_POD_X_SPEED)
+        } else {
+            SOURCE_INITIAL_POD_X_SPEED
+        };
+        Self {
+            position,
+            source: Some(ActorSourcePodMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: actor_sign_extend_u8_to_u16(velocity_low),
+                y_velocity: 0,
+            }),
+        }
+    }
+}
+
 impl ActorHumanSpawn {
     pub const fn new(position: Point, mode: HumanMode) -> Self {
         Self {
@@ -1000,8 +1106,11 @@ impl ActorSourceWaveProfile {
         let wave = u8::try_from(wave.min(u16::from(u8::MAX))).unwrap_or(u8::MAX);
         Self {
             landers: actor_source_wave_u8("landers", wave),
+            bombers: actor_source_wave_u8("bombers", wave),
+            pods: actor_source_wave_u8("pods", wave),
             wave_size: actor_source_wave_u8("wave_size", wave),
             lander_x_velocity: actor_source_wave_u8("lander_x_velocity", wave),
+            bomber_x_velocity: actor_source_wave_u8("bomber_x_velocity", wave),
             lander_shot_time: actor_source_wave_u32("lander_shot_time", wave),
         }
     }
@@ -1016,29 +1125,155 @@ impl ActorSourceWaveProfile {
     }
 
     fn lander_spawns(self, wave: u16) -> Vec<ActorLanderSpawn> {
-        let active_landers = self
-            .wave_size
-            .min(self.landers)
-            .min(ACTOR_WAVE_LANDER_SPAWN_SLOTS.len() as u8);
-        if wave == 1 {
-            return ACTOR_SOURCE_FIRST_WAVE_LANDER_SPAWNS
-                .iter()
-                .copied()
-                .take(usize::from(active_landers))
-                .collect();
+        let mut source_lander_index = 0;
+        self.active_family_slots()
+            .into_iter()
+            .filter_map(|slot| {
+                if slot.kind != ActorSourceEnemyKind::Lander {
+                    return None;
+                }
+                let spawn = if wave == 1 {
+                    ACTOR_SOURCE_FIRST_WAVE_LANDER_SPAWNS
+                        .get(source_lander_index)
+                        .copied()
+                        .unwrap_or_else(|| ActorLanderSpawn::new(slot.position))
+                } else {
+                    ActorLanderSpawn::new(slot.position)
+                };
+                source_lander_index += 1;
+                Some(spawn)
+            })
+            .collect()
+    }
+
+    fn bomber_spawns(self) -> Vec<ActorBomberSpawn> {
+        self.active_family_slots()
+            .into_iter()
+            .filter(|slot| slot.kind == ActorSourceEnemyKind::Bomber)
+            .map(|slot| {
+                ActorBomberSpawn::source_initial(slot.position, self.bomber_x_velocity, slot.index)
+            })
+            .collect()
+    }
+
+    fn pod_spawns(self) -> Vec<ActorPodSpawn> {
+        self.active_family_slots()
+            .into_iter()
+            .filter(|slot| slot.kind == ActorSourceEnemyKind::Pod)
+            .map(|slot| ActorPodSpawn::source_initial(slot.position, slot.index))
+            .collect()
+    }
+
+    fn active_family_slots(self) -> Vec<ActorSourceEnemySlot> {
+        let mut counts = ActorSourceEnemyCounts {
+            landers: self.landers,
+            bombers: self.bombers,
+            pods: self.pods,
+        };
+        let target = usize::from(self.wave_size)
+            .min(SOURCE_MAX_ACTIVE_WAVE_ENEMIES)
+            .min(usize::from(counts.total()));
+        let mut kinds = Vec::with_capacity(target);
+
+        push_actor_source_kind(
+            &mut kinds,
+            &mut counts,
+            target,
+            ActorSourceEnemyKind::Lander,
+        );
+        push_actor_source_kind(
+            &mut kinds,
+            &mut counts,
+            target,
+            ActorSourceEnemyKind::Bomber,
+        );
+        push_actor_source_kind(&mut kinds, &mut counts, target, ActorSourceEnemyKind::Pod);
+        for kind in [
+            ActorSourceEnemyKind::Lander,
+            ActorSourceEnemyKind::Bomber,
+            ActorSourceEnemyKind::Pod,
+        ] {
+            while kinds.len() < target && counts.take(kind) {
+                kinds.push(kind);
+            }
         }
 
-        ACTOR_WAVE_LANDER_SPAWN_SLOTS
-            .iter()
-            .copied()
-            .map(ActorLanderSpawn::new)
-            .take(usize::from(active_landers))
+        kinds
+            .into_iter()
+            .enumerate()
+            .map(|(index, kind)| ActorSourceEnemySlot {
+                kind,
+                index,
+                position: ACTOR_WAVE_ACTIVE_SPAWN_SLOTS[index],
+            })
             .collect()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ActorSourceEnemySlot {
+    kind: ActorSourceEnemyKind,
+    index: usize,
+    position: Point,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ActorSourceEnemyKind {
+    Lander,
+    Bomber,
+    Pod,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ActorSourceEnemyCounts {
+    landers: u8,
+    bombers: u8,
+    pods: u8,
+}
+
+impl ActorSourceEnemyCounts {
+    const fn total(self) -> u8 {
+        self.landers
+            .saturating_add(self.bombers)
+            .saturating_add(self.pods)
+    }
+
+    fn take(&mut self, kind: ActorSourceEnemyKind) -> bool {
+        let count = match kind {
+            ActorSourceEnemyKind::Lander => &mut self.landers,
+            ActorSourceEnemyKind::Bomber => &mut self.bombers,
+            ActorSourceEnemyKind::Pod => &mut self.pods,
+        };
+        if *count == 0 {
+            return false;
+        }
+        *count = count.saturating_sub(1);
+        true
+    }
+}
+
+fn push_actor_source_kind(
+    kinds: &mut Vec<ActorSourceEnemyKind>,
+    counts: &mut ActorSourceEnemyCounts,
+    target: usize,
+    kind: ActorSourceEnemyKind,
+) {
+    if kinds.len() < target && counts.take(kind) {
+        kinds.push(kind);
     }
 }
 
 fn actor_lander_speed_from_source(velocity: u8) -> i16 {
     i16::from((velocity / 16).max(1))
+}
+
+fn actor_velocity_pixels_from_source(velocity: u8) -> i16 {
+    i16::from((velocity / 32).max(1))
+}
+
+const fn actor_sign_extend_u8_to_u16(value: u8) -> u16 {
+    let sign = if value & 0x80 == 0 { 0x00 } else { 0xFF };
+    u16::from_be_bytes([sign, value])
 }
 
 fn actor_source_wave_u8(key: &str, wave: u8) -> u8 {
@@ -1107,6 +1342,8 @@ pub struct ActorWaveProfile {
     pub wave: u16,
     pub behavior_script: ActorBehaviorScript,
     pub lander_spawns: Vec<ActorLanderSpawn>,
+    pub bomber_spawns: Vec<ActorBomberSpawn>,
+    pub pod_spawns: Vec<ActorPodSpawn>,
     pub human_spawns: Vec<ActorHumanSpawn>,
 }
 
@@ -1141,10 +1378,30 @@ impl ActorWaveProfile {
         lander_spawns: Vec<ActorLanderSpawn>,
         human_spawns: Vec<ActorHumanSpawn>,
     ) -> Self {
+        Self::with_family_spawns(
+            wave,
+            behavior_script,
+            lander_spawns,
+            Vec::new(),
+            Vec::new(),
+            human_spawns,
+        )
+    }
+
+    pub fn with_family_spawns(
+        wave: u16,
+        behavior_script: ActorBehaviorScript,
+        lander_spawns: Vec<ActorLanderSpawn>,
+        bomber_spawns: Vec<ActorBomberSpawn>,
+        pod_spawns: Vec<ActorPodSpawn>,
+        human_spawns: Vec<ActorHumanSpawn>,
+    ) -> Self {
         Self {
             wave: wave.max(1),
             behavior_script,
             lander_spawns,
+            bomber_spawns,
+            pod_spawns,
             human_spawns,
         }
     }
@@ -1161,6 +1418,17 @@ impl ActorWaveProfile {
             .iter()
             .map(|spawn| spawn.position)
             .collect()
+    }
+
+    pub fn bomber_spawn_points(&self) -> Vec<Point> {
+        self.bomber_spawns
+            .iter()
+            .map(|spawn| spawn.position)
+            .collect()
+    }
+
+    pub fn pod_spawn_points(&self) -> Vec<Point> {
+        self.pod_spawns.iter().map(|spawn| spawn.position).collect()
     }
 }
 
@@ -1202,11 +1470,23 @@ impl ActorWaveScript {
 
     fn source_backed_profile(wave: u16) -> ActorWaveProfile {
         let source = ActorSourceWaveProfile::for_wave(wave);
-        ActorWaveProfile::with_lander_spawns(
+        ActorWaveProfile::with_family_spawns(
             wave,
             ActorBehaviorScript::default()
-                .with_kind_behavior(ActorKind::Lander, source.lander_behavior()),
+                .with_kind_behavior(ActorKind::Lander, source.lander_behavior())
+                .with_kind_behavior(
+                    ActorKind::Bomber,
+                    ActorBehaviorProfile {
+                        bomber_drift_speed: actor_velocity_pixels_from_source(
+                            source.bomber_x_velocity,
+                        ),
+                        ..ActorBehaviorProfile::default()
+                    },
+                ),
             source.lander_spawns(wave),
+            source.bomber_spawns(),
+            source.pod_spawns(),
+            ACTOR_SOURCE_FIRST_WAVE_HUMAN_SPAWNS.to_vec(),
         )
     }
 
@@ -1240,6 +1520,8 @@ pub enum SpriteKey {
     PlayerLeft,
     Lander,
     Mutant,
+    Bomber,
+    Pod,
     Human,
     HumanFalling,
     HumanCarried,
@@ -1266,6 +1548,10 @@ pub enum VisualEffect {
     SourceLanderFrame {
         frame: u8,
     },
+    SourceBomberFrame {
+        frame: u8,
+    },
+    SourcePod,
     SourceHumanFrame {
         frame: u8,
     },
@@ -1289,6 +1575,8 @@ pub enum SoundCue {
     HumanSafeLanding,
     HumanLost,
     MutantSpawn,
+    BomberHit,
+    PodHit,
     AttractPulse,
     GameOver,
 }
@@ -1505,6 +1793,8 @@ pub struct ActorSnapshot {
     pub bounds: Option<Rect>,
     pub alive: bool,
     pub source_lander: Option<ActorSourceLanderMetadata>,
+    pub source_bomber: Option<ActorSourceBomberMetadata>,
+    pub source_pod: Option<ActorSourcePodMetadata>,
     pub source_human: Option<ActorSourceHumanMetadata>,
 }
 
@@ -1590,6 +1880,12 @@ pub enum SpawnRequest {
         position: Point,
     },
     Mutant {
+        position: Point,
+    },
+    Bomber {
+        position: Point,
+    },
+    Pod {
         position: Point,
     },
     Human {
@@ -1919,6 +2215,14 @@ impl ActorGameDriver {
         self.spawn_lander(position)
     }
 
+    pub fn spawn_bomber_for_test(&mut self, position: Point) -> ActorId {
+        self.spawn_bomber(position)
+    }
+
+    pub fn spawn_pod_for_test(&mut self, position: Point) -> ActorId {
+        self.spawn_pod(position)
+    }
+
     pub fn spawn_human_for_test(&mut self, position: Point) -> ActorId {
         self.spawn_human(position, HumanMode::Grounded)
     }
@@ -1963,6 +2267,30 @@ impl ActorGameDriver {
     fn spawn_mutant(&mut self, position: Point) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(Mutant::new(id, position));
+        id
+    }
+
+    fn spawn_bomber(&mut self, position: Point) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(Bomber::new(id, position));
+        id
+    }
+
+    fn spawn_bomber_from_spawn(&mut self, spawn: ActorBomberSpawn) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(Bomber::from_spawn(id, spawn));
+        id
+    }
+
+    fn spawn_pod(&mut self, position: Point) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(Pod::new(id, position));
+        id
+    }
+
+    fn spawn_pod_from_spawn(&mut self, spawn: ActorPodSpawn) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(Pod::from_spawn(id, spawn));
         id
     }
 
@@ -2031,7 +2359,7 @@ impl ActorGameDriver {
                         position: center_of(enemy.bounds),
                     }));
                     commands.push(GameCommand::AddScore(score_for_hostile(enemy.kind)));
-                    commands.push(GameCommand::PlaySound(SoundCue::Explosion));
+                    commands.push(GameCommand::PlaySound(hit_sound_for_hostile(enemy.kind)));
                     break;
                 }
             }
@@ -2097,6 +2425,12 @@ impl ActorGameDriver {
                 }
                 GameCommand::Spawn(SpawnRequest::Mutant { position }) => {
                     self.spawn_mutant(position);
+                }
+                GameCommand::Spawn(SpawnRequest::Bomber { position }) => {
+                    self.spawn_bomber(position);
+                }
+                GameCommand::Spawn(SpawnRequest::Pod { position }) => {
+                    self.spawn_pod(position);
                 }
                 GameCommand::Spawn(SpawnRequest::Human { position, mode }) => {
                     self.spawn_human(position, mode);
@@ -2187,6 +2521,22 @@ impl ActorGameDriver {
         for spawn in lander_spawns {
             self.spawn_lander_from_spawn(spawn);
         }
+        let bomber_spawns = self
+            .wave_script
+            .profile_for_wave(self.wave)
+            .bomber_spawns
+            .clone();
+        for spawn in bomber_spawns {
+            self.spawn_bomber_from_spawn(spawn);
+        }
+        let pod_spawns = self
+            .wave_script
+            .profile_for_wave(self.wave)
+            .pod_spawns
+            .clone();
+        for spawn in pod_spawns {
+            self.spawn_pod_from_spawn(spawn);
+        }
     }
 
     fn advance_wave_if_cleared(&mut self, was_playing: bool, commands: &[GameCommand]) -> bool {
@@ -2266,27 +2616,42 @@ fn manhattan_distance(left: Point, right: Point) -> i16 {
 }
 
 fn is_hostile(kind: ActorKind) -> bool {
-    matches!(kind, ActorKind::Lander | ActorKind::Mutant)
+    matches!(
+        kind,
+        ActorKind::Lander | ActorKind::Mutant | ActorKind::Bomber | ActorKind::Pod
+    )
 }
 
 fn is_player_laser_target(kind: ActorKind) -> bool {
     matches!(
         kind,
-        ActorKind::Lander | ActorKind::Mutant | ActorKind::EnemyLaser
+        ActorKind::Lander
+            | ActorKind::Mutant
+            | ActorKind::Bomber
+            | ActorKind::Pod
+            | ActorKind::EnemyLaser
     )
 }
 
 fn is_player_hazard(kind: ActorKind) -> bool {
     matches!(
         kind,
-        ActorKind::Lander | ActorKind::Mutant | ActorKind::EnemyLaser
+        ActorKind::Lander
+            | ActorKind::Mutant
+            | ActorKind::Bomber
+            | ActorKind::Pod
+            | ActorKind::EnemyLaser
     )
 }
 
 fn is_smart_bomb_target(kind: ActorKind) -> bool {
     matches!(
         kind,
-        ActorKind::Lander | ActorKind::Mutant | ActorKind::EnemyLaser
+        ActorKind::Lander
+            | ActorKind::Mutant
+            | ActorKind::Bomber
+            | ActorKind::Pod
+            | ActorKind::EnemyLaser
     )
 }
 
@@ -2296,6 +2661,8 @@ fn commands_spawn_hostiles(commands: &[GameCommand]) -> bool {
             command,
             GameCommand::Spawn(SpawnRequest::Lander { .. })
                 | GameCommand::Spawn(SpawnRequest::Mutant { .. })
+                | GameCommand::Spawn(SpawnRequest::Bomber { .. })
+                | GameCommand::Spawn(SpawnRequest::Pod { .. })
         )
     })
 }
@@ -2304,7 +2671,17 @@ fn score_for_hostile(kind: ActorKind) -> u32 {
     match kind {
         ActorKind::Lander => LANDER_SCORE,
         ActorKind::Mutant => MUTANT_SCORE,
+        ActorKind::Bomber => BOMBER_SCORE,
+        ActorKind::Pod => POD_SCORE,
         _ => 0,
+    }
+}
+
+fn hit_sound_for_hostile(kind: ActorKind) -> SoundCue {
+    match kind {
+        ActorKind::Bomber => SoundCue::BomberHit,
+        ActorKind::Pod => SoundCue::PodHit,
+        _ => SoundCue::Explosion,
     }
 }
 
@@ -2381,6 +2758,8 @@ impl AssetActor for AttractDirector {
                 bounds: None,
                 alive: true,
                 source_lander: None,
+                source_bomber: None,
+                source_pod: None,
                 source_human: None,
             },
             commands,
@@ -2429,6 +2808,8 @@ impl AssetActor for ScriptedAttractProgram {
                 bounds: None,
                 alive: true,
                 source_lander: None,
+                source_bomber: None,
+                source_pod: None,
                 source_human: None,
             },
             commands: Vec::new(),
@@ -2523,6 +2904,8 @@ impl AssetActor for PlayerShip {
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
                 source_lander: None,
+                source_bomber: None,
+                source_pod: None,
                 source_human: None,
             },
             commands,
@@ -2610,6 +2993,8 @@ impl AssetActor for Lander {
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
                 source_lander: self.source,
+                source_bomber: None,
+                source_pod: None,
                 source_human: None,
             },
             commands,
@@ -2821,6 +3206,10 @@ impl Lander {
 }
 
 const fn source_lander_drift_from_velocity(x_velocity: u16) -> i16 {
+    actor_source_drift_from_velocity(x_velocity)
+}
+
+const fn actor_source_drift_from_velocity(x_velocity: u16) -> i16 {
     if x_velocity & 0x8000 != 0 {
         -1
     } else if x_velocity == 0 {
@@ -2912,6 +3301,198 @@ impl AssetActor for Mutant {
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
                 source_lander: None,
+                source_bomber: None,
+                source_pod: None,
+                source_human: None,
+            },
+            commands: Vec::new(),
+            draws,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Bomber {
+    id: ActorId,
+    position: Point,
+    drift: i16,
+    source: Option<ActorSourceBomberMetadata>,
+}
+
+impl Bomber {
+    fn new(id: ActorId, position: Point) -> Self {
+        Self::from_spawn(id, ActorBomberSpawn::new(position))
+    }
+
+    fn from_spawn(id: ActorId, spawn: ActorBomberSpawn) -> Self {
+        Self {
+            id,
+            position: spawn.position,
+            drift: spawn
+                .source
+                .map(|source| actor_source_drift_from_velocity(source.x_velocity))
+                .unwrap_or(-1),
+            source: spawn.source,
+        }
+    }
+
+    fn bounds(&self) -> Rect {
+        Rect::from_center(self.position, 8, 8)
+    }
+
+    fn advance_source_motion(&mut self) -> bool {
+        let Some(source) = &mut self.source else {
+            return false;
+        };
+        if source.sleep_ticks > 0 {
+            source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
+            return true;
+        }
+
+        let (x, x_fraction) =
+            actor_source_axis_step(self.position.x, source.x_fraction, source.x_velocity);
+        let (y, y_fraction) =
+            actor_source_axis_step(self.position.y, source.y_fraction, source.y_velocity);
+        self.position = Point::new(x, y);
+        source.x_fraction = x_fraction;
+        source.y_fraction = y_fraction;
+        source.picture_frame =
+            source.picture_frame.saturating_add(1) % SOURCE_BOMBER_PICTURE_FRAME_COUNT;
+        source.sleep_ticks = SOURCE_BOMBER_LOOP_SLEEP_TICKS;
+        self.drift = actor_source_drift_from_velocity(source.x_velocity);
+        true
+    }
+
+    fn draw_effect(&self) -> VisualEffect {
+        self.source
+            .map(|source| VisualEffect::SourceBomberFrame {
+                frame: source.picture_frame,
+            })
+            .unwrap_or(VisualEffect::Static)
+    }
+}
+
+impl AssetActor for Bomber {
+    fn id(&self) -> ActorId {
+        self.id
+    }
+
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
+        let mut draws = Vec::new();
+        if prompt.phase == Phase::Playing {
+            let behavior = prompt.behavior_for(self.id, ActorKind::Bomber);
+            if !self.advance_source_motion() {
+                self.position = self.position.offset(Velocity::new(
+                    self.drift * behavior.bomber_drift_speed.max(0),
+                    0,
+                ));
+            }
+            draws.push(DrawCommand::sprite_with_effect(
+                self.id,
+                SpriteKey::Bomber,
+                self.position,
+                self.draw_effect(),
+            ));
+        }
+
+        ActorReply {
+            id: self.id,
+            snapshot: ActorSnapshot {
+                id: self.id,
+                kind: ActorKind::Bomber,
+                position: self.position,
+                bounds: Some(self.bounds()),
+                alive: prompt.phase == Phase::Playing,
+                source_lander: None,
+                source_bomber: self.source,
+                source_pod: None,
+                source_human: None,
+            },
+            commands: Vec::new(),
+            draws,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Pod {
+    id: ActorId,
+    position: Point,
+    drift: i16,
+    source: Option<ActorSourcePodMetadata>,
+}
+
+impl Pod {
+    fn new(id: ActorId, position: Point) -> Self {
+        Self::from_spawn(id, ActorPodSpawn::new(position))
+    }
+
+    fn from_spawn(id: ActorId, spawn: ActorPodSpawn) -> Self {
+        Self {
+            id,
+            position: spawn.position,
+            drift: spawn
+                .source
+                .map(|source| actor_source_drift_from_velocity(source.x_velocity))
+                .unwrap_or(1),
+            source: spawn.source,
+        }
+    }
+
+    fn bounds(&self) -> Rect {
+        Rect::from_center(self.position, 8, 8)
+    }
+
+    fn advance_source_motion(&mut self) -> bool {
+        let Some(source) = &mut self.source else {
+            return false;
+        };
+        let (x, x_fraction) =
+            actor_source_axis_step(self.position.x, source.x_fraction, source.x_velocity);
+        let (y, y_fraction) =
+            actor_source_axis_step(self.position.y, source.y_fraction, source.y_velocity);
+        self.position = Point::new(x, y);
+        source.x_fraction = x_fraction;
+        source.y_fraction = y_fraction;
+        self.drift = actor_source_drift_from_velocity(source.x_velocity);
+        true
+    }
+}
+
+impl AssetActor for Pod {
+    fn id(&self) -> ActorId {
+        self.id
+    }
+
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
+        let mut draws = Vec::new();
+        if prompt.phase == Phase::Playing {
+            let behavior = prompt.behavior_for(self.id, ActorKind::Pod);
+            if !self.advance_source_motion() {
+                self.position = self.position.offset(Velocity::new(
+                    self.drift * behavior.pod_drift_speed.max(0),
+                    0,
+                ));
+            }
+            draws.push(DrawCommand::sprite_with_effect(
+                self.id,
+                SpriteKey::Pod,
+                self.position,
+                VisualEffect::SourcePod,
+            ));
+        }
+
+        ActorReply {
+            id: self.id,
+            snapshot: ActorSnapshot {
+                id: self.id,
+                kind: ActorKind::Pod,
+                position: self.position,
+                bounds: Some(self.bounds()),
+                alive: prompt.phase == Phase::Playing,
+                source_lander: None,
+                source_bomber: None,
+                source_pod: self.source,
                 source_human: None,
             },
             commands: Vec::new(),
@@ -3102,6 +3683,8 @@ impl AssetActor for Human {
                 bounds: human_collision_bounds(self.mode, self.position),
                 alive: prompt.phase == Phase::Playing,
                 source_lander: None,
+                source_bomber: None,
+                source_pod: None,
                 source_human: self.source,
             },
             commands,
@@ -3183,6 +3766,8 @@ impl AssetActor for ScorePopup {
                 bounds: None,
                 alive: self.age < behavior.score_popup_lifetime_steps,
                 source_lander: None,
+                source_bomber: None,
+                source_pod: None,
                 source_human: None,
             },
             commands,
@@ -3248,6 +3833,8 @@ impl AssetActor for LaserShot {
                 bounds: Some(self.bounds()),
                 alive: self.age < behavior.laser_lifetime_steps,
                 source_lander: None,
+                source_bomber: None,
+                source_pod: None,
                 source_human: None,
             },
             commands,
@@ -3314,6 +3901,8 @@ impl AssetActor for EnemyLaserShot {
                 bounds: Some(self.bounds()),
                 alive: self.age < behavior.lander_shot_lifetime_steps,
                 source_lander: None,
+                source_bomber: None,
+                source_pod: None,
                 source_human: None,
             },
             commands,
@@ -3369,6 +3958,8 @@ impl AssetActor for Explosion {
                 bounds: None,
                 alive: self.age < behavior.explosion_lifetime_steps,
                 source_lander: None,
+                source_bomber: None,
+                source_pod: None,
                 source_human: None,
             },
             commands,
@@ -3713,6 +4304,8 @@ mod tests {
             ]
         );
         assert_eq!(first.human_spawns.len(), 10);
+        assert!(first.bomber_spawns.is_empty());
+        assert!(first.pod_spawns.is_empty());
         assert_eq!(
             first.human_spawn_points(),
             vec![
@@ -3770,15 +4363,53 @@ mod tests {
         let second_lander = second
             .behavior_script
             .behavior_for(ActorId::new(1), ActorKind::Lander);
-        assert_eq!(second.lander_spawns.len(), 5);
+        let second_bomber = second
+            .behavior_script
+            .behavior_for(ActorId::new(1), ActorKind::Bomber);
+        assert_eq!(second.lander_spawns.len(), 3);
         assert!(
             second
                 .lander_spawns
                 .iter()
                 .all(|spawn| spawn.source.is_none())
         );
+        assert_eq!(
+            second.lander_spawn_points(),
+            vec![
+                Point::new(0xE4, 0x2A),
+                Point::new(148, 96),
+                Point::new(236, 66),
+            ]
+        );
+        assert_eq!(second.bomber_spawns.len(), 1);
+        assert_eq!(second.bomber_spawn_points(), vec![Point::new(228, 104)]);
+        assert_eq!(
+            second.bomber_spawns[0].source,
+            Some(ActorSourceBomberMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0xFFD8,
+                y_velocity: 0,
+                picture_frame: 0,
+                cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
+                sleep_ticks: 0,
+                source_slot: 1,
+            })
+        );
+        assert_eq!(second.pod_spawns.len(), 1);
+        assert_eq!(second.pod_spawn_points(), vec![Point::new(184, 72)]);
+        assert_eq!(
+            second.pod_spawns[0].source,
+            Some(ActorSourcePodMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0x0020,
+                y_velocity: 0,
+            })
+        );
         assert_eq!(second_lander.lander_seek_speed, 2);
         assert_eq!(second_lander.lander_fire_period_steps, 48);
+        assert_eq!(second_bomber.bomber_drift_speed, 1);
 
         let fifth = script.profile_for_wave(5);
         let fifth_lander = fifth
@@ -3786,6 +4417,62 @@ mod tests {
             .behavior_for(ActorId::new(1), ActorKind::Lander);
         assert_eq!(fifth_lander.lander_seek_speed, 3);
         assert_eq!(fifth_lander.lander_fire_period_steps, 30);
+    }
+
+    #[test]
+    fn second_source_wave_spawns_bomber_and_pod_actor_families() {
+        let mut driver = started_driver();
+
+        let cleared = driver.step(GameInput {
+            smart_bomb: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(cleared.wave, 2);
+        assert!(
+            cleared
+                .commands
+                .contains(&GameCommand::AdvanceWave { wave: 2 })
+        );
+
+        let live = driver.step(GameInput::NONE);
+
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 3);
+        assert_eq!(driver.snapshot_count(ActorKind::Bomber), 1);
+        assert_eq!(driver.snapshot_count(ActorKind::Pod), 1);
+        assert!(live.snapshots.iter().any(|snapshot| {
+            snapshot.kind == ActorKind::Bomber
+                && snapshot.source_bomber
+                    == Some(ActorSourceBomberMetadata {
+                        x_fraction: 0xD8,
+                        y_fraction: 0,
+                        x_velocity: 0xFFD8,
+                        y_velocity: 0,
+                        picture_frame: 1,
+                        cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
+                        sleep_ticks: SOURCE_BOMBER_LOOP_SLEEP_TICKS,
+                        source_slot: 1,
+                    })
+        }));
+        assert!(live.snapshots.iter().any(|snapshot| {
+            snapshot.kind == ActorKind::Pod
+                && snapshot.source_pod
+                    == Some(ActorSourcePodMetadata {
+                        x_fraction: 0x20,
+                        y_fraction: 0,
+                        x_velocity: 0x0020,
+                        y_velocity: 0,
+                    })
+        }));
+        assert!(
+            live.draws
+                .iter()
+                .any(|draw| draw.sprite == SpriteKey::Bomber
+                    && matches!(draw.effect, VisualEffect::SourceBomberFrame { frame: 1 }))
+        );
+        assert!(
+            live.draws.iter().any(|draw| draw.sprite == SpriteKey::Pod
+                && matches!(draw.effect, VisualEffect::SourcePod))
+        );
     }
 
     #[test]
@@ -4144,6 +4831,33 @@ mod tests {
 
         let seeking = driver.step(GameInput::NONE);
         assert_eq!(snapshot_for(&seeking, lander_id).position.x, 83);
+    }
+
+    #[test]
+    fn behavior_script_can_define_bomber_and_pod_motion() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.set_kind_behavior(
+            ActorKind::Bomber,
+            ActorBehaviorProfile {
+                bomber_drift_speed: 3,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        driver.set_kind_behavior(
+            ActorKind::Pod,
+            ActorBehaviorProfile {
+                pod_drift_speed: 4,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        let bomber = driver.spawn_bomber_for_test(Point::new(100, 80));
+        let pod = driver.spawn_pod_for_test(Point::new(100, 88));
+
+        let report = driver.step(GameInput::NONE);
+
+        assert_eq!(snapshot_for(&report, bomber).position, Point::new(97, 80));
+        assert_eq!(snapshot_for(&report, pod).position, Point::new(104, 88));
     }
 
     #[test]
@@ -4516,6 +5230,53 @@ mod tests {
         assert!(collision.sounds.contains(&SoundCue::Explosion));
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
         assert!(collision.commands.contains(&GameCommand::AddScore(150)));
+    }
+
+    #[test]
+    fn driver_resolves_laser_bomber_collision_with_source_score_sound_and_explosion() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_player();
+        driver.spawn_bomber_for_test(Point::new(62, 120));
+
+        let fired = driver.step(GameInput {
+            fire: true,
+            ..GameInput::NONE
+        });
+        assert!(fired.sounds.contains(&SoundCue::Laser));
+
+        let collision = driver.step(GameInput::NONE);
+        assert_eq!(collision.score, BOMBER_SCORE);
+        assert!(collision.sounds.contains(&SoundCue::BomberHit));
+        assert_eq!(driver.snapshot_count(ActorKind::Bomber), 0);
+        assert!(
+            collision
+                .commands
+                .contains(&GameCommand::AddScore(BOMBER_SCORE))
+        );
+    }
+
+    #[test]
+    fn driver_resolves_laser_pod_collision_with_source_score_sound_and_explosion() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_player();
+        driver.spawn_pod_for_test(Point::new(62, 120));
+
+        driver.step(GameInput {
+            fire: true,
+            ..GameInput::NONE
+        });
+        let collision = driver.step(GameInput::NONE);
+
+        assert_eq!(collision.score, POD_SCORE);
+        assert!(collision.sounds.contains(&SoundCue::PodHit));
+        assert_eq!(driver.snapshot_count(ActorKind::Pod), 0);
+        assert!(
+            collision
+                .commands
+                .contains(&GameCommand::AddScore(POD_SCORE))
+        );
     }
 
     #[test]
