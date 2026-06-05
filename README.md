@@ -82,14 +82,17 @@ two credits, consume both credits, initialize player one as active, publish both
 player score/stock snapshots, and suppress false `GameStarted` events for
 blocked two-player start requests. All accepted actor starts now publish the
 source-length start interval and delay actor playfield spawning plus
-`WaveStarted` until that interval completes; one-player starts keep the
-playfield empty without drawing the two-player source label. Credited
-two-player starts render the source `PLAYER ONE` prompt during the same delay.
-Actor player deaths now decrement the active player's stock and, when the other
-player has stock, enter a source-length `0x60` player-switch sleep exposed
-through `GameOverSnapshot`; the render bridge projects the source
-`PLAYER ONE` / `PLAYER TWO` plus `GAME OVER` switch prompts before the next
-stocked player's source start prompt and delayed actor playfield turn.
+`WaveStarted` until that interval completes. Start audio follows the same
+source cadence: the accepted-start report is silent, the start sound is emitted
+on the following actor step, and the source `0xEA` appearance cue is emitted as
+the delayed playfield starts. One-player starts keep the playfield empty without
+drawing the two-player source label. Credited two-player starts render the
+source `PLAYER ONE` prompt during the same delay. Actor player deaths now
+decrement the active player's stock and, when the other player has stock, enter
+a source-length `0x60` player-switch sleep exposed through `GameOverSnapshot`;
+the render bridge projects the source `PLAYER ONE` / `PLAYER TWO` plus
+`GAME OVER` switch prompts before the next stocked player's source start prompt
+and delayed actor playfield turn.
 `--actor-smoke` exercises that actor frame path through a
 scripted attract/play input sequence and the native draw planner, proving actor
 events, audio, sprites, projectiles, HUD text, overlays, and `wgpu` command-plan

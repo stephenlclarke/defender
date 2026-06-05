@@ -64,6 +64,7 @@ const SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS: u8 = 6;
 const SOURCE_SHELL_SCAN_CADENCE_STEPS: u8 = 8;
 const SOURCE_SHELL_LIMIT: usize = 20;
 const SOURCE_PLAYER_SWITCH_SLEEP_STEPS: u8 = 0x60;
+const SOURCE_START_SOUND_DELAY_STEPS: u8 = 1;
 const SOURCE_START_PLAYFIELD_DELAY_STEPS: u8 = 138;
 const SOURCE_SHELL_X_MAX: i16 = 0x98;
 const SOURCE_PLAYFIELD_START_RNG: ActorSourceRng = ActorSourceRng {
@@ -3561,6 +3562,7 @@ pub enum SoundCue {
     Laser,
     SmartBomb,
     Hyperspace,
+    PlayerAppear,
     HyperspaceMaterialize,
     Explosion,
     LanderHit,
@@ -3594,6 +3596,7 @@ impl SoundCue {
             Self::Laser => Some(0xEB),
             Self::SmartBomb => Some(0xEE),
             Self::Hyperspace => None,
+            Self::PlayerAppear => Some(0xEA),
             Self::HyperspaceMaterialize => Some(0xEA),
             Self::Explosion => Some(0xEE),
             Self::LanderHit => Some(0xF9),
@@ -7908,6 +7911,7 @@ pub struct ActorGameDriver {
     pending_survivor_bonus: Option<PendingSurvivorBonus>,
     pending_player_switch: Option<PendingPlayerSwitch>,
     pending_player_start: Option<PendingPlayerStart>,
+    pending_start_sound_steps: Option<u8>,
 }
 
 impl ActorGameDriver {
@@ -7957,6 +7961,7 @@ impl ActorGameDriver {
             pending_survivor_bonus: None,
             pending_player_switch: None,
             pending_player_start: None,
+            pending_start_sound_steps: None,
         };
         let attract_id = driver.allocate_actor_id();
         let script_id = driver.allocate_actor_id();
@@ -7970,10 +7975,12 @@ impl ActorGameDriver {
     pub fn step(&mut self, input: GameInput) -> StepReport {
         self.step = self.step.saturating_add(1);
         let mut step_commands = Vec::new();
+        let mut delayed_sounds = self.advance_pending_start_sound();
         let mut survivor_bonus_awarded_points = None;
         let mut survivor_bonus_replay_awarded = false;
         if let PlayerStartStep::StartPlayfield = self.advance_pending_player_start() {
             step_commands.push(GameCommand::AdvanceWave { wave: self.wave });
+            delayed_sounds.push(SoundCue::PlayerAppear);
         }
         self.advance_pending_player_switch();
         match self.advance_pending_survivor_bonus() {
@@ -8082,6 +8089,7 @@ impl ActorGameDriver {
         self.advance_baiter_timer(&mut commands);
         let applied_commands = self.apply_commands(&commands);
         self.remove_dead_actors(&dead_actor_ids);
+        delayed_sounds.extend(applied_commands.sounds);
         survivor_bonus_replay_awarded |= applied_commands.bonus_awarded;
         if self.start_survivor_bonus_if_wave_cleared(was_playing, &commands) {
             commands.push(GameCommand::WaveCleared {
@@ -8126,7 +8134,7 @@ impl ActorGameDriver {
             source_rng,
             snapshots: self.snapshots.values().cloned().collect(),
             draws,
-            sounds: applied_commands.sounds,
+            sounds: delayed_sounds,
             commands,
         };
         self.advance_game_over_hall_of_fame_return();
@@ -8493,14 +8501,14 @@ impl ActorGameDriver {
                     if self.phase == Phase::Attract && self.credits > 0 {
                         self.credits = self.credits.saturating_sub(1);
                         self.start_play(1);
-                        applied.sounds.push(SoundCue::Start);
+                        self.pending_start_sound_steps = Some(SOURCE_START_SOUND_DELAY_STEPS);
                     }
                 }
                 GameCommand::StartTwoPlayer => {
                     if self.phase == Phase::Attract && self.credits > 1 {
                         self.credits = self.credits.saturating_sub(2);
                         self.start_play(2);
-                        applied.sounds.push(SoundCue::Start);
+                        self.pending_start_sound_steps = Some(SOURCE_START_SOUND_DELAY_STEPS);
                     }
                 }
                 GameCommand::Spawn(SpawnRequest::Laser {
@@ -8726,6 +8734,7 @@ impl ActorGameDriver {
         self.pending_survivor_bonus = None;
         self.pending_player_switch = Some(PendingPlayerSwitch::new(from_player, to_player));
         self.pending_player_start = None;
+        self.pending_start_sound_steps = None;
         self.baiter_timer_steps = None;
         self.clear_turn_playfield_actors();
     }
@@ -8755,10 +8764,26 @@ impl ActorGameDriver {
         self.pending_survivor_bonus = None;
         self.pending_player_switch = None;
         self.pending_player_start = Some(PendingPlayerStart::new(player));
+        self.pending_start_sound_steps = None;
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.reset_source_shell_scan();
         self.clear_turn_playfield_actors();
         self.apply_wave_profile();
+    }
+
+    fn advance_pending_start_sound(&mut self) -> Vec<SoundCue> {
+        let Some(mut remaining) = self.pending_start_sound_steps else {
+            return Vec::new();
+        };
+
+        remaining = remaining.saturating_sub(1);
+        if remaining > 0 {
+            self.pending_start_sound_steps = Some(remaining);
+            Vec::new()
+        } else {
+            self.pending_start_sound_steps = None;
+            vec![SoundCue::Start]
+        }
     }
 
     fn advance_pending_player_start(&mut self) -> PlayerStartStep {
@@ -8796,6 +8821,7 @@ impl ActorGameDriver {
         self.pending_survivor_bonus = None;
         self.pending_player_switch = None;
         self.pending_player_start = None;
+        self.pending_start_sound_steps = None;
         self.high_scores.record(active_score);
         self.phase = if self.high_scores.qualifies(active_score) {
             Phase::HighScoreEntry
@@ -8845,6 +8871,7 @@ impl ActorGameDriver {
         self.pending_survivor_bonus = None;
         self.pending_player_switch = None;
         self.pending_player_start = None;
+        self.pending_start_sound_steps = None;
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.reset_source_shell_scan();
         self.clear_turn_playfield_actors();
@@ -8857,6 +8884,7 @@ impl ActorGameDriver {
         self.pending_survivor_bonus = None;
         self.pending_player_switch = None;
         self.pending_player_start = None;
+        self.pending_start_sound_steps = None;
         self.clear_wave_playfield_actors();
         self.apply_wave_profile();
         self.spawn_wave_hostiles();
@@ -12885,6 +12913,7 @@ mod tests {
             (SoundCue::Thrust, 0xE9),
             (SoundCue::Laser, 0xEB),
             (SoundCue::SmartBomb, 0xEE),
+            (SoundCue::PlayerAppear, 0xEA),
             (SoundCue::HyperspaceMaterialize, 0xEA),
             (SoundCue::Explosion, 0xEE),
             (SoundCue::LanderHit, 0xF9),
@@ -12933,6 +12962,10 @@ mod tests {
         assert_eq!(
             SoundCue::Laser.sound_event(),
             Some(SoundEvent::UnmappedSoundCommand { command: 0xEB })
+        );
+        assert_eq!(
+            SoundCue::PlayerAppear.sound_event(),
+            Some(SoundEvent::UnmappedSoundCommand { command: 0xEA })
         );
         assert_eq!(
             SoundCue::LanderShot.sound_event(),
@@ -14034,7 +14067,17 @@ mod tests {
         );
         assert!(started.state.world.enemies.is_empty());
         assert_no_source_message(&started.report, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
-        assert_eq!(started.events.sounds(), &[SoundEvent::GameStarted]);
+        assert!(started.events.sounds().is_empty());
+
+        let start_sound = runtime.step(GameInput::NONE);
+        assert_eq!(start_sound.events.sounds(), &[SoundEvent::GameStarted]);
+        assert_eq!(
+            start_sound.report.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS - 1,
+                player: 1,
+            })
+        );
 
         let settled = step_until_player_start_completes(&mut runtime, 1);
         assert_eq!(settled.state.phase, GamePhase::Playing);
@@ -14139,7 +14182,7 @@ mod tests {
         });
         assert_eq!(started.phase, Phase::Playing);
         assert_eq!(started.credits, 0);
-        assert!(started.sounds.contains(&SoundCue::Start));
+        assert!(!started.sounds.contains(&SoundCue::Start));
         assert_eq!(
             started.player_start,
             Some(PlayerStartReport {
@@ -14150,10 +14193,11 @@ mod tests {
         assert_no_source_message(&started, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
         assert_eq!(driver.snapshot_count(ActorKind::Player), 0);
 
-        let settled = driver.step(GameInput::NONE);
-        assert_eq!(settled.phase, Phase::Playing);
+        let start_sound = driver.step(GameInput::NONE);
+        assert_eq!(start_sound.phase, Phase::Playing);
+        assert_eq!(start_sound.sounds, [SoundCue::Start]);
         assert_eq!(
-            settled.player_start,
+            start_sound.player_start,
             Some(PlayerStartReport {
                 delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS - 1,
                 player: 1,
@@ -15159,13 +15203,15 @@ mod tests {
             ..GameInput::NONE
         });
         assert_eq!(started.phase, Phase::Playing);
-        assert!(started.sounds.contains(&SoundCue::Start));
+        assert!(!started.sounds.contains(&SoundCue::Start));
         assert!(
             started
                 .commands
                 .iter()
                 .any(|command| matches!(command, GameCommand::StartOnePlayer))
         );
+        let start_sound = driver.step(GameInput::NONE);
+        assert_eq!(start_sound.sounds, [SoundCue::Start]);
     }
 
     #[test]
@@ -15348,7 +15394,9 @@ mod tests {
             ..GameInput::NONE
         });
         assert_eq!(started.phase, Phase::Playing);
-        assert!(started.sounds.contains(&SoundCue::Start));
+        assert!(!started.sounds.contains(&SoundCue::Start));
+        let start_sound = driver.step(GameInput::NONE);
+        assert_eq!(start_sound.sounds, [SoundCue::Start]);
     }
 
     #[test]
@@ -15390,6 +15438,7 @@ mod tests {
         assert_eq!(started.report.player_count, 1);
         assert_eq!(started.events.gameplay(), &[GameEvent::GameStarted]);
         assert!(!started.events.gameplay().contains(&GameEvent::WaveStarted));
+        assert!(started.events.sounds().is_empty());
         assert_eq!(
             started.report.player_start,
             Some(PlayerStartReport {
@@ -15409,6 +15458,22 @@ mod tests {
         assert!(started.state.world.humans.is_empty());
         assert_no_source_message(&started.report, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
 
+        let start_sound = runtime.step(GameInput::NONE);
+        assert_eq!(start_sound.events.sounds(), &[SoundEvent::GameStarted]);
+        assert_eq!(
+            start_sound.report.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS - 1,
+                player: 1,
+            })
+        );
+        assert!(start_sound.state.world.enemies.is_empty());
+        assert_no_source_message(
+            &start_sound.report,
+            "PLYR1",
+            SOURCE_PLAYER_START_PROMPT_SCREEN,
+        );
+
         let active = step_until_player_start_completes(&mut runtime, 1);
 
         assert_eq!(active.report.phase, Phase::Playing);
@@ -15416,6 +15481,10 @@ mod tests {
         assert_eq!(active.report.player_count, 1);
         assert!(active.report.player_start.is_none());
         assert!(active.events.gameplay().contains(&GameEvent::WaveStarted));
+        assert_eq!(
+            active.events.sounds(),
+            &[SoundEvent::UnmappedSoundCommand { command: 0xEA }]
+        );
         assert_eq!(active.state.world.humans.len(), 10);
         assert!(active.state.world.enemies.iter().any(|enemy| {
             enemy.kind == CleanEnemyKind::Lander
@@ -15454,7 +15523,8 @@ mod tests {
             started.state.player_stocks,
             [PlayerStockSnapshot::new(3, 3); 2]
         );
-        assert!(started.report.sounds.contains(&SoundCue::Start));
+        assert!(!started.report.sounds.contains(&SoundCue::Start));
+        assert!(started.events.sounds().is_empty());
         assert!(started.events.gameplay().contains(&GameEvent::GameStarted));
         assert!(!started.events.gameplay().contains(&GameEvent::WaveStarted));
         assert_eq!(
@@ -15469,6 +15539,7 @@ mod tests {
 
         let status = runtime.step(GameInput::NONE);
         assert_text(&status.report, "2UP 000000");
+        assert_eq!(status.events.sounds(), &[SoundEvent::GameStarted]);
         assert_eq!(
             status.report.player_start,
             Some(PlayerStartReport {
@@ -20311,6 +20382,7 @@ mod tests {
                     .commands
                     .contains(&GameCommand::AdvanceWave { wave: 1 })
             );
+            assert_eq!(report.sounds, [SoundCue::PlayerAppear]);
             return report;
         }
 
@@ -20391,6 +20463,11 @@ mod tests {
             assert_eq!(frame.report.phase, Phase::Playing);
             assert_eq!(frame.report.current_player, player);
             assert!(frame.events.gameplay().contains(&GameEvent::WaveStarted));
+            assert_eq!(
+                frame.events.sounds(),
+                &[SoundEvent::UnmappedSoundCommand { command: 0xEA }]
+            );
+            assert_eq!(frame.report.sounds, [SoundCue::PlayerAppear]);
             return frame;
         }
 

@@ -133,10 +133,13 @@ player count, per-player scores, per-player stocks, optional
 `PlayerSwitchReport`, and optional `PlayerStartReport` values. When an
 accepted one-player or two-player start enters play, the driver publishes a
 source-length player-start delay before spawning playfield actors or emitting
-`WaveStarted`. The render bridge projects the source player-start prompt only
-for two-player sessions, so a credited two-player start draws `PLAYER ONE`
-while a one-player start keeps the playfield empty without drawing `PLYR1`.
-When a player hazard collision reaches
+`WaveStarted`. Start audio is also driver-owned: the accepted-start report is
+silent, the start cue is emitted on the following actor step, and
+`SoundCue::PlayerAppear` carries the source `0xEA` appearance command on the
+same report that starts the delayed playfield. The render bridge projects the
+source player-start prompt only for two-player sessions, so a credited
+two-player start draws `PLAYER ONE` while a one-player start keeps the
+playfield empty without drawing `PLYR1`. When a player hazard collision reaches
 `GameCommand::PlayerKilled`, the driver decrements the active player's stock.
 If another player still has lives, it enters a source-length `0x60` switch
 sleep, publishes that sleep through `GameOverSnapshot`, suppresses attract

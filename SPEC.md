@@ -179,10 +179,10 @@ tree:
 - `src/actor_game.rs`: isolated actor-oriented rewrite surface with
   thread-backed assets, `StepPrompt`/`StepReport` simulation turns,
   scriptable behavior and wave profiles, two-player admission/session
-  snapshots, bounded source start-playfield delay reports, two-player
-  player-switch sleep reports, draw/effect descriptions, and
-  `SoundCue::source_sound_command` metadata for red-label Williams sound-board
-  command bytes where source evidence exists.
+  snapshots, bounded source start-playfield delay reports, source-cadenced
+  start/appearance sound cues, two-player player-switch sleep reports,
+  draw/effect descriptions, and `SoundCue::source_sound_command` metadata for
+  red-label Williams sound-board command bytes where source evidence exists.
   `ActorSoundEventBridge` adapts
   report sound cues into clean `SoundEvent` batches for the existing audio
   runtime contract. `ActorRenderSceneBridge` adapts report draw commands into
@@ -629,9 +629,12 @@ score-card object placement has been corrected against the protected scoring
 frames. Replacement of `docs/start-sequence.gif` still requires owner
 acceptance of the candidate media.
 Accepted actor starts publish the source-length start-playfield delay before
-spawning actors or emitting `WaveStarted`. During a pending two-player start
-handoff, scenes draw the source-backed `PLYR1`/`PLYR2` player label at
-`0x3C80`; one-player starts use the same delay but suppress that label. On the
+spawning actors or emitting `WaveStarted`; their accepted-start report is
+silent, the actor start sound appears on the following step, and the source
+`0xEA` appearance cue appears on the delayed playfield-start report. During a
+pending two-player start handoff, scenes draw the source-backed `PLYR1`/`PLYR2`
+player label at `0x3C80`; one-player starts use the same delay but suppress
+that label. On the
 actor wave-cleared interstitial, scenes draw source-backed `ATWV`, `COMPV`,
 and `BONSX` status text at `0x3850`, `0x3D60`, and `0x3C90`, plus the wave
 number at `0x6550` and multiplier digit at `0x5890`; source numeric glyphs
