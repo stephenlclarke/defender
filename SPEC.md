@@ -772,21 +772,24 @@ reintroduce legacy implementation terminology.
   `assets/red-label/actor-behavior.script`, and
   `assets/red-label/actor-waves.script`. The attract script can draw
   the source `ELECV` presents message, source-style Hall-of-Fame table rows,
-  source scoring/instruction labels, and source `CREDV` credits label/count in
-  addition to Williams reveal and Defender wordmark coalescence. Its source
+  source-offset scoring/instruction labels, source `CREDV` credits label/count,
+  and a scriptable scoring scanner surface in addition to Williams reveal and
+  Defender wordmark coalescence. Its source
   page-start steps are Williams from step 1, `ELECV` from step 236, the
   Defender wordmark from step 365, the high-score/zero-credit Hall-of-Fame page
   from step 488 for the source 60-tick stall window, and the
   scoring/instruction labels from step 1088. Title pages suppress the
   zero-credit line but still show real inserted credits through a
-  `credits_nonzero` script action. The Hall-of-Fame page also draws source
-  `HALLD_*` headings and the source Defender logo; `hall_scores` draws Today’s
-  and All-Time table columns from driver scores plus embedded red-label seed
-  initials. The scoring/instruction page draws `SCANV`, `LANDV`, `MUTV`,
-  `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` from checked `messages.tsv` rows
-  and source screen addresses. Custom attract scripts can draw checked
-  `messages.tsv` labels through source cursor controls, and the older
-  one-column `high_scores` action remains available for custom screens. The
+  `credits_nonzero` script action. The Hall-of-Fame page also draws
+  source-offset `HALLD_*` headings and the source Defender logo; `hall_scores`
+  draws Today’s and All-Time table columns from driver scores plus embedded
+  red-label seed initials. The scoring/instruction page draws `SCANV`, `LANDV`,
+  `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` from checked `messages.tsv`
+  rows and source screen addresses, while `scoring_surface` draws the source
+  top scanner frame/marker bars and `MTERR` mini-terrain records. Custom attract
+  scripts can draw checked `messages.tsv` labels through source cursor controls
+  with optional visual offsets, and the older one-column `high_scores` action
+  remains available for custom screens. The
   default actor wave progression expands
   that wave script through `assets/red-label/wave-table.tsv` for active
   wave size, lander and bomber movement speed, lander fire cadence, baiter

@@ -43,21 +43,24 @@ verification tools.
   `assets/red-label/actor-behavior.script`, and
   `assets/red-label/actor-waves.script` through the same parser path. The
   attract script now draws the source `ELECV` presents message, source-style
-  Hall-of-Fame table rows, source scoring/instruction labels, and source
-  `CREDV` credits label/count alongside the Williams reveal and Defender
-  wordmark coalescence. Its source page-start steps are Williams from step 1,
+  Hall-of-Fame table rows, source-offset scoring/instruction labels, source
+  `CREDV` credits label/count, and a scriptable scoring scanner surface
+  alongside the Williams reveal and Defender wordmark coalescence. Its source
+  page-start steps are Williams from step 1,
   `ELECV` from step 236, the Defender wordmark from step 365, the
   high-score/zero-credit Hall-of-Fame page from step 488 for the source 60-tick
   stall window, and scoring/instruction labels from step 1088. Title pages
   suppress the zero-credit line but still show real inserted credits through a
-  `credits_nonzero` script action. The Hall-of-Fame page also draws source
-  `HALLD_*` headings and the source Defender logo; `hall_scores` draws Today’s
-  and All-Time table columns from driver scores plus embedded red-label seed
-  initials. The scoring/instruction page draws `SCANV`, `LANDV`, `MUTV`,
-  `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` from checked `messages.tsv` rows and
-  source screen addresses. Custom attract scripts can draw checked
-  `messages.tsv` labels through source cursor controls, and the older
-  one-column `high_scores` action remains available for custom screens.
+  `credits_nonzero` script action. The Hall-of-Fame page also draws
+  source-offset `HALLD_*` headings and the source Defender logo; `hall_scores`
+  draws Today’s and All-Time table columns from driver scores plus embedded
+  red-label seed initials. The scoring/instruction page draws `SCANV`, `LANDV`,
+  `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` from checked `messages.tsv`
+  rows and source screen addresses, while `scoring_surface` draws the source top
+  scanner frame/marker bars and `MTERR` mini-terrain records. Custom attract
+  scripts can draw checked `messages.tsv` labels through source cursor controls
+  with optional visual offsets, and the older one-column `high_scores` action
+  remains available for custom screens.
   `ActorWaveScript` now names per-wave progression data and applies behavior
   scripts plus hostile and initial-human spawn records as play starts and waves
   are cleared. Wave scripts can now attach spawn-index behavior profiles that
@@ -769,6 +772,25 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 14:02 BST`: Completed the actor attract scoring-scanner
+  surface slice. The embedded actor attract script and Rust fallback now install
+  a scriptable `scoring_surface` action at step `1088`, and source-message
+  actions accept optional visual offsets so the Hall-of-Fame and
+  scoring/instruction rows keep their source screen addresses while matching the
+  protected visual placement. `ActorRenderSceneBridge` now projects that
+  actor-local scoring surface into source-shaped top scanner frame/marker bars
+  plus checked `MTERR` mini-terrain records, without making attract sequencing
+  display-frame driven. Focused regressions now prove the embedded manifest,
+  custom parser action, source-message offset rendering, source scanner terrain
+  slice, and scoring-page scene sprites. Validation passed with `cargo test
+  actor_game --all-targets --features legacy-tools`, `cargo test actor_smoke
+  --all-targets --features legacy-tools`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, `cargo fmt --check`, touched-doc markdownlint, and `git diff
+  --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780663667461809`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780664554421689`.
 - `2026-06-05 13:44 BST`: Completed the actor attract
   scoring/instruction text slice. The embedded actor attract script and Rust
   fallback now bound the title and Hall-of-Fame surfaces to their source

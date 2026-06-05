@@ -316,20 +316,24 @@ The attract screen is data-driven. `AttractScript` contains ordered
 events for its own current script step into draw commands. The default
 `AttractScript::red_label_title()` parses
 `assets/red-label/actor-attract.script`, recreating the current Williams/logo,
-source `ELECV` presents, bounded Hall-of-Fame rows, scoring/instruction labels,
-and credits opening sequence from checked text. The default Williams reveal,
+source `ELECV` presents, bounded Hall-of-Fame rows, source-offset
+scoring/instruction labels, the scoring scanner surface, and credits opening
+sequence from checked text. The default Williams reveal,
 `ELECV`, and Defender wordmark events use the same source page-start steps as
 the clean attract scheduler: Williams from step 1, `ELECV` from step 236 at
 screen address `0x3258`, and the Defender wordmark from step 365. The default
 high-score title/table and zero-credit credit line start at the Hall-of-Fame
 boundary, step 488; title pages use a `credits_nonzero` event so an inserted
 credit can still be shown immediately without drawing a zero-credit line. The
-same Hall-of-Fame boundary draws source `HALLD_*` headings, the source Defender
-logo, and a `hall_scores` two-column table for the source 60-tick stall window.
-After that bounded Hall window, the script starts scoring/instruction labels at
-step 1088 from the checked `SCANV`, `LANDV`, `MUTV`, `BAITV`, `BOMBV`,
-`SWRMPV`, and `SWARMV` message rows. The older Rust event constructor remains
-available as a fallback. Custom drivers can pass their own parsed or
+same Hall-of-Fame boundary draws source-offset `HALLD_*` headings, the source
+Defender logo, and a `hall_scores` two-column table for the source 60-tick
+stall window. After that bounded Hall window, the script starts
+`scoring_surface` and scoring/instruction labels at step 1088 from the checked
+`SCANV`, `LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` message
+rows. The scoring surface draws the source top scanner frame/marker bars and
+the source `MTERR` mini-terrain records through an actor-local visual effect.
+The older Rust event constructor remains available as a fallback. Custom
+drivers can pass their own parsed or
 constructed sequence through
 `ActorGameDriver::with_attract_script(...)` without replacing coin/start
 control handling.
@@ -348,20 +352,21 @@ defender_wordmark 365 123 96 144
 sprite 2 forever defender_logo 40 44
 credits_nonzero 1 487 176 226 248 226
 credits 488 forever 176 226 248 226
-message 488 600 HALLD_TITLE 0x3854
-message 488 600 HALLD_TODAYS 0x2268
-message 488 600 HALLD_ALL_TIME 0x6068
-message 488 600 HALLD_GREATEST 0x1E72
-message 488 600 HALLD_GREATEST 0x5F72
+message 488 600 HALLD_TITLE 0x3854 -11 -6
+message 488 600 HALLD_TODAYS 0x2268 -11 -6
+message 488 600 HALLD_ALL_TIME 0x6068 -11 -6
+message 488 600 HALLD_GREATEST 0x1E72 -11 -6
+message 488 600 HALLD_GREATEST 0x5F72 -11 -6
 sprite 488 600 defender_logo 85 50
 hall_scores 488 600 0x1886 0x5986 -11 -6
-message 1088 forever SCANV 0x4330
-message 1088 forever LANDV 0x1C70
-message 1088 forever MUTV 0x3C70
-message 1088 forever BAITV 0x5F70
-message 1088 forever BOMBV 0x1CA8
-message 1088 forever SWRMPV 0x40A8
-message 1088 forever SWARMV 0x5CA8
+scoring_surface 1088 forever
+message 1088 forever SCANV 0x4330 -11 -7
+message 1088 forever LANDV 0x1C70 -11 -7
+message 1088 forever MUTV 0x3C70 -11 -7
+message 1088 forever BAITV 0x5F70 -11 -7
+message 1088 forever BOMBV 0x1CA8 -11 -7
+message 1088 forever SWRMPV 0x40A8 -11 -7
+message 1088 forever SWARMV 0x5CA8 -11 -7
 ```
 
 Blank lines and `#` comments are ignored. `duration` can be a step count or
@@ -378,10 +383,15 @@ values when available. `credits` and `credits_nonzero` lines use
 source-backed `CREDV` / `CREDITS:` label plus the visible credit count from
 `StepPrompt.credits`; `credits_nonzero` suppresses the draw until at least one
 credit exists. `message` / `source_message` lines use
-`label top-left-screen-address` after the timing fields, validate `label`
-against `assets/red-label/messages.tsv`, and render through the source
-controlled-message glyph path so red-label cursor tokens such as `[RLF]` and
-`[HMC:...]` affect layout instead of becoming visible text.
+`label top-left-screen-address [offset-x offset-y]` after the timing fields,
+validate `label` against `assets/red-label/messages.tsv`, and render through
+the source controlled-message glyph path so red-label cursor tokens such as
+`[RLF]` and `[HMC:...]` affect layout instead of becoming visible text. When an
+offset is present, the renderer applies it after source cursor layout so
+scripts can preserve source screen addresses while matching the protected
+visual page placement. `scoring_surface` lines take no extra fields and draw
+the source-shaped top scanner border plus `MTERR` mini-terrain on the scoring
+page.
 
 Script actions currently cover:
 
@@ -392,6 +402,8 @@ Script actions currently cover:
 - `HighScores`, for prompt-backed one-column high-score table rows in custom
   attract/game-over scripts.
 - `HallScores`, for source-shaped Today’s and All-Time Hall-of-Fame table rows.
+- `ScoringSurface`, for the source top scanner frame and `MTERR` mini-terrain
+  on the scoring page.
 - `Credits`, for the prompt-backed credit label/count in attract/game-over.
 - `WilliamsLogo`, which emits `SpriteKey::WilliamsLogo` with
   `VisualEffect::WilliamsReveal` metadata for handwriting reveal and title

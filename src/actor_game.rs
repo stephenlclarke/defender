@@ -28,7 +28,7 @@ use crate::{
         push_source_controlled_message_sprites, push_source_text_bytes_sprites,
         source_attract_defender_appearance_pixels,
         source_attract_williams_logo_operation_pixel_counts,
-        source_attract_williams_logo_pixel_path, source_message_text,
+        source_attract_williams_logo_pixel_path, source_message_text, source_screen_position,
     },
     systems::{HighScoreEntrySystem, HighScoreInitialsState, ScreenPosition, ScreenVelocity},
 };
@@ -36,7 +36,10 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
     str::FromStr,
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{
+        OnceLock,
+        mpsc::{self, Receiver, Sender},
+    },
     thread::{self, JoinHandle},
 };
 
@@ -103,6 +106,7 @@ const SOURCE_ATTRACT_HALL_TABLE_INITIALS_OFFSET: u8 = 0x05;
 const SOURCE_ATTRACT_HALL_TABLE_SCORE_OFFSET: u8 = 0x13;
 const SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET: Point = Point::new(-11, -6);
 const SOURCE_ATTRACT_HALL_SCORE_TEXT_LEN: usize = 6;
+const SOURCE_ATTRACT_SCORING_VISUAL_OFFSET: Point = Point::new(-11, -7);
 const SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES: [(&str, u16); 7] = [
     ("SCANV", 0x4330),
     ("LANDV", 0x1C70),
@@ -112,6 +116,25 @@ const SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES: [(&str, u16); 7] = [
     ("SWRMPV", 0x40A8),
     ("SWARMV", 0x5CA8),
 ];
+const SOURCE_TOP_DISPLAY_BORDER_SEGMENTS: [(u16, [f32; 2]); 6] = [
+    (0x0028, [312.0, 2.0]),
+    (0x2F08, [2.0, 32.0]),
+    (0x7008, [2.0, 32.0]),
+    (0x2F07, [130.0, 1.0]),
+    (0x4C07, [16.0, 2.0]),
+    (0x4C28, [16.0, 2.0]),
+];
+const ATTRACT_SCORING_SCANNER_TERRAIN_PIXEL_SIZE: [f32; 2] = [1.0, 1.0];
+const ATTRACT_SCORING_SCANNER_TERRAIN_TINT: Color = Color::from_rgba(174, 81, 0, 255);
+const ATTRACT_SCORING_SCANNER_BORDER_TINT: Color = Color::from_rgba(38, 0, 160, 255);
+const SOURCE_TERRAIN_DATA_TSV: &str = include_str!("../assets/red-label/terrain-data.tsv");
+const SOURCE_TERRAIN_MTERR_LABEL: &str = "MTERR";
+const SOURCE_TERRAIN_MTERR_ADDRESS: u16 = 0xCD67;
+const SOURCE_TERRAIN_MTERR_BYTES: usize = 0x180;
+const SOURCE_SCANNER_TERRAIN_RECORDS: usize = 0x40;
+const SOURCE_SCANNER_MINI_TERRAIN_RECORDS: usize = SOURCE_TERRAIN_MTERR_BYTES / 3;
+const SOURCE_SCANNER_OBJECT_BASE_SCREEN: u16 = 0x3008;
+const SOURCE_SCANNER_SCAN_CENTER_OFFSET: u16 = 0x6D40;
 const DEFENDER_WORDMARK_START_STEP: u64 = SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP;
 const DEFENDER_WORDMARK_SLOTS: u16 = 15;
 const DEFENDER_WORDMARK_ROW_PAIRS: u16 = 6;
@@ -3388,6 +3411,10 @@ pub enum VisualEffect {
     Static,
     SourceMessage {
         top_left_screen_address: u16,
+        visual_offset: Point,
+    },
+    AttractScoringSurface {
+        scoring_tick: u16,
     },
     WilliamsReveal {
         stroke_step: u16,
@@ -3598,35 +3625,40 @@ impl AttractScript {
                 SOURCE_ATTRACT_CREDIT_LABEL_POSITION,
                 SOURCE_ATTRACT_CREDIT_COUNT_POSITION,
             ),
-            AttractScriptEvent::source_message(
+            AttractScriptEvent::source_message_with_offset(
                 SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 SOURCE_ATTRACT_HALL_TITLE_LABEL,
                 0x3854,
+                SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
-            AttractScriptEvent::source_message(
+            AttractScriptEvent::source_message_with_offset(
                 SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 SOURCE_ATTRACT_HALL_TODAYS_LABEL,
                 0x2268,
+                SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
-            AttractScriptEvent::source_message(
+            AttractScriptEvent::source_message_with_offset(
                 SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 SOURCE_ATTRACT_HALL_ALL_TIME_LABEL,
                 0x6068,
+                SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
-            AttractScriptEvent::source_message(
+            AttractScriptEvent::source_message_with_offset(
                 SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 SOURCE_ATTRACT_HALL_GREATEST_LABEL,
                 0x1E72,
+                SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
-            AttractScriptEvent::source_message(
+            AttractScriptEvent::source_message_with_offset(
                 SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 SOURCE_ATTRACT_HALL_GREATEST_LABEL,
                 0x5F72,
+                SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
             AttractScriptEvent::sprite(
                 SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
@@ -3642,12 +3674,17 @@ impl AttractScript {
                 SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
         ];
+        events.push(AttractScriptEvent::scoring_surface(
+            SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP,
+            None,
+        ));
         for (label, screen_address) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES {
-            events.push(AttractScriptEvent::source_message(
+            events.push(AttractScriptEvent::source_message_with_offset(
                 SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP,
                 None,
                 label,
                 screen_address,
+                SOURCE_ATTRACT_SCORING_VISUAL_OFFSET,
             ));
         }
         Self::new(events)
@@ -3757,12 +3794,20 @@ fn parse_attract_script_event(
             let label = parse_attract_source_message_label(line_number, parts.next())?;
             let top_left_screen_address =
                 parse_attract_u16(line_number, parts.next(), "top-left screen address")?;
-            reject_extra_attract_fields(line_number, parts)?;
-            Ok(AttractScriptEvent::source_message(
+            let visual_offset = parse_optional_attract_point(line_number, &mut parts)?;
+            Ok(AttractScriptEvent::source_message_with_offset(
                 start_after_steps,
                 duration_steps,
                 label,
                 top_left_screen_address,
+                visual_offset,
+            ))
+        }
+        "scoring_surface" | "scoring" | "attract_scoring" => {
+            reject_extra_attract_fields(line_number, parts)?;
+            Ok(AttractScriptEvent::scoring_surface(
+                start_after_steps,
+                duration_steps,
             ))
         }
         "sprite" => {
@@ -3860,6 +3905,19 @@ fn parse_attract_point<'a>(
 ) -> Result<Point, AttractScriptParseError> {
     let x = parse_attract_i16(line_number, parts.next(), "x")?;
     let y = parse_attract_i16(line_number, parts.next(), "y")?;
+    Ok(Point::new(x, y))
+}
+
+fn parse_optional_attract_point<'a>(
+    line_number: usize,
+    parts: &mut impl Iterator<Item = &'a str>,
+) -> Result<Point, AttractScriptParseError> {
+    let Some(x_token) = parts.next() else {
+        return Ok(Point::new(0, 0));
+    };
+    let x = parse_attract_i16(line_number, Some(x_token), "offset x")?;
+    let y = parse_attract_i16(line_number, parts.next(), "offset y")?;
+    reject_extra_attract_fields(line_number, parts.by_ref())?;
     Ok(Point::new(x, y))
 }
 
@@ -4052,12 +4110,29 @@ impl AttractScriptEvent {
         label: impl Into<String>,
         top_left_screen_address: u16,
     ) -> Self {
+        Self::source_message_with_offset(
+            start_after_steps,
+            duration_steps,
+            label,
+            top_left_screen_address,
+            Point::new(0, 0),
+        )
+    }
+
+    pub fn source_message_with_offset(
+        start_after_steps: u64,
+        duration_steps: Option<u64>,
+        label: impl Into<String>,
+        top_left_screen_address: u16,
+        visual_offset: Point,
+    ) -> Self {
         Self {
             start_after_steps,
             duration_steps,
             action: AttractScriptAction::SourceMessage {
                 label: label.into(),
                 top_left_screen_address,
+                visual_offset,
             },
         }
     }
@@ -4143,6 +4218,14 @@ impl AttractScriptEvent {
         }
     }
 
+    pub fn scoring_surface(start_after_steps: u64, duration_steps: Option<u64>) -> Self {
+        Self {
+            start_after_steps,
+            duration_steps,
+            action: AttractScriptAction::ScoringSurface,
+        }
+    }
+
     pub fn credits(
         start_after_steps: u64,
         duration_steps: Option<u64>,
@@ -4221,6 +4304,7 @@ pub enum AttractScriptAction {
     SourceMessage {
         label: String,
         top_left_screen_address: u16,
+        visual_offset: Point,
     },
     Sprite {
         sprite: SpriteKey,
@@ -4246,6 +4330,7 @@ pub enum AttractScriptAction {
         all_time_top_left_screen_address: u16,
         visual_offset: Point,
     },
+    ScoringSurface,
     Credits {
         label_position: Point,
         count_position: Point,
@@ -4268,11 +4353,13 @@ impl AttractScriptAction {
             Self::SourceMessage {
                 label,
                 top_left_screen_address,
+                visual_offset,
             } => source_message_text(label).map_or_else(Vec::new, |text| {
-                vec![DrawCommand::source_message(
+                vec![DrawCommand::source_message_with_offset(
                     actor,
                     text,
                     *top_left_screen_address,
+                    *visual_offset,
                 )]
             }),
             Self::Sprite { sprite, position } => {
@@ -4364,6 +4451,14 @@ impl AttractScriptAction {
                 ));
                 draws
             }
+            Self::ScoringSurface => vec![DrawCommand::sprite_with_effect(
+                actor,
+                SpriteKey::Text,
+                Point::new(0, 0),
+                VisualEffect::AttractScoringSurface {
+                    scoring_tick: u16::try_from(age.saturating_sub(1)).unwrap_or(u16::MAX),
+                },
+            )],
             Self::Credits {
                 label_position,
                 count_position,
@@ -4394,9 +4489,11 @@ impl AttractScriptAction {
             Self::SourceMessage {
                 label,
                 top_left_screen_address,
+                visual_offset,
             } => AttractScriptActionManifest::SourceMessage {
                 label: label.clone(),
                 top_left_screen_address: *top_left_screen_address,
+                visual_offset: *visual_offset,
             },
             Self::Sprite { sprite, position } => AttractScriptActionManifest::Sprite {
                 sprite: *sprite,
@@ -4438,6 +4535,7 @@ impl AttractScriptAction {
                 all_time_top_left_screen_address: *all_time_top_left_screen_address,
                 visual_offset: *visual_offset,
             },
+            Self::ScoringSurface => AttractScriptActionManifest::ScoringSurface,
             Self::Credits {
                 label_position,
                 count_position,
@@ -4608,6 +4706,7 @@ pub enum AttractScriptActionManifest {
     SourceMessage {
         label: String,
         top_left_screen_address: u16,
+        visual_offset: Point,
     },
     Sprite {
         sprite: SpriteKey,
@@ -4633,6 +4732,7 @@ pub enum AttractScriptActionManifest {
         all_time_top_left_screen_address: u16,
         visual_offset: Point,
     },
+    ScoringSurface,
     Credits {
         label_position: Point,
         count_position: Point,
@@ -4741,12 +4841,22 @@ impl DrawCommand {
         value: impl Into<String>,
         top_left_screen_address: u16,
     ) -> Self {
+        Self::source_message_with_offset(actor, value, top_left_screen_address, Point::new(0, 0))
+    }
+
+    pub fn source_message_with_offset(
+        actor: ActorId,
+        value: impl Into<String>,
+        top_left_screen_address: u16,
+        visual_offset: Point,
+    ) -> Self {
         Self {
             actor,
             sprite: SpriteKey::Text,
             position: Point::new(0, 0),
             effect: VisualEffect::SourceMessage {
                 top_left_screen_address,
+                visual_offset,
             },
             text: Some(value.into()),
         }
@@ -5486,9 +5596,16 @@ impl ActorRenderSceneBridge {
             };
             if let VisualEffect::SourceMessage {
                 top_left_screen_address,
+                visual_offset,
             } = draw.effect
             {
-                push_source_controlled_message_sprites(scene, text, top_left_screen_address, layer);
+                push_source_controlled_message_sprites_with_offset(
+                    scene,
+                    text,
+                    top_left_screen_address,
+                    layer,
+                    visual_offset,
+                );
                 return;
             }
             push_source_text_bytes_sprites(
@@ -5507,6 +5624,9 @@ impl ActorRenderSceneBridge {
             } => self.push_williams_reveal(scene, draw.position, stroke_step, color_phase),
             VisualEffect::DefenderCoalescence { slot, row_pair } => {
                 self.push_defender_coalescence(scene, slot, row_pair)
+            }
+            VisualEffect::AttractScoringSurface { scoring_tick } => {
+                self.push_attract_scoring_surface(scene, scoring_tick)
             }
             VisualEffect::ExplosionCloud {
                 kind,
@@ -5588,6 +5708,11 @@ impl ActorRenderSceneBridge {
         }
     }
 
+    fn push_attract_scoring_surface(&self, scene: &mut RenderScene, _scoring_tick: u16) {
+        push_attract_scoring_top_display_border(scene);
+        push_attract_scoring_scanner_terrain(scene);
+    }
+
     fn push_explosion_sprite(
         &self,
         scene: &mut RenderScene,
@@ -5651,6 +5776,151 @@ impl Default for ActorRenderSceneBridge {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn push_source_controlled_message_sprites_with_offset(
+    scene: &mut RenderScene,
+    text: &str,
+    top_left_screen_address: u16,
+    layer: RenderLayer,
+    visual_offset: Point,
+) {
+    let first_sprite = scene.sprites.len();
+    push_source_controlled_message_sprites(scene, text, top_left_screen_address, layer);
+    offset_new_sprites(scene, first_sprite, point_position(visual_offset));
+}
+
+fn push_attract_scoring_top_display_border(scene: &mut RenderScene) {
+    for (screen_address, size) in SOURCE_TOP_DISPLAY_BORDER_SEGMENTS {
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::TOP_DISPLAY_BORDER_WORD,
+            layer: RenderLayer::Hud,
+            position: offset_f32_position(
+                source_screen_position(screen_address),
+                point_position(SOURCE_ATTRACT_SCORING_VISUAL_OFFSET),
+            ),
+            size,
+            tint: ATTRACT_SCORING_SCANNER_BORDER_TINT,
+        });
+    }
+}
+
+fn push_attract_scoring_scanner_terrain(scene: &mut RenderScene) {
+    for record in source_scanner_mini_terrain_records() {
+        let origin = offset_f32_position(
+            source_screen_position(record.screen_address),
+            point_position(SOURCE_ATTRACT_SCORING_VISUAL_OFFSET),
+        );
+        for (row, byte) in record.word.to_be_bytes().into_iter().enumerate() {
+            for column in 0..2 {
+                let nibble = if column == 0 { byte >> 4 } else { byte & 0x0F };
+                if nibble == 0 {
+                    continue;
+                }
+                scene.push_sprite(SceneSprite {
+                    sprite: SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL,
+                    layer: RenderLayer::Hud,
+                    position: [origin[0] + column as f32, origin[1] + row as f32],
+                    size: ATTRACT_SCORING_SCANNER_TERRAIN_PIXEL_SIZE,
+                    tint: ATTRACT_SCORING_SCANNER_TERRAIN_TINT,
+                });
+            }
+        }
+    }
+}
+
+fn source_scanner_mini_terrain_records()
+-> &'static [SourceScannerTerrainRecord; SOURCE_SCANNER_TERRAIN_RECORDS] {
+    static RECORDS: OnceLock<[SourceScannerTerrainRecord; SOURCE_SCANNER_TERRAIN_RECORDS]> =
+        OnceLock::new();
+    RECORDS.get_or_init(|| {
+        source_generate_scanner_mini_terrain_records(
+            0u16.wrapping_sub(SOURCE_SCANNER_SCAN_CENTER_OFFSET),
+        )
+    })
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct SourceScannerTerrainRecord {
+    screen_address: u16,
+    word: u16,
+}
+
+fn source_generate_scanner_mini_terrain_records(
+    scan_left: u16,
+) -> [SourceScannerTerrainRecord; SOURCE_SCANNER_TERRAIN_RECORDS] {
+    let bytes = source_mterr_bytes();
+    let first_record = usize::from(scan_left.to_be_bytes()[0] >> 2);
+    assert!(
+        first_record + SOURCE_SCANNER_TERRAIN_RECORDS <= SOURCE_SCANNER_MINI_TERRAIN_RECORDS,
+        "MTERR slice must contain 64 source scanner terrain records"
+    );
+
+    let mut records = [SourceScannerTerrainRecord::default(); SOURCE_SCANNER_TERRAIN_RECORDS];
+    let mut source_column = SOURCE_SCANNER_OBJECT_BASE_SCREEN.to_be_bytes()[0];
+    for (index, record) in records.iter_mut().enumerate() {
+        let source_index = (first_record + index) * 3;
+        *record = SourceScannerTerrainRecord {
+            screen_address: u16::from_be_bytes([source_column, bytes[source_index]]),
+            word: u16::from_be_bytes([bytes[source_index + 1], bytes[source_index + 2]]),
+        };
+        source_column = source_column.wrapping_add(1);
+    }
+
+    records
+}
+
+fn source_mterr_bytes() -> &'static [u8; SOURCE_TERRAIN_MTERR_BYTES] {
+    static MTERR: OnceLock<[u8; SOURCE_TERRAIN_MTERR_BYTES]> = OnceLock::new();
+    MTERR.get_or_init(parse_source_mterr_bytes)
+}
+
+fn parse_source_mterr_bytes() -> [u8; SOURCE_TERRAIN_MTERR_BYTES] {
+    let mut output = [0; SOURCE_TERRAIN_MTERR_BYTES];
+    for (line_index, line) in SOURCE_TERRAIN_DATA_TSV.lines().enumerate().skip(1) {
+        let mut fields = line.split('\t');
+        let label = fields.next().unwrap_or_default();
+        let address = fields.next().unwrap_or_default();
+        let bytes = fields.next().unwrap_or_default();
+        if label != SOURCE_TERRAIN_MTERR_LABEL {
+            continue;
+        }
+        let expected_address = format!("0x{SOURCE_TERRAIN_MTERR_ADDRESS:04X}");
+        assert_eq!(
+            address,
+            expected_address.as_str(),
+            "terrain-data line {} must preserve MTERR source address",
+            line_index + 1
+        );
+        assert_eq!(
+            bytes.len(),
+            SOURCE_TERRAIN_MTERR_BYTES * 2,
+            "MTERR hex payload must contain exactly 0x180 bytes"
+        );
+        for index in 0..SOURCE_TERRAIN_MTERR_BYTES {
+            output[index] = parse_source_hex_byte(&bytes[index * 2..index * 2 + 2]);
+        }
+        return output;
+    }
+
+    panic!("terrain-data.tsv must contain the MTERR record")
+}
+
+fn parse_source_hex_byte(value: &str) -> u8 {
+    u8::from_str_radix(value, 16).expect("source terrain byte must be hexadecimal")
+}
+
+fn offset_new_sprites(scene: &mut RenderScene, first_sprite: usize, offset: [f32; 2]) {
+    if offset == [0.0, 0.0] {
+        return;
+    }
+    for sprite in &mut scene.sprites[first_sprite..] {
+        sprite.position = offset_f32_position(sprite.position, offset);
+    }
+}
+
+fn offset_f32_position(position: [f32; 2], offset: [f32; 2]) -> [f32; 2] {
+    [position[0] + offset[0], position[1] + offset[1]]
 }
 
 fn actor_source_explosion_render_scale(source_size: u16) -> f32 {
@@ -11450,7 +11720,8 @@ mod tests {
                 && matches!(
                     draw.effect,
                     VisualEffect::SourceMessage {
-                        top_left_screen_address: SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN
+                        top_left_screen_address: SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
+                        visual_offset: Point { x: 0, y: 0 },
                     }
                 )
         }));
@@ -11532,7 +11803,8 @@ mod tests {
                 && matches!(
                     draw.effect,
                     VisualEffect::SourceMessage {
-                        top_left_screen_address: 0x3854
+                        top_left_screen_address: 0x3854,
+                        visual_offset: SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET,
                     }
                 )
         }));
@@ -11570,7 +11842,7 @@ mod tests {
         let hall_scene = ActorRenderSceneBridge::new().render_scene_for_report(&hall);
         assert!(hall_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_H
-                && sprite.position == [112.0, 84.0]
+                && sprite.position == [101.0, 78.0]
                 && sprite.layer == RenderLayer::Overlay
         }));
         assert!(hall_scene.sprites.iter().any(|sprite| {
@@ -11617,21 +11889,51 @@ mod tests {
                     && matches!(
                         draw.effect,
                         VisualEffect::SourceMessage {
-                            top_left_screen_address
+                            top_left_screen_address,
+                            visual_offset: SOURCE_ATTRACT_SCORING_VISUAL_OFFSET,
                         } if top_left_screen_address == screen_address
                     )
             }));
         }
+        assert!(scoring.draws.iter().any(|draw| {
+            draw.sprite == SpriteKey::Text
+                && matches!(
+                    draw.effect,
+                    VisualEffect::AttractScoringSurface { scoring_tick: 0 }
+                )
+        }));
         let scoring_scene = ActorRenderSceneBridge::new().render_scene_for_report(&scoring);
         assert!(scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_S
-                && sprite.position == [134.0, 48.0]
+                && sprite.position == [123.0, 41.0]
                 && sprite.layer == RenderLayer::Overlay
         }));
         assert!(scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_L
-                && sprite.position == [56.0, 112.0]
+                && sprite.position == [45.0, 105.0]
                 && sprite.layer == RenderLayer::Overlay
+        }));
+        assert_eq!(
+            scoring_scene
+                .sprites
+                .iter()
+                .filter(|sprite| sprite.sprite == SpriteId::TOP_DISPLAY_BORDER_WORD)
+                .count(),
+            SOURCE_TOP_DISPLAY_BORDER_SEGMENTS.len()
+        );
+        assert!(scoring_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::TOP_DISPLAY_BORDER_WORD
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [-11.0, 33.0]
+                && sprite.size == [312.0, 2.0]
+                && sprite.tint == ATTRACT_SCORING_SCANNER_BORDER_TINT
+        }));
+        assert!(scoring_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [85.0, 30.0]
+                && sprite.size == ATTRACT_SCORING_SCANNER_TERRAIN_PIXEL_SIZE
+                && sprite.tint == ATTRACT_SCORING_SCANNER_TERRAIN_TINT
         }));
         assert!(!scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO
@@ -11666,6 +11968,7 @@ mod tests {
             AttractScriptActionManifest::SourceMessage {
                 ref label,
                 top_left_screen_address: SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
+                visual_offset: Point { x: 0, y: 0 },
             } if label == SOURCE_PRESENTS_MESSAGE_LABEL
         ) && event.start_after_steps
             == SOURCE_ATTRACT_PRESENTS_START_STEP
@@ -11709,6 +12012,7 @@ mod tests {
             AttractScriptActionManifest::SourceMessage {
                 ref label,
                 top_left_screen_address: 0x3854,
+                visual_offset: SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             } if event.start_after_steps == SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
                 && label == SOURCE_ATTRACT_HALL_TITLE_LABEL
                 && event.duration_steps == Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS)
@@ -11723,6 +12027,7 @@ mod tests {
                     AttractScriptActionManifest::SourceMessage {
                         ref label,
                         top_left_screen_address: 0x1E72 | 0x5F72,
+                        visual_offset: SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET,
                     } if event.start_after_steps == SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
                         && label == SOURCE_ATTRACT_HALL_GREATEST_LABEL
                         && event.duration_steps == Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS)
@@ -11738,18 +12043,73 @@ mod tests {
             } if event.start_after_steps == SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
                 && event.duration_steps == Some(SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS)
         )));
+        assert!(parsed.manifest().events.iter().any(|event| matches!(
+            event.action,
+            AttractScriptActionManifest::ScoringSurface
+                if event.start_after_steps == SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP
+                    && event.duration_steps.is_none()
+        )));
         for (label, screen_address) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES {
             assert!(parsed.manifest().events.iter().any(|event| matches!(
                 event.action,
                 AttractScriptActionManifest::SourceMessage {
                     label: ref event_label,
                     top_left_screen_address,
+                    visual_offset: SOURCE_ATTRACT_SCORING_VISUAL_OFFSET,
                 } if event.start_after_steps == SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP
                     && event.duration_steps.is_none()
                     && event_label == label
                     && top_left_screen_address == screen_address
             )));
         }
+    }
+
+    #[test]
+    fn actor_source_scanner_mini_terrain_records_match_reference_slice() {
+        let records = source_scanner_mini_terrain_records();
+
+        assert_eq!(records.len(), SOURCE_SCANNER_TERRAIN_RECORDS);
+        assert_eq!(
+            &records[..8],
+            &[
+                SourceScannerTerrainRecord {
+                    screen_address: 0x3025,
+                    word: 0x7700,
+                },
+                SourceScannerTerrainRecord {
+                    screen_address: 0x3124,
+                    word: 0x7700,
+                },
+                SourceScannerTerrainRecord {
+                    screen_address: 0x3222,
+                    word: 0x0770,
+                },
+                SourceScannerTerrainRecord {
+                    screen_address: 0x3320,
+                    word: 0x0770,
+                },
+                SourceScannerTerrainRecord {
+                    screen_address: 0x341E,
+                    word: 0x0770,
+                },
+                SourceScannerTerrainRecord {
+                    screen_address: 0x351C,
+                    word: 0x0770,
+                },
+                SourceScannerTerrainRecord {
+                    screen_address: 0x361D,
+                    word: 0x7007,
+                },
+                SourceScannerTerrainRecord {
+                    screen_address: 0x371F,
+                    word: 0x7007,
+                },
+            ]
+        );
+        assert_eq!(
+            &source_mterr_bytes()[..9],
+            &[0x25, 0x70, 0x07, 0x26, 0x77, 0x00, 0x26, 0x07, 0x70]
+        );
     }
 
     #[test]
@@ -11861,6 +12221,7 @@ mod tests {
             text 2 5 12 20 CUSTOM ATTRACT\n\
             high_scores 4 forever 80 100 9 3\n\
             hall_scores 4 forever 0x1886 0x5986 -11 -6\n\
+            scoring_surface 4 forever\n\
             credits 4 forever 12 228 82 228\n\
             credits_nonzero 4 8 14 226 84 226\n\
             sprite 6 forever defender_logo 40 44\n\
@@ -11876,7 +12237,7 @@ mod tests {
                 .iter()
                 .map(|event| event.start_after_steps)
                 .collect::<Vec<_>>(),
-            vec![2, 4, 4, 4, 4, 5, 6, 9]
+            vec![2, 4, 4, 4, 4, 4, 5, 6, 9]
         );
         assert_eq!(
             manifest.events[0].action,
@@ -11903,6 +12264,10 @@ mod tests {
         );
         assert_eq!(
             manifest.events[3].action,
+            AttractScriptActionManifest::ScoringSurface
+        );
+        assert_eq!(
+            manifest.events[4].action,
             AttractScriptActionManifest::Credits {
                 label_position: Point::new(12, 228),
                 count_position: Point::new(82, 228),
@@ -11910,23 +12275,23 @@ mod tests {
             }
         );
         assert_eq!(
-            manifest.events[4].action,
+            manifest.events[5].action,
             AttractScriptActionManifest::Credits {
                 label_position: Point::new(14, 226),
                 count_position: Point::new(84, 226),
                 minimum_credits: 1,
             }
         );
-        assert_eq!(manifest.events[4].duration_steps, Some(8));
+        assert_eq!(manifest.events[5].duration_steps, Some(8));
         assert_eq!(
-            manifest.events[6].action,
+            manifest.events[7].action,
             AttractScriptActionManifest::Sprite {
                 sprite: SpriteKey::DefenderLogo,
                 position: Point::new(40, 44),
             }
         );
         assert_eq!(
-            manifest.events[7].action,
+            manifest.events[8].action,
             AttractScriptActionManifest::DefenderWordmark {
                 position: Point::new(70, 80),
                 slots: DEFENDER_WORDMARK_SLOTS,
@@ -12029,6 +12394,7 @@ mod tests {
             AttractScriptActionManifest::SourceMessage {
                 label: "ELECV".to_string(),
                 top_left_screen_address: 0x3258,
+                visual_offset: Point::new(0, 0),
             }
         );
         let mut driver = ActorGameDriver::with_attract_script(script);
@@ -12040,7 +12406,8 @@ mod tests {
                 && matches!(
                     draw.effect,
                     VisualEffect::SourceMessage {
-                        top_left_screen_address: 0x3258
+                        top_left_screen_address: 0x3258,
+                        visual_offset: Point { x: 0, y: 0 },
                     }
                 )
         }));
@@ -12055,6 +12422,42 @@ mod tests {
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_P
                 && sprite.position == [124.0, 108.0]
+                && sprite.layer == RenderLayer::Overlay
+        }));
+    }
+
+    #[test]
+    fn parsed_attract_script_draws_source_message_with_visual_offset() {
+        let script = "message 1 forever ELECV 0x3258 -11 -7"
+            .parse::<AttractScript>()
+            .expect("source message script action should parse with offset");
+        assert_eq!(
+            script.manifest().events[0].action,
+            AttractScriptActionManifest::SourceMessage {
+                label: "ELECV".to_string(),
+                top_left_screen_address: 0x3258,
+                visual_offset: SOURCE_ATTRACT_SCORING_VISUAL_OFFSET,
+            }
+        );
+        let mut driver = ActorGameDriver::with_attract_script(script);
+        let source_text = source_message_text("ELECV").expect("ELECV source message");
+
+        let report = driver.step(GameInput::NONE);
+        assert!(report.draws.iter().any(|draw| {
+            draw.text.as_deref() == Some(source_text)
+                && matches!(
+                    draw.effect,
+                    VisualEffect::SourceMessage {
+                        top_left_screen_address: 0x3258,
+                        visual_offset: SOURCE_ATTRACT_SCORING_VISUAL_OFFSET,
+                    }
+                )
+        }));
+
+        let scene = ActorRenderSceneBridge::new().render_scene_for_report(&report);
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_E
+                && sprite.position == [89.0, 81.0]
                 && sprite.layer == RenderLayer::Overlay
         }));
     }
