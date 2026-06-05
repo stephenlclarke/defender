@@ -766,8 +766,9 @@ reintroduce legacy implementation terminology.
   clean state bridge; enemy-shot actors advance their own fixed-point fraction
   state every actor step while decrementing lifetime on the source shell-scan
   cadence, and source-backed bomber bomb actors publish stationary bomb-shell
-  fraction plus source-cadenced lifetime state. `XYZZY` invincibility is
-  represented as the same
+  fraction plus source-cadenced lifetime state. Actor spawn command handling
+  enforces the shared 20-slot source shell cap for enemy shots and bombs.
+  `XYZZY` invincibility is represented as the same
   temporary player behavior override. The slice now also models source landers
   preferring their configured human target slot, lander pickup/carry/conversion,
   falling-human rescue and safe landing scoring, score popups, hostile

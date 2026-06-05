@@ -46,6 +46,7 @@ const SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD: u8 = 0xC0;
 const SOURCE_PLAYFIELD_Y_MIN: u8 = 42;
 const SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS: u8 = 6;
 const SOURCE_SHELL_SCAN_CADENCE_STEPS: u8 = 8;
+const SOURCE_SHELL_LIMIT: usize = 20;
 const SOURCE_PLAYFIELD_START_RNG: ActorSourceRng = ActorSourceRng {
     seed: 0x52,
     hseed: 0x62,
@@ -4188,6 +4189,8 @@ impl ActorGameDriver {
 
     fn apply_commands(&mut self, commands: &[GameCommand]) -> Vec<SoundCue> {
         let mut sounds = Vec::new();
+        let mut active_source_shells = self.active_source_shell_count();
+        let mut removed_source_shells = BTreeSet::new();
         for command in commands {
             match *command {
                 GameCommand::Credit => {
@@ -4216,7 +4219,9 @@ impl ActorGameDriver {
                     self.spawn_laser(position, direction, owner);
                 }
                 GameCommand::Spawn(SpawnRequest::EnemyLaser { position, velocity }) => {
-                    self.spawn_enemy_laser(position, velocity);
+                    if reserve_source_shell_slot(&mut active_source_shells) {
+                        self.spawn_enemy_laser(position, velocity);
+                    }
                 }
                 GameCommand::Spawn(SpawnRequest::Lander { position }) => {
                     self.spawn_lander(position);
@@ -4228,7 +4233,9 @@ impl ActorGameDriver {
                     self.spawn_bomber(position);
                 }
                 GameCommand::Spawn(SpawnRequest::Bomb { position, source }) => {
-                    self.spawn_bomb(position, source);
+                    if reserve_source_shell_slot(&mut active_source_shells) {
+                        self.spawn_bomb(position, source);
+                    }
                 }
                 GameCommand::Spawn(SpawnRequest::Pod { position }) => {
                     self.spawn_pod(position);
@@ -4249,6 +4256,14 @@ impl ActorGameDriver {
                     self.spawn_score_popup(position, points);
                 }
                 GameCommand::Destroy(id) => {
+                    if removed_source_shells.insert(id)
+                        && self
+                            .snapshots
+                            .get(&id)
+                            .is_some_and(|snapshot| is_source_shell_kind(snapshot.kind))
+                    {
+                        active_source_shells = active_source_shells.saturating_sub(1);
+                    }
                     self.snapshots.remove(&id);
                     self.actors.remove(&id);
                     self.behavior_script.remove_actor_behavior(id);
@@ -4296,6 +4311,13 @@ impl ActorGameDriver {
             }
         }
         sounds
+    }
+
+    fn active_source_shell_count(&self) -> usize {
+        self.snapshots
+            .values()
+            .filter(|snapshot| is_source_shell_kind(snapshot.kind) && snapshot.alive)
+            .count()
     }
 
     fn lose_player_life(&mut self, sounds: &mut Vec<SoundCue>) {
@@ -4610,6 +4632,18 @@ fn is_player_laser_target(kind: ActorKind) -> bool {
             | ActorKind::Baiter
             | ActorKind::EnemyLaser
     )
+}
+
+fn is_source_shell_kind(kind: ActorKind) -> bool {
+    matches!(kind, ActorKind::EnemyLaser | ActorKind::Bomb)
+}
+
+fn reserve_source_shell_slot(active_source_shells: &mut usize) -> bool {
+    if *active_source_shells >= SOURCE_SHELL_LIMIT {
+        return false;
+    }
+    *active_source_shells += 1;
+    true
 }
 
 fn is_player_hazard(kind: ActorKind) -> bool {
@@ -9279,6 +9313,59 @@ mod tests {
     }
 
     #[test]
+    fn source_shell_cap_blocks_and_releases_hostile_projectile_slots() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        for index in 0..SOURCE_SHELL_LIMIT {
+            driver.spawn_enemy_laser(Point::new(40 + index as i16, 120), Velocity::new(0, 0));
+        }
+        let filled = driver.step(GameInput::NONE);
+        assert_eq!(source_shell_snapshot_count(&filled), SOURCE_SHELL_LIMIT);
+
+        driver.apply_commands(&[
+            GameCommand::Spawn(SpawnRequest::EnemyLaser {
+                position: Point::new(96, 96),
+                velocity: Velocity::new(0, 0),
+            }),
+            GameCommand::Spawn(SpawnRequest::Bomb {
+                position: Point::new(100, 100),
+                source: None,
+            }),
+        ]);
+        let capped = driver.step(GameInput::NONE);
+        assert_eq!(source_shell_snapshot_count(&capped), SOURCE_SHELL_LIMIT);
+        assert!(
+            capped
+                .snapshots
+                .iter()
+                .all(|snapshot| snapshot.kind != ActorKind::Bomb)
+        );
+
+        let freed_shell = capped
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::EnemyLaser)
+            .expect("filled source shell list should contain enemy lasers")
+            .id;
+        driver.apply_commands(&[
+            GameCommand::Destroy(freed_shell),
+            GameCommand::Spawn(SpawnRequest::Bomb {
+                position: Point::new(100, 100),
+                source: None,
+            }),
+        ]);
+        let refilled = driver.step(GameInput::NONE);
+
+        assert_eq!(source_shell_snapshot_count(&refilled), SOURCE_SHELL_LIMIT);
+        assert!(
+            refilled
+                .snapshots
+                .iter()
+                .any(|snapshot| snapshot.kind == ActorKind::Bomb)
+        );
+    }
+
+    #[test]
     fn behavior_script_can_define_swarmer_motion() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
@@ -10342,6 +10429,14 @@ mod tests {
             source_human: None,
             source_enemy_projectile: None,
         }
+    }
+
+    fn source_shell_snapshot_count(report: &StepReport) -> usize {
+        report
+            .snapshots
+            .iter()
+            .filter(|snapshot| is_source_shell_kind(snapshot.kind))
+            .count()
     }
 
     fn assert_text(report: &StepReport, value: &str) {

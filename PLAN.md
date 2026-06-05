@@ -4407,3 +4407,27 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780637564288709`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780637923075179`.
+- `2026-06-05 06:44 BST`: Completed the actor source shell-cap cycle. Added a
+  shared 20-slot source shell cap for actor `EnemyLaser` and `Bomb`
+  spawn-command handling. Command application now tracks same-batch shell
+  spawns and destroys, suppresses capped enemy-shot/bomb spawns, and frees a
+  slot immediately when a shell is destroyed. Test helpers can still set up full
+  worlds directly; the cap is enforced at the gameplay command boundary. Added
+  a regression that fills all source shell slots, blocks extra enemy-laser/bomb
+  spawns, then verifies a destroy frees one slot for a bomb. README, SPEC, and
+  the actor architecture notes now document the shared source shell cap. No
+  legacy code, tests, or scaffolding were safe to remove in this slice because
+  clean smoke/fidelity/oracle evidence still depends on clean runtime
+  boundaries outside the actor path. Validation passed with `cargo fmt --check`,
+  focused shell-cap/projectile tests,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780637986496859`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780638267918669`.
