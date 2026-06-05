@@ -44,6 +44,8 @@ const PLAYER_HYPERSPACE_DEATH_DELAY_STEPS: u8 = 39;
 const PLAYER_HYPERSPACE_DEATH_LSEED: u8 = 0x0C;
 const SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD: u8 = 0xC0;
 const SOURCE_PLAYFIELD_Y_MIN: u8 = 42;
+const SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS: u8 = 6;
+const SOURCE_SHELL_SCAN_CADENCE_STEPS: u8 = 8;
 const SOURCE_PLAYFIELD_START_RNG: ActorSourceRng = ActorSourceRng {
     seed: 0x52,
     hseed: 0x62,
@@ -2712,6 +2714,7 @@ pub struct StepPrompt {
     pub high_score_initials: HighScoreInitialsState,
     pub snapshots: Vec<ActorSnapshot>,
     pub behavior_script: ActorBehaviorScript,
+    pub source_shell_scan_tick: bool,
 }
 
 impl StepPrompt {
@@ -3755,6 +3758,7 @@ pub struct ActorGameDriver {
     baiter_timer_steps: Option<u32>,
     baiter_pacing_steps_remaining: u8,
     hyperspace_source_rng: ActorSourceRng,
+    source_shell_scan_steps_remaining: u8,
 }
 
 impl ActorGameDriver {
@@ -3792,6 +3796,7 @@ impl ActorGameDriver {
             baiter_timer_steps: None,
             baiter_pacing_steps_remaining: ACTOR_BAITER_TIMER_PACING_STEPS,
             hyperspace_source_rng: SOURCE_PLAYFIELD_START_RNG,
+            source_shell_scan_steps_remaining: SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS,
         };
         let attract_id = driver.allocate_actor_id();
         let script_id = driver.allocate_actor_id();
@@ -3813,6 +3818,11 @@ impl ActorGameDriver {
             let source_seed = self.hyperspace_source_rng.advance().hyperspace_seed();
             behavior_script = behavior_script.with_hyperspace_source_seed(source_seed);
         }
+        let source_shell_scan_tick = if self.phase == Phase::Playing {
+            self.advance_source_shell_scan_tick()
+        } else {
+            false
+        };
         let base_prompt = StepPrompt {
             step: self.step,
             phase: self.phase,
@@ -3826,6 +3836,7 @@ impl ActorGameDriver {
             high_score_initials: self.high_score_initials,
             snapshots: self.snapshots.values().cloned().collect(),
             behavior_script: behavior_script.clone(),
+            source_shell_scan_tick,
         };
 
         let mut replies = Vec::new();
@@ -4302,6 +4313,7 @@ impl ActorGameDriver {
         self.smart_bombs = 0;
         self.wave = 0;
         self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
+        self.reset_source_shell_scan();
         self.high_score_initials = HighScoreInitialsState::EMPTY;
         self.high_scores.record(self.score);
         self.phase = if self.high_scores.qualifies(self.score) {
@@ -4337,10 +4349,26 @@ impl ActorGameDriver {
         self.smart_bombs = INITIAL_SMART_BOMBS;
         self.high_score_initials = HighScoreInitialsState::EMPTY;
         self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
+        self.reset_source_shell_scan();
         self.apply_wave_profile();
         self.spawn_player();
         self.spawn_wave_hostiles();
         self.spawn_initial_humans();
+    }
+
+    fn reset_source_shell_scan(&mut self) {
+        self.source_shell_scan_steps_remaining = SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS;
+    }
+
+    fn advance_source_shell_scan_tick(&mut self) -> bool {
+        if self.source_shell_scan_steps_remaining > 0 {
+            self.source_shell_scan_steps_remaining =
+                self.source_shell_scan_steps_remaining.saturating_sub(1);
+            return false;
+        }
+
+        self.source_shell_scan_steps_remaining = SOURCE_SHELL_SCAN_CADENCE_STEPS - 1;
+        true
     }
 
     fn apply_wave_profile(&mut self) {
@@ -5867,10 +5895,14 @@ impl AssetActor for Bomb {
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing && self.lifetime_steps > 0 {
-            self.lifetime_steps = self.lifetime_steps.saturating_sub(1);
-            self.source.lifetime_ticks =
-                actor_source_projectile_lifetime_ticks(self.lifetime_steps);
-            draws.push(DrawCommand::sprite(self.id, SpriteKey::Bomb, self.position));
+            if prompt.source_shell_scan_tick {
+                self.lifetime_steps = self.lifetime_steps.saturating_sub(1);
+                self.source.lifetime_ticks =
+                    actor_source_projectile_lifetime_ticks(self.lifetime_steps);
+            }
+            if self.lifetime_steps > 0 {
+                draws.push(DrawCommand::sprite(self.id, SpriteKey::Bomb, self.position));
+            }
         }
 
         ActorReply {
@@ -6834,17 +6866,21 @@ impl AssetActor for EnemyLaserShot {
         let behavior = prompt.behavior_for(self.id, ActorKind::EnemyLaser);
         self.initialize_lifetime(behavior);
         if prompt.phase == Phase::Playing && self.lifetime_steps.is_some_and(|steps| steps > 0) {
-            if let Some(lifetime_steps) = &mut self.lifetime_steps {
+            if prompt.source_shell_scan_tick
+                && let Some(lifetime_steps) = &mut self.lifetime_steps
+            {
                 *lifetime_steps = lifetime_steps.saturating_sub(1);
                 self.source.lifetime_ticks =
                     actor_source_projectile_lifetime_ticks(*lifetime_steps);
             }
-            movement_velocity = self.advance_source_projectile();
-            draws.push(DrawCommand::sprite(
-                self.id,
-                SpriteKey::EnemyLaser,
-                self.position,
-            ));
+            if self.lifetime_steps.is_some_and(|steps| steps > 0) {
+                movement_velocity = self.advance_source_projectile();
+                draws.push(DrawCommand::sprite(
+                    self.id,
+                    SpriteKey::EnemyLaser,
+                    self.position,
+                ));
+            }
         }
         let expired_or_out_of_bounds = self.lifetime_steps == Some(0) || !self.in_playfield();
         if expired_or_out_of_bounds {
@@ -8478,6 +8514,7 @@ mod tests {
             snapshots: Vec::new(),
             behavior_script: ActorBehaviorScript::default()
                 .with_kind_behavior(ActorKind::EnemyLaser, behavior),
+            source_shell_scan_tick: false,
         };
         let mut shot =
             EnemyLaserShot::new(ActorId::new(101), Point::new(10, 80), Velocity::new(1, -1));
@@ -8495,11 +8532,13 @@ mod tests {
                 y_fraction: 0x80,
                 x_velocity: 0x0180,
                 y_velocity: 0xFF80,
-                lifetime_ticks: 3,
+                lifetime_ticks: 4,
             })
         );
 
-        let second = shot.update(&prompt);
+        let mut tick_prompt = prompt;
+        tick_prompt.source_shell_scan_tick = true;
+        let second = shot.update(&tick_prompt);
 
         assert_eq!(second.snapshot.position, Point::new(13, 79));
         assert_eq!(second.snapshot.velocity, Velocity::new(2, 0));
@@ -8510,9 +8549,35 @@ mod tests {
                 y_fraction: 0,
                 x_velocity: 0x0180,
                 y_velocity: 0xFF80,
-                lifetime_ticks: 2,
+                lifetime_ticks: 3,
             })
         );
+    }
+
+    #[test]
+    fn driver_applies_source_shell_scan_lifetime_cadence() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.set_kind_behavior(
+            ActorKind::EnemyLaser,
+            ActorBehaviorProfile {
+                lander_shot_lifetime_steps: 20,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        let shot = driver.spawn_enemy_laser(Point::new(80, 120), Velocity::new(0, 0));
+
+        let lifetimes = (0..=SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS)
+            .map(|_| {
+                let report = driver.step(GameInput::NONE);
+                snapshot_for(&report, shot)
+                    .source_enemy_projectile
+                    .expect("enemy laser should publish source projectile metadata")
+                    .lifetime_ticks
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(lifetimes, vec![20, 20, 20, 20, 20, 20, 19]);
     }
 
     #[test]
@@ -9208,7 +9273,7 @@ mod tests {
                 y_fraction: 0x7B,
                 x_velocity: 0,
                 y_velocity: 0,
-                lifetime_ticks: 4,
+                lifetime_ticks: 5,
             })
         );
     }

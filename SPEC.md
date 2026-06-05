@@ -764,9 +764,10 @@ reintroduce legacy implementation terminology.
   their actor-owned fraction state during active motion. Hostile projectile
   snapshots now carry source-shaped shell velocity/lifetime metadata into the
   clean state bridge; enemy-shot actors advance their own fixed-point fraction
-  and lifetime state, and source-backed bomber bomb actors publish stationary
-  bomb-shell fraction and lifetime state. `XYZZY` invincibility is represented
-  as the same
+  state every actor step while decrementing lifetime on the source shell-scan
+  cadence, and source-backed bomber bomb actors publish stationary bomb-shell
+  fraction plus source-cadenced lifetime state. `XYZZY` invincibility is
+  represented as the same
   temporary player behavior override. The slice now also models source landers
   preferring their configured human target slot, lander pickup/carry/conversion,
   falling-human rescue and safe landing scoring, score popups, hostile

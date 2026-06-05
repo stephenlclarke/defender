@@ -194,7 +194,8 @@ metadata in snapshots and advance active motion by updating their own
 fixed-point position/fraction state.
 Hostile projectile actors publish source-shaped shell metadata too: enemy
 lasers own and advance fixed-point velocity, fraction, and lifetime values,
-and source-backed bomber bomb actors carry stationary bomb-shell fraction and
+with lifetime decrementing on the source shell-scan cadence. Source-backed
+bomber bomb actors carry stationary bomb-shell fraction and source-cadenced
 lifetime values into the clean state bridge.
 
 Initial humans are source-backed: wave `1` uses the captured first-wave starts,
@@ -276,7 +277,7 @@ The actor driver now owns a first Defender gameplay loop:
   actor-owned lifetime state, act as player hazards, and emit a bomb collision
   cue when they hit the player. Source-backed bomber bombs snapshot the bomber
   source fractions as stationary bomb-shell fraction metadata and decrement
-  actor-owned lifetime metadata.
+  actor-owned lifetime metadata on the source shell-scan cadence.
 - Projectile-killed pods spawn a bounded mini-swarmer actor batch using the
   source request count. Source-backed swarmers decrement their actor-owned shot
   timer into hostile projectile commands with a distinct swarmer shot cue.

@@ -109,8 +109,9 @@ their fixed-point metadata through snapshots, publish per-step movement/facing
 metadata for the clean state bridge, and advance fraction state during active
 motion. Hostile projectile actors also publish source-shaped shell metadata:
 enemy lasers own and advance fixed-point source velocity, fraction, and
-lifetime state, while source-backed bomber bomb actors carry stationary source
-bomb-shell fraction and lifetime state into the clean `EnemyProjectileSnapshot`
+lifetime state with the red-label shell-scan cadence, while source-backed
+bomber bomb actors carry stationary source bomb-shell fraction and
+source-cadenced lifetime state into the clean `EnemyProjectileSnapshot`
 contract. It also includes Williams title animation
 metadata, the coalescing
 Defender wordmark surface, lander target-slot seeking, an actor-owned

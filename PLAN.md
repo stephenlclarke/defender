@@ -4384,3 +4384,26 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780637147066859`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780637479073989`.
+- `2026-06-05 06:38 BST`: Completed the actor source shell-scan cadence cycle.
+  Added driver-owned source shell-scan cadence state with the red-label initial
+  delay and eight-step cadence, then passed the resulting
+  `source_shell_scan_tick` through `StepPrompt`. Enemy-shot and bomb actors now
+  advance position every actor step but decrement source lifetime metadata only
+  on shell-scan ticks. Added regressions for no-tick/tick enemy-shot lifetime
+  behavior and for the driver's initial source shell-scan delay. README, SPEC,
+  and the actor architecture notes now describe source-cadenced hostile
+  projectile lifetime. No legacy code, tests, or scaffolding were safe to remove
+  in this slice because clean smoke/fidelity/oracle evidence still depends on
+  clean runtime boundaries outside the actor path. Validation passed with
+  `cargo fmt --check`, focused shell-scan tests,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780637564288709`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780637923075179`.
