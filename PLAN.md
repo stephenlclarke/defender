@@ -3940,3 +3940,26 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780625195752169`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780625474565589`.
+- `2026-06-05 03:23 BST`: Completed the actor driver-owned hyperspace source
+  RNG cycle. Added the source RNG stepper, resettable driver-owned source RNG
+  state, and per-playing-step advancement before actor prompts. The driver now
+  injects the advanced `SEED`/`HSEED`/`LSEED` snapshot into default and
+  kind-level player behavior when scripts have not supplied one, while
+  actor-id scripts remain explicit overrides. `PlayerShip` captures the
+  entry-frame `LSEED` for source `HYP2` death-risk routing and uses the
+  advanced source seed for red-label rematerialization X/facing/Y. Added a
+  regression proving driver-advanced source-backed player rematerialization.
+  No legacy code, tests, or scaffolding were safe to remove because
+  `legacy-tools` still owns ROM reports, trace/media helpers, and
+  oracle-equivalence evidence while the actor runtime remains isolated.
+  Validation passed with `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Audit-only broad
+  `cargo test --all-targets --features legacy-tools` was also run and still
+  fails in existing clean `Game` MAME lifecycle drift outside this actor
+  slice, so it is not claimed as a green release gate. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780625577116929`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780626199637959`.

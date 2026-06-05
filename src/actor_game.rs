@@ -21,6 +21,11 @@ const PLAYER_HYPERSPACE_DEATH_DELAY_STEPS: u8 = 39;
 const PLAYER_HYPERSPACE_DEATH_LSEED: u8 = 0x0C;
 const SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD: u8 = 0xC0;
 const SOURCE_PLAYFIELD_Y_MIN: u8 = 42;
+const SOURCE_PLAYFIELD_START_RNG: ActorHyperspaceSourceSeed = ActorHyperspaceSourceSeed {
+    seed: 0x52,
+    hseed: 0x62,
+    lseed: 0x0C,
+};
 const PLAYER_BOUNDS: Rect = Rect::new(0, 18, 255, 220);
 const LASER_SPEED: i16 = 8;
 const LASER_LIFETIME: u16 = 34;
@@ -798,6 +803,23 @@ pub struct ActorHyperspaceSourceSeed {
     pub lseed: u8,
 }
 
+impl ActorHyperspaceSourceSeed {
+    fn advance(&mut self) -> Self {
+        let product_low = self.seed.wrapping_mul(3).wrapping_add(17);
+        let mut a = self.lseed >> 3;
+        a ^= self.lseed;
+        let carry_into_hseed = (a & 0x01) != 0;
+        let old_hseed = self.hseed;
+        self.hseed = (u8::from(carry_into_hseed) << 7) | (self.hseed >> 1);
+        let carry_into_lseed = (old_hseed & 0x01) != 0;
+        self.lseed = (u8::from(carry_into_lseed) << 7) | (self.lseed >> 1);
+        let (with_lseed, carry) = adc8(product_low, self.lseed, false);
+        let (new_seed, _) = adc8(with_lseed, self.hseed, carry);
+        self.seed = new_seed;
+        *self
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorBehaviorProfile {
     pub player_speed: i16,
@@ -957,6 +979,23 @@ impl ActorBehaviorScript {
             .copied()
             .or_else(|| self.kind_profiles.get(&kind).copied())
             .unwrap_or(self.default_profile)
+    }
+
+    fn with_hyperspace_source_seed(&self, seed: ActorHyperspaceSourceSeed) -> Self {
+        let mut script = self.clone();
+        if script
+            .default_profile
+            .player_hyperspace_source_seed
+            .is_none()
+        {
+            script.default_profile.player_hyperspace_source_seed = Some(seed);
+        }
+        for profile in script.kind_profiles.values_mut() {
+            if profile.player_hyperspace_source_seed.is_none() {
+                profile.player_hyperspace_source_seed = Some(seed);
+            }
+        }
+        script
     }
 
     fn with_input_overrides(
@@ -1499,6 +1538,11 @@ fn actor_lander_speed_from_source(velocity: u8) -> i16 {
 
 fn actor_velocity_pixels_from_source(velocity: u8) -> i16 {
     i16::from((velocity / 32).max(1))
+}
+
+fn adc8(lhs: u8, rhs: u8, carry: bool) -> (u8, bool) {
+    let sum = u16::from(lhs) + u16::from(rhs) + u16::from(u8::from(carry));
+    ((sum & 0xFF) as u8, sum > 0xFF)
 }
 
 const fn actor_sign_extend_u8_to_u16(value: u8) -> u16 {
@@ -2347,6 +2391,7 @@ pub struct ActorGameDriver {
     wave_script: ActorWaveScript,
     baiter_timer_steps: Option<u32>,
     baiter_pacing_steps_remaining: u8,
+    hyperspace_source_rng: ActorHyperspaceSourceSeed,
 }
 
 impl ActorGameDriver {
@@ -2382,6 +2427,7 @@ impl ActorGameDriver {
             wave_script,
             baiter_timer_steps: None,
             baiter_pacing_steps_remaining: ACTOR_BAITER_TIMER_PACING_STEPS,
+            hyperspace_source_rng: SOURCE_PLAYFIELD_START_RNG,
         };
         let attract_id = driver.allocate_actor_id();
         let script_id = driver.allocate_actor_id();
@@ -2395,9 +2441,13 @@ impl ActorGameDriver {
     pub fn step(&mut self, input: GameInput) -> StepReport {
         self.step = self.step.saturating_add(1);
         let was_playing = self.phase == Phase::Playing;
-        let behavior_script = self
+        let mut behavior_script = self
             .behavior_script
             .with_input_overrides(input, self.snapshots.values().cloned());
+        if self.phase == Phase::Playing {
+            let source_seed = self.hyperspace_source_rng.advance();
+            behavior_script = behavior_script.with_hyperspace_source_seed(source_seed);
+        }
         let base_prompt = StepPrompt {
             step: self.step,
             phase: self.phase,
@@ -2866,6 +2916,7 @@ impl ActorGameDriver {
         self.lives = 0;
         self.smart_bombs = 0;
         self.wave = 0;
+        self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.high_scores.record(self.score);
         self.phase = if self.high_scores.qualifies(self.score) {
             Phase::HighScoreEntry
@@ -2882,6 +2933,7 @@ impl ActorGameDriver {
         self.score = 0;
         self.lives = 3;
         self.smart_bombs = INITIAL_SMART_BOMBS;
+        self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.apply_wave_profile();
         self.spawn_player();
         self.spawn_wave_hostiles();
@@ -3503,6 +3555,7 @@ struct PlayerShip {
     direction: Direction,
     laser_cooldown: u8,
     hyperspace_steps_remaining: u8,
+    hyperspace_entry_lseed: Option<u8>,
     hyperspace_death_steps_remaining: Option<u8>,
 }
 
@@ -3514,6 +3567,7 @@ impl PlayerShip {
             direction: Direction::Right,
             laser_cooldown: 0,
             hyperspace_steps_remaining: 0,
+            hyperspace_entry_lseed: None,
             hyperspace_death_steps_remaining: None,
         }
     }
@@ -3528,12 +3582,18 @@ impl PlayerShip {
 
     fn enter_hyperspace(&mut self, behavior: ActorBehaviorProfile) {
         self.hyperspace_steps_remaining = behavior.player_hyperspace_hidden_steps;
+        self.hyperspace_entry_lseed = Some(Self::hyperspace_death_lseed(behavior));
     }
 
-    fn hyperspace_rematerialization(
-        &self,
-        behavior: ActorBehaviorProfile,
-    ) -> (Point, Direction, u8) {
+    fn hyperspace_death_lseed(behavior: ActorBehaviorProfile) -> u8 {
+        behavior
+            .player_hyperspace_source_seed
+            .map_or(behavior.player_hyperspace_death_lseed, |source| {
+                source.lseed
+            })
+    }
+
+    fn hyperspace_rematerialization(&self, behavior: ActorBehaviorProfile) -> (Point, Direction) {
         if let Some(source) = behavior.player_hyperspace_source_seed {
             let (x, direction) = if source.hseed & 1 != 0 {
                 (0x20, Direction::Right)
@@ -3541,7 +3601,7 @@ impl PlayerShip {
                 (0x70, Direction::Left)
             };
             let y = (source.hseed >> 1).wrapping_add(SOURCE_PLAYFIELD_Y_MIN);
-            return (Point::new(x, i16::from(y)), direction, source.lseed);
+            return (Point::new(x, i16::from(y)), direction);
         }
 
         (
@@ -3550,7 +3610,6 @@ impl PlayerShip {
                 behavior.player_hyperspace_rematerialize_y,
             ),
             self.direction,
-            behavior.player_hyperspace_death_lseed,
         )
     }
 
@@ -3561,9 +3620,13 @@ impl PlayerShip {
 
         self.hyperspace_steps_remaining = self.hyperspace_steps_remaining.saturating_sub(1);
         if self.hyperspace_steps_remaining == 0 {
-            let (position, direction, death_lseed) = self.hyperspace_rematerialization(behavior);
+            let (position, direction) = self.hyperspace_rematerialization(behavior);
             self.position = PLAYER_BOUNDS.clamp_point(position);
             self.direction = direction;
+            let death_lseed = self
+                .hyperspace_entry_lseed
+                .take()
+                .unwrap_or_else(|| Self::hyperspace_death_lseed(behavior));
             if death_lseed > SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD {
                 self.hyperspace_death_steps_remaining =
                     Some(behavior.player_hyperspace_death_delay_steps);
@@ -6359,6 +6422,49 @@ mod tests {
                 .contains(&SoundCue::HyperspaceMaterialize)
         );
         assert!(!rematerialized.commands.contains(&GameCommand::PlayerKilled));
+    }
+
+    #[test]
+    fn driver_advances_hyperspace_source_rng_for_default_player_behavior() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let player = driver.spawn_player();
+        driver.set_kind_behavior(
+            ActorKind::Player,
+            ActorBehaviorProfile {
+                player_hyperspace_hidden_steps: 1,
+                player_hyperspace_rematerialize_x: 150,
+                player_hyperspace_rematerialize_y: 92,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        let mut expected_source = SOURCE_PLAYFIELD_START_RNG;
+        expected_source.advance();
+        expected_source.advance();
+
+        driver.step(GameInput {
+            hyperspace: true,
+            ..GameInput::NONE
+        });
+        let rematerialized = driver.step(GameInput::NONE);
+
+        let expected_y =
+            i16::from((expected_source.hseed >> 1).wrapping_add(SOURCE_PLAYFIELD_Y_MIN));
+        let expected_position = if expected_source.hseed & 1 != 0 {
+            Point::new(0x20, expected_y)
+        } else {
+            Point::new(0x70, expected_y)
+        };
+        let player_snapshot = snapshot_for(&rematerialized, player);
+        assert_eq!(player_snapshot.position, expected_position);
+        assert!(rematerialized.draws.iter().any(|draw| {
+            draw.actor == player
+                && draw.position == expected_position
+                && matches!(
+                    (expected_source.hseed & 1 != 0, draw.sprite),
+                    (true, SpriteKey::PlayerRight) | (false, SpriteKey::PlayerLeft)
+                )
+        }));
     }
 
     #[test]

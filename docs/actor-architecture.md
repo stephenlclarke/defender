@@ -108,15 +108,18 @@ render frame effect. The player actor emits `GameCommand::Hyperspace` and
 families, score, lives, and smart-bomb stock unchanged. `PlayerShip` then owns
 the hidden interval: while its hyperspace timer is active it remains alive but
 publishes no collision bounds, no player draw, and no input-driven actions.
-`ActorBehaviorProfile` configures the hidden step count and rematerialization
-coordinates, and the actor emits `SoundCue::HyperspaceMaterialize` when it
-returns. A behavior script can also provide an `ActorHyperspaceSourceSeed`; in
-that source-backed path `HSEED` selects the source X/facing branch and Y high
-byte, while `LSEED` drives the death-risk threshold. Without that snapshot the
-actor uses the direct scripted rematerialization coordinates and effective
-`LSEED` byte. Values above `0xC0` arm the source `HYP2` death-risk branch and
-route through the normal player death/life-stock path after the delay. Full
-source RNG advancement remains a separate porting slice.
+`ActorBehaviorProfile` configures the hidden step count and fallback
+rematerialization coordinates, and the actor emits
+`SoundCue::HyperspaceMaterialize` when it returns. `ActorGameDriver` owns the
+source hyperspace RNG, advances it once per playing step, and injects that
+`ActorHyperspaceSourceSeed` into default and kind-level player behavior when a
+script has not provided a seed. Actor-id profiles remain explicit overrides. In
+the source-backed path `HSEED` selects the source X/facing branch and Y high
+byte, while the entry-frame `LSEED` drives the death-risk threshold. Without a
+seed snapshot the actor uses the direct scripted rematerialization coordinates
+and effective `LSEED` byte. Values above `0xC0` arm the source `HYP2`
+death-risk branch and route through the normal player death/life-stock path
+after the delay.
 
 `XYZZY` invincibility uses the same mechanism. When invincibility is active,
 the driver applies a temporary player behavior override that disables enemy

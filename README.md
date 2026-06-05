@@ -91,12 +91,14 @@ actor hyperspace now emits separate launch/materialization cues and clears
 active hostile projectile actors without spending lives, smart-bomb stock,
 scoring points, or clearing hostile actor families; the player actor owns the
 hidden hyperspace interval and rematerializes at behavior-scripted coordinates
-with no draw, collision bounds, or input actions while hidden. Behavior scripts
-can also supply a source `SEED`/`HSEED`/`LSEED` snapshot so rematerialization
-uses the red-label X/facing/Y branch and the source `HYP2` `LSEED > 0xC0`
-delayed death-risk path. Player hazard collisions now decrement driver-owned
-life stock and respawn a replacement player when lives remain, while final-life
-hits still enter game-over/high-score flow. Baiters do not block wave
+with no draw, collision bounds, or input actions while hidden. The driver owns
+and advances the source hyperspace RNG during play, injects that
+`SEED`/`HSEED`/`LSEED` snapshot into default/kind player behavior, and still
+lets actor-specific scripts override the snapshot; rematerialization uses the
+red-label X/facing/Y branch and the source `HYP2` `LSEED > 0xC0` delayed
+death-risk path. Player hazard collisions now decrement driver-owned life stock
+and respawn a replacement player when lives remain, while final-life hits still
+enter game-over/high-score flow. Baiters do not block wave
 completion once source-counted wave enemies are gone, and explosion draws carry
 enemy/bomb/player/human variant metadata for later source sprite mapping.
 `XYZZY` invincibility and overlay smart bombs are applied through the same
