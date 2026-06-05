@@ -699,19 +699,23 @@ reintroduce legacy implementation terminology.
   starts and when hostile snapshots are cleared. The default actor wave
   progression reads
   `assets/red-label/wave-table.tsv` for active wave size, lander and bomber
-  movement speed, lander fire cadence, and source bomber/pod counts. The actor
-  allocator follows the source active-family shape, so wave `1` remains
-  lander-only while later waves can seed bomber and pod actors beside landers.
-  Source-backed landers, bombers, pods, swarmers, and first-wave humans publish
-  fixed-point metadata in snapshots and advance their actor-owned fraction
-  state during active motion. `XYZZY` invincibility is represented as the same
+  movement speed, lander fire cadence, baiter entry/shot/seek timing, and
+  source bomber/pod counts. The actor allocator follows the source active-family
+  shape, so wave `1` remains lander-only while later waves can seed bomber and
+  pod actors beside landers.
+  Source-backed landers, bombers, pods, swarmers, baiters, and first-wave humans
+  publish fixed-point metadata in snapshots and advance their actor-owned
+  fraction state during active motion. `XYZZY` invincibility is represented as
+  the same
   temporary player behavior override. The slice now also models source landers
   preferring their configured human target slot, lander pickup/carry/conversion,
   falling-human rescue and safe landing scoring, score popups, hostile
   projectile actors for lander shots, bomber/pod hit scores and cues,
   pod laser-hit swarmer spawning with the source request bound, smart-bomb pod
-  scoring without swarmer spawning, smart-bomb hostile clearing, and mutant
-  spawn handoff, but it has not replaced the live `Game` runtime yet.
+  scoring without swarmer spawning, source-paced baiter timer entry with
+  non-wave-blocking baiters, baiter shots/scores/hit cues, smart-bomb hostile
+  clearing, and mutant spawn handoff, but it has not replaced the live `Game`
+  runtime yet.
 
 ## Compatibility Features
 

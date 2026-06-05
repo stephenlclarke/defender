@@ -37,7 +37,16 @@ const SOURCE_HUMAN_RIGHT_X_VELOCITY: u16 = 0x0020;
 const SOURCE_INITIAL_POD_X_SPEED: u8 = 0x20;
 const SOURCE_POD_SWARMER_REQUEST_LIMIT: usize = 6;
 const SOURCE_ACTIVE_SWARMER_LIMIT: usize = 20;
+const SOURCE_ACTIVE_BAITER_LIMIT: usize = 12;
 const SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS: u8 = 3;
+const SOURCE_BAITER_INITIAL_SHOT_TIMER: u8 = 8;
+const SOURCE_BAITER_LOOP_SLEEP_TICKS: u8 = 6;
+const SOURCE_BAITER_X_SEEK_SPEED: u8 = 0x40;
+const SOURCE_BAITER_Y_SEEK_BYTE: u8 = 0x01;
+const SOURCE_BAITER_X_SEEK_WINDOW_HALF_PIXELS: i16 = 20;
+const SOURCE_BAITER_Y_SEEK_WINDOW_HALF_PIXELS: i16 = 10;
+const SOURCE_BAITER_PICTURE_FRAME_COUNT: u8 = 3;
+const ACTOR_BAITER_TIMER_PACING_STEPS: u8 = 15;
 const SOURCE_BOMBER_LOOP_SLEEP_TICKS: u8 = 1;
 const SOURCE_BOMBER_PICTURE_FRAME_COUNT: u8 = 4;
 const SOURCE_BOMBER_CRUISE_ALTITUDE: i16 = 0x50;
@@ -52,11 +61,15 @@ const MUTANT_SEEK_SPEED: i16 = 1;
 const BOMBER_DRIFT_SPEED: i16 = 1;
 const POD_DRIFT_SPEED: i16 = 1;
 const SWARMER_SEEK_SPEED: i16 = 2;
+const BAITER_SEEK_SPEED: i16 = 3;
+const BAITER_FIRE_PERIOD: u64 = 42;
+const BAITER_SHOT_SPEED: i16 = 4;
 const LANDER_SCORE: u32 = 150;
 const MUTANT_SCORE: u32 = 150;
 const BOMBER_SCORE: u32 = 250;
 const POD_SCORE: u32 = 1000;
 const SWARMER_SCORE: u32 = 150;
+const BAITER_SCORE: u32 = 200;
 const HUMAN_RESCUE_SCORE: u32 = 500;
 const HUMAN_SAFE_LANDING_SCORE: u32 = 250;
 const ACTOR_SOURCE_WAVE_TABLE_TSV: &str = include_str!("../assets/red-label/wave-table.tsv");
@@ -731,6 +744,7 @@ pub enum ActorKind {
     Bomber,
     Pod,
     Swarmer,
+    Baiter,
     Human,
     Laser,
     EnemyLaser,
@@ -767,6 +781,9 @@ pub struct ActorBehaviorProfile {
     pub bomber_drift_speed: i16,
     pub pod_drift_speed: i16,
     pub swarmer_seek_speed: i16,
+    pub baiter_seek_speed: i16,
+    pub baiter_fire_period_steps: u64,
+    pub baiter_shot_speed: i16,
     pub human_ground_y: i16,
     pub human_fall_acceleration: i16,
     pub human_max_fall_speed: i16,
@@ -797,6 +814,9 @@ impl ActorBehaviorProfile {
         bomber_drift_speed: BOMBER_DRIFT_SPEED,
         pod_drift_speed: POD_DRIFT_SPEED,
         swarmer_seek_speed: SWARMER_SEEK_SPEED,
+        baiter_seek_speed: BAITER_SEEK_SPEED,
+        baiter_fire_period_steps: BAITER_FIRE_PERIOD,
+        baiter_shot_speed: BAITER_SHOT_SPEED,
         human_ground_y: HUMAN_GROUND_Y,
         human_fall_acceleration: HUMAN_FALL_ACCELERATION,
         human_max_fall_speed: HUMAN_MAX_FALL_SPEED,
@@ -918,6 +938,9 @@ pub struct ActorSourceWaveProfile {
     pub swarmer_x_velocity: u8,
     pub swarmer_shot_time: u32,
     pub swarmer_acceleration_mask: u8,
+    pub baiter_delay: u32,
+    pub baiter_shot_time: u32,
+    pub baiter_seek_probability: u8,
     pub lander_shot_time: u32,
 }
 
@@ -965,6 +988,17 @@ pub struct ActorSourceSwarmerMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceBaiterMetadata {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub shot_timer: u8,
+    pub sleep_ticks: u8,
+    pub picture_frame: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorLanderSpawn {
     pub position: Point,
     pub source: Option<ActorSourceLanderMetadata>,
@@ -986,6 +1020,12 @@ pub struct ActorPodSpawn {
 pub struct ActorSwarmerSpawn {
     pub position: Point,
     pub source: Option<ActorSourceSwarmerMetadata>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorBaiterSpawn {
+    pub position: Point,
+    pub source: Option<ActorSourceBaiterMetadata>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1133,6 +1173,53 @@ impl ActorSwarmerSpawn {
     }
 }
 
+impl ActorBaiterSpawn {
+    pub const fn new(position: Point) -> Self {
+        Self {
+            position,
+            source: None,
+        }
+    }
+
+    fn source_from_player(
+        profile: ActorSourceWaveProfile,
+        player_position: Point,
+        active_baiters: usize,
+    ) -> Self {
+        let spawn_x = if (active_baiters + usize::from(player_position.x >= 128)).is_multiple_of(2)
+        {
+            228
+        } else {
+            28
+        };
+        let spawn_y = (player_position.y + 24
+            - (i16::try_from(active_baiters % 3).unwrap_or(0) * 24))
+            .clamp(PLAYER_BOUNDS.top + 8, HUMAN_GROUND_Y - 24);
+        let position = Point::new(spawn_x, spawn_y);
+        let mut source = ActorSourceBaiterMetadata {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: SOURCE_BAITER_INITIAL_SHOT_TIMER,
+            sleep_ticks: 0,
+            picture_frame: 0,
+        };
+        source_baiter_velocity_update(
+            &mut source,
+            position,
+            profile,
+            player_position,
+            false,
+            u8::MAX,
+        );
+        Self {
+            position,
+            source: Some(source),
+        }
+    }
+}
+
 fn swarmer_spawn_y_velocity_low(index: usize) -> u8 {
     match index % SOURCE_POD_SWARMER_REQUEST_LIMIT {
         0 => 0x20,
@@ -1183,6 +1270,9 @@ impl ActorSourceWaveProfile {
             swarmer_x_velocity: actor_source_wave_u8("swarmer_x_velocity", wave),
             swarmer_shot_time: actor_source_wave_u32("swarmer_shot_time", wave),
             swarmer_acceleration_mask: actor_source_wave_u8("swarmer_acceleration_mask", wave),
+            baiter_delay: actor_source_wave_u32("baiter_time", wave),
+            baiter_shot_time: actor_source_wave_u32("baiter_shot_time", wave),
+            baiter_seek_probability: actor_source_wave_u8("baiter_seek_probability", wave),
             lander_shot_time: actor_source_wave_u32("lander_shot_time", wave),
         }
     }
@@ -1595,6 +1685,7 @@ pub enum SpriteKey {
     Bomber,
     Pod,
     Swarmer,
+    Baiter,
     Human,
     HumanFalling,
     HumanCarried,
@@ -1625,6 +1716,9 @@ pub enum VisualEffect {
         frame: u8,
     },
     SourcePod,
+    SourceBaiterFrame {
+        frame: u8,
+    },
     SourceHumanFrame {
         frame: u8,
     },
@@ -1651,6 +1745,8 @@ pub enum SoundCue {
     BomberHit,
     PodHit,
     SwarmerHit,
+    BaiterHit,
+    BaiterShot,
     AttractPulse,
     GameOver,
 }
@@ -1870,6 +1966,7 @@ pub struct ActorSnapshot {
     pub source_bomber: Option<ActorSourceBomberMetadata>,
     pub source_pod: Option<ActorSourcePodMetadata>,
     pub source_swarmer: Option<ActorSourceSwarmerMetadata>,
+    pub source_baiter: Option<ActorSourceBaiterMetadata>,
     pub source_human: Option<ActorSourceHumanMetadata>,
 }
 
@@ -1966,6 +2063,10 @@ pub enum SpawnRequest {
     Swarmer {
         position: Point,
         source: Option<ActorSourceSwarmerMetadata>,
+    },
+    Baiter {
+        position: Point,
+        source: Option<ActorSourceBaiterMetadata>,
     },
     Human {
         position: Point,
@@ -2147,6 +2248,8 @@ pub struct ActorGameDriver {
     high_scores: HighScoreTable,
     behavior_script: ActorBehaviorScript,
     wave_script: ActorWaveScript,
+    baiter_timer_steps: Option<u32>,
+    baiter_pacing_steps_remaining: u8,
 }
 
 impl ActorGameDriver {
@@ -2179,6 +2282,8 @@ impl ActorGameDriver {
             high_scores: HighScoreTable::default(),
             behavior_script: ActorBehaviorScript::default(),
             wave_script,
+            baiter_timer_steps: None,
+            baiter_pacing_steps_remaining: ACTOR_BAITER_TIMER_PACING_STEPS,
         };
         let attract_id = driver.allocate_actor_id();
         let script_id = driver.allocate_actor_id();
@@ -2227,6 +2332,7 @@ impl ActorGameDriver {
         }
 
         self.resolve_collisions(&behavior_script, &mut commands);
+        self.advance_baiter_timer(&mut commands);
         let sounds = self.apply_commands(&commands);
         self.remove_dead_actors(&dead_actor_ids);
         if self.advance_wave_if_cleared(was_playing, &commands) {
@@ -2304,6 +2410,15 @@ impl ActorGameDriver {
 
     pub fn spawn_swarmer_for_test(&mut self, position: Point) -> ActorId {
         self.spawn_swarmer(position)
+    }
+
+    pub fn spawn_baiter_for_test(&mut self, position: Point) -> ActorId {
+        self.spawn_baiter(position)
+    }
+
+    pub fn set_baiter_timer_for_test(&mut self, timer_steps: u32) {
+        self.baiter_timer_steps = Some(timer_steps.max(1));
+        self.baiter_pacing_steps_remaining = 1;
     }
 
     pub fn spawn_human_for_test(&mut self, position: Point) -> ActorId {
@@ -2386,6 +2501,18 @@ impl ActorGameDriver {
     fn spawn_swarmer_from_spawn(&mut self, spawn: ActorSwarmerSpawn) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(Swarmer::from_spawn(id, spawn));
+        id
+    }
+
+    fn spawn_baiter(&mut self, position: Point) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(Baiter::new(id, position));
+        id
+    }
+
+    fn spawn_baiter_from_spawn(&mut self, spawn: ActorBaiterSpawn) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(Baiter::from_spawn(id, spawn));
         id
     }
 
@@ -2533,6 +2660,9 @@ impl ActorGameDriver {
                 GameCommand::Spawn(SpawnRequest::Swarmer { position, source }) => {
                     self.spawn_swarmer_from_spawn(ActorSwarmerSpawn { position, source });
                 }
+                GameCommand::Spawn(SpawnRequest::Baiter { position, source }) => {
+                    self.spawn_baiter_from_spawn(ActorBaiterSpawn { position, source });
+                }
                 GameCommand::Spawn(SpawnRequest::Human { position, mode }) => {
                     self.spawn_human(position, mode);
                 }
@@ -2587,6 +2717,7 @@ impl ActorGameDriver {
                     } else {
                         Phase::GameOver
                     };
+                    self.baiter_timer_steps = None;
                     sounds.push(SoundCue::GameOver);
                 }
             }
@@ -2611,6 +2742,15 @@ impl ActorGameDriver {
             .profile_for_wave(self.wave)
             .behavior_script
             .clone();
+        if self.phase == Phase::Playing {
+            self.reset_baiter_timer();
+        }
+    }
+
+    fn reset_baiter_timer(&mut self) {
+        let source_profile = ActorSourceWaveProfile::for_wave(self.wave.max(1));
+        self.baiter_timer_steps = Some(source_profile.baiter_delay.max(1));
+        self.baiter_pacing_steps_remaining = ACTOR_BAITER_TIMER_PACING_STEPS;
     }
 
     fn spawn_wave_hostiles(&mut self) {
@@ -2681,6 +2821,60 @@ impl ActorGameDriver {
                 })
             })
             .collect()
+    }
+
+    fn advance_baiter_timer(&mut self, commands: &mut Vec<GameCommand>) {
+        if self.phase != Phase::Playing || self.wave == 0 {
+            return;
+        }
+        let enemy_total = self.source_wave_enemy_total();
+        if enemy_total == 0 {
+            return;
+        }
+        let Some(timer_steps) = self.baiter_timer_steps else {
+            return;
+        };
+
+        if self.baiter_pacing_steps_remaining > 1 {
+            self.baiter_pacing_steps_remaining =
+                self.baiter_pacing_steps_remaining.saturating_sub(1);
+            return;
+        }
+        self.baiter_pacing_steps_remaining = ACTOR_BAITER_TIMER_PACING_STEPS;
+
+        let profile = ActorSourceWaveProfile::for_wave(self.wave.max(1));
+        let timer_steps = source_baiter_accelerated_timer_steps(timer_steps, profile, enemy_total);
+        let decremented_steps = timer_steps.saturating_sub(1);
+        if decremented_steps > 0 {
+            self.baiter_timer_steps = Some(decremented_steps);
+            return;
+        }
+
+        self.baiter_timer_steps = Some(source_baiter_reset_timer_steps(profile, enemy_total));
+        let active_baiters = self.snapshot_count(ActorKind::Baiter);
+        if active_baiters >= SOURCE_ACTIVE_BAITER_LIMIT {
+            return;
+        }
+        let Some(player_position) = self
+            .snapshots
+            .values()
+            .find(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive)
+            .map(|snapshot| snapshot.position)
+        else {
+            return;
+        };
+        let spawn = ActorBaiterSpawn::source_from_player(profile, player_position, active_baiters);
+        commands.push(GameCommand::Spawn(SpawnRequest::Baiter {
+            position: spawn.position,
+            source: spawn.source,
+        }));
+    }
+
+    fn source_wave_enemy_total(&self) -> usize {
+        self.snapshots
+            .values()
+            .filter(|snapshot| is_hostile(snapshot.kind))
+            .count()
     }
 
     fn spawn_initial_humans(&mut self) {
@@ -2756,6 +2950,7 @@ fn is_player_laser_target(kind: ActorKind) -> bool {
             | ActorKind::Bomber
             | ActorKind::Pod
             | ActorKind::Swarmer
+            | ActorKind::Baiter
             | ActorKind::EnemyLaser
     )
 }
@@ -2768,6 +2963,7 @@ fn is_player_hazard(kind: ActorKind) -> bool {
             | ActorKind::Bomber
             | ActorKind::Pod
             | ActorKind::Swarmer
+            | ActorKind::Baiter
             | ActorKind::EnemyLaser
     )
 }
@@ -2780,6 +2976,7 @@ fn is_smart_bomb_target(kind: ActorKind) -> bool {
             | ActorKind::Bomber
             | ActorKind::Pod
             | ActorKind::Swarmer
+            | ActorKind::Baiter
             | ActorKind::EnemyLaser
     )
 }
@@ -2804,6 +3001,7 @@ fn score_for_hostile(kind: ActorKind) -> u32 {
         ActorKind::Bomber => BOMBER_SCORE,
         ActorKind::Pod => POD_SCORE,
         ActorKind::Swarmer => SWARMER_SCORE,
+        ActorKind::Baiter => BAITER_SCORE,
         _ => 0,
     }
 }
@@ -2813,7 +3011,33 @@ fn hit_sound_for_hostile(kind: ActorKind) -> SoundCue {
         ActorKind::Bomber => SoundCue::BomberHit,
         ActorKind::Pod => SoundCue::PodHit,
         ActorKind::Swarmer => SoundCue::SwarmerHit,
+        ActorKind::Baiter => SoundCue::BaiterHit,
         _ => SoundCue::Explosion,
+    }
+}
+
+fn source_baiter_accelerated_timer_steps(
+    current_steps: u32,
+    profile: ActorSourceWaveProfile,
+    enemy_total: usize,
+) -> u32 {
+    if enemy_total > 8 {
+        return current_steps;
+    }
+
+    let mut target_steps = profile.baiter_delay / 2;
+    if enemy_total <= 3 {
+        target_steps /= 2;
+    }
+    target_steps = target_steps.saturating_add(1).max(1);
+    current_steps.min(target_steps)
+}
+
+fn source_baiter_reset_timer_steps(profile: ActorSourceWaveProfile, enemy_total: usize) -> u32 {
+    if enemy_total < 4 {
+        (profile.baiter_delay / 4).max(1)
+    } else {
+        profile.baiter_delay.max(1)
     }
 }
 
@@ -2893,6 +3117,7 @@ impl AssetActor for AttractDirector {
                 source_bomber: None,
                 source_pod: None,
                 source_swarmer: None,
+                source_baiter: None,
                 source_human: None,
             },
             commands,
@@ -2944,6 +3169,7 @@ impl AssetActor for ScriptedAttractProgram {
                 source_bomber: None,
                 source_pod: None,
                 source_swarmer: None,
+                source_baiter: None,
                 source_human: None,
             },
             commands: Vec::new(),
@@ -3041,6 +3267,7 @@ impl AssetActor for PlayerShip {
                 source_bomber: None,
                 source_pod: None,
                 source_swarmer: None,
+                source_baiter: None,
                 source_human: None,
             },
             commands,
@@ -3131,6 +3358,7 @@ impl AssetActor for Lander {
                 source_bomber: None,
                 source_pod: None,
                 source_swarmer: None,
+                source_baiter: None,
                 source_human: None,
             },
             commands,
@@ -3440,6 +3668,7 @@ impl AssetActor for Mutant {
                 source_bomber: None,
                 source_pod: None,
                 source_swarmer: None,
+                source_baiter: None,
                 source_human: None,
             },
             commands: Vec::new(),
@@ -3544,6 +3773,7 @@ impl AssetActor for Bomber {
                 source_bomber: self.source,
                 source_pod: None,
                 source_swarmer: None,
+                source_baiter: None,
                 source_human: None,
             },
             commands: Vec::new(),
@@ -3632,6 +3862,7 @@ impl AssetActor for Pod {
                 source_bomber: None,
                 source_pod: self.source,
                 source_swarmer: None,
+                source_baiter: None,
                 source_human: None,
             },
             commands: Vec::new(),
@@ -3728,12 +3959,225 @@ impl AssetActor for Swarmer {
                 source_bomber: None,
                 source_pod: None,
                 source_swarmer: self.source,
+                source_baiter: None,
                 source_human: None,
             },
             commands: Vec::new(),
             draws,
         }
     }
+}
+
+#[derive(Debug)]
+struct Baiter {
+    id: ActorId,
+    position: Point,
+    source: Option<ActorSourceBaiterMetadata>,
+}
+
+impl Baiter {
+    fn new(id: ActorId, position: Point) -> Self {
+        Self::from_spawn(id, ActorBaiterSpawn::new(position))
+    }
+
+    fn from_spawn(id: ActorId, spawn: ActorBaiterSpawn) -> Self {
+        Self {
+            id,
+            position: spawn.position,
+            source: spawn.source,
+        }
+    }
+
+    fn bounds(&self) -> Rect {
+        Rect::from_center(self.position, 12, 4)
+    }
+
+    fn advance_source_motion(
+        &mut self,
+        prompt: &StepPrompt,
+        behavior: ActorBehaviorProfile,
+        commands: &mut Vec<GameCommand>,
+    ) -> bool {
+        let Some(source) = &mut self.source else {
+            return false;
+        };
+
+        if source.sleep_ticks > 0 {
+            source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
+        } else {
+            source.shot_timer = source.shot_timer.wrapping_sub(1);
+            if source.shot_timer == 0 {
+                let profile = ActorSourceWaveProfile::for_wave(prompt.wave.max(1));
+                source.shot_timer = clamped_source_baiter_shot_reset(profile);
+                push_baiter_shot(self.position, prompt, behavior, commands);
+            }
+
+            source.picture_frame = (source.picture_frame + 1) % SOURCE_BAITER_PICTURE_FRAME_COUNT;
+            if source.picture_frame == 0
+                && let Some(player) = prompt.player_position()
+            {
+                let profile = ActorSourceWaveProfile::for_wave(prompt.wave.max(1));
+                source_baiter_velocity_update(
+                    source,
+                    self.position,
+                    profile,
+                    player,
+                    true,
+                    actor_source_motion_seed(prompt.step, self.id),
+                );
+            }
+            source.sleep_ticks = SOURCE_BAITER_LOOP_SLEEP_TICKS;
+        }
+
+        let (x, x_fraction) = actor_source_axis_step(
+            self.position.x,
+            source.x_fraction,
+            actor_source_baiter_screen_x_velocity(source.x_velocity),
+        );
+        let (y, y_fraction) =
+            actor_source_axis_step(self.position.y, source.y_fraction, source.y_velocity);
+        self.position = Point::new(x, y);
+        source.x_fraction = x_fraction;
+        source.y_fraction = y_fraction;
+        true
+    }
+
+    fn draw_effect(&self) -> VisualEffect {
+        self.source
+            .map(|source| VisualEffect::SourceBaiterFrame {
+                frame: source.picture_frame,
+            })
+            .unwrap_or(VisualEffect::Static)
+    }
+}
+
+fn push_baiter_shot(
+    position: Point,
+    prompt: &StepPrompt,
+    behavior: ActorBehaviorProfile,
+    commands: &mut Vec<GameCommand>,
+) {
+    commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
+        position,
+        velocity: baiter_shot_velocity(position, prompt, behavior),
+    }));
+    commands.push(GameCommand::PlaySound(SoundCue::BaiterShot));
+}
+
+fn baiter_shot_velocity(
+    position: Point,
+    prompt: &StepPrompt,
+    behavior: ActorBehaviorProfile,
+) -> Velocity {
+    let speed = behavior.baiter_shot_speed.max(1);
+    if let Some(player) = prompt.player_position() {
+        return Velocity::new(
+            axis_step(player.x - position.x, speed),
+            axis_step(player.y - position.y, speed),
+        );
+    }
+
+    Velocity::new(speed, 0)
+}
+
+impl AssetActor for Baiter {
+    fn id(&self) -> ActorId {
+        self.id
+    }
+
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
+        let mut commands = Vec::new();
+        let mut draws = Vec::new();
+        if prompt.phase == Phase::Playing {
+            let behavior = prompt.behavior_for(self.id, ActorKind::Baiter);
+            if !self.advance_source_motion(prompt, behavior, &mut commands)
+                && let Some(player) = prompt.player_position()
+            {
+                self.position = step_toward(self.position, player, behavior.baiter_seek_speed);
+                let fire_period = behavior.baiter_fire_period_steps.max(1);
+                if prompt.step % fire_period == self.id.value() % fire_period {
+                    push_baiter_shot(self.position, prompt, behavior, &mut commands);
+                }
+            }
+            draws.push(DrawCommand::sprite_with_effect(
+                self.id,
+                SpriteKey::Baiter,
+                self.position,
+                self.draw_effect(),
+            ));
+        }
+
+        ActorReply {
+            id: self.id,
+            snapshot: ActorSnapshot {
+                id: self.id,
+                kind: ActorKind::Baiter,
+                position: self.position,
+                bounds: Some(self.bounds()),
+                alive: prompt.phase == Phase::Playing,
+                source_lander: None,
+                source_bomber: None,
+                source_pod: None,
+                source_swarmer: None,
+                source_baiter: self.source,
+                source_human: None,
+            },
+            commands,
+            draws,
+        }
+    }
+}
+
+fn clamped_source_baiter_shot_reset(profile: ActorSourceWaveProfile) -> u8 {
+    profile.baiter_shot_time.max(1).min(u32::from(u8::MAX)) as u8
+}
+
+fn actor_source_baiter_screen_x_velocity(source_x_velocity: u16) -> u16 {
+    source_x_velocity.wrapping_shl(2)
+}
+
+fn source_baiter_velocity_update(
+    source: &mut ActorSourceBaiterMetadata,
+    position: Point,
+    profile: ActorSourceWaveProfile,
+    player_position: Point,
+    honor_seek_probability: bool,
+    seed: u8,
+) -> bool {
+    if honor_seek_probability && seed <= profile.baiter_seek_probability {
+        return false;
+    }
+
+    let x_delta = position.x - player_position.x;
+    if x_delta.abs() > SOURCE_BAITER_X_SEEK_WINDOW_HALF_PIXELS {
+        let x_seek_byte = if x_delta > 0 {
+            0u8.wrapping_sub(SOURCE_BAITER_X_SEEK_SPEED)
+        } else {
+            SOURCE_BAITER_X_SEEK_SPEED
+        };
+        source.x_velocity = actor_sign_extend_u8_to_u16(x_seek_byte);
+    }
+
+    let y_delta = position.y - player_position.y;
+    if y_delta.abs() > SOURCE_BAITER_Y_SEEK_WINDOW_HALF_PIXELS {
+        let y_seek_byte = if y_delta > 0 {
+            0u8.wrapping_sub(SOURCE_BAITER_Y_SEEK_BYTE)
+        } else {
+            SOURCE_BAITER_Y_SEEK_BYTE
+        };
+        source.y_velocity =
+            actor_arithmetic_shift_right_word(u16::from_be_bytes([y_seek_byte, 0]), 1);
+    }
+
+    true
+}
+
+fn actor_arithmetic_shift_right_word(value: u16, shift: u8) -> u16 {
+    ((value as i16) >> shift.min(15)) as u16
+}
+
+fn actor_source_motion_seed(step: u64, id: ActorId) -> u8 {
+    (step as u8).wrapping_mul(17).wrapping_add(id.value() as u8)
 }
 
 fn swarmer_seek_velocity(current_velocity: u16, delta: i16) -> u16 {
@@ -3943,6 +4387,7 @@ impl AssetActor for Human {
                 source_bomber: None,
                 source_pod: None,
                 source_swarmer: None,
+                source_baiter: None,
                 source_human: self.source,
             },
             commands,
@@ -4027,6 +4472,7 @@ impl AssetActor for ScorePopup {
                 source_bomber: None,
                 source_pod: None,
                 source_swarmer: None,
+                source_baiter: None,
                 source_human: None,
             },
             commands,
@@ -4095,6 +4541,7 @@ impl AssetActor for LaserShot {
                 source_bomber: None,
                 source_pod: None,
                 source_swarmer: None,
+                source_baiter: None,
                 source_human: None,
             },
             commands,
@@ -4164,6 +4611,7 @@ impl AssetActor for EnemyLaserShot {
                 source_bomber: None,
                 source_pod: None,
                 source_swarmer: None,
+                source_baiter: None,
                 source_human: None,
             },
             commands,
@@ -4222,6 +4670,7 @@ impl AssetActor for Explosion {
                 source_bomber: None,
                 source_pod: None,
                 source_swarmer: None,
+                source_baiter: None,
                 source_human: None,
             },
             commands,
@@ -4549,6 +4998,10 @@ mod tests {
     fn default_wave_script_uses_source_wave_table_values() {
         let script = ActorWaveScript::default_progression();
         assert_eq!(script.name(), "actor-source-wave-table");
+        let first_source = ActorSourceWaveProfile::for_wave(1);
+        assert_eq!(first_source.baiter_delay, 192);
+        assert_eq!(first_source.baiter_shot_time, 10);
+        assert_eq!(first_source.baiter_seek_probability, 200);
 
         let first = script.profile_for_wave(1);
         let first_lander = first
@@ -5143,6 +5596,101 @@ mod tests {
     }
 
     #[test]
+    fn behavior_script_can_define_baiter_motion() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_player();
+        driver.step(GameInput::NONE);
+        driver.set_kind_behavior(
+            ActorKind::Baiter,
+            ActorBehaviorProfile {
+                baiter_seek_speed: 6,
+                baiter_fire_period_steps: u64::MAX,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        let baiter = driver.spawn_baiter_for_test(Point::new(70, 120));
+
+        let report = driver.step(GameInput::NONE);
+
+        assert_eq!(snapshot_for(&report, baiter).position, Point::new(64, 120));
+    }
+
+    #[test]
+    fn baiter_timer_spawns_source_baiter_from_wave_profile() {
+        let mut driver = started_driver();
+
+        driver.set_baiter_timer_for_test(1);
+        let report = driver.step(GameInput::NONE);
+
+        let baiter_spawn = report
+            .commands
+            .iter()
+            .find_map(|command| match command {
+                GameCommand::Spawn(SpawnRequest::Baiter { position, source }) => {
+                    Some((*position, *source))
+                }
+                _ => None,
+            })
+            .expect("expired baiter timer should spawn a baiter");
+        assert_eq!(
+            baiter_spawn,
+            (
+                Point::new(228, 144),
+                Some(ActorSourceBaiterMetadata {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0xFFC0,
+                    y_velocity: 0xFF80,
+                    shot_timer: SOURCE_BAITER_INITIAL_SHOT_TIMER,
+                    sleep_ticks: 0,
+                    picture_frame: 0,
+                })
+            )
+        );
+
+        let live = driver.step(GameInput::NONE);
+        assert_eq!(driver.snapshot_count(ActorKind::Baiter), 1);
+        assert!(live.snapshots.iter().any(|snapshot| {
+            snapshot.kind == ActorKind::Baiter
+                && snapshot.position == Point::new(227, 143)
+                && snapshot.source_baiter
+                    == Some(ActorSourceBaiterMetadata {
+                        x_fraction: 0,
+                        y_fraction: 0x80,
+                        x_velocity: 0xFFC0,
+                        y_velocity: 0xFF80,
+                        shot_timer: 7,
+                        sleep_ticks: SOURCE_BAITER_LOOP_SLEEP_TICKS,
+                        picture_frame: 1,
+                    })
+        }));
+        assert!(live.draws.iter().any(|draw| {
+            draw.sprite == SpriteKey::Baiter
+                && matches!(draw.effect, VisualEffect::SourceBaiterFrame { frame: 1 })
+        }));
+    }
+
+    #[test]
+    fn baiter_does_not_block_wave_completion() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 1;
+        driver.reset_baiter_timer();
+        let baiter = driver.spawn_baiter_for_test(Point::new(100, 100));
+
+        let cleared = driver.step(GameInput::NONE);
+
+        assert!(snapshot_for(&cleared, baiter).alive);
+        assert_eq!(cleared.wave, 2);
+        assert!(
+            cleared
+                .commands
+                .contains(&GameCommand::AdvanceWave { wave: 2 })
+        );
+    }
+
+    #[test]
     fn wave_script_applies_behavior_when_play_starts() {
         let lander_behavior = ActorBehaviorProfile {
             lander_seek_speed: 5,
@@ -5596,6 +6144,29 @@ mod tests {
             live.draws
                 .iter()
                 .any(|draw| draw.sprite == SpriteKey::Swarmer)
+        );
+    }
+
+    #[test]
+    fn driver_resolves_laser_baiter_collision_with_source_score_sound_and_explosion() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_player();
+        driver.spawn_baiter_for_test(Point::new(62, 120));
+
+        driver.step(GameInput {
+            fire: true,
+            ..GameInput::NONE
+        });
+        let collision = driver.step(GameInput::NONE);
+
+        assert_eq!(collision.score, BAITER_SCORE);
+        assert!(collision.sounds.contains(&SoundCue::BaiterHit));
+        assert_eq!(driver.snapshot_count(ActorKind::Baiter), 0);
+        assert!(
+            collision
+                .commands
+                .contains(&GameCommand::AddScore(BAITER_SCORE))
         );
     }
 
