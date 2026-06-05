@@ -6408,7 +6408,7 @@ impl ActorRenderSceneBridge {
             && report.player_start.is_none()
             && report.terrain_blow.is_none()
         {
-            push_source_bgout_terrain_sprites(&mut scene);
+            push_source_bgout_terrain_sprites(&mut scene, report.source_background_left);
         }
         for draw in &report.draws {
             self.push_draw(&mut scene, report.phase, draw);

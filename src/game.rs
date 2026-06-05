@@ -12463,7 +12463,10 @@ impl Game {
             .terrain_blow
             .is_some_and(TerrainBlowSnapshot::terrain_erased);
         if show_playfield && !terrain_erased {
-            push_source_bgout_terrain_sprites(&mut scene);
+            push_source_bgout_terrain_sprites(
+                &mut scene,
+                source_word_from_world_vector(self.camera_left),
+            );
         }
         if self.state.phase != GamePhase::Attract || self.state.post_game_playfield.is_some() {
             push_score_sprites(&mut scene, self.state.scores, self.state.player_count);
@@ -13740,8 +13743,8 @@ struct SourceTerrainGenerationState {
     flavor_1_pointer: usize,
 }
 
-pub(crate) fn push_source_bgout_terrain_sprites(scene: &mut RenderScene) {
-    for record in source_bgout_default_terrain_records() {
+pub(crate) fn push_source_bgout_terrain_sprites(scene: &mut RenderScene, background_left: u16) {
+    for record in source_bgout_terrain_records(background_left) {
         scene.push_sprite(SceneSprite {
             sprite: source_terrain_word_sprite(record.word),
             layer: RenderLayer::Terrain,
@@ -13764,7 +13767,17 @@ fn source_bgout_default_terrain_records()
 -> &'static [SourceTerrainDrawRecord; SOURCE_TERRAIN_SCREEN_WORDS] {
     static RECORDS: OnceLock<[SourceTerrainDrawRecord; SOURCE_TERRAIN_SCREEN_WORDS]> =
         OnceLock::new();
-    RECORDS.get_or_init(source_generate_bgout_default_terrain_records)
+    RECORDS.get_or_init(|| source_generate_bgout_terrain_records(0))
+}
+
+fn source_bgout_terrain_records(
+    background_left: u16,
+) -> [SourceTerrainDrawRecord; SOURCE_TERRAIN_SCREEN_WORDS] {
+    let terrain_left = source_bgout_terrain_left(background_left);
+    if terrain_left == 0 {
+        return *source_bgout_default_terrain_records();
+    }
+    source_generate_bgout_terrain_records(terrain_left)
 }
 
 fn source_scanner_mini_terrain_records()
@@ -13784,10 +13797,12 @@ fn source_scanner_mini_terrain_records_for_scan_left(
     source_generate_scanner_mini_terrain_records(scan_left)
 }
 
-fn source_generate_bgout_default_terrain_records()
--> [SourceTerrainDrawRecord; SOURCE_TERRAIN_SCREEN_WORDS] {
+fn source_generate_bgout_terrain_records(
+    terrain_left: u16,
+) -> [SourceTerrainDrawRecord; SOURCE_TERRAIN_SCREEN_WORDS] {
     let data = source_tdata_bytes();
-    let (flavor_0, flavor_1, state) = source_initialize_terrain_flavor_tables(data);
+    let terrain_left = source_bgout_terrain_left(terrain_left);
+    let (flavor_0, flavor_1, state) = source_initialize_terrain_flavor_tables(data, terrain_left);
     let selected_flavor = if state.terrain_left.to_be_bytes()[1] & 0x20 == 0 {
         &flavor_1
     } else {
@@ -13816,6 +13831,10 @@ fn source_generate_bgout_default_terrain_records()
     records
 }
 
+const fn source_bgout_terrain_left(background_left: u16) -> u16 {
+    background_left & 0xFFE0
+}
+
 fn source_generate_scanner_mini_terrain_records(
     scan_left: u16,
 ) -> [SourceScannerTerrainRecord; SOURCE_SCANNER_TERRAIN_RECORDS] {
@@ -13842,13 +13861,13 @@ fn source_generate_scanner_mini_terrain_records(
 
 fn source_initialize_terrain_flavor_tables(
     data: &[u8; SOURCE_TERRAIN_TDATA_BYTES],
+    terrain_left: u16,
 ) -> (
     [SourceTerrainFlavorRecord; SOURCE_TERRAIN_FLAVOR_RECORDS],
     [SourceTerrainFlavorRecord; SOURCE_TERRAIN_FLAVOR_RECORDS],
     SourceTerrainGenerationState,
 ) {
     let (right, right_offset) = source_alinit_final_terrain_state(data);
-    let terrain_left = 0u16;
     let mut generation_left = terrain_left.wrapping_add(0x2610);
     let mut left = SourceTerrainBitState {
         data_index: data.len() - 1,
@@ -13860,11 +13879,18 @@ fn source_initialize_terrain_flavor_tables(
     source_advance_terrain_right_state(&mut left, data);
 
     let mut scan_x = 0x0010u16;
-    while scan_x != generation_left {
+    for _ in 0..=0x0800 {
+        if scan_x == generation_left {
+            break;
+        }
         left_offset = source_terrain_altitude_step(left_offset, left.data_byte);
         source_advance_terrain_right_state(&mut left, data);
         scan_x = scan_x.wrapping_add(0x20);
     }
+    assert_eq!(
+        scan_x, generation_left,
+        "BGINIT terrain stream must align to BGLX 0x{generation_left:04X}"
+    );
 
     let saved_right = left;
     let saved_right_offset = left_offset;
@@ -17689,6 +17715,41 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "legacy-tools")]
+    #[test]
+    fn source_bgout_terrain_records_match_translated_bgout_for_nonzero_bgl() {
+        let background_left = 0xC4C0;
+        let records = super::source_bgout_terrain_records(background_left);
+        let mut machine = crate::machine::ArcadeMachine::new();
+        machine.red_label_write_ram_byte_for_test(0xA020, 0xC4);
+        machine.red_label_write_ram_byte_for_test(0xA021, 0xC0);
+
+        machine
+            .red_label_initialize_altitude_table()
+            .expect("translated ALINIT altitude table");
+        machine
+            .red_label_initialize_terrain_tables()
+            .expect("translated BGINIT terrain tables");
+        let output = machine
+            .red_label_output_terrain(0x1234)
+            .expect("translated BGOUT terrain output");
+
+        assert_eq!(output.background_left, background_left);
+        assert_eq!(output.terrain_generation_left, background_left);
+        assert_eq!(output.first_screen_address, records[0].screen_address);
+        for (entry_index, record) in records.iter().take(12).enumerate() {
+            let table_entry = output.screen_table_start + entry_index as u16 * 2;
+            assert_eq!(
+                read_red_label_word(&machine, table_entry),
+                record.screen_address
+            );
+            assert_eq!(
+                read_red_label_word(&machine, record.screen_address),
+                record.word
+            );
+        }
+    }
+
     #[test]
     fn source_scanner_mini_terrain_records_match_reference_slice() {
         let records = super::source_scanner_mini_terrain_records();
@@ -17735,6 +17796,14 @@ mod tests {
             &super::source_mterr_bytes()[..9],
             &[0x25, 0x70, 0x07, 0x26, 0x77, 0x00, 0x26, 0x07, 0x70]
         );
+    }
+
+    #[cfg(feature = "legacy-tools")]
+    fn read_red_label_word(machine: &crate::machine::ArcadeMachine, address: u16) -> u16 {
+        let bytes = machine
+            .red_label_ram_range(address..address.wrapping_add(2))
+            .expect("red-label word range");
+        u16::from_be_bytes([bytes[0], bytes[1]])
     }
 
     #[test]
@@ -27485,6 +27554,9 @@ mod tests {
         let mut game = credited_started_game();
 
         let frame = game.step(GameInput::NONE);
+        let expected_records = super::source_bgout_terrain_records(
+            super::source_word_from_world_vector(game.camera_left),
+        );
         let terrain_sprites = frame
             .scene
             .sprites
@@ -27493,16 +27565,28 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(terrain_sprites.len(), super::SOURCE_TERRAIN_SCREEN_WORDS);
-        assert_eq!(terrain_sprites[0].sprite, SpriteId::TERRAIN_TILE);
-        assert_eq!(terrain_sprites[0].position, [304.0, 222.0]);
+        assert_eq!(
+            terrain_sprites[0].sprite,
+            super::source_terrain_word_sprite(expected_records[0].word)
+        );
+        assert_eq!(
+            terrain_sprites[0].position,
+            super::source_screen_position(expected_records[0].screen_address)
+        );
         assert_eq!(terrain_sprites[0].size, super::SOURCE_TERRAIN_WORD_SIZE);
         assert_eq!(terrain_sprites[0].tint, Color::WHITE);
         assert_eq!(
             terrain_sprites[1].position[0] + terrain_sprites[1].size[0],
             terrain_sprites[0].position[0]
         );
-        assert_eq!(terrain_sprites[6].sprite, SpriteId::TERRAIN_TILE_ALT);
-        assert_eq!(terrain_sprites[6].position, [292.0, 215.0]);
+        assert_eq!(
+            terrain_sprites[6].sprite,
+            super::source_terrain_word_sprite(expected_records[6].word)
+        );
+        assert_eq!(
+            terrain_sprites[6].position,
+            super::source_screen_position(expected_records[6].screen_address)
+        );
         assert!(
             terrain_sprites
                 .iter()
