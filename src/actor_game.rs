@@ -2321,7 +2321,12 @@ pub enum VisualEffect {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExplosionKind {
-    Enemy,
+    Lander,
+    Mutant,
+    Bomber,
+    Pod,
+    Swarmer,
+    Baiter,
     Bomb,
     Player,
     Human,
@@ -3339,7 +3344,12 @@ fn actor_explosions_for_report(report: &StepReport) -> Vec<CleanExplosionSnapsho
 
 fn clean_explosion_kind(kind: ExplosionKind) -> CleanExplosionKind {
     match kind {
-        ExplosionKind::Enemy => CleanExplosionKind::Lander,
+        ExplosionKind::Lander => CleanExplosionKind::Lander,
+        ExplosionKind::Mutant => CleanExplosionKind::Mutant,
+        ExplosionKind::Bomber => CleanExplosionKind::Bomber,
+        ExplosionKind::Pod => CleanExplosionKind::Pod,
+        ExplosionKind::Swarmer => CleanExplosionKind::Swarmer,
+        ExplosionKind::Baiter => CleanExplosionKind::Baiter,
         ExplosionKind::Bomb => CleanExplosionKind::Bomb,
         ExplosionKind::Player => CleanExplosionKind::PlayerShip,
         ExplosionKind::Human => CleanExplosionKind::Astronaut,
@@ -3553,7 +3563,12 @@ impl ActorRenderSceneBridge {
 
     fn push_explosion_sprite(&self, scene: &mut RenderScene, position: Point, kind: ExplosionKind) {
         let (sprite, size) = match kind {
-            ExplosionKind::Enemy => (SpriteId::SWARMER_EXPLOSION, EXPLOSION_SCENE_SIZE),
+            ExplosionKind::Lander => (SpriteId::ENEMY_LANDER, LANDER_SCENE_SIZE),
+            ExplosionKind::Mutant => (SpriteId::ENEMY_MUTANT, MUTANT_SCENE_SIZE),
+            ExplosionKind::Bomber => (SpriteId::ENEMY_BOMBER, BOMBER_SCENE_SIZE),
+            ExplosionKind::Pod => (SpriteId::ENEMY_POD, POD_SCENE_SIZE),
+            ExplosionKind::Swarmer => (SpriteId::SWARMER_EXPLOSION, EXPLOSION_SCENE_SIZE),
+            ExplosionKind::Baiter => (SpriteId::ENEMY_BAITER, BAITER_SCENE_SIZE),
             ExplosionKind::Bomb => (SpriteId::BOMB_EXPLOSION, EXPLOSION_SCENE_SIZE),
             ExplosionKind::Human => (SpriteId::ASTRONAUT_EXPLOSION, EXPLOSION_SCENE_SIZE),
             ExplosionKind::Player => (
@@ -4324,10 +4339,12 @@ impl ActorGameDriver {
                     destroyed.insert(enemy.owner);
                     commands.push(GameCommand::Destroy(laser.owner));
                     commands.push(GameCommand::Destroy(enemy.owner));
-                    commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
-                        position: center_of(enemy.bounds),
-                        kind: explosion_kind_for_target(enemy.kind),
-                    }));
+                    if let Some(kind) = explosion_kind_for_target(enemy.kind) {
+                        commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
+                            position: center_of(enemy.bounds),
+                            kind,
+                        }));
+                    }
                     commands.push(GameCommand::AddScore(score_for_hostile(enemy.kind)));
                     commands.push(GameCommand::PlaySound(hit_sound_for_hostile(enemy.kind)));
                     if enemy.kind == ActorKind::Pod {
@@ -4365,10 +4382,12 @@ impl ActorGameDriver {
                 commands.push(GameCommand::Destroy(player.owner));
                 commands.push(GameCommand::Destroy(enemy.owner));
                 if is_player_enemy_collision_target(enemy.kind) {
-                    commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
-                        position: actor_player_enemy_collision_explosion_position(enemy),
-                        kind: explosion_kind_for_target(enemy.kind),
-                    }));
+                    if let Some(kind) = explosion_kind_for_target(enemy.kind) {
+                        commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
+                            position: actor_player_enemy_collision_explosion_position(enemy),
+                            kind,
+                        }));
+                    }
                     commands.push(GameCommand::AddScore(score_for_hostile(enemy.kind)));
                     commands.push(GameCommand::PlaySound(hit_sound_for_hostile(enemy.kind)));
                 }
@@ -4779,7 +4798,9 @@ impl ActorGameDriver {
             self.snapshots.remove(&id);
             self.actors.remove(&id);
             self.behavior_script.remove_actor_behavior(id);
-            self.spawn_explosion(position, explosion_kind_for_target(kind));
+            if let Some(explosion_kind) = explosion_kind_for_target(kind) {
+                self.spawn_explosion(position, explosion_kind);
+            }
             self.score = self.score.saturating_add(score_for_hostile(kind));
             sounds.push(SoundCue::Explosion);
         }
@@ -4967,11 +4988,18 @@ fn player_hazard_sound(kind: ActorKind) -> SoundCue {
     }
 }
 
-fn explosion_kind_for_target(kind: ActorKind) -> ExplosionKind {
-    match kind {
-        ActorKind::Bomb => ExplosionKind::Bomb,
-        _ => ExplosionKind::Enemy,
-    }
+fn explosion_kind_for_target(kind: ActorKind) -> Option<ExplosionKind> {
+    let kind = match kind {
+        ActorKind::Lander => ExplosionKind::Lander,
+        ActorKind::Mutant => ExplosionKind::Mutant,
+        ActorKind::Bomber => ExplosionKind::Bomber,
+        ActorKind::Pod => ExplosionKind::Pod,
+        ActorKind::Swarmer => ExplosionKind::Swarmer,
+        ActorKind::Baiter => ExplosionKind::Baiter,
+        ActorKind::Bomb | ActorKind::EnemyLaser => ExplosionKind::Bomb,
+        _ => return None,
+    };
+    Some(kind)
 }
 
 fn player_hazard_explosion_kind(kind: ActorKind) -> ExplosionKind {
@@ -8572,14 +8600,68 @@ mod tests {
                 DrawCommand::sprite_with_effect(
                     ActorId(103),
                     SpriteKey::Explosion,
+                    Point::new(104, 82),
+                    VisualEffect::ExplosionCloud {
+                        kind: ExplosionKind::Lander,
+                        age: 1,
+                    },
+                ),
+                DrawCommand::sprite_with_effect(
+                    ActorId(104),
+                    SpriteKey::Explosion,
+                    Point::new(108, 84),
+                    VisualEffect::ExplosionCloud {
+                        kind: ExplosionKind::Mutant,
+                        age: 1,
+                    },
+                ),
+                DrawCommand::sprite_with_effect(
+                    ActorId(105),
+                    SpriteKey::Explosion,
+                    Point::new(112, 86),
+                    VisualEffect::ExplosionCloud {
+                        kind: ExplosionKind::Bomber,
+                        age: 1,
+                    },
+                ),
+                DrawCommand::sprite_with_effect(
+                    ActorId(106),
+                    SpriteKey::Explosion,
+                    Point::new(116, 88),
+                    VisualEffect::ExplosionCloud {
+                        kind: ExplosionKind::Pod,
+                        age: 1,
+                    },
+                ),
+                DrawCommand::sprite_with_effect(
+                    ActorId(107),
+                    SpriteKey::Explosion,
                     Point::new(120, 90),
+                    VisualEffect::ExplosionCloud {
+                        kind: ExplosionKind::Swarmer,
+                        age: 1,
+                    },
+                ),
+                DrawCommand::sprite_with_effect(
+                    ActorId(108),
+                    SpriteKey::Explosion,
+                    Point::new(122, 92),
+                    VisualEffect::ExplosionCloud {
+                        kind: ExplosionKind::Baiter,
+                        age: 1,
+                    },
+                ),
+                DrawCommand::sprite_with_effect(
+                    ActorId(109),
+                    SpriteKey::Explosion,
+                    Point::new(124, 94),
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Bomb,
                         age: 2,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
-                    ActorId(104),
+                    ActorId(110),
                     SpriteKey::Explosion,
                     Point::new(124, 96),
                     VisualEffect::ExplosionCloud {
@@ -8588,7 +8670,7 @@ mod tests {
                     },
                 ),
                 DrawCommand::sprite_with_effect(
-                    ActorId(105),
+                    ActorId(111),
                     SpriteKey::Explosion,
                     Point::new(128, 100),
                     VisualEffect::ExplosionCloud {
@@ -8614,6 +8696,21 @@ mod tests {
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ENEMY_BOMB && sprite.layer == RenderLayer::Projectiles
         }));
+        for sprite_id in [
+            SpriteId::ENEMY_LANDER,
+            SpriteId::ENEMY_MUTANT,
+            SpriteId::ENEMY_BOMBER,
+            SpriteId::ENEMY_POD,
+            SpriteId::SWARMER_EXPLOSION,
+            SpriteId::ENEMY_BAITER,
+        ] {
+            assert!(
+                scene.sprites.iter().any(
+                    |sprite| sprite.sprite == sprite_id && sprite.layer == RenderLayer::Objects
+                ),
+                "missing actor explosion sprite {sprite_id:?}"
+            );
+        }
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::BOMB_EXPLOSION && sprite.layer == RenderLayer::Objects
         }));
@@ -8696,7 +8793,7 @@ mod tests {
                     SpriteKey::Explosion,
                     Point::new(120, 90),
                     VisualEffect::ExplosionCloud {
-                        kind: ExplosionKind::Enemy,
+                        kind: ExplosionKind::Lander,
                         age: 0,
                     },
                 ),
@@ -8793,6 +8890,66 @@ mod tests {
         assert_eq!(
             state.world.score_popups[0].kind,
             CleanScorePopupKind::Points500
+        );
+    }
+
+    #[test]
+    fn actor_state_bridge_preserves_enemy_family_explosion_kinds() {
+        let draws = [
+            (ExplosionKind::Lander, Point::new(20, 40)),
+            (ExplosionKind::Mutant, Point::new(24, 44)),
+            (ExplosionKind::Bomber, Point::new(28, 48)),
+            (ExplosionKind::Pod, Point::new(32, 52)),
+            (ExplosionKind::Swarmer, Point::new(36, 56)),
+            (ExplosionKind::Baiter, Point::new(40, 60)),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(index, (kind, position))| {
+            DrawCommand::sprite_with_effect(
+                ActorId(200 + index as u64),
+                SpriteKey::Explosion,
+                position,
+                VisualEffect::ExplosionCloud { kind, age: 0 },
+            )
+        })
+        .collect::<Vec<_>>();
+
+        let report = StepReport {
+            step: 101,
+            phase: Phase::Playing,
+            wave: 3,
+            score: 0,
+            credits: 0,
+            lives: 3,
+            smart_bombs: 3,
+            high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
+            high_score_initials: HighScoreInitialsState::EMPTY,
+            behavior_script: ActorBehaviorScript::default().manifest(),
+            source_rng: None,
+            snapshots: Vec::new(),
+            draws,
+            sounds: Vec::new(),
+            commands: Vec::new(),
+        };
+
+        let kinds = report
+            .game_state()
+            .world
+            .explosions
+            .iter()
+            .map(|explosion| explosion.kind)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            kinds,
+            [
+                CleanExplosionKind::Lander,
+                CleanExplosionKind::Mutant,
+                CleanExplosionKind::Bomber,
+                CleanExplosionKind::Pod,
+                CleanExplosionKind::Swarmer,
+                CleanExplosionKind::Baiter,
+            ]
         );
     }
 
@@ -12762,7 +12919,7 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(explosions.contains(&(
             SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER,
-            ExplosionKind::Enemy,
+            ExplosionKind::Mutant,
         )));
         assert!(explosions.contains(&(player_position, ExplosionKind::Player)));
     }
@@ -12856,7 +13013,7 @@ mod tests {
             matches!(
                 command,
                 GameCommand::Spawn(SpawnRequest::Explosion {
-                    kind: ExplosionKind::Enemy,
+                    kind: ExplosionKind::Lander,
                     ..
                 })
             )

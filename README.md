@@ -176,7 +176,8 @@ death-risk path. Player hazard collisions now decrement driver-owned life stock
 and respawn a replacement player when lives remain, while final-life hits still
 enter game-over/high-score flow. Baiters do not block wave
 completion once source-counted wave enemies are gone, and explosion draws carry
-enemy/bomb/player/human variant metadata for later source sprite mapping.
+lander, mutant, bomber, pod, swarmer, baiter, bomb, player, and human variant
+metadata through the actor render and clean-state bridges.
 `XYZZY` invincibility and overlay smart bombs are applied through the same
 driver-controlled behavior and command paths used by scripts. See
 `docs/actor-architecture.md` for the C++-to-Rust mapping and migration shape.

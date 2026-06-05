@@ -816,8 +816,9 @@ reintroduce legacy implementation terminology.
   advancement and default/kind player-behavior injection, life-stock decrement
   and replacement-player respawn on non-final player hazard collisions, source
   `HYP2` `LSEED > 0xC0` delayed death-risk routing through the same player
-  death path, final-life game-over/high-score handoff, enemy/bomb/player/human
-  explosion variant draw metadata, and mutant spawn handoff. Default
+  death path, final-life game-over/high-score handoff, source-family explosion
+  variant draw metadata for hostile families, bomb, player, and human clouds,
+  and mutant spawn handoff. Default
   interactive play now reaches this actor path through `ActorRuntimeAdapter`.
 
 ## Compatibility Features

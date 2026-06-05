@@ -86,8 +86,8 @@ verification tools.
   command path without consuming stock. Player hazard collisions now decrement
   driver-owned life stock and spawn a replacement player while lives remain,
   with final-life collisions entering the game-over/high-score path. Explosion
-  draws now carry enemy/bomb/player/human variant metadata for later source
-  sprite mapping.
+  draws now carry lander, mutant, bomber, pod, swarmer, baiter, bomb, player,
+  and human variant metadata through the actor render and clean-state bridges.
 - Primary runtime source is `src/`; the converted implementation is parked in
   `src_legacy/` and should remain optional oracle/tooling evidence only.
 - Normal live play uses clean `Game` frames through clean platform, audio, and
@@ -736,6 +736,32 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 10:27 BST`: Completed the actor source-family explosion fidelity
+  slice. Actor `ExplosionKind` now preserves source-family identity for lander,
+  mutant, bomber, pod, swarmer, baiter, bomb, player, and human explosion
+  clouds instead of collapsing hostile explosions to one generic enemy bucket.
+  Actor collision and smart-bomb commands now emit family-specific explosion
+  kinds, the actor clean-state bridge maps them into the clean
+  `ExplosionKind` contract, and `ActorRenderSceneBridge` maps those variants to
+  renderer-owned source-backed family sprites. Enemy-fire clears now use the
+  bomb-shell explosion family instead of a false lander-family fallback. Added
+  focused regressions for actor render-scene explosion family sprites and clean
+  state bridge family preservation, and updated the existing target6, lander
+  collision, and explosion metadata expectations. Validation passed with
+  `cargo fmt --check`, focused actor render/state/explosion/lander-collision
+  tests, `cargo test actor_game::tests::target6 --lib`, `cargo test
+  actor_game --all-targets --features legacy-tools`, `cargo test actor_live
+  --all-targets --features legacy-tools`, `cargo test actor_smoke
+  --all-targets --features legacy-tools`, `cargo check --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features
+  legacy-tools -- -D warnings`, touched-doc markdownlint, and `git diff
+  --check`. A broad diagnostic `cargo test explosion --lib` still picks up two
+  unchanged clean-runtime target6 MAME tests in `src/game.rs`; all actor tests
+  in that filter passed, so this remains the known clean-runtime target6
+  validation caveat rather than actor-slice evidence. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780651173143849`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780651614387479`.
 - `2026-06-05 10:13 BST`: Completed the actor target6
   converted-mutant collision fidelity slice. The actor `CollisionBody` now
   carries raw actor position plus source-mutant metadata, target6 mutant bounds
