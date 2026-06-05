@@ -2053,6 +2053,7 @@ pub enum SoundCue {
     Hyperspace,
     HyperspaceMaterialize,
     Explosion,
+    LanderHit,
     LanderPickup,
     HumanPulled,
     HumanReleased,
@@ -2060,15 +2061,51 @@ pub enum SoundCue {
     HumanSafeLanding,
     HumanLost,
     MutantSpawn,
+    MutantHit,
     BomberHit,
     BombHit,
     PodHit,
     SwarmerHit,
+    LanderShot,
     SwarmerShot,
     BaiterHit,
     BaiterShot,
     AttractPulse,
     GameOver,
+}
+
+impl SoundCue {
+    pub const fn source_sound_command(self) -> Option<u8> {
+        match self {
+            Self::Credit => Some(0xE6),
+            Self::Start => Some(0xF5),
+            Self::Thrust => Some(0xE9),
+            Self::Laser => Some(0xEB),
+            Self::SmartBomb => Some(0xEE),
+            Self::Hyperspace => None,
+            Self::HyperspaceMaterialize => Some(0xEA),
+            Self::Explosion => Some(0xEE),
+            Self::LanderHit => Some(0xF9),
+            Self::LanderPickup => Some(0xF4),
+            Self::HumanPulled => Some(0xF1),
+            Self::HumanReleased => None,
+            Self::HumanRescued => Some(0xF7),
+            Self::HumanSafeLanding => Some(0xE0),
+            Self::HumanLost => Some(0xEE),
+            Self::MutantSpawn => Some(0xEE),
+            Self::MutantHit => Some(0xE8),
+            Self::BomberHit => Some(0xFE),
+            Self::BombHit => Some(0xEE),
+            Self::PodHit => Some(0xFA),
+            Self::SwarmerHit => Some(0xF8),
+            Self::LanderShot => Some(0xFC),
+            Self::SwarmerShot => Some(0xF3),
+            Self::BaiterHit => Some(0xF8),
+            Self::BaiterShot => Some(0xFC),
+            Self::AttractPulse => None,
+            Self::GameOver => Some(0xEC),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -3431,6 +3468,8 @@ fn score_for_hostile(kind: ActorKind) -> u32 {
 
 fn hit_sound_for_hostile(kind: ActorKind) -> SoundCue {
     match kind {
+        ActorKind::Lander => SoundCue::LanderHit,
+        ActorKind::Mutant => SoundCue::MutantHit,
         ActorKind::Bomber => SoundCue::BomberHit,
         ActorKind::Bomb => SoundCue::BombHit,
         ActorKind::Pod => SoundCue::PodHit,
@@ -4223,7 +4262,7 @@ impl Lander {
             position: self.position,
             velocity: self.lander_shot_velocity(prompt, behavior),
         }));
-        commands.push(GameCommand::PlaySound(SoundCue::Laser));
+        commands.push(GameCommand::PlaySound(SoundCue::LanderShot));
     }
 
     fn lander_shot_velocity(
@@ -5547,6 +5586,47 @@ mod tests {
     use super::*;
 
     #[test]
+    fn actor_sound_cues_expose_red_label_sound_commands() {
+        let expected = [
+            (SoundCue::Credit, 0xE6),
+            (SoundCue::Start, 0xF5),
+            (SoundCue::Thrust, 0xE9),
+            (SoundCue::Laser, 0xEB),
+            (SoundCue::SmartBomb, 0xEE),
+            (SoundCue::HyperspaceMaterialize, 0xEA),
+            (SoundCue::Explosion, 0xEE),
+            (SoundCue::LanderHit, 0xF9),
+            (SoundCue::LanderPickup, 0xF4),
+            (SoundCue::HumanPulled, 0xF1),
+            (SoundCue::HumanRescued, 0xF7),
+            (SoundCue::HumanSafeLanding, 0xE0),
+            (SoundCue::HumanLost, 0xEE),
+            (SoundCue::MutantSpawn, 0xEE),
+            (SoundCue::MutantHit, 0xE8),
+            (SoundCue::BomberHit, 0xFE),
+            (SoundCue::BombHit, 0xEE),
+            (SoundCue::PodHit, 0xFA),
+            (SoundCue::SwarmerHit, 0xF8),
+            (SoundCue::LanderShot, 0xFC),
+            (SoundCue::SwarmerShot, 0xF3),
+            (SoundCue::BaiterHit, 0xF8),
+            (SoundCue::BaiterShot, 0xFC),
+            (SoundCue::GameOver, 0xEC),
+        ];
+
+        for (cue, command) in expected {
+            assert_eq!(cue.source_sound_command(), Some(command), "{cue:?}");
+        }
+        for cue in [
+            SoundCue::Hyperspace,
+            SoundCue::HumanReleased,
+            SoundCue::AttractPulse,
+        ] {
+            assert_eq!(cue.source_sound_command(), None, "{cue:?}");
+        }
+    }
+
+    #[test]
     fn attract_actor_accepts_credit_and_start_commands() {
         let mut driver = ActorGameDriver::new();
 
@@ -6321,7 +6401,7 @@ mod tests {
     }
 
     #[test]
-    fn source_lander_shot_timer_controls_first_wave_laser_sound() {
+    fn source_lander_shot_timer_controls_first_wave_shot_sound() {
         let mut driver = ActorGameDriver::new();
         driver.step(GameInput {
             coin: true,
@@ -6342,7 +6422,7 @@ mod tests {
                 },
                 ..GameInput::NONE
             });
-            if report.sounds.contains(&SoundCue::Laser) {
+            if report.sounds.contains(&SoundCue::LanderShot) {
                 first_laser_step = Some(live_step);
                 break;
             }
@@ -6382,7 +6462,7 @@ mod tests {
         }
         let shot_report = shot_report.expect("source lander should spawn a hostile shot");
 
-        assert!(shot_report.sounds.contains(&SoundCue::Laser));
+        assert!(shot_report.sounds.contains(&SoundCue::LanderShot));
         let settled = driver.step(GameInput {
             xyzzy: XyzzyMode {
                 active: true,
@@ -7623,7 +7703,7 @@ mod tests {
 
         let collision = driver.step(GameInput::NONE);
         assert_eq!(collision.score, 150);
-        assert!(collision.sounds.contains(&SoundCue::Explosion));
+        assert!(collision.sounds.contains(&SoundCue::LanderHit));
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
         assert!(collision.commands.contains(&GameCommand::AddScore(150)));
         assert!(collision.commands.iter().any(|command| {
@@ -7635,6 +7715,29 @@ mod tests {
                 })
             )
         }));
+    }
+
+    #[test]
+    fn driver_resolves_laser_mutant_collision_with_source_score_sound() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_player();
+        driver.spawn_mutant(Point::new(62, 120));
+
+        driver.step(GameInput {
+            fire: true,
+            ..GameInput::NONE
+        });
+        let collision = driver.step(GameInput::NONE);
+
+        assert_eq!(collision.score, MUTANT_SCORE);
+        assert!(collision.sounds.contains(&SoundCue::MutantHit));
+        assert_eq!(driver.snapshot_count(ActorKind::Mutant), 0);
+        assert!(
+            collision
+                .commands
+                .contains(&GameCommand::AddScore(MUTANT_SCORE))
+        );
     }
 
     #[test]

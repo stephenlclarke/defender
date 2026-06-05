@@ -52,15 +52,19 @@ verification tools.
   while staying inert during attract so custom attract scripts retain control of
   that screen. Lander
   shot timers now spawn hostile projectile actors that use the same player
-  damage policy as other hazards, including `XYZZY` invincibility overrides;
-  bomber, pod, swarmer, and baiter laser hits award source scores and emit
-  family hit cues, bomber actors now lay first-class bomb hazards with source
-  bomb-collision cues, pod laser kills spawn bounded swarmer actors, source
-  swarmers now emit hostile projectiles and distinct shot cues from actor-owned
-  timers, and source-paced baiter timer entry now spawns source-backed baiter
-  actors that can shoot and pursue the player without blocking wave completion
-  after source-counted enemies are gone. Smart bombs now use driver-owned stock:
-  normal player requests consume stock before clearing hostile actors, exhausted
+  damage policy as other hazards, including `XYZZY` invincibility overrides,
+  and emit a distinct source-command-backed lander-shot cue. Actor sound cues
+  now expose their red-label Williams sound-board command byte where existing
+  source evidence pins one, including player laser, lander/mutant/non-lander
+  family hits, hostile shots, human rescue/loss, and safe landing; unproven
+  semantic cues remain unmapped. Bomber actors now lay first-class bomb hazards
+  with source bomb-collision cues, pod laser kills spawn bounded swarmer actors,
+  source swarmers now emit hostile projectiles and distinct shot cues from
+  actor-owned timers, and source-paced baiter timer entry now spawns
+  source-backed baiter actors that can shoot and pursue the player without
+  blocking wave completion after source-counted enemies are gone. Smart bombs
+  now use driver-owned stock: normal player requests consume stock before
+  clearing hostile actors, exhausted
   stock leaves hostiles alive, and `XYZZY` overlay smart bombs use the same
   command path without consuming stock. Player hazard collisions now decrement
   driver-owned life stock and spawn a replacement player while lives remain,
@@ -3983,3 +3987,21 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780626333478179`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780626918217929`.
+- `2026-06-05 03:44 BST`: Completed the actor source sound-command cue
+  cycle. Added `SoundCue::source_sound_command` so source-backed actor cues
+  expose their red-label Williams sound-board command byte when existing
+  source table or media-audit evidence pins one. Split lander hostile shots
+  from player laser audio (`0xFC` versus `0xEB`) and added lander/mutant hit
+  cues for the source family hit commands (`0xF9` and `0xE8`) alongside the
+  existing bomber, pod, swarmer, baiter, bomb, human rescue/loss, and safe
+  landing mappings. No legacy code, tests, or scaffolding were safe to remove
+  because `legacy-tools` still owns ROM reports, trace/media helpers, and
+  oracle-equivalence evidence while the actor runtime remains isolated.
+  Validation passed with `cargo fmt --check`, `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780627095541089`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780627495227999`.

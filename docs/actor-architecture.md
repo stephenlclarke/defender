@@ -25,8 +25,8 @@ verified.
   lives, credits, and high-score-entry rows from `StepPrompt` state. Explosion
   draws carry `ExplosionKind` metadata so bomb, enemy, player, and human
   explosions can map to separate source sprite families later. Audio is
-  described by `SoundCue`. The future renderer/audio bridge can translate those
-  descriptions into `wgpu` sprites and Williams sound-board commands.
+  described by `SoundCue`; source-backed cues expose their red-label Williams
+  sound-board command byte through `SoundCue::source_sound_command`.
 
 ## C++ to Rust Mapping
 
@@ -202,7 +202,8 @@ The actor driver now owns a first Defender gameplay loop:
   carried human reaches the upper conversion band. Source-backed landers prefer
   their configured target-human slot before falling back to nearest-human
   seeking.
-- Lander shot timers emit both the laser sound cue and an `EnemyLaser` actor.
+- Lander shot timers emit the source `0xFC` lander-shot cue and an `EnemyLaser`
+  actor.
   Enemy lasers are player hazards, smart-bomb targets with no score value, and
   respect the same player damage behavior profile used by `XYZZY` invincibility.
 - Later source waves seed bomber and pod actor families when the wave table

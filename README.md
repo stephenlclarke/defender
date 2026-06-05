@@ -85,10 +85,12 @@ coalescing Defender wordmark surface, lander target-slot seeking, an actor-owned
 status display for score, high score, wave, lives, smart-bomb stock, credits,
 and high-score-entry rows, pickup/carry/conversion,
 falling-human rescue and safe landing scores, score popups, hostile projectile
-actors for lander shots, bomber/pod hit scoring and sound cues, bomber-laid bomb
-actors with source bomb-collision cues, pod laser-hit swarmer spawning, swarmer
-scoring and shot cues, source-paced baiter timer entry, baiter
-shots/scoring/hit cues, and stock-backed smart-bomb hostile clearing. Player
+actors for lander shots, source-command-backed sound cues for player laser,
+lander and mutant hits, non-lander family hits, hostile shots, human
+rescue/loss, and safe landing, bomber-laid bomb actors with source
+bomb-collision cues, pod laser-hit swarmer spawning, swarmer scoring and shot
+cues, source-paced baiter timer entry, baiter shots/scoring/hit cues, and
+stock-backed smart-bomb hostile clearing. Player
 actor hyperspace now emits separate launch/materialization cues and clears
 active hostile projectile actors without spending lives, smart-bomb stock,
 scoring points, or clearing hostile actor families; the player actor owns the
