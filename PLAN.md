@@ -4197,3 +4197,26 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780632487814759`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780633107380529`.
+- `2026-06-05 05:26 BST`: Completed the actor live `GameFrame` handoff cycle.
+  Routed opt-in `--actor-live` through actor-derived clean `GameFrame` values:
+  actor step, `ActorFrame::game_frame()`, `LiveAudioRuntime::submit_game_frame`,
+  and the existing `wgpu` scene draw. This removed the bespoke actor-live
+  `LiveAudioEventBatch::new(frame.report.step, frame.events.sounds())` path
+  while leaving default live play on clean `Game`. Added a focused source guard
+  for the actor-live handoff and updated README, SPEC, actor architecture notes,
+  and the actor smoke module note to describe the clean frame boundary. No
+  legacy code, tests, or scaffolding were safe to remove because default live
+  play still uses clean `Game`, and legacy tooling still backs ROM reports,
+  trace/media helpers, and oracle evidence. Validation passed with
+  `cargo fmt --check`, `cargo test actor_live --lib`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780633156656499`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780633611010569`.

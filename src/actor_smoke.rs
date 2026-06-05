@@ -1,7 +1,8 @@
 //! Actor runtime smoke runner.
 //!
 //! This command path exercises the actor driver through `ActorRuntimeAdapter`
-//! and the native draw planner without claiming full clean `GameFrame` parity.
+//! and the native draw planner while actor frames also expose a clean
+//! `GameFrame` handoff for runtime preflights.
 
 use std::collections::BTreeSet;
 

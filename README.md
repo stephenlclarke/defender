@@ -84,11 +84,11 @@ coverage without switching interactive live play away from the current clean
 renders actor `RenderScene` frames through the offscreen `wgpu` readback path,
 proving nonblank dynamic WGPU output before actor frames replace interactive
 live play. `--actor-live` is now available as an explicit interactive preflight
-mode that uses `ActorRuntimeAdapter`, actor scenes, actor sound events, the
-existing `wgpu` presenter, and the same live key bindings/XYZZY input state
-while leaving normal `cargo run` on the clean `Game` runtime. Actor high-score
-entry now accepts live initials/backspace through the actor input surface and
-draws the in-progress initials row from actor state.
+mode that uses `ActorRuntimeAdapter`, actor-derived clean `GameFrame` values,
+the existing `wgpu` presenter, live audio runtime, and the same live key
+bindings/XYZZY input state while leaving normal `cargo run` on the clean `Game`
+runtime. Actor high-score entry now accepts live initials/backspace through the
+actor input surface and draws the in-progress initials row from actor state.
 The current slice includes same-contract keyboard profiles, `XYZZY` overlay
 state, thread-backed actors, a data-driven `AttractScript` for custom attract
 drivers, `ActorBehaviorScript` profiles for level-wide and per-actor movement
@@ -712,11 +712,11 @@ presenter or replacing the live `Game` runtime. `--actor-wgpu-smoke` then
 renders actor scenes through the actual offscreen `wgpu` texture/readback path
 and requires every actor smoke frame to produce nonblank output plus dynamic
 readback signatures. `--actor-live` opens an interactive actor-frame window
-through the same `wgpu` presenter and live audio event queue while default
-interactive play remains clean `Game`; actor high-score entry accepts the same
-initials/backspace keys through that path. Actor frames now also publish a
-clean state snapshot alongside events and scene data for runtime replacement
-preflights.
+through the same `wgpu` presenter and submits actor-derived clean `GameFrame`
+values to live audio while default interactive play remains clean `Game`; actor
+high-score entry accepts the same initials/backspace keys through that path.
+Actor frames publish a clean state snapshot alongside events and scene data for
+runtime replacement preflights.
 The clean `Game` world seeds terrain, starfield, source-profile active enemy
 batches, human, and projectile snapshots for playing waves and renders them as
 atlas-backed scene sprites. Operator controls are

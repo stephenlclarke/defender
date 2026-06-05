@@ -24,8 +24,8 @@ use winit::{
 use crate::game::GameInput;
 #[cfg(all(not(test), not(coverage)))]
 use crate::{
-    actor_game::{ActorFrame, ActorRuntimeAdapter},
-    audio::{LiveAudioEventBatch, LiveAudioRuntime},
+    actor_game::ActorRuntimeAdapter,
+    audio::LiveAudioRuntime,
     game::{Game, GameFrame},
     renderer::{
         GpuRendererSettings, NativeSceneRenderer, SceneDrawPlan, SpriteBindGroupRole,
@@ -428,7 +428,7 @@ struct ActorLiveApp {
     frame_duration: Duration,
     last_tick: Instant,
     next_wake_at: Instant,
-    latest_frame: Option<ActorFrame>,
+    latest_frame: Option<GameFrame>,
     quit_requested: bool,
     window: Option<Arc<Window>>,
     presenter: Option<WgpuScenePresenter>,
@@ -528,10 +528,9 @@ impl ActorLiveApp {
     fn step_one_frame(&mut self) {
         let input = self.input.drain_game_input();
         let xyzzy = self.input.drain_xyzzy_mode();
-        let frame = self.runtime.step_clean_input(input, xyzzy);
-        if let Some(batch) = LiveAudioEventBatch::new(frame.report.step, frame.events.sounds()) {
-            self.audio.submit_event_batch(batch);
-        }
+        let actor_frame = self.runtime.step_clean_input(input, xyzzy);
+        let frame = actor_frame.game_frame();
+        self.audio.submit_game_frame(&frame);
         self.latest_frame = Some(frame);
     }
 
@@ -1954,6 +1953,22 @@ mod tests {
             None,
         )
         .expect("actor live entrypoint should be wired");
+    }
+
+    #[test]
+    fn actor_live_uses_actor_derived_game_frame_handoff() {
+        let source = include_str!("live_wgpu.rs");
+
+        assert!(source.contains("let actor_frame = self.runtime.step_clean_input(input, xyzzy);"));
+        assert!(source.contains("let frame = actor_frame.game_frame();"));
+        assert!(source.contains("self.audio.submit_game_frame(&frame);"));
+        let old_batch_call = [
+            "LiveAudioEventBatch::new(",
+            "frame.report.step",
+            ", frame.events.sounds())",
+        ]
+        .concat();
+        assert!(!source.contains(&old_batch_call));
     }
 
     #[test]
