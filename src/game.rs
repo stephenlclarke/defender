@@ -2012,6 +2012,24 @@ impl TerrainBlowSnapshot {
         }
     }
 
+    pub fn source_armed_terrain_visible() -> Self {
+        Self {
+            stage: TerrainBlowStage::ExplosionPassSleeping,
+            status_terrain_blown: false,
+            source_elapsed_frames: 0,
+            source_iteration: 0,
+            source_iteration_limit: SOURCE_TERRAIN_BLOW_ITERATION_LIMIT,
+            source_sleep_remaining: Some(1),
+            source_pseudo_color: 0,
+            source_overload_counter: SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER,
+            terrain_erase_entries: SOURCE_TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES,
+            scanner_terrain_erase_entries: SOURCE_TERRAIN_BLOW_SCANNER_ERASE_ENTRIES,
+            terrain_words_remaining: SOURCE_TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES,
+            scanner_terrain_words_remaining: SOURCE_TERRAIN_BLOW_SCANNER_ERASE_ENTRIES,
+            explosions_per_pass: SOURCE_TERRAIN_BLOW_EXPLOSIONS_PER_PASS,
+        }
+    }
+
     pub const fn terrain_erased(self) -> bool {
         self.status_terrain_blown && self.terrain_words_remaining == 0
     }
@@ -4123,6 +4141,17 @@ impl WorldSnapshot {
         }
 
         self.reset_source_terrain_blow_sequence();
+    }
+
+    fn arm_terrain_blow_preserving_playfield(&mut self) {
+        if self.terrain_blow.is_some() {
+            return;
+        }
+
+        self.clear_terrain_blow_human_state();
+        self.explosions
+            .retain(|explosion| explosion.kind != ExplosionKind::Terrain);
+        self.terrain_blow = Some(TerrainBlowSnapshot::source_armed_terrain_visible());
     }
 
     fn reset_source_terrain_blow_sequence(&mut self) {
@@ -10317,7 +10346,7 @@ impl Game {
                 && self.state.frame
                     == SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_TERRAIN_BLOW_STATE_FRAME
             {
-                self.state.world.start_terrain_blow();
+                self.state.world.arm_terrain_blow_preserving_playfield();
             }
             pending.frames_remaining = remaining;
             self.pending_final_death = Some(pending);
@@ -12402,7 +12431,12 @@ impl Game {
                 tint: Color::WHITE,
             });
         }
-        if show_playfield && self.state.world.terrain_blow.is_none() {
+        let terrain_erased = self
+            .state
+            .world
+            .terrain_blow
+            .is_some_and(TerrainBlowSnapshot::terrain_erased);
+        if show_playfield && !terrain_erased {
             push_source_bgout_terrain_sprites(&mut scene);
         }
         if self.state.phase != GamePhase::Attract || self.state.post_game_playfield.is_some() {
@@ -25748,6 +25782,18 @@ mod tests {
                 ));
             }
             if matches!(state_frame, 4779 | 4927 | 4947 | 5991 | 6007) {
+                let terrain_erased = frame
+                    .state
+                    .world
+                    .terrain_blow
+                    .is_some_and(super::TerrainBlowSnapshot::terrain_erased);
+                let terrain_rendered = frame.scene.sprites.iter().any(|sprite| {
+                    sprite.layer == RenderLayer::Terrain
+                        && matches!(
+                            sprite.sprite,
+                            SpriteId::TERRAIN_TILE | SpriteId::TERRAIN_TILE_ALT
+                        )
+                });
                 state_samples.push((
                     state_frame,
                     frame.state.phase,
@@ -25755,6 +25801,8 @@ mod tests {
                     frame.state.player.lives,
                     frame.state.world.terrain_blow.is_some(),
                     frame.state.world.terrain_blow.is_none() || frame.state.world.humans.is_empty(),
+                    terrain_erased,
+                    terrain_rendered,
                     frame
                         .state
                         .world
@@ -25806,6 +25854,8 @@ mod tests {
                     1,
                     false,
                     true,
+                    false,
+                    true,
                     None,
                     0,
                     None,
@@ -25818,8 +25868,10 @@ mod tests {
                     1,
                     true,
                     true,
+                    false,
+                    true,
                     Some(0),
-                    1,
+                    0,
                     None,
                     vec![],
                 ),
@@ -25830,8 +25882,10 @@ mod tests {
                     0,
                     true,
                     true,
+                    false,
+                    true,
                     Some(0),
-                    1,
+                    0,
                     Some(0),
                     vec![GameEvent::GameOver],
                 ),
@@ -25842,6 +25896,8 @@ mod tests {
                     0,
                     true,
                     true,
+                    true,
+                    false,
                     Some(0),
                     1,
                     Some(1044),
@@ -25854,6 +25910,8 @@ mod tests {
                     0,
                     true,
                     true,
+                    true,
+                    false,
                     Some(16),
                     6,
                     Some(1060),

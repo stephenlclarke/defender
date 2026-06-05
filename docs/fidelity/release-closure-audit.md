@@ -1,6 +1,6 @@
 # Release Closure Audit
 
-Last reviewed: `2026-05-29`
+Last reviewed: `2026-06-05`
 
 This audit maps the active fidelity goal to current evidence. It is deliberately
 stricter than the release gate: green tests and media reports prove the covered
@@ -204,9 +204,11 @@ from these perspectives:
   Status: the scan is now a positive organic terrain-blow evidence source.
   The accepted state-steered terrain-blow report remains green, but the
   organic smartmix probe is still unaccepted. The current clean candidate now
-  reaches score `50`, keeps human snapshots empty, starts visible terrain-blow
-  explosions, and emits the sampled `0xEE` cadence, but the regenerated
-  all-axis report still fails visual placement and audio waveform thresholds.
+  reaches score `50`, keeps human snapshots empty, arms the destroyed-planet
+  state while preserving visible terrain, starts visible terrain-blow
+  explosions only at the organic post-game `TERBLO` boundary, and emits the
+  sampled `0xEE` cadence, but the regenerated all-axis report still fails
+  visual placement and audio waveform thresholds.
 - Laser/reverse implementation coverage:
   focused tests cover source-style sparse laser sprites, `LASP1` object
   evidence, far-side enemy collision before culling, capped-fire sound
@@ -380,14 +382,16 @@ complete without owner review or more MAME evidence:
   `target/reference-media/organic-terrain-blow-smartmix-check/report.json`
   still fails all-axis acceptance. The stale clean state mismatch is repaired:
   current clean reaches score `50`, enters terrain blow, keeps clean human
-  snapshots empty once the destroyed-planet branch is active, starts visible
-  `TEREX` terrain explosions at the organic `TERBLO` sound boundary, projects
-  the MAME-observed six-lander/nine-mutant residual object mix before
-  `TERBLO`, and emits the sampled `0xEE` tail. The remaining implementation
-  gap is all-axis media fidelity for that organic branch: current regenerated
-  metrics are visual RMS `90.73` / MAE `42.59` against thresholds `38.00` /
-  `28.00`, and audio still fails waveform correlation despite nonzero clean
-  terrain-blow audio.
+  snapshots empty once the destroyed-planet branch is active, preserves the
+  visible terrain while the source `TERBLO` process is armed, starts visible
+  `TEREX` terrain explosions at post-game frame `1044`, projects the
+  MAME-observed six-lander/nine-mutant residual object mix at the sampled
+  terminal rows, and emits the sampled `0xEE` tail. The remaining
+  implementation gap is all-axis media fidelity for that organic branch:
+  current regenerated metrics are visual RMS `90.80` / MAE `42.68` against
+  thresholds `38.00` / `28.00`, and audio still fails waveform correlation
+  despite nonzero clean terrain-blow audio (`normalized_diff_rms=1.726`,
+  `correlation=-0.005`, `envelope_correlation=0.137`).
 - Owner review of graphics, audio, and playability. `PLAN.md` still requires
   owner signoff before protected reference media replacement and final closure.
 

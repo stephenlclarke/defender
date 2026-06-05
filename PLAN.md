@@ -6328,3 +6328,28 @@ Exit gate:
   terrain-blow regression tests, Cargo check/clippy, touched-doc
   `markdownlint`, and `git diff --check`. Slack start:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780696576650949`.
+- `2026-06-05 23:18 BST`: Completed the organic smartmix delayed
+  terrain-erasure cycle. The target4 terminal branch now arms source
+  terrain-blow state at destroyed-planet time while preserving the visible
+  `BGOUT` playfield: it clears human/cursor state, keeps terrain/scanner erase
+  words pending, and defers `TEREX` births until the post-game frame `1044`
+  reset where MAME starts the visible `TERBLO` sequence. The scene bridge now
+  renders terrain from the actual `terrain_erased()` state instead of hiding it
+  merely because terrain blow is armed. The focused organic regression now
+  asserts terrain is still rendered with zero terrain explosions at state
+  frames `4927` and `4947`, then erased with `TEREX` counts `1` and `6` at
+  state frames `5991` and `6007`. Regenerated ignored media confirms the first
+  compared candidate frame has terrain again, but the all-axis report still
+  fails with visual RMS `90.80`, visual MAE `42.68`,
+  `normalized_diff_rms=1.726`, audio correlation `-0.005`, and audio envelope
+  correlation `0.137`. The remaining organic smartmix gap is now the broader
+  residual-object/HUD/scanner/audio mismatch, not early terrain erasure. No
+  protected media was committed or accepted, and no legacy code, tests, or
+  scaffolding were safe to remove because this proof boundary still depends on
+  clean-vs-MAME reference tooling. Evidence runs included the
+  `reference-clean-capture` and `reference-media-check` targets, with the media
+  check expectedly failing on the current all-axis metrics. Validation passed
+  with `cargo fmt --check`, the focused organic regression, terrain-blow
+  regression tests, Cargo check/clippy, touched-doc `markdownlint`, and
+  `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780697229173389`.
