@@ -1,6 +1,6 @@
 # Defender Current Specification
 
-Last reviewed: `2026-05-29`
+Last reviewed: `2026-06-05`
 
 ## Purpose
 
@@ -788,6 +788,8 @@ reintroduce legacy implementation terminology.
   `XYZZY` invincibility is represented as the same
   temporary player behavior override. The slice now also models source landers
   preferring their configured human target slot, lander pickup/carry/conversion,
+  source-shaped converted-mutant fractions, shot timer, hop RNG, and clean
+  `SourceMutantSnapshot` bridge metadata,
   falling-human rescue and safe landing scoring, score popups, hostile
   projectile actors for lander shots, bomber/pod hit scores and cues,
   bomber-laid bomb actors with source bomb-collision cues and seeded source

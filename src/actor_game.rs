@@ -16,8 +16,9 @@ use crate::{
         HumanSnapshot as CleanHumanSnapshot, PlayerSnapshot, PlayerStockSnapshot,
         ProjectileSnapshot as CleanProjectileSnapshot, ScorePopupKind as CleanScorePopupKind,
         ScorePopupSnapshot as CleanScorePopupSnapshot, ScoreSnapshot, SoundEvent,
-        SourceBaiterSnapshot, SourceBomberSnapshot, SourceLanderSnapshot, SourcePodSnapshot,
-        SourceRandSnapshot, SourceSwarmerSnapshot, WaveProfileSnapshot, WorldSnapshot, WorldVector,
+        SourceBaiterSnapshot, SourceBomberSnapshot, SourceLanderSnapshot, SourceMutantSnapshot,
+        SourcePodSnapshot, SourceRandSnapshot, SourceSwarmerSnapshot, WaveProfileSnapshot,
+        WorldSnapshot, WorldVector,
     },
     renderer::{
         Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
@@ -1236,6 +1237,7 @@ pub struct ActorSourceWaveProfile {
     pub baiter_shot_time: u32,
     pub baiter_seek_probability: u8,
     pub lander_shot_time: u32,
+    pub mutant_shot_time: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1293,6 +1295,39 @@ pub struct ActorSourceBaiterMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceMutantMetadata {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub shot_timer: u8,
+    pub sleep_ticks: u8,
+    pub hop_rng: ActorSourceRngSnapshot,
+    pub render_x_correction: u16,
+    pub target6_first_shot_deferred: bool,
+}
+
+impl ActorSourceMutantMetadata {
+    fn from_lander_conversion(
+        source_lander: ActorSourceLanderMetadata,
+        profile: ActorSourceWaveProfile,
+        hop_rng: ActorSourceRngSnapshot,
+    ) -> Self {
+        Self {
+            x_fraction: source_lander.x_fraction,
+            y_fraction: source_lander.y_fraction,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: profile.mutant_shot_time.min(u32::from(u8::MAX)) as u8,
+            sleep_ticks: 0,
+            hop_rng,
+            render_x_correction: 0,
+            target6_first_shot_deferred: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorSourceEnemyProjectileMetadata {
     pub x_fraction: u8,
     pub y_fraction: u8,
@@ -1329,6 +1364,12 @@ pub struct ActorSwarmerSpawn {
 pub struct ActorBaiterSpawn {
     pub position: Point,
     pub source: Option<ActorSourceBaiterMetadata>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorMutantSpawn {
+    pub position: Point,
+    pub source: Option<ActorSourceMutantMetadata>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1559,6 +1600,15 @@ impl ActorBaiterSpawn {
     }
 }
 
+impl ActorMutantSpawn {
+    pub const fn new(position: Point) -> Self {
+        Self {
+            position,
+            source: None,
+        }
+    }
+}
+
 fn swarmer_spawn_y_velocity_low(index: usize) -> u8 {
     match index % SOURCE_POD_SWARMER_REQUEST_LIMIT {
         0 => 0x20,
@@ -1720,6 +1770,7 @@ impl ActorSourceWaveProfile {
             baiter_shot_time: actor_source_wave_u32("baiter_shot_time", wave),
             baiter_seek_probability: actor_source_wave_u8("baiter_seek_probability", wave),
             lander_shot_time: actor_source_wave_u32("lander_shot_time", wave),
+            mutant_shot_time: actor_source_wave_u32("mutant_shot_time", wave),
         }
     }
 
@@ -2578,6 +2629,7 @@ pub struct ActorSnapshot {
     pub source_pod: Option<ActorSourcePodMetadata>,
     pub source_swarmer: Option<ActorSourceSwarmerMetadata>,
     pub source_baiter: Option<ActorSourceBaiterMetadata>,
+    pub source_mutant: Option<ActorSourceMutantMetadata>,
     pub source_human: Option<ActorSourceHumanMetadata>,
     pub source_enemy_projectile: Option<ActorSourceEnemyProjectileMetadata>,
 }
@@ -2666,6 +2718,7 @@ pub enum SpawnRequest {
     },
     Mutant {
         position: Point,
+        source: Option<ActorSourceMutantMetadata>,
     },
     Bomber {
         position: Point,
@@ -3075,6 +3128,7 @@ fn clean_enemy_snapshot(snapshot: &ActorSnapshot) -> Option<CleanEnemySnapshot> 
     enemy.source_pod = snapshot.source_pod.map(clean_source_pod);
     enemy.source_swarmer = snapshot.source_swarmer.map(clean_source_swarmer);
     enemy.source_baiter = snapshot.source_baiter.map(clean_source_baiter);
+    enemy.source_mutant = snapshot.source_mutant.map(clean_source_mutant);
     Some(enemy)
 }
 
@@ -3135,6 +3189,28 @@ fn clean_source_baiter(source: ActorSourceBaiterMetadata) -> SourceBaiterSnapsho
         shot_timer: source.shot_timer,
         sleep_ticks: source.sleep_ticks,
         picture_frame: source.picture_frame,
+    }
+}
+
+fn clean_source_mutant(source: ActorSourceMutantMetadata) -> SourceMutantSnapshot {
+    SourceMutantSnapshot {
+        x_fraction: source.x_fraction,
+        y_fraction: source.y_fraction,
+        x_velocity: source.x_velocity,
+        y_velocity: source.y_velocity,
+        shot_timer: source.shot_timer,
+        sleep_ticks: source.sleep_ticks,
+        hop_rng: clean_source_rng(source.hop_rng),
+        render_x_correction: source.render_x_correction,
+        target6_first_shot_deferred: source.target6_first_shot_deferred,
+    }
+}
+
+const fn clean_source_rng(source: ActorSourceRngSnapshot) -> SourceRandSnapshot {
+    SourceRandSnapshot {
+        seed: source.seed,
+        hseed: source.hseed,
+        lseed: source.lseed,
     }
 }
 
@@ -4002,6 +4078,10 @@ impl ActorGameDriver {
         self.spawn_lander(position)
     }
 
+    pub fn spawn_mutant_for_test(&mut self, position: Point) -> ActorId {
+        self.spawn_mutant(position)
+    }
+
     pub fn spawn_bomber_for_test(&mut self, position: Point) -> ActorId {
         self.spawn_bomber(position)
     }
@@ -4069,8 +4149,12 @@ impl ActorGameDriver {
     }
 
     fn spawn_mutant(&mut self, position: Point) -> ActorId {
+        self.spawn_mutant_from_spawn(ActorMutantSpawn::new(position))
+    }
+
+    fn spawn_mutant_from_spawn(&mut self, spawn: ActorMutantSpawn) -> ActorId {
         let id = self.allocate_actor_id();
-        self.spawn_actor(Mutant::new(id, position));
+        self.spawn_actor(Mutant::from_spawn(id, spawn));
         id
     }
 
@@ -4294,8 +4378,8 @@ impl ActorGameDriver {
                 GameCommand::Spawn(SpawnRequest::Lander { position }) => {
                     self.spawn_lander(position);
                 }
-                GameCommand::Spawn(SpawnRequest::Mutant { position }) => {
-                    self.spawn_mutant(position);
+                GameCommand::Spawn(SpawnRequest::Mutant { position, source }) => {
+                    self.spawn_mutant_from_spawn(ActorMutantSpawn { position, source });
                 }
                 GameCommand::Spawn(SpawnRequest::Bomber { position }) => {
                     self.spawn_bomber(position);
@@ -4941,6 +5025,7 @@ impl AssetActor for AttractDirector {
                 source_pod: None,
                 source_swarmer: None,
                 source_baiter: None,
+                source_mutant: None,
                 source_human: None,
                 source_enemy_projectile: None,
             },
@@ -4996,6 +5081,7 @@ impl AssetActor for ScriptedAttractProgram {
                 source_pod: None,
                 source_swarmer: None,
                 source_baiter: None,
+                source_mutant: None,
                 source_human: None,
                 source_enemy_projectile: None,
             },
@@ -5100,6 +5186,7 @@ impl StatusDisplay {
             source_pod: None,
             source_swarmer: None,
             source_baiter: None,
+            source_mutant: None,
             source_human: None,
             source_enemy_projectile: None,
         }
@@ -5354,6 +5441,7 @@ impl AssetActor for PlayerShip {
                 source_pod: None,
                 source_swarmer: None,
                 source_baiter: None,
+                source_mutant: None,
                 source_human: None,
                 source_enemy_projectile: None,
             },
@@ -5422,7 +5510,13 @@ impl AssetActor for Lander {
                         human_id,
                         pull_sound_sent,
                     } => {
-                        self.update_carrying(human_id, pull_sound_sent, behavior, &mut commands);
+                        self.update_carrying(
+                            prompt,
+                            human_id,
+                            pull_sound_sent,
+                            behavior,
+                            &mut commands,
+                        );
                     }
                 }
                 self.tick_fire_timer(prompt, behavior, &mut commands);
@@ -5453,6 +5547,7 @@ impl AssetActor for Lander {
                 source_pod: None,
                 source_swarmer: None,
                 source_baiter: None,
+                source_mutant: None,
                 source_human: None,
                 source_enemy_projectile: None,
             },
@@ -5564,6 +5659,7 @@ impl Lander {
 
     fn update_carrying(
         &mut self,
+        prompt: &StepPrompt,
         human_id: ActorId,
         pull_sound_sent: bool,
         behavior: ActorBehaviorProfile,
@@ -5584,9 +5680,20 @@ impl Lander {
             commands.push(GameCommand::Destroy(human_id));
             commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
                 position: self.position,
+                source: self.source_mutant_conversion(prompt),
             }));
             commands.push(GameCommand::PlaySound(SoundCue::MutantSpawn));
         }
+    }
+
+    fn source_mutant_conversion(&self, prompt: &StepPrompt) -> Option<ActorSourceMutantMetadata> {
+        let source = self.source?;
+        let hop_rng = prompt.source_rng?;
+        Some(ActorSourceMutantMetadata::from_lander_conversion(
+            source,
+            ActorSourceWaveProfile::for_wave(prompt.wave),
+            hop_rng,
+        ))
     }
 
     fn tick_source_sleep(&mut self) -> bool {
@@ -5783,14 +5890,16 @@ struct Mutant {
     id: ActorId,
     position: Point,
     drift: i16,
+    source: Option<ActorSourceMutantMetadata>,
 }
 
 impl Mutant {
-    fn new(id: ActorId, position: Point) -> Self {
+    fn from_spawn(id: ActorId, spawn: ActorMutantSpawn) -> Self {
         Self {
             id,
-            position,
+            position: spawn.position,
             drift: -1,
+            source: spawn.source,
         }
     }
 
@@ -5844,6 +5953,7 @@ impl AssetActor for Mutant {
                 source_pod: None,
                 source_swarmer: None,
                 source_baiter: None,
+                source_mutant: self.source,
                 source_human: None,
                 source_enemy_projectile: None,
             },
@@ -6084,6 +6194,7 @@ impl AssetActor for Bomber {
                 source_pod: None,
                 source_swarmer: None,
                 source_baiter: None,
+                source_mutant: None,
                 source_human: None,
                 source_enemy_projectile: None,
             },
@@ -6167,6 +6278,7 @@ impl AssetActor for Bomb {
                 source_pod: None,
                 source_swarmer: None,
                 source_baiter: None,
+                source_mutant: None,
                 source_human: None,
                 source_enemy_projectile: Some(self.source),
             },
@@ -6272,6 +6384,7 @@ impl AssetActor for Pod {
                 source_pod: self.source,
                 source_swarmer: None,
                 source_baiter: None,
+                source_mutant: None,
                 source_human: None,
                 source_enemy_projectile: None,
             },
@@ -6405,6 +6518,7 @@ impl AssetActor for Swarmer {
                 source_pod: None,
                 source_swarmer: self.source,
                 source_baiter: None,
+                source_mutant: None,
                 source_human: None,
                 source_enemy_projectile: None,
             },
@@ -6634,6 +6748,7 @@ impl AssetActor for Baiter {
                 source_pod: None,
                 source_swarmer: None,
                 source_baiter: self.source,
+                source_mutant: None,
                 source_human: None,
                 source_enemy_projectile: None,
             },
@@ -6919,6 +7034,7 @@ impl AssetActor for Human {
                 source_pod: None,
                 source_swarmer: None,
                 source_baiter: None,
+                source_mutant: None,
                 source_human: self.source,
                 source_enemy_projectile: None,
             },
@@ -7007,6 +7123,7 @@ impl AssetActor for ScorePopup {
                 source_pod: None,
                 source_swarmer: None,
                 source_baiter: None,
+                source_mutant: None,
                 source_human: None,
                 source_enemy_projectile: None,
             },
@@ -7078,6 +7195,7 @@ impl AssetActor for LaserShot {
                 source_pod: None,
                 source_swarmer: None,
                 source_baiter: None,
+                source_mutant: None,
                 source_human: None,
                 source_enemy_projectile: None,
             },
@@ -7207,6 +7325,7 @@ impl AssetActor for EnemyLaserShot {
                 source_pod: None,
                 source_swarmer: None,
                 source_baiter: None,
+                source_mutant: None,
                 source_human: None,
                 source_enemy_projectile: Some(self.source),
             },
@@ -7274,6 +7393,7 @@ impl AssetActor for Explosion {
                 source_pod: None,
                 source_swarmer: None,
                 source_baiter: None,
+                source_mutant: None,
                 source_human: None,
                 source_enemy_projectile: None,
             },
@@ -8345,6 +8465,7 @@ mod tests {
         assert_eq!(first_source.baiter_delay, 192);
         assert_eq!(first_source.baiter_shot_time, 10);
         assert_eq!(first_source.baiter_seek_probability, 200);
+        assert_eq!(first_source.mutant_shot_time, 32);
 
         let first = script.profile_for_wave(1);
         let first_lander = first
@@ -11175,6 +11296,94 @@ mod tests {
     }
 
     #[test]
+    fn source_lander_abduction_spawns_source_mutant_metadata() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 1;
+        let source_lander = ActorSourceLanderMetadata {
+            x_fraction: 0x12,
+            y_fraction: 0x34,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: u8::MAX,
+            sleep_ticks: 0,
+            picture_frame: 3,
+            target_human_index: None,
+        };
+        driver.spawn_lander_from_spawn(ActorLanderSpawn {
+            position: Point::new(100, HUMAN_GROUND_Y),
+            source: Some(source_lander),
+        });
+        driver.spawn_human_for_test(Point::new(100, HUMAN_GROUND_Y));
+        driver.step(GameInput::NONE);
+        driver.step(GameInput::NONE);
+
+        let (converted, source_mutant) = (0..120)
+            .filter_map(|_| {
+                let report = driver.step(GameInput::NONE);
+                report.commands.iter().find_map(|command| {
+                    if let GameCommand::Spawn(SpawnRequest::Mutant {
+                        source: Some(source),
+                        ..
+                    }) = command
+                    {
+                        Some((report.clone(), *source))
+                    } else {
+                        None
+                    }
+                })
+            })
+            .next()
+            .expect("source lander should spawn a source mutant");
+        let expected_source = ActorSourceMutantMetadata {
+            x_fraction: source_lander.x_fraction,
+            y_fraction: source_lander.y_fraction,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: ActorSourceWaveProfile::for_wave(converted.wave)
+                .mutant_shot_time
+                .min(u32::from(u8::MAX)) as u8,
+            sleep_ticks: 0,
+            hop_rng: converted
+                .source_rng
+                .expect("playing report should expose source rng"),
+            render_x_correction: 0,
+            target6_first_shot_deferred: false,
+        };
+        assert_eq!(source_mutant, expected_source);
+
+        let settled = driver.step(GameInput::NONE);
+        let mutant = settled
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Mutant)
+            .expect("source mutant should become a live actor");
+        assert_eq!(mutant.source_mutant, Some(expected_source));
+
+        let clean_state = settled.game_state();
+        let clean_mutant = clean_state
+            .world
+            .enemies
+            .iter()
+            .find(|enemy| enemy.kind == CleanEnemyKind::Mutant)
+            .expect("actor bridge should expose a clean mutant");
+        assert_eq!(
+            clean_mutant.source_mutant,
+            Some(SourceMutantSnapshot {
+                x_fraction: expected_source.x_fraction,
+                y_fraction: expected_source.y_fraction,
+                x_velocity: expected_source.x_velocity,
+                y_velocity: expected_source.y_velocity,
+                shot_timer: expected_source.shot_timer,
+                sleep_ticks: expected_source.sleep_ticks,
+                hop_rng: clean_source_rng(expected_source.hop_rng),
+                render_x_correction: expected_source.render_x_correction,
+                target6_first_shot_deferred: expected_source.target6_first_shot_deferred,
+            })
+        );
+    }
+
+    #[test]
     fn driver_resolves_laser_lander_collision_with_score_sound_and_explosion() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
@@ -11208,7 +11417,7 @@ mod tests {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
-        driver.spawn_mutant(Point::new(62, 120));
+        driver.spawn_mutant_for_test(Point::new(62, 120));
 
         driver.step(GameInput {
             fire: true,
@@ -11529,6 +11738,7 @@ mod tests {
             source_pod: None,
             source_swarmer: None,
             source_baiter: None,
+            source_mutant: None,
             source_human: None,
             source_enemy_projectile: None,
         }

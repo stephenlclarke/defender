@@ -43,7 +43,10 @@ verification tools.
   bomber and pod actors beside landers. Source-backed landers, bombers, pods,
   swarmers, and initial humans publish fixed-point metadata and advance
   actor-owned fraction state during active motion, and source landers prefer
-  configured target slots before falling back to nearest-human seeking. The
+  configured target slots before falling back to nearest-human seeking. Source
+  lander/human conversions now spawn mutant actors with source-shaped mutant
+  fractions, wave-derived shot timer, driver-owned hop RNG, and clean
+  `SourceMutantSnapshot` bridge metadata. The
   actor rewrite now has source-RNG-restored later-wave lander placement, shot
   timers, X/Y velocity metadata, and later-wave human target-list restores. It
   also has a persistent `StatusDisplay` actor that draws
@@ -4744,3 +4747,29 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780645175300049`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780645568844929`.
+- `2026-06-05 08:57 BST`: Completed the actor source-mutant conversion
+  metadata cycle. Source-backed lander/human conversions now spawn mutant
+  actors with source-shaped mutant fractions, wave-derived shot timer,
+  driver-owned hop RNG, render-correction, and deferred-shot metadata. Mutant
+  snapshots preserve that metadata and `ActorStateBridge` maps it into the
+  clean `SourceMutantSnapshot` contract, giving the next source mutant AI slice
+  a source-backed state boundary instead of a generic mutant. Added a focused
+  regression covering the conversion spawn command, the settled mutant actor
+  snapshot, and the clean bridge snapshot. README, SPEC, and the actor
+  architecture notes now document the conversion metadata boundary. No legacy
+  code, tests, or scaffolding were safe to remove in this slice because clean
+  smoke/fidelity/oracle evidence still depends on clean runtime boundaries
+  outside the actor path. Validation passed with `cargo fmt --check`,
+  `cargo test source_mutant --lib`, `cargo test completed_abduction --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite was not rerun in this cycle; the previously isolated
+  clean-game MAME window/post-game audio failures remain outside this slice.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780645950497009`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780646630879589`.

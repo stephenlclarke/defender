@@ -226,6 +226,10 @@ walk cadence, picture frame, and fixed-point X fraction after the initial
 source sleep ticks.
 Source-backed landers ask the prompt for their configured target slot first and
 only fall back to nearest-human seeking when that target is unavailable.
+When a source-backed lander completes a human conversion, the spawn command for
+the new mutant carries source-shaped mutant fractions, wave-derived shot timer,
+driver-provided hop RNG, render correction, and deferred-shot metadata into the
+mutant actor snapshot and clean `SourceMutantSnapshot` bridge.
 
 ## Attract Graphics
 
@@ -280,7 +284,8 @@ The actor driver now owns a first Defender gameplay loop:
   `AttachHuman` command, carry it upward, and convert into a mutant when the
   carried human reaches the upper conversion band. Source-backed landers prefer
   their configured target-human slot before falling back to nearest-human
-  seeking.
+  seeking, and source-backed conversions preserve source mutant metadata for
+  the clean state bridge.
 - Lander shot timers emit the source `0xFC` lander-shot cue and an `EnemyLaser`
   actor.
   Enemy lasers are player hazards, smart-bomb targets with no score value, and
