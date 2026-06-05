@@ -109,8 +109,13 @@ verification tools.
   two-player start requests no longer emit false clean `GameStarted` /
   `WaveStarted` events. Score and replay-bonus stock awards route through the
   active player fields so the actor bridge can represent player-two score and
-  stock ownership while the full source `PLE02` switch/death-prompt handoff
-  remains the next two-player fidelity boundary. Actor high-score initials
+  stock ownership. Player hazard deaths now decrement the active player's
+  stock, enter a source-length `0x60` actor player-switch sleep when another
+  player has stock, publish the switch through `GameOverSnapshot`, suppress the
+  attract script during the handoff, and start the next stocked player's actor
+  turn when the sleep expires. The remaining two-player fidelity boundary is
+  the full source `PLE02` death/player-start prompt pixel path. Actor
+  high-score initials
   submission now reports accepted and submitted initials through the clean event
   bridge, enters a finite 60-step
   Hall-of-Fame game-over stall through `GameOverSnapshot`, draws the source
@@ -5577,3 +5582,33 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780671863699699`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780672799324769`.
+- `2026-06-05 16:58 BST`: Completed the actor two-player death-switch cycle.
+  `ActorGameDriver` now owns a bounded `0x60` player-switch sleep when a
+  two-player death leaves the other player stocked. Player hazard deaths
+  decrement the active player's stock first, publish `PlayerSwitchReport`
+  through `StepReport` and `GameOverSnapshot`, suppress attract-script drawing
+  during the switch interstitial, draw a simple actor status `PLAYER n` prompt,
+  and start the next stocked player's turn after the countdown. Final deaths
+  enter the normal game-over/high-score path only when no other player has
+  lives. Focused tests now cover non-final death rotation, player-one
+  final-life switch to player two, player-two final-life switch back to player
+  one, and final game over when no other stock remains. README, SPEC, and the
+  actor architecture notes now distinguish the implemented switch state from
+  the remaining source `PLE02` glyph/media parity work. No legacy code, tests,
+  or scaffolding were safe to remove in this slice because clean
+  smoke/fidelity/oracle evidence still depends on clean runtime boundaries
+  outside the actor path. Validation passed with `cargo test actor_two_player
+  --lib --features legacy-tools`, `cargo test actor_game --all-targets
+  --features legacy-tools`, `cargo fmt --check`, `cargo check --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features
+  legacy-tools -- -D warnings`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo test runtime --all-targets --features legacy-tools`,
+  the actor smoke CLI commands (`--actor-smoke`, `--actor-attract-smoke`,
+  `--actor-post-game-smoke`, and `--actor-wgpu-smoke`), touched-doc
+  markdownlint, and `git diff --check`. The full unfiltered `legacy-tools`
+  suite was not rerun in this cycle; the previously isolated clean-game MAME
+  window/post-game audio failures remain outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780674174951459`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780675123787219`.

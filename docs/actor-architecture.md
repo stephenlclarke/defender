@@ -125,6 +125,23 @@ elapsed script step and evaluates relative `AttractScriptEvent` durations. It
 does not branch on the global driver step or on protected-reference frame
 numbers.
 
+## Two-Player Handoff
+
+The driver owns two-player session state instead of giving one actor authority
+over another player's turn. `StepPrompt` and `StepReport` carry current player,
+player count, per-player scores, per-player stocks, and an optional
+`PlayerSwitchReport`. When a player hazard collision reaches
+`GameCommand::PlayerKilled`, the driver decrements the active player's stock.
+If another player still has lives, it enters a source-length `0x60` switch
+sleep, publishes that sleep through `GameOverSnapshot`, suppresses attract
+script output during the handoff, and starts the next stocked player's actor
+turn after the countdown. If no other player has stock, the normal game-over /
+high-score path runs instead.
+
+The current actor handoff deliberately keeps the remaining visual gap explicit:
+the bounded switch state exists, but full source `PLE02` player-start and
+death-prompt glyph parity is still a separate fidelity boundary.
+
 ## Behavior Scripts
 
 Actor movement and behavior are configurable data owned by the driver.
