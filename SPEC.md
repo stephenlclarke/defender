@@ -721,11 +721,12 @@ reintroduce legacy implementation terminology.
   timer entry with non-wave-blocking baiters, baiter shots/scores/hit cues,
   stock-backed smart-bomb hostile clearing with exhausted-stock guards and a
   non-consuming `XYZZY` overlay path, hyperspace hostile-projectile cleanup and
-  cue emission, actor-owned hidden hyperspace interval plus behavior-scripted
-  rematerialization point, life-stock decrement and replacement-player respawn
-  on non-final player hazard collisions, final-life game-over/high-score
-  handoff, enemy/bomb/player/human explosion variant draw metadata, and mutant
-  spawn handoff, but it has not replaced the live `Game` runtime yet.
+  separate launch/materialization cue emission, actor-owned hidden hyperspace
+  interval plus behavior-scripted rematerialization point, life-stock decrement
+  and replacement-player respawn on non-final player hazard collisions,
+  final-life game-over/high-score handoff, enemy/bomb/player/human explosion
+  variant draw metadata, and mutant spawn handoff, but it has not replaced the
+  live `Game` runtime yet.
 
 ## Compatibility Features
 

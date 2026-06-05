@@ -108,7 +108,8 @@ families, score, lives, and smart-bomb stock unchanged. `PlayerShip` then owns
 the hidden interval: while its hyperspace timer is active it remains alive but
 publishes no collision bounds, no player draw, and no input-driven actions.
 `ActorBehaviorProfile` configures the hidden step count and rematerialization
-coordinates. The later MAME source RNG and death-risk branch remains a separate
+coordinates, and the actor emits `SoundCue::HyperspaceMaterialize` when it
+returns. The later MAME source RNG and death-risk branch remains a separate
 porting slice.
 
 `XYZZY` invincibility uses the same mechanism. When invincibility is active,

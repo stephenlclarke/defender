@@ -3888,3 +3888,19 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780623815440299`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780624217020799`.
+- `2026-06-05 02:55 BST`: Completed the actor hyperspace rematerialization
+  audio cycle. Added `SoundCue::HyperspaceMaterialize` separate from the launch
+  `SoundCue::Hyperspace`, emitted it when the player actor returns from its
+  hidden hyperspace timer, and extended the rematerialization regression to
+  prove launch audio is not reused for return. No legacy code, tests, or
+  scaffolding were safe to remove because `legacy-tools` still owns ROM
+  reports, trace/media helpers, and oracle-equivalence evidence while the actor
+  runtime remains isolated. Validation passed with
+  `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780624273035349`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780624537685539`.

@@ -1796,6 +1796,7 @@ pub enum SoundCue {
     Laser,
     SmartBomb,
     Hyperspace,
+    HyperspaceMaterialize,
     Explosion,
     LanderPickup,
     HumanPulled,
@@ -3510,9 +3511,9 @@ impl PlayerShip {
         self.hyperspace_steps_remaining = behavior.player_hyperspace_hidden_steps;
     }
 
-    fn advance_hyperspace(&mut self, behavior: ActorBehaviorProfile) {
+    fn advance_hyperspace(&mut self, behavior: ActorBehaviorProfile) -> bool {
         if self.hyperspace_steps_remaining == 0 {
-            return;
+            return false;
         }
 
         self.hyperspace_steps_remaining = self.hyperspace_steps_remaining.saturating_sub(1);
@@ -3521,7 +3522,9 @@ impl PlayerShip {
                 behavior.player_hyperspace_rematerialize_x,
                 behavior.player_hyperspace_rematerialize_y,
             ));
+            return true;
         }
+        false
     }
 }
 
@@ -3536,7 +3539,9 @@ impl AssetActor for PlayerShip {
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Player);
             let was_hidden = self.is_hidden_for_hyperspace();
-            self.advance_hyperspace(behavior);
+            if self.advance_hyperspace(behavior) {
+                commands.push(GameCommand::PlaySound(SoundCue::HyperspaceMaterialize));
+            }
             if !was_hidden {
                 let mut velocity = Velocity::default();
                 if prompt.input.altitude_up {
@@ -6104,6 +6109,8 @@ mod tests {
         let hidden_player = snapshot_for(&entered, player);
         assert_eq!(hidden_player.bounds, None);
         assert!(!entered.draws.iter().any(|draw| draw.actor == player));
+        assert!(entered.sounds.contains(&SoundCue::Hyperspace));
+        assert!(!entered.sounds.contains(&SoundCue::HyperspaceMaterialize));
 
         let still_hidden = driver.step(GameInput {
             thrust: true,
@@ -6125,6 +6132,11 @@ mod tests {
         let player_snapshot = snapshot_for(&rematerialized, player);
         assert_eq!(player_snapshot.position, Point::new(150, 92));
         assert!(player_snapshot.bounds.is_some());
+        assert!(
+            rematerialized
+                .sounds
+                .contains(&SoundCue::HyperspaceMaterialize)
+        );
         assert!(rematerialized.draws.iter().any(|draw| {
             draw.actor == player
                 && draw.position == Point::new(150, 92)
