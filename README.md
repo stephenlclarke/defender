@@ -107,7 +107,9 @@ later-wave humans restore from the source target-list distribution.
 Source-backed landers, bombers, pods, swarmers, baiters, and humans publish
 their fixed-point metadata through snapshots, publish per-step movement/facing
 metadata for the clean state bridge, and advance fraction state during active
-motion. Source-backed bombers now update seeded picture-frame and Y-velocity
+motion. Source-backed pods now wrap Y motion through the source active-object
+playfield bounds instead of drifting outside the red-label vertical range.
+Source-backed bombers now update seeded picture-frame and Y-velocity
 metadata, including cruise-altitude and player-relative Y adjustments, during
 active source motion from the driver-provided source RNG snapshot carried in
 `StepPrompt`/`StepReport`, and source-backed baiters gate their picture-wrap

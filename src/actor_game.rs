@@ -44,6 +44,7 @@ const PLAYER_HYPERSPACE_DEATH_DELAY_STEPS: u8 = 39;
 const PLAYER_HYPERSPACE_DEATH_LSEED: u8 = 0x0C;
 const SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD: u8 = 0xC0;
 const SOURCE_PLAYFIELD_Y_MIN: u8 = 42;
+const SOURCE_PLAYFIELD_Y_MAX: u8 = 240;
 const SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS: u8 = 6;
 const SOURCE_SHELL_SCAN_CADENCE_STEPS: u8 = 8;
 const SOURCE_SHELL_LIMIT: usize = 20;
@@ -5710,6 +5711,18 @@ fn actor_source_axis_step(position: i16, fraction: u8, velocity: u16) -> (i16, u
     (i16::from(position), fraction)
 }
 
+fn actor_source_active_object_y_step(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
+    let [mut position, fraction] = u16::from_be_bytes([position as u8, fraction])
+        .wrapping_add(velocity)
+        .to_be_bytes();
+    if position < SOURCE_PLAYFIELD_Y_MIN {
+        position = SOURCE_PLAYFIELD_Y_MAX;
+    } else if position > SOURCE_PLAYFIELD_Y_MAX {
+        position = SOURCE_PLAYFIELD_Y_MIN;
+    }
+    (i16::from(position), fraction)
+}
+
 fn pickup_distance(lander: Point, human: Point, behavior: ActorBehaviorProfile) -> bool {
     (lander.x - human.x).abs() <= behavior.lander_pickup_radius_x
         && (lander.y - human.y).abs() <= behavior.lander_pickup_radius_y
@@ -6192,8 +6205,11 @@ impl Pod {
         };
         let (x, x_fraction) =
             actor_source_axis_step(self.position.x, source.x_fraction, source.x_velocity);
-        let (y, y_fraction) =
-            actor_source_axis_step(self.position.y, source.y_fraction, source.y_velocity);
+        let (y, y_fraction) = actor_source_active_object_y_step(
+            self.position.y,
+            source.y_fraction,
+            source.y_velocity,
+        );
         self.position = Point::new(x, y);
         source.x_fraction = x_fraction;
         source.y_fraction = y_fraction;
@@ -8601,6 +8617,59 @@ mod tests {
         assert!(
             live.draws.iter().any(|draw| draw.sprite == SpriteKey::Pod
                 && matches!(draw.effect, VisualEffect::SourcePod))
+        );
+    }
+
+    #[test]
+    fn source_pod_y_motion_wraps_through_source_playfield_bounds() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let top = driver.spawn_pod_from_spawn(ActorPodSpawn {
+            position: Point::new(0xD0, i16::from(SOURCE_PLAYFIELD_Y_MIN)),
+            source: Some(ActorSourcePodMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0xFFFF,
+            }),
+        });
+        let bottom = driver.spawn_pod_from_spawn(ActorPodSpawn {
+            position: Point::new(0xE0, i16::from(SOURCE_PLAYFIELD_Y_MAX)),
+            source: Some(ActorSourcePodMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0x0100,
+            }),
+        });
+
+        let report = driver.step(GameInput::NONE);
+
+        assert_eq!(
+            snapshot_for(&report, top).position,
+            Point::new(0xD0, i16::from(SOURCE_PLAYFIELD_Y_MAX))
+        );
+        assert_eq!(
+            snapshot_for(&report, top).source_pod,
+            Some(ActorSourcePodMetadata {
+                x_fraction: 0,
+                y_fraction: 0xFF,
+                x_velocity: 0,
+                y_velocity: 0xFFFF,
+            })
+        );
+        assert_eq!(
+            snapshot_for(&report, bottom).position,
+            Point::new(0xE0, i16::from(SOURCE_PLAYFIELD_Y_MIN))
+        );
+        assert_eq!(
+            snapshot_for(&report, bottom).source_pod,
+            Some(ActorSourcePodMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0x0100,
+            })
         );
     }
 

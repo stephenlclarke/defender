@@ -195,7 +195,8 @@ restore landers from the source RNG placement, `RMAX` shot timer, X velocity,
 and Y velocity path, then assign target-list slots from the restored human
 distribution. Source-backed landers, bombers, pods, and baiters publish their
 metadata in snapshots and advance active motion by updating their own
-fixed-point position/fraction state. Source-backed bomber actors also update
+fixed-point position/fraction state. Source-backed pods wrap Y motion through
+the source active-object playfield bounds. Source-backed bomber actors also update
 seeded picture-frame and Y-velocity metadata, including cruise-altitude and
 player-relative Y adjustments, from the driver-provided source RNG snapshot.
 Source-backed baiter actors use that same source RNG snapshot to gate
@@ -289,9 +290,10 @@ The actor driver now owns a first Defender gameplay loop:
   exposes those counts. Bombers and pods draw their own sprites, move through
   actor-owned source fixed-point metadata when source-backed, publish per-step
   movement/facing metadata, and remain script-tunable through their behavior
-  profiles. Source-backed bombers derive picture-frame and Y-velocity updates
-  from the driver-provided source RNG snapshot, including cruise-altitude and
-  player-relative Y adjustments.
+  profiles. Source-backed pods wrap Y motion through the source active-object
+  playfield bounds. Source-backed bombers derive picture-frame and Y-velocity
+  updates from the driver-provided source RNG snapshot, including
+  cruise-altitude and player-relative Y adjustments.
 - Bomber actors can lay first-class `Bomb` actors on a scriptable cadence with
   the source ten-bomb active cap and source `GETSHL` placement bounds. Bombs
   draw their own sprite, expire through actor-owned lifetime state, act as

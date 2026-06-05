@@ -761,8 +761,10 @@ reintroduce legacy implementation terminology.
   inert during attract so custom attract scripts remain in control.
   Source-backed landers, bombers, pods, swarmers, baiters, and humans publish
   fixed-point metadata plus movement/facing metadata in snapshots and advance
-  their actor-owned fraction state during active motion. Source-backed bomber
-  actors now update seeded picture-frame and Y-velocity metadata, including
+  their actor-owned fraction state during active motion. Source-backed pods now
+  wrap Y motion through the source active-object playfield bounds instead of
+  drifting outside the red-label vertical range. Source-backed bomber actors
+  now update seeded picture-frame and Y-velocity metadata, including
   cruise-altitude and player-relative Y adjustments, during active source motion
   from the driver-provided source RNG snapshot carried in
   `StepPrompt`/`StepReport`; source-backed baiters use that same source RNG
