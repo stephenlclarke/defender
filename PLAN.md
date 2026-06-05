@@ -90,7 +90,12 @@ verification tools.
   before wave clear: lander reserves fill active slots first, no-human lander
   reserve rows restore as source-shaped mutants through the source schizoid
   fallback, then bomber, pod, direct mutant, and swarmer reserves use source
-  placement/fraction restore paths once landers are exhausted. Source swarmer
+  placement/fraction restore paths once landers are exhausted. While first-wave
+  source-counted hostiles remain active, the actor driver now runs the source
+  449-step early reserve cadence, materializes the five MAME-observed early
+  reserve lander rows with the `0xEA` appearance cue, resets the source
+  target-list cursor/RNG window, and leaves the later first-wave lander reserve
+  intact for refill behavior. Source swarmer
   reserves use `PLRES`/`RSW0` phony-object placement before the same
   mini-swarmer runtime used by pod destruction. Source
   rematerialization now publishes the `SEED/HSEED` background word into

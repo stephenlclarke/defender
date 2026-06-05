@@ -202,6 +202,12 @@ tree:
   target6 fire2524 wait window, projected collision position,
   source-positioned enemy explosion, hit cue, and score award before routing
   through the normal player death command path.
+  The actor driver owns first-wave early lander reserve timing: once the live
+  first-wave playfield starts, it arms the source 449-step delay, materializes
+  the five MAME-observed early reserve lander rows with the `0xEA` appearance
+  cue while hostiles are still active, applies the source target-list cursor/RNG
+  reset, and keeps normal reserve restoration available when source-counted
+  hostiles have already been cleared.
   Playing reports project the source `BGOUT` terrain into state/render output.
   Final-human removal starts a driver-owned source terrain-blow snapshot,
   erases clean terrain and scanner terrain, emits source flash windows,

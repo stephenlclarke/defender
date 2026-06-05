@@ -169,6 +169,10 @@ source enemy reserve counts after the active batch, expose those counts through
 batches before the driver can publish `WaveCleared`. Lander reserves fill the
 next active batch first; once landers are exhausted, bomber, pod, direct mutant,
 and swarmer reserves use their source restore placement/fraction metadata. When
+the first wave is still active, the actor driver now arms the source 449-step
+early reserve cadence, materializes the five MAME-observed early reserve lander
+rows with the `0xEA` appearance cue, preserves the target-list cursor/RNG reset,
+and keeps the remaining first-wave lander reserve for later refill behavior. When
 no source human targets remain, actor reserve lander rows now follow the source
 schizoid fallback and restore as source-shaped mutants instead of targetless
 landers. Direct mutant restores consume the driver-owned source background word

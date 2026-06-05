@@ -112,6 +112,15 @@ const SOURCE_DEFAULT_RNG: ActorSourceRng = ActorSourceRng {
     hseed: 0xA5,
     lseed: 0x5A,
 };
+const SOURCE_FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS: u16 = 449;
+const SOURCE_FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT: usize = 10;
+const SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT: usize = 6;
+const SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY: u8 = 2;
+const SOURCE_FIRST_WAVE_EARLY_RESERVE_RNG: ActorSourceRng = ActorSourceRng {
+    seed: 0x3A,
+    hseed: 0xDA,
+    lseed: 0x1F,
+};
 const PLAYER_BOUNDS: Rect = Rect::new(0, 18, 255, 220);
 const LASER_SPEED: i16 = 8;
 const LASER_LIFETIME: u16 = 34;
@@ -533,6 +542,58 @@ const ACTOR_SOURCE_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         sleep_ticks: 0x04,
         picture_frame: 1,
         target_human_index: Some(5),
+    }),
+];
+const ACTOR_SOURCE_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
+    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
+        x16: 0x689A,
+        y16: 0x2C70,
+        x_velocity: 0x001E,
+        y_velocity: 0x0070,
+        shot_timer: 0x10,
+        sleep_ticks: 0,
+        picture_frame: 1,
+        target_human_index: Some(7),
+    }),
+    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
+        x16: 0x43D3,
+        y16: 0x2C70,
+        x_velocity: 0xFFEC,
+        y_velocity: 0x0070,
+        shot_timer: 0x3A,
+        sleep_ticks: 0,
+        picture_frame: 1,
+        target_human_index: Some(9),
+    }),
+    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
+        x16: 0x1F51,
+        y16: 0x2C70,
+        x_velocity: 0x0014,
+        y_velocity: 0x0070,
+        shot_timer: 0x13,
+        sleep_ticks: 0,
+        picture_frame: 0,
+        target_human_index: Some(8),
+    }),
+    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
+        x16: 0xFA03,
+        y16: 0x2C70,
+        x_velocity: 0x0016,
+        y_velocity: 0x0070,
+        shot_timer: 0x26,
+        sleep_ticks: 0,
+        picture_frame: 1,
+        target_human_index: Some(7),
+    }),
+    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
+        x16: 0xCF34,
+        y16: 0x2CE0,
+        x_velocity: 0,
+        y_velocity: 0,
+        shot_timer: 0x34,
+        sleep_ticks: 1,
+        picture_frame: 0,
+        target_human_index: Some(6),
     }),
 ];
 const ACTOR_WAVE_ACTIVE_SPAWN_SLOTS: [Point; SOURCE_MAX_ACTIVE_WAVE_ENEMIES] = [
@@ -5561,14 +5622,26 @@ pub struct ActorReply {
     pub draws: Vec<DrawCommand>,
 }
 
-pub trait AssetActor: Send + 'static {
+trait AssetActor: Send + 'static {
     fn id(&self) -> ActorId;
 
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply;
+
+    fn apply_driver_command(&mut self, _command: ActorDriverCommand) {}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ActorDriverCommand {
+    AdjustSourceLanderShotTimer {
+        target_human_index: usize,
+        x_velocity: u16,
+        delta: u8,
+    },
 }
 
 enum ActorRequest {
     Prompt(Box<StepPrompt>),
+    DriverCommand(ActorDriverCommand),
     Stop,
 }
 
@@ -5596,6 +5669,10 @@ impl ThreadedAsset {
             .ok()?;
         self.receiver.recv().ok()
     }
+
+    fn apply_driver_command(&self, command: ActorDriverCommand) {
+        let _ = self.sender.send(ActorRequest::DriverCommand(command));
+    }
 }
 
 impl Drop for ThreadedAsset {
@@ -5618,6 +5695,9 @@ fn run_actor_thread(
                 if sender.send(actor.update(prompt.as_ref())).is_err() {
                     break;
                 }
+            }
+            ActorRequest::DriverCommand(command) => {
+                actor.apply_driver_command(command);
             }
             ActorRequest::Stop => break,
         }
@@ -8401,6 +8481,7 @@ pub struct ActorGameDriver {
     source_astronaut_sleep_ticks: u8,
     source_reserve_activation_ready: bool,
     source_reserve_activation_cooldown_steps: u16,
+    source_first_wave_early_reserve_steps_remaining: Option<u16>,
     source_background_left: u16,
     baiter_timer_steps: Option<u32>,
     baiter_pacing_steps_remaining: u8,
@@ -8462,6 +8543,7 @@ impl ActorGameDriver {
             source_astronaut_sleep_ticks: 0,
             source_reserve_activation_ready: false,
             source_reserve_activation_cooldown_steps: 0,
+            source_first_wave_early_reserve_steps_remaining: None,
             source_background_left: 0,
             baiter_timer_steps: None,
             baiter_pacing_steps_remaining: ACTOR_BAITER_TIMER_PACING_STEPS,
@@ -8503,7 +8585,7 @@ impl ActorGameDriver {
         }
         self.advance_pending_player_switch();
         self.advance_source_reserve_activation_cooldown();
-        self.activate_enemy_reserve_if_ready(&mut step_commands);
+        delayed_sounds.extend(self.activate_enemy_reserve_if_ready(&mut step_commands));
         match self.advance_pending_survivor_bonus() {
             SurvivorBonusStep::StartNextWave => {
                 self.start_pending_wave();
@@ -9298,6 +9380,7 @@ impl ActorGameDriver {
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
         self.source_reserve_activation_cooldown_steps = 0;
+        self.source_first_wave_early_reserve_steps_remaining = None;
         self.source_background_left = 0;
         self.baiter_timer_steps = None;
         self.clear_turn_playfield_actors();
@@ -9335,6 +9418,7 @@ impl ActorGameDriver {
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.source_background_left = 0;
         self.source_reserve_activation_cooldown_steps = 0;
+        self.source_first_wave_early_reserve_steps_remaining = None;
         self.reset_source_shell_scan();
         self.clear_turn_playfield_actors();
         self.apply_wave_profile();
@@ -9599,6 +9683,7 @@ impl ActorGameDriver {
         self.spawn_player();
         self.spawn_wave_hostiles();
         self.spawn_initial_humans();
+        self.arm_first_wave_early_lander_reserve_delay();
     }
 
     fn enter_game_over(&mut self, sounds: &mut Vec<SoundCue>) {
@@ -9621,6 +9706,7 @@ impl ActorGameDriver {
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
         self.source_reserve_activation_cooldown_steps = 0;
+        self.source_first_wave_early_reserve_steps_remaining = None;
         self.high_scores.record(active_score);
         self.phase = if self.high_scores.qualifies(active_score) {
             Phase::HighScoreEntry
@@ -9678,6 +9764,7 @@ impl ActorGameDriver {
         self.source_target_cursor = None;
         self.source_reserve_activation_ready = false;
         self.source_reserve_activation_cooldown_steps = 0;
+        self.source_first_wave_early_reserve_steps_remaining = None;
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.source_background_left = 0;
         self.reset_source_shell_scan();
@@ -9700,6 +9787,7 @@ impl ActorGameDriver {
         self.source_reserve_activation_cooldown_steps = 0;
         self.spawn_wave_hostiles();
         self.spawn_initial_humans();
+        self.arm_first_wave_early_lander_reserve_delay();
     }
 
     fn advance_pending_survivor_bonus(&mut self) -> SurvivorBonusStep {
@@ -9835,6 +9923,7 @@ impl ActorGameDriver {
         self.reset_source_astronaut_process();
         self.source_reserve_activation_ready = false;
         self.source_reserve_activation_cooldown_steps = 0;
+        self.source_first_wave_early_reserve_steps_remaining = None;
         if self.phase == Phase::Playing {
             self.reset_baiter_timer();
         }
@@ -9846,7 +9935,10 @@ impl ActorGameDriver {
         self.baiter_pacing_steps_remaining = ACTOR_BAITER_TIMER_PACING_STEPS;
     }
 
-    fn activate_enemy_reserve_if_ready(&mut self, commands: &mut Vec<GameCommand>) {
+    fn activate_enemy_reserve_if_ready(
+        &mut self,
+        commands: &mut Vec<GameCommand>,
+    ) -> Vec<SoundCue> {
         if self.phase != Phase::Playing
             || self.wave == 0
             || self.pending_survivor_bonus.is_some()
@@ -9854,12 +9946,19 @@ impl ActorGameDriver {
             || self.pending_player_start.is_some()
             || !self.source_reserve_activation_ready
             || self.source_reserve_activation_cooldown_steps > 0
-            || self.has_hostile_snapshots()
             || actor_enemy_reserve_is_empty(self.enemy_reserve)
         {
-            return;
+            return Vec::new();
         }
 
+        if self.has_hostile_snapshots() {
+            if self.activate_first_wave_early_lander_reserve_if_ready(commands) {
+                return vec![SoundCue::HyperspaceMaterialize];
+            }
+            return Vec::new();
+        }
+
+        self.source_first_wave_early_reserve_steps_remaining = None;
         let source_profile = ActorSourceWaveProfile::for_wave(self.wave.max(1));
         let reserve_kinds =
             actor_source_reserve_enemy_kinds(&mut self.enemy_reserve, source_profile);
@@ -9960,6 +10059,75 @@ impl ActorGameDriver {
                 }
             }
         }
+        Vec::new()
+    }
+
+    fn arm_first_wave_early_lander_reserve_delay(&mut self) {
+        self.source_first_wave_early_reserve_steps_remaining = (self.wave == 1
+            && self.enemy_reserve.landers > 0)
+            .then_some(SOURCE_FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS);
+    }
+
+    fn activate_first_wave_early_lander_reserve_if_ready(
+        &mut self,
+        commands: &mut Vec<GameCommand>,
+    ) -> bool {
+        let Some(remaining) = self.source_first_wave_early_reserve_steps_remaining else {
+            return false;
+        };
+        if self.wave != 1 || self.enemy_reserve.landers == 0 {
+            self.source_first_wave_early_reserve_steps_remaining = None;
+            return false;
+        }
+
+        let remaining = remaining.saturating_sub(1);
+        if remaining > 0 {
+            self.source_first_wave_early_reserve_steps_remaining = Some(remaining);
+            return false;
+        }
+
+        self.source_first_wave_early_reserve_steps_remaining = None;
+        if self.source_counted_hostile_snapshot_count()
+            >= SOURCE_FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT
+        {
+            return false;
+        }
+
+        let reserve_count = ACTOR_SOURCE_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS
+            .len()
+            .min(usize::from(self.enemy_reserve.landers));
+        if reserve_count == 0 {
+            return false;
+        }
+
+        self.apply_first_wave_early_reserve_shot_phase_delay();
+        for spawn in ACTOR_SOURCE_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS
+            .iter()
+            .copied()
+            .take(reserve_count)
+        {
+            commands.push(GameCommand::Spawn(SpawnRequest::Lander {
+                position: spawn.position,
+            }));
+            self.spawn_lander_from_spawn(spawn);
+        }
+        self.enemy_reserve.landers = self
+            .enemy_reserve
+            .landers
+            .saturating_sub(u8::try_from(reserve_count).expect("early reserve count fits u8"));
+        self.source_rng = SOURCE_FIRST_WAVE_EARLY_RESERVE_RNG;
+        self.source_target_cursor = Some(SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT);
+        true
+    }
+
+    fn apply_first_wave_early_reserve_shot_phase_delay(&self) {
+        for actor in self.actors.values() {
+            actor.apply_driver_command(ActorDriverCommand::AdjustSourceLanderShotTimer {
+                target_human_index: 2,
+                x_velocity: 0xFFEE,
+                delta: SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY,
+            });
+        }
     }
 
     fn spawn_wave_hostiles(&mut self) {
@@ -9998,6 +10166,13 @@ impl ActorGameDriver {
         self.snapshots
             .values()
             .filter(|snapshot| snapshot.kind == ActorKind::Human && snapshot.alive)
+            .count()
+    }
+
+    fn source_counted_hostile_snapshot_count(&self) -> usize {
+        self.snapshots
+            .values()
+            .filter(|snapshot| is_hostile(snapshot.kind))
             .count()
     }
 
@@ -11138,6 +11313,20 @@ impl Lander {
 impl AssetActor for Lander {
     fn id(&self) -> ActorId {
         self.id
+    }
+
+    fn apply_driver_command(&mut self, command: ActorDriverCommand) {
+        let ActorDriverCommand::AdjustSourceLanderShotTimer {
+            target_human_index,
+            x_velocity,
+            delta,
+        } = command;
+        if let Some(source) = &mut self.source
+            && source.target_human_index == Some(target_human_index)
+            && source.x_velocity == x_velocity
+        {
+            source.shot_timer = source.shot_timer.wrapping_add(delta);
+        }
     }
 
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
@@ -17844,6 +18033,27 @@ mod tests {
     }
 
     #[test]
+    fn first_wave_early_reserve_lander_spawns_match_mame_rows() {
+        let rows = ACTOR_SOURCE_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS
+            .iter()
+            .copied()
+            .map(source_lander_spawn_row_for_test)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            rows,
+            vec![
+                (0x689A, 0x2C70, 0x001E, 0x0070, 0x10, 0, 1, Some(7)),
+                (0x43D3, 0x2C70, 0xFFEC, 0x0070, 0x3A, 0, 1, Some(9)),
+                (0x1F51, 0x2C70, 0x0014, 0x0070, 0x13, 0, 0, Some(8)),
+                (0xFA03, 0x2C70, 0x0016, 0x0070, 0x26, 0, 1, Some(7)),
+                (0xCF34, 0x2CE0, 0, 0, 0x34, 1, 0, Some(6)),
+            ]
+        );
+        assert_eq!(SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY, 2);
+    }
+
+    #[test]
     fn embedded_actor_wave_script_expands_source_wave_range() {
         let parsed = ActorWaveScript::parse_text(ACTOR_RED_LABEL_WAVE_SCRIPT)
             .expect("embedded actor wave script should parse");
@@ -18018,6 +18228,108 @@ mod tests {
             snapshot
                 .source_lander
                 .is_some_and(|source| source.target_human_index == Some(4))
+        }));
+    }
+
+    #[test]
+    fn actor_first_wave_early_lander_reserve_materializes_on_source_cadence() {
+        let mut driver = started_driver();
+        driver.set_kind_behavior(
+            ActorKind::Player,
+            ActorBehaviorProfile {
+                player_takes_enemy_collision_damage: false,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 5);
+        assert_eq!(
+            driver.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 10,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+        assert_eq!(
+            driver.source_first_wave_early_reserve_steps_remaining,
+            Some(SOURCE_FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS)
+        );
+
+        let mut materialized = None;
+        for offset in 1..=SOURCE_FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS {
+            let report = driver.step(GameInput::NONE);
+            let spawn_count = report
+                .commands
+                .iter()
+                .filter(|command| {
+                    matches!(command, GameCommand::Spawn(SpawnRequest::Lander { .. }))
+                })
+                .count();
+            if spawn_count > 0 || report.sounds.contains(&SoundCue::HyperspaceMaterialize) {
+                materialized = Some((offset, report));
+                break;
+            }
+
+            assert_eq!(spawn_count, 0);
+            assert!(!report.sounds.contains(&SoundCue::HyperspaceMaterialize));
+        }
+
+        let (offset, report) = materialized.unwrap_or_else(|| {
+            panic!(
+                "first-wave early lander reserve should materialize on source cadence; \
+                 ready={} cooldown={} early={:?} reserve={:?} hostiles={} phase={:?}",
+                driver.source_reserve_activation_ready,
+                driver.source_reserve_activation_cooldown_steps,
+                driver.source_first_wave_early_reserve_steps_remaining,
+                driver.enemy_reserve,
+                driver.source_counted_hostile_snapshot_count(),
+                driver.phase
+            )
+        });
+        assert_eq!(offset, SOURCE_FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS);
+        assert!(report.sounds.contains(&SoundCue::HyperspaceMaterialize));
+        assert!(
+            !report
+                .commands
+                .contains(&GameCommand::WaveCleared { next_wave: 2 })
+        );
+        assert_eq!(
+            report
+                .commands
+                .iter()
+                .filter(|command| matches!(
+                    command,
+                    GameCommand::Spawn(SpawnRequest::Lander { .. })
+                ))
+                .count(),
+            ACTOR_SOURCE_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS.len()
+        );
+        assert_eq!(
+            report.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 5,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+        assert_eq!(
+            report.game_state().world.enemy_reserve,
+            report.enemy_reserve
+        );
+        assert_eq!(
+            report
+                .snapshots
+                .iter()
+                .filter(|snapshot| snapshot.kind == ActorKind::Lander)
+                .count(),
+            10
+        );
+        assert!(report.snapshots.iter().any(|snapshot| {
+            snapshot.kind == ActorKind::Lander
+                && snapshot.source_lander.is_some_and(|source| {
+                    source.target_human_index
+                        == Some(SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT)
+                        && source.x_velocity == 0
+                        && source.y_velocity == 0
+                })
         }));
     }
 
@@ -22952,8 +23264,29 @@ mod tests {
         driver.spawn_player();
         driver.spawn_wave_hostiles();
         driver.spawn_initial_humans();
+        driver.arm_first_wave_early_lander_reserve_delay();
         let report = driver.step(GameInput::NONE);
         (driver, report)
+    }
+
+    fn source_lander_spawn_row_for_test(
+        spawn: ActorLanderSpawn,
+    ) -> (u16, u16, u16, u16, u8, u8, u8, Option<usize>) {
+        let source = spawn
+            .source
+            .expect("source lander spawn should carry metadata");
+        let x16 = u16::from_be_bytes([spawn.position.x as u8, source.x_fraction]);
+        let y16 = u16::from_be_bytes([spawn.position.y as u8, source.y_fraction]);
+        (
+            x16,
+            y16,
+            source.x_velocity,
+            source.y_velocity,
+            source.shot_timer,
+            source.sleep_ticks,
+            source.picture_frame,
+            source.target_human_index,
+        )
     }
 
     fn destroy_source_counted_hostiles(driver: &mut ActorGameDriver, report: &StepReport) {
