@@ -839,9 +839,10 @@ reintroduce legacy implementation terminology.
   source-counted hostiles are gone, the driver restores a source-shaped reserve
   batch before allowing the survivor-bonus `WaveCleared` path. Lander reserves
   fill active slots first, then bomber and pod reserves restore from their
-  source placement/fraction state once landers are exhausted. Later-wave humans
-  restore from the source target-list distribution instead of reusing
-  first-wave starts.
+  source placement/fraction state once landers are exhausted. If no source
+  human targets remain, actor reserve lander rows use the source schizoid
+  fallback and restore source-shaped mutants directly. Later-wave humans restore
+  from the source target-list distribution instead of reusing first-wave starts.
   A persistent `StatusDisplay` actor draws score, high score, wave, lives,
   credits, and high-score-entry rows from `StepPrompt` state while staying
   inert during attract so custom attract scripts remain in control.

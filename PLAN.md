@@ -87,10 +87,12 @@ verification tools.
   Reserve activation is armed only after the active source batch has published a
   report. When source-counted hostiles are gone, the driver restores source
   reserve batches before wave clear: lander reserves fill active slots first,
-  then bomber and pod reserves use source placement/fraction restore paths once
-  landers are exhausted. Source lander/human conversions now spawn mutant
-  actors with source-shaped mutant fractions, wave-derived shot timer,
-  driver-owned hop RNG, and clean `SourceMutantSnapshot` bridge metadata.
+  no-human lander reserve rows restore as source-shaped mutants through the
+  source schizoid fallback, then bomber and pod reserves use source
+  placement/fraction restore paths once landers are exhausted. Source
+  lander/human conversions now spawn mutant actors with source-shaped mutant
+  fractions, wave-derived shot timer, driver-owned hop RNG, and clean
+  `SourceMutantSnapshot` bridge metadata.
   Source-backed mutant actors now
   consume that metadata to select wave-table X/Y velocities, advance
   actor-owned hop RNG and fixed-point fractions, and emit source-shaped
@@ -822,6 +824,32 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 18:29 BST`: Completed the actor no-human reserve mutant
+  fallback cycle. Source reserve lander rows now follow the red-label
+  no-human schizoid fallback in the actor driver: when no source human target
+  remains, adjacent lander reserve rows restore as source-shaped mutant actors
+  with source placement, shot-timer, and hop-RNG metadata instead of becoming
+  targetless landers. Pre-prompt reserve spawn events remain visible in
+  `StepReport::commands` for the clean event bridge, but the driver no longer
+  replays those already-applied spawns through end-of-step command application,
+  preventing duplicate generic actors on the following report. Added a focused
+  regression covering source-mutant reserve restore state, command shape,
+  reserve depletion, and the duplicate-spawn guard. README, SPEC, and the actor
+  architecture notes now document the actor-side fallback. No legacy code,
+  tests, or scaffolding were safe to remove in this slice because clean
+  smoke/fidelity/oracle evidence still depends on clean runtime boundaries
+  outside the actor path. Validation passed with focused source-reserve tests,
+  the actor-game/smoke/live/runtime/wgpu all-target `legacy-tools` filters,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`, the
+  actor smoke CLI commands (`--actor-smoke`, `--actor-attract-smoke`,
+  `--actor-post-game-smoke`, and `--actor-wgpu-smoke`), touched-doc
+  markdownlint, and `git diff --check`. The full unfiltered `legacy-tools`
+  suite was not rerun in this cycle; the previously isolated clean-game MAME
+  window/post-game audio failures remain outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780680244424649`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780680796659879`.
 - `2026-06-05 16:40 BST`: Completed the actor two-player session-state
   slice. Actor reports now carry driver-owned `current_player`, `player_count`,
   per-player scores, and per-player stock snapshots. `ActorStateBridge` maps

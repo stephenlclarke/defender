@@ -278,12 +278,15 @@ through `StepReport::enemy_reserve` and the clean `WorldSnapshot`, arms reserve
 activation only after the current active batch has reported once, and restores
 the next source batch before survivor-bonus wave clear can start. Lander
 reserves fill active slots first; once no landers remain, bomber and pod
-reserves restore in the source wave-size batch shape. Wave `1` uses the source
-first-wave lander restore metadata from the existing clean evidence, including
-fixed-point fractions, velocities, shot timer, sleep ticks, picture frame, and
-target-human index. Later source waves restore landers from the source RNG
-placement, `RMAX` shot timer, X velocity, and Y velocity path, then assign
-target-list slots from the restored human distribution. Source-backed bombers
+reserves restore in the source wave-size batch shape. If no source human target
+remains while lander reserves are selected, the actor driver follows the source
+schizoid fallback and restores those rows as source-shaped mutants with source
+placement, shot-timer, and hop-RNG metadata. Wave `1` uses the source first-wave
+lander restore metadata from the existing clean evidence, including fixed-point
+fractions, velocities, shot timer, sleep ticks, picture frame, and target-human
+index. Later source waves restore landers from the source RNG placement, `RMAX`
+shot timer, X velocity, and Y velocity path, then assign target-list slots from
+the restored human distribution. Source-backed bombers
 restore from player-relative source squad placement, and source-backed pods
 restore from source RNG placement/velocity state before entering normal
 source-motion updates. Source-backed landers, bombers, pods, and baiters

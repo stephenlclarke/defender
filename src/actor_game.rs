@@ -60,6 +60,8 @@ const PLAYER_HYPERSPACE_DEATH_LSEED: u8 = 0x0C;
 const SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD: u8 = 0xC0;
 const SOURCE_PLAYFIELD_Y_MIN: u8 = 42;
 const SOURCE_PLAYFIELD_Y_MAX: u8 = 240;
+const SOURCE_MUTANT_RESTORE_AVOID_HALF_WIDTH: u16 = 300 * 32;
+const SOURCE_MUTANT_RESTORE_AVOID_WIDTH: u16 = 600 * 32;
 const SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS: u8 = 6;
 const SOURCE_SHELL_SCAN_CADENCE_STEPS: u8 = 8;
 const SOURCE_SHELL_LIMIT: usize = 20;
@@ -2410,6 +2412,43 @@ impl ActorMutantSpawn {
         Self {
             position,
             source: None,
+        }
+    }
+
+    fn source_restore(
+        source_rng: &mut ActorSourceRng,
+        profile: ActorSourceWaveProfile,
+        background_absolute_x: u16,
+    ) -> Self {
+        let placement_state = source_rng.advance();
+        let avoid_left = background_absolute_x.wrapping_sub(SOURCE_MUTANT_RESTORE_AVOID_HALF_WIDTH);
+        let mut relative = u16::from_be_bytes([placement_state.hseed, placement_state.lseed])
+            .wrapping_sub(avoid_left);
+        if relative < SOURCE_MUTANT_RESTORE_AVOID_WIDTH {
+            relative = relative.wrapping_add(0x8000);
+        }
+        let x16 = relative.wrapping_add(avoid_left);
+        let [x, x_fraction] = x16.to_be_bytes();
+        let y = placement_state
+            .seed
+            .wrapping_shr(1)
+            .wrapping_add(SOURCE_PLAYFIELD_Y_MIN);
+        let shot_timer =
+            source_rng.advance_rmax(profile.mutant_shot_time.min(u32::from(u8::MAX)) as u8);
+
+        Self {
+            position: Point::new(i16::from(x), i16::from(y)),
+            source: Some(ActorSourceMutantMetadata {
+                x_fraction,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                shot_timer,
+                sleep_ticks: 0,
+                hop_rng: source_rng.snapshot(),
+                render_x_correction: 0,
+                target6_first_shot_deferred: false,
+            }),
         }
     }
 }
@@ -8212,6 +8251,7 @@ impl ActorGameDriver {
             }
             SurvivorBonusStep::Waiting => {}
         }
+        let pre_applied_command_count = step_commands.len();
         let survivor_bonus_interstitial = self.pending_survivor_bonus.is_some();
         let prompt_player_switch = self.pending_player_switch.map(PendingPlayerSwitch::report);
         let player_switch_interstitial = prompt_player_switch.is_some();
@@ -8303,7 +8343,7 @@ impl ActorGameDriver {
 
         self.resolve_collisions(&behavior_script, &mut commands);
         self.advance_baiter_timer(&mut commands);
-        let applied_commands = self.apply_commands(&commands);
+        let applied_commands = self.apply_commands(&commands[pre_applied_command_count..]);
         self.remove_dead_actors(&dead_actor_ids);
         delayed_sounds.extend(applied_commands.sounds);
         survivor_bonus_replay_awarded |= applied_commands.bonus_awarded;
@@ -9247,16 +9287,36 @@ impl ActorGameDriver {
             match reserve_kinds[index] {
                 ActorSourceEnemyKind::Lander => {
                     let target_index = self.select_next_source_lander_target_index();
-                    let spawn = ActorLanderSpawn::source_restore(
-                        &mut self.source_rng,
-                        source_profile,
-                        target_index,
-                    );
-                    commands.push(GameCommand::Spawn(SpawnRequest::Lander {
-                        position: spawn.position,
-                    }));
-                    self.spawn_lander_from_spawn(spawn);
-                    index += 1;
+                    if let Some(target_index) = target_index {
+                        let spawn = ActorLanderSpawn::source_restore(
+                            &mut self.source_rng,
+                            source_profile,
+                            Some(target_index),
+                        );
+                        commands.push(GameCommand::Spawn(SpawnRequest::Lander {
+                            position: spawn.position,
+                        }));
+                        self.spawn_lander_from_spawn(spawn);
+                        index += 1;
+                    } else {
+                        let lander_count = reserve_kinds[index..]
+                            .iter()
+                            .take_while(|&&kind| kind == ActorSourceEnemyKind::Lander)
+                            .count();
+                        for _ in 0..lander_count {
+                            let spawn = ActorMutantSpawn::source_restore(
+                                &mut self.source_rng,
+                                source_profile,
+                                0,
+                            );
+                            commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
+                                position: spawn.position,
+                                source: spawn.source,
+                            }));
+                            self.spawn_mutant_from_spawn(spawn);
+                        }
+                        index += lander_count;
+                    }
                 }
                 ActorSourceEnemyKind::Bomber => {
                     let bomber_count = reserve_kinds[index..]
@@ -16968,6 +17028,136 @@ mod tests {
                 .source_lander
                 .is_some_and(|source| source.target_human_index == Some(4))
         }));
+    }
+
+    #[test]
+    fn actor_source_reserve_landers_without_humans_restore_source_mutants() {
+        let (mut driver, live) = started_source_wave_driver(2);
+        let player_position = live
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Player)
+            .expect("seed step should publish the player")
+            .position;
+        let clear_playfield = live
+            .snapshots
+            .iter()
+            .filter(|snapshot| is_hostile(snapshot.kind) || snapshot.kind == ActorKind::Human)
+            .map(|snapshot| GameCommand::Destroy(snapshot.id))
+            .collect::<Vec<_>>();
+        driver.apply_commands(&clear_playfield);
+        driver.enemy_reserve = EnemyReserveSnapshot {
+            landers: 2,
+            ..EnemyReserveSnapshot::default()
+        };
+        driver.source_rng = ActorSourceRng {
+            seed: 0x20,
+            hseed: 0x66,
+            lseed: 0x99,
+        };
+        let mut expected_rng = driver.source_rng;
+        let first_spawn = ActorMutantSpawn::source_restore(
+            &mut expected_rng,
+            ActorSourceWaveProfile::for_wave(2),
+            0,
+        );
+        let second_spawn = ActorMutantSpawn::source_restore(
+            &mut expected_rng,
+            ActorSourceWaveProfile::for_wave(2),
+            0,
+        );
+
+        let restored = driver.step(GameInput::NONE);
+
+        assert_eq!(
+            restored.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 0,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+        assert_eq!(
+            restored
+                .commands
+                .iter()
+                .filter(|command| matches!(
+                    command,
+                    GameCommand::Spawn(SpawnRequest::Lander { .. })
+                ))
+                .count(),
+            0
+        );
+        assert_eq!(
+            restored
+                .commands
+                .iter()
+                .filter(|command| matches!(
+                    command,
+                    GameCommand::Spawn(SpawnRequest::Mutant { .. })
+                ))
+                .count(),
+            2
+        );
+        assert_eq!(
+            restored
+                .source_rng
+                .expect("playing report should carry source rng"),
+            expected_rng.advance().snapshot()
+        );
+
+        let prompt = source_mutant_prompt_for_test(
+            restored.step,
+            restored.wave,
+            restored
+                .source_rng
+                .expect("playing report should carry source rng"),
+            player_position,
+            Velocity::default(),
+        );
+        let behavior = ActorBehaviorProfile::default();
+        let source_mutants = restored
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::Mutant)
+            .collect::<Vec<_>>();
+        assert_eq!(source_mutants.len(), 2);
+        for (snapshot, spawn) in source_mutants.iter().zip([first_spawn, second_spawn]) {
+            let (expected_position, expected_source, _) = expected_source_mutant_after_motion(
+                spawn.position,
+                spawn.source.expect("source mutant restore metadata"),
+                snapshot.id,
+                &prompt,
+                behavior,
+            );
+            assert_eq!(snapshot.position, expected_position);
+            assert_eq!(snapshot.source_mutant, Some(expected_source));
+            assert!(snapshot.source_lander.is_none());
+        }
+
+        let followup = driver.step(GameInput::NONE);
+        assert_eq!(
+            followup
+                .snapshots
+                .iter()
+                .filter(|snapshot| snapshot.kind == ActorKind::Lander)
+                .count(),
+            0
+        );
+        assert_eq!(
+            followup
+                .snapshots
+                .iter()
+                .filter(|snapshot| snapshot.kind == ActorKind::Mutant)
+                .count(),
+            2
+        );
+        assert!(
+            followup
+                .snapshots
+                .iter()
+                .filter(|snapshot| snapshot.kind == ActorKind::Mutant)
+                .all(|snapshot| snapshot.source_mutant.is_some())
+        );
     }
 
     #[test]

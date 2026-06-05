@@ -167,9 +167,11 @@ source enemy reserve counts after the active batch, expose those counts through
 `StepReport` and the clean state bridge, and activate source-restored reserve
 batches before the driver can publish `WaveCleared`. Lander reserves fill the
 next active batch first; once landers are exhausted, bomber and pod reserves use
-their source restore placement/fraction metadata. Later-wave actor landers now
-restore from source RNG placement/shot/velocity state, and later-wave humans
-restore from the source target-list distribution.
+their source restore placement/fraction metadata. When no source human targets
+remain, actor reserve lander rows now follow the source schizoid fallback and
+restore as source-shaped mutants instead of targetless landers. Later-wave
+actor landers now restore from source RNG placement/shot/velocity state, and
+later-wave humans restore from the source target-list distribution.
 Custom attract drivers can construct scripts in Rust or parse checked text
 lines for text, static sprites, Williams reveal, Defender wordmark coalescence,
 red-label message-table labels, high-score rows, and credit-count events before
