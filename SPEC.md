@@ -387,11 +387,12 @@ game-exec pacing cadence, accelerates the timer when the remaining source
 wave-enemy total is low, excludes active baiters from that source `WVCHK`
 count, and respects the source active-baiter cap. Active baiters therefore do
 not block reserve activation or wave clear when no source-counted enemies
-remain. Spawned baiters
-retain source shot-timer, picture-cycle, sleep, and velocity state, pursue the
-player through source seek rules, fire source-shaped fireball shells with
-source `USHSND` command evidence, and those enemy projectiles use source
-`SHSCAN` lifetime decrement/wrap behavior, scroll-adjusted fixed-point motion,
+remain. Spawned baiters retain source shot-timer, picture-cycle, sleep, and
+velocity state, pursue the player through source seek rules, fire source
+`SHOOT` fireball shells with source RNG X/Y projection and player-velocity
+contribution, emit source `USHSND` command evidence only when the shared shell
+list allocates a shell, and those enemy projectiles use source `SHSCAN`
+lifetime decrement/wrap behavior, scroll-adjusted fixed-point motion,
 offscreen culling, collision scoring, and player-damage handling with source
 `BKIL` / `AHSND` command evidence when a shell hits the player plus source
 `PLEND` / `PDSND` command evidence when the player-hit path starts. Accepted
@@ -886,7 +887,9 @@ reintroduce legacy implementation terminology.
   acceleration/damping, `SWBMB` fireball direction/shell-cap suppression,
   swarmer shot timer projectile/cue emission, smart-bomb pod scoring without
   swarmer spawning, source-paced baiter timer entry with
-  non-wave-blocking baiters, baiter shots/scores/hit cues,
+  non-wave-blocking baiters, baiter source `SHOOT` fireball projection with
+  source RNG velocity/player-velocity contribution, shell-cap suppression,
+  shots/scores/hit cues,
   stock-backed smart-bomb hostile clearing with exhausted-stock guards and a
   non-consuming `XYZZY` overlay path, hyperspace source-shell cleanup for enemy
   shots and bomb shells, separate launch/materialization cue emission,

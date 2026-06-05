@@ -11799,13 +11799,28 @@ fn actor_source_mutant_fireball(
     source: ActorSourceMutantMetadata,
     shot_rng: ActorSourceRngSnapshot,
 ) -> Option<(Velocity, ActorSourceEnemyProjectileMetadata)> {
+    let lifetime_ticks =
+        actor_source_projectile_lifetime_ticks(behavior.mutant_shot_lifetime_steps);
+    actor_source_enemy_fireball(
+        position,
+        source.x_fraction,
+        source.y_fraction,
+        prompt,
+        shot_rng,
+        lifetime_ticks,
+    )
+}
+
+fn actor_source_enemy_fireball(
+    position: Point,
+    x_fraction: u8,
+    y_fraction: u8,
+    prompt: &StepPrompt,
+    shot_rng: ActorSourceRngSnapshot,
+    lifetime_ticks: u8,
+) -> Option<(Velocity, ActorSourceEnemyProjectileMetadata)> {
     if !source_shell_spawn_in_bounds(position)
-        || prompt
-            .snapshots
-            .iter()
-            .filter(|snapshot| is_source_shell_kind(snapshot.kind))
-            .count()
-            >= SOURCE_SHELL_LIMIT
+        || actor_source_shell_count(prompt) >= SOURCE_SHELL_LIMIT
     {
         return None;
     }
@@ -11826,16 +11841,16 @@ fn actor_source_mutant_fireball(
         .wrapping_sub(position.y as u8);
     let y_velocity = actor_sign_extend_u8_to_u16(y_delta).wrapping_shl(2);
     let velocity = actor_source_screen_velocity(x_velocity, y_velocity);
-    let lifetime_ticks =
-        actor_source_projectile_lifetime_ticks(behavior.mutant_shot_lifetime_steps);
-    let source = ActorSourceEnemyProjectileMetadata {
-        x_fraction: source.x_fraction,
-        y_fraction: source.y_fraction,
-        x_velocity,
-        y_velocity,
-        lifetime_ticks,
-    };
-    Some((velocity, source))
+    Some((
+        velocity,
+        ActorSourceEnemyProjectileMetadata {
+            x_fraction,
+            y_fraction,
+            x_velocity,
+            y_velocity,
+            lifetime_ticks,
+        },
+    ))
 }
 
 fn actor_source_screen_velocity(x_velocity: u16, y_velocity: u16) -> Velocity {
@@ -12570,8 +12585,17 @@ impl Baiter {
             source.shot_timer = source.shot_timer.wrapping_sub(1);
             if source.shot_timer == 0 {
                 let profile = ActorSourceWaveProfile::for_wave(prompt.wave.max(1));
-                source.shot_timer = clamped_source_baiter_shot_reset(profile);
-                push_baiter_shot(self.position, prompt, behavior, Some(*source), commands);
+                let shot_rng = actor_source_baiter_shot_rng(prompt, self.id, self.position);
+                source.shot_timer = actor_source_baiter_shot_reset(profile, shot_rng.seed);
+                push_baiter_shot(
+                    self.id,
+                    self.position,
+                    prompt,
+                    behavior,
+                    Some(*source),
+                    Some(shot_rng),
+                    commands,
+                );
             }
 
             source.picture_frame = (source.picture_frame + 1) % SOURCE_BAITER_PICTURE_FRAME_COUNT;
@@ -12622,27 +12646,70 @@ impl Baiter {
 }
 
 fn push_baiter_shot(
+    actor: ActorId,
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
     source: Option<ActorSourceBaiterMetadata>,
+    shot_rng: Option<ActorSourceRngSnapshot>,
     commands: &mut Vec<GameCommand>,
 ) {
+    if let Some(source) = source {
+        let shot_rng =
+            shot_rng.unwrap_or_else(|| actor_source_baiter_shot_rng(prompt, actor, position));
+        if let Some((velocity, projectile_source)) =
+            actor_source_baiter_fireball(position, prompt, source, shot_rng)
+        {
+            push_source_enemy_projectile_command(
+                position,
+                velocity,
+                projectile_source,
+                SoundCue::BaiterShot,
+                commands,
+            );
+        }
+        return;
+    }
+
     let velocity = baiter_shot_velocity(position, prompt, behavior);
-    let source = source.map(|source| {
-        actor_source_enemy_shot_metadata(
-            source.x_fraction,
-            source.y_fraction,
-            velocity,
-            behavior.lander_shot_lifetime_steps,
-        )
-    });
     commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
         position,
         velocity,
-        source,
+        source: None,
     }));
     commands.push(GameCommand::PlaySound(SoundCue::BaiterShot));
+}
+
+fn actor_source_baiter_shot_rng(
+    prompt: &StepPrompt,
+    actor: ActorId,
+    position: Point,
+) -> ActorSourceRngSnapshot {
+    prompt.source_rng.unwrap_or(ActorSourceRngSnapshot {
+        seed: actor_source_motion_seed(prompt.step, actor),
+        hseed: position.x as u8,
+        lseed: position.y as u8,
+    })
+}
+
+fn actor_source_baiter_shot_reset(profile: ActorSourceWaveProfile, seed: u8) -> u8 {
+    source_rmax(clamped_source_baiter_shot_reset(profile), seed)
+}
+
+fn actor_source_baiter_fireball(
+    position: Point,
+    prompt: &StepPrompt,
+    source: ActorSourceBaiterMetadata,
+    shot_rng: ActorSourceRngSnapshot,
+) -> Option<(Velocity, ActorSourceEnemyProjectileMetadata)> {
+    actor_source_enemy_fireball(
+        position,
+        source.x_fraction,
+        source.y_fraction,
+        prompt,
+        shot_rng,
+        SOURCE_SHELL_LIFETIME_TICKS,
+    )
 }
 
 fn baiter_shot_velocity(
@@ -12690,7 +12757,15 @@ impl AssetActor for Baiter {
                 let can_fire = behavior.baiter_mode == HostileMovementMode::Drift
                     || prompt.player_position().is_some();
                 if can_fire && prompt.step % fire_period == self.id.value() % fire_period {
-                    push_baiter_shot(self.position, prompt, behavior, None, &mut commands);
+                    push_baiter_shot(
+                        self.id,
+                        self.position,
+                        prompt,
+                        behavior,
+                        None,
+                        None,
+                        &mut commands,
+                    );
                 }
             }
             draws.push(DrawCommand::sprite_with_effect(
@@ -19410,6 +19485,35 @@ mod tests {
         });
 
         let report = driver.step(GameInput::NONE);
+        let report_source_rng = report
+            .source_rng
+            .expect("playing report should carry source rng");
+        let prompt = source_mutant_prompt_for_test(
+            report.step,
+            report.wave,
+            report_source_rng,
+            Point::new(42, 120),
+            Velocity::default(),
+        );
+        let mut expected_source = ActorSourceBaiterMetadata {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: actor_source_baiter_shot_reset(
+                ActorSourceWaveProfile::for_wave(report.wave),
+                report_source_rng.seed,
+            ),
+            sleep_ticks: SOURCE_BAITER_LOOP_SLEEP_TICKS,
+            picture_frame: 1,
+        };
+        let (expected_velocity, expected_projectile_source) = actor_source_baiter_fireball(
+            Point::new(70, 120),
+            &prompt,
+            expected_source,
+            report_source_rng,
+        )
+        .expect("expected source baiter fireball");
 
         assert!(report.sounds.contains(&SoundCue::BaiterShot));
         let baiter_shot = report
@@ -19428,16 +19532,77 @@ mod tests {
             baiter_shot,
             (
                 Point::new(70, 120),
-                Velocity::new(-4, 0),
-                Some(ActorSourceEnemyProjectileMetadata {
-                    x_fraction: 0,
-                    y_fraction: 0,
-                    x_velocity: actor_source_projectile_velocity_component(-4),
-                    y_velocity: actor_source_projectile_velocity_component(0),
-                    lifetime_ticks: actor_source_projectile_lifetime_ticks(LANDER_SHOT_LIFETIME),
-                })
+                expected_velocity,
+                Some(expected_projectile_source)
             )
         );
+        let (expected_x, expected_x_fraction) = actor_source_axis_step(
+            70,
+            expected_source.x_fraction,
+            actor_source_baiter_screen_x_velocity(expected_source.x_velocity),
+        );
+        let (expected_y, expected_y_fraction) = actor_source_active_object_y_step(
+            120,
+            expected_source.y_fraction,
+            expected_source.y_velocity,
+        );
+        expected_source.x_fraction = expected_x_fraction;
+        expected_source.y_fraction = expected_y_fraction;
+        assert_eq!(
+            snapshot_for(&report, baiter).position,
+            Point::new(expected_x, expected_y)
+        );
+        assert_eq!(
+            snapshot_for(&report, baiter).source_baiter,
+            Some(expected_source)
+        );
+    }
+
+    #[test]
+    fn source_baiter_full_shell_cap_suppresses_fireball_and_sound() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 1;
+        let player = driver.spawn_player();
+        driver.snapshots.insert(
+            player,
+            actor_snapshot(player.value(), ActorKind::Player, Point::new(42, 120)),
+        );
+        for index in 0..SOURCE_SHELL_LIMIT {
+            let id = ActorId::new(20_000 + index as u64);
+            driver.snapshots.insert(
+                id,
+                actor_snapshot(id.value(), ActorKind::EnemyLaser, Point::new(64, 120)),
+            );
+        }
+        let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
+            position: Point::new(70, 120),
+            source: Some(ActorSourceBaiterMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                shot_timer: 1,
+                sleep_ticks: 0,
+                picture_frame: 0,
+            }),
+        });
+
+        let report = driver.step(GameInput::NONE);
+        let report_source_rng = report
+            .source_rng
+            .expect("playing report should carry source rng");
+
+        assert!(!report.sounds.contains(&SoundCue::BaiterShot));
+        assert!(!report.commands.iter().any(|command| {
+            matches!(
+                command,
+                GameCommand::Spawn(SpawnRequest::EnemyLaser {
+                    source: Some(_),
+                    ..
+                })
+            )
+        }));
         assert_eq!(
             snapshot_for(&report, baiter).source_baiter,
             Some(ActorSourceBaiterMetadata {
@@ -19445,10 +19610,73 @@ mod tests {
                 y_fraction: 0,
                 x_velocity: 0,
                 y_velocity: 0,
-                shot_timer: 10,
+                shot_timer: actor_source_baiter_shot_reset(
+                    ActorSourceWaveProfile::for_wave(report.wave),
+                    report_source_rng.seed,
+                ),
                 sleep_ticks: SOURCE_BAITER_LOOP_SLEEP_TICKS,
                 picture_frame: 1,
             })
+        );
+    }
+
+    #[test]
+    fn source_baiter_fireball_adds_player_velocity_when_seed_is_high() {
+        let source_rng = ActorSourceRngSnapshot {
+            seed: 0x90,
+            hseed: 0,
+            lseed: 0x44,
+        };
+        let prompt = source_mutant_prompt_for_test(
+            7,
+            2,
+            source_rng,
+            Point::new(80, 120),
+            Velocity::new(5, -2),
+        );
+        let source = ActorSourceBaiterMetadata {
+            x_fraction: 0x12,
+            y_fraction: 0x34,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            picture_frame: 0,
+        };
+
+        let (velocity, projectile) =
+            actor_source_baiter_fireball(Point::new(70, 100), &prompt, source, source_rng)
+                .expect("high-seed baiter shot should allocate");
+
+        let expected_x_velocity = actor_sign_extend_u8_to_u16(
+            (source_rng.seed & 0x1F)
+                .wrapping_sub(0x10)
+                .wrapping_add(80)
+                .wrapping_sub(70),
+        )
+        .wrapping_shl(2)
+        .wrapping_add(actor_source_velocity_word(5).wrapping_shl(2));
+        let expected_y_velocity = actor_sign_extend_u8_to_u16(
+            (source_rng.lseed & 0x1F)
+                .wrapping_sub(0x10)
+                .wrapping_add(120)
+                .wrapping_sub(100),
+        )
+        .wrapping_shl(2);
+
+        assert_eq!(
+            projectile,
+            ActorSourceEnemyProjectileMetadata {
+                x_fraction: source.x_fraction,
+                y_fraction: source.y_fraction,
+                x_velocity: expected_x_velocity,
+                y_velocity: expected_y_velocity,
+                lifetime_ticks: SOURCE_SHELL_LIFETIME_TICKS,
+            }
+        );
+        assert_eq!(
+            velocity,
+            actor_source_screen_velocity(expected_x_velocity, expected_y_velocity)
         );
     }
 

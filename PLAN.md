@@ -155,8 +155,11 @@ verification tools.
   loop before using the source `SWBMB` fireball projection with pass-player and
   shell-cap suppression, source shell lifetime metadata, and distinct shot
   cues, and source-paced baiter timer entry now spawns
-  source-backed baiter actors that can shoot and pursue the player without
-  blocking wave completion after source-counted enemies are gone. Smart bombs
+  source-backed baiter actors that can pursue the player and fire source
+  `SHOOT` fireballs with source RNG velocity/player-velocity contribution,
+  source shell-cap suppression, and `USHSND` evidence only when allocation
+  succeeds, without blocking wave completion after source-counted enemies are
+  gone. Smart bombs
   now use driver-owned stock: normal player requests consume stock before
   clearing hostile actors, exhausted
   stock leaves hostiles alive, and `XYZZY` overlay smart bombs use the same
@@ -827,6 +830,36 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 19:19 BST`: Completed the actor source baiter fireball
+  projection cycle. Source-backed baiter shots now use the red-label shared
+  `SHOOT` fireball setup instead of the generic hostile-shot helper: source
+  RNG selects X/Y fireball velocity, high prompt `SEED` adds player X velocity,
+  the source actor fractions become shell fractions, and the source 20-tick
+  shell lifetime is preserved. The source-backed path now suppresses both
+  projectile and `USHSND`/baiter shot sound when source shell placement or the
+  shared shell cap rejects allocation, while non-source scripted baiters keep
+  their existing behavior-profile helper. Source-backed baiter shot-timer
+  resets now use the source `RMAX`-style reset from the same driver-provided
+  source RNG snapshot used for fireball projection. Focused regressions cover
+  successful source projection, full-shell suppression, and high-seed
+  player-velocity contribution. README, SPEC, and actor architecture docs now
+  document the actor-side source `SHOOT` projection. No legacy code, tests, or
+  scaffolding were safe to remove in this slice because clean
+  smoke/fidelity/oracle evidence still depends on clean runtime boundaries
+  outside the actor path. Validation passed with `cargo fmt --check`,
+  `cargo check --all-targets --features legacy-tools`, `cargo test
+  source_baiter --lib --features legacy-tools`, `cargo test source_mutant
+  --lib --features legacy-tools`, `cargo test actor_game --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features
+  legacy-tools -- -D warnings`, the actor-game/smoke/live/runtime/wgpu
+  all-target `legacy-tools` filters, and the actor smoke CLI commands
+  (`--actor-smoke`, `--actor-attract-smoke`, `--actor-post-game-smoke`, and
+  `--actor-wgpu-smoke`). The full unfiltered `legacy-tools` suite was not
+  rerun in this cycle; the previously isolated clean-game MAME
+  window/post-game audio failures remain outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780682854897899`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780683539952199`.
 - `2026-06-05 19:04 BST`: Completed the actor source mini-swarmer fireball
   projection cycle. Source-backed swarmer shots now use the red-label `SWBMB`
   fireball shape instead of the generic hostile-shot helper: the actor path

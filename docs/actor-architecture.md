@@ -341,6 +341,9 @@ lasers own and advance fixed-point velocity, fraction, and lifetime values,
 with lifetime decrementing on the source shell-scan cadence. Enemy-shot spawn
 commands can also carry source fractions, velocities, and lifetime ticks from
 custom drivers and source-backed lander, swarmer, and baiter AI shots.
+Source-backed baiter shots use the shared source fireball projection helper,
+so their source fractions, X/Y velocities, 20-tick lifetime metadata, and
+`USHSND` cue are emitted only after source shell bounds/cap allocation passes.
 Source-backed bomber bomb actors carry stationary bomb-shell fraction and
 source-cadenced lifetime values into the clean state bridge, preserving nonzero
 scripted source lifetime ticks as the initial actor shell-scan lifetime. Driver
@@ -577,8 +580,11 @@ The actor driver now owns a first Defender gameplay loop:
   source active cap. Baiters pursue and shoot through actor-owned metadata,
   publish three-frame source animation state, gate picture-wrap retargeting
   through the driver-provided source RNG snapshot, fold player velocity into
-  source-shaped seek velocity, score 200 points on laser hit, and do not block
-  wave completion once lander/bomber/pod/swarmer snapshots are gone.
+  source-shaped seek velocity, project source `SHOOT` fireball shells from
+  source RNG X/Y deltas plus high-seed player velocity, suppress projectile and
+  `USHSND` cue when the shared source shell list is full, score 200 points on
+  laser hit, and do not block wave completion once lander/bomber/pod/swarmer
+  snapshots are gone.
 - Carried humans follow their lander. If the carrier disappears, the human
   falls under a simple acceleration model and emits the release sound cue.
 - Falling humans caught by the player award 500 points, emit the rescue sound

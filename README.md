@@ -227,7 +227,9 @@ mini-swarmer spawning with source RNG-derived velocity, acceleration, sleep,
 and shot-timer metadata, source mini-swarmer entry seek plus fixed-point
 vertical acceleration/damping, `SWBMB` fireball direction/shell-cap
 suppression, and shot cues, source-paced baiter timer entry, baiter
-shots/scoring/hit cues, and stock-backed smart-bomb hostile clearing.
+source `SHOOT` fireball projection with source RNG velocity/player-velocity
+contribution, shell-cap suppression, shot/scoring/hit cues, and stock-backed
+smart-bomb hostile clearing.
 Actor score awards now use the same replay-bonus threshold model as the clean
 score system, so threshold crossings add life/smart-bomb stock and emit
 `BonusAwarded` through the actor event bridge. Score and replay-bonus stock
@@ -923,9 +925,11 @@ source `WVCHK` count, and respects the source active-baiter cap. Active baiters
 therefore do not block reserve activation or wave clear when no source-counted
 enemies remain.
 Spawned baiters retain source shot-timer, picture-cycle, sleep, and velocity
-state, pursue the player through source seek rules, fire source-shaped
-fireball shells with source `USHSND` command evidence, and those enemy
-projectiles use source `SHSCAN` lifetime decrement/wrap behavior,
+state, pursue the player through source seek rules, fire source `SHOOT`
+fireball shells with source RNG X/Y projection and player-velocity
+contribution, emit source `USHSND` command evidence only when the shared shell
+list allocates a shell, and those enemy projectiles use source `SHSCAN`
+lifetime decrement/wrap behavior,
 scroll-adjusted fixed-point motion, offscreen culling, collision scoring, and
 player-damage handling with source `BKIL` / `AHSND` command evidence when a
 shell hits the player plus source `PLEND` / `PDSND` command evidence when the
