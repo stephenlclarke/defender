@@ -4622,3 +4622,28 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780641968857339`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780642500339539`.
+- `2026-06-05 08:12 BST`: Completed the actor driver-owned source RNG prompt
+  cycle. `StepPrompt` and `StepReport` now carry the driver-owned source RNG
+  snapshot for playing steps, and the default hyperspace behavior derives its
+  source seed from that same prompt boundary. Source-backed bomber motion now
+  consumes the driver-provided source RNG snapshot for picture and Y-motion
+  updates instead of falling back to a local step/id seed when the driver has a
+  source prompt available. Added a focused report snapshot regression and kept
+  the hyperspace/source bomber behavior tests green. README, SPEC, and the
+  actor architecture notes now document the source RNG prompt boundary. No
+  legacy code, tests, or scaffolding were safe to remove in this slice because
+  clean smoke/fidelity/oracle evidence still depends on clean runtime
+  boundaries outside the actor path. Validation passed with `cargo fmt
+  --check`, focused source RNG/hyperspace/source bomber tests,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite was not rerun in this cycle; the previously isolated
+  clean-game MAME window/post-game audio failures remain outside this slice.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780642856268849`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780643571704519`.

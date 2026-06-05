@@ -763,8 +763,9 @@ reintroduce legacy implementation terminology.
   fixed-point metadata plus movement/facing metadata in snapshots and advance
   their actor-owned fraction state during active motion. Source-backed bomber
   actors now update seeded picture-frame and Y-velocity metadata, including
-  cruise-altitude and player-relative Y adjustments, during active source
-  motion. Hostile projectile
+  cruise-altitude and player-relative Y adjustments, during active source motion
+  from the driver-provided source RNG snapshot carried in
+  `StepPrompt`/`StepReport`. Hostile projectile
   snapshots now carry source-shaped shell velocity/lifetime metadata into the
   clean state bridge; enemy-shot actors advance their own fixed-point fraction
   state every actor step while decrementing lifetime on the source shell-scan

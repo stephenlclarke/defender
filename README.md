@@ -109,8 +109,9 @@ their fixed-point metadata through snapshots, publish per-step movement/facing
 metadata for the clean state bridge, and advance fraction state during active
 motion. Source-backed bombers now update seeded picture-frame and Y-velocity
 metadata, including cruise-altitude and player-relative Y adjustments, during
-their actor-owned source motion. Hostile projectile actors also publish
-source-shaped shell metadata:
+active source motion from the driver-provided source RNG snapshot carried in
+`StepPrompt`/`StepReport`. Hostile projectile actors also publish source-shaped
+shell metadata:
 enemy lasers own and advance fixed-point source velocity, fraction, and
 lifetime state with the red-label shell-scan cadence, and enemy-shot spawn
 commands can carry source fractions, velocities, and lifetime ticks from

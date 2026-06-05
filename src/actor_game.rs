@@ -888,6 +888,23 @@ pub struct ActorHyperspaceSourceSeed {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceRngSnapshot {
+    pub seed: u8,
+    pub hseed: u8,
+    pub lseed: u8,
+}
+
+impl ActorSourceRngSnapshot {
+    const fn hyperspace_seed(self) -> ActorHyperspaceSourceSeed {
+        ActorHyperspaceSourceSeed {
+            seed: self.seed,
+            hseed: self.hseed,
+            lseed: self.lseed,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ActorSourceRng {
     seed: u8,
     hseed: u8,
@@ -915,8 +932,8 @@ impl ActorSourceRng {
         source_rmax(max, state.seed)
     }
 
-    const fn hyperspace_seed(self) -> ActorHyperspaceSourceSeed {
-        ActorHyperspaceSourceSeed {
+    const fn snapshot(self) -> ActorSourceRngSnapshot {
+        ActorSourceRngSnapshot {
             seed: self.seed,
             hseed: self.hseed,
             lseed: self.lseed,
@@ -2720,6 +2737,7 @@ pub struct StepPrompt {
     pub high_score_initials: HighScoreInitialsState,
     pub snapshots: Vec<ActorSnapshot>,
     pub behavior_script: ActorBehaviorScript,
+    pub source_rng: Option<ActorSourceRngSnapshot>,
     pub source_shell_scan_tick: bool,
 }
 
@@ -2843,6 +2861,7 @@ pub struct StepReport {
     pub high_scores: [u32; 5],
     pub high_score_initials: HighScoreInitialsState,
     pub behavior_script: ActorBehaviorScriptManifest,
+    pub source_rng: Option<ActorSourceRngSnapshot>,
     pub snapshots: Vec<ActorSnapshot>,
     pub draws: Vec<DrawCommand>,
     pub sounds: Vec<SoundCue>,
@@ -3778,7 +3797,7 @@ pub struct ActorGameDriver {
     wave_script: ActorWaveScript,
     baiter_timer_steps: Option<u32>,
     baiter_pacing_steps_remaining: u8,
-    hyperspace_source_rng: ActorSourceRng,
+    source_rng: ActorSourceRng,
     source_shell_scan_steps_remaining: u8,
 }
 
@@ -3816,7 +3835,7 @@ impl ActorGameDriver {
             wave_script,
             baiter_timer_steps: None,
             baiter_pacing_steps_remaining: ACTOR_BAITER_TIMER_PACING_STEPS,
-            hyperspace_source_rng: SOURCE_PLAYFIELD_START_RNG,
+            source_rng: SOURCE_PLAYFIELD_START_RNG,
             source_shell_scan_steps_remaining: SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS,
         };
         let attract_id = driver.allocate_actor_id();
@@ -3835,9 +3854,14 @@ impl ActorGameDriver {
         let mut behavior_script = self
             .behavior_script
             .with_input_overrides(input, self.snapshots.values().cloned());
-        if self.phase == Phase::Playing {
-            let source_seed = self.hyperspace_source_rng.advance().hyperspace_seed();
-            behavior_script = behavior_script.with_hyperspace_source_seed(source_seed);
+        let source_rng = if self.phase == Phase::Playing {
+            Some(self.source_rng.advance().snapshot())
+        } else {
+            None
+        };
+        if let Some(source_rng) = source_rng {
+            behavior_script =
+                behavior_script.with_hyperspace_source_seed(source_rng.hyperspace_seed());
         }
         let source_shell_scan_tick = if self.phase == Phase::Playing {
             self.advance_source_shell_scan_tick()
@@ -3857,6 +3881,7 @@ impl ActorGameDriver {
             high_score_initials: self.high_score_initials,
             snapshots: self.snapshots.values().cloned().collect(),
             behavior_script: behavior_script.clone(),
+            source_rng,
             source_shell_scan_tick,
         };
 
@@ -3901,6 +3926,7 @@ impl ActorGameDriver {
             high_scores: self.high_scores.entries(),
             high_score_initials: self.high_score_initials,
             behavior_script: behavior_script.manifest(),
+            source_rng,
             snapshots: self.snapshots.values().cloned().collect(),
             draws,
             sounds,
@@ -4379,7 +4405,7 @@ impl ActorGameDriver {
         self.lives = 0;
         self.smart_bombs = 0;
         self.wave = 0;
-        self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
+        self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.reset_source_shell_scan();
         self.high_score_initials = HighScoreInitialsState::EMPTY;
         self.high_scores.record(self.score);
@@ -4415,7 +4441,7 @@ impl ActorGameDriver {
         self.lives = 3;
         self.smart_bombs = INITIAL_SMART_BOMBS;
         self.high_score_initials = HighScoreInitialsState::EMPTY;
-        self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
+        self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.reset_source_shell_scan();
         self.apply_wave_profile();
         self.spawn_player();
@@ -5841,7 +5867,10 @@ impl Bomber {
             return true;
         }
 
-        let seed = actor_source_motion_seed(prompt.step, self.id);
+        let seed = prompt
+            .source_rng
+            .map(|source_rng| source_rng.seed)
+            .unwrap_or_else(|| actor_source_motion_seed(prompt.step, self.id));
         source.picture_frame = actor_source_bomber_picture_frame(seed, source.picture_frame);
         source.y_velocity = actor_source_bomber_random_y_velocity(source.y_velocity, seed);
         if self.position.y == 0 {
@@ -7416,6 +7445,7 @@ mod tests {
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
             high_score_initials: HighScoreInitialsState::EMPTY,
             behavior_script: ActorBehaviorScript::default().manifest(),
+            source_rng: None,
             snapshots: Vec::new(),
             draws: vec![
                 DrawCommand::sprite(ActorId(101), SpriteKey::Laser, Point::new(40, 80)),
@@ -7537,6 +7567,7 @@ mod tests {
                 cursor: 1,
             },
             behavior_script: ActorBehaviorScript::default().manifest(),
+            source_rng: None,
             snapshots: vec![player, lander, human, laser, enemy_laser, bomb],
             draws: vec![
                 DrawCommand::sprite(ActorId(11), SpriteKey::PlayerLeft, Point::new(40, 70)),
@@ -8500,6 +8531,7 @@ mod tests {
                 },
                 live.step,
                 bomber_snapshot.id,
+                live.source_rng,
                 live.snapshots
                     .iter()
                     .find(|snapshot| snapshot.kind == ActorKind::Player)
@@ -8785,6 +8817,7 @@ mod tests {
             snapshots: Vec::new(),
             behavior_script: ActorBehaviorScript::default()
                 .with_kind_behavior(ActorKind::EnemyLaser, behavior),
+            source_rng: None,
             source_shell_scan_tick: false,
         };
         let mut shot = EnemyLaserShot::new(
@@ -9198,6 +9231,22 @@ mod tests {
     }
 
     #[test]
+    fn playing_step_report_carries_driver_source_rng_snapshot() {
+        let mut driver = ActorGameDriver::new();
+
+        let attract = driver.step(GameInput::NONE);
+        assert_eq!(attract.source_rng, None);
+
+        driver.phase = Phase::Playing;
+        let mut expected_source = SOURCE_PLAYFIELD_START_RNG;
+        let expected_snapshot = expected_source.advance().snapshot();
+
+        let playing = driver.step(GameInput::NONE);
+
+        assert_eq!(playing.source_rng, Some(expected_snapshot));
+    }
+
+    #[test]
     fn xyzzy_invincibility_keeps_player_alive_on_enemy_laser_contact() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
@@ -9524,6 +9573,7 @@ mod tests {
             initial_source,
             report.step,
             bomber,
+            report.source_rng,
             None,
         );
 
@@ -9660,6 +9710,7 @@ mod tests {
             initial_source,
             report.step,
             bomber,
+            report.source_rng,
             Some(player_position),
         );
         let snapshot = snapshot_for(&report, bomber);
@@ -9686,6 +9737,11 @@ mod tests {
     fn source_bomber_offscreen_motion_adjusts_cruise_altitude() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
+        driver.source_rng = ActorSourceRng {
+            seed: 0,
+            hseed: 0,
+            lseed: 0,
+        };
         driver.set_kind_behavior(
             ActorKind::Bomber,
             ActorBehaviorProfile {
@@ -9715,6 +9771,7 @@ mod tests {
             initial_source,
             report.step,
             bomber,
+            report.source_rng,
             None,
         );
         let snapshot = snapshot_for(&report, bomber);
@@ -11103,6 +11160,7 @@ mod tests {
         mut source: ActorSourceBomberMetadata,
         step: u64,
         id: ActorId,
+        source_rng: Option<ActorSourceRngSnapshot>,
         player_position: Option<Point>,
     ) -> (Point, ActorSourceBomberMetadata) {
         if source.sleep_ticks > 0 {
@@ -11110,7 +11168,9 @@ mod tests {
             return (position, source);
         }
 
-        let seed = actor_source_motion_seed(step, id);
+        let seed = source_rng
+            .map(|source_rng| source_rng.seed)
+            .unwrap_or_else(|| actor_source_motion_seed(step, id));
         source.picture_frame = actor_source_bomber_picture_frame(seed, source.picture_frame);
         source.y_velocity = actor_source_bomber_random_y_velocity(source.y_velocity, seed);
         if position.y == 0 {
