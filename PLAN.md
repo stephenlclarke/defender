@@ -6376,3 +6376,26 @@ Exit gate:
   check/clippy, touched-doc `markdownlint`, and `git diff --check`. Slack
   start:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780697836698829`.
+- `2026-06-05 23:30 BST`: Completed the organic smartmix live-scanner
+  mini-terrain cycle. The live scanner renderer now honors
+  `ScannerRadarSnapshot::terrain_enabled`: before terrain erase it draws the
+  source `MTERR` mini-terrain slice for the current scanner `scan_left`, using
+  source scanner terrain tint and pixel size before object/player blips. The
+  existing scanner sprite regression now derives the expected terrain pixel
+  count from `MTERR` records and asserts all emitted scanner terrain pixels use
+  the source HUD layer, tint, and size. Regenerated ignored media confirms the
+  first candidate comparison frame now shows the missing orange scanner
+  terrain line alongside the residual objects and live playfield terrain. The
+  all-axis report remains red because the scanner terrain and residual objects
+  are still spatially misaligned against MAME: visual RMS `90.88`, visual MAE
+  `42.76`, scanner RMS `99.90`, `normalized_diff_rms=1.726`, audio
+  correlation `-0.005`, and audio envelope correlation `0.137`. No protected
+  media was committed or accepted, and no legacy code, tests, or scaffolding
+  were safe to remove because this proof boundary still depends on
+  clean-vs-MAME reference tooling. Evidence runs included the
+  `reference-clean-capture` and `reference-media-check` targets, with the media
+  check expectedly failing on the current all-axis metrics. Validation passed
+  with `cargo fmt --check`, the focused scanner regression, the focused
+  organic regression, terrain-blow regression tests, Cargo check/clippy,
+  touched-doc `markdownlint`, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780698365603889`.

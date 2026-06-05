@@ -596,8 +596,10 @@ const ATTRACT_SCORING_OBJECT_REFERENCE_OFFSET: [f32; 2] = [-15.0, -10.0];
 const ATTRACT_HALL_OF_FAME_REFERENCE_OFFSET: [f32; 2] = [-11.0, -6.0];
 const ATTRACT_SCORING_SCANNER_ORIGIN: [f32; 2] = [84.0, 0.0];
 const ATTRACT_SCORING_SCANNER_SIZE: [f32; 2] = [128.0, 32.0];
-const ATTRACT_SCORING_SCANNER_TERRAIN_PIXEL_SIZE: [f32; 2] = [1.0, 1.0];
-const ATTRACT_SCORING_SCANNER_TERRAIN_TINT: Color = Color::from_rgba(174, 81, 0, 255);
+const SOURCE_SCANNER_TERRAIN_PIXEL_SIZE: [f32; 2] = [1.0, 1.0];
+const SOURCE_SCANNER_TERRAIN_TINT: Color = Color::from_rgba(174, 81, 0, 255);
+const ATTRACT_SCORING_SCANNER_TERRAIN_PIXEL_SIZE: [f32; 2] = SOURCE_SCANNER_TERRAIN_PIXEL_SIZE;
+const ATTRACT_SCORING_SCANNER_TERRAIN_TINT: Color = SOURCE_SCANNER_TERRAIN_TINT;
 const ATTRACT_SCORING_SCANNER_BORDER_TINT: Color = Color::from_rgba(38, 0, 160, 255);
 const SOURCE_WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255];
 const SOURCE_WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255];
@@ -13749,10 +13751,16 @@ fn source_scanner_mini_terrain_records()
     static RECORDS: OnceLock<[SourceScannerTerrainRecord; SOURCE_SCANNER_TERRAIN_RECORDS]> =
         OnceLock::new();
     RECORDS.get_or_init(|| {
-        source_generate_scanner_mini_terrain_records(
+        source_scanner_mini_terrain_records_for_scan_left(
             0u16.wrapping_sub(SOURCE_SCANNER_SCAN_CENTER_OFFSET),
         )
     })
+}
+
+fn source_scanner_mini_terrain_records_for_scan_left(
+    scan_left: u16,
+) -> [SourceScannerTerrainRecord; SOURCE_SCANNER_TERRAIN_RECORDS] {
+    source_generate_scanner_mini_terrain_records(scan_left)
 }
 
 fn source_generate_bgout_default_terrain_records()
@@ -15074,6 +15082,12 @@ pub(crate) fn push_scanner_radar_sprites(scene: &mut RenderScene, scanner: &Scan
         return;
     }
 
+    if scanner.terrain_enabled
+        && let Some(scan_left) = scanner.scan_left
+    {
+        push_scanner_terrain_sprites(scene, scan_left);
+    }
+
     let blip_count = usize::from(scanner.blip_count).min(SCANNER_RADAR_BLIP_LIMIT);
     for blip in &scanner.blips[..blip_count] {
         if SOURCE_VISUAL_STATE
@@ -15117,6 +15131,27 @@ pub(crate) fn push_scanner_radar_sprites(scene: &mut RenderScene, scanner: &Scan
             player_blip.screen_address.wrapping_sub(0x00FF),
             player_blip.upper_byte,
         );
+    }
+}
+
+fn push_scanner_terrain_sprites(scene: &mut RenderScene, scan_left: u16) {
+    for record in source_scanner_mini_terrain_records_for_scan_left(scan_left) {
+        let origin = source_screen_position(record.screen_address);
+        for (row, byte) in record.word.to_be_bytes().into_iter().enumerate() {
+            for column in 0..2 {
+                let nibble = if column == 0 { byte >> 4 } else { byte & 0x0F };
+                if nibble == 0 {
+                    continue;
+                }
+                scene.push_sprite(SceneSprite {
+                    sprite: SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL,
+                    layer: RenderLayer::Hud,
+                    position: [origin[0] + column as f32, origin[1] + row as f32],
+                    size: SOURCE_SCANNER_TERRAIN_PIXEL_SIZE,
+                    tint: SOURCE_SCANNER_TERRAIN_TINT,
+                });
+            }
+        }
     }
 }
 
@@ -27602,7 +27637,32 @@ mod tests {
         );
 
         let scene = game.scene();
+        let expected_terrain_pixels = super::source_scanner_mini_terrain_records_for_scan_left(
+            game.state
+                .world
+                .scanner
+                .scan_left
+                .expect("scanner scan left"),
+        )
+        .into_iter()
+        .flat_map(|record| record.word.to_be_bytes())
+        .map(|byte| u16::from(byte >> 4 != 0) + u16::from(byte & 0x0F != 0))
+        .sum::<u16>();
+        let scanner_terrain_sprites = scene
+            .sprites
+            .iter()
+            .filter(|sprite| sprite.sprite == SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL)
+            .collect::<Vec<_>>();
 
+        assert_eq!(
+            scanner_terrain_sprites.len(),
+            usize::from(expected_terrain_pixels)
+        );
+        assert!(scanner_terrain_sprites.iter().all(|sprite| {
+            sprite.layer == RenderLayer::Hud
+                && sprite.size == super::SOURCE_SCANNER_TERRAIN_PIXEL_SIZE
+                && sprite.tint == super::SOURCE_SCANNER_TERRAIN_TINT
+        }));
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::SCANNER_OBJECT_BLIP
                 && sprite.layer == RenderLayer::Hud

@@ -206,10 +206,11 @@ from these perspectives:
   organic smartmix probe is still unaccepted. The current clean candidate now
   reaches score `50`, keeps human snapshots empty, arms the destroyed-planet
   state while preserving visible terrain, projects the six-lander/nine-mutant
-  residual object formation from the first compared frame, starts visible
-  terrain-blow explosions only at the organic post-game `TERBLO` boundary, and
-  emits the sampled `0xEE` cadence, but the regenerated all-axis report still
-  fails visual placement and audio waveform thresholds.
+  residual object formation from the first compared frame, renders the live
+  scanner mini-terrain from source `MTERR` records while terrain is still
+  armed, starts visible terrain-blow explosions only at the organic post-game
+  `TERBLO` boundary, and emits the sampled `0xEE` cadence, but the regenerated
+  all-axis report still fails visual placement and audio waveform thresholds.
 - Laser/reverse implementation coverage:
   focused tests cover source-style sparse laser sprites, `LASP1` object
   evidence, far-side enemy collision before culling, capped-fire sound
@@ -387,12 +388,13 @@ complete without owner review or more MAME evidence:
   visible terrain while the source `TERBLO` process is armed, starts visible
   `TEREX` terrain explosions at post-game frame `1044`, projects the
   MAME-observed six-lander/nine-mutant residual object mix from state frame
-  `5960` through the sampled terminal rows, and emits the sampled `0xEE` tail.
-  The remaining implementation gap is all-axis media fidelity for that organic
-  branch: current regenerated metrics are visual RMS `90.85` / MAE `42.72`
-  against thresholds `38.00` / `28.00`, and audio still fails waveform
-  correlation despite nonzero clean terrain-blow audio
-  (`normalized_diff_rms=1.726`, `correlation=-0.005`,
+  `5960` through the sampled terminal rows, renders source `MTERR`
+  mini-terrain in the live scanner until terrain erase, and emits the sampled
+  `0xEE` tail. The remaining implementation gap is all-axis media fidelity for
+  that organic branch: current regenerated metrics are visual RMS `90.88` /
+  MAE `42.76` against thresholds `38.00` / `28.00`, scanner RMS `99.90`, and
+  audio still fails waveform correlation despite nonzero clean terrain-blow
+  audio (`normalized_diff_rms=1.726`, `correlation=-0.005`,
   `envelope_correlation=0.137`).
 - Owner review of graphics, audio, and playability. `PLAN.md` still requires
   owner signoff before protected reference media replacement and final closure.
