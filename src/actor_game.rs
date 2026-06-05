@@ -158,6 +158,7 @@ const SOURCE_TARGET6_MUTANT_FIRE2524_FIRST_SHOT_RAW: (u16, u16) = (0x082C, 0x516
 const SOURCE_TARGET6_MUTANT_FIRE2524_SECOND_SHOT_RAW: (u16, u16) = (0x07FC, 0x8150);
 const SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MIN: u16 = 0xA400;
 const SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MAX: u16 = 0xA600;
+const SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_TOP_LEFT: Point = Point::new(0x20, 0xA2);
 const SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER: Point = Point::new(0x21, 0xA9);
 const SOURCE_TARGET6_MUTANT_VISUAL_X_CORRECTION: u16 = 0x0168;
 const SOURCE_OBJECT_SCREEN_X_SHIFT: u8 = 6;
@@ -2317,6 +2318,7 @@ pub enum VisualEffect {
     ExplosionCloud {
         kind: ExplosionKind,
         age: u16,
+        source_center: Option<Point>,
     },
 }
 
@@ -2789,6 +2791,7 @@ pub enum SpawnRequest {
     Explosion {
         position: Point,
         kind: ExplosionKind,
+        source_center: Option<Point>,
     },
     ScorePopup {
         position: Point,
@@ -3332,11 +3335,18 @@ fn actor_explosions_for_report(report: &StepReport) -> Vec<CleanExplosionSnapsho
         .draws
         .iter()
         .filter_map(|draw| match draw.effect {
-            VisualEffect::ExplosionCloud { kind, .. } => {
-                Some(CleanExplosionSnapshot::source_spawn(
+            VisualEffect::ExplosionCloud {
+                kind,
+                age,
+                source_center,
+            } => {
+                let mut explosion = CleanExplosionSnapshot::source_spawn(
                     clean_explosion_kind(kind),
                     screen_position(draw.position),
-                ))
+                );
+                explosion.source_center = source_center.map(screen_position);
+                explosion.source_size = source_explosion_size_for_age(age);
+                Some(explosion)
             }
             _ => None,
         })
@@ -3492,9 +3502,11 @@ impl ActorRenderSceneBridge {
             VisualEffect::DefenderCoalescence { slot, row_pair } => {
                 self.push_defender_coalescence(scene, slot, row_pair)
             }
-            VisualEffect::ExplosionCloud { kind, age } => {
-                self.push_explosion_sprite(scene, draw.position, kind, age)
-            }
+            VisualEffect::ExplosionCloud {
+                kind,
+                age,
+                source_center,
+            } => self.push_explosion_sprite(scene, draw.position, kind, age, source_center),
             VisualEffect::Static
             | VisualEffect::SourceLanderFrame { .. }
             | VisualEffect::SourceBomberFrame { .. }
@@ -3575,6 +3587,7 @@ impl ActorRenderSceneBridge {
         position: Point,
         kind: ExplosionKind,
         age: u16,
+        source_center: Option<Point>,
     ) {
         let (sprite, base_size) = match kind {
             ExplosionKind::Lander => (SpriteId::ENEMY_LANDER, LANDER_SCENE_SIZE),
@@ -3596,7 +3609,7 @@ impl ActorRenderSceneBridge {
                 scene,
                 clean_explosion_kind(kind),
                 source_position,
-                None,
+                source_center.and_then(try_screen_position),
                 source_size,
             )
         {
@@ -4343,8 +4356,17 @@ impl ActorGameDriver {
     }
 
     fn spawn_explosion(&mut self, position: Point, kind: ExplosionKind) -> ActorId {
+        self.spawn_explosion_with_source_center(position, kind, None)
+    }
+
+    fn spawn_explosion_with_source_center(
+        &mut self,
+        position: Point,
+        kind: ExplosionKind,
+        source_center: Option<Point>,
+    ) -> ActorId {
         let id = self.allocate_actor_id();
-        self.spawn_actor(Explosion::new(id, position, kind));
+        self.spawn_actor(Explosion::new(id, position, kind, source_center));
         id
     }
 
@@ -4383,6 +4405,7 @@ impl ActorGameDriver {
                         commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
                             position: center_of(enemy.bounds),
                             kind,
+                            source_center: None,
                         }));
                     }
                     commands.push(GameCommand::AddScore(score_for_hostile(enemy.kind)));
@@ -4423,9 +4446,11 @@ impl ActorGameDriver {
                 commands.push(GameCommand::Destroy(enemy.owner));
                 if is_player_enemy_collision_target(enemy.kind) {
                     if let Some(kind) = explosion_kind_for_target(enemy.kind) {
+                        let placement = actor_player_enemy_collision_explosion_placement(enemy);
                         commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
-                            position: actor_player_enemy_collision_explosion_position(enemy),
+                            position: placement.position,
                             kind,
+                            source_center: placement.source_center,
                         }));
                     }
                     commands.push(GameCommand::AddScore(score_for_hostile(enemy.kind)));
@@ -4434,6 +4459,7 @@ impl ActorGameDriver {
                 commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
                     position: center_of(player.bounds),
                     kind: player_hazard_explosion_kind(enemy.kind),
+                    source_center: None,
                 }));
                 commands.push(GameCommand::PlaySound(player_hazard_sound(enemy.kind)));
                 commands.push(GameCommand::PlayerKilled);
@@ -4517,8 +4543,12 @@ impl ActorGameDriver {
                 GameCommand::Spawn(SpawnRequest::Human { position, mode }) => {
                     self.spawn_human(position, mode);
                 }
-                GameCommand::Spawn(SpawnRequest::Explosion { position, kind }) => {
-                    self.spawn_explosion(position, kind);
+                GameCommand::Spawn(SpawnRequest::Explosion {
+                    position,
+                    kind,
+                    source_center,
+                }) => {
+                    self.spawn_explosion_with_source_center(position, kind, source_center);
                 }
                 GameCommand::Spawn(SpawnRequest::ScorePopup { position, points }) => {
                     self.spawn_score_popup(position, points);
@@ -5462,6 +5492,7 @@ impl PlayerShip {
         commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
             position: self.position,
             kind: ExplosionKind::Player,
+            source_center: None,
         }));
         commands.push(GameCommand::PlaySound(SoundCue::Explosion));
         commands.push(GameCommand::PlayerKilled);
@@ -6765,14 +6796,28 @@ fn actor_source_target6_mutant_uses_fire2524_collision_projection(
             .contains(&raw_y16)
 }
 
-fn actor_player_enemy_collision_explosion_position(enemy: &CollisionBody) -> Point {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ActorExplosionPlacement {
+    position: Point,
+    source_center: Option<Point>,
+}
+
+fn actor_player_enemy_collision_explosion_placement(
+    enemy: &CollisionBody,
+) -> ActorExplosionPlacement {
     if actor_source_target6_mutant_uses_fire2524_collision_projection(
         enemy.position,
         enemy.source_mutant,
     ) {
-        SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER
+        ActorExplosionPlacement {
+            position: SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_TOP_LEFT,
+            source_center: Some(SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER),
+        }
     } else {
-        center_of(enemy.bounds)
+        ActorExplosionPlacement {
+            position: center_of(enemy.bounds),
+            source_center: None,
+        }
     }
 }
 
@@ -7966,6 +8011,7 @@ impl Human {
                 commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
                     position: self.position,
                     kind: ExplosionKind::Human,
+                    source_center: None,
                 }));
                 commands.push(GameCommand::PlaySound(SoundCue::HumanLost));
             }
@@ -8346,15 +8392,22 @@ struct Explosion {
     id: ActorId,
     position: Point,
     kind: ExplosionKind,
+    source_center: Option<Point>,
     age: u16,
 }
 
 impl Explosion {
-    fn new(id: ActorId, position: Point, kind: ExplosionKind) -> Self {
+    fn new(
+        id: ActorId,
+        position: Point,
+        kind: ExplosionKind,
+        source_center: Option<Point>,
+    ) -> Self {
         Self {
             id,
             position,
             kind,
+            source_center,
             age: 0,
         }
     }
@@ -8377,6 +8430,7 @@ impl AssetActor for Explosion {
                 VisualEffect::ExplosionCloud {
                     kind: self.kind,
                     age: self.age,
+                    source_center: self.source_center,
                 },
             ));
             self.age = self.age.saturating_add(1);
@@ -8644,6 +8698,7 @@ mod tests {
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Lander,
                         age: 2,
+                        source_center: None,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -8653,6 +8708,7 @@ mod tests {
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Mutant,
                         age: 2,
+                        source_center: None,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -8662,6 +8718,7 @@ mod tests {
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Bomber,
                         age: 2,
+                        source_center: None,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -8671,6 +8728,7 @@ mod tests {
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Pod,
                         age: 2,
+                        source_center: None,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -8680,6 +8738,7 @@ mod tests {
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Swarmer,
                         age: 2,
+                        source_center: None,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -8689,6 +8748,7 @@ mod tests {
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Baiter,
                         age: 2,
+                        source_center: None,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -8698,6 +8758,7 @@ mod tests {
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Bomb,
                         age: 2,
+                        source_center: None,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -8707,6 +8768,7 @@ mod tests {
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Human,
                         age: 1,
+                        source_center: None,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -8716,6 +8778,7 @@ mod tests {
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Player,
                         age: 1,
+                        source_center: None,
                     },
                 ),
             ],
@@ -8803,6 +8866,65 @@ mod tests {
     }
 
     #[test]
+    fn actor_explosion_source_center_reaches_state_and_render_bridges() {
+        let top_left = Point::new(0x20, 0xA2);
+        let source_center = Point::new(0x21, 0xA9);
+        let report = StepReport {
+            step: 7,
+            phase: Phase::Playing,
+            wave: 1,
+            score: 0,
+            credits: 0,
+            lives: 3,
+            smart_bombs: 3,
+            high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
+            high_score_initials: HighScoreInitialsState::EMPTY,
+            behavior_script: ActorBehaviorScript::default().manifest(),
+            source_rng: None,
+            snapshots: Vec::new(),
+            draws: vec![DrawCommand::sprite_with_effect(
+                ActorId(101),
+                SpriteKey::Explosion,
+                top_left,
+                VisualEffect::ExplosionCloud {
+                    kind: ExplosionKind::Mutant,
+                    age: 2,
+                    source_center: Some(source_center),
+                },
+            )],
+            sounds: Vec::new(),
+            commands: Vec::new(),
+        };
+
+        let state = ActorStateBridge::new().state_for_report(&report);
+        assert_eq!(state.world.explosions.len(), 1);
+        assert_eq!(state.world.explosions[0].kind, CleanExplosionKind::Mutant);
+        assert_eq!(
+            state.world.explosions[0].position,
+            ScreenPosition::new(0x20, 0xA2)
+        );
+        assert_eq!(
+            state.world.explosions[0].source_center,
+            Some(ScreenPosition::new(0x21, 0xA9))
+        );
+        assert_eq!(
+            state.world.explosions[0].source_size,
+            source_explosion_size_for_age(2)
+        );
+
+        let scene = report.render_scene();
+        let mut expected = RenderScene::empty(report.step, ACTOR_RENDER_SURFACE);
+        assert!(push_source_explosion_cloud_pixels(
+            &mut expected,
+            CleanExplosionKind::Mutant,
+            ScreenPosition::new(0x20, 0xA2),
+            Some(ScreenPosition::new(0x21, 0xA9)),
+            source_explosion_size_for_age(2),
+        ));
+        assert_eq!(scene.sprites, expected.sprites);
+    }
+
+    #[test]
     fn actor_state_bridge_maps_report_snapshots_and_draw_effects_to_clean_state() {
         let mut player = actor_snapshot(11, ActorKind::Player, Point::new(40, 70));
         player.bounds = Some(Rect::from_center(player.position, 16, 6));
@@ -8874,6 +8996,7 @@ mod tests {
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Lander,
                         age: 0,
+                        source_center: None,
                     },
                 ),
                 DrawCommand::sprite(ActorId(18), SpriteKey::Score500, Point::new(122, 88)),
@@ -8989,7 +9112,11 @@ mod tests {
                 ActorId(200 + index as u64),
                 SpriteKey::Explosion,
                 position,
-                VisualEffect::ExplosionCloud { kind, age: 0 },
+                VisualEffect::ExplosionCloud {
+                    kind,
+                    age: 0,
+                    source_center: None,
+                },
             )
         })
         .collect::<Vec<_>>();
@@ -12990,17 +13117,20 @@ mod tests {
         let explosions = commands
             .iter()
             .filter_map(|command| match command {
-                GameCommand::Spawn(SpawnRequest::Explosion { position, kind }) => {
-                    Some((*position, *kind))
-                }
+                GameCommand::Spawn(SpawnRequest::Explosion {
+                    position,
+                    kind,
+                    source_center,
+                }) => Some((*position, *kind, *source_center)),
                 _ => None,
             })
             .collect::<Vec<_>>();
         assert!(explosions.contains(&(
-            SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER,
+            SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_TOP_LEFT,
             ExplosionKind::Mutant,
+            Some(SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER),
         )));
-        assert!(explosions.contains(&(player_position, ExplosionKind::Player)));
+        assert!(explosions.contains(&(player_position, ExplosionKind::Player, None)));
     }
 
     #[test]
@@ -13270,6 +13400,7 @@ mod tests {
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Bomb,
                         age: 0,
+                        ..
                     }
                 )
         }));

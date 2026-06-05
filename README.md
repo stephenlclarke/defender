@@ -180,7 +180,8 @@ lander, mutant, bomber, pod, swarmer, baiter, bomb, player, and human variant
 metadata through the actor render and clean-state bridges. Actor explosion
 rendering now uses draw age with the clean source explosion-size curve, keeping
 the source-family cloud centered as it expands, and descriptor-backed
-enemy-family clouds now render through clean source expanded-object pixels.
+enemy-family clouds now render through clean source expanded-object pixels with
+source top-left and center metadata preserved where MAME evidence requires it.
 `XYZZY` invincibility and overlay smart bombs are applied through the same
 driver-controlled behavior and command paths used by scripts. See
 `docs/actor-architecture.md` for the C++-to-Rust mapping and migration shape.

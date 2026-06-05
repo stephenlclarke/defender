@@ -24,11 +24,12 @@ evidence commands.
   values. The status display is also an actor: it draws score, high score, wave,
   lives, credits, and high-score-entry rows from `StepPrompt` state. Explosion
   draws carry `ExplosionKind` metadata for lander, mutant, bomber, pod,
-  swarmer, baiter, bomb, player, and human clouds, so the actor render and
-  clean-state bridges preserve source family identity; the render bridge also
-  routes descriptor-backed enemy-family explosions through the clean source
-  expanded-object pixel-cloud renderer and uses the draw age to apply the
-  clean source explosion-size curve. Audio is
+  swarmer, baiter, bomb, player, and human clouds plus optional source-center
+  metadata, so the actor render and clean-state bridges preserve source family
+  identity and source top-left/center placement. The render bridge also routes
+  descriptor-backed enemy-family explosions through the clean source
+  expanded-object pixel-cloud renderer and uses the draw age to apply the clean
+  source explosion-size curve. Audio is
   described by `SoundCue`; source-backed cues expose their red-label Williams
   sound-board command byte through `SoundCue::source_sound_command`.
   `ActorSoundEventBridge` converts a stream of `StepReport` sound cues into the
@@ -313,8 +314,8 @@ The actor driver now owns a first Defender gameplay loop:
   anchors, deferred visible-entry shot, dive-shot anchor overrides, and exact
   fire2524 projectile fractions/velocities inside the actor source path. The
   driver-side collision resolver also suppresses the pending fire2524 target6
-  collision interval and projects the eventual target6 enemy explosion to the
-  source collision center.
+  collision interval and preserves the eventual target6 `SCZP1` explosion
+  top-left plus source center.
 - Lander shot timers emit the source `0xFC` lander-shot cue and an `EnemyLaser`
   actor.
   Enemy lasers are player hazards, smart-bomb targets with no score value, and
@@ -361,8 +362,8 @@ The actor driver now owns a first Defender gameplay loop:
   actor-owned lifetime state. `ActorRenderSceneBridge` maps that age through
   the clean source explosion-size curve, caps the render scale the same way as
   the clean expanded-object path, and projects descriptor-backed lander,
-  mutant, bomber, pod, swarmer, and baiter clouds through source pixels instead
-  of static atlas sprites.
+  mutant, bomber, pod, swarmer, and baiter clouds through source pixels with
+  optional source-center metadata instead of static atlas sprites.
 - Smart bomb is now a real driver command: normal player requests consume the
   driver-owned stock before clearing active hostile actors, awarding enemy
   scores, and spawning explosions while preserving human actors. Exhausted stock

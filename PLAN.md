@@ -90,7 +90,9 @@ verification tools.
   and human variant metadata through the actor render and clean-state bridges,
   and actor render output now uses draw age with the clean source
   explosion-size curve; descriptor-backed enemy-family clouds route through the
-  clean source expanded-object pixel renderer instead of static atlas sprites.
+  clean source expanded-object pixel renderer instead of static atlas sprites,
+  preserving separate source top-left and center metadata for target6 `SCZP1`
+  collision explosions.
 - Primary runtime source is `src/`; the converted implementation is parked in
   `src_legacy/` and should remain optional oracle/tooling evidence only.
 - Normal interactive live play now uses the actor runtime through
@@ -741,6 +743,29 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 11:06 BST`: Completed the actor source explosion top-left/center
+  metadata slice. Actor `ExplosionCloud` draw effects and
+  `SpawnRequest::Explosion` commands now carry optional source-center metadata,
+  `Explosion` actors preserve it through actor-owned lifetime state, and
+  `ActorStateBridge` maps it into clean `ExplosionSnapshot` values while also
+  publishing the age-derived source size. `ActorRenderSceneBridge` passes the
+  same source center into the clean source expanded-object pixel renderer. The
+  target6 fire2524 player/enemy collision path now emits the MAME-backed
+  `SCZP1` top-left `0x20,0xA2` plus source center `0x21,0xA9` instead of
+  overloading the center as the draw position, while generic explosion spawns
+  keep `source_center: None`. Added focused regressions for target6 explosion
+  command placement and for source-center preservation through actor state and
+  render bridges. Validation passed with `cargo fmt --check`, focused
+  target6/source-center/render tests, `cargo test actor_game::tests::target6
+  --lib`, `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`, `cargo test
+  actor_smoke --all-targets --features legacy-tools`, `cargo check
+  --all-targets --features legacy-tools`, `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`, touched-doc markdownlint, and `git
+  diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780653412152619`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780653966181179`.
 - `2026-06-05 10:54 BST`: Completed the actor source explosion pixel-cloud
   routing slice. Added a clean crate-private `push_source_explosion_cloud_pixels`
   helper that builds source explosion descriptor detail and reuses the clean

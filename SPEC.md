@@ -819,8 +819,9 @@ reintroduce legacy implementation terminology.
   death path, final-life game-over/high-score handoff, source-family explosion
   variant draw metadata for hostile families, bomb, player, and human clouds,
   age-based source explosion-size scaling in the actor render bridge,
-  descriptor-backed enemy-family source explosion pixel clouds, and mutant
-  spawn handoff. Default
+  descriptor-backed enemy-family source explosion pixel clouds, source
+  top-left/center placement metadata for target6 `SCZP1` collisions, and
+  mutant spawn handoff. Default
   interactive play now reaches this actor path through `ActorRuntimeAdapter`.
 
 ## Compatibility Features
