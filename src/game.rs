@@ -109,6 +109,9 @@ const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_TERRAIN_BLOW_STATE_FRAME: u64 
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_POST_GAME_DURATION_FRAMES: u16 = 1200;
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_TERRAIN_BLOW_POST_GAME_FRAME: u16 = 1044;
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECT_SAMPLE_ALIGNMENT_FRAMES: u16 = 1;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_POST_GAME_SCROLL_START_FRAME: u16 = 375;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_POST_GAME_SCROLL_BASE: u16 = 0xCD00;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_POST_GAME_SCROLL_DELTA: u16 = 0x00C0;
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_PROJECTILE_DEATH_SOUND_SEQUENCE: [(u16, u8); 5] = [
     (2, SOURCE_PDSND_SOUND_COMMAND),
     (3, SOURCE_AHSND_SOUND_COMMAND),
@@ -6525,6 +6528,18 @@ fn source_target4_smartmix_terminal_post_game_enemies(frame: u16) -> Vec<EnemySn
         .collect()
 }
 
+fn source_target4_smartmix_terminal_post_game_background_left(frame: u16) -> Option<u16> {
+    if frame < SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_POST_GAME_SCROLL_START_FRAME {
+        return None;
+    }
+
+    Some(
+        SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_POST_GAME_SCROLL_BASE.wrapping_add(
+            frame.wrapping_mul(SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_POST_GAME_SCROLL_DELTA),
+        ),
+    )
+}
+
 fn source_terminal_post_game_lander(
     position: ScreenPosition,
     picture_frame: u8,
@@ -10019,6 +10034,12 @@ impl Game {
                 .high_score
                 .max(self.state.scores.player_one);
             gameplay_events.push(GameEvent::EnemyDestroyed);
+        }
+        if self.post_game_sound_profile == PostGameSoundProfile::Target4SmartmixTerminal
+            && let Some(background_left) =
+                source_target4_smartmix_terminal_post_game_background_left(post_game.frame)
+        {
+            self.camera_left = world_word(background_left);
         }
         if self.post_game_sound_profile == PostGameSoundProfile::Target4SmartmixTerminal {
             self.state
@@ -25814,6 +25835,8 @@ mod tests {
                     .map(|enemy| enemy.position);
                 terminal_object_samples.push((
                     state_frame,
+                    super::source_word_from_world_vector(game.camera_left),
+                    frame.state.world.scanner.scan_left,
                     lander_count,
                     mutant_count,
                     first_mutant_position,
@@ -25878,10 +25901,38 @@ mod tests {
         assert_eq!(
             terminal_object_samples,
             vec![
-                (5960, 6, 9, Some(ScreenPosition::new(48, 54))),
-                (5981, 6, 9, Some(ScreenPosition::new(44, 51))),
-                (5990, 6, 9, Some(ScreenPosition::new(41, 49))),
-                (5991, 6, 9, Some(ScreenPosition::new(41, 49))),
+                (
+                    5960,
+                    0xC4C0,
+                    Some(0x5780),
+                    6,
+                    9,
+                    Some(ScreenPosition::new(48, 54))
+                ),
+                (
+                    5981,
+                    0xD480,
+                    Some(0x6740),
+                    6,
+                    9,
+                    Some(ScreenPosition::new(44, 51))
+                ),
+                (
+                    5990,
+                    0xDB40,
+                    Some(0x6E00),
+                    6,
+                    9,
+                    Some(ScreenPosition::new(41, 49))
+                ),
+                (
+                    5991,
+                    0xDC00,
+                    Some(0x6EC0),
+                    6,
+                    9,
+                    Some(ScreenPosition::new(41, 49))
+                ),
             ]
         );
         assert_eq!(
