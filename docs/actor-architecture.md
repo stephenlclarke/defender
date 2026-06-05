@@ -21,9 +21,10 @@ verified.
   commands, sound cues, and gameplay commands. The driver resolves collisions
   and applies world rules in stable actor-id order.
 - Rendering is described by `DrawCommand`, `SpriteKey`, and `VisualEffect`
-  values. Audio is described by `SoundCue`. The future renderer/audio bridge can
-  translate those descriptions into `wgpu` sprites and Williams sound-board
-  commands.
+  values. Explosion draws carry `ExplosionKind` metadata so bomb, enemy, player,
+  and human explosions can map to separate source sprite families later. Audio is
+  described by `SoundCue`. The future renderer/audio bridge can translate those
+  descriptions into `wgpu` sprites and Williams sound-board commands.
 
 ## C++ to Rust Mapping
 
@@ -193,6 +194,8 @@ The actor driver now owns a first Defender gameplay loop:
   cue, and spawn a 500-point popup actor.
 - Slow falling humans settle safely on the terrain line for 250 points and a
   250-point popup. Fast impacts destroy the human and spawn an explosion.
+- Explosion actors publish variant metadata for enemy, bomb, player, and human
+  explosion clouds while retaining actor-owned lifetime state.
 - Smart bomb is now a real driver command: it removes active hostile actors,
   awards enemy scores, and spawns explosions while preserving human actors.
 - Player laser hits now resolve lander, mutant, bomber, pod, swarmer, and baiter

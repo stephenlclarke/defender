@@ -85,8 +85,9 @@ popups, hostile projectile actors for lander shots, bomber/pod hit scoring and
 sound cues, bomber-laid bomb actors with source bomb-collision cues, pod
 laser-hit swarmer spawning, swarmer scoring and shot cues, source-paced baiter
 timer entry, baiter shots/scoring/hit cues, and smart-bomb hostile clearing.
-Baiters do not block wave completion once source-counted wave enemies are gone.
-`XYZZY` invincibility is applied as the same
+Baiters do not block wave completion once source-counted wave enemies are gone,
+and explosion draws carry enemy/bomb/player/human variant metadata for later
+source sprite mapping. `XYZZY` invincibility is applied as the same
 driver-controlled behavior override used by scripts. See
 `docs/actor-architecture.md` for the C++-to-Rust mapping and migration shape.
 

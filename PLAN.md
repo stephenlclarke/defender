@@ -49,7 +49,8 @@ verification tools.
   swarmers now emit hostile projectiles and distinct shot cues from actor-owned
   timers, and source-paced baiter timer entry now spawns source-backed baiter
   actors that can shoot and pursue the player without blocking wave completion
-  after source-counted enemies are gone.
+  after source-counted enemies are gone. Explosion draws now carry
+  enemy/bomb/player/human variant metadata for later source sprite mapping.
 - Primary runtime source is `src/`; the converted implementation is parked in
   `src_legacy/` and should remain optional oracle/tooling evidence only.
 - Normal live play uses clean `Game` frames through clean platform, audio, and
@@ -3760,3 +3761,17 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780620038768129`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780620406992099`.
+- `2026-06-05 01:52 BST`: Completed the actor explosion variants cycle. Added
+  `ExplosionKind` metadata for enemy, bomb, player, and human explosion clouds;
+  threaded explosion kind through collision, smart-bomb, and human-loss spawn
+  paths; and added regressions for bomb/player explosion kind plus explosion
+  draw metadata. No legacy code or tests were safe to remove because the actor
+  runtime remains isolated. Validation passed with
+  `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780620461056999`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780620763255829`.

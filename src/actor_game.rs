@@ -1738,8 +1738,17 @@ pub enum VisualEffect {
         frame: u8,
     },
     ExplosionCloud {
+        kind: ExplosionKind,
         age: u16,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExplosionKind {
+    Enemy,
+    Bomb,
+    Player,
+    Human,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2094,6 +2103,7 @@ pub enum SpawnRequest {
     },
     Explosion {
         position: Point,
+        kind: ExplosionKind,
     },
     ScorePopup {
         position: Point,
@@ -2574,9 +2584,9 @@ impl ActorGameDriver {
         id
     }
 
-    fn spawn_explosion(&mut self, position: Point) -> ActorId {
+    fn spawn_explosion(&mut self, position: Point, kind: ExplosionKind) -> ActorId {
         let id = self.allocate_actor_id();
-        self.spawn_actor(Explosion::new(id, position));
+        self.spawn_actor(Explosion::new(id, position, kind));
         id
     }
 
@@ -2613,6 +2623,7 @@ impl ActorGameDriver {
                     commands.push(GameCommand::Destroy(enemy.owner));
                     commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
                         position: center_of(enemy.bounds),
+                        kind: explosion_kind_for_target(enemy.kind),
                     }));
                     commands.push(GameCommand::AddScore(score_for_hostile(enemy.kind)));
                     commands.push(GameCommand::PlaySound(hit_sound_for_hostile(enemy.kind)));
@@ -2639,6 +2650,7 @@ impl ActorGameDriver {
                 commands.push(GameCommand::Destroy(enemy.owner));
                 commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
                     position: center_of(player.bounds),
+                    kind: player_hazard_explosion_kind(enemy.kind),
                 }));
                 commands.push(GameCommand::PlaySound(player_hazard_sound(enemy.kind)));
                 commands.push(GameCommand::EnterGameOver);
@@ -2703,8 +2715,8 @@ impl ActorGameDriver {
                 GameCommand::Spawn(SpawnRequest::Human { position, mode }) => {
                     self.spawn_human(position, mode);
                 }
-                GameCommand::Spawn(SpawnRequest::Explosion { position }) => {
-                    self.spawn_explosion(position);
+                GameCommand::Spawn(SpawnRequest::Explosion { position, kind }) => {
+                    self.spawn_explosion(position, kind);
                 }
                 GameCommand::Spawn(SpawnRequest::ScorePopup { position, points }) => {
                     self.spawn_score_popup(position, points);
@@ -2936,7 +2948,7 @@ impl ActorGameDriver {
             self.snapshots.remove(&id);
             self.actors.remove(&id);
             self.behavior_script.remove_actor_behavior(id);
-            self.spawn_explosion(position);
+            self.spawn_explosion(position, explosion_kind_for_target(kind));
             self.score = self.score.saturating_add(score_for_hostile(kind));
             sounds.push(SoundCue::Explosion);
         }
@@ -3062,6 +3074,20 @@ fn player_hazard_sound(kind: ActorKind) -> SoundCue {
     match kind {
         ActorKind::Bomb => SoundCue::BombHit,
         _ => SoundCue::Explosion,
+    }
+}
+
+fn explosion_kind_for_target(kind: ActorKind) -> ExplosionKind {
+    match kind {
+        ActorKind::Bomb => ExplosionKind::Bomb,
+        _ => ExplosionKind::Enemy,
+    }
+}
+
+fn player_hazard_explosion_kind(kind: ActorKind) -> ExplosionKind {
+    match kind {
+        ActorKind::Bomb => ExplosionKind::Bomb,
+        _ => ExplosionKind::Player,
     }
 }
 
@@ -4486,6 +4512,7 @@ impl Human {
                 commands.push(GameCommand::HumanLost(self.id));
                 commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
                     position: self.position,
+                    kind: ExplosionKind::Human,
                 }));
                 commands.push(GameCommand::PlaySound(SoundCue::HumanLost));
             }
@@ -4792,14 +4819,16 @@ impl AssetActor for EnemyLaserShot {
 struct Explosion {
     id: ActorId,
     position: Point,
+    kind: ExplosionKind,
     age: u16,
 }
 
 impl Explosion {
-    fn new(id: ActorId, position: Point) -> Self {
+    fn new(id: ActorId, position: Point, kind: ExplosionKind) -> Self {
         Self {
             id,
             position,
+            kind,
             age: 0,
         }
     }
@@ -4819,7 +4848,10 @@ impl AssetActor for Explosion {
                 self.id,
                 SpriteKey::Explosion,
                 self.position,
-                VisualEffect::ExplosionCloud { age: self.age },
+                VisualEffect::ExplosionCloud {
+                    kind: self.kind,
+                    age: self.age,
+                },
             ));
             self.age = self.age.saturating_add(1);
         }
@@ -6351,6 +6383,15 @@ mod tests {
         assert!(collision.sounds.contains(&SoundCue::Explosion));
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
         assert!(collision.commands.contains(&GameCommand::AddScore(150)));
+        assert!(collision.commands.iter().any(|command| {
+            matches!(
+                command,
+                GameCommand::Spawn(SpawnRequest::Explosion {
+                    kind: ExplosionKind::Enemy,
+                    ..
+                })
+            )
+        }));
     }
 
     #[test]
@@ -6473,6 +6514,36 @@ mod tests {
         assert_eq!(report.phase, Phase::GameOver);
         assert!(report.sounds.contains(&SoundCue::BombHit));
         assert!(report.sounds.contains(&SoundCue::GameOver));
+        assert!(report.commands.iter().any(|command| {
+            matches!(
+                command,
+                GameCommand::Spawn(SpawnRequest::Explosion {
+                    kind: ExplosionKind::Bomb,
+                    ..
+                })
+            )
+        }));
+    }
+
+    #[test]
+    fn explosion_actor_draws_variant_metadata() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let explosion = driver.spawn_explosion(Point::new(90, 80), ExplosionKind::Bomb);
+
+        let report = driver.step(GameInput::NONE);
+
+        assert!(report.draws.iter().any(|draw| {
+            draw.actor == explosion
+                && draw.sprite == SpriteKey::Explosion
+                && matches!(
+                    draw.effect,
+                    VisualEffect::ExplosionCloud {
+                        kind: ExplosionKind::Bomb,
+                        age: 0,
+                    }
+                )
+        }));
     }
 
     #[test]
