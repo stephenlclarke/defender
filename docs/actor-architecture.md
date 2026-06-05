@@ -125,16 +125,18 @@ elapsed script step and evaluates relative `AttractScriptEvent` durations. It
 does not branch on the global driver step or on protected-reference frame
 numbers.
 
-## Two-Player Handoff
+## Start Delay And Two-Player Handoff
 
 The driver owns two-player session state instead of giving one actor authority
 over another player's turn. `StepPrompt` and `StepReport` carry current player,
 player count, per-player scores, per-player stocks, optional
-`PlayerSwitchReport`, and optional `PlayerStartReport` values. When a credited
-two-player start is accepted, the driver publishes a source-length player-start
-delay before spawning playfield actors or emitting `WaveStarted`; the render
-bridge projects the source `PLAYER ONE` prompt from that report state. When a
-player hazard collision reaches
+`PlayerSwitchReport`, and optional `PlayerStartReport` values. When an
+accepted one-player or two-player start enters play, the driver publishes a
+source-length player-start delay before spawning playfield actors or emitting
+`WaveStarted`. The render bridge projects the source player-start prompt only
+for two-player sessions, so a credited two-player start draws `PLAYER ONE`
+while a one-player start keeps the playfield empty without drawing `PLYR1`.
+When a player hazard collision reaches
 `GameCommand::PlayerKilled`, the driver decrements the active player's stock.
 If another player still has lives, it enters a source-length `0x60` switch
 sleep, publishes that sleep through `GameOverSnapshot`, suppresses attract

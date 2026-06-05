@@ -20,10 +20,18 @@ use crate::{
     },
 };
 
-const ACTOR_SMOKE_FRAMES: u32 = 96;
+const ACTOR_SMOKE_FRAMES: u32 = 192;
+const ACTOR_SMOKE_COIN_FRAME: u32 = 1;
+const ACTOR_SMOKE_START_FRAME: u32 = 3;
+const ACTOR_SMOKE_FIRE_FRAME: u32 = 143;
+const ACTOR_SMOKE_THRUST_FRAME: u32 = 145;
+const ACTOR_SMOKE_REVERSE_FRAME: u32 = 147;
+const ACTOR_SMOKE_SMART_BOMB_FRAME: u32 = 149;
+const ACTOR_SMOKE_HYPERSPACE_FRAME: u32 = 151;
+const ACTOR_SMOKE_ALTITUDE_DOWN_FRAME: u32 = 153;
 const POST_GAME_PLAYER_COLLISIONS: u8 = 3;
 const POST_GAME_HALL_STALL_STEPS: u8 = 60;
-const POST_GAME_PLAYER_RESPAWN_SEARCH_STEPS: u8 = 8;
+const POST_GAME_PLAYER_RESPAWN_SEARCH_STEPS: u16 = 160;
 const POST_GAME_ATTRACT_RETURN_SEARCH_STEPS: u8 = 96;
 const REQUIRED_INPUTS: [&str; 8] = [
     "coin",
@@ -1092,56 +1100,56 @@ struct ScriptedInput {
 
 fn smoke_input(frame_index: u32) -> ScriptedInput {
     let (value, label) = match frame_index {
-        1 => (
+        ACTOR_SMOKE_COIN_FRAME => (
             GameInput {
                 coin: true,
                 ..GameInput::NONE
             },
             Some("coin"),
         ),
-        3 => (
+        ACTOR_SMOKE_START_FRAME => (
             GameInput {
                 start_one: true,
                 ..GameInput::NONE
             },
             Some("start_one"),
         ),
-        5 => (
+        ACTOR_SMOKE_FIRE_FRAME => (
             GameInput {
                 fire: true,
                 ..GameInput::NONE
             },
             Some("fire"),
         ),
-        7 => (
+        ACTOR_SMOKE_THRUST_FRAME => (
             GameInput {
                 thrust: true,
                 ..GameInput::NONE
             },
             Some("thrust"),
         ),
-        9 => (
+        ACTOR_SMOKE_REVERSE_FRAME => (
             GameInput {
                 reverse: true,
                 ..GameInput::NONE
             },
             Some("reverse"),
         ),
-        11 => (
+        ACTOR_SMOKE_SMART_BOMB_FRAME => (
             GameInput {
                 smart_bomb: true,
                 ..GameInput::NONE
             },
             Some("smart_bomb"),
         ),
-        13 => (
+        ACTOR_SMOKE_HYPERSPACE_FRAME => (
             GameInput {
                 hyperspace: true,
                 ..GameInput::NONE
             },
             Some("hyperspace"),
         ),
-        15 => (
+        ACTOR_SMOKE_ALTITUDE_DOWN_FRAME => (
             GameInput {
                 altitude_down: true,
                 ..GameInput::NONE
@@ -1163,9 +1171,11 @@ fn record_unique_label(labels: &mut Vec<String>, label: &str) {
 #[cfg(test)]
 mod tests {
     use super::{
-        ACTOR_SMOKE_FRAMES, ActorAttractCycleSmokeReport, ActorPostGameSmokeReport,
-        ActorSmokeReport, attract_cycle_report, default_attract_cycle_report,
-        default_post_game_report, smoke_actor_input, smoke_frame_count, smoke_input, smoke_report,
+        ACTOR_SMOKE_COIN_FRAME, ACTOR_SMOKE_FIRE_FRAME, ACTOR_SMOKE_FRAMES,
+        ACTOR_SMOKE_START_FRAME, ACTOR_SMOKE_THRUST_FRAME, ActorAttractCycleSmokeReport,
+        ActorPostGameSmokeReport, ActorSmokeReport, attract_cycle_report,
+        default_attract_cycle_report, default_post_game_report, smoke_actor_input,
+        smoke_frame_count, smoke_input, smoke_report,
     };
 
     #[test]
@@ -1426,23 +1436,38 @@ mod tests {
 
     #[test]
     fn smoke_script_uses_release_frames_between_edge_inputs() {
-        assert!(smoke_input(1).value.coin);
-        assert_eq!(smoke_input(2).value, crate::actor_game::GameInput::NONE);
-        assert!(smoke_input(3).value.start_one);
-        assert_eq!(smoke_input(4).value, crate::actor_game::GameInput::NONE);
-        assert!(smoke_input(5).value.fire);
-        assert_eq!(smoke_input(6).value, crate::actor_game::GameInput::NONE);
-        assert!(smoke_input(7).value.thrust);
-        assert_eq!(smoke_input(8).value, crate::actor_game::GameInput::NONE);
+        assert!(smoke_input(ACTOR_SMOKE_COIN_FRAME).value.coin);
+        assert_eq!(
+            smoke_input(ACTOR_SMOKE_COIN_FRAME + 1).value,
+            crate::actor_game::GameInput::NONE
+        );
+        assert!(smoke_input(ACTOR_SMOKE_START_FRAME).value.start_one);
+        assert_eq!(
+            smoke_input(ACTOR_SMOKE_START_FRAME + 1).value,
+            crate::actor_game::GameInput::NONE
+        );
+        assert!(smoke_input(ACTOR_SMOKE_FIRE_FRAME).value.fire);
+        assert_eq!(
+            smoke_input(ACTOR_SMOKE_FIRE_FRAME + 1).value,
+            crate::actor_game::GameInput::NONE
+        );
+        assert!(smoke_input(ACTOR_SMOKE_THRUST_FRAME).value.thrust);
+        assert_eq!(
+            smoke_input(ACTOR_SMOKE_THRUST_FRAME + 1).value,
+            crate::actor_game::GameInput::NONE
+        );
     }
 
     #[test]
     fn smoke_script_helpers_match_current_actor_smoke_contract() {
         assert_eq!(smoke_frame_count(), ACTOR_SMOKE_FRAMES);
-        assert!(smoke_actor_input(1).coin);
-        assert!(smoke_actor_input(3).start_one);
-        assert!(smoke_actor_input(5).fire);
-        assert_eq!(smoke_actor_input(6), crate::actor_game::GameInput::NONE);
+        assert!(smoke_actor_input(ACTOR_SMOKE_COIN_FRAME).coin);
+        assert!(smoke_actor_input(ACTOR_SMOKE_START_FRAME).start_one);
+        assert!(smoke_actor_input(ACTOR_SMOKE_FIRE_FRAME).fire);
+        assert_eq!(
+            smoke_actor_input(ACTOR_SMOKE_FIRE_FRAME + 1),
+            crate::actor_game::GameInput::NONE
+        );
     }
 
     #[test]

@@ -109,17 +109,18 @@ verification tools.
   two-player start requests no longer emit false clean `GameStarted` /
   `WaveStarted` events. Score and replay-bonus stock awards route through the
   active player fields so the actor bridge can represent player-two score and
-  stock ownership. Credited two-player starts now publish a source-length
-  actor player-start delay, render the source `PLAYER ONE` prompt through the
-  actor render bridge, and delay actor playfield spawning plus `WaveStarted`
-  until the delay expires. Player hazard deaths now decrement the active
-  player's stock, enter a source-length `0x60` actor player-switch sleep when
-  another player has stock, publish the switch through `GameOverSnapshot`,
-  suppress the attract script during the handoff, render the source
-  `PLAYER ONE` / `PLAYER TWO` plus `GAME OVER` switch prompts, and start the
-  next stocked player's source prompt/delayed actor turn when the switch sleep
-  expires. The remaining two-player fidelity boundary is MAME media proof and
-  exact prompt pixel/timing parity. Actor
+  stock ownership. Accepted one-player and two-player starts now publish a
+  source-length actor player-start delay and delay actor playfield spawning plus
+  `WaveStarted` until the delay expires. One-player starts keep the playfield
+  empty without drawing the two-player source prompt; credited two-player starts
+  render the source `PLAYER ONE` prompt through the actor render bridge. Player
+  hazard deaths now decrement the active player's stock, enter a source-length
+  `0x60` actor player-switch sleep when another player has stock, publish the
+  switch through `GameOverSnapshot`, suppress the attract script during the
+  handoff, render the source `PLAYER ONE` / `PLAYER TWO` plus `GAME OVER`
+  switch prompts, and start the next stocked player's source prompt/delayed
+  actor turn when the switch sleep expires. The remaining two-player fidelity
+  boundary is MAME media proof and exact prompt pixel/timing parity. Actor
   high-score initials
   submission now reports accepted and submitted initials through the clean event
   bridge, enters a finite 60-step
@@ -5649,3 +5650,35 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780675275699089`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780676232273589`.
+- `2026-06-05 17:34 BST`: Completed the actor one-player source-start delay
+  cycle. Accepted one-player starts now publish the same source-length
+  `138`-step `PlayerStartReport` as two-player starts and delay playfield actor
+  spawning plus `WaveStarted` until the delay expires. One-player start reports
+  keep the playfield world empty without rendering the two-player source
+  `PLYR1` prompt, while credited two-player starts and post-switch turns keep
+  the source player-label prompt path. Actor input, source RNG, shell scan, and
+  wave-clear detection remain paused during the delay. The actor smoke script
+  now waits until delayed playfield activation before injecting fire, thrust,
+  reverse, smart bomb, hyperspace, and altitude inputs, preserving real
+  playfield coverage in the executable smoke path. Focused tests cover the
+  one-player delayed `WaveStarted` boundary, no-prompt render contract,
+  two-player prompt preservation, and updated wave/script setup helpers. No
+  legacy code, tests, or scaffolding were safe to remove in this slice because
+  clean smoke/fidelity/oracle evidence still depends on clean runtime
+  boundaries outside the actor path. Validation passed with `cargo test
+  actor_one_player_start --lib --features legacy-tools`, `cargo test
+  actor_two_player --lib --features legacy-tools`, `cargo test actor_game
+  --all-targets --features legacy-tools`, `cargo test actor_smoke
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test runtime --all-targets --features
+  legacy-tools`, `cargo fmt --check`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, the actor smoke CLI commands (`--actor-smoke`,
+  `--actor-attract-smoke`, `--actor-post-game-smoke`, and
+  `--actor-wgpu-smoke`), touched-doc markdownlint, and `git diff --check`.
+  The full unfiltered `legacy-tools` suite was not rerun in this cycle; the
+  previously isolated clean-game MAME window/post-game audio failures remain
+  outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780676514729719`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780677225766979`.

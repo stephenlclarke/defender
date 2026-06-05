@@ -6098,6 +6098,9 @@ fn push_actor_player_start_prompt_sprites(scene: &mut RenderScene, report: &Step
     let Some(player_start) = report.player_start else {
         return;
     };
+    if report.player_count <= 1 {
+        return;
+    }
 
     push_actor_source_message_sprites(
         scene,
@@ -8846,13 +8849,7 @@ impl ActorGameDriver {
         self.reset_source_shell_scan();
         self.clear_turn_playfield_actors();
         self.apply_wave_profile();
-        if player_count > 1 {
-            self.pending_player_start = Some(PendingPlayerStart::new(self.current_player));
-        } else {
-            self.spawn_player();
-            self.spawn_wave_hostiles();
-            self.spawn_initial_humans();
-        }
+        self.pending_player_start = Some(PendingPlayerStart::new(self.current_player));
     }
 
     fn start_pending_wave(&mut self) {
@@ -13130,7 +13127,7 @@ mod tests {
             start_one: true,
             ..GameInput::NONE
         });
-        runtime.step(GameInput::NONE);
+        step_until_player_start_completes(&mut runtime, 1);
 
         let cleared = runtime.step(GameInput {
             smart_bomb: true,
@@ -14027,13 +14024,19 @@ mod tests {
             XyzzyMode::INACTIVE,
         );
         assert_eq!(started.report.phase, Phase::Playing);
+        assert_eq!(started.events.gameplay(), &[GameEvent::GameStarted]);
         assert_eq!(
-            started.events.gameplay(),
-            &[GameEvent::GameStarted, GameEvent::WaveStarted]
+            started.report.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS,
+                player: 1,
+            })
         );
+        assert!(started.state.world.enemies.is_empty());
+        assert_no_source_message(&started.report, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
         assert_eq!(started.events.sounds(), &[SoundEvent::GameStarted]);
 
-        let settled = runtime.step(GameInput::NONE);
+        let settled = step_until_player_start_completes(&mut runtime, 1);
         assert_eq!(settled.state.phase, GamePhase::Playing);
         assert_eq!(settled.state.wave, 1);
         assert_eq!(
@@ -14081,7 +14084,7 @@ mod tests {
             start_one: true,
             ..GameInput::NONE
         });
-        runtime.step(GameInput::NONE);
+        step_until_player_start_completes(&mut runtime, 1);
 
         let thrusting = runtime.step(GameInput {
             thrust: true,
@@ -14137,10 +14140,34 @@ mod tests {
         assert_eq!(started.phase, Phase::Playing);
         assert_eq!(started.credits, 0);
         assert!(started.sounds.contains(&SoundCue::Start));
+        assert_eq!(
+            started.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS,
+                player: 1,
+            })
+        );
+        assert_no_source_message(&started, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
         assert_eq!(driver.snapshot_count(ActorKind::Player), 0);
 
         let settled = driver.step(GameInput::NONE);
         assert_eq!(settled.phase, Phase::Playing);
+        assert_eq!(
+            settled.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS - 1,
+                player: 1,
+            })
+        );
+        assert_eq!(driver.snapshot_count(ActorKind::Player), 0);
+
+        let settled = step_until_driver_player_start_completes(&mut driver, 1);
+        assert_eq!(settled.phase, Phase::Playing);
+        assert!(
+            settled
+                .commands
+                .contains(&GameCommand::AdvanceWave { wave: 1 })
+        );
         assert_eq!(driver.snapshot_count(ActorKind::Player), 1);
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 5);
         assert_eq!(driver.snapshot_count(ActorKind::Human), 10);
@@ -15347,6 +15374,57 @@ mod tests {
     }
 
     #[test]
+    fn actor_one_player_start_uses_source_playfield_delay_without_source_prompt() {
+        let mut driver = ActorGameDriver::new();
+        driver.credits = 1;
+        let mut runtime = ActorRuntimeAdapter::with_driver(driver);
+
+        let started = runtime.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(started.report.phase, Phase::Playing);
+        assert_eq!(started.report.credits, 0);
+        assert_eq!(started.report.current_player, 1);
+        assert_eq!(started.report.player_count, 1);
+        assert_eq!(started.events.gameplay(), &[GameEvent::GameStarted]);
+        assert!(!started.events.gameplay().contains(&GameEvent::WaveStarted));
+        assert_eq!(
+            started.report.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS,
+                player: 1,
+            })
+        );
+        assert!(started.report.snapshots.iter().all(|snapshot| !matches!(
+            snapshot.kind,
+            ActorKind::Player
+                | ActorKind::Lander
+                | ActorKind::Bomber
+                | ActorKind::Pod
+                | ActorKind::Human
+        )));
+        assert!(started.state.world.enemies.is_empty());
+        assert!(started.state.world.humans.is_empty());
+        assert_no_source_message(&started.report, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
+
+        let active = step_until_player_start_completes(&mut runtime, 1);
+
+        assert_eq!(active.report.phase, Phase::Playing);
+        assert_eq!(active.report.current_player, 1);
+        assert_eq!(active.report.player_count, 1);
+        assert!(active.report.player_start.is_none());
+        assert!(active.events.gameplay().contains(&GameEvent::WaveStarted));
+        assert_eq!(active.state.world.humans.len(), 10);
+        assert!(active.state.world.enemies.iter().any(|enemy| {
+            enemy.kind == CleanEnemyKind::Lander
+                || enemy.kind == CleanEnemyKind::Bomber
+                || enemy.kind == CleanEnemyKind::Pod
+        }));
+    }
+
+    #[test]
     fn actor_two_player_start_initializes_session_state_bridge() {
         let mut driver = ActorGameDriver::new();
         driver.credits = 2;
@@ -16534,7 +16612,7 @@ mod tests {
             ..GameInput::NONE
         });
 
-        let live = driver.step(GameInput::NONE);
+        let live = step_until_driver_player_start_completes(&mut driver, 1);
         let lander = live
             .snapshots
             .iter()
@@ -16577,8 +16655,11 @@ mod tests {
 
         let initial = Point::new(0xFB, 0x2C);
         let mut lander_id = None;
+        let mut current_report = Some(step_until_driver_player_start_completes(&mut driver, 1));
         for expected_sleep in [3, 2, 1, 0] {
-            let sleeping = driver.step(GameInput::NONE);
+            let sleeping = current_report
+                .take()
+                .unwrap_or_else(|| driver.step(GameInput::NONE));
             let lander = sleeping
                 .snapshots
                 .iter()
@@ -16626,7 +16707,11 @@ mod tests {
         });
 
         let mut first_laser_step = None;
-        for live_step in 1..=50 {
+        let live = step_until_driver_player_start_completes(&mut driver, 1);
+        if live.sounds.contains(&SoundCue::LanderShot) {
+            first_laser_step = Some(1);
+        }
+        for live_step in 2..=50 {
             let report = driver.step(GameInput {
                 xyzzy: XyzzyMode {
                     active: true,
@@ -16657,7 +16742,15 @@ mod tests {
         });
 
         let mut shot_report = None;
-        for _ in 1..=50 {
+        let live = step_until_driver_player_start_completes(&mut driver, 1);
+        if live
+            .commands
+            .iter()
+            .any(|command| matches!(command, GameCommand::Spawn(SpawnRequest::EnemyLaser { .. })))
+        {
+            shot_report = Some(live);
+        }
+        for _ in 2..=50 {
             let report = driver.step(GameInput {
                 xyzzy: XyzzyMode {
                     active: true,
@@ -17227,7 +17320,7 @@ mod tests {
             ..GameInput::NONE
         });
 
-        let live = driver.step(GameInput::NONE);
+        let live = step_until_driver_player_start_completes(&mut driver, 1);
         let human = live
             .snapshots
             .iter()
@@ -17264,7 +17357,7 @@ mod tests {
             ..GameInput::NONE
         });
 
-        let first_live = driver.step(GameInput::NONE);
+        let first_live = step_until_driver_player_start_completes(&mut driver, 1);
         let human = first_live
             .snapshots
             .iter()
@@ -18756,7 +18849,7 @@ mod tests {
         assert_eq!(driver.wave(), 1);
         assert_eq!(driver.wave_script_name(), "opening-chasers");
 
-        driver.step(GameInput::NONE);
+        step_until_driver_player_start_completes(&mut driver, 1);
         let chasing = driver.step(GameInput::NONE);
         let lander = chasing
             .snapshots
@@ -18790,7 +18883,7 @@ mod tests {
             start_one: true,
             ..GameInput::NONE
         });
-        let settled = driver.step(GameInput::NONE);
+        let settled = step_until_driver_player_start_completes(&mut driver, 1);
 
         assert_eq!(driver.snapshot_count(ActorKind::Human), 1);
         assert!(settled.snapshots.iter().any(|snapshot| {
@@ -18900,7 +18993,7 @@ mod tests {
             start_one: true,
             ..GameInput::NONE
         });
-        driver.step(GameInput::NONE);
+        step_until_driver_player_start_completes(&mut driver, 1);
         let chasing = driver.step(GameInput::NONE);
         let lander = chasing
             .snapshots
@@ -18959,7 +19052,7 @@ mod tests {
             start_one: true,
             ..GameInput::NONE
         });
-        let report = driver.step(GameInput::NONE);
+        let report = step_until_driver_player_start_completes(&mut driver, 1);
         let landers = report
             .snapshots
             .iter()
@@ -19032,7 +19125,7 @@ mod tests {
             start_one: true,
             ..GameInput::NONE
         });
-        driver.step(GameInput::NONE);
+        step_until_driver_player_start_completes(&mut driver, 1);
 
         let cleared = driver.step(GameInput {
             smart_bomb: true,
@@ -20166,7 +20259,7 @@ mod tests {
             start_one: true,
             ..GameInput::NONE
         });
-        driver.step(GameInput::NONE);
+        step_until_driver_player_start_completes(&mut driver, 1);
         driver
     }
 
@@ -20189,6 +20282,39 @@ mod tests {
         }
 
         panic!("wave {wave} should start after survivor bonus cadence");
+    }
+
+    fn step_until_driver_player_start_completes(
+        driver: &mut ActorGameDriver,
+        player: u8,
+    ) -> StepReport {
+        let mut previous_delay = SOURCE_START_PLAYFIELD_DELAY_STEPS.saturating_add(1);
+        for _ in 0..=SOURCE_START_PLAYFIELD_DELAY_STEPS {
+            let report = driver.step(GameInput::NONE);
+            if let Some(player_start) = report.player_start {
+                assert_eq!(player_start.player, player);
+                assert!(player_start.delay_steps_remaining < previous_delay);
+                previous_delay = player_start.delay_steps_remaining;
+                assert!(
+                    !report
+                        .commands
+                        .contains(&GameCommand::AdvanceWave { wave: 1 })
+                );
+                assert_no_source_message(&report, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
+                continue;
+            }
+
+            assert_eq!(report.phase, Phase::Playing);
+            assert_eq!(report.current_player, player);
+            assert!(
+                report
+                    .commands
+                    .contains(&GameCommand::AdvanceWave { wave: 1 })
+            );
+            return report;
+        }
+
+        panic!("player {player} start should complete after source delay");
     }
 
     fn step_until_player_switch_completes(
@@ -20246,11 +20372,19 @@ mod tests {
                 previous_delay = player_start.delay_steps_remaining;
                 assert!(!frame.events.gameplay().contains(&GameEvent::WaveStarted));
                 assert!(frame.state.world.enemies.is_empty());
-                assert_source_message(
-                    &frame.report,
-                    player_source_message_label(player),
-                    SOURCE_PLAYER_START_PROMPT_SCREEN,
-                );
+                if frame.report.player_count > 1 {
+                    assert_source_message(
+                        &frame.report,
+                        player_source_message_label(player),
+                        SOURCE_PLAYER_START_PROMPT_SCREEN,
+                    );
+                } else {
+                    assert_no_source_message(
+                        &frame.report,
+                        player_source_message_label(player),
+                        SOURCE_PLAYER_START_PROMPT_SCREEN,
+                    );
+                }
                 continue;
             }
 
@@ -20529,6 +20663,24 @@ mod tests {
                     && sprite.position == position
             }),
             "expected source message {label} at {top_left_screen_address:#06x}"
+        );
+    }
+
+    fn assert_no_source_message(report: &StepReport, label: &str, top_left_screen_address: u16) {
+        let text = source_message_text(label).expect("source message label should exist");
+        let first_glyph = text
+            .chars()
+            .find_map(SpriteId::message_glyph)
+            .expect("source message should contain a visible glyph");
+        let position = source_screen_position(top_left_screen_address);
+        let scene = report.render_scene();
+        assert!(
+            scene.sprites.iter().all(|sprite| {
+                sprite.sprite != first_glyph
+                    || sprite.layer != RenderLayer::Overlay
+                    || sprite.position != position
+            }),
+            "unexpected source message {label} at {top_left_screen_address:#06x}"
         );
     }
 }
