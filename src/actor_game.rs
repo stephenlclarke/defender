@@ -9783,11 +9783,11 @@ impl ActorGameDriver {
         self.source_astronaut_cursor = Some(next_cursor);
         self.source_astronaut_sleep_ticks = SOURCE_ASTRONAUT_PROCESS_SLEEP_TICKS;
 
-        let source_human_count = self.source_human_snapshot_count();
+        let human_count = self.human_snapshot_count();
         self.snapshots.values().find_map(|snapshot| {
             let source = snapshot.source_human?;
             (source.target_slot_index == next_cursor
-                && actor_source_astronaut_walk_targetable(source_human_count, snapshot))
+                && actor_source_astronaut_walk_targetable(human_count, snapshot))
             .then_some(next_cursor)
         })
     }
@@ -9994,14 +9994,10 @@ impl ActorGameDriver {
         })
     }
 
-    fn source_human_snapshot_count(&self) -> usize {
+    fn human_snapshot_count(&self) -> usize {
         self.snapshots
             .values()
-            .filter(|snapshot| {
-                snapshot.kind == ActorKind::Human
-                    && snapshot.alive
-                    && snapshot.source_human.is_some()
-            })
+            .filter(|snapshot| snapshot.kind == ActorKind::Human && snapshot.alive)
             .count()
     }
 
@@ -19465,6 +19461,47 @@ mod tests {
         assert_eq!(driver.source_astronaut_cursor, Some(2));
         assert_eq!(
             snapshot_for(&slot2_suppressed, human_ids[2]).position,
+            Point::new(56, 220)
+        );
+    }
+
+    #[test]
+    fn source_human_walk_process_suppression_counts_plain_humans() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let mut source_ids = Vec::new();
+        for slot in 0..9usize {
+            source_ids.push(driver.spawn_human_from_spawn(source_human_spawn_for_test(
+                Point::new(40 + i16::try_from(slot).expect("slot fits i16") * 8, 220),
+                slot,
+                0,
+            )));
+        }
+        driver.spawn_human_for_test(Point::new(128, 220));
+
+        driver.step(GameInput::NONE);
+        driver.source_rng = ActorSourceRng {
+            seed: 0,
+            hseed: 0,
+            lseed: 0,
+        };
+        let slot1_walked = driver.step(GameInput::NONE);
+        assert_eq!(
+            snapshot_for(&slot1_walked, source_ids[1]).position,
+            Point::new(47, 221)
+        );
+
+        driver.source_astronaut_sleep_ticks = 0;
+        driver.source_rng = ActorSourceRng {
+            seed: 0,
+            hseed: 0,
+            lseed: 0,
+        };
+        let slot2_suppressed = driver.step(GameInput::NONE);
+
+        assert_eq!(driver.source_astronaut_cursor, Some(2));
+        assert_eq!(
+            snapshot_for(&slot2_suppressed, source_ids[2]).position,
             Point::new(56, 220)
         );
     }

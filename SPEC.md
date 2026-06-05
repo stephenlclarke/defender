@@ -875,10 +875,10 @@ reintroduce legacy implementation terminology.
   the source astronaut process cadence/cursor: one grounded source-backed human
   target-list slot receives the source RNG seed per process tick, walks
   fixed-point X, and steps Y toward terrain-relative source targets, while
-  first-wave inactive slots stay suppressed until the human count changes.
-  Source-backed hostile actors now wrap Y motion through the source
-  active-object playfield bounds instead of drifting outside the red-label
-  vertical range. Source-backed
+  first-wave inactive slots stay suppressed until the total live human count
+  changes from ten. Source-backed hostile actors now wrap Y motion through the
+  source active-object playfield bounds instead of drifting outside the
+  red-label vertical range. Source-backed
   bomber actors now update seeded picture-frame and Y-velocity metadata,
   including
   cruise-altitude and player-relative Y adjustments, during active source motion

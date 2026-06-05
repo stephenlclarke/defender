@@ -374,7 +374,7 @@ process cadence/cursor and prompts one grounded source human target-list slot
 per process tick; the selected human applies the driver source RNG seed,
 updates picture frame, steps fixed-point X, and steps Y toward
 terrain-relative source targets. First-wave inactive source human slots `>= 2`
-stay suppressed while all ten source humans remain.
+stay suppressed while the total live human count remains ten.
 Source-backed landers ask the prompt for their configured target slot first and
 only fall back to nearest-human seeking when that target is unavailable.
 When a source-backed lander completes a human conversion, the spawn command for

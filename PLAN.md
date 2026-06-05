@@ -103,7 +103,7 @@ verification tools.
   grounded source-backed human target-list slot receives the source RNG seed
   per process tick, walks fixed-point X, and steps Y toward terrain-relative
   source targets, while first-wave inactive slots stay suppressed until the
-  human count changes.
+  total live human count changes from ten.
   Source-backed mutant actors now
   consume that metadata to select wave-table X/Y velocities, advance
   actor-owned hop RNG and fixed-point fractions, and emit source-shaped
@@ -856,6 +856,34 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 21:40 BST`: Completed the actor source astronaut human-count
+  correction cycle. The actor source astronaut process now uses total live
+  human snapshot count, not source-backed human count, for the source
+  first-wave inactive-slot suppression rule. This matches the clean source
+  routine that suppresses target-list slots `>= 2` while the world still has
+  ten live humans, even if some live humans are not source-backed target-list
+  entries. Focused tests now cover the mixed source/plain human case in
+  addition to selected-slot-only cadence, source process sleep hold, inactive
+  slot suppression, high-seed walk/Y-target branch, and low-seed turn/no-Y-step
+  branch. README, SPEC, PLAN, and actor architecture docs now spell out that
+  the suppression boundary is the total live human count changing from ten. No
+  legacy code, tests, or scaffolding were safe to remove in this slice because
+  the remaining clean smoke/fidelity/oracle evidence still depends on those
+  boundaries. Validation passed with `cargo fmt --check`, `cargo test
+  source_human_walk --lib --features legacy-tools`, `cargo test
+  source_human_walk_process --lib --features legacy-tools`, `cargo test
+  actor_game --all-targets --features legacy-tools`, `cargo check
+  --all-targets --features legacy-tools`, `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`, the actor smoke CLI commands
+  (`--actor-smoke`, `--actor-attract-smoke`, `--actor-post-game-smoke`, and
+  `--actor-wgpu-smoke`), `markdownlint README.md SPEC.md PLAN.md
+  docs/actor-architecture.md`, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite was not rerun in this cycle; the previously isolated
+  clean-game MAME window/post-game audio failures remain outside this slice.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780691740901069`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780692044064429`.
 - `2026-06-05 21:33 BST`: Completed the actor source astronaut process
   cadence cycle. The actor driver now owns the source astronaut process
   cursor/sleep cadence and passes one selected target-list slot through
