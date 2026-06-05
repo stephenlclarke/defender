@@ -49,8 +49,10 @@ verification tools.
   Defender wordmark from step 365, and the high-score/zero-credit
   Hall-of-Fame page from step 488. Title pages suppress the zero-credit line
   but still show real inserted credits through a `credits_nonzero` script
-  action. Custom attract scripts can draw checked `messages.tsv` labels
-  through source cursor controls.
+  action. The Hall-of-Fame page also draws source `HALLD_*` headings and the
+  source Defender logo, while the actor high-score rows remain the current
+  scriptable table fallback. Custom attract scripts can draw checked
+  `messages.tsv` labels through source cursor controls.
   `ActorWaveScript` now names per-wave progression data and applies behavior
   scripts plus hostile and initial-human spawn records as play starts and waves
   are cleared. Wave scripts can now attach spawn-index behavior profiles that
@@ -762,6 +764,25 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 13:14 BST`: Completed the actor Hall-of-Fame heading fidelity
+  slice. The embedded actor attract script and Rust fallback now draw the
+  source Hall-of-Fame display headings at step `488` through checked
+  `messages.tsv` labels: `HALLD_TITLE`, `HALLD_TODAYS`, `HALLD_ALL_TIME`, and
+  both `HALLD_GREATEST` positions. The same Hall-of-Fame page now draws the
+  source Defender logo at the clean protected-reference position, while the
+  existing scriptable high-score rows remain as the actor table fallback for
+  the next table-layout slice. Focused regressions prove source heading draw
+  commands, duplicate `GREATEST` headings, logo draw placement, rendered source
+  glyphs, rendered logo placement, and checked-script/fallback manifest parity.
+  Validation passed with `cargo fmt --check`, focused actor attract
+  draw/render/manifest tests, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, touched-doc
+  markdownlint, and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780661286211789`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780661658481039`.
 - `2026-06-05 13:06 BST`: Completed the actor attract Hall-of-Fame timing
   slice. The embedded actor attract script and Rust fallback now keep the
   high-score title/table and zero-credit credit row off the

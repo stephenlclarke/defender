@@ -24,9 +24,11 @@ Current files:
   step 236, the Defender wordmark from step 365, and the
   high-score/zero-credit Hall-of-Fame page from step 488. A `credits_nonzero`
   title-page event suppresses the zero-credit line while still showing a real
-  inserted credit. It also uses the driver-owned high-score table and credit
-  count carried in `StepPrompt`. Custom attract scripts can also use checked
-  `messages.tsv` labels through the script parser's `message` action.
+  inserted credit. The Hall-of-Fame page also draws source `HALLD_*` headings
+  and the source Defender logo, while the high-score rows remain the current
+  scriptable table fallback. It also uses the driver-owned high-score table and
+  credit count carried in `StepPrompt`. Custom attract scripts can also use
+  checked `messages.tsv` labels through the script parser's `message` action.
 - `actor-behavior.script`: embedded actor-runtime baseline behavior profile
   parsed by `ActorBehaviorScript`, including player, laser, hostile, human,
   explosion, and score-popup timing/tuning defaults.

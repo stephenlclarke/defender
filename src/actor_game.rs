@@ -83,6 +83,11 @@ const SOURCE_ATTRACT_HIGH_SCORE_TITLE_POSITION: Point = Point::new(78, 176);
 const SOURCE_ATTRACT_HIGH_SCORE_TABLE_POSITION: Point = Point::new(82, 188);
 const SOURCE_ATTRACT_CREDIT_LABEL_POSITION: Point = Point::new(176, 226);
 const SOURCE_ATTRACT_CREDIT_COUNT_POSITION: Point = Point::new(248, 226);
+const SOURCE_ATTRACT_HALL_TITLE_LABEL: &str = "HALLD_TITLE";
+const SOURCE_ATTRACT_HALL_TODAYS_LABEL: &str = "HALLD_TODAYS";
+const SOURCE_ATTRACT_HALL_ALL_TIME_LABEL: &str = "HALLD_ALL_TIME";
+const SOURCE_ATTRACT_HALL_GREATEST_LABEL: &str = "HALLD_GREATEST";
+const SOURCE_ATTRACT_HALL_DEFENDER_LOGO_POSITION: Point = Point::new(85, 50);
 const DEFENDER_WORDMARK_START_STEP: u64 = SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP;
 const DEFENDER_WORDMARK_SLOTS: u16 = 15;
 const DEFENDER_WORDMARK_ROW_PAIRS: u16 = 6;
@@ -3576,6 +3581,42 @@ impl AttractScript {
                 None,
                 SOURCE_ATTRACT_CREDIT_LABEL_POSITION,
                 SOURCE_ATTRACT_CREDIT_COUNT_POSITION,
+            ),
+            AttractScriptEvent::source_message(
+                SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
+                None,
+                SOURCE_ATTRACT_HALL_TITLE_LABEL,
+                0x3854,
+            ),
+            AttractScriptEvent::source_message(
+                SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
+                None,
+                SOURCE_ATTRACT_HALL_TODAYS_LABEL,
+                0x2268,
+            ),
+            AttractScriptEvent::source_message(
+                SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
+                None,
+                SOURCE_ATTRACT_HALL_ALL_TIME_LABEL,
+                0x6068,
+            ),
+            AttractScriptEvent::source_message(
+                SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
+                None,
+                SOURCE_ATTRACT_HALL_GREATEST_LABEL,
+                0x1E72,
+            ),
+            AttractScriptEvent::source_message(
+                SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
+                None,
+                SOURCE_ATTRACT_HALL_GREATEST_LABEL,
+                0x5F72,
+            ),
+            AttractScriptEvent::sprite(
+                SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
+                None,
+                SpriteKey::DefenderLogo,
+                SOURCE_ATTRACT_HALL_DEFENDER_LOGO_POSITION,
             ),
         ])
     }
@@ -11241,6 +11282,45 @@ mod tests {
                 .iter()
                 .any(|draw| draw.text.as_deref() == Some("00"))
         );
+        let hall_title_text =
+            source_message_text(SOURCE_ATTRACT_HALL_TITLE_LABEL).expect("Hall title source text");
+        assert!(hall.draws.iter().any(|draw| {
+            draw.text.as_deref() == Some(hall_title_text)
+                && matches!(
+                    draw.effect,
+                    VisualEffect::SourceMessage {
+                        top_left_screen_address: 0x3854
+                    }
+                )
+        }));
+        let hall_greatest_text = source_message_text(SOURCE_ATTRACT_HALL_GREATEST_LABEL)
+            .expect("Hall greatest source text");
+        assert_eq!(
+            hall.draws
+                .iter()
+                .filter(|draw| draw.text.as_deref() == Some(hall_greatest_text))
+                .count(),
+            2
+        );
+        assert!(hall.draws.iter().any(|draw| {
+            draw.sprite == SpriteKey::DefenderLogo
+                && draw.position == SOURCE_ATTRACT_HALL_DEFENDER_LOGO_POSITION
+        }));
+        let hall_scene = ActorRenderSceneBridge::new().render_scene_for_report(&hall);
+        assert!(hall_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_H
+                && sprite.position == [112.0, 84.0]
+                && sprite.layer == RenderLayer::Overlay
+        }));
+        assert!(hall_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO
+                && sprite.position
+                    == [
+                        f32::from(SOURCE_ATTRACT_HALL_DEFENDER_LOGO_POSITION.x),
+                        f32::from(SOURCE_ATTRACT_HALL_DEFENDER_LOGO_POSITION.y),
+                    ]
+                && sprite.layer == RenderLayer::Overlay
+        }));
 
         let mut settled = None;
         for _ in 0..(DEFENDER_WORDMARK_SLOTS * DEFENDER_WORDMARK_ROW_PAIRS + 1) {
@@ -11310,6 +11390,37 @@ mod tests {
                 label_position: SOURCE_ATTRACT_CREDIT_LABEL_POSITION,
                 count_position: SOURCE_ATTRACT_CREDIT_COUNT_POSITION,
                 minimum_credits: 0,
+            } if event.start_after_steps == SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
+        )));
+        assert!(parsed.manifest().events.iter().any(|event| matches!(
+            event.action,
+            AttractScriptActionManifest::SourceMessage {
+                ref label,
+                top_left_screen_address: 0x3854,
+            } if event.start_after_steps == SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
+                && label == SOURCE_ATTRACT_HALL_TITLE_LABEL
+        )));
+        assert_eq!(
+            parsed
+                .manifest()
+                .events
+                .iter()
+                .filter(|event| matches!(
+                    event.action,
+                    AttractScriptActionManifest::SourceMessage {
+                        ref label,
+                        top_left_screen_address: 0x1E72 | 0x5F72,
+                    } if event.start_after_steps == SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
+                        && label == SOURCE_ATTRACT_HALL_GREATEST_LABEL
+                ))
+                .count(),
+            2
+        );
+        assert!(parsed.manifest().events.iter().any(|event| matches!(
+            event.action,
+            AttractScriptActionManifest::Sprite {
+                sprite: SpriteKey::DefenderLogo,
+                position: SOURCE_ATTRACT_HALL_DEFENDER_LOGO_POSITION,
             } if event.start_after_steps == SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
         )));
     }

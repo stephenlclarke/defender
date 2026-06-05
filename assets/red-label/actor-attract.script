@@ -11,3 +11,9 @@ credits_nonzero 1 487 176 226 248 226
 text 488 forever 78 176 HIGH SCORES
 high_scores 488 forever 82 188 10 5
 credits 488 forever 176 226 248 226
+message 488 forever HALLD_TITLE 0x3854
+message 488 forever HALLD_TODAYS 0x2268
+message 488 forever HALLD_ALL_TIME 0x6068
+message 488 forever HALLD_GREATEST 0x1E72
+message 488 forever HALLD_GREATEST 0x5F72
+sprite 488 forever defender_logo 85 50

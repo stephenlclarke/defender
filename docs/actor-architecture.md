@@ -323,9 +323,11 @@ step 1, `ELECV` from step 236 at screen address `0x3258`, and the Defender
 wordmark from step 365. The default high-score title/table and zero-credit
 credit line start at the Hall-of-Fame boundary, step 488; title pages use a
 `credits_nonzero` event so an inserted credit can still be shown immediately
-without drawing a zero-credit line. The older Rust event constructor remains
-available as a fallback. Custom drivers can pass their own parsed or
-constructed sequence through
+without drawing a zero-credit line. The same Hall-of-Fame boundary draws
+source `HALLD_*` headings and the source Defender logo, while the high-score
+rows remain the current scriptable table fallback. The older Rust event
+constructor remains available as a fallback. Custom drivers can pass their own
+parsed or constructed sequence through
 `ActorGameDriver::with_attract_script(...)` without replacing coin/start
 control handling.
 `ActorGameDriver::script_manifest()` includes the immutable attract-event
@@ -342,6 +344,12 @@ sprite 2 forever defender_logo 40 44
 credits_nonzero 1 487 176 226 248 226
 high_scores 488 forever 82 188 10 5
 credits 488 forever 176 226 248 226
+message 488 forever HALLD_TITLE 0x3854
+message 488 forever HALLD_TODAYS 0x2268
+message 488 forever HALLD_ALL_TIME 0x6068
+message 488 forever HALLD_GREATEST 0x1E72
+message 488 forever HALLD_GREATEST 0x5F72
+sprite 488 forever defender_logo 85 50
 williams_logo 5 - 108 60
 defender_wordmark 365 - 96 144
 ```

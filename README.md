@@ -116,8 +116,10 @@ wordmark coalescence using source title page-start steps: Williams from step 1,
 `ELECV` from step 236, the Defender wordmark from step 365, and the
 high-score/zero-credit Hall-of-Fame page from step 488. Title pages suppress
 the zero-credit line but still show a real inserted credit through a
-`credits_nonzero` script action. Custom attract scripts can draw checked
-`messages.tsv` labels through source cursor controls.
+`credits_nonzero` script action. The Hall-of-Fame page also draws source
+`HALLD_*` headings and the source Defender logo, while the actor high-score
+rows remain the current scriptable table fallback. Custom attract scripts can
+draw checked `messages.tsv` labels through source cursor controls.
 The default actor wave allocator now
 uses the source active-family
 shape, so later waves can introduce bomber and pod actor families alongside
