@@ -1518,8 +1518,8 @@ mod tests {
     }
 
     #[test]
-    fn runtime_entrypoint_runs_clean_default_live_config() {
-        super::run().expect("runtime bridge should run clean default live under tests");
+    fn runtime_entrypoint_runs_actor_default_live_config() {
+        super::run().expect("runtime bridge should run actor default live under tests");
     }
 
     #[test]

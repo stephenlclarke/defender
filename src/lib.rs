@@ -391,7 +391,7 @@ mod public_api_tests {
         assert!(!platform_rs.contains(&app_runtime_call));
 
         let runtime_rs = include_str!("runtime.rs");
-        assert!(runtime_rs.contains("crate::live_wgpu::run("));
+        assert!(runtime_rs.contains("crate::live_wgpu::run_actor_live"));
         assert!(runtime_rs.contains("crate::live_wgpu::run_smoke"));
         assert!(runtime_rs.contains("RuntimeCommand::Help"));
         assert!(runtime_rs.contains("RuntimeCommand::RomReport { path }"));

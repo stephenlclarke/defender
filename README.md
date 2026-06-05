@@ -80,16 +80,15 @@ behavior display-frame driven.
 `--actor-smoke` exercises that actor frame path through a
 scripted attract/play input sequence and the native draw planner, proving actor
 events, audio, sprites, projectiles, HUD text, overlays, and `wgpu` command-plan
-coverage without switching interactive live play away from the current clean
-`Game` runtime. `--actor-wgpu-smoke` uses the same actor input sequence and
-renders actor `RenderScene` frames through the offscreen `wgpu` readback path,
-proving nonblank dynamic WGPU output before actor frames replace interactive
-live play. `--actor-live` is now available as an explicit interactive preflight
-mode that uses `ActorRuntimeAdapter`, actor-derived clean `GameFrame` values,
+coverage. `--actor-wgpu-smoke` uses the same actor input sequence and renders
+actor `RenderScene` frames through the offscreen `wgpu` readback path, proving
+nonblank dynamic WGPU output. Normal `cargo run` now opens the actor live
+runtime through `ActorRuntimeAdapter`, actor-derived clean `GameFrame` values,
 the existing `wgpu` presenter, live audio runtime, and the same live key
-bindings/XYZZY input state while leaving normal `cargo run` on the clean `Game`
-runtime. Actor high-score entry now accepts live initials/backspace through the
-actor input surface and draws the in-progress initials row from actor state.
+bindings/XYZZY input state. `--actor-live` remains as an explicit alias for
+that actor live path. Actor high-score entry now accepts live initials/backspace
+through the actor input surface and draws the in-progress initials row from
+actor state.
 The current slice includes same-contract keyboard profiles, `XYZZY` overlay
 state, thread-backed actors, a data-driven `AttractScript` for custom attract
 drivers, `ActorBehaviorScript` profiles for level-wide and per-actor movement
@@ -169,7 +168,7 @@ Common commands:
 
 ```sh
 cargo run
-cargo run -- --actor-live
+cargo run -- --actor-live # explicit actor-live alias
 cargo run -- --input-profile planetoid
 cargo run -- --input-profile cabinet
 cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin
@@ -703,9 +702,7 @@ command/draw/instance plus ordered sprite-only begin-pass, viewport, and
 projection upload coverage, and prepares sprite-only native draw plans plus
 frame-level `wgpu` command, resource bind-group, pipeline-layout bind-group,
 pipeline descriptor shape, encoder command-shape, and upload plans without
-entering the legacy live presenter. Interactive live play uses the same clean
-gameplay frames and executes the native sprite draw plans through `wgpu`
-buffers, bind groups, and indexed draws. `--live-smoke` reuses that clean frame
+entering the legacy live presenter. `--live-smoke` still reuses that clean frame
 source, renders the smoke frames through an offscreen `wgpu` target, reads back
 pixel signatures, checks the selected first/last signatures, and reports
 live-smoke evidence with `legacy_presenter_used: false`. `--actor-smoke` is the
@@ -713,15 +710,14 @@ actor-runtime counterpart: it steps `ActorRuntimeAdapter`, verifies attract,
 credited attract, playing, clean gameplay/audio events, required actor sprite
 families, projectile/HUD/overlay layers, native sprite draw commands, native
 pipelines, and frame-level `wgpu` command plans without entering the legacy
-presenter or replacing the live `Game` runtime. `--actor-wgpu-smoke` then
-renders actor scenes through the actual offscreen `wgpu` texture/readback path
-and requires every actor smoke frame to produce nonblank output plus dynamic
-readback signatures. `--actor-live` opens an interactive actor-frame window
-through the same `wgpu` presenter and submits actor-derived clean `GameFrame`
-values to live audio while default interactive play remains clean `Game`; actor
-high-score entry accepts the same initials/backspace keys through that path.
-Actor frames publish a clean state snapshot alongside events and scene data for
-runtime replacement preflights.
+presenter. `--actor-wgpu-smoke` then renders actor scenes through the actual
+offscreen `wgpu` texture/readback path and requires every actor smoke frame to
+produce nonblank output plus dynamic readback signatures. Normal interactive
+play and the explicit `--actor-live` alias now open an actor-frame window
+through the same `wgpu` presenter and submit actor-derived clean `GameFrame`
+values to live audio; actor high-score entry accepts the same
+initials/backspace keys through that path. Actor frames publish a clean state
+snapshot alongside events and scene data for the live runtime.
 The clean `Game` world seeds terrain, starfield, source-profile active enemy
 batches, human, and projectile snapshots for playing waves and renders them as
 atlas-backed scene sprites. Operator controls are

@@ -146,11 +146,6 @@ pub(crate) enum RuntimeCommand {
     FidelityScenarioInputWriter {
         path: PathBuf,
     },
-    WgpuLive {
-        input_profile: LiveInputProfile,
-        audio_mode: LiveAudioMode,
-        cmos_path: Option<PathBuf>,
-    },
     ActorWgpuLive {
         input_profile: LiveInputProfile,
         audio_mode: LiveAudioMode,
@@ -165,12 +160,7 @@ pub(crate) enum RuntimeCommand {
 impl RuntimeCommand {
     fn from_config(config: &RuntimeConfig) -> Self {
         match config.mode {
-            RunMode::Interactive => Self::WgpuLive {
-                input_profile: input_profile(config.controls),
-                audio_mode: audio_mode(config.audio),
-                cmos_path: config.cmos_path.clone(),
-            },
-            RunMode::ActorInteractive => Self::ActorWgpuLive {
+            RunMode::Interactive | RunMode::ActorInteractive => Self::ActorWgpuLive {
                 input_profile: input_profile(config.controls),
                 audio_mode: audio_mode(config.audio),
                 cmos_path: config.cmos_path.clone(),
@@ -241,11 +231,6 @@ impl RuntimeBackend for InstalledRuntimeBackend {
             RuntimeCommand::FidelityScenarioInputWriter { path } => {
                 run_fidelity_scenario_input_writer_command(path)
             }
-            RuntimeCommand::WgpuLive {
-                input_profile,
-                audio_mode,
-                cmos_path,
-            } => crate::live_wgpu::run(input_profile, audio_mode, cmos_path.as_deref()),
             RuntimeCommand::ActorWgpuLive {
                 input_profile,
                 audio_mode,
@@ -505,7 +490,7 @@ mod tests {
     }
 
     #[test]
-    fn runtime_host_adapts_clean_config_to_launch_command() {
+    fn runtime_host_adapts_default_config_to_actor_launch_command() {
         let calls = Rc::new(RefCell::new(Vec::new()));
         let host = RuntimeHost::with_backend(RecordingBackend {
             calls: Rc::clone(&calls),
@@ -522,7 +507,7 @@ mod tests {
         let observed = calls.borrow();
         assert_eq!(
             observed.as_slice(),
-            &[RuntimeCommand::WgpuLive {
+            &[RuntimeCommand::ActorWgpuLive {
                 input_profile: LiveInputProfile::Cabinet,
                 audio_mode: LiveAudioMode::Disabled,
                 cmos_path: Some(PathBuf::from("scores.bin")),
@@ -759,10 +744,10 @@ mod tests {
     }
 
     #[test]
-    fn default_config_uses_wgpu_live_launch() {
+    fn default_config_uses_actor_wgpu_live_launch() {
         assert_eq!(
             RuntimeCommand::from_config(&RuntimeConfig::default()),
-            RuntimeCommand::WgpuLive {
+            RuntimeCommand::ActorWgpuLive {
                 input_profile: LiveInputProfile::Planetoid,
                 audio_mode: LiveAudioMode::Device,
                 cmos_path: None,
@@ -843,10 +828,10 @@ mod tests {
     }
 
     #[test]
-    fn installed_backend_runs_config_driven_wgpu_live() {
+    fn installed_backend_runs_config_driven_actor_wgpu_live_by_default() {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
             .run(&RuntimeConfig::default())
-            .expect("installed backend should run config-driven live");
+            .expect("installed backend should run config-driven actor live");
     }
 
     #[test]

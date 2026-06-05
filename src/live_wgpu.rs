@@ -283,24 +283,6 @@ impl From<ActorSmokeReport> for LiveSmokeReport {
 }
 
 #[cfg(all(not(test), not(coverage)))]
-pub(crate) fn run(
-    input_profile: LiveInputProfile,
-    audio_mode: LiveAudioMode,
-    cmos_path: Option<&Path>,
-) -> anyhow::Result<()> {
-    run_clean_live(input_profile, audio_mode, cmos_path)
-}
-
-#[cfg(any(test, coverage))]
-pub(crate) fn run(
-    _input_profile: LiveInputProfile,
-    _audio_mode: LiveAudioMode,
-    _cmos_path: Option<&Path>,
-) -> anyhow::Result<()> {
-    Ok(())
-}
-
-#[cfg(all(not(test), not(coverage)))]
 pub(crate) fn run_actor_live(
     input_profile: LiveInputProfile,
     audio_mode: LiveAudioMode,
@@ -365,24 +347,6 @@ pub(crate) fn run_smoke(
 }
 
 #[cfg(all(not(test), not(coverage)))]
-fn run_clean_live(
-    input_profile: LiveInputProfile,
-    audio_mode: LiveAudioMode,
-    _cmos_path: Option<&Path>,
-) -> anyhow::Result<()> {
-    let event_loop = winit::event_loop::EventLoop::new().context("creating wgpu event loop")?;
-    let mut app = CleanLiveApp::new(input_profile, LiveAudioRuntime::for_mode(audio_mode));
-
-    event_loop
-        .run_app(&mut app)
-        .context("running clean wgpu live event loop")?;
-    if let Some(error) = app.take_error() {
-        return Err(error);
-    }
-    Ok(())
-}
-
-#[cfg(all(not(test), not(coverage)))]
 fn run_actor_live_app(
     input_profile: LiveInputProfile,
     audio_mode: LiveAudioMode,
@@ -399,23 +363,6 @@ fn run_actor_live_app(
         return Err(error);
     }
     Ok(())
-}
-
-#[cfg(all(not(test), not(coverage)))]
-struct CleanLiveApp {
-    input_profile: LiveInputProfile,
-    game: Game,
-    audio: LiveAudioRuntime,
-    input: LiveInputState,
-    accumulator: FixedStepAccumulator,
-    frame_duration: Duration,
-    last_tick: Instant,
-    next_wake_at: Instant,
-    latest_frame: Option<GameFrame>,
-    quit_requested: bool,
-    window: Option<Arc<Window>>,
-    presenter: Option<WgpuScenePresenter>,
-    error: Option<anyhow::Error>,
 }
 
 #[cfg(all(not(test), not(coverage)))]
@@ -567,190 +514,6 @@ impl ActorLiveApp {
 
 #[cfg(all(not(test), not(coverage)))]
 impl ApplicationHandler for ActorLiveApp {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if let Err(error) = self.initialize_window(event_loop) {
-            self.handle_error(event_loop, error);
-        }
-    }
-
-    fn window_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        window_id: WindowId,
-        event: WindowEvent,
-    ) {
-        if !self.window_matches(window_id) {
-            return;
-        }
-
-        match event {
-            WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::KeyboardInput { event, .. } => {
-                self.handle_keyboard_input(&event);
-                if self.quit_requested {
-                    event_loop.exit();
-                }
-            }
-            WindowEvent::Resized(size) => self.resize(size),
-            WindowEvent::RedrawRequested => {
-                if let Some(window) = &self.window {
-                    window.pre_present_notify();
-                }
-                if let Err(error) = self.draw_frame() {
-                    self.handle_error(event_loop, error);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        if self.error.is_some() || self.quit_requested {
-            event_loop.exit();
-            return;
-        }
-
-        if self.step_due_frames()
-            && let Some(window) = &self.window
-        {
-            window.request_redraw();
-        }
-        event_loop.set_control_flow(ControlFlow::WaitUntil(self.next_wake_at));
-    }
-
-    fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
-        self.presenter = None;
-        self.window = None;
-    }
-}
-
-#[cfg(all(not(test), not(coverage)))]
-impl CleanLiveApp {
-    fn new(input_profile: LiveInputProfile, audio: LiveAudioRuntime) -> Self {
-        let now = Instant::now();
-        let frame_duration = Duration::from_micros(FrameRate::CABINET.frame_duration_micros());
-        let mut app = Self {
-            input_profile,
-            game: Game::new(),
-            audio,
-            input: LiveInputState::default(),
-            accumulator: FixedStepAccumulator::new(FrameRate::CABINET),
-            frame_duration,
-            last_tick: now,
-            next_wake_at: now + frame_duration,
-            latest_frame: None,
-            quit_requested: false,
-            window: None,
-            presenter: None,
-            error: None,
-        };
-        app.step_one_frame();
-        app
-    }
-
-    fn take_error(&mut self) -> Option<anyhow::Error> {
-        self.error.take()
-    }
-
-    fn initialize_window(&mut self, event_loop: &ActiveEventLoop) -> anyhow::Result<()> {
-        if self.window.is_some() {
-            return Ok(());
-        }
-
-        let window = Arc::new(
-            event_loop
-                .create_window(
-                    Window::default_attributes()
-                        .with_title("Defender")
-                        .with_inner_size(LogicalSize::new(
-                            f64::from(INITIAL_WINDOW_WIDTH),
-                            f64::from(INITIAL_WINDOW_HEIGHT),
-                        )),
-                )
-                .context("creating clean wgpu window")?,
-        );
-        let presenter = pollster::block_on(WgpuScenePresenter::new(window.clone()))
-            .context("initializing clean wgpu presenter")?;
-        self.window = Some(window);
-        self.presenter = Some(presenter);
-        self.last_tick = Instant::now();
-        self.next_wake_at = self.last_tick + self.frame_duration;
-        Ok(())
-    }
-
-    fn handle_error(&mut self, event_loop: &ActiveEventLoop, error: anyhow::Error) {
-        if self.error.is_none() {
-            self.error = Some(error);
-        }
-        event_loop.exit();
-    }
-
-    fn window_matches(&self, window_id: WindowId) -> bool {
-        self.window
-            .as_ref()
-            .is_some_and(|window| window.id() == window_id)
-    }
-
-    fn handle_keyboard_input(&mut self, event: &KeyEvent) {
-        let Some(control) = live_control_from_winit(self.input_profile, event) else {
-            return;
-        };
-        let pressed = event.state == ElementState::Pressed;
-        if control == LiveControl::Quit && pressed {
-            self.quit_requested = true;
-            return;
-        }
-        self.input.apply(control, pressed);
-    }
-
-    fn resize(&mut self, size: PhysicalSize<u32>) {
-        let Some((width, height)) = renderable_window_size(size) else {
-            return;
-        };
-        if let Some(presenter) = &mut self.presenter {
-            presenter.resize(width, height);
-        }
-    }
-
-    fn step_one_frame(&mut self) {
-        let frame = self.game.step(self.input.drain_game_input());
-        self.audio.submit_game_frame(&frame);
-        self.latest_frame = Some(frame);
-    }
-
-    fn step_due_frames(&mut self) -> bool {
-        let now = Instant::now();
-        let elapsed = now.saturating_duration_since(self.last_tick);
-        self.last_tick = now;
-        self.accumulator
-            .add_elapsed_micros(elapsed.as_micros().try_into().unwrap_or(u64::MAX));
-        let due_steps = self.accumulator.consume_due_steps(MAX_STEPS_PER_TICK);
-
-        for _ in 0..due_steps {
-            self.step_one_frame();
-        }
-
-        let micros_until_next = FrameRate::CABINET
-            .frame_duration_micros()
-            .saturating_sub(self.accumulator.accumulated_micros())
-            .max(1);
-        self.next_wake_at = Instant::now() + Duration::from_micros(micros_until_next);
-        due_steps > 0
-    }
-
-    fn draw_frame(&mut self) -> anyhow::Result<()> {
-        let Some(frame) = &self.latest_frame else {
-            return Ok(());
-        };
-        let Some(presenter) = &mut self.presenter else {
-            return Ok(());
-        };
-        presenter.draw_scene(&frame.scene)
-    }
-}
-
-#[cfg(all(not(test), not(coverage)))]
-impl ApplicationHandler for CleanLiveApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if let Err(error) = self.initialize_window(event_loop) {
             self.handle_error(event_loop, error);

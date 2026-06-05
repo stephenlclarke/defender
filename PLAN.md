@@ -4267,3 +4267,26 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780634355717309`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780634724324509`.
+- `2026-06-05 05:56 BST`: Completed the actor default live runtime cycle.
+  Routed normal interactive `cargo run` through `ActorWgpuLive` and
+  `ActorRuntimeAdapter`; `--actor-live` remains an explicit alias for the same
+  actor live path. Removed stale clean interactive live scaffolding:
+  `RuntimeCommand::WgpuLive`, `live_wgpu::run`, `run_clean_live`, and
+  `CleanLiveApp`. Clean `--live-smoke`, `--game-smoke`, and `legacy-tools`
+  commands remain explicit evidence/oracle paths. README, SPEC, and the actor
+  architecture notes now describe actor live as the default interactive runtime.
+  Validation passed with focused default-runtime tests,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test live_smoke --all-targets --features legacy-tools`,
+  `cargo test runtime --all-targets --features legacy-tools`,
+  `cargo test platform --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780634778441109`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780635370459349`.

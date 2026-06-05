@@ -1,9 +1,9 @@
 # Actor Architecture Rewrite
 
 `src/actor_game.rs` is the first isolated slice of the Rust actor-oriented
-rewrite. It does not replace the live `Game` runtime yet. The current runtime
-remains available for fidelity evidence while the actor model is built out and
-verified.
+rewrite. It now owns the default interactive live runtime, while the clean
+`Game` path remains available through explicit smoke, fidelity, and oracle
+evidence commands.
 
 ## Structure
 
@@ -47,22 +47,20 @@ verified.
   attract/play sequence and the native draw planner. The smoke report verifies
   attract, credited attract, playing actor frames, clean gameplay/audio events,
   required actor sprite families, projectiles, HUD text, overlays, native
-  draw-command pipelines, and frame-level `wgpu` command plans while keeping
-  live play on the current clean `Game` runtime.
+  draw-command pipelines, and frame-level `wgpu` command plans for actor live
+  runtime coverage.
 - `--actor-wgpu-smoke` reuses that actor smoke sequence but sends the resulting
   actor `RenderScene` values through the offscreen `wgpu` texture/readback path.
   It requires every actor frame to render nonblank pixels and produce dynamic
-  readback signatures before actor frames are considered for interactive live
-  play.
-- `--actor-live` is the first explicit interactive actor runtime preflight. It
-  keeps default `cargo run` on clean `Game`, but the opt-in actor window steps
-  `ActorRuntimeAdapter`, converts each actor frame into a clean `GameFrame`,
-  submits that frame to the live audio runtime, and draws actor scenes with the
-  existing `wgpu` presenter. The shared live input state carries the same key
-  bindings and `XYZZY` mode into actor steps. Actor high-score entry now
-  consumes initials/backspace from that input surface, updates driver-owned
-  initials state, and returns to game-over after a three-letter entry is
-  submitted.
+  readback signatures for the actor runtime.
+- Normal `cargo run` and the explicit `--actor-live` alias now use the
+  interactive actor runtime. The actor window steps `ActorRuntimeAdapter`,
+  converts each actor frame into a clean `GameFrame`, submits that frame to the
+  live audio runtime, and draws actor scenes with the existing `wgpu` presenter.
+  The shared live input state carries the same key bindings and `XYZZY` mode
+  into actor steps. Actor high-score entry now consumes initials/backspace from
+  that input surface, updates driver-owned initials state, and returns to
+  game-over after a three-letter entry is submitted.
 
 ## C++ to Rust Mapping
 
@@ -306,6 +304,6 @@ The actor driver now owns a first Defender gameplay loop:
   driver-owned data.
 
 These mechanics are still intentionally compact. The next fidelity slices
-should port the remaining source restore positions and use the actor state,
-render, and audio bridges as the replacement boundary once actor gameplay parity
-is high enough to retire isolated scaffolding.
+should port the remaining source restore positions against the actor state,
+render, and audio bridges now used by the default live runtime, then retire
+isolated scaffolding as parity improves.

@@ -187,20 +187,19 @@ tree:
   `ActorStateBridge` adapts report phase, score, stock, high-score state, and
   actor snapshots with velocity/facing metadata into clean `GameState` values.
   `ActorRuntimeAdapter` bundles reports, clean `GameState`, clean `GameEvents`,
-  and clean `RenderScene` values into actor `ActorFrame` values. The actor game
-  is available through explicit actor smoke/live preflight commands while
-  default live play remains on the clean `Game` runtime.
+  and clean `RenderScene` values into actor `ActorFrame` values. Normal
+  interactive play uses the actor live runtime, with explicit actor smoke and
+  WGPU smoke commands retained as evidence gates.
 - `src/actor_smoke.rs`: the crate-private actor smoke command that steps
   `ActorRuntimeAdapter` through scripted attract/play inputs, verifies
   actor-origin clean gameplay/audio events, required actor sprite coverage,
   projectile/HUD/overlay layers, native draw-command pipeline coverage, and
-  frame-level `wgpu` command plans without replacing the live clean `Game`
-  runtime.
+  frame-level `wgpu` command plans.
 - `src/live_wgpu.rs`: also owns `--actor-wgpu-smoke`, which reuses the actor
   smoke input sequence, renders actor `RenderScene` frames through the offscreen
   `wgpu` texture/readback path, and checks nonblank dynamic readback evidence
-  without changing the default interactive live frame source. It also owns the
-  explicit `--actor-live` preflight mode, which steps `ActorRuntimeAdapter`,
+  for the actor runtime. It also owns default interactive actor live play and
+  the explicit `--actor-live` alias, which step `ActorRuntimeAdapter`,
   submits actor-derived clean `GameFrame` values to the live audio runtime, and
   draws actor scenes with the existing `wgpu` presenter. The actor live input
   path carries initials/backspace into actor high-score entry instead of
@@ -702,15 +701,14 @@ reintroduce legacy implementation terminology.
 - `--actor-smoke` runs the actor runtime adapter through attract, credited
   attract, and playing actor steps, verifies clean gameplay/audio events,
   actor sprite families, projectile/HUD/overlay layers, native draw-command
-  pipeline coverage, and frame-level `wgpu` command plans without replacing
-  live play's current clean `Game` frame source.
+  pipeline coverage, and frame-level `wgpu` command plans.
 - `--actor-wgpu-smoke` renders the same actor smoke frames through the actual
   offscreen `wgpu` readback path and verifies nonblank dynamic frame signatures.
-- `--actor-live` opens an explicit interactive actor-frame window using the
-  existing `wgpu` presenter and actor-derived clean `GameFrame` handoff to live
-  audio while preserving default `cargo run` on clean `Game`. It carries
-  high-score initials/backspace through actor input for the actor-owned
-  high-score-entry phase.
+- Normal `cargo run` and the explicit `--actor-live` alias open an interactive
+  actor-frame window using the existing `wgpu` presenter and actor-derived
+  clean `GameFrame` handoff to live audio. They carry high-score
+  initials/backspace through actor input for the actor-owned high-score-entry
+  phase.
 - Runtime renderer selection has been removed.
 - `--input-profile planetoid` is the default input profile.
 - `--input-profile cabinet` exposes a MAME-style cabinet keyboard profile.
@@ -781,8 +779,8 @@ reintroduce legacy implementation terminology.
   and replacement-player respawn on non-final player hazard collisions, source
   `HYP2` `LSEED > 0xC0` delayed death-risk routing through the same player
   death path, final-life game-over/high-score handoff, enemy/bomb/player/human
-  explosion variant draw metadata, and mutant spawn handoff, but it has not
-  replaced the live `Game` runtime yet.
+  explosion variant draw metadata, and mutant spawn handoff. Default
+  interactive play now reaches this actor path through `ActorRuntimeAdapter`.
 
 ## Compatibility Features
 
