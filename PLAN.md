@@ -38,12 +38,13 @@ verification tools.
   speed, lander fire cadence, and source bomber/pod counts. The actor wave
   allocator follows the source active-family shape, so later waves now seed
   bomber and pod actors beside landers. Source-backed landers, bombers, pods,
-  and initial humans publish fixed-point metadata and advance actor-owned
-  fraction state during active motion, and source landers prefer configured
-  target slots before falling back to nearest-human seeking. Lander shot timers
-  now spawn hostile projectile actors that use the same player damage policy as
-  other hazards, including `XYZZY` invincibility overrides; bomber and pod
-  laser hits award source scores and emit family hit cues.
+  swarmers, and initial humans publish fixed-point metadata and advance
+  actor-owned fraction state during active motion, and source landers prefer
+  configured target slots before falling back to nearest-human seeking. Lander
+  shot timers now spawn hostile projectile actors that use the same player
+  damage policy as other hazards, including `XYZZY` invincibility overrides;
+  bomber, pod, and swarmer laser hits award source scores and emit family hit
+  cues, and pod laser kills spawn bounded swarmer actors.
 - Primary runtime source is `src/`; the converted implementation is parked in
   `src_legacy/` and should remain optional oracle/tooling evidence only.
 - Normal live play uses clean `Game` frames through clean platform, audio, and
@@ -3692,3 +3693,19 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780617037548159`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780617817021029`.
+- `2026-06-05 01:16 BST`: Completed the actor pod swarmer spawn behavior
+  cycle. Added first-class `Swarmer` actors with source-style spawn metadata,
+  scriptable movement, sprite/sound/score integration, and hostile/smart-bomb
+  participation. Player-laser pod kills now emit the bounded six-swarmer batch
+  through driver spawn commands using the actor source wave profile, while
+  smart-bomb pod scoring intentionally does not spawn swarmers. Added
+  regressions for swarmer scriptability, pod laser-hit swarmer spawn metadata,
+  live swarmer draw snapshots, and the smart-bomb no-swarmer exception.
+  Validation passed with `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780617884352029`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780618577781619`.

@@ -11,8 +11,8 @@ verified.
   ids, actor threads, and the latest snapshots.
 - Each asset is a Rust struct implementing `AssetActor`. The current slice has
   `AttractDirector`, `ScriptedAttractProgram`, `PlayerShip`, `Lander`,
-  `Mutant`, `Bomber`, `Pod`, `Human`, `LaserShot`, `EnemyLaserShot`,
-  `Explosion`, and `ScorePopup`.
+  `Mutant`, `Bomber`, `Pod`, `Swarmer`, `Human`, `LaserShot`,
+  `EnemyLaserShot`, `Explosion`, and `ScorePopup`.
 - `ThreadedAsset` runs one actor on one Rust thread. The driver sends one
   `StepPrompt` per simulation step and waits for one `ActorReply`, keeping
   behavior deterministic while still matching the requested thread-per-asset
@@ -71,10 +71,10 @@ numbers.
 Actor movement and behavior are configurable data owned by the driver.
 `ActorBehaviorProfile` holds tunable attributes for player movement and laser
 cooldown, laser speed and lifetime, lander seek/carry/fire behavior, mutant
-pursuit, bomber/pod drift, human fall/landing behavior, and timed effect
-lifetimes. It also holds behavior modes such as `LanderBehaviorMode`, allowing
-scripts to choose whether a lander seeks humans, chases the player, or simply
-drifts.
+pursuit, bomber/pod drift, swarmer pursuit, human fall/landing behavior, and
+timed effect lifetimes. It also holds behavior modes such as
+`LanderBehaviorMode`, allowing scripts to choose whether a lander seeks humans,
+chases the player, or simply drifts.
 
 `ActorBehaviorScript` resolves those profiles in this order:
 
@@ -170,6 +170,9 @@ The actor driver now owns a first Defender gameplay loop:
   exposes those counts. Bombers and pods draw their own sprites, move through
   actor-owned source fixed-point metadata when source-backed, and remain
   script-tunable through their behavior profiles.
+- Projectile-killed pods spawn a bounded mini-swarmer actor batch using the
+  source request count. Smart-bomb pod scoring intentionally does not spawn
+  swarmers, matching the clean source behavior.
 - Carried humans follow their lander. If the carrier disappears, the human
   falls under a simple acceleration model and emits the release sound cue.
 - Falling humans caught by the player award 500 points, emit the rescue sound
@@ -178,8 +181,9 @@ The actor driver now owns a first Defender gameplay loop:
   250-point popup. Fast impacts destroy the human and spawn an explosion.
 - Smart bomb is now a real driver command: it removes active hostile actors,
   awards enemy scores, and spawns explosions while preserving human actors.
-- Player laser hits now resolve lander, mutant, bomber, and pod targets through
-  the driver, awarding source scores and family hit cues for bombers and pods.
+- Player laser hits now resolve lander, mutant, bomber, pod, and swarmer
+  targets through the driver, awarding source scores and family hit cues for
+  bomber, pod, and swarmer families.
 - Wave scripts now apply behavior profiles when play starts and when all
   hostile snapshots are cleared, allowing level difficulty to progress through
   driver-owned data.

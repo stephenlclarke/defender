@@ -35,6 +35,9 @@ const SOURCE_HUMAN_WALK_SLEEP_TICKS: u8 = 2;
 const SOURCE_HUMAN_LEFT_X_VELOCITY: u16 = 0xFFE0;
 const SOURCE_HUMAN_RIGHT_X_VELOCITY: u16 = 0x0020;
 const SOURCE_INITIAL_POD_X_SPEED: u8 = 0x20;
+const SOURCE_POD_SWARMER_REQUEST_LIMIT: usize = 6;
+const SOURCE_ACTIVE_SWARMER_LIMIT: usize = 20;
+const SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS: u8 = 3;
 const SOURCE_BOMBER_LOOP_SLEEP_TICKS: u8 = 1;
 const SOURCE_BOMBER_PICTURE_FRAME_COUNT: u8 = 4;
 const SOURCE_BOMBER_CRUISE_ALTITUDE: i16 = 0x50;
@@ -48,10 +51,12 @@ const LANDER_CONVERSION_Y: i16 = 24;
 const MUTANT_SEEK_SPEED: i16 = 1;
 const BOMBER_DRIFT_SPEED: i16 = 1;
 const POD_DRIFT_SPEED: i16 = 1;
+const SWARMER_SEEK_SPEED: i16 = 2;
 const LANDER_SCORE: u32 = 150;
 const MUTANT_SCORE: u32 = 150;
 const BOMBER_SCORE: u32 = 250;
 const POD_SCORE: u32 = 1000;
+const SWARMER_SCORE: u32 = 150;
 const HUMAN_RESCUE_SCORE: u32 = 500;
 const HUMAN_SAFE_LANDING_SCORE: u32 = 250;
 const ACTOR_SOURCE_WAVE_TABLE_TSV: &str = include_str!("../assets/red-label/wave-table.tsv");
@@ -725,6 +730,7 @@ pub enum ActorKind {
     Mutant,
     Bomber,
     Pod,
+    Swarmer,
     Human,
     Laser,
     EnemyLaser,
@@ -760,6 +766,7 @@ pub struct ActorBehaviorProfile {
     pub mutant_seek_speed: i16,
     pub bomber_drift_speed: i16,
     pub pod_drift_speed: i16,
+    pub swarmer_seek_speed: i16,
     pub human_ground_y: i16,
     pub human_fall_acceleration: i16,
     pub human_max_fall_speed: i16,
@@ -789,6 +796,7 @@ impl ActorBehaviorProfile {
         mutant_seek_speed: MUTANT_SEEK_SPEED,
         bomber_drift_speed: BOMBER_DRIFT_SPEED,
         pod_drift_speed: POD_DRIFT_SPEED,
+        swarmer_seek_speed: SWARMER_SEEK_SPEED,
         human_ground_y: HUMAN_GROUND_Y,
         human_fall_acceleration: HUMAN_FALL_ACCELERATION,
         human_max_fall_speed: HUMAN_MAX_FALL_SPEED,
@@ -907,6 +915,9 @@ pub struct ActorSourceWaveProfile {
     pub wave_size: u8,
     pub lander_x_velocity: u8,
     pub bomber_x_velocity: u8,
+    pub swarmer_x_velocity: u8,
+    pub swarmer_shot_time: u32,
+    pub swarmer_acceleration_mask: u8,
     pub lander_shot_time: u32,
 }
 
@@ -943,6 +954,17 @@ pub struct ActorSourcePodMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceSwarmerMetadata {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub acceleration: u8,
+    pub sleep_ticks: u8,
+    pub shot_timer: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorLanderSpawn {
     pub position: Point,
     pub source: Option<ActorSourceLanderMetadata>,
@@ -958,6 +980,12 @@ pub struct ActorBomberSpawn {
 pub struct ActorPodSpawn {
     pub position: Point,
     pub source: Option<ActorSourcePodMetadata>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSwarmerSpawn {
+    pub position: Point,
+    pub source: Option<ActorSourceSwarmerMetadata>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1075,6 +1103,47 @@ impl ActorPodSpawn {
     }
 }
 
+impl ActorSwarmerSpawn {
+    pub const fn new(position: Point) -> Self {
+        Self {
+            position,
+            source: None,
+        }
+    }
+
+    fn source_from_pod(position: Point, profile: ActorSourceWaveProfile, index: usize) -> Self {
+        let x_velocity_low = if index.is_multiple_of(2) {
+            profile.swarmer_x_velocity
+        } else {
+            0u8.wrapping_sub(profile.swarmer_x_velocity)
+        };
+        let y_velocity_low = swarmer_spawn_y_velocity_low(index);
+        Self {
+            position,
+            source: Some(ActorSourceSwarmerMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: actor_sign_extend_u8_to_u16(x_velocity_low),
+                y_velocity: actor_sign_extend_u8_to_u16(y_velocity_low),
+                acceleration: ((index as u8).wrapping_mul(7)) & profile.swarmer_acceleration_mask,
+                sleep_ticks: 0,
+                shot_timer: profile.swarmer_shot_time.min(u32::from(u8::MAX)) as u8,
+            }),
+        }
+    }
+}
+
+fn swarmer_spawn_y_velocity_low(index: usize) -> u8 {
+    match index % SOURCE_POD_SWARMER_REQUEST_LIMIT {
+        0 => 0x20,
+        1 => 0xE0,
+        2 => 0x18,
+        3 => 0xE8,
+        4 => 0x10,
+        _ => 0xF0,
+    }
+}
+
 impl ActorHumanSpawn {
     pub const fn new(position: Point, mode: HumanMode) -> Self {
         Self {
@@ -1111,6 +1180,9 @@ impl ActorSourceWaveProfile {
             wave_size: actor_source_wave_u8("wave_size", wave),
             lander_x_velocity: actor_source_wave_u8("lander_x_velocity", wave),
             bomber_x_velocity: actor_source_wave_u8("bomber_x_velocity", wave),
+            swarmer_x_velocity: actor_source_wave_u8("swarmer_x_velocity", wave),
+            swarmer_shot_time: actor_source_wave_u32("swarmer_shot_time", wave),
+            swarmer_acceleration_mask: actor_source_wave_u8("swarmer_acceleration_mask", wave),
             lander_shot_time: actor_source_wave_u32("lander_shot_time", wave),
         }
     }
@@ -1522,6 +1594,7 @@ pub enum SpriteKey {
     Mutant,
     Bomber,
     Pod,
+    Swarmer,
     Human,
     HumanFalling,
     HumanCarried,
@@ -1577,6 +1650,7 @@ pub enum SoundCue {
     MutantSpawn,
     BomberHit,
     PodHit,
+    SwarmerHit,
     AttractPulse,
     GameOver,
 }
@@ -1795,6 +1869,7 @@ pub struct ActorSnapshot {
     pub source_lander: Option<ActorSourceLanderMetadata>,
     pub source_bomber: Option<ActorSourceBomberMetadata>,
     pub source_pod: Option<ActorSourcePodMetadata>,
+    pub source_swarmer: Option<ActorSourceSwarmerMetadata>,
     pub source_human: Option<ActorSourceHumanMetadata>,
 }
 
@@ -1887,6 +1962,10 @@ pub enum SpawnRequest {
     },
     Pod {
         position: Point,
+    },
+    Swarmer {
+        position: Point,
+        source: Option<ActorSourceSwarmerMetadata>,
     },
     Human {
         position: Point,
@@ -2223,6 +2302,10 @@ impl ActorGameDriver {
         self.spawn_pod(position)
     }
 
+    pub fn spawn_swarmer_for_test(&mut self, position: Point) -> ActorId {
+        self.spawn_swarmer(position)
+    }
+
     pub fn spawn_human_for_test(&mut self, position: Point) -> ActorId {
         self.spawn_human(position, HumanMode::Grounded)
     }
@@ -2294,6 +2377,18 @@ impl ActorGameDriver {
         id
     }
 
+    fn spawn_swarmer(&mut self, position: Point) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(Swarmer::new(id, position));
+        id
+    }
+
+    fn spawn_swarmer_from_spawn(&mut self, spawn: ActorSwarmerSpawn) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(Swarmer::from_spawn(id, spawn));
+        id
+    }
+
     fn spawn_human(&mut self, position: Point, mode: HumanMode) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(Human::new(id, position, mode));
@@ -2360,6 +2455,9 @@ impl ActorGameDriver {
                     }));
                     commands.push(GameCommand::AddScore(score_for_hostile(enemy.kind)));
                     commands.push(GameCommand::PlaySound(hit_sound_for_hostile(enemy.kind)));
+                    if enemy.kind == ActorKind::Pod {
+                        commands.extend(self.pod_swarmer_spawn_commands(center_of(enemy.bounds)));
+                    }
                     break;
                 }
             }
@@ -2431,6 +2529,9 @@ impl ActorGameDriver {
                 }
                 GameCommand::Spawn(SpawnRequest::Pod { position }) => {
                     self.spawn_pod(position);
+                }
+                GameCommand::Spawn(SpawnRequest::Swarmer { position, source }) => {
+                    self.spawn_swarmer_from_spawn(ActorSwarmerSpawn { position, source });
                 }
                 GameCommand::Spawn(SpawnRequest::Human { position, mode }) => {
                     self.spawn_human(position, mode);
@@ -2561,6 +2662,27 @@ impl ActorGameDriver {
             .any(|snapshot| is_hostile(snapshot.kind))
     }
 
+    fn pod_swarmer_spawn_commands(&self, position: Point) -> Vec<GameCommand> {
+        let active_swarmers = self
+            .snapshots
+            .values()
+            .filter(|snapshot| snapshot.kind == ActorKind::Swarmer)
+            .count();
+        let spawn_count = SOURCE_POD_SWARMER_REQUEST_LIMIT
+            .min(SOURCE_ACTIVE_SWARMER_LIMIT.saturating_sub(active_swarmers));
+        let source_profile = ActorSourceWaveProfile::for_wave(self.wave.max(1));
+
+        (0..spawn_count)
+            .map(|index| {
+                let spawn = ActorSwarmerSpawn::source_from_pod(position, source_profile, index);
+                GameCommand::Spawn(SpawnRequest::Swarmer {
+                    position: spawn.position,
+                    source: spawn.source,
+                })
+            })
+            .collect()
+    }
+
     fn spawn_initial_humans(&mut self) {
         let human_spawns = self
             .wave_script
@@ -2618,7 +2740,11 @@ fn manhattan_distance(left: Point, right: Point) -> i16 {
 fn is_hostile(kind: ActorKind) -> bool {
     matches!(
         kind,
-        ActorKind::Lander | ActorKind::Mutant | ActorKind::Bomber | ActorKind::Pod
+        ActorKind::Lander
+            | ActorKind::Mutant
+            | ActorKind::Bomber
+            | ActorKind::Pod
+            | ActorKind::Swarmer
     )
 }
 
@@ -2629,6 +2755,7 @@ fn is_player_laser_target(kind: ActorKind) -> bool {
             | ActorKind::Mutant
             | ActorKind::Bomber
             | ActorKind::Pod
+            | ActorKind::Swarmer
             | ActorKind::EnemyLaser
     )
 }
@@ -2640,6 +2767,7 @@ fn is_player_hazard(kind: ActorKind) -> bool {
             | ActorKind::Mutant
             | ActorKind::Bomber
             | ActorKind::Pod
+            | ActorKind::Swarmer
             | ActorKind::EnemyLaser
     )
 }
@@ -2651,6 +2779,7 @@ fn is_smart_bomb_target(kind: ActorKind) -> bool {
             | ActorKind::Mutant
             | ActorKind::Bomber
             | ActorKind::Pod
+            | ActorKind::Swarmer
             | ActorKind::EnemyLaser
     )
 }
@@ -2663,6 +2792,7 @@ fn commands_spawn_hostiles(commands: &[GameCommand]) -> bool {
                 | GameCommand::Spawn(SpawnRequest::Mutant { .. })
                 | GameCommand::Spawn(SpawnRequest::Bomber { .. })
                 | GameCommand::Spawn(SpawnRequest::Pod { .. })
+                | GameCommand::Spawn(SpawnRequest::Swarmer { .. })
         )
     })
 }
@@ -2673,6 +2803,7 @@ fn score_for_hostile(kind: ActorKind) -> u32 {
         ActorKind::Mutant => MUTANT_SCORE,
         ActorKind::Bomber => BOMBER_SCORE,
         ActorKind::Pod => POD_SCORE,
+        ActorKind::Swarmer => SWARMER_SCORE,
         _ => 0,
     }
 }
@@ -2681,6 +2812,7 @@ fn hit_sound_for_hostile(kind: ActorKind) -> SoundCue {
     match kind {
         ActorKind::Bomber => SoundCue::BomberHit,
         ActorKind::Pod => SoundCue::PodHit,
+        ActorKind::Swarmer => SoundCue::SwarmerHit,
         _ => SoundCue::Explosion,
     }
 }
@@ -2760,6 +2892,7 @@ impl AssetActor for AttractDirector {
                 source_lander: None,
                 source_bomber: None,
                 source_pod: None,
+                source_swarmer: None,
                 source_human: None,
             },
             commands,
@@ -2810,6 +2943,7 @@ impl AssetActor for ScriptedAttractProgram {
                 source_lander: None,
                 source_bomber: None,
                 source_pod: None,
+                source_swarmer: None,
                 source_human: None,
             },
             commands: Vec::new(),
@@ -2906,6 +3040,7 @@ impl AssetActor for PlayerShip {
                 source_lander: None,
                 source_bomber: None,
                 source_pod: None,
+                source_swarmer: None,
                 source_human: None,
             },
             commands,
@@ -2995,6 +3130,7 @@ impl AssetActor for Lander {
                 source_lander: self.source,
                 source_bomber: None,
                 source_pod: None,
+                source_swarmer: None,
                 source_human: None,
             },
             commands,
@@ -3303,6 +3439,7 @@ impl AssetActor for Mutant {
                 source_lander: None,
                 source_bomber: None,
                 source_pod: None,
+                source_swarmer: None,
                 source_human: None,
             },
             commands: Vec::new(),
@@ -3406,6 +3543,7 @@ impl AssetActor for Bomber {
                 source_lander: None,
                 source_bomber: self.source,
                 source_pod: None,
+                source_swarmer: None,
                 source_human: None,
             },
             commands: Vec::new(),
@@ -3493,12 +3631,131 @@ impl AssetActor for Pod {
                 source_lander: None,
                 source_bomber: None,
                 source_pod: self.source,
+                source_swarmer: None,
                 source_human: None,
             },
             commands: Vec::new(),
             draws,
         }
     }
+}
+
+#[derive(Debug)]
+struct Swarmer {
+    id: ActorId,
+    position: Point,
+    source: Option<ActorSourceSwarmerMetadata>,
+}
+
+impl Swarmer {
+    fn new(id: ActorId, position: Point) -> Self {
+        Self::from_spawn(id, ActorSwarmerSpawn::new(position))
+    }
+
+    fn from_spawn(id: ActorId, spawn: ActorSwarmerSpawn) -> Self {
+        Self {
+            id,
+            position: spawn.position,
+            source: spawn.source,
+        }
+    }
+
+    fn bounds(&self) -> Rect {
+        Rect::from_center(self.position, 6, 4)
+    }
+
+    fn advance_source_motion(&mut self, prompt: &StepPrompt) -> bool {
+        let Some(source) = &mut self.source else {
+            return false;
+        };
+        if source.sleep_ticks > 0 {
+            source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
+            return true;
+        }
+
+        if let Some(player) = prompt.player_position() {
+            source.x_velocity =
+                swarmer_seek_velocity(source.x_velocity, player.x - self.position.x);
+            source.y_velocity = swarmer_accelerated_velocity(
+                source.y_velocity,
+                source.acceleration,
+                player.y - self.position.y,
+            );
+        }
+        let (x, x_fraction) =
+            actor_source_axis_step(self.position.x, source.x_fraction, source.x_velocity);
+        let (y, y_fraction) =
+            actor_source_axis_step(self.position.y, source.y_fraction, source.y_velocity);
+        self.position = Point::new(x, y);
+        source.x_fraction = x_fraction;
+        source.y_fraction = y_fraction;
+        source.shot_timer = source.shot_timer.saturating_sub(1);
+        source.sleep_ticks = SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS;
+        true
+    }
+}
+
+impl AssetActor for Swarmer {
+    fn id(&self) -> ActorId {
+        self.id
+    }
+
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
+        let mut draws = Vec::new();
+        if prompt.phase == Phase::Playing {
+            let behavior = prompt.behavior_for(self.id, ActorKind::Swarmer);
+            if !self.advance_source_motion(prompt)
+                && let Some(player) = prompt.player_position()
+            {
+                self.position = step_toward(self.position, player, behavior.swarmer_seek_speed);
+            }
+            draws.push(DrawCommand::sprite(
+                self.id,
+                SpriteKey::Swarmer,
+                self.position,
+            ));
+        }
+
+        ActorReply {
+            id: self.id,
+            snapshot: ActorSnapshot {
+                id: self.id,
+                kind: ActorKind::Swarmer,
+                position: self.position,
+                bounds: Some(self.bounds()),
+                alive: prompt.phase == Phase::Playing,
+                source_lander: None,
+                source_bomber: None,
+                source_pod: None,
+                source_swarmer: self.source,
+                source_human: None,
+            },
+            commands: Vec::new(),
+            draws,
+        }
+    }
+}
+
+fn swarmer_seek_velocity(current_velocity: u16, delta: i16) -> u16 {
+    if delta == 0 {
+        current_velocity
+    } else if delta > 0 {
+        actor_sign_extend_u8_to_u16(0x20)
+    } else {
+        actor_sign_extend_u8_to_u16(0u8.wrapping_sub(0x20))
+    }
+}
+
+fn swarmer_accelerated_velocity(current_velocity: u16, acceleration: u8, delta: i16) -> u16 {
+    if delta == 0 || acceleration == 0 {
+        return current_velocity;
+    }
+    let adjustment = if delta > 0 {
+        actor_sign_extend_u8_to_u16(acceleration.max(1))
+    } else {
+        actor_sign_extend_u8_to_u16(0u8.wrapping_sub(acceleration.max(1)))
+    };
+    current_velocity.wrapping_add(adjustment)
 }
 
 #[derive(Debug)]
@@ -3685,6 +3942,7 @@ impl AssetActor for Human {
                 source_lander: None,
                 source_bomber: None,
                 source_pod: None,
+                source_swarmer: None,
                 source_human: self.source,
             },
             commands,
@@ -3768,6 +4026,7 @@ impl AssetActor for ScorePopup {
                 source_lander: None,
                 source_bomber: None,
                 source_pod: None,
+                source_swarmer: None,
                 source_human: None,
             },
             commands,
@@ -3835,6 +4094,7 @@ impl AssetActor for LaserShot {
                 source_lander: None,
                 source_bomber: None,
                 source_pod: None,
+                source_swarmer: None,
                 source_human: None,
             },
             commands,
@@ -3903,6 +4163,7 @@ impl AssetActor for EnemyLaserShot {
                 source_lander: None,
                 source_bomber: None,
                 source_pod: None,
+                source_swarmer: None,
                 source_human: None,
             },
             commands,
@@ -3960,6 +4221,7 @@ impl AssetActor for Explosion {
                 source_lander: None,
                 source_bomber: None,
                 source_pod: None,
+                source_swarmer: None,
                 source_human: None,
             },
             commands,
@@ -4861,6 +5123,26 @@ mod tests {
     }
 
     #[test]
+    fn behavior_script_can_define_swarmer_motion() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.spawn_player();
+        driver.step(GameInput::NONE);
+        driver.set_kind_behavior(
+            ActorKind::Swarmer,
+            ActorBehaviorProfile {
+                swarmer_seek_speed: 5,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        let swarmer = driver.spawn_swarmer_for_test(Point::new(70, 120));
+
+        let report = driver.step(GameInput::NONE);
+
+        assert_eq!(snapshot_for(&report, swarmer).position, Point::new(65, 120));
+    }
+
+    #[test]
     fn wave_script_applies_behavior_when_play_starts() {
         let lander_behavior = ActorBehaviorProfile {
             lander_seek_speed: 5,
@@ -5260,6 +5542,7 @@ mod tests {
     fn driver_resolves_laser_pod_collision_with_source_score_sound_and_explosion() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
+        driver.wave = 2;
         driver.spawn_player();
         driver.spawn_pod_for_test(Point::new(62, 120));
 
@@ -5277,6 +5560,63 @@ mod tests {
                 .commands
                 .contains(&GameCommand::AddScore(POD_SCORE))
         );
+        let swarmer_spawns = collision
+            .commands
+            .iter()
+            .filter_map(|command| match command {
+                GameCommand::Spawn(SpawnRequest::Swarmer { position, source }) => {
+                    Some((*position, *source))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(swarmer_spawns.len(), SOURCE_POD_SWARMER_REQUEST_LIMIT);
+        assert_eq!(
+            swarmer_spawns[0],
+            (
+                Point::new(64, 120),
+                Some(ActorSourceSwarmerMetadata {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0x0028,
+                    y_velocity: 0x0020,
+                    acceleration: 0,
+                    sleep_ticks: 0,
+                    shot_timer: 20,
+                })
+            )
+        );
+
+        let live = driver.step(GameInput::NONE);
+        assert_eq!(
+            driver.snapshot_count(ActorKind::Swarmer),
+            SOURCE_POD_SWARMER_REQUEST_LIMIT
+        );
+        assert!(
+            live.draws
+                .iter()
+                .any(|draw| draw.sprite == SpriteKey::Swarmer)
+        );
+    }
+
+    #[test]
+    fn smart_bomb_pod_score_does_not_spawn_swarmers() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 2;
+        driver.spawn_player();
+        driver.spawn_pod_for_test(Point::new(120, 120));
+
+        let report = driver.step(GameInput {
+            smart_bomb: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(report.score, POD_SCORE);
+        assert_eq!(driver.snapshot_count(ActorKind::Pod), 0);
+        assert!(!report.commands.iter().any(|command| {
+            matches!(command, GameCommand::Spawn(SpawnRequest::Swarmer { .. }))
+        }));
     }
 
     #[test]
