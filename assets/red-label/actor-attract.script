@@ -2,14 +2,13 @@
 # Format: <action> <start-step> <duration|forever> <x> <y> [text]
 # message uses: <label> <top-left-screen-address>
 # high_scores adds: <row-height> <rows>
+# hall_scores uses: <todays-screen-address> <all-time-screen-address> <offset-x> <offset-y>
 # credits and credits_nonzero use: <label-x> <label-y> <count-x> <count-y>
 
 williams_logo 1 forever 108 60
 message 236 forever ELECV 0x3258
 defender_wordmark 365 forever 96 144
 credits_nonzero 1 487 176 226 248 226
-text 488 forever 78 176 HIGH SCORES
-high_scores 488 forever 82 188 10 5
 credits 488 forever 176 226 248 226
 message 488 forever HALLD_TITLE 0x3854
 message 488 forever HALLD_TODAYS 0x2268
@@ -17,3 +16,4 @@ message 488 forever HALLD_ALL_TIME 0x6068
 message 488 forever HALLD_GREATEST 0x1E72
 message 488 forever HALLD_GREATEST 0x5F72
 sprite 488 forever defender_logo 85 50
+hall_scores 488 forever 0x1886 0x5986 -11 -6

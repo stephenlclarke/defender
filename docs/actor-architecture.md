@@ -324,10 +324,11 @@ wordmark from step 365. The default high-score title/table and zero-credit
 credit line start at the Hall-of-Fame boundary, step 488; title pages use a
 `credits_nonzero` event so an inserted credit can still be shown immediately
 without drawing a zero-credit line. The same Hall-of-Fame boundary draws
-source `HALLD_*` headings and the source Defender logo, while the high-score
-rows remain the current scriptable table fallback. The older Rust event
-constructor remains available as a fallback. Custom drivers can pass their own
-parsed or constructed sequence through
+source `HALLD_*` headings, the source Defender logo, and a `hall_scores`
+two-column table using the clean source table addresses plus embedded red-label
+seed initials. The older Rust event constructor remains available as a
+fallback. Custom drivers can pass their own parsed or constructed sequence
+through
 `ActorGameDriver::with_attract_script(...)` without replacing coin/start
 control handling.
 `ActorGameDriver::script_manifest()` includes the immutable attract-event
@@ -342,7 +343,6 @@ text 1 forever 10 10 PRESS START
 message 236 forever ELECV 0x3258
 sprite 2 forever defender_logo 40 44
 credits_nonzero 1 487 176 226 248 226
-high_scores 488 forever 82 188 10 5
 credits 488 forever 176 226 248 226
 message 488 forever HALLD_TITLE 0x3854
 message 488 forever HALLD_TODAYS 0x2268
@@ -350,6 +350,7 @@ message 488 forever HALLD_ALL_TIME 0x6068
 message 488 forever HALLD_GREATEST 0x1E72
 message 488 forever HALLD_GREATEST 0x5F72
 sprite 488 forever defender_logo 85 50
+hall_scores 488 forever 0x1886 0x5986 -11 -6
 williams_logo 5 - 108 60
 defender_wordmark 365 - 96 144
 ```
@@ -359,11 +360,15 @@ Blank lines and `#` comments are ignored. `duration` can be a step count or
 include the source line number so custom driver tooling can reject malformed
 scripts before the actor runtime starts. `high_scores` lines use
 `x y row-height rows` after the timing fields and draw rows from the
-driver-owned high-score table carried in `StepPrompt`. `credits` and
-`credits_nonzero` lines use `label-x label-y count-x count-y` after the timing
-fields and draw the source-backed `CREDV` / `CREDITS:` label plus the visible
-credit count from `StepPrompt.credits`; `credits_nonzero` suppresses the draw
-until at least one credit exists. `message` / `source_message` lines use
+driver-owned high-score table carried in `StepPrompt`. `hall_scores` lines use
+`todays-screen-address all-time-screen-address offset-x offset-y` and draw
+source-shaped Today’s and All-Time table columns with ranks, red-label seed
+initials from `assets/red-label/high-scores.tsv`, and current actor score
+values when available. `credits` and `credits_nonzero` lines use
+`label-x label-y count-x count-y` after the timing fields and draw the
+source-backed `CREDV` / `CREDITS:` label plus the visible credit count from
+`StepPrompt.credits`; `credits_nonzero` suppresses the draw until at least one
+credit exists. `message` / `source_message` lines use
 `label top-left-screen-address` after the timing fields, validate `label`
 against `assets/red-label/messages.tsv`, and render through the source
 controlled-message glyph path so red-label cursor tokens such as `[RLF]` and
@@ -375,7 +380,9 @@ Script actions currently cover:
 - `SourceMessage`, for checked red-label message-table labels rendered through
   source cursor controls.
 - `Sprite`, for static sprite placement.
-- `HighScores`, for prompt-backed high-score table rows in attract/game-over.
+- `HighScores`, for prompt-backed one-column high-score table rows in custom
+  attract/game-over scripts.
+- `HallScores`, for source-shaped Today’s and All-Time Hall-of-Fame table rows.
 - `Credits`, for the prompt-backed credit label/count in attract/game-over.
 - `WilliamsLogo`, which emits `SpriteKey::WilliamsLogo` with
   `VisualEffect::WilliamsReveal` metadata for handwriting reveal and title

@@ -12,14 +12,15 @@ use crate::{
         EnemySnapshot as CleanEnemySnapshot, ExplosionKind as CleanExplosionKind,
         ExplosionSnapshot as CleanExplosionSnapshot, GameEvent, GameEvents, GameFrame,
         GameInput as CleanGameInput, GameOverSnapshot, GamePhase, GameState,
-        HighScoreEntrySnapshot, HighScoreTableEntrySnapshot, HighScoreTablesSnapshot,
-        HumanSnapshot as CleanHumanSnapshot, PlayerSnapshot, PlayerStockSnapshot,
-        ProjectileSnapshot as CleanProjectileSnapshot, ScorePopupKind as CleanScorePopupKind,
-        ScorePopupSnapshot as CleanScorePopupSnapshot, ScoreSnapshot, SoundEvent,
-        SourceBaiterSnapshot, SourceBomberSnapshot, SourceLanderSnapshot, SourceMutantSnapshot,
-        SourcePodSnapshot, SourceRandSnapshot, SourceSwarmerSnapshot, WaveProfileSnapshot,
-        WorldSnapshot, WorldVector, push_source_explosion_cloud_pixels,
-        source_explosion_render_scale, source_explosion_size_for_age,
+        HIGH_SCORE_TABLE_ENTRIES, HighScoreEntrySnapshot, HighScoreTableEntrySnapshot,
+        HighScoreTablesSnapshot, HumanSnapshot as CleanHumanSnapshot, PlayerSnapshot,
+        PlayerStockSnapshot, ProjectileSnapshot as CleanProjectileSnapshot,
+        ScorePopupKind as CleanScorePopupKind, ScorePopupSnapshot as CleanScorePopupSnapshot,
+        ScoreSnapshot, SoundEvent, SourceBaiterSnapshot, SourceBomberSnapshot,
+        SourceLanderSnapshot, SourceMutantSnapshot, SourcePodSnapshot, SourceRandSnapshot,
+        SourceSwarmerSnapshot, WaveProfileSnapshot, WorldSnapshot, WorldVector,
+        push_source_explosion_cloud_pixels, source_explosion_render_scale,
+        source_explosion_size_for_age,
     },
     renderer::{
         Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
@@ -79,8 +80,6 @@ const WILLIAMS_REVEAL_STEPS: u16 = SOURCE_ATTRACT_PRESENTS_START_STEP as u16;
 const WILLIAMS_COLOR_PERIOD: u16 = 8;
 const SOURCE_ATTRACT_WILLIAMS_LOGO_POSITION: Point = Point::new(108, 60);
 const SOURCE_ATTRACT_DEFENDER_WORDMARK_POSITION: Point = Point::new(96, 144);
-const SOURCE_ATTRACT_HIGH_SCORE_TITLE_POSITION: Point = Point::new(78, 176);
-const SOURCE_ATTRACT_HIGH_SCORE_TABLE_POSITION: Point = Point::new(82, 188);
 const SOURCE_ATTRACT_CREDIT_LABEL_POSITION: Point = Point::new(176, 226);
 const SOURCE_ATTRACT_CREDIT_COUNT_POSITION: Point = Point::new(248, 226);
 const SOURCE_ATTRACT_HALL_TITLE_LABEL: &str = "HALLD_TITLE";
@@ -88,6 +87,13 @@ const SOURCE_ATTRACT_HALL_TODAYS_LABEL: &str = "HALLD_TODAYS";
 const SOURCE_ATTRACT_HALL_ALL_TIME_LABEL: &str = "HALLD_ALL_TIME";
 const SOURCE_ATTRACT_HALL_GREATEST_LABEL: &str = "HALLD_GREATEST";
 const SOURCE_ATTRACT_HALL_DEFENDER_LOGO_POSITION: Point = Point::new(85, 50);
+const SOURCE_ATTRACT_HALL_TODAYS_TABLE_SCREEN: u16 = 0x1886;
+const SOURCE_ATTRACT_HALL_ALL_TIME_TABLE_SCREEN: u16 = 0x5986;
+const SOURCE_ATTRACT_HALL_TABLE_ROW_STEP: u8 = 0x0A;
+const SOURCE_ATTRACT_HALL_TABLE_INITIALS_OFFSET: u8 = 0x05;
+const SOURCE_ATTRACT_HALL_TABLE_SCORE_OFFSET: u8 = 0x13;
+const SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET: Point = Point::new(-11, -6);
+const SOURCE_ATTRACT_HALL_SCORE_TEXT_LEN: usize = 6;
 const DEFENDER_WORDMARK_START_STEP: u64 = SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP;
 const DEFENDER_WORDMARK_SLOTS: u16 = 15;
 const DEFENDER_WORDMARK_ROW_PAIRS: u16 = 6;
@@ -205,6 +211,7 @@ const ACTOR_RED_LABEL_BEHAVIOR_SCRIPT: &str =
     include_str!("../assets/red-label/actor-behavior.script");
 const ACTOR_RED_LABEL_WAVE_SCRIPT: &str = include_str!("../assets/red-label/actor-waves.script");
 const ACTOR_SOURCE_WAVE_TABLE_TSV: &str = include_str!("../assets/red-label/wave-table.tsv");
+const ACTOR_SOURCE_HIGH_SCORES_TSV: &str = include_str!("../assets/red-label/high-scores.tsv");
 const ACTOR_SOURCE_WAVE_TABLE_HEADER: &str =
     "key\tceiling\tfloor\tintra_delta\tinter_delta\twave1\twave2\twave3\twave4";
 const ACTOR_SOURCE_DEFAULT_DIFFICULTY_INITIAL: u8 = 5;
@@ -3557,19 +3564,6 @@ impl AttractScript {
                 None,
                 SOURCE_ATTRACT_DEFENDER_WORDMARK_POSITION,
             ),
-            AttractScriptEvent::text(
-                SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
-                None,
-                SOURCE_ATTRACT_HIGH_SCORE_TITLE_POSITION,
-                "HIGH SCORES",
-            ),
-            AttractScriptEvent::high_scores(
-                SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
-                None,
-                SOURCE_ATTRACT_HIGH_SCORE_TABLE_POSITION,
-                10,
-                5,
-            ),
             AttractScriptEvent::credits_when_nonzero(
                 1,
                 Some(SOURCE_ATTRACT_HALL_OF_FAME_START_STEP.saturating_sub(1)),
@@ -3617,6 +3611,13 @@ impl AttractScript {
                 None,
                 SpriteKey::DefenderLogo,
                 SOURCE_ATTRACT_HALL_DEFENDER_LOGO_POSITION,
+            ),
+            AttractScriptEvent::hall_scores(
+                SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
+                None,
+                SOURCE_ATTRACT_HALL_TODAYS_TABLE_SCREEN,
+                SOURCE_ATTRACT_HALL_ALL_TIME_TABLE_SCREEN,
+                SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
         ])
     }
@@ -3776,6 +3777,21 @@ fn parse_attract_script_event(
                 position,
                 row_height,
                 rows,
+            ))
+        }
+        "hall_scores" | "hall_of_fame_scores" | "hall_of_fame_table" => {
+            let todays_top_left_screen_address =
+                parse_attract_u16(line_number, parts.next(), "today's table screen address")?;
+            let all_time_top_left_screen_address =
+                parse_attract_u16(line_number, parts.next(), "all-time table screen address")?;
+            let visual_offset = parse_attract_point(line_number, &mut parts)?;
+            reject_extra_attract_fields(line_number, parts)?;
+            Ok(AttractScriptEvent::hall_scores(
+                start_after_steps,
+                duration_steps,
+                todays_top_left_screen_address,
+                all_time_top_left_screen_address,
+                visual_offset,
             ))
         }
         "credits" | "credit_count" => {
@@ -4078,6 +4094,24 @@ impl AttractScriptEvent {
         }
     }
 
+    pub fn hall_scores(
+        start_after_steps: u64,
+        duration_steps: Option<u64>,
+        todays_top_left_screen_address: u16,
+        all_time_top_left_screen_address: u16,
+        visual_offset: Point,
+    ) -> Self {
+        Self {
+            start_after_steps,
+            duration_steps,
+            action: AttractScriptAction::HallScores {
+                todays_top_left_screen_address,
+                all_time_top_left_screen_address,
+                visual_offset,
+            },
+        }
+    }
+
     pub fn credits(
         start_after_steps: u64,
         duration_steps: Option<u64>,
@@ -4175,6 +4209,11 @@ pub enum AttractScriptAction {
         position: Point,
         row_height: i16,
         rows: usize,
+    },
+    HallScores {
+        todays_top_left_screen_address: u16,
+        all_time_top_left_screen_address: u16,
+        visual_offset: Point,
     },
     Credits {
         label_position: Point,
@@ -4274,6 +4313,26 @@ impl AttractScriptAction {
                     )
                 })
                 .collect(),
+            Self::HallScores {
+                todays_top_left_screen_address,
+                all_time_top_left_screen_address,
+                visual_offset,
+            } => {
+                let entries = source_hall_score_entries(high_scores);
+                let mut draws = hall_score_table_draws(
+                    actor,
+                    entries,
+                    *todays_top_left_screen_address,
+                    *visual_offset,
+                );
+                draws.extend(hall_score_table_draws(
+                    actor,
+                    entries,
+                    *all_time_top_left_screen_address,
+                    *visual_offset,
+                ));
+                draws
+            }
             Self::Credits {
                 label_position,
                 count_position,
@@ -4339,6 +4398,15 @@ impl AttractScriptAction {
                 row_height: *row_height,
                 rows: *rows,
             },
+            Self::HallScores {
+                todays_top_left_screen_address,
+                all_time_top_left_screen_address,
+                visual_offset,
+            } => AttractScriptActionManifest::HallScores {
+                todays_top_left_screen_address: *todays_top_left_screen_address,
+                all_time_top_left_screen_address: *all_time_top_left_screen_address,
+                visual_offset: *visual_offset,
+            },
             Self::Credits {
                 label_position,
                 count_position,
@@ -4354,6 +4422,138 @@ impl AttractScriptAction {
 
 fn source_credits_label_text() -> &'static str {
     source_message_text(SOURCE_CREDITS_MESSAGE_LABEL).unwrap_or("CREDITS:")
+}
+
+fn source_hall_score_entries(
+    high_scores: &[u32; 5],
+) -> [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] {
+    std::array::from_fn(|index| {
+        let seed = source_high_score_seed_entry(index);
+        HighScoreTableEntrySnapshot {
+            rank: seed.rank,
+            score: high_scores.get(index).copied().unwrap_or(seed.score),
+            initials: seed.initials,
+        }
+    })
+}
+
+fn source_high_score_seed_entry(index: usize) -> HighScoreTableEntrySnapshot {
+    let line = ACTOR_SOURCE_HIGH_SCORES_TSV
+        .lines()
+        .skip(1)
+        .nth(index)
+        .unwrap_or_else(|| panic!("missing red-label high-score seed row {index}"));
+    let mut fields = line.split('\t');
+    let initials = fields
+        .next()
+        .unwrap_or_else(|| panic!("missing red-label high-score initials row {index}"));
+    let score = fields
+        .next()
+        .unwrap_or_else(|| panic!("missing red-label high-score value row {index}"))
+        .parse::<u32>()
+        .unwrap_or_else(|error| panic!("red-label high-score row {index} score: {error}"));
+    HighScoreTableEntrySnapshot {
+        rank: u8::try_from(index + 1).expect("red-label high-score rank fits u8"),
+        score,
+        initials: high_score_initials_from_seed(initials),
+    }
+}
+
+fn high_score_initials_from_seed(initials: &str) -> [Option<char>; 3] {
+    let mut result = [None; 3];
+    for (index, character) in initials.chars().take(result.len()).enumerate() {
+        if character.is_ascii_alphabetic() {
+            result[index] = Some(character.to_ascii_uppercase());
+        }
+    }
+    result
+}
+
+fn hall_score_table_draws(
+    actor: ActorId,
+    entries: [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES],
+    top_left_screen_address: u16,
+    visual_offset: Point,
+) -> Vec<DrawCommand> {
+    let mut draws = Vec::with_capacity(entries.len() * 3);
+    for (index, entry) in entries.iter().copied().enumerate() {
+        let vertical_offset = u8::try_from(index).expect("high-score table index fits in u8")
+            * SOURCE_ATTRACT_HALL_TABLE_ROW_STEP;
+        draws.push(DrawCommand::text(
+            actor,
+            offset_point(
+                source_screen_point_with_offset(top_left_screen_address, 0, vertical_offset),
+                visual_offset,
+            ),
+            char::from(b'1' + u8::try_from(index).expect("high-score rank fits u8")).to_string(),
+        ));
+        draws.push(DrawCommand::text(
+            actor,
+            offset_point(
+                source_screen_point_with_offset(
+                    top_left_screen_address,
+                    SOURCE_ATTRACT_HALL_TABLE_INITIALS_OFFSET,
+                    vertical_offset,
+                ),
+                visual_offset,
+            ),
+            hall_score_initials_text(entry.initials),
+        ));
+        draws.push(DrawCommand::text(
+            actor,
+            offset_point(
+                source_screen_point_with_offset(
+                    top_left_screen_address,
+                    SOURCE_ATTRACT_HALL_TABLE_SCORE_OFFSET,
+                    vertical_offset,
+                ),
+                visual_offset,
+            ),
+            hall_score_text(entry.score),
+        ));
+    }
+    draws
+}
+
+fn source_screen_point_with_offset(
+    top_left_screen_address: u16,
+    horizontal: u8,
+    vertical: u8,
+) -> Point {
+    let [column, row] = top_left_screen_address.to_be_bytes();
+    Point::new(
+        i16::from(column.wrapping_add(horizontal)) * 2,
+        i16::from(row.wrapping_add(vertical)),
+    )
+}
+
+fn offset_point(point: Point, offset: Point) -> Point {
+    Point::new(
+        point.x.saturating_add(offset.x),
+        point.y.saturating_add(offset.y),
+    )
+}
+
+fn hall_score_initials_text(initials: [Option<char>; 3]) -> String {
+    initials
+        .into_iter()
+        .map(|initial| initial.unwrap_or(' '))
+        .collect()
+}
+
+fn hall_score_text(score: u32) -> String {
+    let mut text = [b' '; SOURCE_ATTRACT_HALL_SCORE_TEXT_LEN];
+    let mut place = 100_000;
+    let mut seen_non_zero = false;
+    for byte in &mut text {
+        let digit = ((score.min(999_999) / place) % 10) as u8;
+        if digit != 0 || seen_non_zero {
+            seen_non_zero = true;
+            *byte = b'0' + digit;
+        }
+        place /= 10;
+    }
+    String::from_utf8_lossy(&text).into_owned()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -4396,6 +4596,11 @@ pub enum AttractScriptActionManifest {
         position: Point,
         row_height: i16,
         rows: usize,
+    },
+    HallScores {
+        todays_top_left_screen_address: u16,
+        all_time_top_left_screen_address: u16,
+        visual_offset: Point,
     },
     Credits {
         label_position: Point,
@@ -4873,14 +5078,7 @@ fn player_direction_for_report(report: &StepReport) -> CleanDirection {
 }
 
 fn high_score_tables_for_report(report: &StepReport) -> HighScoreTablesSnapshot {
-    let mut entries = HighScoreTablesSnapshot::EMPTY.all_time;
-    for (index, score) in report.high_scores.iter().copied().enumerate() {
-        entries[index] = HighScoreTableEntrySnapshot {
-            rank: u8::try_from(index + 1).expect("actor high-score rank should fit u8"),
-            score,
-            initials: [None; 3],
-        };
-    }
+    let entries = source_hall_score_entries(&report.high_scores);
     HighScoreTablesSnapshot {
         all_time: entries,
         todays_greatest: entries,
@@ -11265,12 +11463,12 @@ mod tests {
         assert!(
             hall.draws
                 .iter()
-                .any(|draw| draw.text.as_deref() == Some("HIGH SCORES"))
+                .all(|draw| draw.text.as_deref() != Some("HIGH SCORES"))
         );
         assert!(
             hall.draws
                 .iter()
-                .any(|draw| draw.text.as_deref() == Some("1. 010000"))
+                .all(|draw| draw.text.as_deref() != Some("1. 010000"))
         );
         assert!(
             hall.draws
@@ -11306,10 +11504,38 @@ mod tests {
             draw.sprite == SpriteKey::DefenderLogo
                 && draw.position == SOURCE_ATTRACT_HALL_DEFENDER_LOGO_POSITION
         }));
+        assert!(hall.draws.iter().any(|draw| {
+            draw.position == Point::new(37, 128) && draw.text.as_deref() == Some("1")
+        }));
+        assert!(hall.draws.iter().any(|draw| {
+            draw.position == Point::new(47, 128) && draw.text.as_deref() == Some("DRJ")
+        }));
+        assert!(hall.draws.iter().any(|draw| {
+            draw.position == Point::new(75, 128) && draw.text.as_deref() == Some(" 10000")
+        }));
+        assert!(hall.draws.iter().any(|draw| {
+            draw.position == Point::new(167, 128) && draw.text.as_deref() == Some("1")
+        }));
+        assert!(hall.draws.iter().any(|draw| {
+            draw.position == Point::new(177, 128) && draw.text.as_deref() == Some("DRJ")
+        }));
+        assert!(hall.draws.iter().any(|draw| {
+            draw.position == Point::new(205, 198) && draw.text.as_deref() == Some("  6010")
+        }));
         let hall_scene = ActorRenderSceneBridge::new().render_scene_for_report(&hall);
         assert!(hall_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_H
                 && sprite.position == [112.0, 84.0]
+                && sprite.layer == RenderLayer::Overlay
+        }));
+        assert!(hall_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_D
+                && sprite.position == [47.0, 128.0]
+                && sprite.layer == RenderLayer::Overlay
+        }));
+        assert!(hall_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_DIGIT_1
+                && sprite.position == [79.0, 128.0]
                 && sprite.layer == RenderLayer::Overlay
         }));
         assert!(hall_scene.sprites.iter().any(|sprite| {
@@ -11368,10 +11594,10 @@ mod tests {
         )));
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
-            AttractScriptActionManifest::HighScores {
-                position: SOURCE_ATTRACT_HIGH_SCORE_TABLE_POSITION,
-                row_height: 10,
-                rows: 5,
+            AttractScriptActionManifest::HallScores {
+                todays_top_left_screen_address: SOURCE_ATTRACT_HALL_TODAYS_TABLE_SCREEN,
+                all_time_top_left_screen_address: SOURCE_ATTRACT_HALL_ALL_TIME_TABLE_SCREEN,
+                visual_offset: SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             } if event.start_after_steps == SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
         )));
         assert!(parsed.manifest().events.iter().any(|event| matches!(
@@ -11533,6 +11759,7 @@ mod tests {
             defender_wordmark 9 12 70 80\n\
             text 2 5 12 20 CUSTOM ATTRACT\n\
             high_scores 4 forever 80 100 9 3\n\
+            hall_scores 4 forever 0x1886 0x5986 -11 -6\n\
             credits 4 forever 12 228 82 228\n\
             credits_nonzero 4 8 14 226 84 226\n\
             sprite 6 forever defender_logo 40 44\n\
@@ -11548,7 +11775,7 @@ mod tests {
                 .iter()
                 .map(|event| event.start_after_steps)
                 .collect::<Vec<_>>(),
-            vec![2, 4, 4, 4, 5, 6, 9]
+            vec![2, 4, 4, 4, 4, 5, 6, 9]
         );
         assert_eq!(
             manifest.events[0].action,
@@ -11567,6 +11794,14 @@ mod tests {
         );
         assert_eq!(
             manifest.events[2].action,
+            AttractScriptActionManifest::HallScores {
+                todays_top_left_screen_address: SOURCE_ATTRACT_HALL_TODAYS_TABLE_SCREEN,
+                all_time_top_left_screen_address: SOURCE_ATTRACT_HALL_ALL_TIME_TABLE_SCREEN,
+                visual_offset: SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET,
+            }
+        );
+        assert_eq!(
+            manifest.events[3].action,
             AttractScriptActionManifest::Credits {
                 label_position: Point::new(12, 228),
                 count_position: Point::new(82, 228),
@@ -11574,23 +11809,23 @@ mod tests {
             }
         );
         assert_eq!(
-            manifest.events[3].action,
+            manifest.events[4].action,
             AttractScriptActionManifest::Credits {
                 label_position: Point::new(14, 226),
                 count_position: Point::new(84, 226),
                 minimum_credits: 1,
             }
         );
-        assert_eq!(manifest.events[3].duration_steps, Some(8));
+        assert_eq!(manifest.events[4].duration_steps, Some(8));
         assert_eq!(
-            manifest.events[5].action,
+            manifest.events[6].action,
             AttractScriptActionManifest::Sprite {
                 sprite: SpriteKey::DefenderLogo,
                 position: Point::new(40, 44),
             }
         );
         assert_eq!(
-            manifest.events[6].action,
+            manifest.events[7].action,
             AttractScriptActionManifest::DefenderWordmark {
                 position: Point::new(70, 80),
                 slots: DEFENDER_WORDMARK_SLOTS,

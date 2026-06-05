@@ -42,17 +42,19 @@ verification tools.
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and
   `assets/red-label/actor-waves.script` through the same parser path. The
-  attract script now draws the source `ELECV` presents message,
-  prompt-backed high-score table rows, and source `CREDV` credits label/count
-  alongside the Williams reveal and Defender wordmark coalescence using source
-  title page-start steps: Williams from step 1, `ELECV` from step 236, the
+  attract script now draws the source `ELECV` presents message, source-style
+  Hall-of-Fame table rows, and source `CREDV` credits label/count alongside the
+  Williams reveal and Defender wordmark coalescence using source title
+  page-start steps: Williams from step 1, `ELECV` from step 236, the
   Defender wordmark from step 365, and the high-score/zero-credit
   Hall-of-Fame page from step 488. Title pages suppress the zero-credit line
   but still show real inserted credits through a `credits_nonzero` script
   action. The Hall-of-Fame page also draws source `HALLD_*` headings and the
-  source Defender logo, while the actor high-score rows remain the current
-  scriptable table fallback. Custom attract scripts can draw checked
-  `messages.tsv` labels through source cursor controls.
+  source Defender logo; `hall_scores` draws Today’s and All-Time table columns
+  from driver scores plus embedded red-label seed initials. Custom attract
+  scripts can draw checked `messages.tsv` labels through source cursor
+  controls, and the older one-column `high_scores` action remains available for
+  custom screens.
   `ActorWaveScript` now names per-wave progression data and applies behavior
   scripts plus hostile and initial-human spawn records as play starts and waves
   are cleared. Wave scripts can now attach spawn-index behavior profiles that
@@ -764,6 +766,25 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 13:32 BST`: Completed the actor Hall-of-Fame table fidelity
+  slice. The embedded actor attract script and Rust fallback now replace the
+  generic one-column default high-score list with a source-shaped
+  `hall_scores` action at step `488`, drawing Today’s and All-Time
+  Hall-of-Fame columns from clean source screen addresses plus a checked visual
+  offset. The table uses driver high-score values with embedded red-label seed
+  initials from `assets/red-label/high-scores.tsv`, while the older
+  one-column `high_scores` action remains available for custom attract
+  scripts. The parser, action manifest, render bridge tests, checked script,
+  and docs now cover the new table action. Validation passed with focused
+  attract draw/render/manifest tests, `cargo test actor_game --all-targets
+  --features legacy-tools`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, `cargo fmt
+  --check`, touched-doc markdownlint, and `git diff --check`. Slack cycle
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780661754103879`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780662760239339`.
 - `2026-06-05 13:14 BST`: Completed the actor Hall-of-Fame heading fidelity
   slice. The embedded actor attract script and Rust fallback now draw the
   source Hall-of-Fame display headings at step `488` through checked

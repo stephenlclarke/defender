@@ -18,17 +18,18 @@ Current files:
 
 - `actor-attract.script`: embedded actor-runtime title/attract script that
   drives the Williams reveal, source `ELECV` presents message, Defender
-  wordmark coalescence, and high-score title/table plus source `CREDV` credits
-  label/count text through the checked `AttractScript` parser using source
-  page-start steps for the title messages: Williams from step 1, `ELECV` from
-  step 236, the Defender wordmark from step 365, and the
+  wordmark coalescence, source-style Hall-of-Fame table rows, and source
+  `CREDV` credits label/count text through the checked `AttractScript` parser
+  using source page-start steps for the title messages: Williams from step 1,
+  `ELECV` from step 236, the Defender wordmark from step 365, and the
   high-score/zero-credit Hall-of-Fame page from step 488. A `credits_nonzero`
   title-page event suppresses the zero-credit line while still showing a real
   inserted credit. The Hall-of-Fame page also draws source `HALLD_*` headings
-  and the source Defender logo, while the high-score rows remain the current
-  scriptable table fallback. It also uses the driver-owned high-score table and
-  credit count carried in `StepPrompt`. Custom attract scripts can also use
-  checked `messages.tsv` labels through the script parser's `message` action.
+  and the source Defender logo; `hall_scores` draws Today’s and All-Time table
+  columns from driver scores plus embedded red-label seed initials. It also
+  uses the driver-owned high-score table and credit count carried in
+  `StepPrompt`. Custom attract scripts can also use checked `messages.tsv`
+  labels through the script parser's `message` action.
 - `actor-behavior.script`: embedded actor-runtime baseline behavior profile
   parsed by `ActorBehaviorScript`, including player, laser, hostile, human,
   explosion, and score-popup timing/tuning defaults.
