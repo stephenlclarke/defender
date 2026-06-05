@@ -10,10 +10,10 @@ use crate::{
         ATTRACT_SCORING_SEQUENCE_START_FRAME, AttractPresentationSnapshot,
         Direction as CleanDirection, EnemyKind as CleanEnemyKind,
         EnemyProjectileSnapshot as CleanEnemyProjectileSnapshot, EnemyProjectileSourceKind,
-        EnemySnapshot as CleanEnemySnapshot, ExplosionKind as CleanExplosionKind,
-        ExplosionSnapshot as CleanExplosionSnapshot, GameEvent, GameEvents, GameFrame,
-        GameInput as CleanGameInput, GameOverSnapshot, GamePhase, GameState,
-        HIGH_SCORE_TABLE_ENTRIES, HighScoreEntrySnapshot, HighScoreTableEntrySnapshot,
+        EnemyReserveSnapshot, EnemySnapshot as CleanEnemySnapshot,
+        ExplosionKind as CleanExplosionKind, ExplosionSnapshot as CleanExplosionSnapshot,
+        GameEvent, GameEvents, GameFrame, GameInput as CleanGameInput, GameOverSnapshot, GamePhase,
+        GameState, HIGH_SCORE_TABLE_ENTRIES, HighScoreEntrySnapshot, HighScoreTableEntrySnapshot,
         HighScoreTablesSnapshot, HumanSnapshot as CleanHumanSnapshot, PlayerSnapshot,
         PlayerStockSnapshot, ProjectileSnapshot as CleanProjectileSnapshot,
         ScorePopupKind as CleanScorePopupKind, ScorePopupSnapshot as CleanScorePopupSnapshot,
@@ -260,6 +260,7 @@ const SOURCE_ASTRO_RESTORE_Y: u8 = 0xE0;
 const SOURCE_HUMAN_LEFT_X_VELOCITY: u16 = 0xFFE0;
 const SOURCE_HUMAN_RIGHT_X_VELOCITY: u16 = 0x0020;
 const SOURCE_INITIAL_POD_X_SPEED: u8 = 0x20;
+const SOURCE_BOMBER_SQUAD_SIZE: usize = 4;
 const SOURCE_POD_SWARMER_REQUEST_LIMIT: usize = 6;
 const SOURCE_ACTIVE_SWARMER_LIMIT: usize = 20;
 const SOURCE_ACTIVE_BAITER_LIMIT: usize = 12;
@@ -2225,6 +2226,51 @@ impl ActorBomberSpawn {
             }),
         }
     }
+
+    fn source_restore_batch(
+        profile: ActorSourceWaveProfile,
+        player_absolute_x: u16,
+        count: usize,
+    ) -> Vec<Self> {
+        let mut bombers = Vec::with_capacity(count);
+        let mut remaining = count;
+        let mut positive_x_velocity = true;
+
+        while remaining > 0 {
+            let squad_count = remaining.min(SOURCE_BOMBER_SQUAD_SIZE);
+            let velocity_low = if positive_x_velocity {
+                profile.bomber_x_velocity
+            } else {
+                0u8.wrapping_sub(profile.bomber_x_velocity)
+            };
+            positive_x_velocity = !positive_x_velocity;
+            let x_velocity = actor_sign_extend_u8_to_u16(velocity_low);
+
+            for squad_remaining in (1..=squad_count).rev() {
+                let x16 = player_absolute_x
+                    .wrapping_add((squad_remaining as u16).wrapping_mul(0x0180))
+                    .wrapping_add(0x8000);
+                let [x, x_fraction] = x16.to_be_bytes();
+                bombers.push(Self {
+                    position: Point::new(i16::from(x), SOURCE_BOMBER_CRUISE_ALTITUDE),
+                    source: Some(ActorSourceBomberMetadata {
+                        x_fraction,
+                        y_fraction: 0,
+                        x_velocity,
+                        y_velocity: 0,
+                        picture_frame: 0,
+                        cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
+                        sleep_ticks: 0,
+                        source_slot: (squad_remaining - 1) as u8,
+                    }),
+                });
+            }
+
+            remaining -= squad_count;
+        }
+
+        bombers
+    }
 }
 
 impl ActorPodSpawn {
@@ -2248,6 +2294,34 @@ impl ActorPodSpawn {
                 y_fraction: 0,
                 x_velocity: actor_sign_extend_u8_to_u16(velocity_low),
                 y_velocity: 0,
+            }),
+        }
+    }
+
+    fn source_restore(source_rng: &mut ActorSourceRng) -> Self {
+        let state = source_rng.advance();
+        let [x, x_fraction] =
+            u16::from_be_bytes([(state.hseed & 0x3F).wrapping_add(0x10), state.lseed])
+                .to_be_bytes();
+        let y = state
+            .lseed
+            .wrapping_shr(1)
+            .wrapping_add(SOURCE_PLAYFIELD_Y_MIN);
+        let x_velocity = actor_sign_extend_u8_to_u16((state.seed & 0x3F).wrapping_sub(0x20));
+        let mut y_velocity_low = (state.lseed & 0x7F).wrapping_sub(0x40);
+        if y_velocity_low & 0x80 == 0 {
+            y_velocity_low |= 0x20;
+        } else {
+            y_velocity_low &= 0xDF;
+        }
+
+        Self {
+            position: Point::new(i16::from(x), i16::from(y)),
+            source: Some(ActorSourcePodMetadata {
+                x_fraction,
+                y_fraction: 0,
+                x_velocity,
+                y_velocity: actor_sign_extend_u8_to_u16(y_velocity_low),
             }),
         }
     }
@@ -2572,6 +2646,19 @@ impl ActorSourceWaveProfile {
             .collect()
     }
 
+    fn enemy_reserve_after_active_batch(self) -> EnemyReserveSnapshot {
+        let mut reserve = EnemyReserveSnapshot {
+            landers: self.landers,
+            bombers: self.bombers,
+            pods: self.pods,
+            ..EnemyReserveSnapshot::default()
+        };
+        for slot in self.active_family_slots() {
+            actor_enemy_reserve_take(&mut reserve, slot.kind);
+        }
+        reserve
+    }
+
     fn active_family_slots(self) -> Vec<ActorSourceEnemySlot> {
         let mut counts = ActorSourceEnemyCounts {
             landers: self.landers,
@@ -2671,6 +2758,85 @@ fn push_actor_source_kind(
     }
 }
 
+fn actor_enemy_reserve_total(reserve: EnemyReserveSnapshot) -> u8 {
+    reserve
+        .landers
+        .saturating_add(reserve.bombers)
+        .saturating_add(reserve.pods)
+}
+
+fn actor_enemy_reserve_is_empty(reserve: EnemyReserveSnapshot) -> bool {
+    actor_enemy_reserve_total(reserve) == 0
+}
+
+fn actor_enemy_reserve_take(
+    reserve: &mut EnemyReserveSnapshot,
+    kind: ActorSourceEnemyKind,
+) -> bool {
+    let count = match kind {
+        ActorSourceEnemyKind::Lander => &mut reserve.landers,
+        ActorSourceEnemyKind::Bomber => &mut reserve.bombers,
+        ActorSourceEnemyKind::Pod => &mut reserve.pods,
+    };
+    if *count == 0 {
+        return false;
+    }
+    *count = count.saturating_sub(1);
+    true
+}
+
+fn actor_source_reserve_enemy_kinds(
+    reserve: &mut EnemyReserveSnapshot,
+    profile: ActorSourceWaveProfile,
+) -> Vec<ActorSourceEnemyKind> {
+    if reserve.landers > 0 {
+        let target = SOURCE_MAX_ACTIVE_WAVE_ENEMIES.min(usize::from(reserve.landers));
+        let mut kinds = Vec::with_capacity(target);
+        while kinds.len() < target
+            && actor_enemy_reserve_take(reserve, ActorSourceEnemyKind::Lander)
+        {
+            kinds.push(ActorSourceEnemyKind::Lander);
+        }
+        return kinds;
+    }
+
+    let target = usize::from(profile.wave_size)
+        .min(SOURCE_MAX_ACTIVE_WAVE_ENEMIES)
+        .min(usize::from(actor_enemy_reserve_total(*reserve)));
+    let mut kinds = Vec::with_capacity(target);
+
+    for kind in [
+        ActorSourceEnemyKind::Lander,
+        ActorSourceEnemyKind::Bomber,
+        ActorSourceEnemyKind::Pod,
+    ] {
+        push_actor_reserve_kind(&mut kinds, reserve, target, kind);
+    }
+
+    for kind in [
+        ActorSourceEnemyKind::Lander,
+        ActorSourceEnemyKind::Bomber,
+        ActorSourceEnemyKind::Pod,
+    ] {
+        while kinds.len() < target && actor_enemy_reserve_take(reserve, kind) {
+            kinds.push(kind);
+        }
+    }
+
+    kinds
+}
+
+fn push_actor_reserve_kind(
+    kinds: &mut Vec<ActorSourceEnemyKind>,
+    reserve: &mut EnemyReserveSnapshot,
+    target: usize,
+    kind: ActorSourceEnemyKind,
+) {
+    if kinds.len() < target && actor_enemy_reserve_take(reserve, kind) {
+        kinds.push(kind);
+    }
+}
+
 fn actor_lander_speed_from_source(velocity: u8) -> i16 {
     i16::from((velocity / 16).max(1))
 }
@@ -2765,6 +2931,7 @@ pub struct ActorWaveProfile {
     pub bomber_spawns: Vec<ActorBomberSpawn>,
     pub pod_spawns: Vec<ActorPodSpawn>,
     pub human_spawns: Vec<ActorHumanSpawn>,
+    pub enemy_reserve: EnemyReserveSnapshot,
     pub spawn_behavior_profiles: Vec<ActorWaveSpawnBehaviorProfile>,
 }
 
@@ -2824,8 +2991,14 @@ impl ActorWaveProfile {
             bomber_spawns,
             pod_spawns,
             human_spawns,
+            enemy_reserve: EnemyReserveSnapshot::default(),
             spawn_behavior_profiles: Vec::new(),
         }
+    }
+
+    pub fn with_enemy_reserve(mut self, enemy_reserve: EnemyReserveSnapshot) -> Self {
+        self.enemy_reserve = enemy_reserve;
+        self
     }
 
     pub fn with_spawn_behavior_profiles(
@@ -2880,6 +3053,7 @@ impl ActorWaveProfile {
             bomber_spawns: self.bomber_spawns.clone(),
             pod_spawns: self.pod_spawns.clone(),
             human_spawns: self.human_spawns.clone(),
+            enemy_reserve: self.enemy_reserve,
             spawn_behavior_profiles: self.spawn_behavior_profiles.clone(),
         }
     }
@@ -2900,6 +3074,7 @@ pub struct ActorWaveProfileManifest {
     pub bomber_spawns: Vec<ActorBomberSpawn>,
     pub pod_spawns: Vec<ActorPodSpawn>,
     pub human_spawns: Vec<ActorHumanSpawn>,
+    pub enemy_reserve: EnemyReserveSnapshot,
     pub spawn_behavior_profiles: Vec<ActorWaveSpawnBehaviorProfile>,
 }
 
@@ -2965,6 +3140,7 @@ impl ActorWaveScript {
             source.pod_spawns(),
             human_spawns,
         )
+        .with_enemy_reserve(source.enemy_reserve_after_active_batch())
     }
 
     pub fn name(&self) -> &str {
@@ -3161,6 +3337,19 @@ impl ParsedActorWaveScript {
                     .push(ActorHumanSpawn::new(position, mode));
                 Ok(())
             }
+            "enemy_reserve" | "reserve" => {
+                let landers = parse_wave_u8(line_number, parts.next(), "reserve landers")?;
+                let bombers = parse_wave_u8(line_number, parts.next(), "reserve bombers")?;
+                let pods = parse_wave_u8(line_number, parts.next(), "reserve pods")?;
+                reject_extra_wave_fields(line_number, parts)?;
+                self.current_profile_mut(line_number)?.enemy_reserve = EnemyReserveSnapshot {
+                    landers,
+                    bombers,
+                    pods,
+                    ..EnemyReserveSnapshot::default()
+                };
+                Ok(())
+            }
             _ => Err(ActorWaveScriptParseError::new(
                 line_number,
                 format!("unknown wave action `{action}`"),
@@ -3221,6 +3410,7 @@ struct ParsedActorWaveProfile {
     bomber_spawns: Vec<ActorBomberSpawn>,
     pod_spawns: Vec<ActorPodSpawn>,
     human_spawns: Vec<ActorHumanSpawn>,
+    enemy_reserve: EnemyReserveSnapshot,
     spawn_behavior_profiles: Vec<ActorWaveSpawnBehaviorProfile>,
 }
 
@@ -3233,6 +3423,7 @@ impl ParsedActorWaveProfile {
             bomber_spawns: Vec::new(),
             pod_spawns: Vec::new(),
             human_spawns: Vec::new(),
+            enemy_reserve: EnemyReserveSnapshot::default(),
             spawn_behavior_profiles: Vec::new(),
         }
     }
@@ -3246,6 +3437,7 @@ impl ParsedActorWaveProfile {
             bomber_spawns: profile.bomber_spawns,
             pod_spawns: profile.pod_spawns,
             human_spawns: profile.human_spawns,
+            enemy_reserve: profile.enemy_reserve,
             spawn_behavior_profiles: profile.spawn_behavior_profiles,
         }
     }
@@ -3283,6 +3475,7 @@ impl ParsedActorWaveProfile {
             self.pod_spawns,
             self.human_spawns,
         )
+        .with_enemy_reserve(self.enemy_reserve)
         .with_spawn_behavior_profiles(self.spawn_behavior_profiles)
     }
 }
@@ -3342,6 +3535,20 @@ fn parse_wave_usize(
 ) -> Result<usize, ActorWaveScriptParseError> {
     let value = parse_wave_u64(line_number, token, field)?;
     usize::try_from(value).map_err(|error| {
+        ActorWaveScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is invalid: {error}"),
+        )
+    })
+}
+
+fn parse_wave_u8(
+    line_number: usize,
+    token: Option<&str>,
+    field: &str,
+) -> Result<u8, ActorWaveScriptParseError> {
+    let value = parse_wave_u64(line_number, token, field)?;
+    u8::try_from(value).map_err(|error| {
         ActorWaveScriptParseError::new(
             line_number,
             format!("{field} `{value}` is invalid: {error}"),
@@ -5266,6 +5473,7 @@ pub struct StepReport {
     pub bonus_awarded: bool,
     pub survivor_bonus: Option<SurvivorBonusReport>,
     pub behavior_script: ActorBehaviorScriptManifest,
+    pub enemy_reserve: EnemyReserveSnapshot,
     pub source_rng: Option<ActorSourceRngSnapshot>,
     pub snapshots: Vec<ActorSnapshot>,
     pub draws: Vec<DrawCommand>,
@@ -5477,6 +5685,7 @@ fn world_snapshot_for_report(report: &StepReport) -> WorldSnapshot {
         enemy_projectiles: actor_enemy_projectiles_for_report(report),
         explosions: actor_explosions_for_report(report),
         score_popups: actor_score_popups_for_report(report),
+        enemy_reserve: report.enemy_reserve,
         source_rng: SourceRandSnapshot::default(),
         ..WorldSnapshot::default()
     };
@@ -7903,6 +8112,9 @@ pub struct ActorGameDriver {
     attract_script: AttractScript,
     behavior_script: ActorBehaviorScript,
     wave_script: ActorWaveScript,
+    enemy_reserve: EnemyReserveSnapshot,
+    source_target_cursor: Option<usize>,
+    source_reserve_activation_ready: bool,
     baiter_timer_steps: Option<u32>,
     baiter_pacing_steps_remaining: u8,
     source_rng: ActorSourceRng,
@@ -7953,6 +8165,9 @@ impl ActorGameDriver {
             attract_script: attract_script.clone(),
             behavior_script: ActorBehaviorScript::default(),
             wave_script,
+            enemy_reserve: EnemyReserveSnapshot::default(),
+            source_target_cursor: None,
+            source_reserve_activation_ready: false,
             baiter_timer_steps: None,
             baiter_pacing_steps_remaining: ACTOR_BAITER_TIMER_PACING_STEPS,
             source_rng: SOURCE_PLAYFIELD_START_RNG,
@@ -7983,6 +8198,7 @@ impl ActorGameDriver {
             delayed_sounds.push(SoundCue::PlayerAppear);
         }
         self.advance_pending_player_switch();
+        self.activate_enemy_reserve_if_ready(&mut step_commands);
         match self.advance_pending_survivor_bonus() {
             SurvivorBonusStep::StartNextWave => {
                 self.start_pending_wave();
@@ -8107,6 +8323,13 @@ impl ActorGameDriver {
             .map(|bonus| bonus.report(survivor_bonus_awarded_points));
         let player_switch = self.pending_player_switch.map(PendingPlayerSwitch::report);
         let player_start = self.pending_player_start.map(PendingPlayerStart::report);
+        if self.phase == Phase::Playing
+            && !survivor_bonus_interstitial
+            && !player_switch_interstitial
+            && !player_start_interstitial
+        {
+            self.source_reserve_activation_ready = true;
+        }
 
         let report = StepReport {
             step: self.step,
@@ -8131,6 +8354,7 @@ impl ActorGameDriver {
             bonus_awarded: survivor_bonus_replay_awarded,
             survivor_bonus,
             behavior_script: behavior_script.manifest(),
+            enemy_reserve: self.enemy_reserve,
             source_rng,
             snapshots: self.snapshots.values().cloned().collect(),
             draws,
@@ -8735,6 +8959,9 @@ impl ActorGameDriver {
         self.pending_player_switch = Some(PendingPlayerSwitch::new(from_player, to_player));
         self.pending_player_start = None;
         self.pending_start_sound_steps = None;
+        self.enemy_reserve = EnemyReserveSnapshot::default();
+        self.source_target_cursor = None;
+        self.source_reserve_activation_ready = false;
         self.baiter_timer_steps = None;
         self.clear_turn_playfield_actors();
     }
@@ -8822,6 +9049,9 @@ impl ActorGameDriver {
         self.pending_player_switch = None;
         self.pending_player_start = None;
         self.pending_start_sound_steps = None;
+        self.enemy_reserve = EnemyReserveSnapshot::default();
+        self.source_target_cursor = None;
+        self.source_reserve_activation_ready = false;
         self.high_scores.record(active_score);
         self.phase = if self.high_scores.qualifies(active_score) {
             Phase::HighScoreEntry
@@ -8872,6 +9102,9 @@ impl ActorGameDriver {
         self.pending_player_switch = None;
         self.pending_player_start = None;
         self.pending_start_sound_steps = None;
+        self.enemy_reserve = EnemyReserveSnapshot::default();
+        self.source_target_cursor = None;
+        self.source_reserve_activation_ready = false;
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.reset_source_shell_scan();
         self.clear_turn_playfield_actors();
@@ -8977,11 +9210,11 @@ impl ActorGameDriver {
     }
 
     fn apply_wave_profile(&mut self) {
-        self.behavior_script = self
-            .wave_script
-            .profile_for_wave(self.wave)
-            .behavior_script
-            .clone();
+        let wave_profile = self.wave_script.profile_for_wave(self.wave);
+        self.behavior_script = wave_profile.behavior_script.clone();
+        self.enemy_reserve = wave_profile.enemy_reserve;
+        self.source_target_cursor = Some(0);
+        self.source_reserve_activation_ready = false;
         if self.phase == Phase::Playing {
             self.reset_baiter_timer();
         }
@@ -8993,10 +9226,77 @@ impl ActorGameDriver {
         self.baiter_pacing_steps_remaining = ACTOR_BAITER_TIMER_PACING_STEPS;
     }
 
+    fn activate_enemy_reserve_if_ready(&mut self, commands: &mut Vec<GameCommand>) {
+        if self.phase != Phase::Playing
+            || self.wave == 0
+            || self.pending_survivor_bonus.is_some()
+            || self.pending_player_switch.is_some()
+            || self.pending_player_start.is_some()
+            || !self.source_reserve_activation_ready
+            || self.has_hostile_snapshots()
+            || actor_enemy_reserve_is_empty(self.enemy_reserve)
+        {
+            return;
+        }
+
+        let source_profile = ActorSourceWaveProfile::for_wave(self.wave.max(1));
+        let reserve_kinds =
+            actor_source_reserve_enemy_kinds(&mut self.enemy_reserve, source_profile);
+        let mut index = 0;
+        while index < reserve_kinds.len() {
+            match reserve_kinds[index] {
+                ActorSourceEnemyKind::Lander => {
+                    let target_index = self.select_next_source_lander_target_index();
+                    let spawn = ActorLanderSpawn::source_restore(
+                        &mut self.source_rng,
+                        source_profile,
+                        target_index,
+                    );
+                    commands.push(GameCommand::Spawn(SpawnRequest::Lander {
+                        position: spawn.position,
+                    }));
+                    self.spawn_lander_from_spawn(spawn);
+                    index += 1;
+                }
+                ActorSourceEnemyKind::Bomber => {
+                    let bomber_count = reserve_kinds[index..]
+                        .iter()
+                        .take_while(|&&kind| kind == ActorSourceEnemyKind::Bomber)
+                        .count();
+                    let player_absolute_x = self
+                        .active_player_position()
+                        .map_or(0, |position| actor_source_absolute_x(position, 0));
+                    for spawn in ActorBomberSpawn::source_restore_batch(
+                        source_profile,
+                        player_absolute_x,
+                        bomber_count,
+                    ) {
+                        commands.push(GameCommand::Spawn(SpawnRequest::Bomber {
+                            position: spawn.position,
+                        }));
+                        self.spawn_bomber_from_spawn(spawn);
+                    }
+                    index += bomber_count;
+                }
+                ActorSourceEnemyKind::Pod => {
+                    let spawn = ActorPodSpawn::source_restore(&mut self.source_rng);
+                    commands.push(GameCommand::Spawn(SpawnRequest::Pod {
+                        position: spawn.position,
+                    }));
+                    self.spawn_pod_from_spawn(spawn);
+                    index += 1;
+                }
+            }
+        }
+    }
+
     fn spawn_wave_hostiles(&mut self) {
         let wave_profile = self.wave_script.profile_for_wave(self.wave).clone();
         for (spawn_index, spawn) in wave_profile.lander_spawns.iter().copied().enumerate() {
             let actor = self.spawn_lander_from_spawn(spawn);
+            if let Some(target_index) = spawn.source.and_then(|source| source.target_human_index) {
+                self.source_target_cursor = Some(target_index);
+            }
             self.apply_wave_spawn_behavior(&wave_profile, ActorKind::Lander, spawn_index, actor);
         }
         for (spawn_index, spawn) in wave_profile.bomber_spawns.iter().copied().enumerate() {
@@ -9007,6 +9307,45 @@ impl ActorGameDriver {
             let actor = self.spawn_pod_from_spawn(spawn);
             self.apply_wave_spawn_behavior(&wave_profile, ActorKind::Pod, spawn_index, actor);
         }
+    }
+
+    fn active_player_position(&self) -> Option<Point> {
+        self.snapshots
+            .values()
+            .find(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive)
+            .map(|snapshot| snapshot.position)
+    }
+
+    fn select_next_source_lander_target_index(&mut self) -> Option<usize> {
+        if !self.snapshots.values().any(|snapshot| {
+            snapshot.kind == ActorKind::Human && snapshot.alive && snapshot.source_human.is_some()
+        }) {
+            return None;
+        }
+
+        let original_cursor = self
+            .source_target_cursor
+            .filter(|slot| *slot < SOURCE_TARGET_LIST_ENTRY_COUNT)
+            .unwrap_or(0);
+        let mut probe = original_cursor;
+        for _ in 0..SOURCE_TARGET_LIST_ENTRY_COUNT {
+            probe = actor_source_target_list_next_slot_index(probe);
+            if self.snapshots.values().any(|snapshot| {
+                snapshot.kind == ActorKind::Human
+                    && snapshot.alive
+                    && snapshot
+                        .source_human
+                        .is_some_and(|source| source.target_slot_index == probe)
+            }) {
+                self.source_target_cursor = Some(probe);
+                return Some(probe);
+            }
+            if probe == original_cursor {
+                break;
+            }
+        }
+
+        None
     }
 
     fn apply_wave_spawn_behavior(
@@ -9031,6 +9370,7 @@ impl ActorGameDriver {
             || self.wave == 0
             || self.pending_survivor_bonus.is_some()
             || self.pending_player_start.is_some()
+            || !actor_enemy_reserve_is_empty(self.enemy_reserve)
             || self.has_hostile_snapshots()
             || commands_spawn_hostiles(commands)
         {
@@ -13464,6 +13804,7 @@ mod tests {
             bonus_awarded: false,
             survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
+            enemy_reserve: EnemyReserveSnapshot::default(),
             source_rng: None,
             snapshots: Vec::new(),
             draws: vec![
@@ -13670,6 +14011,7 @@ mod tests {
             bonus_awarded: false,
             survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
+            enemy_reserve: EnemyReserveSnapshot::default(),
             source_rng: None,
             snapshots: Vec::new(),
             draws: vec![DrawCommand::sprite_with_effect(
@@ -13789,6 +14131,7 @@ mod tests {
             bonus_awarded: false,
             survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
+            enemy_reserve: EnemyReserveSnapshot::default(),
             source_rng: None,
             snapshots: vec![player, lander, human, laser, enemy_laser, bomb],
             draws: vec![
@@ -13949,6 +14292,7 @@ mod tests {
             bonus_awarded: false,
             survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
+            enemy_reserve: EnemyReserveSnapshot::default(),
             source_rng: None,
             snapshots: Vec::new(),
             draws,
@@ -16124,15 +16468,16 @@ mod tests {
             ..GameInput::NONE
         });
 
-        assert_eq!(report.score, LANDER_SCORE * 5 + 100);
+        assert_eq!(report.score, LANDER_SCORE * 5);
         assert_eq!(report.smart_bombs, INITIAL_SMART_BOMBS - 1);
         assert_eq!(
-            report
-                .survivor_bonus
-                .expect("smart-bomb wave clear should start survivor bonus")
-                .awarded_points,
-            Some(100)
+            report.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 10,
+                ..EnemyReserveSnapshot::default()
+            }
         );
+        assert!(report.survivor_bonus.is_none());
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
         assert_eq!(driver.snapshot_count(ActorKind::Human), 10);
         assert!(report.sounds.contains(&SoundCue::SmartBomb));
@@ -16140,6 +16485,27 @@ mod tests {
         assert!(report.commands.contains(&GameCommand::SmartBomb {
             consume_stock: true,
         }));
+
+        let restored = driver.step(GameInput::NONE);
+        assert_eq!(
+            restored.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 5,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 5);
+        assert_eq!(
+            restored
+                .commands
+                .iter()
+                .filter(|command| matches!(
+                    command,
+                    GameCommand::Spawn(SpawnRequest::Lander { .. })
+                ))
+                .count(),
+            SOURCE_MAX_ACTIVE_WAVE_ENEMIES
+        );
     }
 
     #[test]
@@ -16179,20 +16545,31 @@ mod tests {
             ..GameInput::NONE
         });
 
-        assert_eq!(report.score, LANDER_SCORE * 5 + 100);
+        assert_eq!(report.score, LANDER_SCORE * 5);
         assert_eq!(report.smart_bombs, 0);
         assert_eq!(
-            report
-                .survivor_bonus
-                .expect("overlay smart-bomb wave clear should start survivor bonus")
-                .awarded_points,
-            Some(100)
+            report.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 10,
+                ..EnemyReserveSnapshot::default()
+            }
         );
+        assert!(report.survivor_bonus.is_none());
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
         assert!(report.sounds.contains(&SoundCue::SmartBomb));
         assert!(report.commands.contains(&GameCommand::SmartBomb {
             consume_stock: false,
         }));
+
+        let restored = driver.step(GameInput::NONE);
+        assert_eq!(
+            restored.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 5,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 5);
     }
 
     #[test]
@@ -16394,6 +16771,15 @@ mod tests {
                 target_slot_index: 9,
             })
         );
+        assert_eq!(
+            second.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 17,
+                bombers: 2,
+                pods: 0,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
         assert_eq!(second_lander.lander_seek_speed, 2);
         assert_eq!(second_lander.lander_fire_period_steps, 48);
         assert_eq!(second_bomber.bomber_drift_speed, 1);
@@ -16425,35 +16811,35 @@ mod tests {
             usize::from(ACTOR_SOURCE_BACKED_WAVES)
         );
         assert_eq!(parsed.profile_for_wave(1).lander_spawns.len(), 5);
+        assert_eq!(
+            parsed.profile_for_wave(1).enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 10,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
         assert_eq!(parsed.profile_for_wave(2).bomber_spawns.len(), 1);
         assert_eq!(parsed.profile_for_wave(2).pod_spawns.len(), 1);
     }
 
     #[test]
     fn second_source_wave_spawns_bomber_and_pod_actor_families() {
-        let mut driver = started_driver();
-
-        let cleared = driver.step(GameInput {
-            smart_bomb: true,
-            ..GameInput::NONE
-        });
-        assert_eq!(cleared.wave, 1);
-        assert!(
-            cleared
-                .commands
-                .contains(&GameCommand::WaveCleared { next_wave: 2 })
-        );
-
-        let live = step_until_wave_started(&mut driver, 2);
+        let (driver, live) = started_source_wave_driver(2);
         assert_eq!(live.wave, 2);
-        assert!(
-            live.commands
-                .contains(&GameCommand::AdvanceWave { wave: 2 })
-        );
 
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 3);
         assert_eq!(driver.snapshot_count(ActorKind::Bomber), 1);
         assert_eq!(driver.snapshot_count(ActorKind::Pod), 1);
+        assert_eq!(
+            live.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 17,
+                bombers: 2,
+                pods: 0,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+        assert_eq!(live.game_state().world.enemy_reserve, live.enemy_reserve);
         let bomber_snapshot = live
             .snapshots
             .iter()
@@ -16475,10 +16861,7 @@ mod tests {
                 live.step,
                 bomber_snapshot.id,
                 live.source_rng,
-                live.snapshots
-                    .iter()
-                    .find(|snapshot| snapshot.kind == ActorKind::Player)
-                    .map(|snapshot| snapshot.position),
+                None,
             );
         assert!(live.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Lander
@@ -16520,6 +16903,183 @@ mod tests {
         assert!(
             live.draws.iter().any(|draw| draw.sprite == SpriteKey::Pod
                 && matches!(draw.effect, VisualEffect::SourcePod))
+        );
+    }
+
+    #[test]
+    fn actor_source_reserve_landers_activate_before_wave_clear() {
+        let (mut driver, live) = started_source_wave_driver(2);
+        assert_eq!(
+            live.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 17,
+                bombers: 2,
+                pods: 0,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+
+        destroy_source_counted_hostiles(&mut driver, &live);
+        let restored = driver.step(GameInput::NONE);
+
+        assert_eq!(restored.phase, Phase::Playing);
+        assert!(
+            !restored
+                .commands
+                .contains(&GameCommand::WaveCleared { next_wave: 3 })
+        );
+        assert_eq!(
+            restored.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 12,
+                bombers: 2,
+                pods: 0,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+        assert_eq!(
+            restored.game_state().world.enemy_reserve,
+            restored.enemy_reserve
+        );
+        assert_eq!(
+            restored
+                .commands
+                .iter()
+                .filter(|command| matches!(
+                    command,
+                    GameCommand::Spawn(SpawnRequest::Lander { .. })
+                ))
+                .count(),
+            SOURCE_MAX_ACTIVE_WAVE_ENEMIES
+        );
+        let source_landers = restored
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::Lander)
+            .collect::<Vec<_>>();
+        assert_eq!(source_landers.len(), SOURCE_MAX_ACTIVE_WAVE_ENEMIES);
+        assert!(
+            source_landers
+                .iter()
+                .all(|snapshot| snapshot.source_lander.is_some())
+        );
+        assert!(source_landers.iter().any(|snapshot| {
+            snapshot
+                .source_lander
+                .is_some_and(|source| source.target_human_index == Some(4))
+        }));
+    }
+
+    #[test]
+    fn actor_source_bomber_and_pod_reserves_use_restore_state() {
+        let (mut driver, seeded) = started_source_wave_driver(2);
+        let player_position = seeded
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Player)
+            .expect("seed step should publish the player")
+            .position;
+        destroy_source_counted_hostiles(&mut driver, &seeded);
+        driver.enemy_reserve = EnemyReserveSnapshot {
+            bombers: 5,
+            pods: 2,
+            ..EnemyReserveSnapshot::default()
+        };
+        driver.source_rng = ActorSourceRng {
+            seed: 0x12,
+            hseed: 0x6D,
+            lseed: 0x80,
+        };
+        let mut expected_rng = driver.source_rng;
+        let mut expected_pod = ActorPodSpawn::source_restore(&mut expected_rng);
+        if let Some(source) = &mut expected_pod.source {
+            let (x, x_fraction) = actor_source_axis_step(
+                expected_pod.position.x,
+                source.x_fraction,
+                source.x_velocity,
+            );
+            let (y, y_fraction) = actor_source_active_object_y_step(
+                expected_pod.position.y,
+                source.y_fraction,
+                source.y_velocity,
+            );
+            expected_pod.position = Point::new(x, y);
+            source.x_fraction = x_fraction;
+            source.y_fraction = y_fraction;
+        }
+
+        let restored = driver.step(GameInput::NONE);
+
+        assert_eq!(
+            restored.enemy_reserve,
+            EnemyReserveSnapshot {
+                bombers: 1,
+                pods: 1,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+        assert_eq!(
+            restored
+                .commands
+                .iter()
+                .filter(|command| matches!(
+                    command,
+                    GameCommand::Spawn(SpawnRequest::Bomber { .. })
+                ))
+                .count(),
+            4
+        );
+        assert_eq!(
+            restored
+                .commands
+                .iter()
+                .filter(|command| matches!(command, GameCommand::Spawn(SpawnRequest::Pod { .. })))
+                .count(),
+            1
+        );
+        let bombers = restored
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::Bomber)
+            .collect::<Vec<_>>();
+        assert_eq!(bombers.len(), 4);
+        assert!(
+            bombers
+                .iter()
+                .all(|snapshot| snapshot.source_bomber.is_some())
+        );
+        assert!(bombers.iter().any(|snapshot| {
+            let source = snapshot.source_bomber.expect("source bomber");
+            source.x_velocity
+                == actor_sign_extend_u8_to_u16(
+                    ActorSourceWaveProfile::for_wave(2).bomber_x_velocity,
+                )
+                && source.source_slot == 0
+        }));
+        assert!(restored.snapshots.iter().any(|snapshot| {
+            snapshot.kind == ActorKind::Pod
+                && snapshot.position == expected_pod.position
+                && snapshot.source_pod == expected_pod.source
+        }));
+        assert!(
+            restored
+                .snapshots
+                .iter()
+                .filter_map(|snapshot| snapshot.source_bomber)
+                .any(|source| {
+                    let expected_spawn = ActorBomberSpawn::source_restore_batch(
+                        ActorSourceWaveProfile::for_wave(2),
+                        actor_source_absolute_x(player_position, 0),
+                        1,
+                    )[0];
+                    let expected_source = expected_spawn.source.expect("expected source bomber");
+                    let (_, x_fraction) = actor_source_axis_step(
+                        expected_spawn.position.x,
+                        expected_source.x_fraction,
+                        expected_source.x_velocity,
+                    );
+                    source.x_fraction == x_fraction
+                })
         );
     }
 
@@ -18975,10 +19535,12 @@ mod tests {
             lander 100 100\n\
             bomber 120 80\n\
             pod 160 88\n\
+            reserve 2 1 1\n\
             human 32 214 grounded\n\
             wave 1\n\
             behavior kind lander lander_mode chase_player\n\
             behavior kind lander lander_seek_speed 6\n\
+            enemy_reserve 3 0 0\n\
             spawn_behavior lander 0 lander_seek_speed 8\n\
             lander 80 96\n\
             human 40 214 falling -1\n",
@@ -19003,6 +19565,13 @@ mod tests {
         assert_eq!(
             manifest.waves[0].human_spawns[0].mode,
             HumanMode::Falling { velocity: -1 }
+        );
+        assert_eq!(
+            manifest.waves[0].enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 3,
+                ..EnemyReserveSnapshot::default()
+            }
         );
         let wave_one_lander = manifest.waves[0]
             .behavior_script
@@ -19030,6 +19599,15 @@ mod tests {
         assert_eq!(
             manifest.waves[1].pod_spawns[0].position,
             Point::new(160, 88)
+        );
+        assert_eq!(
+            manifest.waves[1].enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 2,
+                bombers: 1,
+                pods: 1,
+                ..EnemyReserveSnapshot::default()
+            }
         );
         let wave_two_lander = manifest.waves[1]
             .behavior_script
@@ -20332,6 +20910,29 @@ mod tests {
         });
         step_until_driver_player_start_completes(&mut driver, 1);
         driver
+    }
+
+    fn started_source_wave_driver(wave: u16) -> (ActorGameDriver, StepReport) {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = wave.max(1);
+        driver.source_rng = SOURCE_PLAYFIELD_START_RNG;
+        driver.apply_wave_profile();
+        driver.spawn_player();
+        driver.spawn_wave_hostiles();
+        driver.spawn_initial_humans();
+        let report = driver.step(GameInput::NONE);
+        (driver, report)
+    }
+
+    fn destroy_source_counted_hostiles(driver: &mut ActorGameDriver, report: &StepReport) {
+        let commands = report
+            .snapshots
+            .iter()
+            .filter(|snapshot| is_hostile(snapshot.kind))
+            .map(|snapshot| GameCommand::Destroy(snapshot.id))
+            .collect::<Vec<_>>();
+        driver.apply_commands(&commands);
     }
 
     fn scene_has_survivor_bonus_icon(scene: &RenderScene, position: [f32; 2]) -> bool {

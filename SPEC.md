@@ -831,8 +831,17 @@ reintroduce legacy implementation terminology.
   entry/shot/seek timing, and source bomber/pod counts. The actor allocator
   follows the source active-family
   shape, so wave `1` remains lander-only while later waves can seed bomber and
-  pod actors beside source-RNG-restored landers. Later-wave humans restore from
-  the source target-list distribution instead of reusing first-wave starts.
+  pod actors beside source-RNG-restored landers. Source-backed wave profiles
+  retain the post-active-batch enemy reserve counts, script wave profiles can
+  set those counts with `reserve` / `enemy_reserve`, and
+  `StepReport::enemy_reserve` maps them into the clean world snapshot. Reserve
+  activation is armed only after the active batch has published a report; when
+  source-counted hostiles are gone, the driver restores a source-shaped reserve
+  batch before allowing the survivor-bonus `WaveCleared` path. Lander reserves
+  fill active slots first, then bomber and pod reserves restore from their
+  source placement/fraction state once landers are exhausted. Later-wave humans
+  restore from the source target-list distribution instead of reusing
+  first-wave starts.
   A persistent `StatusDisplay` actor draws score, high score, wave, lives,
   credits, and high-score-entry rows from `StepPrompt` state while staying
   inert during attract so custom attract scripts remain in control.

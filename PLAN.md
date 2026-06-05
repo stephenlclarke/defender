@@ -81,9 +81,17 @@ verification tools.
   swarmers, and initial humans publish fixed-point metadata and advance
   actor-owned fraction state during active motion, and source landers prefer
   configured target slots before falling back to nearest-human seeking. Source
-  lander/human conversions now spawn mutant actors with source-shaped mutant
-  fractions, wave-derived shot timer, driver-owned hop RNG, and clean
-  `SourceMutantSnapshot` bridge metadata. Source-backed mutant actors now
+  wave profiles now retain post-active-batch enemy reserve counts, parsed wave
+  scripts can set custom reserves with `reserve` / `enemy_reserve`, and
+  `StepReport` maps the current reserve counts into the clean world snapshot.
+  Reserve activation is armed only after the active source batch has published a
+  report. When source-counted hostiles are gone, the driver restores source
+  reserve batches before wave clear: lander reserves fill active slots first,
+  then bomber and pod reserves use source placement/fraction restore paths once
+  landers are exhausted. Source lander/human conversions now spawn mutant
+  actors with source-shaped mutant fractions, wave-derived shot timer,
+  driver-owned hop RNG, and clean `SourceMutantSnapshot` bridge metadata.
+  Source-backed mutant actors now
   consume that metadata to select wave-table X/Y velocities, advance
   actor-owned hop RNG and fixed-point fractions, and emit source-shaped
   `0xF6` hostile projectile commands from their shot timers. The
@@ -5714,3 +5722,38 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780677389299959`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780677933880219`.
+- `2026-06-05 18:18 BST`: Completed the actor source-reserve activation
+  cycle. Source-backed actor wave profiles now retain post-active-batch enemy
+  reserve counts and expose those counts through `StepReport` plus the clean
+  `WorldSnapshot`. Parsed wave scripts preserve source-expanded reserves and
+  can set custom reserve counts with `reserve` / `enemy_reserve`. The driver
+  arms reserve activation only after the active batch has published a report,
+  preventing player-start and wave-install steps from refilling immediately.
+  When source-counted hostiles are gone, reserve landers restore first from
+  source RNG placement/shot/velocity state before wave clear can start; after
+  landers are exhausted, bomber and pod reserve batches restore from
+  source-shaped placement/fraction metadata. Smart-bomb tests now cover the
+  destruction report and following reserve-restoration report rather than
+  assuming the first active batch clears the wave. README, SPEC, and the actor
+  architecture notes now document reserve counts, state bridging, restore
+  ordering, and the parser directive. No legacy code, tests, or scaffolding
+  were safe to remove in this slice because clean smoke/fidelity/oracle
+  evidence still depends on clean runtime boundaries outside the actor path.
+  Validation passed with `cargo fmt --check`, `cargo check --all-targets
+  --features legacy-tools`, `cargo test actor_source --lib --features
+  legacy-tools`, `cargo test
+  second_source_wave_spawns_bomber_and_pod_actor_families --lib --features
+  legacy-tools`, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo test actor_live --all-targets --features
+  legacy-tools`, `cargo test runtime --all-targets --features legacy-tools`,
+  `cargo test actor_wgpu --all-targets --features legacy-tools`, the actor
+  smoke CLI commands (`--actor-smoke`, `--actor-attract-smoke`,
+  `--actor-post-game-smoke`, and `--actor-wgpu-smoke`), touched-doc
+  markdownlint, and `git diff --check`. The full unfiltered `legacy-tools`
+  suite was not rerun in this cycle; the previously isolated clean-game MAME
+  window/post-game audio failures remain outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780678969677879`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780679884866769`.

@@ -272,16 +272,25 @@ allocation, movement speed, fire cadence, mutant hop/shot behavior, and baiter
 entry pacing. Wave `1` remains lander-only; later source waves seed one
 lander, one bomber, and one pod when those reserve counts are available before
 filling the rest of the active batch, matching the clean source allocator's
-family order. Wave `1` uses the source first-wave lander restore metadata from
-the existing clean evidence, including fixed-point fractions, velocities, shot
-timer, sleep ticks, picture frame, and target-human index. Later source waves
-restore landers from the source RNG placement, `RMAX` shot timer, X velocity,
-and Y velocity path, then assign target-list slots from the restored human
-distribution. Source-backed landers, bombers, pods, and baiters publish their
-metadata in snapshots and advance active motion by updating their own
-fixed-point position/fraction state. Source-backed hostile actors wrap Y motion
-through the source active-object playfield bounds. Source-backed bomber actors
-also update
+family order. Each source-backed wave profile also carries the source enemy
+reserve counts left after that active batch. The driver publishes those counts
+through `StepReport::enemy_reserve` and the clean `WorldSnapshot`, arms reserve
+activation only after the current active batch has reported once, and restores
+the next source batch before survivor-bonus wave clear can start. Lander
+reserves fill active slots first; once no landers remain, bomber and pod
+reserves restore in the source wave-size batch shape. Wave `1` uses the source
+first-wave lander restore metadata from the existing clean evidence, including
+fixed-point fractions, velocities, shot timer, sleep ticks, picture frame, and
+target-human index. Later source waves restore landers from the source RNG
+placement, `RMAX` shot timer, X velocity, and Y velocity path, then assign
+target-list slots from the restored human distribution. Source-backed bombers
+restore from player-relative source squad placement, and source-backed pods
+restore from source RNG placement/velocity state before entering normal
+source-motion updates. Source-backed landers, bombers, pods, and baiters
+publish their metadata in snapshots and advance active motion by updating their
+own fixed-point position/fraction state. Source-backed hostile actors wrap Y
+motion through the source active-object playfield bounds. Source-backed bomber
+actors also update
 seeded picture-frame and Y-velocity metadata, including cruise-altitude and
 player-relative Y adjustments, from the driver-provided source RNG snapshot.
 Source-backed baiter actors use that same source RNG snapshot to gate
@@ -305,6 +314,7 @@ behavior kind lander lander_drift_speed 5
 lander 100 100
 bomber 120 80
 pod 160 88
+reserve 4 1 0
 source_waves 3 16
 ```
 
@@ -315,11 +325,13 @@ current wave/kind behavior at the point where the line is parsed and are then
 installed as actor-id behavior profiles when that spawn index is allocated.
 `lander`, `bomber`, `pod`, and `human` lines add clean scripted spawn records;
 humans default to `grounded` and can also be declared as `falling <velocity>` or
-`carried <actor-id>`. `source_wave <wave>` and `source_waves <first> <last>`
-expand source-backed wave-table profiles into the same checked script, so the
-production default and custom level scripts use the same parser surface. The
-parser sorts wave profiles by wave number, rejects duplicate waves, and reports
-malformed lines with source line numbers.
+`carried <actor-id>`. `reserve <landers> <bombers> <pods>` or
+`enemy_reserve <landers> <bombers> <pods>` sets script-owned reserve counts for
+custom waves. `source_wave <wave>` and `source_waves <first> <last>` expand
+source-backed wave-table profiles, including source reserve counts, into the
+same checked script, so the production default and custom level scripts use the
+same parser surface. The parser sorts wave profiles by wave number, rejects
+duplicate waves, and reports malformed lines with source line numbers.
 
 Hostile projectile actors publish source-shaped shell metadata too: enemy
 lasers own and advance fixed-point velocity, fraction, and lifetime values,

@@ -162,9 +162,14 @@ screens.
 The default actor wave allocator now
 uses the source active-family
 shape, so later waves can introduce bomber and pod actor families alongside
-landers instead of remaining lander-only. Later-wave
-actor landers now restore from source RNG placement/shot/velocity state, and
-later-wave humans restore from the source target-list distribution.
+landers instead of remaining lander-only. Source wave profiles now retain the
+source enemy reserve counts after the active batch, expose those counts through
+`StepReport` and the clean state bridge, and activate source-restored reserve
+batches before the driver can publish `WaveCleared`. Lander reserves fill the
+next active batch first; once landers are exhausted, bomber and pod reserves use
+their source restore placement/fraction metadata. Later-wave actor landers now
+restore from source RNG placement/shot/velocity state, and later-wave humans
+restore from the source target-list distribution.
 Custom attract drivers can construct scripts in Rust or parse checked text
 lines for text, static sprites, Williams reveal, Defender wordmark coalescence,
 red-label message-table labels, high-score rows, and credit-count events before
@@ -225,8 +230,8 @@ awards now update the driver-owned active-player score/stock fields, so the
 actor session bridge preserves player-one/player-two ownership across
 two-player death switches. The remaining two-player prompt work is MAME media
 proof and exact pixel/timing parity beyond the source-message report/render
-contract. When source-counted hostile
-actors are gone, the actor driver publishes a wave-cleared interstitial
+contract. When source-counted hostile actors are gone and no actor enemy
+reserves remain, the actor driver publishes a wave-cleared interstitial
 `StepReport` before spawning the next wave: the clear report keeps surviving
 humans visible for the source `ATTACK WAVE` / `COMPLETED` / `BONUS X`
 presentation and survivor icon row, then the following actor step applies the
