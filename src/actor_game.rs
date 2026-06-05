@@ -5,6 +5,7 @@
 //! the driver prompts every asset once per step, gathers commands, resolves
 //! world rules in a stable order, and publishes a step description.
 
+use crate::game::SoundEvent;
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::mpsc::{self, Receiver, Sender},
@@ -2106,6 +2107,57 @@ impl SoundCue {
             Self::GameOver => Some(0xEC),
         }
     }
+
+    pub const fn sound_event(self) -> Option<SoundEvent> {
+        match self {
+            Self::Credit => Some(SoundEvent::CreditAdded),
+            Self::Start => Some(SoundEvent::GameStarted),
+            Self::Thrust => Some(SoundEvent::ThrustStarted),
+            _ => match self.source_sound_command() {
+                Some(command) => Some(SoundEvent::UnmappedSoundCommand { command }),
+                None => None,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ActorSoundEventBridge {
+    thrust_active: bool,
+}
+
+impl ActorSoundEventBridge {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn sound_events_for_report(&mut self, report: &StepReport) -> Vec<SoundEvent> {
+        self.sound_events_for_cues(&report.sounds)
+    }
+
+    pub fn sound_events_for_cues(&mut self, cues: &[SoundCue]) -> Vec<SoundEvent> {
+        let mut events = Vec::new();
+        let mut thrust_requested = false;
+        for cue in cues.iter().copied() {
+            if cue == SoundCue::Thrust {
+                if !thrust_requested && !self.thrust_active {
+                    events.push(SoundEvent::ThrustStarted);
+                }
+                thrust_requested = true;
+                continue;
+            }
+
+            if let Some(event) = cue.sound_event() {
+                events.push(event);
+            }
+        }
+
+        if !thrust_requested && self.thrust_active {
+            events.push(SoundEvent::ThrustStopped);
+        }
+        self.thrust_active = thrust_requested;
+        events
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2604,6 +2656,12 @@ pub struct StepReport {
     pub draws: Vec<DrawCommand>,
     pub sounds: Vec<SoundCue>,
     pub commands: Vec<GameCommand>,
+}
+
+impl StepReport {
+    pub fn sound_events(&self, bridge: &mut ActorSoundEventBridge) -> Vec<SoundEvent> {
+        bridge.sound_events_for_report(self)
+    }
 }
 
 pub struct ActorGameDriver {
@@ -5624,6 +5682,89 @@ mod tests {
         ] {
             assert_eq!(cue.source_sound_command(), None, "{cue:?}");
         }
+    }
+
+    #[test]
+    fn actor_sound_cues_map_to_clean_sound_events() {
+        assert_eq!(
+            SoundCue::Credit.sound_event(),
+            Some(SoundEvent::CreditAdded)
+        );
+        assert_eq!(SoundCue::Start.sound_event(), Some(SoundEvent::GameStarted));
+        assert_eq!(
+            SoundCue::Thrust.sound_event(),
+            Some(SoundEvent::ThrustStarted)
+        );
+        assert_eq!(
+            SoundCue::Laser.sound_event(),
+            Some(SoundEvent::UnmappedSoundCommand { command: 0xEB })
+        );
+        assert_eq!(
+            SoundCue::LanderShot.sound_event(),
+            Some(SoundEvent::UnmappedSoundCommand { command: 0xFC })
+        );
+        assert_eq!(SoundCue::Hyperspace.sound_event(), None);
+        assert_eq!(SoundCue::HumanReleased.sound_event(), None);
+    }
+
+    #[test]
+    fn actor_sound_event_bridge_emits_clean_audio_events_and_thrust_edges() {
+        let mut bridge = ActorSoundEventBridge::new();
+
+        assert_eq!(
+            bridge.sound_events_for_cues(&[SoundCue::Credit, SoundCue::Laser]),
+            [
+                SoundEvent::CreditAdded,
+                SoundEvent::UnmappedSoundCommand { command: 0xEB },
+            ]
+        );
+        assert_eq!(
+            bridge.sound_events_for_cues(&[SoundCue::Thrust, SoundCue::LanderShot]),
+            [
+                SoundEvent::ThrustStarted,
+                SoundEvent::UnmappedSoundCommand { command: 0xFC },
+            ]
+        );
+        assert_eq!(
+            bridge.sound_events_for_cues(&[SoundCue::Thrust, SoundCue::SwarmerShot]),
+            [SoundEvent::UnmappedSoundCommand { command: 0xF3 }]
+        );
+        assert_eq!(
+            bridge.sound_events_for_cues(&[SoundCue::HumanReleased]),
+            [SoundEvent::ThrustStopped]
+        );
+        assert!(bridge.sound_events_for_cues(&[]).is_empty());
+    }
+
+    #[test]
+    fn step_report_uses_actor_sound_event_bridge() {
+        let mut driver = started_driver();
+        let mut bridge = ActorSoundEventBridge::new();
+
+        let fired = driver.step(GameInput {
+            fire: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(
+            fired.sound_events(&mut bridge),
+            [SoundEvent::UnmappedSoundCommand { command: 0xEB }]
+        );
+
+        let thrusting = driver.step(GameInput {
+            thrust: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(
+            thrusting.sound_events(&mut bridge),
+            [SoundEvent::ThrustStarted]
+        );
+
+        let coasting = driver.step(GameInput::NONE);
+        assert_eq!(
+            coasting.sound_events(&mut bridge),
+            [SoundEvent::ThrustStopped]
+        );
     }
 
     #[test]

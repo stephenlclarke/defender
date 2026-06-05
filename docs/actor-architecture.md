@@ -27,6 +27,9 @@ verified.
   explosions can map to separate source sprite families later. Audio is
   described by `SoundCue`; source-backed cues expose their red-label Williams
   sound-board command byte through `SoundCue::source_sound_command`.
+  `ActorSoundEventBridge` converts a stream of `StepReport` sound cues into the
+  clean `SoundEvent` values consumed by the live audio runtime, including
+  thrust start/stop edges derived from actor cue state.
 
 ## C++ to Rust Mapping
 

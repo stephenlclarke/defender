@@ -180,8 +180,9 @@ tree:
   thread-backed assets, `StepPrompt`/`StepReport` simulation turns,
   scriptable behavior and wave profiles, draw/effect descriptions, and
   `SoundCue::source_sound_command` metadata for red-label Williams sound-board
-  command bytes where source evidence exists. It is not wired into the live
-  runtime yet.
+  command bytes where source evidence exists. `ActorSoundEventBridge` adapts
+  report sound cues into clean `SoundEvent` batches for the existing audio
+  runtime contract. The actor game is not wired into the live runtime yet.
 - `src/game_smoke.rs`: the crate-private clean game smoke command that steps
   `Game` through scripted controls, verifies sprite plus native pipeline and
   draw-instance coverage, verifies sprite buffer upload-plan, render-pass plan,

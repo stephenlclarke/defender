@@ -57,10 +57,13 @@ verification tools.
   now expose their red-label Williams sound-board command byte where existing
   source evidence pins one, including player laser, lander/mutant/non-lander
   family hits, hostile shots, human rescue/loss, and safe landing; unproven
-  semantic cues remain unmapped. Bomber actors now lay first-class bomb hazards
-  with source bomb-collision cues, pod laser kills spawn bounded swarmer actors,
-  source swarmers now emit hostile projectiles and distinct shot cues from
-  actor-owned timers, and source-paced baiter timer entry now spawns
+  semantic cues remain unmapped. `ActorSoundEventBridge` now converts actor
+  `StepReport` cue streams into the clean `SoundEvent` surface used by live
+  audio, including thrust start/stop edges derived from actor cue state. Bomber
+  actors now lay first-class bomb hazards with source bomb-collision cues, pod
+  laser kills spawn bounded swarmer actors, source swarmers now emit hostile
+  projectiles and distinct shot cues from actor-owned timers, and source-paced
+  baiter timer entry now spawns
   source-backed baiter actors that can shoot and pursue the player without
   blocking wave completion after source-counted enemies are gone. Smart bombs
   now use driver-owned stock: normal player requests consume stock before
@@ -4005,3 +4008,20 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780627095541089`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780627495227999`.
+- `2026-06-05 03:53 BST`: Completed the actor clean-audio event bridge
+  cycle. Added `SoundCue::sound_event`, `ActorSoundEventBridge`, and
+  `StepReport::sound_events` so actor cue streams can be converted into the
+  clean `SoundEvent` batches already consumed by the live audio runtime. The
+  bridge keeps actor simulation step-driven while deriving thrust start/stop
+  edges from cue state instead of replaying thrust continuously. No legacy
+  code, tests, or scaffolding were safe to remove because `legacy-tools` still
+  owns ROM reports, trace/media helpers, and oracle-equivalence evidence while
+  the actor runtime remains isolated. Validation passed with
+  `cargo fmt --check`, `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780627619924799`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780628000622989`.

@@ -90,7 +90,10 @@ lander and mutant hits, non-lander family hits, hostile shots, human
 rescue/loss, and safe landing, bomber-laid bomb actors with source
 bomb-collision cues, pod laser-hit swarmer spawning, swarmer scoring and shot
 cues, source-paced baiter timer entry, baiter shots/scoring/hit cues, and
-stock-backed smart-bomb hostile clearing. Player
+stock-backed smart-bomb hostile clearing. `ActorSoundEventBridge` now converts
+actor `StepReport` sound cues into the clean `SoundEvent` surface consumed by
+the live audio runtime, deriving thrust start/stop edges from the actor cue
+stream. Player
 actor hyperspace now emits separate launch/materialization cues and clears
 active hostile projectile actors without spending lives, smart-bomb stock,
 scoring points, or clearing hostile actor families; the player actor owns the
