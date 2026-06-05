@@ -3922,3 +3922,21 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780624670527609`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780625085453599`.
+- `2026-06-05 03:11 BST`: Completed the actor source-seed hyperspace
+  rematerialization cycle. Added `ActorHyperspaceSourceSeed` and an optional
+  behavior-profile source snapshot so `PlayerShip` derives hyperspace
+  rematerialization X/facing/Y from source `HSEED` when available, keeps direct
+  scripted coordinates as the fallback, and feeds the same source `LSEED` into
+  the already-ported `HYP2` death-risk branch. Added regression coverage for
+  source-seed rematerialization overriding fallback coordinates and selecting
+  the source facing branch. No legacy code, tests, or scaffolding were safe to
+  remove because `legacy-tools` still owns ROM reports, trace/media helpers,
+  and oracle-equivalence evidence while the actor runtime remains isolated.
+  Validation passed with `cargo test actor_game --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo fmt --check`, `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780625195752169`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780625474565589`.

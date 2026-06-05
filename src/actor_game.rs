@@ -20,6 +20,7 @@ const PLAYER_HYPERSPACE_REMATERIALIZE_Y: i16 = 120;
 const PLAYER_HYPERSPACE_DEATH_DELAY_STEPS: u8 = 39;
 const PLAYER_HYPERSPACE_DEATH_LSEED: u8 = 0x0C;
 const SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD: u8 = 0xC0;
+const SOURCE_PLAYFIELD_Y_MIN: u8 = 42;
 const PLAYER_BOUNDS: Rect = Rect::new(0, 18, 255, 220);
 const LASER_SPEED: i16 = 8;
 const LASER_LIFETIME: u16 = 34;
@@ -791,12 +792,20 @@ pub enum HostileMovementMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorHyperspaceSourceSeed {
+    pub seed: u8,
+    pub hseed: u8,
+    pub lseed: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorBehaviorProfile {
     pub player_speed: i16,
     pub player_laser_cooldown_steps: u8,
     pub player_hyperspace_hidden_steps: u8,
     pub player_hyperspace_rematerialize_x: i16,
     pub player_hyperspace_rematerialize_y: i16,
+    pub player_hyperspace_source_seed: Option<ActorHyperspaceSourceSeed>,
     pub player_hyperspace_death_delay_steps: u8,
     pub player_hyperspace_death_lseed: u8,
     pub player_takes_enemy_collision_damage: bool,
@@ -844,6 +853,7 @@ impl ActorBehaviorProfile {
         player_hyperspace_hidden_steps: PLAYER_HYPERSPACE_HIDDEN_STEPS,
         player_hyperspace_rematerialize_x: PLAYER_HYPERSPACE_REMATERIALIZE_X,
         player_hyperspace_rematerialize_y: PLAYER_HYPERSPACE_REMATERIALIZE_Y,
+        player_hyperspace_source_seed: None,
         player_hyperspace_death_delay_steps: PLAYER_HYPERSPACE_DEATH_DELAY_STEPS,
         player_hyperspace_death_lseed: PLAYER_HYPERSPACE_DEATH_LSEED,
         player_takes_enemy_collision_damage: true,
@@ -3520,6 +3530,30 @@ impl PlayerShip {
         self.hyperspace_steps_remaining = behavior.player_hyperspace_hidden_steps;
     }
 
+    fn hyperspace_rematerialization(
+        &self,
+        behavior: ActorBehaviorProfile,
+    ) -> (Point, Direction, u8) {
+        if let Some(source) = behavior.player_hyperspace_source_seed {
+            let (x, direction) = if source.hseed & 1 != 0 {
+                (0x20, Direction::Right)
+            } else {
+                (0x70, Direction::Left)
+            };
+            let y = (source.hseed >> 1).wrapping_add(SOURCE_PLAYFIELD_Y_MIN);
+            return (Point::new(x, i16::from(y)), direction, source.lseed);
+        }
+
+        (
+            Point::new(
+                behavior.player_hyperspace_rematerialize_x,
+                behavior.player_hyperspace_rematerialize_y,
+            ),
+            self.direction,
+            behavior.player_hyperspace_death_lseed,
+        )
+    }
+
     fn advance_hyperspace(&mut self, behavior: ActorBehaviorProfile) -> bool {
         if self.hyperspace_steps_remaining == 0 {
             return false;
@@ -3527,11 +3561,10 @@ impl PlayerShip {
 
         self.hyperspace_steps_remaining = self.hyperspace_steps_remaining.saturating_sub(1);
         if self.hyperspace_steps_remaining == 0 {
-            self.position = PLAYER_BOUNDS.clamp_point(Point::new(
-                behavior.player_hyperspace_rematerialize_x,
-                behavior.player_hyperspace_rematerialize_y,
-            ));
-            if behavior.player_hyperspace_death_lseed > SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD {
+            let (position, direction, death_lseed) = self.hyperspace_rematerialization(behavior);
+            self.position = PLAYER_BOUNDS.clamp_point(position);
+            self.direction = direction;
+            if death_lseed > SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD {
                 self.hyperspace_death_steps_remaining =
                     Some(behavior.player_hyperspace_death_delay_steps);
             }
@@ -6282,6 +6315,50 @@ mod tests {
         assert!(!settled.commands.contains(&GameCommand::PlayerKilled));
         assert_eq!(settled.lives, 3);
         assert_eq!(driver.snapshot_count(ActorKind::Player), 1);
+    }
+
+    #[test]
+    fn hyperspace_source_seed_controls_rematerialization_position_and_direction() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        let player = driver.spawn_player();
+        driver.set_actor_behavior(
+            player,
+            ActorBehaviorProfile {
+                player_hyperspace_hidden_steps: 1,
+                player_hyperspace_rematerialize_x: 150,
+                player_hyperspace_rematerialize_y: 92,
+                player_hyperspace_source_seed: Some(ActorHyperspaceSourceSeed {
+                    seed: 0x12,
+                    hseed: 0x34,
+                    lseed: 0,
+                }),
+                ..ActorBehaviorProfile::default()
+            },
+        );
+
+        driver.step(GameInput {
+            hyperspace: true,
+            ..GameInput::NONE
+        });
+        let rematerialized = driver.step(GameInput::NONE);
+
+        let player_snapshot = snapshot_for(&rematerialized, player);
+        assert_eq!(
+            player_snapshot.position,
+            Point::new(0x70, i16::from((0x34_u8 >> 1) + SOURCE_PLAYFIELD_Y_MIN))
+        );
+        assert!(rematerialized.draws.iter().any(|draw| {
+            draw.actor == player
+                && draw.position == player_snapshot.position
+                && matches!(draw.sprite, SpriteKey::PlayerLeft)
+        }));
+        assert!(
+            rematerialized
+                .sounds
+                .contains(&SoundCue::HyperspaceMaterialize)
+        );
+        assert!(!rematerialized.commands.contains(&GameCommand::PlayerKilled));
     }
 
     #[test]

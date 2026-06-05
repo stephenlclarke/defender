@@ -73,11 +73,12 @@ numbers.
 
 Actor movement and behavior are configurable data owned by the driver.
 `ActorBehaviorProfile` holds tunable attributes for player movement and laser
-cooldown, player hyperspace hiding/rematerialization, laser speed and lifetime,
-lander seek/carry/fire behavior, mutant movement, bomber movement/bomb cadence,
-pod movement, swarmer movement/fire behavior, baiter movement/fire behavior,
-bomb lifetime, human fall/landing behavior, and timed effect lifetimes. It also
-holds behavior modes such as
+cooldown, player hyperspace hiding/rematerialization including optional source
+seed snapshots, laser speed and lifetime, lander seek/carry/fire behavior,
+mutant movement, bomber movement/bomb cadence, pod movement, swarmer
+movement/fire behavior, baiter movement/fire behavior, bomb lifetime, human
+fall/landing behavior, and timed effect lifetimes. It also holds behavior modes
+such as
 `LanderBehaviorMode` and `HostileMovementMode`, allowing scripts to choose
 whether a lander seeks humans, chases the player, or simply drifts, and whether
 non-source mutant, bomber, pod, swarmer, and baiter actors drift or chase the
@@ -109,10 +110,13 @@ the hidden interval: while its hyperspace timer is active it remains alive but
 publishes no collision bounds, no player draw, and no input-driven actions.
 `ActorBehaviorProfile` configures the hidden step count and rematerialization
 coordinates, and the actor emits `SoundCue::HyperspaceMaterialize` when it
-returns. The same profile carries the effective source `LSEED` byte and death
-delay; values above `0xC0` arm the source `HYP2` death-risk branch and route
-through the normal player death/life-stock path after the delay. Full source
-RNG advancement remains a separate porting slice.
+returns. A behavior script can also provide an `ActorHyperspaceSourceSeed`; in
+that source-backed path `HSEED` selects the source X/facing branch and Y high
+byte, while `LSEED` drives the death-risk threshold. Without that snapshot the
+actor uses the direct scripted rematerialization coordinates and effective
+`LSEED` byte. Values above `0xC0` arm the source `HYP2` death-risk branch and
+route through the normal player death/life-stock path after the delay. Full
+source RNG advancement remains a separate porting slice.
 
 `XYZZY` invincibility uses the same mechanism. When invincibility is active,
 the driver applies a temporary player behavior override that disables enemy
