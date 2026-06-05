@@ -4222,7 +4222,9 @@ impl ActorGameDriver {
                     self.spawn_laser(position, direction, owner);
                 }
                 GameCommand::Spawn(SpawnRequest::EnemyLaser { position, velocity }) => {
-                    if reserve_source_shell_slot(&mut active_source_shells) {
+                    if source_shell_spawn_in_bounds(position)
+                        && reserve_source_shell_slot(&mut active_source_shells)
+                    {
                         self.spawn_enemy_laser(position, velocity);
                     }
                 }
@@ -4661,11 +4663,15 @@ fn bomb_shell_slot_available(active_bomb_shells: usize) -> bool {
     active_bomb_shells < SOURCE_ACTIVE_BOMBER_BOMB_LIMIT
 }
 
+fn source_shell_spawn_in_bounds(position: Point) -> bool {
+    position.x < SOURCE_SHELL_X_MAX && position.y > i16::from(SOURCE_PLAYFIELD_Y_MIN)
+}
+
 fn bomb_shell_spawn_in_source_bounds(
     position: Point,
     source: Option<ActorSourceEnemyProjectileMetadata>,
 ) -> bool {
-    source.is_none() || position.x < SOURCE_SHELL_X_MAX
+    source.is_none() || source_shell_spawn_in_bounds(position)
 }
 
 fn reserve_source_shell_slot(active_source_shells: &mut usize) -> bool {
@@ -5833,7 +5839,7 @@ impl Bomber {
         if active_bombs >= SOURCE_ACTIVE_BOMBER_BOMB_LIMIT {
             return;
         }
-        if self.source.is_some() && self.position.x >= SOURCE_SHELL_X_MAX {
+        if self.source.is_some() && !source_shell_spawn_in_bounds(self.position) {
             return;
         }
 
@@ -9350,7 +9356,7 @@ mod tests {
     }
 
     #[test]
-    fn source_bomber_bomb_spawn_respects_getshl_x_bound() {
+    fn source_bomber_bomb_spawn_respects_getshl_bounds() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.set_kind_behavior(
@@ -9374,6 +9380,19 @@ mod tests {
                 source_slot: 0,
             }),
         });
+        driver.spawn_bomber_from_spawn(ActorBomberSpawn {
+            position: Point::new(SOURCE_SHELL_X_MAX - 1, i16::from(SOURCE_PLAYFIELD_Y_MIN)),
+            source: Some(ActorSourceBomberMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                picture_frame: 0,
+                cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
+                sleep_ticks: 0,
+                source_slot: 1,
+            }),
+        });
 
         let report = driver.step(GameInput::NONE);
 
@@ -9387,13 +9406,23 @@ mod tests {
     }
 
     #[test]
-    fn source_bomb_spawn_commands_respect_getshl_x_bound() {
+    fn source_bomb_spawn_commands_respect_getshl_bounds() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
 
         driver.apply_commands(&[
             GameCommand::Spawn(SpawnRequest::Bomb {
                 position: Point::new(SOURCE_SHELL_X_MAX, 100),
+                source: Some(ActorSourceEnemyProjectileMetadata {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0,
+                    y_velocity: 0,
+                    lifetime_ticks: 0,
+                }),
+            }),
+            GameCommand::Spawn(SpawnRequest::Bomb {
+                position: Point::new(SOURCE_SHELL_X_MAX - 1, i16::from(SOURCE_PLAYFIELD_Y_MIN)),
                 source: Some(ActorSourceEnemyProjectileMetadata {
                     x_fraction: 0,
                     y_fraction: 0,
@@ -9416,6 +9445,36 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(bombs.len(), 1);
         assert_eq!(bombs[0].position, Point::new(SOURCE_SHELL_X_MAX, 108));
+    }
+
+    #[test]
+    fn source_enemy_laser_spawn_commands_respect_getshl_bounds() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+
+        driver.apply_commands(&[
+            GameCommand::Spawn(SpawnRequest::EnemyLaser {
+                position: Point::new(SOURCE_SHELL_X_MAX, 100),
+                velocity: Velocity::new(0, 0),
+            }),
+            GameCommand::Spawn(SpawnRequest::EnemyLaser {
+                position: Point::new(SOURCE_SHELL_X_MAX - 1, i16::from(SOURCE_PLAYFIELD_Y_MIN)),
+                velocity: Velocity::new(0, 0),
+            }),
+            GameCommand::Spawn(SpawnRequest::EnemyLaser {
+                position: Point::new(SOURCE_SHELL_X_MAX - 1, 100),
+                velocity: Velocity::new(0, 0),
+            }),
+        ]);
+        let report = driver.step(GameInput::NONE);
+
+        let shots = report
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::EnemyLaser)
+            .collect::<Vec<_>>();
+        assert_eq!(shots.len(), 1);
+        assert_eq!(shots[0].position, Point::new(SOURCE_SHELL_X_MAX - 1, 100));
     }
 
     #[test]

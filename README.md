@@ -115,8 +115,9 @@ source-cadenced lifetime state into the clean `EnemyProjectileSnapshot`
 contract. The driver enforces the shared 20-slot source shell cap across
 enemy-shot and bomb spawn commands plus the red-label 10-slot bomber bomb shell
 cap. Source-backed bomb-shell spawn commands also honor the source `GETSHL`
-X bound at `0x98`, while non-source scripted bombs remain available. It also
-includes Williams title animation
+X/Y placement bounds at X `0x98` and Y `0x2A`, while non-source scripted bombs
+remain available. Enemy-shot spawn commands use the same source shell placement
+bounds. It also includes Williams title animation
 metadata, the coalescing
 Defender wordmark surface, lander target-slot seeking, an actor-owned
 status display for score, high score, wave, lives, smart-bomb stock, credits,

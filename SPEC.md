@@ -769,7 +769,8 @@ reintroduce legacy implementation terminology.
   fraction plus source-cadenced lifetime state. Actor spawn command handling
   enforces the shared 20-slot source shell cap for enemy shots and bombs plus
   the red-label 10-slot bomber bomb shell cap, and source-backed bomb-shell
-  spawns honor the source `GETSHL` X bound at `0x98`.
+  plus enemy-shot spawns honor the source `GETSHL` X/Y placement bounds at
+  X `0x98` and Y `0x2A`.
   `XYZZY` invincibility is represented as the same
   temporary player behavior override. The slice now also models source landers
   preferring their configured human target slot, lander pickup/carry/conversion,

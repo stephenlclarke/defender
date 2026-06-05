@@ -4497,3 +4497,26 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780639336869439`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780639677266069`.
+- `2026-06-05 07:13 BST`: Completed the actor source shell placement bounds
+  cycle. Driver command handling now rejects source shell spawns outside the
+  red-label `GETSHL` placement bounds: X `0x98` or beyond, and Y `0x2A` or
+  below. Enemy-shot commands and source-backed bomb-shell commands share the
+  bound, while non-source scripted bomb actors remain available for custom
+  drivers. Expanded regressions for source bomber emission, direct source-backed
+  bomb commands, non-source bomb commands, and enemy-shot command filtering.
+  README, SPEC, and the actor architecture notes now document the X/Y shell
+  placement behavior. No legacy code, tests, or scaffolding were safe to remove
+  in this slice because clean smoke/fidelity/oracle evidence still depends on
+  clean runtime boundaries outside the actor path. Validation passed with
+  `cargo fmt --check`, focused placement/fraction/cap tests,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780639773324399`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780640013914859`.
