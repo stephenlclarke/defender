@@ -761,8 +761,9 @@ reintroduce legacy implementation terminology.
   manifest after transient input overrides such as `XYZZY` invincibility.
   `ActorWaveScript` names a driver-owned progression script whose wave profiles
   apply behavior scripts plus hostile and initial-human spawn records when play
-  starts and when hostile snapshots are cleared. The default actor wave
-  progression reads
+  starts and when hostile snapshots are cleared. `ActorWaveScript` can be built
+  from Rust profile constructors or checked text wave/spawn records. The
+  default actor wave progression reads
   `assets/red-label/wave-table.tsv` for active wave size, lander and bomber
   movement speed, lander fire cadence, baiter entry/shot/seek timing, and
   source bomber/pod counts. The actor allocator follows the source active-family

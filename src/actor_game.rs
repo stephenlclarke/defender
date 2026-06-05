@@ -2777,6 +2777,373 @@ impl ActorWaveScript {
     }
 }
 
+impl FromStr for ActorWaveScript {
+    type Err = ActorWaveScriptParseError;
+
+    fn from_str(source: &str) -> Result<Self, Self::Err> {
+        let mut parser = ParsedActorWaveScript::new();
+        for (line_index, raw_line) in source.lines().enumerate() {
+            let line_number = line_index + 1;
+            let line = raw_line
+                .split_once('#')
+                .map_or(raw_line, |(before_comment, _)| before_comment)
+                .trim();
+            if line.is_empty() {
+                continue;
+            }
+            parser.parse_line(line_number, line)?;
+        }
+        parser.finish()
+    }
+}
+
+impl ActorWaveScript {
+    pub fn parse_text(source: &str) -> Result<Self, ActorWaveScriptParseError> {
+        source.parse()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorWaveScriptParseError {
+    pub line: usize,
+    pub message: String,
+}
+
+impl ActorWaveScriptParseError {
+    fn new(line: usize, message: impl Into<String>) -> Self {
+        Self {
+            line,
+            message: message.into(),
+        }
+    }
+}
+
+impl fmt::Display for ActorWaveScriptParseError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "actor wave script line {}: {}",
+            self.line, self.message
+        )
+    }
+}
+
+impl std::error::Error for ActorWaveScriptParseError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ParsedActorWaveScript {
+    name: String,
+    waves: Vec<ParsedActorWaveProfile>,
+}
+
+impl ParsedActorWaveScript {
+    fn new() -> Self {
+        Self {
+            name: "parsed-wave-script".to_string(),
+            waves: Vec::new(),
+        }
+    }
+
+    fn parse_line(
+        &mut self,
+        line_number: usize,
+        line: &str,
+    ) -> Result<(), ActorWaveScriptParseError> {
+        let mut parts = line.split_whitespace();
+        let action = parts
+            .next()
+            .ok_or_else(|| ActorWaveScriptParseError::new(line_number, "missing action"))?;
+        match normalize_script_token(action).as_str() {
+            "name" => {
+                let name = parts.collect::<Vec<_>>().join(" ");
+                if name.is_empty() {
+                    return Err(ActorWaveScriptParseError::new(
+                        line_number,
+                        "name action needs a value",
+                    ));
+                }
+                self.name = name;
+                Ok(())
+            }
+            "wave" => {
+                let wave = parse_wave_u16(line_number, parts.next(), "wave")?;
+                reject_extra_wave_fields(line_number, parts)?;
+                if self.waves.iter().any(|profile| profile.wave == wave.max(1)) {
+                    return Err(ActorWaveScriptParseError::new(
+                        line_number,
+                        format!("duplicate wave `{}`", wave.max(1)),
+                    ));
+                }
+                self.waves.push(ParsedActorWaveProfile::new(wave));
+                Ok(())
+            }
+            "behavior" => {
+                let behavior_line = parts.collect::<Vec<_>>().join(" ");
+                if behavior_line.is_empty() {
+                    return Err(ActorWaveScriptParseError::new(
+                        line_number,
+                        "behavior action needs a profile update",
+                    ));
+                }
+                let profile = self.current_profile_mut(line_number)?;
+                parse_behavior_script_line(
+                    line_number,
+                    &behavior_line,
+                    &mut profile.behavior_script,
+                )
+                .map_err(|error| ActorWaveScriptParseError::new(error.line, error.message))
+            }
+            "lander" => {
+                let position = parse_wave_point(line_number, &mut parts)?;
+                reject_extra_wave_fields(line_number, parts)?;
+                self.current_profile_mut(line_number)?
+                    .lander_spawns
+                    .push(ActorLanderSpawn::new(position));
+                Ok(())
+            }
+            "bomber" => {
+                let position = parse_wave_point(line_number, &mut parts)?;
+                reject_extra_wave_fields(line_number, parts)?;
+                self.current_profile_mut(line_number)?
+                    .bomber_spawns
+                    .push(ActorBomberSpawn::new(position));
+                Ok(())
+            }
+            "pod" => {
+                let position = parse_wave_point(line_number, &mut parts)?;
+                reject_extra_wave_fields(line_number, parts)?;
+                self.current_profile_mut(line_number)?
+                    .pod_spawns
+                    .push(ActorPodSpawn::new(position));
+                Ok(())
+            }
+            "human" => {
+                let position = parse_wave_point(line_number, &mut parts)?;
+                let mode = parse_wave_human_mode(line_number, parts)?;
+                self.current_profile_mut(line_number)?
+                    .human_spawns
+                    .push(ActorHumanSpawn::new(position, mode));
+                Ok(())
+            }
+            _ => Err(ActorWaveScriptParseError::new(
+                line_number,
+                format!("unknown wave action `{action}`"),
+            )),
+        }
+    }
+
+    fn current_profile_mut(
+        &mut self,
+        line_number: usize,
+    ) -> Result<&mut ParsedActorWaveProfile, ActorWaveScriptParseError> {
+        self.waves.last_mut().ok_or_else(|| {
+            ActorWaveScriptParseError::new(line_number, "wave action must appear before this line")
+        })
+    }
+
+    fn finish(self) -> Result<ActorWaveScript, ActorWaveScriptParseError> {
+        if self.waves.is_empty() {
+            return Err(ActorWaveScriptParseError::new(
+                0,
+                "wave script needs at least one wave",
+            ));
+        }
+        Ok(ActorWaveScript::new(
+            self.name,
+            self.waves
+                .into_iter()
+                .map(ParsedActorWaveProfile::finish)
+                .collect(),
+        ))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ParsedActorWaveProfile {
+    wave: u16,
+    behavior_script: ActorBehaviorScript,
+    lander_spawns: Vec<ActorLanderSpawn>,
+    bomber_spawns: Vec<ActorBomberSpawn>,
+    pod_spawns: Vec<ActorPodSpawn>,
+    human_spawns: Vec<ActorHumanSpawn>,
+}
+
+impl ParsedActorWaveProfile {
+    fn new(wave: u16) -> Self {
+        Self {
+            wave: wave.max(1),
+            behavior_script: ActorBehaviorScript::default(),
+            lander_spawns: Vec::new(),
+            bomber_spawns: Vec::new(),
+            pod_spawns: Vec::new(),
+            human_spawns: Vec::new(),
+        }
+    }
+
+    fn finish(self) -> ActorWaveProfile {
+        ActorWaveProfile::with_family_spawns(
+            self.wave,
+            self.behavior_script,
+            self.lander_spawns,
+            self.bomber_spawns,
+            self.pod_spawns,
+            self.human_spawns,
+        )
+    }
+}
+
+fn parse_wave_point<'a>(
+    line_number: usize,
+    parts: &mut impl Iterator<Item = &'a str>,
+) -> Result<Point, ActorWaveScriptParseError> {
+    let x = parse_wave_i16(line_number, parts.next(), "x")?;
+    let y = parse_wave_i16(line_number, parts.next(), "y")?;
+    Ok(Point::new(x, y))
+}
+
+fn parse_wave_human_mode<'a>(
+    line_number: usize,
+    mut parts: impl Iterator<Item = &'a str>,
+) -> Result<HumanMode, ActorWaveScriptParseError> {
+    let Some(mode) = parts.next() else {
+        return Ok(HumanMode::Grounded);
+    };
+    match normalize_script_token(mode).as_str() {
+        "grounded" => {
+            reject_extra_wave_fields(line_number, parts)?;
+            Ok(HumanMode::Grounded)
+        }
+        "falling" => {
+            let velocity = parse_wave_i16(line_number, parts.next(), "fall velocity")?;
+            reject_extra_wave_fields(line_number, parts)?;
+            Ok(HumanMode::Falling { velocity })
+        }
+        "carried" | "carried_by" => {
+            let actor = ActorId::new(parse_wave_u64(line_number, parts.next(), "carrier actor")?);
+            reject_extra_wave_fields(line_number, parts)?;
+            Ok(HumanMode::CarriedBy(actor))
+        }
+        _ => Err(ActorWaveScriptParseError::new(
+            line_number,
+            format!("unknown human mode `{mode}`"),
+        )),
+    }
+}
+
+fn parse_wave_u16(
+    line_number: usize,
+    token: Option<&str>,
+    field: &str,
+) -> Result<u16, ActorWaveScriptParseError> {
+    let value = parse_wave_u64(line_number, token, field)?;
+    u16::try_from(value).map_err(|error| {
+        ActorWaveScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is invalid: {error}"),
+        )
+    })
+}
+
+fn parse_wave_i16(
+    line_number: usize,
+    token: Option<&str>,
+    field: &str,
+) -> Result<i16, ActorWaveScriptParseError> {
+    let token = token
+        .ok_or_else(|| ActorWaveScriptParseError::new(line_number, format!("missing {field}")))?;
+    i16::try_from(parse_wave_i64_value(line_number, token, field)?).map_err(|error| {
+        ActorWaveScriptParseError::new(
+            line_number,
+            format!("{field} `{token}` is invalid: {error}"),
+        )
+    })
+}
+
+fn parse_wave_u64(
+    line_number: usize,
+    token: Option<&str>,
+    field: &str,
+) -> Result<u64, ActorWaveScriptParseError> {
+    let token = token
+        .ok_or_else(|| ActorWaveScriptParseError::new(line_number, format!("missing {field}")))?;
+    parse_wave_u64_value(line_number, token, field)
+}
+
+fn parse_wave_u64_value(
+    line_number: usize,
+    value: &str,
+    field: &str,
+) -> Result<u64, ActorWaveScriptParseError> {
+    if let Some(hex) = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))
+    {
+        return u64::from_str_radix(hex, 16).map_err(|error| {
+            ActorWaveScriptParseError::new(
+                line_number,
+                format!("{field} `{value}` is invalid: {error}"),
+            )
+        });
+    }
+    value.parse::<u64>().map_err(|error| {
+        ActorWaveScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is invalid: {error}"),
+        )
+    })
+}
+
+fn parse_wave_i64_value(
+    line_number: usize,
+    value: &str,
+    field: &str,
+) -> Result<i64, ActorWaveScriptParseError> {
+    if let Some(hex) = value
+        .strip_prefix("-0x")
+        .or_else(|| value.strip_prefix("-0X"))
+    {
+        return i64::from_str_radix(hex, 16)
+            .map(|value| -value)
+            .map_err(|error| {
+                ActorWaveScriptParseError::new(
+                    line_number,
+                    format!("{field} `{value}` is invalid: {error}"),
+                )
+            });
+    }
+    if let Some(hex) = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))
+    {
+        return i64::from_str_radix(hex, 16).map_err(|error| {
+            ActorWaveScriptParseError::new(
+                line_number,
+                format!("{field} `{value}` is invalid: {error}"),
+            )
+        });
+    }
+    value.parse::<i64>().map_err(|error| {
+        ActorWaveScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is invalid: {error}"),
+        )
+    })
+}
+
+fn reject_extra_wave_fields<'a>(
+    line_number: usize,
+    mut parts: impl Iterator<Item = &'a str>,
+) -> Result<(), ActorWaveScriptParseError> {
+    if let Some(extra) = parts.next() {
+        Err(ActorWaveScriptParseError::new(
+            line_number,
+            format!("unexpected extra field `{extra}`"),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorWaveScriptManifest {
     pub name: String,
@@ -13414,6 +13781,135 @@ mod tests {
                 && snapshot.position == Point::new(32, HUMAN_GROUND_Y)
                 && snapshot.source_human.is_none()
         }));
+    }
+
+    #[test]
+    fn wave_script_text_parser_builds_sorted_profiles_and_spawns() {
+        let wave_script = ActorWaveScript::parse_text(
+            "\
+            name parsed progression\n\
+            wave 2\n\
+            behavior kind lander lander_mode drift\n\
+            behavior kind lander lander_drift_speed 5\n\
+            lander 100 100\n\
+            bomber 120 80\n\
+            pod 160 88\n\
+            human 32 214 grounded\n\
+            wave 1\n\
+            behavior kind lander lander_mode chase_player\n\
+            behavior kind lander lander_seek_speed 6\n\
+            lander 80 96\n\
+            human 40 214 falling -1\n",
+        )
+        .expect("wave script text should parse");
+
+        let manifest = wave_script.manifest();
+
+        assert_eq!(manifest.name, "parsed progression");
+        assert_eq!(
+            manifest
+                .waves
+                .iter()
+                .map(|profile| profile.wave)
+                .collect::<Vec<_>>(),
+            vec![1, 2]
+        );
+        assert_eq!(
+            manifest.waves[0].lander_spawns[0].position,
+            Point::new(80, 96)
+        );
+        assert_eq!(
+            manifest.waves[0].human_spawns[0].mode,
+            HumanMode::Falling { velocity: -1 }
+        );
+        let wave_one_lander = manifest.waves[0]
+            .behavior_script
+            .kind_profile(ActorKind::Lander)
+            .expect("wave 1 lander profile should parse");
+        assert_eq!(wave_one_lander.lander_mode, LanderBehaviorMode::ChasePlayer);
+        assert_eq!(wave_one_lander.lander_seek_speed, 6);
+
+        assert_eq!(
+            manifest.waves[1].bomber_spawns[0].position,
+            Point::new(120, 80)
+        );
+        assert_eq!(
+            manifest.waves[1].pod_spawns[0].position,
+            Point::new(160, 88)
+        );
+        let wave_two_lander = manifest.waves[1]
+            .behavior_script
+            .kind_profile(ActorKind::Lander)
+            .expect("wave 2 lander profile should parse");
+        assert_eq!(wave_two_lander.lander_mode, LanderBehaviorMode::Drift);
+        assert_eq!(wave_two_lander.lander_drift_speed, 5);
+    }
+
+    #[test]
+    fn parsed_wave_script_drives_wave_spawns_and_next_wave_behavior() {
+        let wave_script = "\
+            name parsed waves\n\
+            wave 1\n\
+            behavior kind lander lander_mode chase_player\n\
+            behavior kind lander lander_seek_speed 5\n\
+            lander 80 214\n\
+            human 100 214\n\
+            wave 2\n\
+            behavior kind lander lander_mode drift\n\
+            behavior kind lander lander_drift_speed 5\n\
+            lander 100 100\n"
+            .parse::<ActorWaveScript>()
+            .expect("wave script should parse");
+        let mut driver = ActorGameDriver::with_wave_script(wave_script);
+
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput::NONE);
+        let chasing = driver.step(GameInput::NONE);
+        let lander = chasing
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Lander)
+            .expect("wave 1 should spawn a lander");
+        assert_eq!(lander.position, Point::new(74, 209));
+
+        let cleared = driver.step(GameInput {
+            smart_bomb: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(cleared.wave, 2);
+
+        let next_wave = driver.step(GameInput::NONE);
+        let lander = next_wave
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Lander)
+            .expect("wave 2 should spawn a lander");
+        assert_eq!(lander.position, Point::new(95, 100));
+    }
+
+    #[test]
+    fn wave_script_text_parser_reports_line_errors() {
+        let error = ActorWaveScript::parse_text("lander 80 96\n")
+            .expect_err("spawn before wave should fail");
+        assert_eq!(error.line, 1);
+        assert!(error.to_string().contains("wave action must appear"));
+
+        let error = ActorWaveScript::parse_text("wave 1\nwave 1\n")
+            .expect_err("duplicate wave should fail");
+        assert_eq!(error.line, 2);
+        assert!(error.to_string().contains("duplicate wave"));
+
+        let error = ActorWaveScript::parse_text("wave 1\nbehavior kind lander no_such_field 1\n")
+            .expect_err("bad behavior update should fail");
+        assert_eq!(error.line, 2);
+        assert!(error.to_string().contains("unknown behavior field"));
     }
 
     #[test]

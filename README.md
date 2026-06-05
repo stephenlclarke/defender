@@ -101,7 +101,9 @@ configured attract events, driver behavior, and wave profiles, while each
 `StepReport` carries the effective per-step behavior manifest after transient
 input overrides such as `XYZZY` invincibility. Behavior scripts can also be
 parsed from checked text lines that update default, actor-kind, or actor-id
-profiles. The default actor wave allocator now uses the source active-family
+profiles. Wave scripts can be parsed from checked text lines that name wave
+profiles, per-wave behavior updates, and lander/bomber/pod/human spawn
+records. The default actor wave allocator now uses the source active-family
 shape, so later waves can introduce bomber and pod actor families alongside
 landers instead of remaining lander-only. Later-wave
 actor landers now restore from source RNG placement/shot/velocity state, and

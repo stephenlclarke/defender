@@ -228,6 +228,31 @@ player-relative Y adjustments, from the driver-provided source RNG snapshot.
 Source-backed baiter actors use that same source RNG snapshot to gate
 picture-wrap retargeting against the wave's `baiter_seek_probability` and add
 player velocity into the source-shaped seek velocity.
+
+`ActorWaveScript::parse_text(...)` and
+`str::parse::<ActorWaveScript>()` accept checked text level scripts:
+
+```text
+name hard opening
+wave 1
+behavior kind lander lander_mode chase_player
+behavior kind lander lander_seek_speed 6
+lander 80 96
+human 40 214
+wave 2
+behavior kind lander lander_mode drift
+behavior kind lander lander_drift_speed 5
+lander 100 100
+bomber 120 80
+pod 160 88
+```
+
+`behavior` lines reuse the `ActorBehaviorScript` parser for the current wave.
+`lander`, `bomber`, `pod`, and `human` lines add clean scripted spawn records;
+humans default to `grounded` and can also be declared as `falling <velocity>` or
+`carried <actor-id>`. The parser sorts wave profiles by wave number, rejects
+duplicate waves, and reports malformed lines with source line numbers.
+
 Hostile projectile actors publish source-shaped shell metadata too: enemy
 lasers own and advance fixed-point velocity, fraction, and lifetime values,
 with lifetime decrementing on the source shell-scan cadence. Enemy-shot spawn
