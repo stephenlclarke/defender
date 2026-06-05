@@ -1268,6 +1268,15 @@ pub struct ActorSourceBaiterMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceEnemyProjectileMetadata {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub lifetime_ticks: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorLanderSpawn {
     pub position: Point,
     pub source: Option<ActorSourceLanderMetadata>,
@@ -2544,6 +2553,7 @@ pub struct ActorSnapshot {
     pub source_swarmer: Option<ActorSourceSwarmerMetadata>,
     pub source_baiter: Option<ActorSourceBaiterMetadata>,
     pub source_human: Option<ActorSourceHumanMetadata>,
+    pub source_enemy_projectile: Option<ActorSourceEnemyProjectileMetadata>,
 }
 
 impl ActorSnapshot {
@@ -3140,11 +3150,21 @@ fn actor_enemy_projectiles_for_report(report: &StepReport) -> Vec<CleanEnemyProj
             } else {
                 EnemyProjectileSourceKind::Fireball
             },
-            source_x_fraction: 0,
-            source_y_fraction: 0,
-            source_x_velocity: 0,
-            source_y_velocity: 0,
-            source_lifetime_ticks: 0,
+            source_x_fraction: snapshot
+                .source_enemy_projectile
+                .map_or(0, |source| source.x_fraction),
+            source_y_fraction: snapshot
+                .source_enemy_projectile
+                .map_or(0, |source| source.y_fraction),
+            source_x_velocity: snapshot
+                .source_enemy_projectile
+                .map_or(0, |source| source.x_velocity),
+            source_y_velocity: snapshot
+                .source_enemy_projectile
+                .map_or(0, |source| source.y_velocity),
+            source_lifetime_ticks: snapshot
+                .source_enemy_projectile
+                .map_or(0, |source| source.lifetime_ticks),
         })
         .collect()
 }
@@ -3214,6 +3234,15 @@ fn screen_velocity_component(value: i16) -> i8 {
 
 fn screen_coordinate(value: i16) -> u8 {
     u8::try_from(value.clamp(0, 255)).expect("screen coordinate should be clamped to u8")
+}
+
+fn actor_source_projectile_velocity_component(value: i16) -> u16 {
+    let clamped = value.clamp(i16::from(i8::MIN), i16::from(i8::MAX)) as i8;
+    ((i16::from(clamped)) << 8) as u16
+}
+
+fn actor_source_projectile_lifetime_ticks(remaining_steps: u16) -> u8 {
+    remaining_steps.min(u16::from(u8::MAX)) as u8
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -4737,6 +4766,7 @@ impl AssetActor for AttractDirector {
                 source_swarmer: None,
                 source_baiter: None,
                 source_human: None,
+                source_enemy_projectile: None,
             },
             commands,
             draws,
@@ -4791,6 +4821,7 @@ impl AssetActor for ScriptedAttractProgram {
                 source_swarmer: None,
                 source_baiter: None,
                 source_human: None,
+                source_enemy_projectile: None,
             },
             commands: Vec::new(),
             draws,
@@ -4894,6 +4925,7 @@ impl StatusDisplay {
             source_swarmer: None,
             source_baiter: None,
             source_human: None,
+            source_enemy_projectile: None,
         }
     }
 }
@@ -5147,6 +5179,7 @@ impl AssetActor for PlayerShip {
                 source_swarmer: None,
                 source_baiter: None,
                 source_human: None,
+                source_enemy_projectile: None,
             },
             commands,
             draws,
@@ -5245,6 +5278,7 @@ impl AssetActor for Lander {
                 source_swarmer: None,
                 source_baiter: None,
                 source_human: None,
+                source_enemy_projectile: None,
             },
             commands,
             draws,
@@ -5610,6 +5644,7 @@ impl AssetActor for Mutant {
                 source_swarmer: None,
                 source_baiter: None,
                 source_human: None,
+                source_enemy_projectile: None,
             },
             commands: Vec::new(),
             draws,
@@ -5756,6 +5791,7 @@ impl AssetActor for Bomber {
                 source_swarmer: None,
                 source_baiter: None,
                 source_human: None,
+                source_enemy_projectile: None,
             },
             commands,
             draws,
@@ -5812,6 +5848,13 @@ impl AssetActor for Bomb {
                 source_swarmer: None,
                 source_baiter: None,
                 source_human: None,
+                source_enemy_projectile: Some(ActorSourceEnemyProjectileMetadata {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0,
+                    y_velocity: 0,
+                    lifetime_ticks: actor_source_projectile_lifetime_ticks(self.lifetime_steps),
+                }),
             },
             commands: Vec::new(),
             draws,
@@ -5913,6 +5956,7 @@ impl AssetActor for Pod {
                 source_swarmer: None,
                 source_baiter: None,
                 source_human: None,
+                source_enemy_projectile: None,
             },
             commands: Vec::new(),
             draws,
@@ -6042,6 +6086,7 @@ impl AssetActor for Swarmer {
                 source_swarmer: self.source,
                 source_baiter: None,
                 source_human: None,
+                source_enemy_projectile: None,
             },
             commands,
             draws,
@@ -6240,6 +6285,7 @@ impl AssetActor for Baiter {
                 source_swarmer: None,
                 source_baiter: self.source,
                 source_human: None,
+                source_enemy_projectile: None,
             },
             commands,
             draws,
@@ -6513,6 +6559,7 @@ impl AssetActor for Human {
                 source_swarmer: None,
                 source_baiter: None,
                 source_human: self.source,
+                source_enemy_projectile: None,
             },
             commands,
             draws,
@@ -6600,6 +6647,7 @@ impl AssetActor for ScorePopup {
                 source_swarmer: None,
                 source_baiter: None,
                 source_human: None,
+                source_enemy_projectile: None,
             },
             commands,
             draws,
@@ -6670,6 +6718,7 @@ impl AssetActor for LaserShot {
                 source_swarmer: None,
                 source_baiter: None,
                 source_human: None,
+                source_enemy_projectile: None,
             },
             commands,
             draws,
@@ -6744,6 +6793,15 @@ impl AssetActor for EnemyLaserShot {
                 source_swarmer: None,
                 source_baiter: None,
                 source_human: None,
+                source_enemy_projectile: Some(ActorSourceEnemyProjectileMetadata {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: actor_source_projectile_velocity_component(self.velocity.dx),
+                    y_velocity: actor_source_projectile_velocity_component(self.velocity.dy),
+                    lifetime_ticks: actor_source_projectile_lifetime_ticks(
+                        behavior.lander_shot_lifetime_steps.saturating_sub(self.age),
+                    ),
+                }),
             },
             commands,
             draws,
@@ -6810,6 +6868,7 @@ impl AssetActor for Explosion {
                 source_swarmer: None,
                 source_baiter: None,
                 source_human: None,
+                source_enemy_projectile: None,
             },
             commands,
             draws,
@@ -7122,6 +7181,21 @@ mod tests {
         laser.direction = Some(Direction::Right);
         let mut enemy_laser = actor_snapshot(15, ActorKind::EnemyLaser, Point::new(90, 80));
         enemy_laser.velocity = Velocity::new(-3, 2);
+        enemy_laser.source_enemy_projectile = Some(ActorSourceEnemyProjectileMetadata {
+            x_fraction: 0x22,
+            y_fraction: 0x77,
+            x_velocity: 0xFD00,
+            y_velocity: 0x0200,
+            lifetime_ticks: 17,
+        });
+        let mut bomb = actor_snapshot(16, ActorKind::Bomb, Point::new(100, 84));
+        bomb.source_enemy_projectile = Some(ActorSourceEnemyProjectileMetadata {
+            x_fraction: 0x44,
+            y_fraction: 0x55,
+            x_velocity: 0,
+            y_velocity: 0,
+            lifetime_ticks: 9,
+        });
 
         let report = StepReport {
             step: 77,
@@ -7137,14 +7211,7 @@ mod tests {
                 cursor: 1,
             },
             behavior_script: ActorBehaviorScript::default().manifest(),
-            snapshots: vec![
-                player,
-                lander,
-                human,
-                laser,
-                enemy_laser,
-                actor_snapshot(16, ActorKind::Bomb, Point::new(100, 84)),
-            ],
+            snapshots: vec![player, lander, human, laser, enemy_laser, bomb],
             draws: vec![
                 DrawCommand::sprite(ActorId(11), SpriteKey::PlayerLeft, Point::new(40, 70)),
                 DrawCommand::sprite(ActorId(13), SpriteKey::HumanCarried, Point::new(0x1C, 0xE1)),
@@ -7211,6 +7278,29 @@ mod tests {
             ScreenVelocity::new(8, 0)
         );
         assert_eq!(state.world.enemy_projectiles.len(), 2);
+        let fireball = state
+            .world
+            .enemy_projectiles
+            .iter()
+            .find(|projectile| projectile.source_kind == EnemyProjectileSourceKind::Fireball)
+            .expect("actor enemy laser should bridge as a source fireball");
+        assert_eq!(fireball.velocity, ScreenVelocity::new(-3, 2));
+        assert_eq!(fireball.source_x_fraction, 0x22);
+        assert_eq!(fireball.source_y_fraction, 0x77);
+        assert_eq!(fireball.source_x_velocity, 0xFD00);
+        assert_eq!(fireball.source_y_velocity, 0x0200);
+        assert_eq!(fireball.source_lifetime_ticks, 17);
+        let bomb_shell = state
+            .world
+            .enemy_projectiles
+            .iter()
+            .find(|projectile| projectile.source_kind == EnemyProjectileSourceKind::BomberBombShell)
+            .expect("actor bomb should bridge as a source bomb shell");
+        assert_eq!(bomb_shell.source_x_fraction, 0x44);
+        assert_eq!(bomb_shell.source_y_fraction, 0x55);
+        assert_eq!(bomb_shell.source_x_velocity, 0);
+        assert_eq!(bomb_shell.source_y_velocity, 0);
+        assert_eq!(bomb_shell.source_lifetime_ticks, 9);
         assert!(
             state
                 .world
@@ -8277,12 +8367,23 @@ mod tests {
             },
             ..GameInput::NONE
         });
-        assert!(
-            settled
-                .snapshots
-                .iter()
-                .any(|snapshot| snapshot.kind == ActorKind::EnemyLaser)
+        let enemy_laser = settled
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::EnemyLaser)
+            .expect("spawned hostile shot should publish an actor snapshot");
+        let source_projectile = enemy_laser
+            .source_enemy_projectile
+            .expect("hostile shot should publish source projectile metadata");
+        assert_eq!(
+            source_projectile.x_velocity,
+            actor_source_projectile_velocity_component(enemy_laser.velocity.dx)
         );
+        assert_eq!(
+            source_projectile.y_velocity,
+            actor_source_projectile_velocity_component(enemy_laser.velocity.dy)
+        );
+        assert!(source_projectile.lifetime_ticks > 0);
         assert!(
             settled
                 .draws
@@ -8900,6 +9001,17 @@ mod tests {
 
         let live = driver.step(GameInput::NONE);
         assert_eq!(driver.snapshot_count(ActorKind::Bomb), 1);
+        let bomb = live
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Bomb)
+            .expect("spawned bomb should publish an actor snapshot");
+        let source_projectile = bomb
+            .source_enemy_projectile
+            .expect("bomb should publish source projectile metadata");
+        assert_eq!(source_projectile.x_velocity, 0);
+        assert_eq!(source_projectile.y_velocity, 0);
+        assert!(source_projectile.lifetime_ticks > 0);
         assert!(live.draws.iter().any(|draw| draw.sprite == SpriteKey::Bomb));
     }
 
@@ -9965,6 +10077,7 @@ mod tests {
             source_swarmer: None,
             source_baiter: None,
             source_human: None,
+            source_enemy_projectile: None,
         }
     }
 

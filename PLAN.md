@@ -4308,3 +4308,29 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780635425370539`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780635728580809`.
+- `2026-06-05 06:15 BST`: Completed the actor projectile source state cycle.
+  Added actor-owned source projectile metadata for hostile shots and bombs, so
+  enemy laser actors publish source-shaped fixed-point velocity/lifetime fields
+  and bomb actors publish stationary source bomb-shell lifetime fields.
+  `ActorStateBridge` now maps those fields into clean
+  `EnemyProjectileSnapshot` values instead of zero-filling source projectile
+  metadata. Added regressions for clean-state bridge mapping, source lander
+  hostile shot metadata, and bomber-laid bomb metadata. README, SPEC, and the
+  actor architecture notes now document the hostile projectile metadata handoff.
+  No legacy code, tests, or scaffolding were safe to remove in this slice
+  because the clean runtime still backs smoke/fidelity/oracle evidence outside
+  the actor runtime. Validation passed with `cargo fmt --check`,
+  `cargo test actor_state --lib`,
+  `cargo test source_lander_shot_timer_spawns_hostile_projectile --lib`,
+  `cargo test bomber_actor_lays_scripted_bomb_actor --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite still has the previously isolated clean-game MAME
+  window/post-game audio failures outside this slice. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780635834006829`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780636580657689`.

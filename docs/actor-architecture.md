@@ -41,8 +41,8 @@ evidence commands.
   clean `GameState`, a clean gameplay/audio `GameEvents` batch, and the clean
   `RenderScene`. `ActorStateBridge` maps actor phase, score, stock,
   high-score-entry state, and published actor snapshots with velocity/facing
-  metadata into the clean state contract without making the actor simulation
-  display-frame driven.
+  metadata plus hostile-projectile source metadata into the clean state
+  contract without making the actor simulation display-frame driven.
 - `src/actor_smoke.rs` exercises `ActorRuntimeAdapter` through a scripted
   attract/play sequence and the native draw planner. The smoke report verifies
   attract, credited attract, playing actor frames, clean gameplay/audio events,
@@ -192,6 +192,9 @@ and Y velocity path, then assign target-list slots from the restored human
 distribution. Source-backed landers, bombers, pods, and baiters publish their
 metadata in snapshots and advance active motion by updating their own
 fixed-point position/fraction state.
+Hostile projectile actors publish source-shaped shell metadata too: enemy
+lasers carry fixed-point velocity and lifetime values, and bomb actors carry
+stationary bomb-shell lifetime values into the clean state bridge.
 
 Initial humans are source-backed: wave `1` uses the captured first-wave starts,
 while later source waves restore humans through the source target-list RNG
@@ -260,6 +263,7 @@ The actor driver now owns a first Defender gameplay loop:
   actor.
   Enemy lasers are player hazards, smart-bomb targets with no score value, and
   respect the same player damage behavior profile used by `XYZZY` invincibility.
+  Their snapshots expose source-shaped shell velocity and lifetime metadata.
 - Later source waves seed bomber and pod actor families when the wave table
   exposes those counts. Bombers and pods draw their own sprites, move through
   actor-owned source fixed-point metadata when source-backed, publish per-step
@@ -268,7 +272,8 @@ The actor driver now owns a first Defender gameplay loop:
 - Bomber actors can lay first-class `Bomb` actors on a scriptable cadence with
   the source ten-bomb active cap. Bombs draw their own sprite, expire through
   actor-owned lifetime state, act as player hazards, and emit a bomb collision
-  cue when they hit the player.
+  cue when they hit the player. Bomb snapshots expose stationary source
+  bomb-shell lifetime metadata.
 - Projectile-killed pods spawn a bounded mini-swarmer actor batch using the
   source request count. Source-backed swarmers decrement their actor-owned shot
   timer into hostile projectile commands with a distinct swarmer shot cue.

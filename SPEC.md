@@ -185,7 +185,8 @@ tree:
   runtime contract. `ActorRenderSceneBridge` adapts report draw commands into
   clean `RenderScene` sprites for the existing native renderer contract, and
   `ActorStateBridge` adapts report phase, score, stock, high-score state, and
-  actor snapshots with velocity/facing metadata into clean `GameState` values.
+  actor snapshots with velocity/facing plus hostile-projectile source metadata
+  into clean `GameState` values.
   `ActorRuntimeAdapter` bundles reports, clean `GameState`, clean `GameEvents`,
   and clean `RenderScene` values into actor `ActorFrame` values. Normal
   interactive play uses the actor live runtime, with explicit actor smoke and
@@ -760,8 +761,10 @@ reintroduce legacy implementation terminology.
   inert during attract so custom attract scripts remain in control.
   Source-backed landers, bombers, pods, swarmers, baiters, and humans publish
   fixed-point metadata plus movement/facing metadata in snapshots and advance
-  their actor-owned fraction state during active motion. `XYZZY` invincibility
-  is represented as the same
+  their actor-owned fraction state during active motion. Hostile projectile
+  snapshots now carry source-shaped shell velocity/lifetime metadata into the
+  clean state bridge, including stationary bomb-shell lifetime state. `XYZZY`
+  invincibility is represented as the same
   temporary player behavior override. The slice now also models source landers
   preferring their configured human target slot, lander pickup/carry/conversion,
   falling-human rescue and safe landing scoring, score popups, hostile
