@@ -3252,6 +3252,21 @@ fn actor_source_projectile_lifetime_ticks(remaining_steps: u16) -> u8 {
     remaining_steps.min(u16::from(u8::MAX)) as u8
 }
 
+fn actor_source_enemy_shot_metadata(
+    x_fraction: u8,
+    y_fraction: u8,
+    velocity: Velocity,
+    lifetime_steps: u16,
+) -> ActorSourceEnemyProjectileMetadata {
+    ActorSourceEnemyProjectileMetadata {
+        x_fraction,
+        y_fraction,
+        x_velocity: actor_source_projectile_velocity_component(velocity.dx),
+        y_velocity: actor_source_projectile_velocity_component(velocity.dy),
+        lifetime_ticks: actor_source_projectile_lifetime_ticks(lifetime_steps),
+    }
+}
+
 fn actor_source_projectile_axis_step(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
     let raw = i32::from(position) * 256 + i32::from(fraction) + i32::from(velocity as i16);
     let next_position = raw.div_euclid(256);
@@ -5579,10 +5594,19 @@ impl Lander {
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) {
+        let velocity = self.lander_shot_velocity(prompt, behavior);
+        let source = self.source.map(|source| {
+            actor_source_enemy_shot_metadata(
+                source.x_fraction,
+                source.y_fraction,
+                velocity,
+                behavior.lander_shot_lifetime_steps,
+            )
+        });
         commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
             position: self.position,
-            velocity: self.lander_shot_velocity(prompt, behavior),
-            source: None,
+            velocity,
+            source,
         }));
         commands.push(GameCommand::PlaySound(SoundCue::LanderShot));
     }
@@ -6180,7 +6204,7 @@ impl Swarmer {
         if source.shot_timer == 0 {
             let profile = ActorSourceWaveProfile::for_wave(prompt.wave.max(1));
             source.shot_timer = clamped_source_swarmer_shot_reset(profile);
-            push_swarmer_shot(self.position, prompt, behavior, commands);
+            push_swarmer_shot(self.position, prompt, behavior, Some(*source), commands);
         }
         source.sleep_ticks = SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS;
         true
@@ -6212,7 +6236,7 @@ impl AssetActor for Swarmer {
                 let can_fire = behavior.swarmer_mode == HostileMovementMode::Drift
                     || prompt.player_position().is_some();
                 if can_fire && prompt.step % fire_period == self.id.value() % fire_period {
-                    push_swarmer_shot(self.position, prompt, behavior, &mut commands);
+                    push_swarmer_shot(self.position, prompt, behavior, None, &mut commands);
                 }
             }
             draws.push(DrawCommand::sprite(
@@ -6254,12 +6278,22 @@ fn push_swarmer_shot(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
+    source: Option<ActorSourceSwarmerMetadata>,
     commands: &mut Vec<GameCommand>,
 ) {
+    let velocity = hostile_shot_velocity(position, prompt, behavior.swarmer_shot_speed);
+    let source = source.map(|source| {
+        actor_source_enemy_shot_metadata(
+            source.x_fraction,
+            source.y_fraction,
+            velocity,
+            behavior.lander_shot_lifetime_steps,
+        )
+    });
     commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
         position,
-        velocity: hostile_shot_velocity(position, prompt, behavior.swarmer_shot_speed),
-        source: None,
+        velocity,
+        source,
     }));
     commands.push(GameCommand::PlaySound(SoundCue::SwarmerShot));
 }
@@ -6311,7 +6345,7 @@ impl Baiter {
             if source.shot_timer == 0 {
                 let profile = ActorSourceWaveProfile::for_wave(prompt.wave.max(1));
                 source.shot_timer = clamped_source_baiter_shot_reset(profile);
-                push_baiter_shot(self.position, prompt, behavior, commands);
+                push_baiter_shot(self.position, prompt, behavior, Some(*source), commands);
             }
 
             source.picture_frame = (source.picture_frame + 1) % SOURCE_BAITER_PICTURE_FRAME_COUNT;
@@ -6357,12 +6391,22 @@ fn push_baiter_shot(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
+    source: Option<ActorSourceBaiterMetadata>,
     commands: &mut Vec<GameCommand>,
 ) {
+    let velocity = baiter_shot_velocity(position, prompt, behavior);
+    let source = source.map(|source| {
+        actor_source_enemy_shot_metadata(
+            source.x_fraction,
+            source.y_fraction,
+            velocity,
+            behavior.lander_shot_lifetime_steps,
+        )
+    });
     commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
         position,
-        velocity: baiter_shot_velocity(position, prompt, behavior),
-        source: None,
+        velocity,
+        source,
     }));
     commands.push(GameCommand::PlaySound(SoundCue::BaiterShot));
 }
@@ -6412,7 +6456,7 @@ impl AssetActor for Baiter {
                 let can_fire = behavior.baiter_mode == HostileMovementMode::Drift
                     || prompt.player_position().is_some();
                 if can_fire && prompt.step % fire_period == self.id.value() % fire_period {
-                    push_baiter_shot(self.position, prompt, behavior, &mut commands);
+                    push_baiter_shot(self.position, prompt, behavior, None, &mut commands);
                 }
             }
             draws.push(DrawCommand::sprite_with_effect(
@@ -8563,6 +8607,36 @@ mod tests {
         let shot_report = shot_report.expect("source lander should spawn a hostile shot");
 
         assert!(shot_report.sounds.contains(&SoundCue::LanderShot));
+        let (shot_position, shot_velocity, shot_source) = shot_report
+            .commands
+            .iter()
+            .find_map(|command| match command {
+                GameCommand::Spawn(SpawnRequest::EnemyLaser {
+                    position,
+                    velocity,
+                    source,
+                }) => Some((*position, *velocity, *source)),
+                _ => None,
+            })
+            .expect("source lander should emit a hostile shot command");
+        let lander_source = shot_report
+            .snapshots
+            .iter()
+            .find(|snapshot| {
+                snapshot.kind == ActorKind::Lander && snapshot.position == shot_position
+            })
+            .and_then(|snapshot| snapshot.source_lander)
+            .expect("source lander snapshot should own shot fractions");
+        assert_eq!(
+            shot_source,
+            Some(ActorSourceEnemyProjectileMetadata {
+                x_fraction: lander_source.x_fraction,
+                y_fraction: lander_source.y_fraction,
+                x_velocity: actor_source_projectile_velocity_component(shot_velocity.dx),
+                y_velocity: actor_source_projectile_velocity_component(shot_velocity.dy),
+                lifetime_ticks: actor_source_projectile_lifetime_ticks(LANDER_SHOT_LIFETIME),
+            })
+        );
         let settled = driver.step(GameInput {
             xyzzy: XyzzyMode {
                 active: true,
@@ -9878,16 +9952,32 @@ mod tests {
         let report = driver.step(GameInput::NONE);
 
         assert!(report.sounds.contains(&SoundCue::SwarmerShot));
-        assert!(report.commands.iter().any(|command| {
-            matches!(
-                command,
+        let swarmer_shot = report
+            .commands
+            .iter()
+            .find_map(|command| match command {
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
-                    position: Point { x: 69, y: 120 },
-                    velocity: Velocity { dx: -3, dy: 0 },
-                    source: None,
+                    position,
+                    velocity,
+                    source,
+                }) => Some((*position, *velocity, *source)),
+                _ => None,
+            })
+            .expect("source swarmer should emit a hostile shot command");
+        assert_eq!(
+            swarmer_shot,
+            (
+                Point::new(69, 120),
+                Velocity::new(-3, 0),
+                Some(ActorSourceEnemyProjectileMetadata {
+                    x_fraction: 0xE0,
+                    y_fraction: 0,
+                    x_velocity: actor_source_projectile_velocity_component(-3),
+                    y_velocity: actor_source_projectile_velocity_component(0),
+                    lifetime_ticks: actor_source_projectile_lifetime_ticks(LANDER_SHOT_LIFETIME),
                 })
             )
-        }));
+        );
         assert_eq!(
             snapshot_for(&report, swarmer).source_swarmer,
             Some(ActorSourceSwarmerMetadata {
@@ -9926,16 +10016,32 @@ mod tests {
         let report = driver.step(GameInput::NONE);
 
         assert!(report.sounds.contains(&SoundCue::BaiterShot));
-        assert!(report.commands.iter().any(|command| {
-            matches!(
-                command,
+        let baiter_shot = report
+            .commands
+            .iter()
+            .find_map(|command| match command {
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
-                    position: Point { x: 70, y: 120 },
-                    velocity: Velocity { dx: -4, dy: 0 },
-                    source: None,
+                    position,
+                    velocity,
+                    source,
+                }) => Some((*position, *velocity, *source)),
+                _ => None,
+            })
+            .expect("source baiter should emit a hostile shot command");
+        assert_eq!(
+            baiter_shot,
+            (
+                Point::new(70, 120),
+                Velocity::new(-4, 0),
+                Some(ActorSourceEnemyProjectileMetadata {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: actor_source_projectile_velocity_component(-4),
+                    y_velocity: actor_source_projectile_velocity_component(0),
+                    lifetime_ticks: actor_source_projectile_lifetime_ticks(LANDER_SHOT_LIFETIME),
                 })
             )
-        }));
+        );
         assert_eq!(
             snapshot_for(&report, baiter).source_baiter,
             Some(ActorSourceBaiterMetadata {

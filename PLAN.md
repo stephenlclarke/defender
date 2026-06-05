@@ -4568,3 +4568,30 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780640384287429`.
   Slack completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780641115599679`.
+- `2026-06-05 07:40 BST`: Completed the actor source-backed AI shot metadata
+  cycle. Source-backed lander, swarmer, and baiter actors now carry source
+  projectile metadata when their shot timers emit `EnemyLaser` spawn commands:
+  the command preserves the firing actor's current source fractions, derives
+  fixed-point shell velocities from the emitted shot velocity, and carries
+  nonzero shell lifetime ticks through the source-aware spawn boundary. The
+  non-source fallback firing paths still emit ordinary `source: None` enemy
+  shots for custom/simple behavior. Expanded regressions for source
+  lander/swarmer/baiter shot commands to assert the spawn payload metadata, and
+  kept the scripted enemy-shot metadata regression green. README, SPEC, and the
+  actor architecture notes now document source-backed AI shot metadata. No
+  legacy code, tests, or scaffolding were safe to remove in this slice because
+  clean smoke/fidelity/oracle evidence still depends on clean runtime
+  boundaries outside the actor path. Validation passed with `cargo fmt
+  --check`, focused source lander/swarmer/baiter/scripted enemy-shot tests,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  touched-doc markdownlint, and `git diff --check`. The full unfiltered
+  `legacy-tools` suite was not rerun in this cycle; the previously isolated
+  clean-game MAME window/post-game audio failures remain outside this slice.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780641377152289`.
+  Slack completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780641802044359`.
