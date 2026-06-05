@@ -320,9 +320,12 @@ source `ELECV` presents, high-score, and credits opening sequence from checked
 text. The default Williams reveal, `ELECV`, and Defender wordmark events use
 the same source page-start steps as the clean attract scheduler: Williams from
 step 1, `ELECV` from step 236 at screen address `0x3258`, and the Defender
-wordmark from step 365. The older Rust event constructor remains available as a
-fallback. Custom drivers can pass their own parsed or constructed sequence
-through
+wordmark from step 365. The default high-score title/table and zero-credit
+credit line start at the Hall-of-Fame boundary, step 488; title pages use a
+`credits_nonzero` event so an inserted credit can still be shown immediately
+without drawing a zero-credit line. The older Rust event constructor remains
+available as a fallback. Custom drivers can pass their own parsed or
+constructed sequence through
 `ActorGameDriver::with_attract_script(...)` without replacing coin/start
 control handling.
 `ActorGameDriver::script_manifest()` includes the immutable attract-event
@@ -334,12 +337,13 @@ same event model from checked text script lines:
 ```text
 # action start duration x y ...
 text 1 forever 10 10 PRESS START
-message 1 forever ELECV 0x3258
+message 236 forever ELECV 0x3258
 sprite 2 forever defender_logo 40 44
-high_scores 1 forever 82 188 10 5
-credits 1 forever 176 226 248 226
+credits_nonzero 1 487 176 226 248 226
+high_scores 488 forever 82 188 10 5
+credits 488 forever 176 226 248 226
 williams_logo 5 - 108 60
-defender_wordmark 72 - 96 144
+defender_wordmark 365 - 96 144
 ```
 
 Blank lines and `#` comments are ignored. `duration` can be a step count or
@@ -347,10 +351,11 @@ Blank lines and `#` comments are ignored. `duration` can be a step count or
 include the source line number so custom driver tooling can reject malformed
 scripts before the actor runtime starts. `high_scores` lines use
 `x y row-height rows` after the timing fields and draw rows from the
-driver-owned high-score table carried in `StepPrompt`. `credits` lines use
-`label-x label-y count-x count-y` after the timing fields and draw the
-source-backed `CREDV` / `CREDITS:` label plus the visible credit count from
-`StepPrompt.credits`. `message` / `source_message` lines use
+driver-owned high-score table carried in `StepPrompt`. `credits` and
+`credits_nonzero` lines use `label-x label-y count-x count-y` after the timing
+fields and draw the source-backed `CREDV` / `CREDITS:` label plus the visible
+credit count from `StepPrompt.credits`; `credits_nonzero` suppresses the draw
+until at least one credit exists. `message` / `source_message` lines use
 `label top-left-screen-address` after the timing fields, validate `label`
 against `assets/red-label/messages.tsv`, and render through the source
 controlled-message glyph path so red-label cursor tokens such as `[RLF]` and

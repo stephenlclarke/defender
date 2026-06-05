@@ -113,8 +113,11 @@ share the same checked script parser path. The attract script now includes
 the source `ELECV` presents message, prompt-backed high-score table rows, and
 source `CREDV` credits label/count alongside Williams reveal and Defender
 wordmark coalescence using source title page-start steps: Williams from step 1,
-`ELECV` from step 236, and the Defender wordmark from step 365. Custom attract
-scripts can draw checked `messages.tsv` labels through source cursor controls.
+`ELECV` from step 236, the Defender wordmark from step 365, and the
+high-score/zero-credit Hall-of-Fame page from step 488. Title pages suppress
+the zero-credit line but still show a real inserted credit through a
+`credits_nonzero` script action. Custom attract scripts can draw checked
+`messages.tsv` labels through source cursor controls.
 The default actor wave allocator now
 uses the source active-family
 shape, so later waves can introduce bomber and pod actor families alongside

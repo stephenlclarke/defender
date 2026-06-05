@@ -21,10 +21,12 @@ Current files:
   wordmark coalescence, and high-score title/table plus source `CREDV` credits
   label/count text through the checked `AttractScript` parser using source
   page-start steps for the title messages: Williams from step 1, `ELECV` from
-  step 236, and the Defender wordmark from step 365. It also uses the
-  driver-owned high-score table and credit count carried in `StepPrompt`.
-  Custom attract scripts can also use checked `messages.tsv` labels through the
-  script parser's `message` action.
+  step 236, the Defender wordmark from step 365, and the
+  high-score/zero-credit Hall-of-Fame page from step 488. A `credits_nonzero`
+  title-page event suppresses the zero-credit line while still showing a real
+  inserted credit. It also uses the driver-owned high-score table and credit
+  count carried in `StepPrompt`. Custom attract scripts can also use checked
+  `messages.tsv` labels through the script parser's `message` action.
 - `actor-behavior.script`: embedded actor-runtime baseline behavior profile
   parsed by `ActorBehaviorScript`, including player, laser, hostile, human,
   explosion, and score-popup timing/tuning defaults.

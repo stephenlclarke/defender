@@ -74,10 +74,15 @@ const EXPLOSION_LIFETIME: u16 = 20;
 const SCORE_POPUP_LIFETIME: u16 = 50;
 const SOURCE_ATTRACT_PRESENTS_START_STEP: u64 = 236;
 const SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP: u64 = 365;
+const SOURCE_ATTRACT_HALL_OF_FAME_START_STEP: u64 = 488;
 const WILLIAMS_REVEAL_STEPS: u16 = SOURCE_ATTRACT_PRESENTS_START_STEP as u16;
 const WILLIAMS_COLOR_PERIOD: u16 = 8;
 const SOURCE_ATTRACT_WILLIAMS_LOGO_POSITION: Point = Point::new(108, 60);
 const SOURCE_ATTRACT_DEFENDER_WORDMARK_POSITION: Point = Point::new(96, 144);
+const SOURCE_ATTRACT_HIGH_SCORE_TITLE_POSITION: Point = Point::new(78, 176);
+const SOURCE_ATTRACT_HIGH_SCORE_TABLE_POSITION: Point = Point::new(82, 188);
+const SOURCE_ATTRACT_CREDIT_LABEL_POSITION: Point = Point::new(176, 226);
+const SOURCE_ATTRACT_CREDIT_COUNT_POSITION: Point = Point::new(248, 226);
 const DEFENDER_WORDMARK_START_STEP: u64 = SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP;
 const DEFENDER_WORDMARK_SLOTS: u16 = 15;
 const DEFENDER_WORDMARK_ROW_PAIRS: u16 = 6;
@@ -3547,9 +3552,31 @@ impl AttractScript {
                 None,
                 SOURCE_ATTRACT_DEFENDER_WORDMARK_POSITION,
             ),
-            AttractScriptEvent::text(1, None, Point::new(78, 176), "HIGH SCORES"),
-            AttractScriptEvent::high_scores(1, None, Point::new(82, 188), 10, 5),
-            AttractScriptEvent::credits(1, None, Point::new(176, 226), Point::new(248, 226)),
+            AttractScriptEvent::text(
+                SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
+                None,
+                SOURCE_ATTRACT_HIGH_SCORE_TITLE_POSITION,
+                "HIGH SCORES",
+            ),
+            AttractScriptEvent::high_scores(
+                SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
+                None,
+                SOURCE_ATTRACT_HIGH_SCORE_TABLE_POSITION,
+                10,
+                5,
+            ),
+            AttractScriptEvent::credits_when_nonzero(
+                1,
+                Some(SOURCE_ATTRACT_HALL_OF_FAME_START_STEP.saturating_sub(1)),
+                SOURCE_ATTRACT_CREDIT_LABEL_POSITION,
+                SOURCE_ATTRACT_CREDIT_COUNT_POSITION,
+            ),
+            AttractScriptEvent::credits(
+                SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
+                None,
+                SOURCE_ATTRACT_CREDIT_LABEL_POSITION,
+                SOURCE_ATTRACT_CREDIT_COUNT_POSITION,
+            ),
         ])
     }
 
@@ -3715,6 +3742,17 @@ fn parse_attract_script_event(
             let count_position = parse_attract_point(line_number, &mut parts)?;
             reject_extra_attract_fields(line_number, parts)?;
             Ok(AttractScriptEvent::credits(
+                start_after_steps,
+                duration_steps,
+                label_position,
+                count_position,
+            ))
+        }
+        "credits_nonzero" | "credit_count_nonzero" | "credits_when_nonzero" => {
+            let label_position = parse_attract_point(line_number, &mut parts)?;
+            let count_position = parse_attract_point(line_number, &mut parts)?;
+            reject_extra_attract_fields(line_number, parts)?;
+            Ok(AttractScriptEvent::credits_when_nonzero(
                 start_after_steps,
                 duration_steps,
                 label_position,
@@ -4011,6 +4049,24 @@ impl AttractScriptEvent {
             action: AttractScriptAction::Credits {
                 label_position,
                 count_position,
+                minimum_credits: 0,
+            },
+        }
+    }
+
+    pub fn credits_when_nonzero(
+        start_after_steps: u64,
+        duration_steps: Option<u64>,
+        label_position: Point,
+        count_position: Point,
+    ) -> Self {
+        Self {
+            start_after_steps,
+            duration_steps,
+            action: AttractScriptAction::Credits {
+                label_position,
+                count_position,
+                minimum_credits: 1,
             },
         }
     }
@@ -4082,6 +4138,7 @@ pub enum AttractScriptAction {
     Credits {
         label_position: Point,
         count_position: Point,
+        minimum_credits: u8,
     },
 }
 
@@ -4179,10 +4236,21 @@ impl AttractScriptAction {
             Self::Credits {
                 label_position,
                 count_position,
-            } => vec![
-                DrawCommand::text(actor, *label_position, source_credits_label_text()),
-                DrawCommand::text(actor, *count_position, format!("{:02}", credits.min(99))),
-            ],
+                minimum_credits,
+            } => {
+                if credits < *minimum_credits {
+                    Vec::new()
+                } else {
+                    vec![
+                        DrawCommand::text(actor, *label_position, source_credits_label_text()),
+                        DrawCommand::text(
+                            actor,
+                            *count_position,
+                            format!("{:02}", credits.min(99)),
+                        ),
+                    ]
+                }
+            }
         }
     }
 
@@ -4233,9 +4301,11 @@ impl AttractScriptAction {
             Self::Credits {
                 label_position,
                 count_position,
+                minimum_credits,
             } => AttractScriptActionManifest::Credits {
                 label_position: *label_position,
                 count_position: *count_position,
+                minimum_credits: *minimum_credits,
             },
         }
     }
@@ -4289,6 +4359,7 @@ pub enum AttractScriptActionManifest {
     Credits {
         label_position: Point,
         count_position: Point,
+        minimum_credits: u8,
     },
 }
 
@@ -10292,7 +10363,7 @@ mod tests {
                 .iter()
                 .any(|sprite| sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO)
         );
-        assert!(williams_scene.sprites.iter().any(|sprite| {
+        assert!(!williams_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_H && sprite.layer == RenderLayer::Overlay
         }));
 
@@ -10320,6 +10391,18 @@ mod tests {
                 .iter()
                 .any(|sprite| sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO)
         );
+
+        let mut hall = None;
+        for _ in SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP..SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
+        {
+            hall = Some(driver.step(GameInput::NONE));
+        }
+        let hall_scene = hall
+            .expect("hall-of-fame page boundary should be reached")
+            .render_scene();
+        assert!(hall_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_H && sprite.layer == RenderLayer::Overlay
+        }));
     }
 
     #[test]
@@ -11004,6 +11087,18 @@ mod tests {
                 .any(|draw| draw.sprite == SpriteKey::WilliamsLogo
                     && matches!(draw.effect, VisualEffect::WilliamsReveal { .. }))
         );
+        assert!(
+            credited
+                .draws
+                .iter()
+                .any(|draw| draw.text.as_deref() == Some(source_credits_label_text()))
+        );
+        assert!(
+            credited
+                .draws
+                .iter()
+                .any(|draw| draw.text.as_deref() == Some("01"))
+        );
 
         let started = driver.step(GameInput {
             start_one: true,
@@ -11040,7 +11135,25 @@ mod tests {
             williams
                 .draws
                 .iter()
-                .any(|draw| draw.text.as_deref() == Some("1. 010000"))
+                .all(|draw| draw.text.as_deref() != Some("HIGH SCORES"))
+        );
+        assert!(
+            williams
+                .draws
+                .iter()
+                .all(|draw| draw.text.as_deref() != Some("1. 010000"))
+        );
+        assert!(
+            williams
+                .draws
+                .iter()
+                .all(|draw| draw.text.as_deref() != Some(source_credits_label_text()))
+        );
+        assert!(
+            williams
+                .draws
+                .iter()
+                .all(|draw| draw.text.as_deref() != Some("00"))
         );
         let presents_text =
             source_message_text(SOURCE_PRESENTS_MESSAGE_LABEL).expect("ELECV source message");
@@ -11102,6 +11215,33 @@ mod tests {
                 )
         }));
 
+        let mut hall = None;
+        for _ in SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP..SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
+        {
+            hall = Some(driver.step(GameInput::NONE));
+        }
+        let hall = hall.expect("hall-of-fame page boundary should be reached");
+        assert!(
+            hall.draws
+                .iter()
+                .any(|draw| draw.text.as_deref() == Some("HIGH SCORES"))
+        );
+        assert!(
+            hall.draws
+                .iter()
+                .any(|draw| draw.text.as_deref() == Some("1. 010000"))
+        );
+        assert!(
+            hall.draws
+                .iter()
+                .any(|draw| draw.text.as_deref() == Some(source_credits_label_text()))
+        );
+        assert!(
+            hall.draws
+                .iter()
+                .any(|draw| draw.text.as_deref() == Some("00"))
+        );
+
         let mut settled = None;
         for _ in 0..(DEFENDER_WORDMARK_SLOTS * DEFENDER_WORDMARK_ROW_PAIRS + 1) {
             let step = driver.step(GameInput::NONE);
@@ -11149,17 +11289,28 @@ mod tests {
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
             AttractScriptActionManifest::HighScores {
-                position: Point { x: 82, y: 188 },
+                position: SOURCE_ATTRACT_HIGH_SCORE_TABLE_POSITION,
                 row_height: 10,
                 rows: 5,
-            }
+            } if event.start_after_steps == SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
         )));
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
             AttractScriptActionManifest::Credits {
-                label_position: Point { x: 176, y: 226 },
-                count_position: Point { x: 248, y: 226 },
-            }
+                label_position: SOURCE_ATTRACT_CREDIT_LABEL_POSITION,
+                count_position: SOURCE_ATTRACT_CREDIT_COUNT_POSITION,
+                minimum_credits: 1,
+            } if event.start_after_steps == 1
+                && event.duration_steps
+                    == Some(SOURCE_ATTRACT_HALL_OF_FAME_START_STEP.saturating_sub(1))
+        )));
+        assert!(parsed.manifest().events.iter().any(|event| matches!(
+            event.action,
+            AttractScriptActionManifest::Credits {
+                label_position: SOURCE_ATTRACT_CREDIT_LABEL_POSITION,
+                count_position: SOURCE_ATTRACT_CREDIT_COUNT_POSITION,
+                minimum_credits: 0,
+            } if event.start_after_steps == SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
         )));
     }
 
@@ -11272,6 +11423,7 @@ mod tests {
             text 2 5 12 20 CUSTOM ATTRACT\n\
             high_scores 4 forever 80 100 9 3\n\
             credits 4 forever 12 228 82 228\n\
+            credits_nonzero 4 8 14 226 84 226\n\
             sprite 6 forever defender_logo 40 44\n\
             williams_logo 5 - 18 44\n",
         )
@@ -11285,7 +11437,7 @@ mod tests {
                 .iter()
                 .map(|event| event.start_after_steps)
                 .collect::<Vec<_>>(),
-            vec![2, 4, 4, 5, 6, 9]
+            vec![2, 4, 4, 4, 5, 6, 9]
         );
         assert_eq!(
             manifest.events[0].action,
@@ -11307,17 +11459,27 @@ mod tests {
             AttractScriptActionManifest::Credits {
                 label_position: Point::new(12, 228),
                 count_position: Point::new(82, 228),
+                minimum_credits: 0,
             }
         );
         assert_eq!(
-            manifest.events[4].action,
+            manifest.events[3].action,
+            AttractScriptActionManifest::Credits {
+                label_position: Point::new(14, 226),
+                count_position: Point::new(84, 226),
+                minimum_credits: 1,
+            }
+        );
+        assert_eq!(manifest.events[3].duration_steps, Some(8));
+        assert_eq!(
+            manifest.events[5].action,
             AttractScriptActionManifest::Sprite {
                 sprite: SpriteKey::DefenderLogo,
                 position: Point::new(40, 44),
             }
         );
         assert_eq!(
-            manifest.events[5].action,
+            manifest.events[6].action,
             AttractScriptActionManifest::DefenderWordmark {
                 position: Point::new(70, 80),
                 slots: DEFENDER_WORDMARK_SLOTS,

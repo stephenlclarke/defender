@@ -45,9 +45,12 @@ verification tools.
   attract script now draws the source `ELECV` presents message,
   prompt-backed high-score table rows, and source `CREDV` credits label/count
   alongside the Williams reveal and Defender wordmark coalescence using source
-  title page-start steps: Williams from step 1, `ELECV` from step 236, and the
-  Defender wordmark from step 365. Custom attract scripts can draw checked
-  `messages.tsv` labels through source cursor controls.
+  title page-start steps: Williams from step 1, `ELECV` from step 236, the
+  Defender wordmark from step 365, and the high-score/zero-credit
+  Hall-of-Fame page from step 488. Title pages suppress the zero-credit line
+  but still show real inserted credits through a `credits_nonzero` script
+  action. Custom attract scripts can draw checked `messages.tsv` labels
+  through source cursor controls.
   `ActorWaveScript` now names per-wave progression data and applies behavior
   scripts plus hostile and initial-human spawn records as play starts and waves
   are cleared. Wave scripts can now attach spawn-index behavior profiles that
@@ -759,6 +762,26 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 13:06 BST`: Completed the actor attract Hall-of-Fame timing
+  slice. The embedded actor attract script and Rust fallback now keep the
+  high-score title/table and zero-credit credit row off the
+  Williams/presents/Defender title pages, then draw them from the clean
+  Hall-of-Fame boundary at source step `488`. Added a checked
+  `credits_nonzero` attract script action so title pages can still show an
+  inserted credit immediately while suppressing the zero-credit line. The
+  attract manifest now exposes the credit action's minimum-credit threshold for
+  custom-driver inspection. Focused tests prove title-page suppression,
+  inserted-credit display, Hall-of-Fame-boundary table/credit display,
+  checked-script fallback parity, parser/manifest support, and render-bridge
+  glyph timing. Validation passed with `cargo fmt --check`, focused default
+  attract/parser/credit/render tests, `cargo test actor_game --all-targets
+  --features legacy-tools`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, touched-doc
+  markdownlint, and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780660579625589`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780661156387059`.
 - `2026-06-05 12:54 BST`: Completed the actor attract source timing slice.
   The embedded `assets/red-label/actor-attract.script` and the Rust fallback
   constructor now use the clean source title page-start boundaries: Williams
