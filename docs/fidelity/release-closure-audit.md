@@ -49,14 +49,17 @@ from these perspectives:
   that the smoke gates require to remain zero in the active gameplay path.
   Status: proven as source hygiene for current clean runtime debt markers.
 - Release validation:
-  the full release gate in `PLAN.md` passed on `2026-05-29 15:54 BST` after
-  the PRBP1 pod up-thrust report was promoted to all-axis evidence and the
-  clean-only post-game thrust/background audio leak was fixed. The gate
-  includes default and `legacy-tools` Rust tests, both clippy passes, clean
-  fidelity, media script tests, owner-review package generation, the
-  accepted-report gate, MAME doctor, MAME smoke recording, README media,
-  game/live smoke, docs lint, and diff hygiene.
-  Status: proven for the current gate.
+  the release gate in `PLAN.md` passed on `2026-05-29 15:54 BST` after the
+  PRBP1 pod up-thrust report was promoted to all-axis evidence and the
+  clean-only post-game thrust/background audio leak was fixed. The current gate
+  now also includes actor smoke checks, so full current-gate status requires a
+  fresh run after the actor rewrite slices. The gate includes default and
+  `legacy-tools` Rust tests, both clippy passes, clean fidelity, media script
+  tests, owner-review package generation, the accepted-report gate, MAME
+  doctor, MAME smoke recording, README media, game smoke, actor smoke gates,
+  live smoke, docs lint, and diff hygiene.
+  Status: previously proven for the 2026-05-29 gate; current expanded gate
+  pending fresh full run.
 - Reference report closure gate:
   `docs/fidelity/reference-report-gate.json` lists the accepted media reports
   and expected acceptance modes; `make reference-report-gate` currently passes

@@ -45,10 +45,10 @@ The accepted MAME-vs-clean report gate now covers sprite visuals, player laser
 visual/audio, reverse orientation, explosion/coalescence visuals, terrain blow,
 gameplay audio families, non-lander audio/visual presentation, playability,
 rescue/loss, death/respawn, smart bomb, hyperspace, and organic non-lander
-presentation. The full `make release-gate` path is green as of 2026-05-29 and
-includes the accepted report gate, the owner-review evidence package, MAME
-doctor, a short MAME recorder smoke capture, README media generation, game
-smoke, live `wgpu` smoke, docs lint, and diff hygiene.
+presentation. The current `make release-gate` path includes the accepted
+report gate, the owner-review evidence package, MAME doctor, a short MAME
+recorder smoke capture, README media generation, game smoke, actor smoke gates,
+live `wgpu` smoke, docs lint, and diff hygiene.
 
 The accepted gate is still green, but final closure is no longer only an
 owner-review decision. A fresh organic smart-bomb/up-thrust search found a
@@ -83,7 +83,11 @@ events, audio, sprites, projectiles, HUD text, overlays, and `wgpu` command-plan
 coverage. `--actor-attract-smoke` advances the default no-input actor attract
 cycle through Williams reveal, Defender coalescence, Hall of Fame, scoring
 surface, final scoring label, and the `cycle 3367` return while verifying
-native draw plans and attract silence. `--actor-wgpu-smoke` uses the same actor
+native draw plans and attract silence. `--actor-post-game-smoke` drives live
+actor play through three actor-owned pod/player collisions, high-score initials
+entry, the 60-step Hall-of-Fame game-over stall, and the return to the Williams
+attract reveal while verifying actor events, sound, native draw plans, and
+sprite atlas coverage. `--actor-wgpu-smoke` uses the same actor
 input sequence and renders actor `RenderScene` frames through the offscreen
 `wgpu` readback path, proving nonblank dynamic WGPU output. Normal `cargo run`
 now opens the actor live
@@ -263,6 +267,7 @@ cargo run -- --live-smoke
 cargo run -- --game-smoke
 cargo run -- --actor-smoke
 cargo run -- --actor-attract-smoke
+cargo run -- --actor-post-game-smoke
 cargo run -- --actor-wgpu-smoke
 cargo run -- --mute
 cargo run --features legacy-tools -- --rom-report
@@ -296,6 +301,7 @@ make live-wgpu
 make smoke-wgpu
 make game-smoke
 make actor-attract-smoke
+make actor-post-game-smoke
 make live-smoke
 make ci
 make ci-doctor
@@ -558,8 +564,8 @@ make release-gate
 formatting, default and `legacy-tools` Rust tests, both clippy passes,
 clean-fidelity, reference-media helper tests, fresh MAME evidence package,
 accepted report gate and owner-review checklist, MAME doctor, short MAME
-recorder smoke, README media generation, game/live smoke, docs lint, and diff
-hygiene.
+recorder smoke, README media generation, game smoke, actor attract/post-game
+smoke, live smoke, docs lint, and diff hygiene.
 
 `make fidelity` runs formatting, default Rust targets, default clippy,
 `legacy-tools` Rust targets, `legacy-tools` clippy, Lua trace exporter
@@ -651,6 +657,9 @@ checked first/last frame signatures.
 `cargo run -- --actor-attract-smoke` runs the default actor attract sequence
 without inputs through the full checked script cycle and reports milestone,
 draw-plan, silence, and cycle-return evidence.
+`cargo run -- --actor-post-game-smoke` runs the actor runtime through a
+qualifying final-life post-game path, including high-score initials, the
+60-step Hall-of-Fame game-over stall, and return to Williams attract.
 `make coverage-new-code` requires an explicit base and subtracts the accepted
 uncovered-line baseline in `tools/new_rust_coverage_baseline.txt`; refresh that
 baseline only when intentionally accepting existing uncovered debt. `make ci`
@@ -803,10 +812,13 @@ credited attract, playing, clean gameplay/audio events, required actor sprite
 families, projectile/HUD/overlay layers, native sprite draw commands, native
 pipelines, and frame-level `wgpu` command plans without entering the legacy
 presenter. `--actor-attract-smoke` covers the no-input default attract cycle
-through the Hall/scoring/cycle-return milestones before `--actor-wgpu-smoke`
-renders actor scenes through the actual offscreen `wgpu` texture/readback path
-and requires every actor smoke frame to produce nonblank output plus dynamic
-readback signatures. Normal interactive play and the explicit `--actor-live`
+through the Hall/scoring/cycle-return milestones. `--actor-post-game-smoke`
+starts actor play, forces three real pod/player collisions, submits initials,
+checks the 60-step Hall-of-Fame game-over stall, and verifies return to the
+Williams attract reveal before `--actor-wgpu-smoke` renders actor scenes
+through the actual offscreen `wgpu` texture/readback path and requires every
+actor smoke frame to produce nonblank output plus dynamic readback signatures.
+Normal interactive play and the explicit `--actor-live`
 alias now open an actor-frame window
 through the same `wgpu` presenter and submit actor-derived clean `GameFrame`
 values to live audio; actor high-score entry accepts the same

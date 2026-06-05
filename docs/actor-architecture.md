@@ -50,7 +50,10 @@ evidence commands.
   contract without making the actor simulation display-frame driven.
   `StepPrompt` and `StepReport` also carry the driver-owned source RNG snapshot
   for playing steps, so source actors can make seeded movement decisions from
-  shared world state instead of local frame counters.
+  shared world state instead of local frame counters. Submitted high-score
+  initials now enter a finite 60-step Hall-of-Fame game-over stall through the
+  clean `GameOverSnapshot` contract before returning to the normal Williams
+  attract reveal.
 - `src/actor_smoke.rs` exercises `ActorRuntimeAdapter` through a scripted
   attract/play sequence and the native draw planner. The smoke report verifies
   attract, credited attract, playing actor frames, clean gameplay/audio events,
@@ -60,7 +63,11 @@ evidence commands.
   full-cycle gate that advances the default checked attract script through
   Williams reveal, Defender coalescence, Hall of Fame, scoring surface, final
   scoring label, and the `cycle 3367` return while checking native draw plans
-  and absence of attract gameplay/audio events.
+  and absence of attract gameplay/audio events. It also owns
+  `--actor-post-game-smoke`, which starts actor play, forces three actor-owned
+  pod/player collisions, submits high-score initials, checks the 60-step
+  Hall-of-Fame game-over stall, and verifies return to the Williams attract
+  reveal with actor event, sound, draw-plan, and atlas coverage.
 - `--actor-wgpu-smoke` reuses that actor smoke sequence but sends the resulting
   actor `RenderScene` values through the offscreen `wgpu` texture/readback path.
   It requires every actor frame to render nonblank pixels and produce dynamic
@@ -71,8 +78,9 @@ evidence commands.
   live audio runtime, and draws actor scenes with the existing `wgpu` presenter.
   The shared live input state carries the same key bindings and `XYZZY` mode
   into actor steps. Actor high-score entry now consumes initials/backspace from
-  that input surface, updates driver-owned initials state, and returns to
-  game-over after a three-letter entry is submitted.
+  that input surface, updates driver-owned initials state, enters the 60-step
+  Hall-of-Fame game-over stall after a three-letter entry is submitted, and
+  returns to attract after the stall.
 
 ## C++ to Rust Mapping
 

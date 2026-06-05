@@ -83,6 +83,7 @@ const SOURCE_ATTRACT_HALL_OF_FAME_START_STEP: u64 = 488;
 const SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP: u64 = ATTRACT_SCORING_SEQUENCE_START_FRAME as u64;
 const SOURCE_ATTRACT_CYCLE_STEPS: u64 =
     SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP + ATTRACT_SCORING_DEMO_TOTAL_STEPS as u64;
+const SOURCE_HIGH_SCORE_HALL_STALL_STEPS: u8 = 60;
 const SOURCE_ATTRACT_WILLIAMS_LOGO_DURATION_STEPS: u64 = SOURCE_ATTRACT_HALL_OF_FAME_START_STEP - 1;
 const SOURCE_ATTRACT_PRESENTS_DURATION_STEPS: u64 =
     SOURCE_ATTRACT_HALL_OF_FAME_START_STEP - SOURCE_ATTRACT_PRESENTS_START_STEP;
@@ -5083,6 +5084,7 @@ pub struct StepPrompt {
     pub credits: u8,
     pub lives: u8,
     pub smart_bombs: u8,
+    pub game_over_hall_of_fame_stall_remaining: Option<u8>,
     pub high_scores: [u32; 5],
     pub high_score_initials: HighScoreInitialsState,
     pub snapshots: Vec<ActorSnapshot>,
@@ -5215,8 +5217,11 @@ pub struct StepReport {
     pub credits: u8,
     pub lives: u8,
     pub smart_bombs: u8,
+    pub game_over_hall_of_fame_stall_remaining: Option<u8>,
     pub high_scores: [u32; 5],
     pub high_score_initials: HighScoreInitialsState,
+    pub high_score_initial_accepted: bool,
+    pub high_score_submitted: bool,
     pub behavior_script: ActorBehaviorScriptManifest,
     pub source_rng: Option<ActorSourceRngSnapshot>,
     pub snapshots: Vec<ActorSnapshot>,
@@ -5280,7 +5285,7 @@ impl ActorStateBridge {
             high_score_entry: high_score_entry_for_report(report),
             high_score_submission: None,
             high_score_tables,
-            game_over: GameOverSnapshot::NONE,
+            game_over: game_over_snapshot_for_report(report),
             world: world_snapshot_for_report(report),
         }
     }
@@ -5371,6 +5376,17 @@ fn high_score_entry_for_report(report: &StepReport) -> Option<HighScoreEntrySnap
             score: report.score,
             rank: u8::try_from(index + 1).expect("actor high-score rank should fit u8"),
         })
+}
+
+fn game_over_snapshot_for_report(report: &StepReport) -> GameOverSnapshot {
+    let Some(remaining) = report.game_over_hall_of_fame_stall_remaining else {
+        return GameOverSnapshot::NONE;
+    };
+
+    GameOverSnapshot {
+        hall_of_fame_stall_remaining: Some(remaining),
+        ..GameOverSnapshot::NONE
+    }
 }
 
 fn world_snapshot_for_report(report: &StepReport) -> WorldSnapshot {
@@ -7450,6 +7466,12 @@ impl Default for ActorRuntimeAdapter {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct HighScoreEntryStep {
+    accepted: bool,
+    submitted: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorDriverScriptManifest {
     pub step: u64,
@@ -7492,8 +7514,17 @@ fn actor_gameplay_events_for_report(report: &StepReport) -> Vec<GameEvent> {
             | GameCommand::PlaySound(_) => {}
         }
     }
+    if report.sounds.contains(&SoundCue::GameOver) {
+        push_unique_game_event(&mut events, GameEvent::GameOver);
+    }
     if report.phase == Phase::HighScoreEntry {
         push_unique_game_event(&mut events, GameEvent::HighScoreEntryStarted);
+    }
+    if report.high_score_initial_accepted {
+        push_unique_game_event(&mut events, GameEvent::HighScoreInitialAccepted);
+    }
+    if report.high_score_submitted {
+        push_unique_game_event(&mut events, GameEvent::HighScoreSubmitted);
     }
     events
 }
@@ -7524,6 +7555,7 @@ pub struct ActorGameDriver {
     baiter_pacing_steps_remaining: u8,
     source_rng: ActorSourceRng,
     source_shell_scan_steps_remaining: u8,
+    game_over_hall_of_fame_stall_remaining: Option<u8>,
 }
 
 impl ActorGameDriver {
@@ -7563,6 +7595,7 @@ impl ActorGameDriver {
             baiter_pacing_steps_remaining: ACTOR_BAITER_TIMER_PACING_STEPS,
             source_rng: SOURCE_PLAYFIELD_START_RNG,
             source_shell_scan_steps_remaining: SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS,
+            game_over_hall_of_fame_stall_remaining: None,
         };
         let attract_id = driver.allocate_actor_id();
         let script_id = driver.allocate_actor_id();
@@ -7576,7 +7609,7 @@ impl ActorGameDriver {
     pub fn step(&mut self, input: GameInput) -> StepReport {
         self.step = self.step.saturating_add(1);
         let was_playing = self.phase == Phase::Playing;
-        self.apply_high_score_entry_input(input);
+        let high_score_entry_step = self.apply_high_score_entry_input(input);
         let mut behavior_script = self
             .behavior_script
             .with_input_overrides(input, self.snapshots.values().cloned());
@@ -7604,6 +7637,7 @@ impl ActorGameDriver {
             credits: prompt_credits,
             lives: self.lives,
             smart_bombs: self.smart_bombs,
+            game_over_hall_of_fame_stall_remaining: self.game_over_hall_of_fame_stall_remaining,
             high_scores: self.high_scores.entries(),
             high_score_initials: self.high_score_initials,
             snapshots: self.snapshots.values().cloned().collect(),
@@ -7642,7 +7676,7 @@ impl ActorGameDriver {
             commands.push(GameCommand::AdvanceWave { wave: self.wave });
         }
 
-        StepReport {
+        let report = StepReport {
             step: self.step,
             phase: self.phase,
             wave: self.wave,
@@ -7650,15 +7684,20 @@ impl ActorGameDriver {
             credits: self.credits,
             lives: self.lives,
             smart_bombs: self.smart_bombs,
+            game_over_hall_of_fame_stall_remaining: self.game_over_hall_of_fame_stall_remaining,
             high_scores: self.high_scores.entries(),
             high_score_initials: self.high_score_initials,
+            high_score_initial_accepted: high_score_entry_step.accepted,
+            high_score_submitted: high_score_entry_step.submitted,
             behavior_script: behavior_script.manifest(),
             source_rng,
             snapshots: self.snapshots.values().cloned().collect(),
             draws,
             sounds,
             commands,
-        }
+        };
+        self.advance_game_over_hall_of_fame_return();
+        report
     }
 
     pub fn phase(&self) -> Phase {
@@ -8179,6 +8218,7 @@ impl ActorGameDriver {
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.reset_source_shell_scan();
         self.high_score_initials = HighScoreInitialsState::EMPTY;
+        self.game_over_hall_of_fame_stall_remaining = None;
         self.high_scores.record(self.score);
         self.phase = if self.high_scores.qualifies(self.score) {
             Phase::HighScoreEntry
@@ -8189,9 +8229,9 @@ impl ActorGameDriver {
         sounds.push(SoundCue::GameOver);
     }
 
-    fn apply_high_score_entry_input(&mut self, input: GameInput) {
+    fn apply_high_score_entry_input(&mut self, input: GameInput) -> HighScoreEntryStep {
         if self.phase != Phase::HighScoreEntry {
-            return;
+            return HighScoreEntryStep::default();
         }
 
         let frame = HighScoreEntrySystem::enter_initial(
@@ -8202,6 +8242,11 @@ impl ActorGameDriver {
         self.high_score_initials = frame.state;
         if frame.submitted {
             self.phase = Phase::GameOver;
+            self.game_over_hall_of_fame_stall_remaining = Some(SOURCE_HIGH_SCORE_HALL_STALL_STEPS);
+        }
+        HighScoreEntryStep {
+            accepted: frame.accepted,
+            submitted: frame.submitted,
         }
     }
 
@@ -8212,6 +8257,7 @@ impl ActorGameDriver {
         self.lives = 3;
         self.smart_bombs = INITIAL_SMART_BOMBS;
         self.high_score_initials = HighScoreInitialsState::EMPTY;
+        self.game_over_hall_of_fame_stall_remaining = None;
         self.source_rng = SOURCE_PLAYFIELD_START_RNG;
         self.reset_source_shell_scan();
         self.apply_wave_profile();
@@ -8222,6 +8268,24 @@ impl ActorGameDriver {
 
     fn reset_source_shell_scan(&mut self) {
         self.source_shell_scan_steps_remaining = SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS;
+    }
+
+    fn advance_game_over_hall_of_fame_return(&mut self) {
+        if self.phase != Phase::GameOver {
+            return;
+        }
+        let Some(remaining) = self.game_over_hall_of_fame_stall_remaining else {
+            return;
+        };
+
+        let next = remaining.saturating_sub(1);
+        if next > 0 {
+            self.game_over_hall_of_fame_stall_remaining = Some(next);
+            return;
+        }
+
+        self.game_over_hall_of_fame_stall_remaining = None;
+        self.phase = Phase::Attract;
     }
 
     fn advance_source_shell_scan_tick(&mut self) -> bool {
@@ -8755,17 +8819,38 @@ impl AssetActor for ScriptedAttractProgram {
     }
 
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
-        let draws = if matches!(prompt.phase, Phase::Attract | Phase::GameOver) {
-            self.elapsed_steps = self.elapsed_steps.saturating_add(1);
-            self.script.draws_for(
-                self.id,
-                self.elapsed_steps,
-                &prompt.high_scores,
-                prompt.credits,
-            )
-        } else {
-            self.elapsed_steps = 0;
-            Vec::new()
+        let draws = match prompt.phase {
+            Phase::Attract => {
+                self.elapsed_steps = self.elapsed_steps.saturating_add(1);
+                self.script.draws_for(
+                    self.id,
+                    self.elapsed_steps,
+                    &prompt.high_scores,
+                    prompt.credits,
+                )
+            }
+            Phase::GameOver if prompt.game_over_hall_of_fame_stall_remaining.is_some() => {
+                self.elapsed_steps = 0;
+                self.script.draws_for(
+                    self.id,
+                    SOURCE_ATTRACT_HALL_OF_FAME_START_STEP,
+                    &prompt.high_scores,
+                    prompt.credits,
+                )
+            }
+            Phase::GameOver => {
+                self.elapsed_steps = self.elapsed_steps.saturating_add(1);
+                self.script.draws_for(
+                    self.id,
+                    self.elapsed_steps,
+                    &prompt.high_scores,
+                    prompt.credits,
+                )
+            }
+            Phase::Playing | Phase::HighScoreEntry => {
+                self.elapsed_steps = 0;
+                Vec::new()
+            }
         };
 
         ActorReply {
@@ -12235,8 +12320,11 @@ mod tests {
             credits: 0,
             lives: 3,
             smart_bombs: 3,
+            game_over_hall_of_fame_stall_remaining: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
             high_score_initials: HighScoreInitialsState::EMPTY,
+            high_score_initial_accepted: false,
+            high_score_submitted: false,
             behavior_script: ActorBehaviorScript::default().manifest(),
             source_rng: None,
             snapshots: Vec::new(),
@@ -12429,8 +12517,11 @@ mod tests {
             credits: 0,
             lives: 3,
             smart_bombs: 3,
+            game_over_hall_of_fame_stall_remaining: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
             high_score_initials: HighScoreInitialsState::EMPTY,
+            high_score_initial_accepted: false,
+            high_score_submitted: false,
             behavior_script: ActorBehaviorScript::default().manifest(),
             source_rng: None,
             snapshots: Vec::new(),
@@ -12530,11 +12621,14 @@ mod tests {
             credits: 1,
             lives: 2,
             smart_bombs: 1,
+            game_over_hall_of_fame_stall_remaining: None,
             high_scores: [12_000, 10_000, 7_500, 5_000, 2_500],
             high_score_initials: HighScoreInitialsState {
                 initials: [Some('R'), None, None],
                 cursor: 1,
             },
+            high_score_initial_accepted: false,
+            high_score_submitted: false,
             behavior_script: ActorBehaviorScript::default().manifest(),
             source_rng: None,
             snapshots: vec![player, lander, human, laser, enemy_laser, bomb],
@@ -12681,8 +12775,11 @@ mod tests {
             credits: 0,
             lives: 3,
             smart_bombs: 3,
+            game_over_hall_of_fame_stall_remaining: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
             high_score_initials: HighScoreInitialsState::EMPTY,
+            high_score_initial_accepted: false,
+            high_score_submitted: false,
             behavior_script: ActorBehaviorScript::default().manifest(),
             source_rng: None,
             snapshots: Vec::new(),
@@ -14151,6 +14248,8 @@ mod tests {
             ..GameInput::NONE
         });
         assert_eq!(first.phase, Phase::HighScoreEntry);
+        assert!(first.high_score_initial_accepted);
+        assert!(!first.high_score_submitted);
         assert_text(&first, "INITIALS A__");
 
         let erased = driver.step(GameInput {
@@ -14164,11 +14263,13 @@ mod tests {
             high_score_initial: Some('B'),
             ..GameInput::NONE
         });
+        assert!(second.high_score_initial_accepted);
         assert_text(&second, "INITIALS B__");
         let third = driver.step(GameInput {
             high_score_initial: Some('C'),
             ..GameInput::NONE
         });
+        assert!(third.high_score_initial_accepted);
         assert_text(&third, "INITIALS BC_");
         let submitted = driver.step(GameInput {
             high_score_initial: Some('D'),
@@ -14176,11 +14277,45 @@ mod tests {
         });
 
         assert_eq!(submitted.phase, Phase::GameOver);
+        assert!(submitted.high_score_initial_accepted);
+        assert!(submitted.high_score_submitted);
+        assert_eq!(
+            submitted.game_over_hall_of_fame_stall_remaining,
+            Some(SOURCE_HIGH_SCORE_HALL_STALL_STEPS)
+        );
+        assert_eq!(
+            submitted.game_state().game_over,
+            GameOverSnapshot {
+                hall_of_fame_stall_remaining: Some(SOURCE_HIGH_SCORE_HALL_STALL_STEPS),
+                ..GameOverSnapshot::NONE
+            }
+        );
+        assert_text(&submitted, "HALL OF FAME");
         assert!(!submitted.draws.iter().any(|draw| {
             draw.text
                 .as_deref()
                 .is_some_and(|text| text.contains("INITIALS"))
         }));
+
+        for expected_timer in (1..SOURCE_HIGH_SCORE_HALL_STALL_STEPS).rev() {
+            let waiting = driver.step(GameInput::NONE);
+            assert_eq!(waiting.phase, Phase::GameOver);
+            assert_eq!(
+                waiting.game_over_hall_of_fame_stall_remaining,
+                Some(expected_timer)
+            );
+            assert_text(&waiting, "HALL OF FAME");
+        }
+
+        let returned = driver.step(GameInput::NONE);
+        assert_eq!(returned.phase, Phase::Attract);
+        assert_eq!(returned.game_over_hall_of_fame_stall_remaining, None);
+        assert!(
+            returned
+                .draws
+                .iter()
+                .any(|draw| matches!(draw.effect, VisualEffect::WilliamsReveal { .. }))
+        );
     }
 
     #[test]
@@ -15082,6 +15217,7 @@ mod tests {
             credits: 0,
             lives: 3,
             smart_bombs: 3,
+            game_over_hall_of_fame_stall_remaining: None,
             high_scores: [0; 5],
             high_score_initials: HighScoreInitialsState::EMPTY,
             snapshots: Vec::new(),
@@ -18588,6 +18724,7 @@ mod tests {
             credits: 0,
             lives: 3,
             smart_bombs: INITIAL_SMART_BOMBS,
+            game_over_hall_of_fame_stall_remaining: None,
             high_scores: [0; 5],
             high_score_initials: HighScoreInitialsState::EMPTY,
             snapshots: vec![actor_snapshot_with_velocity(

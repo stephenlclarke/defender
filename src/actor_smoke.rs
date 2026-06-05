@@ -10,8 +10,10 @@ use anyhow::bail;
 
 use crate::{
     actor_game::{
-        ActorFrame, ActorRuntimeAdapter, AttractScript, GameInput, Phase, SpriteKey, VisualEffect,
+        ActorFrame, ActorKind, ActorRuntimeAdapter, AttractScript, GameInput, Phase, Point,
+        SpriteKey, VisualEffect,
     },
+    game::{GameEvent, GameOverSnapshot, SoundEvent},
     renderer::{
         NativeRenderPipeline, NativeSceneRenderer, RenderLayer, SceneDrawPlan, SpriteId,
         source_message_text,
@@ -19,6 +21,10 @@ use crate::{
 };
 
 const ACTOR_SMOKE_FRAMES: u32 = 96;
+const POST_GAME_PLAYER_COLLISIONS: u8 = 3;
+const POST_GAME_HALL_STALL_STEPS: u8 = 60;
+const POST_GAME_PLAYER_RESPAWN_SEARCH_STEPS: u8 = 8;
+const POST_GAME_ATTRACT_RETURN_SEARCH_STEPS: u8 = 96;
 const REQUIRED_INPUTS: [&str; 8] = [
     "coin",
     "start_one",
@@ -95,6 +101,40 @@ pub(crate) struct ActorAttractCycleSmokeReport {
     pub(crate) saw_scoring_surface: bool,
     pub(crate) saw_final_scoring_label: bool,
     pub(crate) saw_cycle_return: bool,
+    pub(crate) clean_exit: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ActorPostGameSmokeReport {
+    pub(crate) frames: u32,
+    pub(crate) distinct_scene_signatures: usize,
+    pub(crate) playing_frames: u32,
+    pub(crate) high_score_entry_frames: u32,
+    pub(crate) game_over_frames: u32,
+    pub(crate) attract_frames: u32,
+    pub(crate) forced_player_collisions: u8,
+    pub(crate) final_score: u32,
+    pub(crate) final_lives: u8,
+    pub(crate) player_destroyed_events: usize,
+    pub(crate) game_over_events: usize,
+    pub(crate) high_score_entry_events: usize,
+    pub(crate) high_score_initial_accept_events: usize,
+    pub(crate) high_score_submit_events: usize,
+    pub(crate) actor_sound_frames: u32,
+    pub(crate) actor_sound_events: usize,
+    pub(crate) game_over_sound_events: usize,
+    pub(crate) saw_game_over_hall_stall: bool,
+    pub(crate) hall_stall_frames: u32,
+    pub(crate) saw_attract_return: bool,
+    pub(crate) saw_return_williams_reveal: bool,
+    pub(crate) saw_player_sprite: bool,
+    pub(crate) saw_pod_sprite: bool,
+    pub(crate) saw_explosion_pixels: bool,
+    pub(crate) saw_hall_of_fame: bool,
+    pub(crate) sprite_instances: usize,
+    pub(crate) sprite_draw_commands: usize,
+    pub(crate) wgpu_frame_commands: usize,
+    pub(crate) missing_sprite_regions: usize,
     pub(crate) clean_exit: bool,
 }
 
@@ -323,6 +363,131 @@ impl ActorAttractCycleSmokeReport {
     }
 }
 
+impl ActorPostGameSmokeReport {
+    pub(crate) fn validate(&self) -> anyhow::Result<()> {
+        if self.frames == 0 {
+            bail!("actor post-game smoke did not advance any frames");
+        }
+        if self.distinct_scene_signatures < 6 {
+            bail!("actor post-game smoke did not produce dynamic scene signatures");
+        }
+        if self.playing_frames == 0 {
+            bail!("actor post-game smoke did not observe playing frames");
+        }
+        if self.high_score_entry_frames == 0 {
+            bail!("actor post-game smoke did not observe high-score-entry frames");
+        }
+        if self.game_over_frames == 0 {
+            bail!("actor post-game smoke did not observe game-over frames");
+        }
+        if self.attract_frames == 0 || !self.saw_attract_return {
+            bail!("actor post-game smoke did not return to attract");
+        }
+        if self.forced_player_collisions != POST_GAME_PLAYER_COLLISIONS {
+            bail!(
+                "actor post-game smoke forced {} player collision(s), expected {}",
+                self.forced_player_collisions,
+                POST_GAME_PLAYER_COLLISIONS
+            );
+        }
+        if self.final_score < 3_000 {
+            bail!("actor post-game smoke did not build a qualifying final score");
+        }
+        if self.final_lives != 0 {
+            bail!("actor post-game smoke did not end with zero lives");
+        }
+        if self.player_destroyed_events < usize::from(POST_GAME_PLAYER_COLLISIONS) {
+            bail!("actor post-game smoke did not emit player-destroyed events");
+        }
+        if self.game_over_events == 0 {
+            bail!("actor post-game smoke did not emit game-over events");
+        }
+        if self.high_score_entry_events == 0 {
+            bail!("actor post-game smoke did not emit high-score-entry events");
+        }
+        if self.high_score_initial_accept_events != 3 {
+            bail!("actor post-game smoke did not accept three high-score initials");
+        }
+        if self.high_score_submit_events != 1 {
+            bail!("actor post-game smoke did not submit one high-score entry");
+        }
+        if self.actor_sound_frames == 0 || self.actor_sound_events == 0 {
+            bail!("actor post-game smoke did not produce clean sound events");
+        }
+        if self.game_over_sound_events == 0 {
+            bail!("actor post-game smoke did not bridge the game-over sound command");
+        }
+        if !self.saw_game_over_hall_stall
+            || self.hall_stall_frames != u32::from(POST_GAME_HALL_STALL_STEPS)
+        {
+            bail!("actor post-game smoke did not observe the 60-step Hall-of-Fame stall");
+        }
+        if !self.saw_return_williams_reveal {
+            bail!("actor post-game smoke did not restart Williams reveal after post-game return");
+        }
+        if !self.saw_player_sprite {
+            bail!("actor post-game smoke did not render player sprites");
+        }
+        if !self.saw_pod_sprite {
+            bail!("actor post-game smoke did not render pod sprites");
+        }
+        if !self.saw_explosion_pixels {
+            bail!("actor post-game smoke did not render source explosion pixels");
+        }
+        if !self.saw_hall_of_fame {
+            bail!("actor post-game smoke did not render Hall of Fame after submission");
+        }
+        if self.sprite_instances == 0 || self.sprite_draw_commands == 0 {
+            bail!("actor post-game smoke did not produce sprite draw plans");
+        }
+        if self.wgpu_frame_commands == 0 {
+            bail!("actor post-game smoke did not produce wgpu frame commands");
+        }
+        if self.missing_sprite_regions != 0 {
+            bail!("actor post-game smoke had missing sprite atlas regions");
+        }
+        if !self.clean_exit {
+            bail!("actor post-game smoke did not exit cleanly");
+        }
+        Ok(())
+    }
+
+    pub(crate) fn to_text(&self) -> String {
+        format!(
+            "actor post-game smoke passed\n  frames: {}\n  distinct_scene_signatures: {}\n  playing_frames: {}\n  high_score_entry_frames: {}\n  game_over_frames: {}\n  attract_frames: {}\n  forced_player_collisions: {}\n  final_score: {}\n  final_lives: {}\n  player_destroyed_events: {}\n  game_over_events: {}\n  high_score_entry_events: {}\n  high_score_initial_accept_events: {}\n  high_score_submit_events: {}\n  actor_sound_frames: {}\n  actor_sound_events: {}\n  game_over_sound_events: {}\n  hall_stall_frames: {}\n  saw_attract_return: {}\n  saw_return_williams_reveal: {}\n  saw_player_sprite: {}\n  saw_pod_sprite: {}\n  saw_explosion_pixels: {}\n  saw_hall_of_fame: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  wgpu_frame_commands: {}\n  missing_sprite_regions: {}\n  clean_exit: {}\n",
+            self.frames,
+            self.distinct_scene_signatures,
+            self.playing_frames,
+            self.high_score_entry_frames,
+            self.game_over_frames,
+            self.attract_frames,
+            self.forced_player_collisions,
+            self.final_score,
+            self.final_lives,
+            self.player_destroyed_events,
+            self.game_over_events,
+            self.high_score_entry_events,
+            self.high_score_initial_accept_events,
+            self.high_score_submit_events,
+            self.actor_sound_frames,
+            self.actor_sound_events,
+            self.game_over_sound_events,
+            self.hall_stall_frames,
+            self.saw_attract_return,
+            self.saw_return_williams_reveal,
+            self.saw_player_sprite,
+            self.saw_pod_sprite,
+            self.saw_explosion_pixels,
+            self.saw_hall_of_fame,
+            self.sprite_instances,
+            self.sprite_draw_commands,
+            self.wgpu_frame_commands,
+            self.missing_sprite_regions,
+            self.clean_exit
+        )
+    }
+}
+
 pub(crate) fn run() -> anyhow::Result<()> {
     let report = default_smoke_report()?;
 
@@ -337,12 +502,23 @@ pub(crate) fn run_attract_cycle() -> anyhow::Result<()> {
     Ok(())
 }
 
+pub(crate) fn run_post_game() -> anyhow::Result<()> {
+    let report = default_post_game_report()?;
+
+    print!("{}", report.to_text());
+    Ok(())
+}
+
 pub(crate) fn default_smoke_report() -> anyhow::Result<ActorSmokeReport> {
     smoke_report(ACTOR_SMOKE_FRAMES)
 }
 
 pub(crate) fn default_attract_cycle_report() -> anyhow::Result<ActorAttractCycleSmokeReport> {
     attract_cycle_report(default_attract_cycle_steps()?)
+}
+
+pub(crate) fn default_post_game_report() -> anyhow::Result<ActorPostGameSmokeReport> {
+    post_game_report()
 }
 
 pub(crate) fn smoke_frame_count() -> u32 {
@@ -406,6 +582,123 @@ pub(crate) fn attract_cycle_report(frames: u64) -> anyhow::Result<ActorAttractCy
     report.distinct_scene_signatures = signatures.len();
     report.validate()?;
     Ok(report)
+}
+
+pub(crate) fn post_game_report() -> anyhow::Result<ActorPostGameSmokeReport> {
+    let mut runtime = ActorRuntimeAdapter::new();
+    let renderer = NativeSceneRenderer::default();
+    let mut report = ActorPostGameSmokeReport {
+        clean_exit: true,
+        ..ActorPostGameSmokeReport::default()
+    };
+    let mut signatures = BTreeSet::new();
+
+    step_post_game(
+        &mut runtime,
+        &renderer,
+        &mut report,
+        &mut signatures,
+        GameInput {
+            coin: true,
+            ..GameInput::NONE
+        },
+    );
+    step_post_game(
+        &mut runtime,
+        &renderer,
+        &mut report,
+        &mut signatures,
+        GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        },
+    );
+
+    for _ in 0..POST_GAME_PLAYER_COLLISIONS {
+        let player_position =
+            step_until_player_position(&mut runtime, &renderer, &mut report, &mut signatures)?;
+        runtime.driver_mut().spawn_pod_for_test(player_position);
+        let collision = step_post_game(
+            &mut runtime,
+            &renderer,
+            &mut report,
+            &mut signatures,
+            GameInput::NONE,
+        );
+        if collision
+            .events
+            .gameplay()
+            .contains(&GameEvent::PlayerDestroyed)
+        {
+            report.forced_player_collisions = report.forced_player_collisions.saturating_add(1);
+        }
+    }
+
+    for initial in ['P', 'L', 'R'] {
+        step_post_game(
+            &mut runtime,
+            &renderer,
+            &mut report,
+            &mut signatures,
+            GameInput {
+                high_score_initial: Some(initial),
+                ..GameInput::NONE
+            },
+        );
+    }
+
+    for _ in 0..POST_GAME_ATTRACT_RETURN_SEARCH_STEPS {
+        let frame = step_post_game(
+            &mut runtime,
+            &renderer,
+            &mut report,
+            &mut signatures,
+            GameInput::NONE,
+        );
+        if frame.report.phase == Phase::Attract {
+            report.saw_attract_return = true;
+            break;
+        }
+    }
+
+    report.distinct_scene_signatures = signatures.len();
+    report.validate()?;
+    Ok(report)
+}
+
+fn step_post_game(
+    runtime: &mut ActorRuntimeAdapter,
+    renderer: &NativeSceneRenderer,
+    report: &mut ActorPostGameSmokeReport,
+    signatures: &mut BTreeSet<u64>,
+    input: GameInput,
+) -> ActorFrame {
+    let frame = runtime.step(input);
+    let plan = renderer.prepare(&frame.scene);
+    observe_post_game_frame(report, signatures, &frame, &plan);
+    frame
+}
+
+fn step_until_player_position(
+    runtime: &mut ActorRuntimeAdapter,
+    renderer: &NativeSceneRenderer,
+    report: &mut ActorPostGameSmokeReport,
+    signatures: &mut BTreeSet<u64>,
+) -> anyhow::Result<Point> {
+    for _ in 0..POST_GAME_PLAYER_RESPAWN_SEARCH_STEPS {
+        let frame = step_post_game(runtime, renderer, report, signatures, GameInput::NONE);
+        if let Some(position) = frame
+            .report
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive)
+            .map(|snapshot| snapshot.position)
+        {
+            return Ok(position);
+        }
+    }
+
+    bail!("actor post-game smoke could not find a live player for forced collision")
 }
 
 fn observe_frame(
@@ -527,6 +820,93 @@ fn observe_attract_cycle_frame(
     signatures.insert(scene_signature(frame, plan));
 }
 
+fn observe_post_game_frame(
+    report: &mut ActorPostGameSmokeReport,
+    signatures: &mut BTreeSet<u64>,
+    frame: &ActorFrame,
+    plan: &SceneDrawPlan,
+) {
+    report.frames = report.frames.saturating_add(1);
+    match frame.report.phase {
+        Phase::Attract => report.attract_frames = report.attract_frames.saturating_add(1),
+        Phase::Playing => report.playing_frames = report.playing_frames.saturating_add(1),
+        Phase::GameOver => report.game_over_frames = report.game_over_frames.saturating_add(1),
+        Phase::HighScoreEntry => {
+            report.high_score_entry_frames = report.high_score_entry_frames.saturating_add(1);
+        }
+    }
+
+    report.final_score = frame.report.score;
+    report.final_lives = frame.report.lives;
+
+    for event in frame.events.gameplay() {
+        match event {
+            GameEvent::PlayerDestroyed => {
+                report.player_destroyed_events = report.player_destroyed_events.saturating_add(1);
+            }
+            GameEvent::GameOver => {
+                report.game_over_events = report.game_over_events.saturating_add(1);
+            }
+            GameEvent::HighScoreEntryStarted => {
+                report.high_score_entry_events = report.high_score_entry_events.saturating_add(1);
+            }
+            GameEvent::HighScoreInitialAccepted => {
+                report.high_score_initial_accept_events =
+                    report.high_score_initial_accept_events.saturating_add(1);
+            }
+            GameEvent::HighScoreSubmitted => {
+                report.high_score_submit_events = report.high_score_submit_events.saturating_add(1);
+            }
+            _ => {}
+        }
+    }
+
+    if !frame.events.sounds().is_empty() {
+        report.actor_sound_frames = report.actor_sound_frames.saturating_add(1);
+        report.actor_sound_events = report
+            .actor_sound_events
+            .saturating_add(frame.events.sounds().len());
+    }
+    report.game_over_sound_events = report.game_over_sound_events.saturating_add(
+        frame
+            .events
+            .sounds()
+            .iter()
+            .filter(|event| **event == SoundEvent::UnmappedSoundCommand { command: 0xEC })
+            .count(),
+    );
+
+    if let Some(remaining) = frame.report.game_over_hall_of_fame_stall_remaining {
+        report.saw_game_over_hall_stall = true;
+        report.hall_stall_frames = report.hall_stall_frames.saturating_add(1);
+        if frame.state.game_over
+            != (GameOverSnapshot {
+                hall_of_fame_stall_remaining: Some(remaining),
+                ..GameOverSnapshot::NONE
+            })
+        {
+            report.clean_exit = false;
+        }
+    }
+
+    observe_post_game_draws(report, frame);
+    observe_post_game_scene(report, frame);
+
+    report.sprite_instances = report
+        .sprite_instances
+        .saturating_add(plan.sprite_instances);
+    report.sprite_draw_commands = report
+        .sprite_draw_commands
+        .saturating_add(plan.sprite_draw_commands.len());
+    report.wgpu_frame_commands = report
+        .wgpu_frame_commands
+        .saturating_add(plan.frame_plan.command_count());
+    report.missing_sprite_regions = report
+        .missing_sprite_regions
+        .saturating_add(plan.missing_sprite_regions);
+    signatures.insert(scene_signature(frame, plan));
+}
+
 fn observe_attract_cycle_draws(report: &mut ActorAttractCycleSmokeReport, frame: &ActorFrame) {
     let hall_title = source_message_text("HALLD_TITLE").expect("HALLD_TITLE message is checked in");
     let final_scoring_label = source_message_text("SWARMV").expect("SWARMV message is checked in");
@@ -571,6 +951,28 @@ fn observe_attract_cycle_draws(report: &mut ActorAttractCycleSmokeReport, frame:
     }
 }
 
+fn observe_post_game_draws(report: &mut ActorPostGameSmokeReport, frame: &ActorFrame) {
+    let hall_title = source_message_text("HALLD_TITLE").expect("HALLD_TITLE message is checked in");
+
+    for draw in &frame.report.draws {
+        match draw.sprite {
+            SpriteKey::PlayerRight | SpriteKey::PlayerLeft => report.saw_player_sprite = true,
+            SpriteKey::Pod => report.saw_pod_sprite = true,
+            SpriteKey::Explosion => report.saw_explosion_pixels = true,
+            SpriteKey::WilliamsLogo
+                if frame.report.phase == Phase::Attract
+                    && matches!(draw.effect, VisualEffect::WilliamsReveal { .. }) =>
+            {
+                report.saw_return_williams_reveal = true;
+            }
+            _ => {}
+        }
+        if draw.text.as_deref() == Some(hall_title) {
+            report.saw_hall_of_fame = true;
+        }
+    }
+}
+
 fn observe_attract_cycle_scene(report: &mut ActorAttractCycleSmokeReport, frame: &ActorFrame) {
     for sprite in &frame.scene.sprites {
         if sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL {
@@ -581,6 +983,21 @@ fn observe_attract_cycle_scene(report: &mut ActorAttractCycleSmokeReport, frame:
         }
         if sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO {
             report.saw_hall_of_fame = true;
+        }
+    }
+}
+
+fn observe_post_game_scene(report: &mut ActorPostGameSmokeReport, frame: &ActorFrame) {
+    for sprite in &frame.scene.sprites {
+        match sprite.sprite {
+            SpriteId::PLAYER_SHIP | SpriteId::PLAYER_SHIP_LEFT => report.saw_player_sprite = true,
+            SpriteId::ENEMY_POD => report.saw_pod_sprite = true,
+            SpriteId::PLAYER_EXPLOSION_PIXEL => report.saw_explosion_pixels = true,
+            SpriteId::HALL_OF_FAME_DEFENDER_LOGO => report.saw_hall_of_fame = true,
+            SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL if frame.report.phase == Phase::Attract => {
+                report.saw_return_williams_reveal = true;
+            }
+            _ => {}
         }
     }
 }
@@ -746,9 +1163,9 @@ fn record_unique_label(labels: &mut Vec<String>, label: &str) {
 #[cfg(test)]
 mod tests {
     use super::{
-        ACTOR_SMOKE_FRAMES, ActorAttractCycleSmokeReport, ActorSmokeReport, attract_cycle_report,
-        default_attract_cycle_report, smoke_actor_input, smoke_frame_count, smoke_input,
-        smoke_report,
+        ACTOR_SMOKE_FRAMES, ActorAttractCycleSmokeReport, ActorPostGameSmokeReport,
+        ActorSmokeReport, attract_cycle_report, default_attract_cycle_report,
+        default_post_game_report, smoke_actor_input, smoke_frame_count, smoke_input, smoke_report,
     };
 
     #[test]
@@ -817,6 +1234,39 @@ mod tests {
     }
 
     #[test]
+    fn post_game_report_exercises_high_score_hall_return() {
+        let report = default_post_game_report().expect("actor post-game smoke report");
+
+        assert!(report.frames >= 60);
+        assert!(report.playing_frames > 0);
+        assert!(report.high_score_entry_frames > 0);
+        assert_eq!(report.game_over_frames, 60);
+        assert_eq!(report.hall_stall_frames, 60);
+        assert!(report.attract_frames > 0);
+        assert_eq!(report.forced_player_collisions, 3);
+        assert!(report.final_score >= 3_000);
+        assert_eq!(report.final_lives, 0);
+        assert!(report.player_destroyed_events >= 3);
+        assert!(report.game_over_events > 0);
+        assert!(report.high_score_entry_events > 0);
+        assert_eq!(report.high_score_initial_accept_events, 3);
+        assert_eq!(report.high_score_submit_events, 1);
+        assert!(report.game_over_sound_events > 0);
+        assert!(report.saw_game_over_hall_stall);
+        assert!(report.saw_attract_return);
+        assert!(report.saw_return_williams_reveal);
+        assert!(report.saw_player_sprite);
+        assert!(report.saw_pod_sprite);
+        assert!(report.saw_explosion_pixels);
+        assert!(report.saw_hall_of_fame);
+        assert!(report.sprite_instances > 0);
+        assert!(report.sprite_draw_commands > 0);
+        assert!(report.wgpu_frame_commands > 0);
+        assert_eq!(report.missing_sprite_regions, 0);
+        assert!(report.clean_exit);
+    }
+
+    #[test]
     fn attract_cycle_report_validates_required_default_milestones() {
         let mut report = ActorAttractCycleSmokeReport {
             frames: 3367,
@@ -853,6 +1303,58 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "actor attract smoke unexpectedly produced sound events"
+        );
+    }
+
+    #[test]
+    fn post_game_report_validates_high_score_return_contract() {
+        let mut report = ActorPostGameSmokeReport {
+            frames: 72,
+            distinct_scene_signatures: 6,
+            playing_frames: 10,
+            high_score_entry_frames: 3,
+            game_over_frames: 60,
+            attract_frames: 1,
+            forced_player_collisions: 3,
+            final_score: 3_000,
+            player_destroyed_events: 3,
+            game_over_events: 1,
+            high_score_entry_events: 1,
+            high_score_initial_accept_events: 3,
+            high_score_submit_events: 1,
+            actor_sound_frames: 4,
+            actor_sound_events: 6,
+            game_over_sound_events: 1,
+            saw_game_over_hall_stall: true,
+            hall_stall_frames: 60,
+            saw_attract_return: true,
+            saw_return_williams_reveal: true,
+            saw_player_sprite: true,
+            saw_pod_sprite: true,
+            saw_explosion_pixels: true,
+            saw_hall_of_fame: true,
+            sprite_instances: 1,
+            sprite_draw_commands: 1,
+            wgpu_frame_commands: 1,
+            clean_exit: true,
+            ..ActorPostGameSmokeReport::default()
+        };
+
+        report.hall_stall_frames = 59;
+        let error = report.validate().expect_err("short Hall stall should fail");
+        assert_eq!(
+            error.to_string(),
+            "actor post-game smoke did not observe the 60-step Hall-of-Fame stall"
+        );
+
+        report.hall_stall_frames = 60;
+        report.saw_attract_return = false;
+        let error = report
+            .validate()
+            .expect_err("missing attract return should fail");
+        assert_eq!(
+            error.to_string(),
+            "actor post-game smoke did not return to attract"
         );
     }
 
@@ -1011,5 +1513,46 @@ mod tests {
         assert!(text.contains("cycle_steps: 3367"));
         assert!(text.contains("saw_scoring_surface: true"));
         assert!(text.contains("saw_cycle_return: true"));
+    }
+
+    #[test]
+    fn post_game_report_formats_current_cli_output() {
+        let report = ActorPostGameSmokeReport {
+            frames: 72,
+            distinct_scene_signatures: 9,
+            playing_frames: 8,
+            high_score_entry_frames: 3,
+            game_over_frames: 60,
+            attract_frames: 1,
+            forced_player_collisions: 3,
+            final_score: 3_000,
+            player_destroyed_events: 3,
+            game_over_events: 1,
+            high_score_entry_events: 3,
+            high_score_initial_accept_events: 3,
+            high_score_submit_events: 1,
+            actor_sound_frames: 4,
+            actor_sound_events: 6,
+            game_over_sound_events: 1,
+            hall_stall_frames: 60,
+            saw_attract_return: true,
+            saw_return_williams_reveal: true,
+            saw_player_sprite: true,
+            saw_pod_sprite: true,
+            saw_explosion_pixels: true,
+            saw_hall_of_fame: true,
+            sprite_instances: 44,
+            sprite_draw_commands: 22,
+            wgpu_frame_commands: 66,
+            clean_exit: true,
+            ..ActorPostGameSmokeReport::default()
+        };
+
+        let text = report.to_text();
+
+        assert!(text.starts_with("actor post-game smoke passed\n"));
+        assert!(text.contains("forced_player_collisions: 3"));
+        assert!(text.contains("hall_stall_frames: 60"));
+        assert!(text.contains("saw_attract_return: true"));
     }
 }

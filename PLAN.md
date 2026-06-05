@@ -100,7 +100,11 @@ verification tools.
   score, high score, wave, lives, smart-bomb stock, credits, and
   high-score-entry rows from the same `StepPrompt` state as gameplay actors
   while staying inert during attract so custom attract scripts retain control of
-  that screen. Lander
+  that screen. Actor high-score initials submission now reports accepted and
+  submitted initials through the clean event bridge, enters a finite 60-step
+  Hall-of-Fame game-over stall through `GameOverSnapshot`, draws the source
+  Hall page during that stall, and returns to the Williams attract reveal after
+  the stall. Lander
   shot timers now spawn hostile projectile actors that use the same player
   damage policy as other hazards, including `XYZZY` invincibility overrides,
   and emit a distinct source-command-backed lander-shot cue. Actor sound cues
@@ -291,6 +295,7 @@ make reference-mame-smoke
 make readme-media
 cargo run -- --game-smoke
 cargo run -- --actor-attract-smoke
+cargo run -- --actor-post-game-smoke
 cargo run -- --live-smoke
 markdownlint README.md SPEC.md PLAN.md docs/fidelity/mame-golden-clips.md \
   docs/fidelity/release-closure-audit.md assets/sounds/README.md
@@ -763,13 +768,12 @@ Exit gate:
    and owner review, not a known static-sprite implementation path.
 7. Run release-gate validation and owner review. The default and
    `legacy-tools` all-targets Rust test gates, both clippy gates, and
-   `make clean-fidelity` are green. The full release gate is green as of the
-   `2026-05-29 15:54 BST` release-gate validation cycle after promoting the
-   PRBP1 pod up-thrust proof to all-axis and fixing the clean-only post-game
-   thrust/background audio leak: media script tooling, owner-review package,
-   accepted-report semantic coverage gate, MAME doctor, MAME smoke, README
-   media, game/live smoke, docs lint, diff hygiene, and final clippy rechecks
-   all passed. A later scan found an unaccepted organic smart-bomb/up-thrust
+   `make clean-fidelity` were green in the `2026-05-29 15:54 BST`
+   release-gate validation cycle after promoting the PRBP1 pod up-thrust proof
+   to all-axis and fixing the clean-only post-game thrust/background audio
+   leak. The current release-gate path now also includes actor smoke gates, so
+   full release-gate status requires a fresh run after the actor rewrite
+   slices. A later scan found an unaccepted organic smart-bomb/up-thrust
    terrain-blow candidate whose clean report currently fails; owner review and
    classification or repair of that new concrete mismatch remain before
    protected reference media replacement.
@@ -780,6 +784,34 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-05 15:40 BST`: Completed the actor post-game Hall-return smoke
+  gate slice. Actor high-score initials submission now emits
+  accepted/submitted clean events, enters a finite 60-step Hall-of-Fame
+  `GameOverSnapshot`, draws the source Hall page during the stall, and returns
+  to the Williams attract reveal. Added `--actor-post-game-smoke` and
+  `make actor-post-game-smoke`; `make release-gate` now includes the new
+  actor post-game smoke target. The new smoke report starts actor play, forces
+  three actor-owned pod/player collisions for a 3,000-point qualifying score,
+  submits initials, verifies 60 GameOver Hall frames, clean game-over and
+  high-score events, bridged game-over sound, native draw-plan coverage, sprite
+  atlas coverage, and attract return. No legacy code, tests, or scaffolding
+  were safe to remove because legacy tooling still backs ROM reports,
+  trace/media helpers, and oracle-equivalence evidence while the actor runtime
+  continues closing fidelity gaps. Validation passed with `cargo test
+  high_score_entry_accepts_initials_and_backspace_from_actor_input --lib
+  --features legacy-tools`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo run -- --actor-post-game-smoke`, `cargo test runtime
+  --all-targets --features legacy-tools`, `cargo test platform --all-targets
+  --features legacy-tools`, `make actor-post-game-smoke`, `cargo test
+  actor_game --all-targets --features legacy-tools`, `cargo test actor_live
+  --all-targets --features legacy-tools`, `cargo test actor_wgpu --all-targets
+  --features legacy-tools`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, `cargo fmt --check`, touched-doc markdownlint, and
+  `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780669131121529`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780670433685769`.
 - `2026-06-05 15:16 BST`: Completed the actor attract-cycle smoke gate
   slice. Added `--actor-attract-smoke` and `make actor-attract-smoke`, wiring
   the command through the clean platform/runtime boundary and into

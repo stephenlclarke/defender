@@ -1,4 +1,4 @@
-.PHONY: fmt test legacy-tools-test clippy legacy-tools-clippy fidelity release-gate clean-fidelity ci ci-doctor trace-doctor coverage-doctor smoke-doctor reference-media-doctor reference-mame-doctor trace-script-test media-script-test trace-fixtures reference-inputs reference-traces reference-fixtures-check reference-media-fetch reference-mame-capture reference-mame-smoke reference-clean-capture reference-window-scan reference-window-scan-organic reference-report-gate reference-signoff-summary reference-evidence-package owner-review-package reference-media-check coverage coverage-new-code coverage-new-code-baseline sq sq-ci sonar run run-wgpu live live-wgpu smoke-wgpu game-smoke actor-attract-smoke live-smoke docs-lint diff-check readme-media
+.PHONY: fmt test legacy-tools-test clippy legacy-tools-clippy fidelity release-gate clean-fidelity ci ci-doctor trace-doctor coverage-doctor smoke-doctor reference-media-doctor reference-mame-doctor trace-script-test media-script-test trace-fixtures reference-inputs reference-traces reference-fixtures-check reference-media-fetch reference-mame-capture reference-mame-smoke reference-clean-capture reference-window-scan reference-window-scan-organic reference-report-gate reference-signoff-summary reference-evidence-package owner-review-package reference-media-check coverage coverage-new-code coverage-new-code-baseline sq sq-ci sonar run run-wgpu live live-wgpu smoke-wgpu game-smoke actor-attract-smoke actor-post-game-smoke live-smoke docs-lint diff-check readme-media
 
 SONAR_SCANNER ?= sonar-scanner
 SONAR_ARGS ?= -Dsonar.qualitygate.wait=true
@@ -102,6 +102,7 @@ release-gate:
 	$(MAKE) readme-media
 	$(MAKE) game-smoke
 	$(MAKE) actor-attract-smoke
+	$(MAKE) actor-post-game-smoke
 	$(MAKE) live-smoke
 	$(MAKE) docs-lint
 	$(MAKE) diff-check
@@ -351,6 +352,9 @@ game-smoke:
 
 actor-attract-smoke:
 	cargo run -- --actor-attract-smoke
+
+actor-post-game-smoke:
+	cargo run -- --actor-post-game-smoke
 
 live-smoke: smoke-wgpu
 

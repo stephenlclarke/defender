@@ -110,6 +110,7 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
         CliClassification::Error(error) => Err(error.into()),
         CliClassification::ActorSmoke => crate::runtime::run_actor_smoke(),
         CliClassification::ActorAttractSmoke => crate::runtime::run_actor_attract_smoke(),
+        CliClassification::ActorPostGameSmoke => crate::runtime::run_actor_post_game_smoke(),
         CliClassification::ActorWgpuSmoke => crate::runtime::run_actor_wgpu_smoke(),
     }
 }
@@ -130,6 +131,7 @@ enum CliClassification {
     GameSmoke,
     ActorSmoke,
     ActorAttractSmoke,
+    ActorPostGameSmoke,
     ActorWgpuSmoke,
     Help,
     Error(CleanCliError),
@@ -231,6 +233,9 @@ impl RuntimeCliClassifier {
                 ArgClassification::ActorAttractSmoke => {
                     return CliClassification::ActorAttractSmoke;
                 }
+                ArgClassification::ActorPostGameSmoke => {
+                    return CliClassification::ActorPostGameSmoke;
+                }
                 ArgClassification::ActorWgpuSmoke => return CliClassification::ActorWgpuSmoke,
                 ArgClassification::Help => return CliClassification::Help,
                 ArgClassification::Error(error) => {
@@ -292,6 +297,17 @@ impl RuntimeCliClassifier {
                     return ArgClassification::Error(CleanCliError::TooManyActorAttractSmokeArgs);
                 }
                 ArgClassification::ActorAttractSmoke
+            }
+            "--actor-post-game-smoke" => {
+                if live_option_seen {
+                    return ArgClassification::Error(CleanCliError::LiveOptionsWithCommand(
+                        "--actor-post-game-smoke",
+                    ));
+                }
+                if args.next().is_some() {
+                    return ArgClassification::Error(CleanCliError::TooManyActorPostGameSmokeArgs);
+                }
+                ArgClassification::ActorPostGameSmoke
             }
             "--actor-wgpu-smoke" => {
                 if live_option_seen {
@@ -532,6 +548,7 @@ enum ArgClassification {
     GameSmoke,
     ActorSmoke,
     ActorAttractSmoke,
+    ActorPostGameSmoke,
     ActorWgpuSmoke,
     Runtime,
     Help,
@@ -553,6 +570,7 @@ enum CleanCliError {
     TooManyGameSmokeArgs,
     TooManyActorSmokeArgs,
     TooManyActorAttractSmokeArgs,
+    TooManyActorPostGameSmokeArgs,
     TooManyActorWgpuSmokeArgs,
     InvalidFidelityTraceFrameCount { value: String, error: String },
     NonPositiveFidelityTraceFrameCount,
@@ -626,6 +644,12 @@ impl fmt::Display for CleanCliError {
                 write!(
                     formatter,
                     "--actor-attract-smoke does not accept additional arguments"
+                )
+            }
+            Self::TooManyActorPostGameSmokeArgs => {
+                write!(
+                    formatter,
+                    "--actor-post-game-smoke does not accept additional arguments"
                 )
             }
             Self::TooManyActorWgpuSmokeArgs => {
@@ -861,6 +885,14 @@ mod tests {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--actor-attract-smoke"])),
             CliClassification::ActorAttractSmoke
+        );
+    }
+
+    #[test]
+    fn clean_cli_owns_actor_post_game_smoke_command() {
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&["--actor-post-game-smoke"])),
+            CliClassification::ActorPostGameSmoke
         );
     }
 
@@ -1159,6 +1191,25 @@ mod tests {
             (
                 vec!["--actor-attract-smoke", "--mute"],
                 CleanCliError::TooManyActorAttractSmokeArgs,
+            ),
+        ] {
+            assert_eq!(
+                RuntimeCliClassifier::classify(args(&values)),
+                CliClassification::Error(error)
+            );
+        }
+    }
+
+    #[test]
+    fn clean_cli_rejects_malformed_actor_post_game_smoke_args() {
+        for (values, error) in [
+            (
+                vec!["--mute", "--actor-post-game-smoke"],
+                CleanCliError::LiveOptionsWithCommand("--actor-post-game-smoke"),
+            ),
+            (
+                vec!["--actor-post-game-smoke", "--mute"],
+                CleanCliError::TooManyActorPostGameSmokeArgs,
             ),
         ] {
             assert_eq!(
@@ -1475,6 +1526,10 @@ mod tests {
             "--actor-attract-smoke does not accept additional arguments"
         );
         assert_eq!(
+            CleanCliError::TooManyActorPostGameSmokeArgs.to_string(),
+            "--actor-post-game-smoke does not accept additional arguments"
+        );
+        assert_eq!(
             CleanCliError::TooManyActorWgpuSmokeArgs.to_string(),
             "--actor-wgpu-smoke does not accept additional arguments"
         );
@@ -1601,6 +1656,12 @@ mod tests {
     fn actor_attract_smoke_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&["--actor-attract-smoke"]))
             .expect("actor attract smoke CLI should run through configured runtime");
+    }
+
+    #[test]
+    fn actor_post_game_smoke_cli_entrypoint_accepts_supported_args() {
+        super::run_with_args(args(&["--actor-post-game-smoke"]))
+            .expect("actor post-game smoke CLI should run through configured runtime");
     }
 
     #[test]

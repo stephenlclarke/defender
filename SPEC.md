@@ -84,10 +84,10 @@ visual/audio/all acceptance mode that can prove that facet; the local accepted
 `target/reference-media/mame/`, and clean candidate artifacts stay under
 `target/reference-media/clean/`. Accepted visual proof uses MP4 MAME reference
 clips and clean GIF candidates; accepted audio proof uses WAV reference and
-candidate files. The full `make release-gate` path is green as of 2026-05-29
-and includes the owner-review package, accepted report gate, MAME doctor, MAME
-smoke recorder, README media generation, game/live smoke, docs lint, and diff
-hygiene.
+candidate files. The current `make release-gate` path includes the
+owner-review package, accepted report gate, MAME doctor, MAME smoke recorder,
+README media generation, game smoke, actor smoke gates, live smoke, docs lint,
+and diff hygiene.
 
 The accepted gate is still green, but final closure is no longer only an
 owner-review decision. A fresh organic smart-bomb/up-thrust search found a
@@ -209,7 +209,11 @@ tree:
   advances the default no-input actor attract script through Williams reveal,
   Defender coalescence, Hall of Fame, scoring surface, final scoring label, and
   the `cycle 3367` return while verifying native draw plans and no attract
-  gameplay/audio events.
+  gameplay/audio events. It also owns `--actor-post-game-smoke`, which drives
+  actor play through three real pod/player collisions, a qualifying high-score
+  initials submission, the 60-step Hall-of-Fame game-over stall, and return to
+  the Williams attract reveal while verifying actor events, bridged sound,
+  native draw plans, and sprite atlas coverage.
 - `src/live_wgpu.rs`: also owns `--actor-wgpu-smoke`, which reuses the actor
   smoke input sequence, renders actor `RenderScene` frames through the offscreen
   `wgpu` texture/readback path, and checks nonblank dynamic readback evidence
@@ -722,6 +726,10 @@ reintroduce legacy implementation terminology.
   Williams reveal, Defender coalescence, Hall of Fame, scoring surface, final
   scoring label, and the `cycle 3367` return while verifying native draw-plan
   coverage and attract silence.
+- `--actor-post-game-smoke` runs the actor runtime through final-life
+  post-game play: three actor-owned pod/player collisions, high-score initials
+  entry, a 60-step Hall-of-Fame game-over stall, and return to the Williams
+  attract reveal, with actor event, sound, draw-plan, and sprite atlas checks.
 - `--actor-wgpu-smoke` renders the same actor smoke frames through the actual
   offscreen `wgpu` readback path and verifies nonblank dynamic frame signatures.
 - Normal `cargo run` and the explicit `--actor-live` alias open an interactive
@@ -900,7 +908,8 @@ make diff-check
 formatting, default and `legacy-tools` Rust tests, both clippy passes,
 clean-fidelity, reference-media helper tests, fresh owner-review evidence
 package, accepted report gate, MAME doctor, short MAME recorder smoke, README
-media generation, game/live smoke, docs lint, and diff hygiene.
+media generation, game smoke, actor attract/post-game smoke, live smoke, docs
+lint, and diff hygiene.
 
 `make fidelity` runs the broad gate: formatting, default Rust targets, default
 clippy, explicit `legacy-tools` Rust targets, `legacy-tools` clippy, trace
