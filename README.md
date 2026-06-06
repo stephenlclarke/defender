@@ -93,9 +93,10 @@ decrement the active player's stock and, when the other player has stock, enter
 a source-length `0x60` player-switch sleep exposed through `GameOverSnapshot`;
 the render bridge projects the source `PLAYER ONE` / `PLAYER TWO` plus
 `GAME OVER` switch prompts before the next stocked player's source start prompt
-and delayed actor playfield turn. Actor regressions now lock that the switch
-prompt persists across the full source switch sleep, clears at the handoff, and
-that the next player-start prompt owns the delayed start interval.
+and delayed actor playfield turn. Actor regressions now lock that the full
+source-glyph switch prompt persists across the full source switch sleep, clears
+at the handoff, and that the next player-start prompt owns the delayed start
+interval.
 `--actor-smoke` exercises that actor frame path through a
 scripted attract/play input sequence and the native draw planner, proving actor
 events, audio, sprites, projectiles, HUD text, overlays, and `wgpu` command-plan
@@ -276,8 +277,8 @@ score system, so threshold crossings add life/smart-bomb stock and emit
 awards now update the driver-owned active-player score/stock fields, so the
 actor session bridge preserves player-one/player-two ownership across
 two-player death switches. The remaining two-player prompt work is MAME media
-proof and exact pixel/timing parity beyond the now-locked source-message
-report/render contract. When source-counted hostile actors are gone and no
+proof beyond the now-locked source-message report/render and full source-glyph
+placement contract. When source-counted hostile actors are gone and no
 actor enemy reserves remain, the actor driver publishes a wave-cleared interstitial
 `StepReport` before spawning the next wave: the clear report keeps surviving
 humans visible for the source `ATTACK WAVE` / `COMPLETED` / `BONUS X`

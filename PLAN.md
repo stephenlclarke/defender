@@ -152,10 +152,10 @@ verification tools.
   script during the handoff, render the source `PLAYER ONE` / `PLAYER TWO` plus
   `GAME OVER` switch prompts, and start the next stocked player's delayed
   source-prompt actor turn when the switch sleep expires. Focused actor
-  regressions now lock the switch prompt across the full source sleep, prove it
-  clears at the handoff, and verify the next player-start prompt owns the
-  delayed start interval. The remaining two-player fidelity boundary is MAME
-  media proof and exact prompt pixel/timing parity beyond that source-message
+  regressions now lock the full source-glyph switch prompt across the full
+  source sleep, prove it clears at the handoff, and verify the next
+  player-start prompt owns the delayed start interval. The remaining
+  two-player fidelity boundary is MAME media proof beyond that source-message
   report/render contract. Actor high-score initials
   submission now reports accepted and submitted initials through the clean event
   bridge, enters a finite 60-step
@@ -881,6 +881,21 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-06 03:35 BST`: Completed the actor two-player source-prompt
+  proof-hardening cycle. The two-player start/switch regressions now assert the
+  full source message-glyph run in the rendered actor scene, including exact
+  glyph sprite id, overlay layer, source-derived position, glyph size, and white
+  tint for `PLAYER ONE`, `PLAYER TWO`, and `GAME OVER` prompts. The shared
+  source-message assertion now checks every visible glyph instead of only the
+  first glyph, and the player-switch helper verifies both the switch
+  interstitial prompts and the next player's start prompt at the handoff. No
+  protected media or legacy code was touched. Validation passed with
+  `cargo fmt --check`, `cargo test actor_two_player --lib`,
+  `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`, touched
+  docs markdownlint, and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780712978428889`.
 - `2026-06-06 03:24 BST`: Completed the retired `oldsrc/` cleanup cycle. The
   unused pre-clean source snapshot has been removed from the tracked workspace,
   leaving `src_legacy/` as the only intentional legacy boundary for explicit

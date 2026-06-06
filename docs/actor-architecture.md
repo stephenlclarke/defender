@@ -156,9 +156,9 @@ handoff frame starts the next player's delay, and does not leak into the
 eventual `WaveStarted` report.
 
 The current actor handoff deliberately keeps the remaining visual gap explicit:
-the bounded switch/start state and source-message glyph projection are locked,
-but full MAME media proof and exact prompt pixel/timing parity remain a separate
-fidelity boundary.
+the bounded switch/start state, source-message glyph projection, and exact
+source-glyph prompt placement are locked, but full MAME media proof remains a
+separate fidelity boundary.
 
 ## Behavior Scripts
 

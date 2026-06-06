@@ -17332,6 +17332,7 @@ mod tests {
         );
         assert!(started.state.world.enemies.is_empty());
         assert_source_message(&started.report, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
+        assert_source_message_scene(&started.scene, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
 
         let status = runtime.step(GameInput::NONE);
         assert_text(&status.report, "2UP 000000");
@@ -17344,6 +17345,7 @@ mod tests {
             })
         );
         assert_source_message(&status.report, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
+        assert_source_message_scene(&status.scene, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
 
         let active = step_until_player_start_completes(&mut runtime, 1);
         assert_eq!(active.report.phase, Phase::Playing);
@@ -17478,6 +17480,7 @@ mod tests {
         );
         assert!(switched.state.world.enemies.is_empty());
         assert_source_message(&switched.report, "PLYR2", SOURCE_PLAYER_START_PROMPT_SCREEN);
+        assert_source_message_scene(&switched.scene, "PLYR2", SOURCE_PLAYER_START_PROMPT_SCREEN);
 
         let active = step_until_player_start_completes(&mut runtime, 2);
         assert_eq!(active.report.phase, Phase::Playing);
@@ -17549,6 +17552,7 @@ mod tests {
             })
         );
         assert_source_message(&switched.report, "PLYR2", SOURCE_PLAYER_START_PROMPT_SCREEN);
+        assert_source_message_scene(&switched.scene, "PLYR2", SOURCE_PLAYER_START_PROMPT_SCREEN);
 
         let active = step_until_player_start_completes(&mut runtime, 2);
         assert_eq!(active.report.current_player, 2);
@@ -17640,6 +17644,7 @@ mod tests {
             })
         );
         assert_source_message(&switched.report, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
+        assert_source_message_scene(&switched.scene, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
 
         let active = step_until_player_start_completes(&mut runtime, 1);
         assert_eq!(active.report.current_player, 1);
@@ -23825,6 +23830,16 @@ mod tests {
                 SOURCE_PLAYER_SWITCH_LABEL_SCREEN,
             );
             assert_source_message(&waiting.report, "GO", SOURCE_PLAYER_SWITCH_GAME_OVER_SCREEN);
+            assert_source_message_scene(
+                &waiting.scene,
+                player_source_message_label(from_player),
+                SOURCE_PLAYER_SWITCH_LABEL_SCREEN,
+            );
+            assert_source_message_scene(
+                &waiting.scene,
+                "GO",
+                SOURCE_PLAYER_SWITCH_GAME_OVER_SCREEN,
+            );
             assert_no_source_message(
                 &waiting.report,
                 player_source_message_label(to_player),
@@ -23852,6 +23867,11 @@ mod tests {
         );
         assert_source_message(
             &switched.report,
+            player_source_message_label(to_player),
+            SOURCE_PLAYER_START_PROMPT_SCREEN,
+        );
+        assert_source_message_scene(
+            &switched.scene,
             player_source_message_label(to_player),
             SOURCE_PLAYER_START_PROMPT_SCREEN,
         );
@@ -24270,21 +24290,60 @@ mod tests {
     }
 
     fn assert_source_message(report: &StepReport, label: &str, top_left_screen_address: u16) {
-        let text = source_message_text(label).expect("source message label should exist");
-        let first_glyph = text
-            .chars()
-            .find_map(SpriteId::message_glyph)
-            .expect("source message should contain a visible glyph");
-        let position = source_screen_position(top_left_screen_address);
         let scene = report.render_scene();
+        assert_source_message_scene(&scene, label, top_left_screen_address);
+    }
+
+    fn assert_source_message_scene(scene: &RenderScene, label: &str, top_left_screen_address: u16) {
+        for (sprite_id, position, size) in
+            expected_plain_source_message_sprites(label, top_left_screen_address)
+        {
+            assert!(
+                scene.sprites.iter().any(|sprite| {
+                    sprite.sprite == sprite_id
+                        && sprite.layer == RenderLayer::Overlay
+                        && sprite.position == position
+                        && sprite.size == size
+                        && sprite.tint == Color::WHITE
+                }),
+                "expected full source message {label} glyph {sprite_id:?} at {top_left_screen_address:#06x}"
+            );
+        }
+    }
+
+    fn expected_plain_source_message_sprites(
+        label: &str,
+        top_left_screen_address: u16,
+    ) -> Vec<(SpriteId, [f32; 2], [f32; 2])> {
+        let text = source_message_text(label).expect("source message label should exist");
+        let mut cursor = top_left_screen_address;
+        let mut expected = Vec::new();
+        for character in text.chars() {
+            let size = SpriteId::message_glyph_size(character)
+                .expect("test source prompt should use clean message glyphs");
+            if character != ' ' {
+                let sprite =
+                    SpriteId::message_glyph(character).expect("visible prompt glyph should exist");
+                expected.push((
+                    sprite,
+                    source_screen_position(cursor),
+                    [size[0] as f32, size[1] as f32],
+                ));
+            }
+            cursor = source_test_text_cursor_after_glyph(cursor, size[0]);
+        }
         assert!(
-            scene.sprites.iter().any(|sprite| {
-                sprite.sprite == first_glyph
-                    && sprite.layer == RenderLayer::Overlay
-                    && sprite.position == position
-            }),
-            "expected source message {label} at {top_left_screen_address:#06x}"
+            !expected.is_empty(),
+            "source message {label} should contain visible glyphs"
         );
+        expected
+    }
+
+    fn source_test_text_cursor_after_glyph(cursor: u16, width_pixels: u32) -> u16 {
+        let [column, row] = cursor.to_be_bytes();
+        let width_columns =
+            u8::try_from(width_pixels / 2).expect("source glyph width should fit in u8");
+        u16::from_be_bytes([column.wrapping_add(width_columns).wrapping_add(1), row])
     }
 
     fn assert_no_source_message(report: &StepReport, label: &str, top_left_screen_address: u16) {
