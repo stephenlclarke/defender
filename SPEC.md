@@ -780,7 +780,10 @@ reintroduce legacy implementation terminology.
   actor-frame window using the existing `wgpu` presenter and actor-derived
   clean `GameFrame` handoff to live audio. They carry high-score
   initials/backspace through actor input for the actor-owned high-score-entry
-  phase.
+  phase. `--actor-script <path>` loads one checked sectioned actor driver
+  script into that live actor runtime before the window opens; it is rejected
+  with `--live-smoke` because that command still exercises the clean-game smoke
+  path.
 - Runtime renderer selection has been removed.
 - `--input-profile planetoid` is the default input profile.
 - `--input-profile cabinet` exposes a MAME-style cabinet keyboard profile.
@@ -826,7 +829,8 @@ reintroduce legacy implementation terminology.
   sectioned bundle also implements `str::parse::<ActorDriverScripts>()`,
   exposes `ActorDriverScripts::manifest()` before driver startup, and can be
   launched through `ActorRuntimeAdapter::with_scripts` for custom-driver
-  runtime checks.
+  runtime checks. The live actor runtime exposes the same path through
+  `--actor-script <path>`.
   Read-only script manifests expose persistent attract event, driver behavior,
   reusable wave/spawn behavior preset definitions, wave-profile configuration,
   and source wave-table metadata for source-backed wave profiles, and every

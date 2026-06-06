@@ -160,6 +160,7 @@ pub(crate) enum RuntimeCommand {
         input_profile: LiveInputProfile,
         audio_mode: LiveAudioMode,
         cmos_path: Option<PathBuf>,
+        actor_script_path: Option<PathBuf>,
     },
     WgpuLiveSmoke {
         input_profile: LiveInputProfile,
@@ -174,6 +175,7 @@ impl RuntimeCommand {
                 input_profile: input_profile(config.controls),
                 audio_mode: audio_mode(config.audio),
                 cmos_path: config.cmos_path.clone(),
+                actor_script_path: config.actor_script_path.clone(),
             },
             RunMode::Smoke => Self::WgpuLiveSmoke {
                 input_profile: input_profile(config.controls),
@@ -247,7 +249,13 @@ impl RuntimeBackend for InstalledRuntimeBackend {
                 input_profile,
                 audio_mode,
                 cmos_path,
-            } => crate::live_wgpu::run_actor_live(input_profile, audio_mode, cmos_path.as_deref()),
+                actor_script_path,
+            } => crate::live_wgpu::run_actor_live(
+                input_profile,
+                audio_mode,
+                cmos_path.as_deref(),
+                actor_script_path.as_deref(),
+            ),
             RuntimeCommand::WgpuLiveSmoke {
                 input_profile,
                 cmos_path,
@@ -451,6 +459,7 @@ pub(crate) fn help_text() -> &'static str {
         "defender\n",
         "  cargo run\n",
         "  cargo run -- --actor-live\n",
+        "  cargo run -- --actor-script /path/to/driver.script\n",
         "  cargo run -- --live-smoke\n",
         "  cargo run -- --game-smoke\n",
         "  cargo run -- --actor-smoke\n",
@@ -522,6 +531,7 @@ mod tests {
             audio: AudioOutput::Disabled,
             mode: RunMode::Interactive,
             cmos_path: Some(PathBuf::from("scores.bin")),
+            actor_script_path: Some(PathBuf::from("driver.script")),
         };
 
         host.run(&config).expect("runtime host should run backend");
@@ -533,6 +543,7 @@ mod tests {
                 input_profile: LiveInputProfile::Cabinet,
                 audio_mode: LiveAudioMode::Disabled,
                 cmos_path: Some(PathBuf::from("scores.bin")),
+                actor_script_path: Some(PathBuf::from("driver.script")),
             }]
         );
     }
@@ -801,6 +812,7 @@ mod tests {
                 input_profile: LiveInputProfile::Planetoid,
                 audio_mode: LiveAudioMode::Device,
                 cmos_path: None,
+                actor_script_path: None,
             }
         );
     }
@@ -812,6 +824,7 @@ mod tests {
             audio: AudioOutput::Null,
             mode: RunMode::Smoke,
             cmos_path: Some(PathBuf::from("smoke_cmos.bin")),
+            actor_script_path: None,
         };
 
         assert_eq!(
@@ -830,6 +843,7 @@ mod tests {
             audio: AudioOutput::Disabled,
             mode: RunMode::Interactive,
             cmos_path: Some(PathBuf::from("actor_cmos.bin")),
+            actor_script_path: Some(PathBuf::from("actor-driver.script")),
         };
 
         assert_eq!(
@@ -838,6 +852,7 @@ mod tests {
                 input_profile: LiveInputProfile::Cabinet,
                 audio_mode: LiveAudioMode::Disabled,
                 cmos_path: Some(PathBuf::from("actor_cmos.bin")),
+                actor_script_path: Some(PathBuf::from("actor-driver.script")),
             }
         );
     }
@@ -892,6 +907,7 @@ mod tests {
                 audio: AudioOutput::Null,
                 mode: RunMode::Interactive,
                 cmos_path: None,
+                actor_script_path: None,
             })
             .expect("installed backend should run config-driven actor live");
     }
@@ -1066,6 +1082,7 @@ mod tests {
 
         assert!(text.starts_with("defender\n  cargo run\n"));
         assert!(text.contains("--actor-live"));
+        assert!(text.contains("--actor-script /path/to/driver.script"));
         assert!(text.contains("--rom-report"));
         assert!(text.contains("--input-profile planetoid"));
         assert!(text.contains("--input-profile cabinet"));

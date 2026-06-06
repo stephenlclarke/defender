@@ -1,14 +1,13 @@
 //! Runtime-facing WGPU live launch facade.
 
-use std::path::Path;
 #[cfg(all(not(test), not(coverage)))]
 use std::{
     collections::BTreeSet,
     sync::{Arc, mpsc},
     time::{Duration, Instant},
 };
+use std::{fs, path::Path};
 
-#[cfg(all(not(test), not(coverage)))]
 use anyhow::Context;
 #[cfg(all(not(test), not(coverage)))]
 use winit::{
@@ -22,9 +21,14 @@ use winit::{
 
 #[cfg(any(test, all(not(test), not(coverage))))]
 use crate::game::GameInput;
+use crate::{
+    actor_game::{ActorDriverScripts, ActorRuntimeAdapter, XyzzyController, XyzzyMode},
+    actor_smoke::ActorSmokeReport,
+    audio::LiveAudioMode,
+    game_smoke::GameSmokeReport,
+};
 #[cfg(all(not(test), not(coverage)))]
 use crate::{
-    actor_game::ActorRuntimeAdapter,
     audio::LiveAudioRuntime,
     game::{Game, GameFrame},
     renderer::{
@@ -32,12 +36,6 @@ use crate::{
         SpriteBufferRole, SpriteBufferUpload, SpriteRenderPassEncoderCommand, SurfaceSize,
     },
     systems::{FixedStepAccumulator, FrameRate},
-};
-use crate::{
-    actor_game::{XyzzyController, XyzzyMode},
-    actor_smoke::ActorSmokeReport,
-    audio::LiveAudioMode,
-    game_smoke::GameSmokeReport,
 };
 
 #[cfg(all(not(test), not(coverage)))]
@@ -282,13 +280,28 @@ impl From<ActorSmokeReport> for LiveSmokeReport {
     }
 }
 
+pub(crate) fn actor_runtime_from_script_path(
+    actor_script_path: Option<&Path>,
+) -> anyhow::Result<ActorRuntimeAdapter> {
+    let Some(path) = actor_script_path else {
+        return Ok(ActorRuntimeAdapter::new());
+    };
+    let source = fs::read_to_string(path)
+        .with_context(|| format!("reading actor driver script {}", path.display()))?;
+    let scripts = source
+        .parse::<ActorDriverScripts>()
+        .with_context(|| format!("parsing actor driver script {}", path.display()))?;
+    Ok(ActorRuntimeAdapter::with_scripts(scripts))
+}
+
 #[cfg(all(not(test), not(coverage)))]
 pub(crate) fn run_actor_live(
     input_profile: LiveInputProfile,
     audio_mode: LiveAudioMode,
     cmos_path: Option<&Path>,
+    actor_script_path: Option<&Path>,
 ) -> anyhow::Result<()> {
-    run_actor_live_app(input_profile, audio_mode, cmos_path)
+    run_actor_live_app(input_profile, audio_mode, cmos_path, actor_script_path)
 }
 
 #[cfg(any(test, coverage))]
@@ -296,7 +309,9 @@ pub(crate) fn run_actor_live(
     _input_profile: LiveInputProfile,
     _audio_mode: LiveAudioMode,
     _cmos_path: Option<&Path>,
+    actor_script_path: Option<&Path>,
 ) -> anyhow::Result<()> {
+    let _runtime = actor_runtime_from_script_path(actor_script_path)?;
     Ok(())
 }
 
@@ -351,10 +366,16 @@ fn run_actor_live_app(
     input_profile: LiveInputProfile,
     audio_mode: LiveAudioMode,
     _cmos_path: Option<&Path>,
+    actor_script_path: Option<&Path>,
 ) -> anyhow::Result<()> {
     let event_loop =
         winit::event_loop::EventLoop::new().context("creating actor wgpu event loop")?;
-    let mut app = ActorLiveApp::new(input_profile, LiveAudioRuntime::for_mode(audio_mode));
+    let runtime = actor_runtime_from_script_path(actor_script_path)?;
+    let mut app = ActorLiveApp::new(
+        input_profile,
+        LiveAudioRuntime::for_mode(audio_mode),
+        runtime,
+    );
 
     event_loop
         .run_app(&mut app)
@@ -384,12 +405,16 @@ struct ActorLiveApp {
 
 #[cfg(all(not(test), not(coverage)))]
 impl ActorLiveApp {
-    fn new(input_profile: LiveInputProfile, audio: LiveAudioRuntime) -> Self {
+    fn new(
+        input_profile: LiveInputProfile,
+        audio: LiveAudioRuntime,
+        runtime: ActorRuntimeAdapter,
+    ) -> Self {
         let now = Instant::now();
         let frame_duration = Duration::from_micros(FrameRate::CABINET.frame_duration_micros());
         let mut app = Self {
             input_profile,
-            runtime: ActorRuntimeAdapter::new(),
+            runtime,
             audio,
             input: LiveInputState::default(),
             accumulator: FixedStepAccumulator::new(FrameRate::CABINET),
@@ -1599,9 +1624,17 @@ fn single_character(text: &str) -> Option<char> {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
     use crate::GameInput;
 
-    use super::{LiveInputState, LiveSmokeReport, run_actor_live, run_actor_wgpu_smoke, run_smoke};
+    use super::{
+        LiveInputState, LiveSmokeReport, actor_runtime_from_script_path, run_actor_live,
+        run_actor_wgpu_smoke, run_smoke,
+    };
 
     #[test]
     fn live_smoke_report_formats_current_cli_output() {
@@ -1714,8 +1747,91 @@ mod tests {
             super::LiveInputProfile::Test,
             crate::audio::LiveAudioMode::Null,
             None,
+            None,
         )
         .expect("actor live entrypoint should be wired");
+    }
+
+    #[test]
+    fn actor_live_entrypoint_loads_sectioned_script_file_under_tests() {
+        let path = write_actor_script_file(
+            "live-entrypoint",
+            "\
+            [attract]\n\
+            text 1 forever 12 20 LIVE SCRIPT\n\
+            [behavior]\n\
+            kind lander lander_mode drift\n\
+            [wave]\n\
+            name live script waves\n\
+            wave 1\n\
+            lander 80 214\n\
+            human 100 214\n",
+        );
+
+        run_actor_live(
+            super::LiveInputProfile::Test,
+            crate::audio::LiveAudioMode::Null,
+            None,
+            Some(&path),
+        )
+        .expect("actor live entrypoint should parse script file under tests");
+
+        let mut runtime = actor_runtime_from_script_path(Some(&path))
+            .expect("actor script path should build a runtime");
+        let frame = runtime.step(crate::actor_game::GameInput::NONE);
+
+        assert_eq!(
+            runtime.driver().script_manifest().wave_script.name,
+            "live script waves"
+        );
+        assert!(frame.report.draws.iter().any(|draw| {
+            draw.text.as_deref() == Some("LIVE SCRIPT")
+                && draw.position == crate::actor_game::Point::new(12, 20)
+        }));
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn actor_script_file_loader_reports_read_and_parse_context() {
+        let missing = unique_actor_script_path("missing-script");
+        let read_error = match actor_runtime_from_script_path(Some(&missing)) {
+            Ok(_) => panic!("missing script should fail"),
+            Err(error) => error,
+        };
+        assert!(
+            read_error
+                .to_string()
+                .contains("reading actor driver script")
+        );
+        assert!(
+            read_error
+                .to_string()
+                .contains(&missing.display().to_string())
+        );
+
+        let malformed = write_actor_script_file(
+            "malformed-script",
+            "\
+            [attract]\n\
+            text 1 forever 12 20 BAD SCRIPT\n\
+            [behavior]\n\
+            kind lander lander_mode drift\n\
+            [wave]\n\
+            lander 80 214\n",
+        );
+        let parse_error = match actor_runtime_from_script_path(Some(&malformed)) {
+            Ok(_) => panic!("malformed script should fail"),
+            Err(error) => error,
+        };
+        assert!(
+            parse_error
+                .to_string()
+                .contains("parsing actor driver script")
+        );
+        assert!(format!("{parse_error:#}").contains("actor driver wave script line 6"));
+
+        let _ = fs::remove_file(malformed);
     }
 
     #[test]
@@ -1820,5 +1936,22 @@ mod tests {
         input.apply(super::LiveControl::Hyperspace, false);
         input.apply(super::LiveControl::ServiceAutoUp, false);
         assert_eq!(input.drain_game_input(), GameInput::NONE);
+    }
+
+    fn write_actor_script_file(label: &str, source: &str) -> std::path::PathBuf {
+        let path = unique_actor_script_path(label);
+        fs::write(&path, source).expect("write actor script");
+        path
+    }
+
+    fn unique_actor_script_path(label: &str) -> std::path::PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "defender-{label}-{}-{nanos}.script",
+            std::process::id()
+        ))
     }
 }

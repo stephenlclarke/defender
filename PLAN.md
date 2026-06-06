@@ -47,8 +47,12 @@ verification tools.
   sectioned custom-driver bundle now implements
   `str::parse::<ActorDriverScripts>()`, exposes a pre-driver
   `ActorDriverScripts::manifest()`, and can boot the actor runtime directly
-  through `ActorRuntimeAdapter::with_scripts`. The built-in actor attract,
-  behavior, and wave scripts are embedded from
+  through `ActorRuntimeAdapter::with_scripts`. The live actor runtime also
+  accepts `--actor-script <path>` to load one checked sectioned custom-driver
+  script before the window opens, while rejecting that option with
+  `--live-smoke` so a custom actor script is never silently ignored by the
+  clean-game smoke path. The built-in actor attract, behavior, and wave scripts
+  are embedded from
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and
   `assets/red-label/actor-waves.script` through the same parser path. The
@@ -916,6 +920,36 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 06:34 BST`: Completed the actor script file runtime-loading
+  cycle. `--actor-script <path>` is now a live actor runtime option: the CLI
+  stores it in `RuntimeConfig`, runtime command mapping preserves it, and
+  `live_wgpu` reads the file, parses it as `ActorDriverScripts`, and boots
+  `ActorRuntimeAdapter::with_scripts` before the actor window starts. The CLI
+  rejects `--actor-script` with `--live-smoke` because that path still runs the
+  clean-game smoke. Focused regressions cover CLI classification, runtime
+  command propagation, live-entrypoint parsing of a sectioned script file,
+  custom attract drawing from that file-backed runtime, and contextual
+  read/parse failures. README, SPEC, and the actor architecture guide now
+  document the live script-file entry point. No legacy code, tests, or
+  scaffolding were safe to remove because this slice only opens the active
+  actor driver script surface to the playable runtime. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780723706769549>.
+  Validation passed with `cargo test actor_script --all-targets`, `cargo test
+  actor_live_entrypoint_loads_sectioned_script_file_under_tests --all-targets`,
+  `cargo test runtime_host_adapts_default_config_to_actor_launch_command
+  --all-targets`, `cargo test clean_cli_rejects_malformed_live_args
+  --all-targets`, `cargo test clean_help_text_preserves_current_cli_contract
+  --all-targets`, `cargo test
+  clean_runtime_and_oracle_use_quarantined_adapters --lib`, `cargo test
+  actor_live --all-targets --features legacy-tools`, `cargo test actor_game
+  --all-targets --features legacy-tools`, `cargo check --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features
+  legacy-tools -- -D warnings`, `make actor-smoke`, `make actor-wgpu-smoke`,
+  `cargo fmt --check`, `markdownlint README.md SPEC.md PLAN.md
+  docs/actor-architecture.md docs/fidelity/mame-golden-clips.md
+  docs/fidelity/release-closure-audit.md assets/sounds/README.md
+  assets/red-label/README.md`, and `git diff --check`.
 
 - `2026-06-06 06:20 BST`: Completed the runnable actor driver script cycle.
   Sectioned custom-driver scripts now implement

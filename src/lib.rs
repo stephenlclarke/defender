@@ -390,6 +390,7 @@ mod public_api_tests {
         assert!(platform_rs.contains("CleanCliError::MissingInputProfile"));
         assert!(platform_rs.contains("CleanCliError::UnknownInputProfile"));
         assert!(platform_rs.contains("CleanCliError::MissingCmosPath"));
+        assert!(platform_rs.contains("CleanCliError::MissingActorScriptPath"));
         assert!(platform_rs.contains("CleanCliError::RemovedRendererSelection"));
         assert!(platform_rs.contains("CleanCliError::UnknownArgument"));
         assert!(platform_rs.contains("RuntimeConfig::default()"));
@@ -397,6 +398,7 @@ mod public_api_tests {
         assert!(platform_rs.contains("\"--help\" | \"-h\" => ArgClassification::Help"));
         assert!(platform_rs.contains("ArgClassification::Error"));
         assert!(platform_rs.contains("\"--live-smoke\""));
+        assert!(platform_rs.contains("\"--actor-script\""));
         assert!(platform_rs.contains("\"--game-smoke\""));
         assert!(platform_rs.contains("\"--actor-smoke\""));
         assert!(platform_rs.contains("\"--actor-attract-smoke\""));

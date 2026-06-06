@@ -31,6 +31,7 @@ pub struct RuntimeConfig {
     pub audio: AudioOutput,
     pub mode: RunMode,
     pub cmos_path: Option<PathBuf>,
+    pub actor_script_path: Option<PathBuf>,
 }
 
 impl Default for RuntimeConfig {
@@ -40,6 +41,7 @@ impl Default for RuntimeConfig {
             audio: AudioOutput::Device,
             mode: RunMode::Interactive,
             cmos_path: None,
+            actor_script_path: None,
         }
     }
 }
@@ -244,6 +246,10 @@ impl RuntimeCliClassifier {
             }
         }
 
+        if config.mode == RunMode::Smoke && config.actor_script_path.is_some() {
+            return CliClassification::Error(CleanCliError::ActorScriptWithLiveSmoke);
+        }
+
         CliClassification::Runtime(config)
     }
 
@@ -343,6 +349,13 @@ impl RuntimeCliClassifier {
                     return ArgClassification::Error(CleanCliError::MissingCmosPath);
                 };
                 config.cmos_path = Some(PathBuf::from(value));
+                ArgClassification::Runtime
+            }
+            "--actor-script" => {
+                let Some(value) = args.next() else {
+                    return ArgClassification::Error(CleanCliError::MissingActorScriptPath);
+                };
+                config.actor_script_path = Some(PathBuf::from(value));
                 ArgClassification::Runtime
             }
             "--rom-report" => {
@@ -560,6 +573,8 @@ enum CleanCliError {
     MissingInputProfile,
     UnknownInputProfile(String),
     MissingCmosPath,
+    MissingActorScriptPath,
+    ActorScriptWithLiveSmoke,
     RemovedRendererSelection,
     UnknownArgument(String),
     LiveOptionsWithCommand(&'static str),
@@ -603,6 +618,14 @@ impl fmt::Display for CleanCliError {
                 write!(formatter, "unknown input profile: {value}")
             }
             Self::MissingCmosPath => write!(formatter, "--cmos-path requires a file path"),
+            Self::MissingActorScriptPath => write!(
+                formatter,
+                "--actor-script requires a sectioned actor driver script path"
+            ),
+            Self::ActorScriptWithLiveSmoke => write!(
+                formatter,
+                "--actor-script requires the actor live runtime; --live-smoke uses the clean smoke path"
+            ),
             Self::RemovedRendererSelection => {
                 write!(
                     formatter,
@@ -844,6 +867,7 @@ mod tests {
                 audio: AudioOutput::Disabled,
                 mode: RunMode::Interactive,
                 cmos_path: Some(PathBuf::from("scores.bin")),
+                actor_script_path: None,
             })
         );
     }
@@ -861,6 +885,35 @@ mod tests {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--actor-live"])),
             CliClassification::Runtime(RuntimeConfig::default())
+        );
+    }
+
+    #[test]
+    fn clean_cli_accepts_actor_script_for_interactive_actor_runtime() {
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&["--actor-script", "driver.script"])),
+            CliClassification::Runtime(RuntimeConfig {
+                controls: ControlProfile::Planetoid,
+                audio: AudioOutput::Device,
+                mode: RunMode::Interactive,
+                cmos_path: None,
+                actor_script_path: Some(PathBuf::from("driver.script")),
+            })
+        );
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&[
+                "--actor-live",
+                "--actor-script",
+                "driver.script",
+                "--mute",
+            ])),
+            CliClassification::Runtime(RuntimeConfig {
+                controls: ControlProfile::Planetoid,
+                audio: AudioOutput::Disabled,
+                mode: RunMode::Interactive,
+                cmos_path: None,
+                actor_script_path: Some(PathBuf::from("driver.script")),
+            })
         );
     }
 
@@ -920,6 +973,7 @@ mod tests {
                 audio: AudioOutput::Disabled,
                 mode: RunMode::Smoke,
                 cmos_path: Some(PathBuf::from("scores.bin")),
+                actor_script_path: None,
             })
         );
     }
@@ -940,6 +994,7 @@ mod tests {
                 audio: AudioOutput::Disabled,
                 mode: RunMode::Interactive,
                 cmos_path: Some(PathBuf::from("actor-scores.bin")),
+                actor_script_path: None,
             })
         );
     }
@@ -953,6 +1008,7 @@ mod tests {
                 audio: AudioOutput::Device,
                 mode: RunMode::Smoke,
                 cmos_path: None,
+                actor_script_path: None,
             })
         );
     }
@@ -1129,12 +1185,20 @@ mod tests {
                 vec!["--live-smoke", "--cmos-path"],
                 CleanCliError::MissingCmosPath,
             ),
+            (
+                vec!["--actor-script", "driver.script", "--live-smoke"],
+                CleanCliError::ActorScriptWithLiveSmoke,
+            ),
             (vec!["--input-profile"], CleanCliError::MissingInputProfile),
             (
                 vec!["--input-profile", "unknown"],
                 CleanCliError::UnknownInputProfile(String::from("unknown")),
             ),
             (vec!["--cmos-path"], CleanCliError::MissingCmosPath),
+            (
+                vec!["--actor-script"],
+                CleanCliError::MissingActorScriptPath,
+            ),
         ] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
@@ -1484,6 +1548,14 @@ mod tests {
         assert_eq!(
             CleanCliError::MissingCmosPath.to_string(),
             "--cmos-path requires a file path"
+        );
+        assert_eq!(
+            CleanCliError::MissingActorScriptPath.to_string(),
+            "--actor-script requires a sectioned actor driver script path"
+        );
+        assert_eq!(
+            CleanCliError::ActorScriptWithLiveSmoke.to_string(),
+            "--actor-script requires the actor live runtime; --live-smoke uses the clean smoke path"
         );
         assert_eq!(
             CleanCliError::RemovedRendererSelection.to_string(),
