@@ -127,7 +127,8 @@ wave, spawned world, reserve/source-state, and effective behavior counts/modes;
 it also advances through the actor `XYZZY` overlay smart-bomb path to report the
 source-shaped wave-clear survivor-bonus interstitial, its `0x80` wave-advance
 sleep window, next playable wave, and a bounded reserve activation batch sequence
-plus post-reserve wave-clear interstitial when progression reaches them. The checked
+plus post-reserve wave-clear and `0x80` sleep interstitials when progression reaches
+them. The checked
 `examples/actor-custom-attract.script` file is a minimal editable custom-driver
 starting point. Actor high-score entry now accepts live initials/backspace
 through the actor input surface and draws the in-progress initials row from

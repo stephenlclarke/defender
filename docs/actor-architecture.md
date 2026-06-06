@@ -93,9 +93,9 @@ evidence commands.
   checker then uses the actor `XYZZY` overlay smart-bomb path to assist
   progression and reports the source-shaped wave-clear survivor-bonus
   interstitial, its `0x80` wave-advance sleep window, next playable wave, and a
-  bounded reserve activation batch sequence plus post-reserve wave-clear
-  interstitial when real wave-clear/wave-start and reserve activation emit
-  their actor reports. The checked
+  bounded reserve activation batch sequence plus post-reserve wave-clear and
+  `0x80` sleep interstitials when real wave-clear/wave-start and reserve
+  activation emit their actor reports. The checked
   `examples/actor-custom-attract.script` file is the editable smoke-tested
   example. The shared live input state carries the same key
   bindings and `XYZZY` mode into actor steps. Actor high-score entry now
@@ -271,7 +271,9 @@ When that next wave still has enemy reserves, the checker keeps stepping the
 same actor path through smart-bomb cooldown and reserve activation, then reports
 each observed restored batch's spawned family counts, resulting source state,
 terminal batch status, and the first following `WaveCleared` interstitial after
-those source reserves are empty.
+those source reserves are empty. It then records the later survivor-bonus
+report that enters the post-reserve source `0x80` wave-advance sleep before the
+next playable wave starts.
 
 `AttractScript::manifest`, `ActorBehaviorScript::manifest`,
 `ActorWaveScript::manifest`, `ActorDriverScripts::manifest`, and

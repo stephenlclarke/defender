@@ -213,6 +213,8 @@ pub(crate) struct ActorScriptCheckReport {
     pub(crate) reserve_activation_status: String,
     pub(crate) post_reserve_wave_clear: Option<ActorScriptCheckWaveClearSummary>,
     pub(crate) post_reserve_wave_clear_unavailable_reason: Option<String>,
+    pub(crate) post_reserve_wave_clear_advance_sleep: Option<ActorScriptCheckWaveClearSummary>,
+    pub(crate) post_reserve_wave_clear_advance_sleep_unavailable_reason: Option<String>,
     pub(crate) clean_exit: bool,
 }
 
@@ -413,8 +415,22 @@ impl ActorScriptCheckReport {
                         .unwrap_or("not_sampled")
                 )
             });
+        let post_reserve_wave_clear_advance_sleep = self
+            .post_reserve_wave_clear_advance_sleep
+            .as_ref()
+            .map(|summary| {
+                wave_clear_summary_to_text("post_reserve_wave_clear_advance_sleep", summary)
+            })
+            .unwrap_or_else(|| {
+                format!(
+                    "  post_reserve_wave_clear_advance_sleep: unavailable,reason={}\n",
+                    self.post_reserve_wave_clear_advance_sleep_unavailable_reason
+                        .as_deref()
+                        .unwrap_or("not_sampled")
+                )
+            });
         format!(
-            "actor script check passed\n  path: {}\n  attract_events: {}\n  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_source_state: background_left=0x{:04x},rng={}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}{}{}{}  clean_exit: {}\n",
+            "actor script check passed\n  path: {}\n  attract_events: {}\n  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_source_state: background_left=0x{:04x},rng={}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}{}{}{}{}  clean_exit: {}\n",
             self.path,
             self.attract_events,
             self.behavior_kind_profiles,
@@ -456,6 +472,7 @@ impl ActorScriptCheckReport {
             next_playing,
             reserve_activation,
             post_reserve_wave_clear,
+            post_reserve_wave_clear_advance_sleep,
             self.clean_exit
         )
     }
@@ -694,6 +711,10 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         post_reserve_wave_clear: reserve_activation.post_reserve_wave_clear,
         post_reserve_wave_clear_unavailable_reason: reserve_activation
             .post_reserve_wave_clear_unavailable_reason,
+        post_reserve_wave_clear_advance_sleep: reserve_activation
+            .post_reserve_wave_clear_advance_sleep,
+        post_reserve_wave_clear_advance_sleep_unavailable_reason: reserve_activation
+            .post_reserve_wave_clear_advance_sleep_unavailable_reason,
         clean_exit: true,
     })
 }
@@ -719,6 +740,8 @@ struct ActorScriptCheckReserveActivationSequence {
     status: String,
     post_reserve_wave_clear: Option<ActorScriptCheckWaveClearSummary>,
     post_reserve_wave_clear_unavailable_reason: Option<String>,
+    post_reserve_wave_clear_advance_sleep: Option<ActorScriptCheckWaveClearSummary>,
+    post_reserve_wave_clear_advance_sleep_unavailable_reason: Option<String>,
 }
 
 fn actor_script_check_playing_summary(frame: &ActorFrame) -> ActorScriptCheckPlayingSummary {
@@ -1005,6 +1028,8 @@ impl ActorScriptCheckReserveActivationSequence {
             status: status.to_string(),
             post_reserve_wave_clear: None,
             post_reserve_wave_clear_unavailable_reason: Some(status.to_string()),
+            post_reserve_wave_clear_advance_sleep: None,
+            post_reserve_wave_clear_advance_sleep_unavailable_reason: Some(status.to_string()),
         }
     }
 
@@ -1015,12 +1040,17 @@ impl ActorScriptCheckReserveActivationSequence {
     fn with_post_reserve_wave_clear(
         batches: Vec<ActorScriptCheckReserveActivationSummary>,
         summary: ActorScriptCheckWaveClearSummary,
+        advance_sleep: Option<ActorScriptCheckWaveClearSummary>,
+        advance_sleep_unavailable_reason: Option<String>,
     ) -> Self {
         Self {
             batches,
             status: String::from("reserve_empty"),
             post_reserve_wave_clear: Some(summary),
             post_reserve_wave_clear_unavailable_reason: None,
+            post_reserve_wave_clear_advance_sleep: advance_sleep,
+            post_reserve_wave_clear_advance_sleep_unavailable_reason:
+                advance_sleep_unavailable_reason,
         }
     }
 
@@ -1033,6 +1063,8 @@ impl ActorScriptCheckReserveActivationSequence {
             status: String::from("reserve_empty"),
             post_reserve_wave_clear: None,
             post_reserve_wave_clear_unavailable_reason: Some(reason.to_string()),
+            post_reserve_wave_clear_advance_sleep: None,
+            post_reserve_wave_clear_advance_sleep_unavailable_reason: Some(reason.to_string()),
         }
     }
 }
@@ -1050,8 +1082,12 @@ fn actor_script_check_to_post_reserve_wave_clear(
         frame = runtime.step(input);
         let assist_steps = reserve_empty_assist_steps.saturating_add(step as u32);
         if let Some(summary) = actor_script_check_wave_clear_summary(&frame, assist_steps) {
-            return ActorScriptCheckReserveActivationSequence::with_post_reserve_wave_clear(
-                batches, summary,
+            return actor_script_check_to_post_reserve_wave_clear_advance_sleep(
+                runtime,
+                frame,
+                assist_steps,
+                batches,
+                summary,
             );
         }
         if frame.report.wave > wave {
@@ -1065,6 +1101,62 @@ fn actor_script_check_to_post_reserve_wave_clear(
     ActorScriptCheckReserveActivationSequence::with_post_reserve_wave_clear_unavailable(
         batches,
         "post_reserve_wave_clear_not_observed",
+    )
+}
+
+fn actor_script_check_to_post_reserve_wave_clear_advance_sleep(
+    runtime: &mut ActorRuntimeAdapter,
+    wave_clear_frame: ActorFrame,
+    wave_clear_assist_steps: u32,
+    batches: Vec<ActorScriptCheckReserveActivationSummary>,
+    wave_clear: ActorScriptCheckWaveClearSummary,
+) -> ActorScriptCheckReserveActivationSequence {
+    let mut frame = wave_clear_frame;
+    let wave = frame.report.wave;
+    if let Some(summary) =
+        actor_script_check_wave_clear_advance_sleep_summary(&frame, wave_clear_assist_steps)
+    {
+        return ActorScriptCheckReserveActivationSequence::with_post_reserve_wave_clear(
+            batches,
+            wave_clear,
+            Some(summary),
+            None,
+        );
+    }
+
+    for step in 1..=ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT {
+        let input = actor_script_check_assist_input(&frame);
+        frame = runtime.step(input);
+        let assist_steps = wave_clear_assist_steps.saturating_add(step as u32);
+        if let Some(summary) =
+            actor_script_check_wave_clear_advance_sleep_summary(&frame, assist_steps)
+        {
+            return ActorScriptCheckReserveActivationSequence::with_post_reserve_wave_clear(
+                batches,
+                wave_clear,
+                Some(summary),
+                None,
+            );
+        }
+        if frame.report.wave > wave {
+            return ActorScriptCheckReserveActivationSequence::with_post_reserve_wave_clear(
+                batches,
+                wave_clear,
+                None,
+                Some(String::from(
+                    "wave_advanced_before_post_reserve_wave_clear_advance_sleep",
+                )),
+            );
+        }
+    }
+
+    ActorScriptCheckReserveActivationSequence::with_post_reserve_wave_clear(
+        batches,
+        wave_clear,
+        None,
+        Some(String::from(
+            "post_reserve_wave_clear_advance_sleep_not_observed",
+        )),
     )
 }
 
@@ -2775,6 +2867,13 @@ mod tests {
             report.post_reserve_wave_clear_unavailable_reason.as_deref(),
             Some("next_playing_has_no_reserve")
         );
+        assert!(report.post_reserve_wave_clear_advance_sleep.is_none());
+        assert_eq!(
+            report
+                .post_reserve_wave_clear_advance_sleep_unavailable_reason
+                .as_deref(),
+            Some("next_playing_has_no_reserve")
+        );
         assert!(report.clean_exit);
         assert_eq!(
             report.to_text(),
@@ -2823,6 +2922,7 @@ mod tests {
                 "  reserve_activation_batches: 0\n",
                 "  reserve_activation_status: next_playing_has_no_reserve\n",
                 "  post_reserve_wave_clear: unavailable,reason=next_playing_has_no_reserve\n",
+                "  post_reserve_wave_clear_advance_sleep: unavailable,reason=next_playing_has_no_reserve\n",
                 "  clean_exit: true\n",
             )
         );
@@ -2948,6 +3048,10 @@ mod tests {
             .post_reserve_wave_clear
             .as_ref()
             .expect("checker should report wave clear after reserve exhaustion");
+        let post_reserve_wave_sleep = report
+            .post_reserve_wave_clear_advance_sleep
+            .as_ref()
+            .expect("checker should report post-reserve wave advance sleep");
         assert_eq!(report.reserve_activation_batches.len(), 3);
         let first_activation = &report.reserve_activation_batches[0];
         let second_activation = &report.reserve_activation_batches[1];
@@ -3063,6 +3167,28 @@ mod tests {
             None
         );
         assert!(report.post_reserve_wave_clear_unavailable_reason.is_none());
+        assert_eq!(post_reserve_wave_sleep.assist_steps, 776);
+        assert_eq!(post_reserve_wave_sleep.next_wave, 3);
+        assert_eq!(post_reserve_wave_sleep.score, 6400);
+        assert_eq!(post_reserve_wave_sleep.world_enemies, 0);
+        assert_eq!(post_reserve_wave_sleep.world_humans, 10);
+        assert_eq!(post_reserve_wave_sleep.total_survivors, Some(10));
+        assert_eq!(post_reserve_wave_sleep.visible_icons, Some(10));
+        assert_eq!(post_reserve_wave_sleep.remaining_awards, Some(0));
+        assert_eq!(post_reserve_wave_sleep.awarded_points, None);
+        assert_eq!(
+            post_reserve_wave_sleep.astronaut_sleep_steps_remaining,
+            Some(0)
+        );
+        assert_eq!(
+            post_reserve_wave_sleep.wave_advance_sleep_steps_remaining,
+            Some(128)
+        );
+        assert!(
+            report
+                .post_reserve_wave_clear_advance_sleep_unavailable_reason
+                .is_none()
+        );
         assert!(report.to_text().contains(
             "next_playing_source_counts: landers=1,bombers=1,pods=1,mutants=0,swarmers=0"
         ));
@@ -3115,6 +3241,12 @@ mod tests {
         );
         assert!(report.to_text().contains(
             "post_reserve_wave_clear_survivor_bonus: total=10,visible_icons=1,remaining_awards=9,awarded_points=200"
+        ));
+        assert!(report.to_text().contains(
+            "post_reserve_wave_clear_advance_sleep_survivor_bonus: total=10,visible_icons=10,remaining_awards=0,awarded_points=none"
+        ));
+        assert!(report.to_text().contains(
+            "post_reserve_wave_clear_advance_sleep_sleep: astronaut_steps=0,wave_advance_steps=128"
         ));
     }
 

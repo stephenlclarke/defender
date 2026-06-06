@@ -66,7 +66,8 @@ verification tools.
   reserve activation to report a bounded restored reserve batch sequence,
   including each batch's spawned family counts, resulting source/reserve state,
   terminal batch status, and the first following post-reserve wave-clear
-  interstitial after those source reserves are empty.
+  interstitial plus its `0x80` wave-advance sleep after those source reserves
+  are empty.
   `examples/actor-custom-attract.script` provides a checked editable
   starting point. The built-in actor attract, behavior, and
   wave scripts are embedded from
@@ -943,6 +944,31 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 18:17 BST`: Completed the actor script post-reserve
+  wave-advance sleep checker cycle. After a checked reserve-heavy custom
+  driver reaches `post_reserve_wave_clear_*`, `--actor-script-check <path>`
+  now keeps stepping the same actor `XYZZY` assist path until the following
+  survivor-bonus report enters the source `0x80` wave-advance sleep, then
+  reports it as `post_reserve_wave_clear_advance_sleep_*`. The focused
+  regression proves the post-reserve wave-three sleep arrives at cumulative
+  assist step `776`, score `6400`, zero world enemies, ten survivors, ten
+  visible icons, no remaining awards, awarded points `none`, astronaut sleep
+  `0`, and wave-advance sleep `128`, while the minimal checked example reports
+  the block as unavailable with reason `next_playing_has_no_reserve`. No legacy
+  code, tests, or scaffolding were safe to remove because this slice hardens
+  the active script-authoring preflight. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780762318637019>.
+  Validation passed with `cargo fmt --check`, `cargo test actor_script_check
+  --all-targets --features legacy-tools`, `cargo test actor_script
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, `cargo run
+  --quiet --features legacy-tools -- --actor-script-check
+  examples/actor-custom-attract.script`, `make actor-smoke`, `make
+  actor-wgpu-smoke`, `markdownlint README.md SPEC.md PLAN.md
+  docs/actor-architecture.md`, and `git diff --check`.
 
 - `2026-06-06 17:09 BST`: Completed the actor script post-reserve wave-clear
   checker cycle. `--actor-script-check <path>` now keeps stepping the same
