@@ -124,18 +124,22 @@ drivers, `ActorBehaviorScript` profiles for level-wide and per-actor movement
 and behavior tuning, script-selectable lander behavior modes, script-selectable
 non-source hostile drift/chase modes, and named `ActorWaveScript` progression
 backed by `assets/red-label/wave-table.tsv` for active wave size, lander and
-bomber movement speed, lander fire cadence, baiter entry/shot/seek timing, and
-scripted hostile/human spawn records. Read-only script manifests expose the
-configured attract events, driver behavior, wave profiles, and source wave-table
-metadata for source-backed profiles, while each `StepReport` carries the
-effective per-step behavior manifest after transient input overrides such as
-`XYZZY` invincibility. Behavior scripts can also be parsed from checked text
-lines that update default, actor-kind, or actor-id profiles. Wave scripts can
-be parsed from checked text lines that name wave profiles, per-wave behavior
-updates, and `lander` / `bomber` / `pod` / `mutant` / `swarmer` / `baiter` /
-`human` spawn records, including spawn-index behavior profiles that become
-actor-id profiles after the driver allocates those wave actors. The built-in
-actor attract,
+bomber movement speed, source family counts including direct mutants and
+swarmers, lander fire cadence, baiter entry/shot/seek timing, and scripted
+hostile/human spawn records. Read-only script manifests expose the configured
+attract events, driver behavior, wave profiles, and source wave-table metadata
+for source-backed profiles, while each `StepReport` carries the effective
+per-step behavior manifest after transient input overrides such as `XYZZY`
+invincibility. Behavior scripts can also be parsed from checked text lines that
+update default, actor-kind, or actor-id profiles. Wave scripts can be parsed
+from checked text lines that name wave profiles, per-wave behavior updates, and
+`lander` / `bomber` / `pod` / `mutant` / `swarmer` / `baiter` / `human` spawn
+records, including spawn-index behavior profiles that become actor-id profiles
+after the driver allocates those wave actors. `source_wave <wave>` lines can
+also override individual source profile fields, letting custom drivers keep
+source-shaped allocation, movement, shots, baiter timing, and mutant hop
+behavior while tuning the counts and constants for a specific level. The
+built-in actor attract,
 behavior, and wave scripts are embedded from
 `assets/red-label/actor-attract.script`,
 `assets/red-label/actor-behavior.script`, and
@@ -168,14 +172,15 @@ scripts; the older one-column `high_scores` action remains available for custom
 screens.
 The default actor wave allocator now
 uses the source active-family
-shape, so later waves can introduce bomber and pod actor families alongside
-landers instead of remaining lander-only. Source wave profiles now retain the
-source enemy reserve counts after the active batch, expose those counts through
-`StepReport` and the clean state bridge, and activate source-restored reserve
-batches before the driver can publish `WaveCleared`. Lander reserves fill the
-next active batch first; once landers are exhausted, bomber, pod, direct mutant,
-and swarmer reserves use their source restore placement/fraction metadata. When
-the first wave is still active, the actor driver now arms the source 449-step
+shape, so later waves can introduce bomber, pod, direct mutant, and swarmer
+actor families alongside landers instead of remaining lander-only. Source wave
+profiles now retain the source enemy reserve counts after the active batch,
+expose those counts through `StepReport` and the clean state bridge, and
+activate source-restored reserve batches before the driver can publish
+`WaveCleared`. Lander reserves fill the next active batch first; once landers
+are exhausted, bomber, pod, direct mutant, and swarmer reserves use their source
+restore placement/fraction metadata. When the first wave is still active, the
+actor driver now arms the source 449-step
 early reserve cadence, materializes the five MAME-observed early reserve lander
 rows with the `0xEA` appearance cue, preserves the target-list cursor/RNG reset,
 and keeps the remaining first-wave lander reserve for later refill behavior. The
@@ -207,7 +212,10 @@ allocates actor ids for the wave.
 Source-backed wave-profile manifests preserve the exact `ActorSourceWaveProfile`
 record expanded from `wave-table.tsv`, so custom drivers can inspect source
 active counts, movement, shot cadence, baiter timing, and mutant hop/shot
-settings without reading private driver state.
+settings without reading private driver state. Parsed `source_wave` overrides
+preserve that manifest field with the effective tuned profile, and actors read
+the same effective profile from `StepPrompt` instead of re-reading table
+defaults.
 Source-backed landers, bombers, pods, swarmers, baiters, and humans publish
 their fixed-point metadata through snapshots, publish per-step movement/facing
 metadata for the clean state bridge, and advance fraction state during active

@@ -2114,6 +2114,7 @@ pub struct ActorSourceWaveProfile {
     pub landers: u8,
     pub bombers: u8,
     pub pods: u8,
+    pub mutants: u8,
     pub swarmers: u8,
     pub wave_size: u8,
     pub lander_x_velocity: u8,
@@ -2622,6 +2623,33 @@ impl ActorMutantSpawn {
         }
     }
 
+    fn source_initial(
+        position: Point,
+        profile: ActorSourceWaveProfile,
+        spawn_index: usize,
+    ) -> Self {
+        let mut source_rng = SOURCE_DEFAULT_RNG;
+        for _ in 0..=spawn_index {
+            source_rng.advance();
+        }
+        let shot_timer =
+            source_rng.advance_rmax(profile.mutant_shot_time.min(u32::from(u8::MAX)) as u8);
+        Self {
+            position,
+            source: Some(ActorSourceMutantMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                shot_timer,
+                sleep_ticks: 0,
+                hop_rng: source_rng.snapshot(),
+                render_x_correction: 0,
+                target6_first_shot_deferred: false,
+            }),
+        }
+    }
+
     fn source_restore(
         source_rng: &mut ActorSourceRng,
         profile: ActorSourceWaveProfile,
@@ -2806,6 +2834,7 @@ impl ActorSourceWaveProfile {
             landers: actor_source_wave_u8("landers", wave),
             bombers: actor_source_wave_u8("bombers", wave),
             pods: actor_source_wave_u8("pods", wave),
+            mutants: actor_source_wave_u8("mutants", wave),
             swarmers: actor_source_wave_u8("swarmers", wave),
             wave_size: actor_source_wave_u8("wave_size", wave),
             lander_x_velocity: actor_source_wave_u8("lander_x_velocity", wave),
@@ -2890,13 +2919,30 @@ impl ActorSourceWaveProfile {
             .collect()
     }
 
+    fn mutant_spawns(self) -> Vec<ActorMutantSpawn> {
+        self.active_family_slots()
+            .into_iter()
+            .filter(|slot| slot.kind == ActorSourceEnemyKind::Mutant)
+            .map(|slot| ActorMutantSpawn::source_initial(slot.position, self, slot.index))
+            .collect()
+    }
+
+    fn swarmer_spawns(self) -> Vec<ActorSwarmerSpawn> {
+        let mut source_rng = SOURCE_DEFAULT_RNG;
+        self.active_family_slots()
+            .into_iter()
+            .filter(|slot| slot.kind == ActorSourceEnemyKind::Swarmer)
+            .map(|slot| ActorSwarmerSpawn::source_from_pod(&mut source_rng, self, slot.position))
+            .collect()
+    }
+
     fn enemy_reserve_after_active_batch(self) -> EnemyReserveSnapshot {
         let mut reserve = EnemyReserveSnapshot {
             landers: self.landers,
             bombers: self.bombers,
             pods: self.pods,
+            mutants: self.mutants,
             swarmers: self.swarmers,
-            ..EnemyReserveSnapshot::default()
         };
         for slot in self.active_family_slots() {
             actor_enemy_reserve_take(&mut reserve, slot.kind);
@@ -2909,31 +2955,29 @@ impl ActorSourceWaveProfile {
             landers: self.landers,
             bombers: self.bombers,
             pods: self.pods,
-            mutants: 0,
-            swarmers: 0,
+            mutants: self.mutants,
+            swarmers: self.swarmers,
         };
         let target = usize::from(self.wave_size)
             .min(SOURCE_MAX_ACTIVE_WAVE_ENEMIES)
             .min(usize::from(counts.total()));
         let mut kinds = Vec::with_capacity(target);
 
-        push_actor_source_kind(
-            &mut kinds,
-            &mut counts,
-            target,
-            ActorSourceEnemyKind::Lander,
-        );
-        push_actor_source_kind(
-            &mut kinds,
-            &mut counts,
-            target,
-            ActorSourceEnemyKind::Bomber,
-        );
-        push_actor_source_kind(&mut kinds, &mut counts, target, ActorSourceEnemyKind::Pod);
         for kind in [
             ActorSourceEnemyKind::Lander,
             ActorSourceEnemyKind::Bomber,
             ActorSourceEnemyKind::Pod,
+            ActorSourceEnemyKind::Mutant,
+            ActorSourceEnemyKind::Swarmer,
+        ] {
+            push_actor_source_kind(&mut kinds, &mut counts, target, kind);
+        }
+        for kind in [
+            ActorSourceEnemyKind::Lander,
+            ActorSourceEnemyKind::Bomber,
+            ActorSourceEnemyKind::Pod,
+            ActorSourceEnemyKind::Mutant,
+            ActorSourceEnemyKind::Swarmer,
         ] {
             while kinds.len() < target && counts.take(kind) {
                 kinds.push(kind);
@@ -3446,6 +3490,13 @@ impl ActorWaveScript {
 
     fn source_backed_profile(wave: u16) -> ActorWaveProfile {
         let source = ActorSourceWaveProfile::for_wave(wave);
+        Self::source_backed_profile_from_source(wave, source)
+    }
+
+    fn source_backed_profile_from_source(
+        wave: u16,
+        source: ActorSourceWaveProfile,
+    ) -> ActorWaveProfile {
         let human_spawns = source.human_spawns(wave);
         ActorWaveProfile::with_family_spawns(
             wave,
@@ -3466,6 +3517,8 @@ impl ActorWaveScript {
             human_spawns,
         )
         .with_source_wave(source)
+        .with_mutant_spawns(source.mutant_spawns())
+        .with_swarmer_spawns(source.swarmer_spawns())
         .with_enemy_reserve(source.enemy_reserve_after_active_batch())
     }
 
@@ -3584,8 +3637,12 @@ impl ParsedActorWaveScript {
             }
             "source_wave" | "source_backed_wave" => {
                 let wave = parse_wave_u16(line_number, parts.next(), "wave")?;
-                reject_extra_wave_fields(line_number, parts)?;
-                self.push_profile(line_number, ParsedActorWaveProfile::source_backed(wave))
+                let mut source = ActorSourceWaveProfile::for_wave(wave);
+                parse_source_wave_profile_updates(line_number, &mut source, parts)?;
+                self.push_profile(
+                    line_number,
+                    ParsedActorWaveProfile::source_backed_from_source(wave, source),
+                )
             }
             "source_waves" | "source_backed_waves" => {
                 let first = parse_wave_u16(line_number, parts.next(), "first wave")?.max(1);
@@ -3809,7 +3866,11 @@ impl ParsedActorWaveProfile {
     }
 
     fn source_backed(wave: u16) -> Self {
-        let profile = ActorWaveScript::source_backed_profile(wave);
+        Self::source_backed_from_source(wave, ActorSourceWaveProfile::for_wave(wave))
+    }
+
+    fn source_backed_from_source(wave: u16, source: ActorSourceWaveProfile) -> Self {
+        let profile = ActorWaveScript::source_backed_profile_from_source(wave, source);
         Self {
             wave: profile.wave,
             source_wave: profile.source_wave,
@@ -3906,6 +3967,94 @@ fn parse_wave_human_mode<'a>(
     }
 }
 
+fn parse_source_wave_profile_updates<'a>(
+    line_number: usize,
+    source: &mut ActorSourceWaveProfile,
+    mut parts: impl Iterator<Item = &'a str>,
+) -> Result<(), ActorWaveScriptParseError> {
+    while let Some(field) = parts.next() {
+        let value = parts.next().ok_or_else(|| {
+            ActorWaveScriptParseError::new(
+                line_number,
+                format!("source wave field `{field}` needs a value"),
+            )
+        })?;
+        apply_source_wave_profile_field(line_number, source, field, value)?;
+    }
+    Ok(())
+}
+
+fn apply_source_wave_profile_field(
+    line_number: usize,
+    source: &mut ActorSourceWaveProfile,
+    field: &str,
+    value: &str,
+) -> Result<(), ActorWaveScriptParseError> {
+    match normalize_script_token(field).as_str() {
+        "landers" => source.landers = parse_wave_u8(line_number, Some(value), field)?,
+        "bombers" => source.bombers = parse_wave_u8(line_number, Some(value), field)?,
+        "pods" => source.pods = parse_wave_u8(line_number, Some(value), field)?,
+        "mutants" => source.mutants = parse_wave_u8(line_number, Some(value), field)?,
+        "swarmers" => source.swarmers = parse_wave_u8(line_number, Some(value), field)?,
+        "wave_size" => source.wave_size = parse_wave_u8(line_number, Some(value), field)?,
+        "lander_x_velocity" => {
+            source.lander_x_velocity = parse_wave_u8(line_number, Some(value), field)?
+        }
+        "lander_y_velocity_msb" => {
+            source.lander_y_velocity_msb = parse_wave_u8(line_number, Some(value), field)?
+        }
+        "lander_y_velocity_lsb" => {
+            source.lander_y_velocity_lsb = parse_wave_u8(line_number, Some(value), field)?
+        }
+        "bomber_x_velocity" => {
+            source.bomber_x_velocity = parse_wave_u8(line_number, Some(value), field)?
+        }
+        "swarmer_x_velocity" => {
+            source.swarmer_x_velocity = parse_wave_u8(line_number, Some(value), field)?
+        }
+        "swarmer_shot_time" => {
+            source.swarmer_shot_time = parse_wave_u32(line_number, Some(value), field)?
+        }
+        "swarmer_acceleration_mask" => {
+            source.swarmer_acceleration_mask = parse_wave_u8(line_number, Some(value), field)?
+        }
+        "baiter_time" | "baiter_delay" => {
+            source.baiter_delay = parse_wave_u32(line_number, Some(value), field)?
+        }
+        "baiter_shot_time" => {
+            source.baiter_shot_time = parse_wave_u32(line_number, Some(value), field)?
+        }
+        "baiter_seek_probability" => {
+            source.baiter_seek_probability = parse_wave_u8(line_number, Some(value), field)?
+        }
+        "lander_shot_time" => {
+            source.lander_shot_time = parse_wave_u32(line_number, Some(value), field)?
+        }
+        "mutant_random_y" => {
+            source.mutant_random_y = parse_wave_u8(line_number, Some(value), field)?
+        }
+        "mutant_y_velocity_msb" => {
+            source.mutant_y_velocity_msb = parse_wave_u8(line_number, Some(value), field)?
+        }
+        "mutant_y_velocity_lsb" => {
+            source.mutant_y_velocity_lsb = parse_wave_u8(line_number, Some(value), field)?
+        }
+        "mutant_x_velocity" => {
+            source.mutant_x_velocity = parse_wave_u8(line_number, Some(value), field)?
+        }
+        "mutant_shot_time" => {
+            source.mutant_shot_time = parse_wave_u32(line_number, Some(value), field)?
+        }
+        _ => {
+            return Err(ActorWaveScriptParseError::new(
+                line_number,
+                format!("unknown source wave field `{field}`"),
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn parse_wave_actor_kind(
     line_number: usize,
     token: Option<&str>,
@@ -3951,6 +4100,20 @@ fn parse_wave_u16(
 ) -> Result<u16, ActorWaveScriptParseError> {
     let value = parse_wave_u64(line_number, token, field)?;
     u16::try_from(value).map_err(|error| {
+        ActorWaveScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is invalid: {error}"),
+        )
+    })
+}
+
+fn parse_wave_u32(
+    line_number: usize,
+    token: Option<&str>,
+    field: &str,
+) -> Result<u32, ActorWaveScriptParseError> {
+    let value = parse_wave_u64(line_number, token, field)?;
+    u32::try_from(value).map_err(|error| {
         ActorWaveScriptParseError::new(
             line_number,
             format!("{field} `{value}` is invalid: {error}"),
@@ -5711,6 +5874,7 @@ pub struct StepPrompt {
     pub phase: Phase,
     pub input: GameInput,
     pub wave: u16,
+    pub source_wave: ActorSourceWaveProfile,
     pub current_player: u8,
     pub player_count: u8,
     pub score: u32,
@@ -8819,6 +8983,7 @@ impl ActorGameDriver {
             phase: self.phase,
             input: effective_input,
             wave: self.wave,
+            source_wave: self.current_source_wave_profile(),
             current_player: self.current_player,
             player_count: self.player_count,
             score: self.active_score(),
@@ -10131,8 +10296,15 @@ impl ActorGameDriver {
         }
     }
 
+    fn current_source_wave_profile(&self) -> ActorSourceWaveProfile {
+        self.wave_script
+            .profile_for_wave(self.wave)
+            .source_wave
+            .unwrap_or_else(|| ActorSourceWaveProfile::for_wave(self.wave.max(1)))
+    }
+
     fn reset_baiter_timer(&mut self) {
-        let source_profile = ActorSourceWaveProfile::for_wave(self.wave.max(1));
+        let source_profile = self.current_source_wave_profile();
         self.baiter_timer_steps = Some(source_profile.baiter_delay.max(1));
         self.baiter_pacing_steps_remaining = ACTOR_BAITER_TIMER_PACING_STEPS;
     }
@@ -10162,7 +10334,7 @@ impl ActorGameDriver {
 
         self.source_first_wave_early_reserve_steps_remaining = None;
         self.clear_first_wave_lander_refill();
-        let source_profile = ActorSourceWaveProfile::for_wave(self.wave.max(1));
+        let source_profile = self.current_source_wave_profile();
         let reserve_kinds =
             actor_source_reserve_enemy_kinds(&mut self.enemy_reserve, source_profile);
         let mut index = 0;
@@ -10586,7 +10758,7 @@ impl ActorGameDriver {
             .count();
         let spawn_count = SOURCE_POD_SWARMER_REQUEST_LIMIT
             .min(SOURCE_ACTIVE_SWARMER_LIMIT.saturating_sub(active_swarmers));
-        let source_profile = ActorSourceWaveProfile::for_wave(self.wave.max(1));
+        let source_profile = self.current_source_wave_profile();
 
         (0..spawn_count)
             .map(|_| {
@@ -10622,7 +10794,7 @@ impl ActorGameDriver {
         }
         self.baiter_pacing_steps_remaining = ACTOR_BAITER_TIMER_PACING_STEPS;
 
-        let profile = ActorSourceWaveProfile::for_wave(self.wave.max(1));
+        let profile = self.current_source_wave_profile();
         let timer_steps = source_baiter_accelerated_timer_steps(timer_steps, profile, enemy_total);
         let decremented_steps = timer_steps.saturating_sub(1);
         if decremented_steps > 0 {
@@ -11862,7 +12034,7 @@ impl Lander {
         let hop_rng = prompt.source_rng?;
         Some(ActorSourceMutantMetadata::from_lander_conversion(
             source,
-            ActorSourceWaveProfile::for_wave(prompt.wave),
+            prompt.source_wave,
             hop_rng,
         ))
     }
@@ -12189,7 +12361,7 @@ impl Mutant {
         let Some(player_position) = prompt.player_position() else {
             return false;
         };
-        let profile = ActorSourceWaveProfile::for_wave(prompt.wave.max(1));
+        let profile = prompt.source_wave;
         let player_absolute_x = actor_source_absolute_x(player_position, 0);
         let object_absolute_x = actor_source_absolute_x(self.position, source.x_fraction);
         source.x_velocity = actor_source_mutant_x_velocity(
@@ -13602,7 +13774,7 @@ impl Swarmer {
         let Some(player) = prompt.player_position() else {
             return false;
         };
-        let profile = ActorSourceWaveProfile::for_wave(prompt.wave.max(1));
+        let profile = prompt.source_wave;
         let mut horizontal_seek_only = false;
         if source.horizontal_seek_pending {
             source.x_velocity = source_mini_swarmer_seek_velocity(
@@ -13838,7 +14010,7 @@ impl Baiter {
         } else {
             source.shot_timer = source.shot_timer.wrapping_sub(1);
             if source.shot_timer == 0 {
-                let profile = ActorSourceWaveProfile::for_wave(prompt.wave.max(1));
+                let profile = prompt.source_wave;
                 let shot_rng = actor_source_baiter_shot_rng(prompt, self.id, self.position);
                 source.shot_timer = actor_source_baiter_shot_reset(profile, shot_rng.seed);
                 push_baiter_shot(
@@ -13856,7 +14028,7 @@ impl Baiter {
             if source.picture_frame == 0
                 && let Some(player) = prompt.player_position()
             {
-                let profile = ActorSourceWaveProfile::for_wave(prompt.wave.max(1));
+                let profile = prompt.source_wave;
                 let seed = prompt
                     .source_rng
                     .map(|source_rng| source_rng.seed)
@@ -19724,6 +19896,7 @@ mod tests {
             phase: Phase::Playing,
             input: GameInput::NONE,
             wave: 1,
+            source_wave: ActorSourceWaveProfile::for_wave(1),
             current_player: 1,
             player_count: 1,
             score: 0,
@@ -22501,6 +22674,76 @@ mod tests {
     }
 
     #[test]
+    fn parsed_source_wave_overrides_drive_source_shaped_custom_wave() {
+        let wave_script = concat!(
+            "name custom source shape\n",
+            "source_wave 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
+            "swarmer_x_velocity 64 swarmer_shot_time 11 baiter_time 24 ",
+            "mutant_x_velocity 48 mutant_random_y 2 mutant_shot_time 12\n",
+        )
+        .parse::<ActorWaveScript>()
+        .expect("source wave overrides should parse");
+        let manifest = wave_script.manifest();
+        let profile = &manifest.waves[0];
+        let source = profile
+            .source_wave
+            .expect("source_wave override should preserve source metadata");
+
+        assert_eq!(source.wave_size, 5);
+        assert_eq!(source.landers, 1);
+        assert_eq!(source.bombers, 1);
+        assert_eq!(source.pods, 1);
+        assert_eq!(source.mutants, 1);
+        assert_eq!(source.swarmers, 1);
+        assert_eq!(source.swarmer_x_velocity, 64);
+        assert_eq!(source.swarmer_shot_time, 11);
+        assert_eq!(source.baiter_delay, 24);
+        assert_eq!(source.mutant_x_velocity, 48);
+        assert_eq!(source.mutant_random_y, 2);
+        assert_eq!(source.mutant_shot_time, 12);
+        assert_eq!(profile.lander_spawns.len(), 1);
+        assert_eq!(profile.bomber_spawns.len(), 1);
+        assert_eq!(profile.pod_spawns.len(), 1);
+        assert_eq!(profile.mutant_spawns.len(), 1);
+        assert_eq!(profile.swarmer_spawns.len(), 1);
+        assert_eq!(profile.enemy_reserve, EnemyReserveSnapshot::default());
+        assert!(profile.mutant_spawns[0].source.is_some());
+        assert!(profile.swarmer_spawns[0].source.is_some());
+
+        let mut driver = ActorGameDriver::with_wave_script(wave_script);
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        let report = step_until_driver_player_start_completes(&mut driver, 1);
+
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 1);
+        assert_eq!(driver.snapshot_count(ActorKind::Bomber), 1);
+        assert_eq!(driver.snapshot_count(ActorKind::Pod), 1);
+        assert_eq!(driver.snapshot_count(ActorKind::Mutant), 1);
+        assert_eq!(driver.snapshot_count(ActorKind::Swarmer), 1);
+        assert!(report.snapshots.iter().any(|snapshot| {
+            snapshot.kind == ActorKind::Mutant && snapshot.source_mutant.is_some()
+        }));
+        assert!(report.snapshots.iter().any(|snapshot| {
+            snapshot.kind == ActorKind::Swarmer && snapshot.source_swarmer.is_some()
+        }));
+        assert_eq!(
+            driver
+                .script_manifest()
+                .current_wave_profile
+                .source_wave
+                .expect("current wave manifest should expose source override")
+                .mutants,
+            1
+        );
+    }
+
+    #[test]
     fn parsed_wave_script_applies_spawn_index_behavior_after_actor_allocation() {
         let wave_script = "\
             name spawn behavior\n\
@@ -23243,6 +23486,76 @@ mod tests {
             )
         );
         assert_ne!(expected_source.hop_rng, source.hop_rng);
+    }
+
+    #[test]
+    fn source_mutant_actor_uses_prompt_source_wave_profile() {
+        let actor = ActorId::new(1001);
+        let default_profile = ActorSourceWaveProfile::for_wave(1);
+        let mut source_profile = default_profile;
+        source_profile.mutant_x_velocity = 0x48;
+        source_profile.mutant_y_velocity_msb = 0x00;
+        source_profile.mutant_y_velocity_lsb = 0x40;
+        source_profile.mutant_random_y = 2;
+        source_profile.mutant_shot_time = 12;
+        assert_ne!(
+            source_profile.mutant_x_velocity,
+            default_profile.mutant_x_velocity
+        );
+
+        let source = ActorSourceMutantMetadata {
+            x_fraction: 0x20,
+            y_fraction: 0x40,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 9,
+            sleep_ticks: 0,
+            hop_rng: ActorSourceRngSnapshot {
+                seed: 0x81,
+                hseed: 0x22,
+                lseed: 0x44,
+            },
+            render_x_correction: 0,
+            target6_first_shot_deferred: false,
+        };
+        let start = Point::new(100, 80);
+        let prompt = source_mutant_prompt_with_source_wave_for_test(
+            12,
+            1,
+            source_profile,
+            ActorSourceRngSnapshot {
+                seed: 0x52,
+                hseed: 0x34,
+                lseed: 0x12,
+            },
+            Point::new(42, 120),
+            Velocity::default(),
+        );
+        let behavior = ActorBehaviorProfile::default();
+        let (expected_position, expected_source, _shot) =
+            expected_source_mutant_after_motion(start, source, actor, &prompt, behavior);
+        let default_x_velocity = actor_source_mutant_x_velocity(
+            default_profile.mutant_x_velocity,
+            actor_source_absolute_x(Point::new(42, 120), 0),
+            actor_source_absolute_x(start, source.x_fraction),
+        );
+
+        let mut mutant = Mutant::from_spawn(
+            actor,
+            ActorMutantSpawn {
+                position: start,
+                source: Some(source),
+            },
+        );
+        let reply = mutant.update(&prompt);
+        let updated_source = reply
+            .snapshot
+            .source_mutant
+            .expect("source mutant should keep source metadata");
+
+        assert_ne!(updated_source.x_velocity, default_x_velocity);
+        assert_eq!(reply.snapshot.position, expected_position);
+        assert_eq!(updated_source, expected_source);
     }
 
     #[test]
@@ -24445,11 +24758,30 @@ mod tests {
         player_position: Point,
         player_velocity: Velocity,
     ) -> StepPrompt {
+        source_mutant_prompt_with_source_wave_for_test(
+            step,
+            wave,
+            ActorSourceWaveProfile::for_wave(wave),
+            source_rng,
+            player_position,
+            player_velocity,
+        )
+    }
+
+    fn source_mutant_prompt_with_source_wave_for_test(
+        step: u64,
+        wave: u16,
+        source_wave: ActorSourceWaveProfile,
+        source_rng: ActorSourceRngSnapshot,
+        player_position: Point,
+        player_velocity: Velocity,
+    ) -> StepPrompt {
         StepPrompt {
             step,
             phase: Phase::Playing,
             input: GameInput::NONE,
             wave,
+            source_wave,
             current_player: 1,
             player_count: 1,
             score: 0,
@@ -24497,7 +24829,7 @@ mod tests {
         let player_position = prompt
             .player_position()
             .expect("source mutant expected helper needs a player");
-        let profile = ActorSourceWaveProfile::for_wave(prompt.wave.max(1));
+        let profile = prompt.source_wave;
         let player_absolute_x = actor_source_absolute_x(player_position, 0);
         let object_absolute_x = actor_source_absolute_x(position, source.x_fraction);
         source.x_velocity = actor_source_mutant_x_velocity(

@@ -867,12 +867,16 @@ reintroduce legacy implementation terminology.
   default actor wave progression expands
   that wave script through `assets/red-label/wave-table.tsv` for active
   wave size, lander and bomber movement speed, lander fire cadence, baiter
-  entry/shot/seek timing, source bomber/pod/swarmer counts, and mutant
-  hop/shot fields. Source-backed wave-profile manifests retain that exact
-  `ActorSourceWaveProfile` record for custom driver inspection. The actor allocator
+  entry/shot/seek timing, source bomber/pod/direct-mutant/swarmer counts, and
+  mutant hop/shot fields. Source-backed wave-profile manifests retain the
+  effective `ActorSourceWaveProfile` record for custom driver inspection:
+  source-table waves expose the expanded red-label values, while parsed
+  `source_wave <wave> <field> <value> ...` overrides expose the tuned profile
+  that actors receive in `StepPrompt`. The actor allocator
   follows the source active-family
-  shape, so wave `1` remains lander-only while later waves can seed bomber and
-  pod actors beside source-RNG-restored landers. Source-backed wave profiles
+  shape, so wave `1` remains lander-only while later waves can seed bomber,
+  pod, direct-mutant, and swarmer actors beside source-RNG-restored landers
+  when those source counts are present. Source-backed wave profiles
   retain the post-active-batch enemy reserve counts, script wave profiles can
   set those counts with `reserve` / `enemy_reserve` or the all-family
   `reserve_full` / `enemy_reserve_full` form, and `StepReport::enemy_reserve`

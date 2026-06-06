@@ -77,15 +77,21 @@ verification tools.
   actor-id profiles after the driver allocates those actors. Default actor wave
   progression expands the checked wave script through
   `assets/red-label/wave-table.tsv` for active wave size, lander and bomber
-  speed, lander fire cadence, source bomber/pod/swarmer counts, baiter timing,
-  and mutant hop/shot fields. Source-backed wave-profile manifests preserve the
-  exact `ActorSourceWaveProfile` record expanded from that table, so custom
+  speed, lander fire cadence, source bomber/pod/direct-mutant/swarmer counts,
+  baiter timing, and mutant hop/shot fields. Source-backed wave-profile
+  manifests preserve the effective `ActorSourceWaveProfile` record expanded
+  from that table or tuned by parsed `source_wave` field overrides, so custom
   drivers can inspect source progression values without driver internals. The
   actor wave allocator follows the source active-family shape, so later waves
-  now seed bomber and pod actors beside landers. Source-backed landers,
-  bombers, pods, swarmers, and initial humans publish fixed-point metadata and
-  advance actor-owned fraction state during active motion, and source landers
-  prefer configured target slots before falling back to nearest-human seeking.
+  now seed bomber, pod, direct-mutant, and swarmer actors beside landers when
+  those counts are present. Source-backed actors consume the driver-owned
+  effective source wave profile from `StepPrompt`, so scripted level tuning
+  changes allocation, fixed-point movement, source AI shots, baiter cadence, and
+  mutant hop/shot behavior through the same data surface. Source-backed
+  landers, bombers, pods, swarmers, and initial humans publish fixed-point
+  metadata and advance actor-owned fraction state during active motion, and
+  source landers prefer configured target slots before falling back to
+  nearest-human seeking.
   Source
   wave profiles now retain post-active-batch enemy reserve counts, parsed wave
   scripts can set custom reserves with `reserve` / `enemy_reserve` or the
@@ -892,6 +898,35 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 05:02 BST`: Completed the actor source-wave scripting
+  override cycle. `source_wave <wave>` script lines now accept checked
+  `<field> <value>` overrides for exposed `ActorSourceWaveProfile` fields,
+  including active family counts, direct mutants, swarmer counts, movement
+  constants, shot timers, baiter cadence, and mutant hop/shot settings. The
+  source-backed allocator now includes direct mutant and swarmer active slots
+  when the effective source profile exposes those counts, and source-shaped
+  initial mutant/swarmer spawns carry their source metadata into snapshots.
+  `StepPrompt` now carries the driver-owned effective source profile, so
+  source-backed landers, mutants, swarmers, and baiters consume script-tuned
+  profile values instead of re-reading `wave-table.tsv`. README, SPEC, and the
+  actor architecture guide now document the custom-driver source-wave override
+  contract. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780717699601259>.
+  Validation passed with `cargo test
+  parsed_source_wave_overrides_drive_source_shaped_custom_wave --lib
+  --features legacy-tools`, `cargo test
+  source_mutant_actor_uses_prompt_source_wave_profile --lib --features
+  legacy-tools`, `cargo test source_wave --lib --features legacy-tools`,
+  `cargo test actor_game --all-targets --features legacy-tools`, `cargo test
+  actor_smoke --all-targets --features legacy-tools`, `cargo test actor_live
+  --all-targets --features legacy-tools`, `cargo check --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features
+  legacy-tools -- -D warnings`, `make actor-smoke`, `make actor-wgpu-smoke`
+  with `frame_source: actor_game`, `cargo fmt --check`, `markdownlint README.md
+  SPEC.md PLAN.md docs/actor-architecture.md
+  docs/fidelity/mame-golden-clips.md docs/fidelity/release-closure-audit.md
+  assets/sounds/README.md`, and `git diff --check`.
 
 - `2026-06-06 04:46 BST`: Completed the actor source-wave manifest
   introspection cycle. `ActorWaveProfile` and `ActorWaveProfileManifest` now
