@@ -74,7 +74,9 @@ verification tools.
   are cleared. Checked wave scripts can declare clean `lander`, `bomber`,
   `pod`, `mutant`, `swarmer`, `baiter`, and `human` initial-spawn records.
   Wave scripts can now attach spawn-index behavior profiles that become
-  actor-id profiles after the driver allocates those actors. Default actor wave
+  actor-id profiles after the driver allocates those actors, and range behavior
+  directives can apply the same checked behavior or spawn-index profile update
+  across existing source-backed progression bands. Default actor wave
   progression expands the checked wave script through
   `assets/red-label/wave-table.tsv` for active wave size, lander and bomber
   speed, lander fire cadence, source bomber/pod/direct-mutant/swarmer counts,
@@ -899,6 +901,35 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 05:22 BST`: Completed the actor wave-range behavior scripting
+  cycle. Checked wave scripts now accept `behavior_waves <first> <last> ...`
+  and `spawn_behavior_waves <first> <last> <kind> <index> <field> <value>`
+  directives, applying the same behavior parser and spawn-index behavior
+  profile updates across already-defined source-backed or clean wave profiles.
+  This lets custom drivers tune movement, fire cadence, damage policy, and
+  specific restored actor slots across a progression band without repeating
+  wave blocks. The parser rejects range behavior directives that reference
+  undefined waves, preserving explicit custom-driver script ownership. Added
+  focused parser/manifest regressions for ranged behavior, ranged spawn-index
+  behavior, and undefined-wave errors. README, SPEC,
+  `assets/red-label/README.md`, and the actor architecture guide now document
+  the range behavior contract. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780719205279769>.
+  Validation passed with `cargo test
+  parsed_wave_script_applies_behavior_ranges_to_existing_profiles --lib
+  --features legacy-tools`, `cargo test
+  parsed_wave_script_reports_missing_behavior_range_profiles --lib --features
+  legacy-tools`, `cargo test wave_script --lib --features legacy-tools`,
+  `cargo test actor_game --all-targets --features legacy-tools`, `cargo test
+  actor_smoke --all-targets --features legacy-tools`, `cargo test actor_live
+  --all-targets --features legacy-tools`, `cargo check --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features
+  legacy-tools -- -D warnings`, `make actor-smoke`, `make actor-wgpu-smoke`
+  with `frame_source: actor_game`, `cargo fmt --check`, `markdownlint README.md
+  SPEC.md PLAN.md docs/actor-architecture.md
+  docs/fidelity/mame-golden-clips.md docs/fidelity/release-closure-audit.md
+  assets/sounds/README.md assets/red-label/README.md`, and `git diff --check`.
 
 - `2026-06-06 05:11 BST`: Completed the actor source-wave range override
   cycle. `source_waves <first> <last>` script lines now accept the same checked

@@ -832,7 +832,11 @@ reintroduce legacy implementation terminology.
   spawn-index behavior profiles that the driver installs as actor-id profiles
   immediately after allocating wave actors. Spawn indices are per kind and
   advance across the full wave allocation stream, covering initial wave actors,
-  source reserve/refill actors, and command-applied later hostile actors. The
+  source reserve/refill actors, and command-applied later hostile actors.
+  `behavior_waves` and `spawn_behavior_waves` apply the same checked profile
+  updates to every existing wave profile in a range, allowing custom source
+  progression bands to tune actor movement, fire cadence, damage policy, and
+  specific spawn slots without repeating wave blocks. The
   built-in actor attract,
   behavior, and wave scripts are embedded from
   `assets/red-label/actor-attract.script`,

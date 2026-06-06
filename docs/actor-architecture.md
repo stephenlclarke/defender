@@ -342,11 +342,17 @@ swarmer 150 96
 baiter 170 104
 reserve 4 1 0
 source_waves 3 16
+behavior_waves 3 16 kind lander lander_seek_speed 7
+spawn_behavior_waves 3 16 lander 0 lander_seek_speed 9
 source_wave 17 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1
 source_waves 18 20 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1
 ```
 
-`behavior` lines reuse the `ActorBehaviorScript` parser for the current wave.
+`behavior` lines reuse the `ActorBehaviorScript` parser for the current wave;
+`behavior_waves <first> <last> ...` applies that same checked behavior update
+to every existing wave profile in the range. The parser rejects range behavior
+updates that reference undefined waves, which keeps custom scripts explicit
+about which source-backed or clean profiles they are tuning.
 `spawn_behavior <kind> <index> <field> <value>` lines configure one spawned
 actor before the driver has allocated its runtime actor id. They inherit the
 current wave/kind behavior at the point where the line is parsed and are then
@@ -356,6 +362,8 @@ initial wave spawns consume the first indices, then source reserve/refill
 spawns, pod-created swarmers, baiters, and other command-applied later hostile
 spawns consume subsequent same-kind indices. This lets custom progression
 scripts tune a specific restored actor without changing the actor struct.
+`spawn_behavior_waves <first> <last> <kind> <index> <field> <value>` applies
+the same spawn-index profile update across an existing wave range.
 `lander`, `bomber`, `pod`, `mutant`, `swarmer`, `baiter`, and `human` lines add
 clean scripted spawn records; humans default to `grounded` and can also be
 declared as `falling <velocity>` or `carried <actor-id>`. The compatible
