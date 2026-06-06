@@ -822,7 +822,11 @@ reintroduce legacy implementation terminology.
   text as one custom-driver configuration, and `ActorDriverScripts::parse_text`
   accepts one sectioned script with `[attract]`, `[behavior]`, and `[wave]`
   blocks. Wave parsing in either bundle form inherits the parsed behavior
-  script as its base before applying per-wave or source-backed overrides.
+  script as its base before applying per-wave or source-backed overrides. The
+  sectioned bundle also implements `str::parse::<ActorDriverScripts>()`,
+  exposes `ActorDriverScripts::manifest()` before driver startup, and can be
+  launched through `ActorRuntimeAdapter::with_scripts` for custom-driver
+  runtime checks.
   Read-only script manifests expose persistent attract event, driver behavior,
   reusable wave/spawn behavior preset definitions, wave-profile configuration,
   and source wave-table metadata for source-backed wave profiles, and every

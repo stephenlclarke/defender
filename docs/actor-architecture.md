@@ -232,16 +232,21 @@ The parsed behavior script becomes the base used while parsing the bundled wave
 script, so clean wave records inherit driver-wide tuning and source-backed wave
 records preserve that tuning unless the red-label wave table owns the specific
 family field. Sectioned parser errors preserve the original source line number
-when a delegated attract, behavior, or wave line is malformed.
+when a delegated attract, behavior, or wave line is malformed. The same
+sectioned text implements `str::parse::<ActorDriverScripts>()`, can be
+inspected through `ActorDriverScripts::manifest()` before a driver is created,
+and can be launched directly with `ActorRuntimeAdapter::with_scripts` for
+custom-driver runtime smoke tests.
 
 `AttractScript::manifest`, `ActorBehaviorScript::manifest`,
-`ActorWaveScript::manifest`, and `ActorGameDriver::script_manifest` expose
-read-only snapshots of configured attract events, driver behavior, and wave
-scripts for custom drivers and test tooling. Wave manifests also expose parsed
-`behavior_preset` and `spawn_behavior_preset` definitions by normalized name,
-so tooling can verify or serialize reusable level-difficulty blocks instead of
-only inspecting their resolved per-wave effects. Source-backed wave profiles
-carry the exact `ActorSourceWaveProfile` expanded from
+`ActorWaveScript::manifest`, `ActorDriverScripts::manifest`, and
+`ActorGameDriver::script_manifest` expose read-only snapshots of configured
+attract events, driver behavior, and wave scripts for custom drivers and test
+tooling. Wave manifests also expose parsed `behavior_preset` and
+`spawn_behavior_preset` definitions by normalized name, so tooling can verify
+or serialize reusable level-difficulty blocks instead of only inspecting their
+resolved per-wave effects. Source-backed wave profiles carry the exact
+`ActorSourceWaveProfile` expanded from
 `assets/red-label/wave-table.tsv` in those manifests; hand-scripted custom
 waves leave that field empty.
 `StepReport::behavior_script` carries the effective behavior manifest used for

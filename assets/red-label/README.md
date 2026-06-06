@@ -59,7 +59,9 @@ Current files:
   drivers, either from separate sources or from one sectioned script with
   `[attract]`, `[behavior]`, and `[wave]` blocks, and uses the parsed behavior
   script as the bundled wave parser's baseline before applying source-table or
-  wave-local overrides.
+  wave-local overrides. The sectioned form also supports
+  `str::parse::<ActorDriverScripts>()`, pre-start bundle manifest inspection,
+  and direct `ActorRuntimeAdapter::with_scripts` runtime smoke tests.
 - `audit-adjustments.tsv`: red-label `romc8.src` `AUDITG` / `MSGAUD`
   operator audit and adjustment message table, including the source CMOS cell
   offsets and display widths used by `DISAUD`.

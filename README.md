@@ -158,7 +158,11 @@ can parse and install all three scripts as one checked custom-driver
 configuration, while `ActorDriverScripts::parse_text` accepts one sectioned
 script with `[attract]`, `[behavior]`, and `[wave]` blocks; bundled wave
 parsing inherits the parsed behavior script as its base before applying
-wave-local or source-backed overrides. The attract script now includes
+wave-local or source-backed overrides. The sectioned form also implements
+`str::parse::<ActorDriverScripts>()`, exposes `ActorDriverScripts::manifest()`
+before driver startup, and can be passed directly to
+`ActorRuntimeAdapter::with_scripts` for runnable custom-driver smoke tests. The
+attract script now includes
 the source `ELECV` presents message, source-style Hall-of-Fame table rows,
 source-offset scoring/instruction labels, the source `CREDV` credits
 label/count, and a scriptable scoring scanner surface alongside Williams reveal
@@ -225,7 +229,10 @@ Custom driver tooling can also use `ActorDriverScripts::parse_text` with
 separate sources, to check and install attract, behavior, and wave text
 together. The parsed behavior script becomes the baseline inherited by clean
 wave records and any source wave fields that are not explicitly owned by the
-red-label wave table.
+red-label wave table. The same sectioned text can be parsed through
+`str::parse::<ActorDriverScripts>()`, inspected through the bundle manifest,
+and launched with `ActorRuntimeAdapter::with_scripts` so custom attract and
+level drivers can be tested without constructing a private driver first.
 Checked wave scripts can declare clean initial `lander`, `bomber`, `pod`,
 `mutant`, `swarmer`, `baiter`, and `human` spawn rows before the driver
 allocates actor ids for the wave.

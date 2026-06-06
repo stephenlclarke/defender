@@ -44,8 +44,11 @@ verification tools.
   accepts a single sectioned custom-driver script with `[attract]`,
   `[behavior]`, and `[wave]` blocks. Bundled wave parsing inherits the parsed
   behavior baseline before applying wave-local/source-backed overrides. The
-  built-in
-  actor attract, behavior, and wave scripts are embedded from
+  sectioned custom-driver bundle now implements
+  `str::parse::<ActorDriverScripts>()`, exposes a pre-driver
+  `ActorDriverScripts::manifest()`, and can boot the actor runtime directly
+  through `ActorRuntimeAdapter::with_scripts`. The built-in actor attract,
+  behavior, and wave scripts are embedded from
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and
   `assets/red-label/actor-waves.script` through the same parser path. The
@@ -913,6 +916,33 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 06:20 BST`: Completed the runnable actor driver script cycle.
+  Sectioned custom-driver scripts now implement
+  `str::parse::<ActorDriverScripts>()`, expose
+  `ActorDriverScripts::manifest()` for pre-driver attract/behavior/wave
+  inspection, and can boot directly through `ActorRuntimeAdapter::with_scripts`.
+  Added a focused runtime regression that parses one sectioned script, verifies
+  the manifest before startup, boots the runtime from that bundle, confirms the
+  custom attract text is drawn, and checks that bundled wave parsing inherited
+  the driver behavior script. README, SPEC, the actor architecture guide, and
+  `assets/red-label/README.md` now document the runnable sectioned-bundle API.
+  No legacy code, tests, or scaffolding were safe to remove because this slice
+  only adds the public runtime adapter path for the active custom-driver
+  surface. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780723063161409>.
+  Validation passed with `cargo test
+  sectioned_driver_script_parses_to_manifest_and_runtime_adapter --lib
+  --features legacy-tools`, `cargo test sectioned_driver_script --lib
+  --features legacy-tools`, `cargo test driver_script_bundle --lib --features
+  legacy-tools`, `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`, `cargo clippy
+  --all-targets --features legacy-tools -- -D warnings`, `make actor-smoke`,
+  `make actor-wgpu-smoke`, `cargo fmt --check`, `markdownlint README.md
+  SPEC.md PLAN.md docs/actor-architecture.md
+  docs/fidelity/mame-golden-clips.md docs/fidelity/release-closure-audit.md
+  assets/sounds/README.md assets/red-label/README.md`, and `git diff
+  --check`.
 
 - `2026-06-06 06:09 BST`: Completed the sectioned actor driver script cycle.
   `ActorDriverScripts::parse_text` now accepts one checked custom-driver

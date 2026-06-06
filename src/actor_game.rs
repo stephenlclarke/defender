@@ -8977,6 +8977,10 @@ impl ActorRuntimeAdapter {
         Self::with_driver(ActorGameDriver::new())
     }
 
+    pub fn with_scripts(scripts: ActorDriverScripts) -> Self {
+        Self::with_driver(ActorGameDriver::with_scripts(scripts))
+    }
+
     pub fn with_driver(driver: ActorGameDriver) -> Self {
         Self::with_components(
             driver,
@@ -9223,6 +9227,22 @@ impl ActorDriverScripts {
                 .map_err(ActorDriverScriptsParseError::from_wave)?;
         Ok(Self::new(attract_script, behavior_script, wave_script))
     }
+
+    pub fn manifest(&self) -> ActorDriverScriptsManifest {
+        ActorDriverScriptsManifest {
+            attract_script: self.attract_script.manifest(),
+            behavior_script: self.behavior_script.manifest(),
+            wave_script: self.wave_script.manifest(),
+        }
+    }
+}
+
+impl FromStr for ActorDriverScripts {
+    type Err = ActorDriverScriptsParseError;
+
+    fn from_str(source: &str) -> Result<Self, Self::Err> {
+        Self::parse_text(source)
+    }
 }
 
 impl Default for ActorDriverScripts {
@@ -9239,6 +9259,13 @@ impl Default for ActorDriverScripts {
             wave_script,
         )
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorDriverScriptsManifest {
+    pub attract_script: AttractScriptManifest,
+    pub behavior_script: ActorBehaviorScriptManifest,
+    pub wave_script: ActorWaveScriptManifest,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23129,6 +23156,52 @@ mod tests {
             .expect("sectioned wave should inherit bundled behavior");
         assert_eq!(lander.lander_mode, LanderBehaviorMode::Drift);
         assert_eq!(lander.lander_drift_speed, 4);
+    }
+
+    #[test]
+    fn sectioned_driver_script_parses_to_manifest_and_runtime_adapter() {
+        let scripts = "\
+            [attract]\n\
+            text 1 forever 12 20 RUNTIME SCRIPT\n\
+            [behavior]\n\
+            default player_takes_enemy_collision_damage false\n\
+            kind lander lander_mode drift\n\
+            kind lander lander_drift_speed 3\n\
+            [wave]\n\
+            name runtime script waves\n\
+            wave 1\n\
+            lander 80 214\n\
+            human 100 214\n"
+            .parse::<ActorDriverScripts>()
+            .expect("sectioned driver script should parse via FromStr");
+        let manifest = scripts.manifest();
+
+        assert_eq!(manifest.attract_script.events.len(), 1);
+        assert!(
+            !manifest
+                .behavior_script
+                .default_profile
+                .player_takes_enemy_collision_damage
+        );
+        assert_eq!(manifest.wave_script.name, "runtime script waves");
+        let wave_lander = manifest.wave_script.waves[0]
+            .behavior_script
+            .kind_profile(ActorKind::Lander)
+            .expect("wave should inherit bundled lander behavior");
+        assert_eq!(wave_lander.lander_mode, LanderBehaviorMode::Drift);
+        assert_eq!(wave_lander.lander_drift_speed, 3);
+
+        let mut runtime = ActorRuntimeAdapter::with_scripts(scripts);
+        let frame = runtime.step(GameInput::NONE);
+
+        assert_eq!(
+            runtime.driver().script_manifest().wave_script,
+            manifest.wave_script
+        );
+        assert!(frame.report.draws.iter().any(|draw| {
+            draw.text.as_deref() == Some("RUNTIME SCRIPT") && draw.position == Point::new(12, 20)
+        }));
+        assert_eq!(frame.state.phase, GamePhase::Attract);
     }
 
     #[test]
