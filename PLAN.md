@@ -58,12 +58,13 @@ verification tools.
   reserve/source-state, and the effective first-play behavior profile actors
   receive for movement/damage/fire tuning.
   It then uses the actor `XYZZY` overlay smart-bomb path to assist wave clear
-  and reports the next playable wave when the normal actor survivor-bonus and
-  wave-start logic reaches it, including source/reserve counts and effective
-  behavior. When that next wave still has enemy reserves, the checker keeps
-  stepping through smart-bomb cooldown and reserve activation to report a
-  bounded restored reserve batch sequence, including each batch's spawned
-  family counts, resulting source/reserve state, and terminal batch status.
+  and reports the source-shaped wave-clear survivor-bonus interstitial before
+  the next playable wave when the normal actor survivor-bonus and wave-start
+  logic reaches them, including source/reserve counts and effective behavior.
+  When that next wave still has enemy reserves, the checker keeps stepping
+  through smart-bomb cooldown and reserve activation to report a bounded
+  restored reserve batch sequence, including each batch's spawned family
+  counts, resulting source/reserve state, and terminal batch status.
   `examples/actor-custom-attract.script` provides a checked editable
   starting point. The built-in actor attract, behavior, and
   wave scripts are embedded from
@@ -940,6 +941,34 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 16:45 BST`: Completed the actor script wave-clear
+  interstitial checker cycle. `--actor-script-check <path>` now reports the
+  first source-shaped `WaveCleared` interstitial it observes during assisted
+  next-wave preflight, including cumulative assist steps, next wave, score,
+  world enemy/human counts, survivor count, visible survivor icons, remaining
+  survivor awards, first awarded survivor points, and source interstitial sleep
+  fields. The checker continues through the same actor `XYZZY` overlay
+  smart-bomb path to the next playable wave and reserve activation batches, so
+  custom wave scripts can now preflight first play, survivor-bonus handoff,
+  next-wave behavior, and queued reserve ordering without bypassing actor
+  commands or adding frame-driven logic. The focused regressions prove the
+  checked example script reports a two-survivor interstitial before wave two,
+  and the two-wave reserve script reports a ten-survivor interstitial before
+  its source-backed second wave and reserve sequence. No legacy code, tests, or
+  scaffolding were safe to remove because this slice hardens the active
+  script-authoring preflight. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780760350111719>.
+  Validation passed with `cargo fmt --check`, `cargo test actor_script_check
+  --all-targets --features legacy-tools`, `cargo test actor_script
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, `cargo run
+  --quiet --features legacy-tools -- --actor-script-check
+  examples/actor-custom-attract.script`, `make actor-smoke`, `make
+  actor-wgpu-smoke`, `markdownlint README.md SPEC.md PLAN.md
+  docs/actor-architecture.md`, and `git diff --check`.
 
 - `2026-06-06 16:33 BST`: Completed the actor script reserve-activation
   sequence checker cycle. `--actor-script-check <path>` now extends assisted

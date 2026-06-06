@@ -789,9 +789,10 @@ reintroduce legacy implementation terminology.
   the first playable wave and prints script manifest, first-frame, source-wave,
   spawned world, reserve/source-state, and effective behavior counts/modes
   without opening a window. The checker then uses the actor `XYZZY` overlay
-  smart-bomb path to assist progression and reports the next playable wave
-  plus a bounded reserve activation batch sequence when real actor
-  wave-clear/wave-start and reserve-activation logic reaches them.
+  smart-bomb path to assist progression and reports the source-shaped
+  wave-clear survivor-bonus interstitial, next playable wave, and a bounded
+  reserve activation batch sequence when real actor wave-clear/wave-start and
+  reserve-activation logic reaches them.
   `examples/actor-custom-attract.script` is the checked editable sample for
   that flow.
 - Runtime renderer selection has been removed.
@@ -842,9 +843,9 @@ reintroduce legacy implementation terminology.
   runtime checks. The live actor runtime exposes the same path through
   `--actor-script <path>` and the headless check path through
   `--actor-script-check <path>`, including first-play reserve/source-state
-  reporting plus assisted next-wave and reserve-activation batch summaries for
-  source/reserve counts, restored family counts, batch status, damage, fire
-  cadence, and actor movement modes.
+  reporting plus assisted wave-clear, next-wave, and reserve-activation batch
+  summaries for source/reserve counts, survivor-bonus cadence, restored family
+  counts, batch status, damage, fire cadence, and actor movement modes.
   Read-only script manifests expose persistent attract event, driver behavior,
   reusable wave/spawn behavior preset definitions, wave-profile configuration,
   and source wave-table metadata for source-backed wave profiles, and every

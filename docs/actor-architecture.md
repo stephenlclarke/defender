@@ -91,9 +91,10 @@ evidence commands.
   attract/behavior/wave manifest counts plus first-frame, effective source-wave,
   spawned world, reserve/source-state, and first-play behavior summaries. The
   checker then uses the actor `XYZZY` overlay smart-bomb path to assist
-  progression and reports the next playable wave when real wave-clear/wave-start
-  logic reaches it, plus a bounded reserve activation batch sequence when
-  reserve activation emits restored actor spawns. The checked
+  progression and reports the source-shaped wave-clear survivor-bonus
+  interstitial, next playable wave, and a bounded reserve activation batch
+  sequence when real wave-clear/wave-start and reserve activation emit their
+  actor reports. The checked
   `examples/actor-custom-attract.script` file is the editable smoke-tested
   example. The shared live input state carries the same key
   bindings and `XYZZY` mode into actor steps. Actor high-score entry now
@@ -259,6 +260,9 @@ first-play reserve/source-state plus the behavior profile that actors receive
 through `StepReport`. It also samples the next playable wave with an actor
 `XYZZY` overlay smart-bomb assist loop, so progressive custom-driver wave
 profiles can be checked before live launch without bypassing actor commands.
+The checker records the first `WaveCleared` report it observes, including the
+survivor count, visible source astronaut icons, awarded survivor points,
+world counts, and source interstitial sleep fields.
 When that next wave still has enemy reserves, the checker keeps stepping the
 same actor path through smart-bomb cooldown and reserve activation, then reports
 each observed restored batch's spawned family counts, resulting source state,
