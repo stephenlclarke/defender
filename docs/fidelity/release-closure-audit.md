@@ -1,6 +1,6 @@
 # Release Closure Audit
 
-Last reviewed: `2026-06-05`
+Last reviewed: `2026-06-06`
 
 This audit maps the active fidelity goal to current evidence. It is deliberately
 stricter than the release gate: green tests and media reports prove the covered
@@ -37,9 +37,17 @@ from these perspectives:
   thrust/reverse, smart bomb, hyperspace, abduction, and death.
   Status: proven for the embedded scenario set.
 - Runtime smoke paths:
-  `cargo run -- --game-smoke` and `cargo run -- --live-smoke` passed. Live
-  smoke rendered `320` nonblank offscreen `wgpu` frames.
-  Status: proven for the smoke path.
+  `cargo run -- --game-smoke`, `cargo run -- --actor-smoke`,
+  `cargo run -- --actor-attract-smoke`, `cargo run -- --actor-post-game-smoke`,
+  `cargo run -- --actor-wgpu-smoke`, and `cargo run -- --live-smoke` passed
+  through the hardened `2026-06-06` release gate. Actor play smoke proves the
+  actor runtime through attract, credit, play, gameplay/audio events, sprite
+  layers, native draw commands, and zero temporary raster commands.
+  Actor `wgpu` smoke rendered the actor frame source through offscreen readback
+  with `frame_source: actor_game`, `192` nonblank offscreen frames, and
+  `0` temporary raster commands. Live smoke rendered the clean frame source
+  through `320` nonblank offscreen `wgpu` frames.
+  Status: proven for the clean and actor smoke paths.
 - Clean runtime fidelity-debt scan:
   a `2026-05-29` bounded scan checked production clean runtime source for
   `TODO`, `FIXME`, `placeholder`, `stub`, `approximate`, `guess`,
@@ -49,17 +57,15 @@ from these perspectives:
   that the smoke gates require to remain zero in the active gameplay path.
   Status: proven as source hygiene for current clean runtime debt markers.
 - Release validation:
-  the release gate in `PLAN.md` passed on `2026-05-29 15:54 BST` after the
-  PRBP1 pod up-thrust report was promoted to all-axis evidence and the
-  clean-only post-game thrust/background audio leak was fixed. The current gate
-  now also includes actor smoke checks, so full current-gate status requires a
-  fresh run after the actor rewrite slices. The gate includes default and
-  `legacy-tools` Rust tests, both clippy passes, clean fidelity, media script
-  tests, owner-review package generation, the accepted-report gate, MAME
-  doctor, MAME smoke recording, README media, game smoke, actor smoke gates,
-  live smoke, docs lint, and diff hygiene.
-  Status: previously proven for the 2026-05-29 gate; current expanded gate
-  pending fresh full run.
+  the release gate in `PLAN.md` passed on `2026-06-06 04:04 BST` after
+  `0b927ac` hardened the gate to include both actor play smoke and actor
+  offscreen `wgpu` smoke. The gate includes default and `legacy-tools` Rust
+  tests, both clippy passes, clean fidelity, media script tests,
+  owner-review package generation, the accepted-report gate, MAME doctor,
+  MAME smoke recording, README media, game smoke, actor play smoke, actor
+  attract/post-game smoke, actor offscreen `wgpu` smoke, live smoke, docs lint,
+  and diff hygiene.
+  Status: proven locally for the current hardened actor-era gate.
 - Reference report closure gate:
   `docs/fidelity/reference-report-gate.json` lists the accepted media reports
   and expected acceptance modes; `make reference-report-gate` currently passes

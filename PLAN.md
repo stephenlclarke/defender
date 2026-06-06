@@ -872,13 +872,14 @@ Exit gate:
    to all-axis and fixing the clean-only post-game thrust/background audio
    leak. The later organic smart-bomb/up-thrust terrain-blow candidate now has
    a passing all-axis report and is accepted as organic last-human terrain-blow
-   proof in the report gate. The actor-era `2026-06-06 03:50 BST` full
-   `make release-gate` pass is now green, including default and `legacy-tools`
-   Rust tests, both clippy gates, `make clean-fidelity`, media helper tests,
-   owner-review package/report gate, MAME doctor/smoke, README media, game
-   smoke, actor play smoke, actor attract/post-game smoke, actor offscreen
-   `wgpu` smoke, live smoke, docs lint, and diff hygiene. Owner review remains
-   before protected reference media replacement.
+   proof in the report gate. The hardened actor-era `2026-06-06 04:04 BST`
+   full `make release-gate` pass is now green, including default and
+   `legacy-tools` Rust tests, both clippy gates, `make clean-fidelity`, media
+   helper tests, owner-review package/report gate, MAME doctor/smoke, README
+   media, game smoke, actor play smoke, actor attract/post-game smoke, actor
+   offscreen `wgpu` smoke with `frame_source: actor_game`, live smoke, docs
+   lint, and diff hygiene. Owner review remains before protected reference
+   media replacement.
    The owner-review checklist in `docs/fidelity/release-closure-audit.md`
    defines the finite sign-off action and is printed by
    `make owner-review-package`: accept the current 28-report gate and proof
@@ -886,6 +887,21 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-06 04:08 BST`: Completed the owner-review closure-audit sync cycle.
+  `docs/fidelity/release-closure-audit.md` now marks the current hardened
+  actor-era release gate as locally proven instead of pending a fresh run after
+  actor rewrite slices. Its runtime-smoke proof now names `--actor-smoke`,
+  `--actor-attract-smoke`, `--actor-post-game-smoke`, `--actor-wgpu-smoke`,
+  and `--live-smoke`, including the actor offscreen `wgpu` proof with
+  `frame_source: actor_game`, `192` nonblank offscreen frames, and zero
+  temporary raster commands. The active PLAN release-validation item now points
+  at the `2026-06-06 04:04 BST` hardened actor gate rather than the earlier
+  pre-hardening pass, and an older work-log entry now explicitly notes that the
+  04:04 gate superseded its gate-rerun requirement. Validation passed with the
+  stale gate-requirement scan, touched-doc markdownlint, `git diff --check`,
+  and `make owner-review-package` with the accepted `28`-report gate. Slack
+  cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780715191729049`.
 - `2026-06-06 04:04 BST`: Completed the actor release-gate hardening cycle.
   `make release-gate` now runs the actor replacement play/render proof directly:
   `make actor-smoke` verifies the actor runtime through attract, credit, play,
@@ -959,7 +975,9 @@ Exit gate:
   visual comparisons, and `25` accepted audio comparisons. README, SPEC,
   PLAN, and `docs/fidelity/release-closure-audit.md` now describe the organic
   smartmix terrain-blow clip as accepted evidence rather than an open failing
-  probe; final closure remains owner review plus a fresh full release-gate run.
+  probe; the later `2026-06-06 04:04 BST` hardened actor release-gate cycle
+  supersedes this entry's gate-rerun requirement, leaving owner review as the
+  closure boundary.
   Validation passed with `make reference-report-gate` and
   `make reference-signoff-summary`. Slack start:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780709479376629`.
