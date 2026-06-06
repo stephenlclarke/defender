@@ -325,9 +325,10 @@ player velocity into the source-shaped seek velocity.
 
 ```text
 name hard opening
+behavior_preset hard_lander kind lander lander_mode chase_player
+behavior_preset hard_lander kind lander lander_seek_speed 7
 wave 1
-behavior kind lander lander_mode chase_player
-behavior kind lander lander_seek_speed 6
+use_behavior hard_lander
 spawn_behavior lander 0 lander_seek_speed 8
 lander 80 96
 human 40 214
@@ -342,17 +343,25 @@ swarmer 150 96
 baiter 170 104
 reserve 4 1 0
 source_waves 3 16
-behavior_waves 3 16 kind lander lander_seek_speed 7
+use_behavior_waves 3 16 hard_lander
+behavior_waves 3 16 kind baiter baiter_fire_period_steps 30
 spawn_behavior_waves 3 16 lander 0 lander_seek_speed 9
 source_wave 17 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1
 source_waves 18 20 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1
 ```
 
 `behavior` lines reuse the `ActorBehaviorScript` parser for the current wave;
+`behavior_preset <name> ...` stores one checked behavior update in a reusable
+named block, and repeated lines append to that block. `use_behavior <name>`
+replays the named updates onto the current wave profile, preserving existing
+source-backed behavior fields unless the preset changes them.
+`use_behavior_waves <first> <last> <name>` replays the same preset onto every
+existing wave profile in the range.
 `behavior_waves <first> <last> ...` applies that same checked behavior update
 to every existing wave profile in the range. The parser rejects range behavior
-updates that reference undefined waves, which keeps custom scripts explicit
-about which source-backed or clean profiles they are tuning.
+updates that reference undefined waves and preset uses that reference undefined
+presets, which keeps custom scripts explicit about which source-backed or clean
+profiles they are tuning.
 `spawn_behavior <kind> <index> <field> <value>` lines configure one spawned
 actor before the driver has allocated its runtime actor id. They inherit the
 current wave/kind behavior at the point where the line is parsed and are then

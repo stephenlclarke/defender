@@ -132,11 +132,13 @@ for source-backed profiles, while each `StepReport` carries the effective
 per-step behavior manifest after transient input overrides such as `XYZZY`
 invincibility. Behavior scripts can also be parsed from checked text lines that
 update default, actor-kind, or actor-id profiles. Wave scripts can be parsed
-from checked text lines that name wave profiles, per-wave behavior updates, and
-`lander` / `bomber` / `pod` / `mutant` / `swarmer` / `baiter` / `human` spawn
-records, including spawn-index behavior profiles that become actor-id profiles
-after the driver allocates those wave actors. `behavior_waves` and
-`spawn_behavior_waves` apply those same movement/fire/damage and spawn-index
+from checked text lines that name wave profiles, reusable behavior presets,
+per-wave behavior updates, and `lander` / `bomber` / `pod` / `mutant` /
+`swarmer` / `baiter` / `human` spawn records, including spawn-index behavior
+profiles that become actor-id profiles after the driver allocates those wave
+actors. `behavior_preset` definitions can be applied with `use_behavior` for
+one wave or `use_behavior_waves` for an existing wave range; `behavior_waves`
+and `spawn_behavior_waves` apply direct movement/fire/damage and spawn-index
 behavior updates across an existing wave range, so custom drivers can tune a
 whole progression band without repeating wave blocks. `source_wave <wave>` and
 `source_waves <first> <last>` lines can also override individual source profile

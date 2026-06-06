@@ -3599,6 +3599,7 @@ impl std::error::Error for ActorWaveScriptParseError {}
 struct ParsedActorWaveScript {
     name: String,
     waves: Vec<ParsedActorWaveProfile>,
+    behavior_presets: BTreeMap<String, Vec<ParsedBehaviorPresetUpdate>>,
 }
 
 impl ParsedActorWaveScript {
@@ -3606,6 +3607,7 @@ impl ParsedActorWaveScript {
         Self {
             name: "parsed-wave-script".to_string(),
             waves: Vec::new(),
+            behavior_presets: BTreeMap::new(),
         }
     }
 
@@ -3629,6 +3631,17 @@ impl ParsedActorWaveScript {
                 }
                 self.name = name;
                 Ok(())
+            }
+            "behavior_preset" | "behaviour_preset" => {
+                let name = parse_wave_behavior_preset_name(line_number, parts.next())?;
+                let behavior_line = parts.collect::<Vec<_>>().join(" ");
+                if behavior_line.is_empty() {
+                    return Err(ActorWaveScriptParseError::new(
+                        line_number,
+                        format!("behavior preset `{name}` needs a profile update"),
+                    ));
+                }
+                self.define_behavior_preset(line_number, name, behavior_line)
             }
             "wave" => {
                 let wave = parse_wave_u16(line_number, parts.next(), "wave")?;
@@ -3684,6 +3697,14 @@ impl ParsedActorWaveScript {
                 )
                 .map_err(|error| ActorWaveScriptParseError::new(error.line, error.message))
             }
+            "use_behavior"
+            | "use_behaviour"
+            | "apply_behavior_preset"
+            | "apply_behaviour_preset" => {
+                let name = parse_wave_behavior_preset_name(line_number, parts.next())?;
+                reject_extra_wave_fields(line_number, parts)?;
+                self.apply_behavior_preset_to_current_wave(line_number, &name)
+            }
             "behavior_waves" | "behaviour_waves" | "behavior_range" | "behaviour_range" => {
                 let first = parse_wave_u16(line_number, parts.next(), "first wave")?.max(1);
                 let last = parse_wave_u16(line_number, parts.next(), "last wave")?.max(1);
@@ -3695,6 +3716,16 @@ impl ParsedActorWaveScript {
                     ));
                 }
                 self.apply_behavior_to_wave_range(line_number, first, last, &behavior_line)
+            }
+            "use_behavior_waves"
+            | "use_behaviour_waves"
+            | "behavior_preset_waves"
+            | "behaviour_preset_waves" => {
+                let first = parse_wave_u16(line_number, parts.next(), "first wave")?.max(1);
+                let last = parse_wave_u16(line_number, parts.next(), "last wave")?.max(1);
+                let name = parse_wave_behavior_preset_name(line_number, parts.next())?;
+                reject_extra_wave_fields(line_number, parts)?;
+                self.apply_behavior_preset_to_wave_range(line_number, first, last, &name)
             }
             "spawn_behavior" | "spawn_behaviour" => {
                 let kind = parse_wave_actor_kind(line_number, parts.next())?;
@@ -3831,6 +3862,45 @@ impl ParsedActorWaveScript {
         }
     }
 
+    fn define_behavior_preset(
+        &mut self,
+        line_number: usize,
+        name: String,
+        behavior_line: String,
+    ) -> Result<(), ActorWaveScriptParseError> {
+        let mut validation = ActorBehaviorScript::from_arcade_profile();
+        parse_behavior_script_line(line_number, &behavior_line, &mut validation)
+            .map_err(|error| ActorWaveScriptParseError::new(error.line, error.message))?;
+        self.behavior_presets
+            .entry(name)
+            .or_default()
+            .push(ParsedBehaviorPresetUpdate {
+                line_number,
+                line: behavior_line,
+            });
+        Ok(())
+    }
+
+    fn behavior_preset_updates(
+        &self,
+        line_number: usize,
+        name: &str,
+    ) -> Result<Vec<ParsedBehaviorPresetUpdate>, ActorWaveScriptParseError> {
+        self.behavior_presets.get(name).cloned().ok_or_else(|| {
+            ActorWaveScriptParseError::new(line_number, format!("unknown behavior preset `{name}`"))
+        })
+    }
+
+    fn apply_behavior_preset_to_current_wave(
+        &mut self,
+        line_number: usize,
+        name: &str,
+    ) -> Result<(), ActorWaveScriptParseError> {
+        let updates = self.behavior_preset_updates(line_number, name)?;
+        let profile = self.current_profile_mut(line_number)?;
+        apply_behavior_preset_updates(&updates, &mut profile.behavior_script)
+    }
+
     fn current_profile_mut(
         &mut self,
         line_number: usize,
@@ -3890,6 +3960,22 @@ impl ParsedActorWaveScript {
         Ok(())
     }
 
+    fn apply_behavior_preset_to_wave_range(
+        &mut self,
+        line_number: usize,
+        first: u16,
+        last: u16,
+        name: &str,
+    ) -> Result<(), ActorWaveScriptParseError> {
+        Self::validate_wave_range(line_number, first, last, "behavior preset wave")?;
+        let updates = self.behavior_preset_updates(line_number, name)?;
+        for wave in first..=last {
+            let profile = self.profile_for_wave_mut(line_number, wave)?;
+            apply_behavior_preset_updates(&updates, &mut profile.behavior_script)?;
+        }
+        Ok(())
+    }
+
     fn apply_behavior_to_wave_range(
         &mut self,
         line_number: usize,
@@ -3939,6 +4025,12 @@ impl ParsedActorWaveScript {
                 .collect(),
         ))
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ParsedBehaviorPresetUpdate {
+    line_number: usize,
+    line: String,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -4043,6 +4135,17 @@ impl ParsedActorWaveProfile {
     }
 }
 
+fn apply_behavior_preset_updates(
+    updates: &[ParsedBehaviorPresetUpdate],
+    behavior_script: &mut ActorBehaviorScript,
+) -> Result<(), ActorWaveScriptParseError> {
+    for update in updates {
+        parse_behavior_script_line(update.line_number, &update.line, behavior_script)
+            .map_err(|error| ActorWaveScriptParseError::new(error.line, error.message))?;
+    }
+    Ok(())
+}
+
 fn parse_wave_point<'a>(
     line_number: usize,
     parts: &mut impl Iterator<Item = &'a str>,
@@ -4079,6 +4182,23 @@ fn parse_wave_human_mode<'a>(
             format!("unknown human mode `{mode}`"),
         )),
     }
+}
+
+fn parse_wave_behavior_preset_name(
+    line_number: usize,
+    token: Option<&str>,
+) -> Result<String, ActorWaveScriptParseError> {
+    let token = token.ok_or_else(|| {
+        ActorWaveScriptParseError::new(line_number, "missing behavior preset name")
+    })?;
+    let name = normalize_script_token(token);
+    if name.is_empty() {
+        return Err(ActorWaveScriptParseError::new(
+            line_number,
+            "missing behavior preset name",
+        ));
+    }
+    Ok(name)
 }
 
 fn parse_source_wave_profile_updates<'a>(
@@ -22954,6 +23074,55 @@ mod tests {
     }
 
     #[test]
+    fn parsed_wave_script_applies_named_behavior_presets_to_current_and_range_profiles() {
+        let wave_script = concat!(
+            "name preset behavior\n",
+            "behavior_preset hard_lander kind lander lander_mode chase_player\n",
+            "behavior_preset hard_lander kind lander lander_seek_speed 7\n",
+            "source_waves 1 2 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
+            "use_behavior_waves 1 2 hard_lander\n",
+            "wave 3\n",
+            "use_behavior hard_lander\n",
+            "lander 80 214\n",
+        )
+        .parse::<ActorWaveScript>()
+        .expect("behavior preset wave script should parse");
+        let manifest = wave_script.manifest();
+
+        assert_eq!(
+            manifest
+                .waves
+                .iter()
+                .map(|profile| profile.wave)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+        for profile in manifest.waves.iter().take(2) {
+            let source_lander = ActorSourceWaveProfile::for_wave(profile.wave).lander_behavior();
+            let lander_behavior = profile
+                .behavior_script
+                .kind_profile(ActorKind::Lander)
+                .expect("range preset should install lander kind profile");
+            assert_eq!(lander_behavior.lander_mode, LanderBehaviorMode::ChasePlayer);
+            assert_eq!(lander_behavior.lander_seek_speed, 7);
+            assert_eq!(
+                lander_behavior.lander_fire_period_steps,
+                source_lander.lander_fire_period_steps
+            );
+        }
+        let clean_wave_lander = manifest.waves[2]
+            .behavior_script
+            .kind_profile(ActorKind::Lander)
+            .expect("current-wave preset should install lander kind profile");
+        assert_eq!(
+            clean_wave_lander.lander_mode,
+            LanderBehaviorMode::ChasePlayer
+        );
+        assert_eq!(clean_wave_lander.lander_seek_speed, 7);
+        assert_eq!(manifest.waves[2].source_wave, None);
+    }
+
+    #[test]
     fn parsed_wave_script_reports_missing_behavior_range_profiles() {
         let error = "\
             name missing behavior range\n\
@@ -22964,6 +23133,19 @@ mod tests {
 
         assert_eq!(error.line, 3);
         assert_eq!(error.message, "wave range references undefined wave `2`");
+    }
+
+    #[test]
+    fn parsed_wave_script_reports_unknown_behavior_presets() {
+        let error = "\
+            name missing preset\n\
+            source_wave 1\n\
+            use_behavior missing\n"
+            .parse::<ActorWaveScript>()
+            .expect_err("preset use should require a definition");
+
+        assert_eq!(error.line, 3);
+        assert_eq!(error.message, "unknown behavior preset `missing`");
     }
 
     #[test]
@@ -23115,6 +23297,12 @@ mod tests {
         let error = ActorWaveScript::parse_text("wave 1\nbehavior kind lander no_such_field 1\n")
             .expect_err("bad behavior update should fail");
         assert_eq!(error.line, 2);
+        assert!(error.to_string().contains("unknown behavior field"));
+
+        let error =
+            ActorWaveScript::parse_text("behavior_preset hard kind lander no_such_field 1\n")
+                .expect_err("bad behavior preset update should fail");
+        assert_eq!(error.line, 1);
         assert!(error.to_string().contains("unknown behavior field"));
     }
 

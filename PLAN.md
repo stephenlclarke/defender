@@ -76,7 +76,10 @@ verification tools.
   Wave scripts can now attach spawn-index behavior profiles that become
   actor-id profiles after the driver allocates those actors, and range behavior
   directives can apply the same checked behavior or spawn-index profile update
-  across existing source-backed progression bands. Default actor wave
+  across existing source-backed progression bands. They can also define named
+  checked behavior presets and apply them to one wave or an existing wave
+  range, so custom drivers can reuse difficulty blocks while preserving
+  source-backed wave motion unless explicitly overridden. Default actor wave
   progression expands the checked wave script through
   `assets/red-label/wave-table.tsv` for active wave size, lander and bomber
   speed, lander fire cadence, source bomber/pod/direct-mutant/swarmer counts,
@@ -901,6 +904,39 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 05:29 BST`: Completed the actor wave behavior preset scripting
+  cycle. Checked wave scripts now accept
+  `behavior_preset <name> <profile-update...>` definitions,
+  `use_behavior <name>` for the current wave, and
+  `use_behavior_waves <first> <last> <name>` for existing wave ranges. Presets
+  are validated through the same `ActorBehaviorScript` parser as direct
+  behavior lines, append repeated update lines to one named block, and replay
+  onto existing wave profiles without resetting source-backed movement/fire
+  fields unless the preset explicitly changes them. Undefined preset uses are
+  rejected with source line numbers. Added focused parser/manifest regressions
+  for current-wave preset use, range preset use, source-backed behavior
+  preservation, undefined preset errors, and preset validation errors. README,
+  SPEC, `assets/red-label/README.md`, and the actor architecture guide now
+  document the preset contract. No legacy code, tests, or scaffolding were safe
+  to remove in this slice because the changed surface is the active actor wave
+  parser and its custom-driver documentation. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780719977340469>.
+  Validation passed with `cargo test
+  parsed_wave_script_applies_named_behavior_presets_to_current_and_range_profiles
+  --lib --features legacy-tools`, `cargo test
+  parsed_wave_script_reports_unknown_behavior_presets --lib --features
+  legacy-tools`, `cargo test wave_script_text_parser_reports_line_errors --lib
+  --features legacy-tools`, `cargo test wave_script --lib --features
+  legacy-tools`, `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`, `cargo test
+  actor_live --all-targets --features legacy-tools`, `cargo check
+  --all-targets --features legacy-tools`, `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`, `make actor-smoke`, `make
+  actor-wgpu-smoke` with `frame_source: actor_game`, `cargo fmt --check`,
+  `markdownlint README.md SPEC.md PLAN.md docs/actor-architecture.md
+  docs/fidelity/mame-golden-clips.md docs/fidelity/release-closure-audit.md
+  assets/sounds/README.md assets/red-label/README.md`, and `git diff --check`.
 
 - `2026-06-06 05:22 BST`: Completed the actor wave-range behavior scripting
   cycle. Checked wave scripts now accept `behavior_waves <first> <last> ...`
