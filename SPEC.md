@@ -189,8 +189,9 @@ tree:
   runtime contract. `ActorRenderSceneBridge` adapts report draw commands into
   clean `RenderScene` sprites for the existing native renderer contract, and
   `ActorStateBridge` adapts report phase, current player, player count,
-  per-player scores/stocks, high-score state, and actor snapshots with
-  velocity/facing plus hostile-projectile source metadata into clean
+  per-player scores/stocks, high-score state, driver-owned source RNG, and
+  actor snapshots with velocity/facing plus hostile-projectile source metadata
+  into clean
   `GameState` values. Source-backed mutant actors consume
   source-shaped conversion metadata, wave-table mutant velocity/random-hop
   rows, driver-provided source RNG snapshots, and actor-owned shot timers to

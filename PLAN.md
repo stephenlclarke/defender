@@ -155,7 +155,11 @@ verification tools.
   actor-owned hop RNG and fixed-point fractions, and emit source-shaped
   `0xF6` hostile projectile commands from their shot timers. The
   actor rewrite now has source-RNG-restored later-wave lander placement, shot
-  timers, X/Y velocity metadata, and later-wave human target-list restores. It
+  timers, X/Y velocity metadata, and later-wave human target-list restores. The
+  actor clean-state bridge now preserves `StepReport::source_rng` in
+  `WorldSnapshot::source_rng`, so the runtime state contract exposes the same
+  driver-owned source RNG that source-backed movement and projectile actors
+  consume from `StepPrompt`. It
   also carries first-wave target6 converted-mutant source correction metadata,
   target6 dive/visual projection anchors, deferred visible-entry shot state,
   source-shaped target6 dive shot-position overrides, and exact fire2524
@@ -923,6 +927,27 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 06:54 BST`: Completed the actor source-RNG state bridge cycle.
+  `ActorStateBridge` now preserves `StepReport::source_rng` in the clean
+  `WorldSnapshot::source_rng` field instead of publishing the default clean RNG
+  while source-backed actors consume a different driver-owned RNG from
+  `StepPrompt`. The focused regression extends the driver source-RNG report
+  test to assert the same value reaches the clean `GameState` bridge. README,
+  SPEC, and the actor architecture guide document the state-bridge contract.
+  No legacy code, tests, or scaffolding were safe to remove in this slice
+  because the change tightens the actor-to-clean bridge used by the existing
+  smoke and fidelity gates. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780725219910189>.
+  Validation passed with `cargo test
+  playing_step_report_carries_driver_source_rng_snapshot --lib --features
+  legacy-tools`, `cargo test actor_state_bridge --lib --features
+  legacy-tools`, `cargo fmt --check`, `cargo test actor_game --all-targets
+  --features legacy-tools`, `cargo test actor_live --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, `make
+  actor-smoke`, `make actor-wgpu-smoke`, `markdownlint README.md SPEC.md
+  PLAN.md docs/actor-architecture.md`, and `git diff --check`.
 
 - `2026-06-06 06:46 BST`: Completed the actor script check tooling cycle.
   Added `--actor-script-check <path>` as a headless custom-driver validation

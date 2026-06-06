@@ -1145,7 +1145,10 @@ source `SEED`/`HSEED`: the clean camera/background word, player X/facing branch,
 player Y high byte, cleared velocity, and source `APSND` appearance command.
 The actor path now publishes the same source background word from source-backed
 hyperspace rematerialization and keeps it in the driver-owned prompt/report
-state used by restore placement.
+state used by restore placement. Its clean-state bridge also preserves the
+driver-owned source RNG in `WorldSnapshot::source_rng`, so source-backed
+restore and projectile metadata remain visible through the runtime state
+contract.
 Their clean `HYP2` tail follows the source `LSEED > 0xC0` death-risk branch
 into the existing player damage path with source `PDSND` command evidence,
 while `0xC0` and below complete safely.

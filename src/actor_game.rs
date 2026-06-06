@@ -6744,7 +6744,7 @@ fn world_snapshot_for_report(report: &StepReport) -> WorldSnapshot {
         explosions: actor_explosions_for_report(report),
         score_popups: actor_score_popups_for_report(report),
         enemy_reserve: report.enemy_reserve,
-        source_rng: SourceRandSnapshot::default(),
+        source_rng: report.source_rng.map(clean_source_rng).unwrap_or_default(),
         ..WorldSnapshot::default()
     };
     world.scanner.enabled = report.phase == Phase::Playing && report.terrain_blow.is_none();
@@ -21127,6 +21127,10 @@ mod tests {
         let playing = driver.step(GameInput::NONE);
 
         assert_eq!(playing.source_rng, Some(expected_snapshot));
+        assert_eq!(
+            playing.game_state().world.source_rng,
+            clean_source_rng(expected_snapshot)
+        );
     }
 
     #[test]
