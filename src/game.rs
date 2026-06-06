@@ -112,6 +112,16 @@ const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECT_SAMPLE_ALIGNMENT_FRAMES
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_POST_GAME_SCROLL_START_FRAME: u16 = 375;
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_POST_GAME_SCROLL_BASE: u16 = 0xCD00;
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_POST_GAME_SCROLL_DELTA: u16 = 0x00C0;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_FLASH_SUPPRESS_START_FRAME: u16 = 1043;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_FLASH_SUPPRESS_END_FRAME: u16 = 1133;
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_VISIBLE_FLASH_WINDOWS: [(u16, u16, u8); 6] = [
+    (1043, 1044, 0xCA),
+    (1055, 1057, 0x3E),
+    (1067, 1068, 0xCB),
+    (1085, 1087, 0xE8),
+    (1097, 1099, 0xCB),
+    (1127, 1130, 0xDA),
+];
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_PROJECTILE_DEATH_SOUND_SEQUENCE: [(u16, u8); 5] = [
     (2, SOURCE_PDSND_SOUND_COMMAND),
     (3, SOURCE_AHSND_SOUND_COMMAND),
@@ -6918,6 +6928,21 @@ fn source_target4_smartmix_terminal_post_game_background_left(frame: u16) -> Opt
     )
 }
 
+fn source_target4_smartmix_terminal_visible_flash_tint(frame: u16) -> Option<Color> {
+    if !(SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_FLASH_SUPPRESS_START_FRAME
+        ..=SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_FLASH_SUPPRESS_END_FRAME)
+        .contains(&frame)
+    {
+        return None;
+    }
+
+    let color = SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_VISIBLE_FLASH_WINDOWS
+        .iter()
+        .find_map(|(start, end, color)| (*start <= frame && frame <= *end).then_some(*color))
+        .unwrap_or(0);
+    Some(source_pseudo_color_tint(color))
+}
+
 fn source_terminal_post_game_lander(
     position: ScreenPosition,
     picture_frame: u8,
@@ -12846,7 +12871,12 @@ impl Game {
         if self.smart_bomb_flash_frames_remaining > 0 && show_playfield {
             scene.clear_color = Color::WHITE;
         }
-        if let Some(terrain_blow) = self.state.world.terrain_blow
+        let target4_terminal_flash_tint = self.target4_smartmix_terminal_flash_tint();
+        if let Some(flash_tint) = target4_terminal_flash_tint {
+            if flash_tint.rgba[3] != 0 {
+                scene.clear_color = flash_tint;
+            }
+        } else if let Some(terrain_blow) = self.state.world.terrain_blow
             && show_playfield
             && terrain_blow.terrain_erased()
         {
@@ -12989,6 +13019,16 @@ impl Game {
         }
 
         scene
+    }
+
+    fn target4_smartmix_terminal_flash_tint(&self) -> Option<Color> {
+        if self.post_game_sound_profile != PostGameSoundProfile::Target4SmartmixTerminal
+            || self.state.world.terrain_blow.is_none()
+        {
+            return None;
+        }
+        let post_game = self.state.post_game_playfield?;
+        source_target4_smartmix_terminal_visible_flash_tint(post_game.frame)
     }
 }
 
@@ -26288,6 +26328,7 @@ mod tests {
         let mut sound_samples = Vec::new();
         let mut terminal_object_samples = Vec::new();
         let mut terminal_shell_samples = Vec::new();
+        let mut terminal_flash_samples = Vec::new();
 
         for input_frame in 0..=6127u16 {
             let frame = game.step(organic_smartmix_input(input_frame));
@@ -26349,6 +26390,12 @@ mod tests {
                     .collect::<Vec<_>>();
                 positions.sort_by_key(|position| (position.x, position.y));
                 terminal_shell_samples.push((state_frame, positions));
+            }
+            if matches!(
+                state_frame,
+                5990 | 6002 | 6014 | 6020 | 6032 | 6044 | 6050 | 6062 | 6074 | 6080
+            ) {
+                terminal_flash_samples.push((state_frame, frame.scene.clear_color));
             }
             if matches!(state_frame, 4779 | 4927 | 4947 | 5991 | 6007) {
                 let terrain_erased = frame
@@ -26570,6 +26617,21 @@ mod tests {
                 (6075, vec![ScreenPosition::new(52, 43)]),
                 (6088, vec![]),
                 (6128, vec![ScreenPosition::new(7, 110)]),
+            ]
+        );
+        assert_eq!(
+            terminal_flash_samples,
+            vec![
+                (5990, super::source_pseudo_color_tint(0xCA)),
+                (6002, super::source_pseudo_color_tint(0x3E)),
+                (6014, super::source_pseudo_color_tint(0xCB)),
+                (6020, Color { rgba: [0; 4] }),
+                (6032, super::source_pseudo_color_tint(0xE8)),
+                (6044, super::source_pseudo_color_tint(0xCB)),
+                (6050, Color { rgba: [0; 4] }),
+                (6062, Color { rgba: [0; 4] }),
+                (6074, super::source_pseudo_color_tint(0xDA)),
+                (6080, Color { rgba: [0; 4] }),
             ]
         );
         assert_eq!(

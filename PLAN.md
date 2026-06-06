@@ -587,27 +587,26 @@ Exit gate:
    `ASTCNT=0x00`, `pc=0xED88`, `terrain_blown=false`, and a live `TERBLO`
    process. The candidate report at
    `target/reference-media/organic-terrain-blow-smartmix-check/report.json`
-   still needs all-axis repair and owner review. The focused clean guard now
-   matches the terminal-death state rows through score `50`, terrain-blown
-   status at frame `4927`, attract handoff at frame `4947`, no clean human
-   snapshots once terrain blow is active, delayed visible `TEREX` progression
-   at the organic `TERBLO` sound boundary, the MAME-observed six-lander /
-   nine-mutant residual object mix before `TERBLO`, and the sampled `0xEE`
-   terrain-blow tail at frames `5991`, `5995`, `5999`, `6003`, and `6007`.
-   The current regenerated report improves from stale no-audio/static-clean
-   evidence but still fails with visual RMS `89.11` / MAE `40.82`; audio passes
-   with envelope correlation `0.4431`. A `2026-06-06` terminal-flash
-   experiment confirmed that directly replaying the organic `pcram0` rows, or
-   a sampled visible-video flash table, is not yet safe: report-only visual
-   metrics worsened, so the generic source terrain-blow flash remains in place
-   until the organic media frame alignment is solved. A follow-up
-   `2026-06-06` guard hardening now prevents the armed-but-not-erased terrain
-   blow state from applying flash clear color in either clean source rendering
-   or actor rendering; the organic report remains at the same visual-fail /
-   audio-pass baseline instead of taking the flash-table regression. The
-   state-steered `TERBLO` clip remains the accepted bounded terrain-blow
-   evidence, and the organic smartmix TERBLO cadence remains the concrete
-   follow-up rather than a missing-evidence boundary. A follow-up
+   now passes all-axis comparison after the target4 terminal branch overlays
+   only the MAME-visible terrain-flash windows from the smartmix terminal
+   death clip while keeping flash suppressed across the intervening black
+   phases. The focused clean guard now matches the terminal-death state rows
+   through score `50`, terrain-blown status at frame `4927`, attract handoff
+   at frame `4947`, no clean human snapshots once terrain blow is active,
+   delayed visible `TEREX` progression at the organic `TERBLO` sound boundary,
+   the MAME-observed six-lander / nine-mutant residual object mix before
+   `TERBLO`, sampled `0xEE` terrain-blow tail rows at frames `5991`, `5995`,
+   `5999`, `6003`, and `6007`, and sampled terminal flash colors at frames
+   `5990`, `6002`, `6014`, `6032`, `6044`, and `6074`. The regenerated media
+   report passes with visual RMS `23.11` / MAE `3.42`, visual-region RMS
+   `29.01` HUD, `32.07` scanner, `15.30` playfield, `19.57` laser band, and
+   `28.36` terrain, plus audio envelope correlation `0.4431`. Earlier
+   `2026-06-06` direct `pcram0` replay and sample-step experiments were not
+   kept because they regressed the comparator; the accepted fix is bounded to
+   the terminal branch and leaves the generic source terrain-blow flash path
+   intact for other windows. The state-steered `TERBLO` clip remains accepted
+   bounded terrain-blow evidence, and the organic smartmix clip is now the
+   first passing organic terrain-blow all-axis proof. A follow-up
    non-lander trace inventory identified `extended_hold_up_7000`, frames
    `5811-7000`, as the
    next finite organic visual media target. Its input program is
@@ -882,6 +881,29 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-06 02:27 BST`: Completed the organic smartmix terminal flash
+  parity cycle. The target4 terminal post-game branch now suppresses the
+  generic terrain-blow flash across the terminal black phases and overlays
+  only the MAME-visible sampled colors at state frames `5990`, `6002`,
+  `6014`, `6032`, `6044`, and `6074`. The focused organic regression now
+  asserts those clear-color samples alongside the existing score,
+  terrain-blow, residual-object, terminal-shell, and sound-cadence checks.
+  Regenerated ignored clean media for `organic-terrain-blow-smartmix` and the
+  report-only comparator now pass all-axis comparison at
+  `target/reference-media/organic-terrain-blow-smartmix-check/report.json`:
+  visual RMS `23.11`, visual MAE `3.42`, visual-region RMS `29.01` HUD,
+  `32.07` scanner, `15.30` playfield, `19.57` laser band, and `28.36`
+  terrain, with audio envelope correlation `0.4431`. No protected media was
+  committed, and no legacy code, tests, or scaffolding were safe to remove
+  because the remaining fidelity slices still depend on the clean-vs-MAME
+  reference tooling. Validation passed with `cargo fmt --check`, `cargo test
+  clean_game_organic_smartmix_terminal_death_and_terrain_blow_match_mame_window
+  --lib --features legacy-tools`, `cargo test terrain_blow --lib --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, and the
+  regenerated report-only organic terrain-blow smartmix media check. Slack
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780708681019739`.
 - `2026-06-06 02:15 BST`: Completed the armed terrain-blow render guard cycle.
   The clean source renderer and actor render bridge now apply terrain-blow flash
   clear color only after `TerrainBlowSnapshot::terrain_erased()` is true, so the
