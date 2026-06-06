@@ -212,6 +212,11 @@ The built-in baseline profile is the embedded checked script
 `assets/red-label/actor-behavior.script`; `ActorBehaviorScript::default()`
 parses that asset at startup and the raw arcade profile remains available as
 the parser fallback.
+`ActorDriverScripts::parse_texts` checks attract, behavior, and wave text as
+one custom-driver configuration. The parsed behavior script becomes the base
+used while parsing the bundled wave script, so clean wave records inherit
+driver-wide tuning and source-backed wave records preserve that tuning unless
+the red-label wave table owns the specific family field.
 
 `AttractScript::manifest`, `ActorBehaviorScript::manifest`,
 `ActorWaveScript::manifest`, and `ActorGameDriver::script_manifest` expose
@@ -324,7 +329,8 @@ Source-backed baiter actors use that same source RNG snapshot to gate
 picture-wrap retargeting against the wave's `baiter_seek_probability` and add
 player velocity into the source-shaped seek velocity.
 
-`ActorWaveScript::parse_text(...)` and
+`ActorWaveScript::parse_text(...)`,
+`ActorWaveScript::parse_text_with_base_behavior(...)`, and
 `str::parse::<ActorWaveScript>()` accept checked text level scripts:
 
 ```text
@@ -357,6 +363,9 @@ source_waves 18 20 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1
 ```
 
 `behavior` lines reuse the `ActorBehaviorScript` parser for the current wave;
+when parsed through `parse_text_with_base_behavior` or
+`ActorDriverScripts::parse_texts`, each new clean wave starts from the supplied
+base behavior script instead of the arcade fallback.
 `behavior_preset <name> ...` stores one checked behavior update in a reusable
 named block, and repeated lines append to that block. `use_behavior <name>`
 replays the named updates onto the current wave profile, preserving existing

@@ -54,7 +54,10 @@ Current files:
   `spawn_behavior_preset` plus `use_spawn_behavior` /
   `use_spawn_behavior_waves`, with direct `behavior_waves` /
   `spawn_behavior_waves` updates still available, to tune movement and
-  spawn-index behavior across existing wave ranges.
+  spawn-index behavior across existing wave ranges. `ActorDriverScripts`
+  parses the attract, behavior, and wave script texts together for custom
+  drivers, and uses the parsed behavior script as the bundled wave parser's
+  baseline before applying source-table or wave-local overrides.
 - `audit-adjustments.tsv`: red-label `romc8.src` `AUDITG` / `MSGAUD`
   operator audit and adjustment message table, including the source CMOS cell
   offsets and display widths used by `DISAUD`.

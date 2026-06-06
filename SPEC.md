@@ -818,6 +818,10 @@ reintroduce legacy implementation terminology.
   without rewriting actor structs. `ActorBehaviorScript` can be built from Rust
   profile constructors or checked text profile updates. The built-in baseline
   behavior is embedded from `assets/red-label/actor-behavior.script`.
+  `ActorDriverScripts::parse_texts` can parse the attract, behavior, and wave
+  text as one custom-driver configuration; wave parsing in that bundle inherits
+  the parsed behavior script as its base before applying per-wave or
+  source-backed overrides.
   Read-only script manifests expose persistent attract event, driver behavior,
   reusable wave/spawn behavior preset definitions, wave-profile configuration,
   and source wave-table metadata for source-backed wave profiles, and every

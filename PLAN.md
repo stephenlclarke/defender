@@ -39,7 +39,10 @@ verification tools.
   preset definitions, and wave profiles so custom drivers can inspect their
   installed scripts without actor-thread introspection. Attract, behavior, and
   wave scripts can now be parsed from checked text lines before installation in
-  a custom driver, and the built-in
+  a custom driver, and `ActorDriverScripts::parse_texts` can install all three
+  as one checked custom-driver bundle whose wave parser inherits the parsed
+  behavior baseline before applying wave-local/source-backed overrides. The
+  built-in
   actor attract, behavior, and wave scripts are embedded from
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and
@@ -908,6 +911,35 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 06:01 BST`: Completed the actor driver script bundle cycle.
+  Added `ActorDriverScripts` as a checked attract/behavior/wave script bundle
+  for custom drivers, with sectioned parse errors for malformed attract,
+  behavior, or wave text. `ActorWaveScript::parse_text_with_base_behavior`
+  now lets bundled wave parsing inherit the parsed behavior script as its
+  baseline before wave-local updates and source-backed wave-table fields are
+  applied. `ActorGameDriver::new` now builds from the same red-label bundle
+  path, and `ActorGameDriver::with_scripts` installs a parsed custom bundle
+  without requiring post-construction mutation. Added focused regressions for
+  bundled attract drawing, inherited clean/source wave behavior, playing
+  manifest state, and sectioned wave parse errors. README, SPEC, the actor
+  architecture guide, and `assets/red-label/README.md` now document the bundle
+  and inheritance contract. No legacy code, tests, or scaffolding were safe to
+  remove in this slice because the changed surface is the active custom-driver
+  script API. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780721659607239>.
+  Validation passed with `cargo test driver_script_bundle --lib --features
+  legacy-tools`, `cargo test
+  wave_script_text_parser_can_inherit_custom_base_behavior --lib --features
+  legacy-tools`, `cargo test default_driver_exposes_embedded_actor_script_manifests
+  --lib --features legacy-tools`, `cargo test wave_script --lib --features
+  legacy-tools`, `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`, `cargo clippy
+  --all-targets --features legacy-tools -- -D warnings`, `make actor-smoke`,
+  `make actor-wgpu-smoke`, `cargo fmt --check`, `markdownlint README.md
+  SPEC.md PLAN.md docs/actor-architecture.md
+  docs/fidelity/mame-golden-clips.md docs/fidelity/release-closure-audit.md
+  assets/sounds/README.md assets/red-label/README.md`, and `git diff --check`.
 
 - `2026-06-06 05:50 BST`: Completed the actor wave preset manifest cycle.
   `ActorWaveScriptManifest` now preserves parsed `behavior_preset` definitions

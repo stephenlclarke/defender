@@ -3510,10 +3510,23 @@ impl ActorWaveScript {
         wave: u16,
         source: ActorSourceWaveProfile,
     ) -> ActorWaveProfile {
+        Self::source_backed_profile_from_source_with_behavior(
+            wave,
+            source,
+            &ActorBehaviorScript::from_arcade_profile(),
+        )
+    }
+
+    fn source_backed_profile_from_source_with_behavior(
+        wave: u16,
+        source: ActorSourceWaveProfile,
+        base_behavior: &ActorBehaviorScript,
+    ) -> ActorWaveProfile {
         let human_spawns = source.human_spawns(wave);
         ActorWaveProfile::with_family_spawns(
             wave,
-            ActorBehaviorScript::from_arcade_profile()
+            base_behavior
+                .clone()
                 .with_kind_behavior(ActorKind::Lander, source.lander_behavior())
                 .with_kind_behavior(
                     ActorKind::Bomber,
@@ -3561,7 +3574,21 @@ impl FromStr for ActorWaveScript {
     type Err = ActorWaveScriptParseError;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        let mut parser = ParsedActorWaveScript::new();
+        let base_behavior = ActorBehaviorScript::from_arcade_profile();
+        Self::parse_text_with_base_behavior(source, &base_behavior)
+    }
+}
+
+impl ActorWaveScript {
+    pub fn parse_text(source: &str) -> Result<Self, ActorWaveScriptParseError> {
+        source.parse()
+    }
+
+    pub fn parse_text_with_base_behavior(
+        source: &str,
+        base_behavior: &ActorBehaviorScript,
+    ) -> Result<Self, ActorWaveScriptParseError> {
+        let mut parser = ParsedActorWaveScript::with_base_behavior(base_behavior.clone());
         for (line_index, raw_line) in source.lines().enumerate() {
             let line_number = line_index + 1;
             let line = raw_line
@@ -3574,12 +3601,6 @@ impl FromStr for ActorWaveScript {
             parser.parse_line(line_number, line)?;
         }
         parser.finish()
-    }
-}
-
-impl ActorWaveScript {
-    pub fn parse_text(source: &str) -> Result<Self, ActorWaveScriptParseError> {
-        source.parse()
     }
 }
 
@@ -3616,15 +3637,17 @@ struct ParsedActorWaveScript {
     waves: Vec<ParsedActorWaveProfile>,
     behavior_presets: BTreeMap<String, Vec<ParsedBehaviorPresetUpdate>>,
     spawn_behavior_presets: BTreeMap<String, Vec<ParsedSpawnBehaviorPresetUpdate>>,
+    base_behavior: ActorBehaviorScript,
 }
 
 impl ParsedActorWaveScript {
-    fn new() -> Self {
+    fn with_base_behavior(base_behavior: ActorBehaviorScript) -> Self {
         Self {
             name: "parsed-wave-script".to_string(),
             waves: Vec::new(),
             behavior_presets: BTreeMap::new(),
             spawn_behavior_presets: BTreeMap::new(),
+            base_behavior,
         }
     }
 
@@ -3671,7 +3694,10 @@ impl ParsedActorWaveScript {
             "wave" => {
                 let wave = parse_wave_u16(line_number, parts.next(), "wave")?;
                 reject_extra_wave_fields(line_number, parts)?;
-                self.push_profile(line_number, ParsedActorWaveProfile::new(wave))
+                self.push_profile(
+                    line_number,
+                    ParsedActorWaveProfile::new_with_behavior(wave, self.base_behavior.clone()),
+                )
             }
             "source_wave" | "source_backed_wave" => {
                 let wave = parse_wave_u16(line_number, parts.next(), "wave")?;
@@ -3679,7 +3705,11 @@ impl ParsedActorWaveScript {
                 parse_source_wave_profile_updates(line_number, &mut source, parts)?;
                 self.push_profile(
                     line_number,
-                    ParsedActorWaveProfile::source_backed_from_source(wave, source),
+                    ParsedActorWaveProfile::source_backed_from_source_with_behavior(
+                        wave,
+                        source,
+                        &self.base_behavior,
+                    ),
                 )
             }
             "source_waves" | "source_backed_waves" => {
@@ -3701,7 +3731,11 @@ impl ParsedActorWaveScript {
                     )?;
                     self.push_profile(
                         line_number,
-                        ParsedActorWaveProfile::source_backed_from_source(wave, source),
+                        ParsedActorWaveProfile::source_backed_from_source_with_behavior(
+                            wave,
+                            source,
+                            &self.base_behavior,
+                        ),
                     )?;
                 }
                 Ok(())
@@ -4145,6 +4179,7 @@ impl ParsedActorWaveScript {
             waves,
             behavior_presets,
             spawn_behavior_presets,
+            base_behavior: _,
         } = self;
         if waves.is_empty() {
             return Err(ActorWaveScriptParseError::new(
@@ -4220,11 +4255,11 @@ struct ParsedActorWaveProfile {
 }
 
 impl ParsedActorWaveProfile {
-    fn new(wave: u16) -> Self {
+    fn new_with_behavior(wave: u16, behavior_script: ActorBehaviorScript) -> Self {
         Self {
             wave: wave.max(1),
             source_wave: None,
-            behavior_script: ActorBehaviorScript::from_arcade_profile(),
+            behavior_script,
             lander_spawns: Vec::new(),
             bomber_spawns: Vec::new(),
             pod_spawns: Vec::new(),
@@ -4237,8 +4272,16 @@ impl ParsedActorWaveProfile {
         }
     }
 
-    fn source_backed_from_source(wave: u16, source: ActorSourceWaveProfile) -> Self {
-        let profile = ActorWaveScript::source_backed_profile_from_source(wave, source);
+    fn source_backed_from_source_with_behavior(
+        wave: u16,
+        source: ActorSourceWaveProfile,
+        base_behavior: &ActorBehaviorScript,
+    ) -> Self {
+        let profile = ActorWaveScript::source_backed_profile_from_source_with_behavior(
+            wave,
+            source,
+            base_behavior,
+        );
         Self {
             wave: profile.wave,
             source_wave: profile.source_wave,
@@ -9138,6 +9181,115 @@ enum PlayerStartStep {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorDriverScripts {
+    pub attract_script: AttractScript,
+    pub behavior_script: ActorBehaviorScript,
+    pub wave_script: ActorWaveScript,
+}
+
+impl ActorDriverScripts {
+    pub fn new(
+        attract_script: AttractScript,
+        behavior_script: ActorBehaviorScript,
+        wave_script: ActorWaveScript,
+    ) -> Self {
+        Self {
+            attract_script,
+            behavior_script,
+            wave_script,
+        }
+    }
+
+    pub fn parse_texts(
+        attract_source: &str,
+        behavior_source: &str,
+        wave_source: &str,
+    ) -> Result<Self, ActorDriverScriptsParseError> {
+        let attract_script = AttractScript::parse_text(attract_source)
+            .map_err(ActorDriverScriptsParseError::from_attract)?;
+        let behavior_script = ActorBehaviorScript::parse_text(behavior_source)
+            .map_err(ActorDriverScriptsParseError::from_behavior)?;
+        let wave_script =
+            ActorWaveScript::parse_text_with_base_behavior(wave_source, &behavior_script)
+                .map_err(ActorDriverScriptsParseError::from_wave)?;
+        Ok(Self::new(attract_script, behavior_script, wave_script))
+    }
+}
+
+impl Default for ActorDriverScripts {
+    fn default() -> Self {
+        let behavior_script = ActorBehaviorScript::red_label_default();
+        let wave_script = ActorWaveScript::parse_text_with_base_behavior(
+            ACTOR_RED_LABEL_WAVE_SCRIPT,
+            &behavior_script,
+        )
+        .unwrap_or_else(|error| panic!("embedded actor wave script is invalid: {error}"));
+        Self::new(
+            AttractScript::red_label_title(),
+            behavior_script,
+            wave_script,
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActorDriverScriptSection {
+    Attract,
+    Behavior,
+    Wave,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorDriverScriptsParseError {
+    pub section: ActorDriverScriptSection,
+    pub line: usize,
+    pub message: String,
+}
+
+impl ActorDriverScriptsParseError {
+    fn new(section: ActorDriverScriptSection, line: usize, message: impl Into<String>) -> Self {
+        Self {
+            section,
+            line,
+            message: message.into(),
+        }
+    }
+
+    fn from_attract(error: AttractScriptParseError) -> Self {
+        Self::new(ActorDriverScriptSection::Attract, error.line, error.message)
+    }
+
+    fn from_behavior(error: ActorBehaviorScriptParseError) -> Self {
+        Self::new(
+            ActorDriverScriptSection::Behavior,
+            error.line,
+            error.message,
+        )
+    }
+
+    fn from_wave(error: ActorWaveScriptParseError) -> Self {
+        Self::new(ActorDriverScriptSection::Wave, error.line, error.message)
+    }
+}
+
+impl fmt::Display for ActorDriverScriptsParseError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let section = match self.section {
+            ActorDriverScriptSection::Attract => "attract",
+            ActorDriverScriptSection::Behavior => "behavior",
+            ActorDriverScriptSection::Wave => "wave",
+        };
+        write!(
+            formatter,
+            "actor driver {section} script line {}: {}",
+            self.line, self.message
+        )
+    }
+}
+
+impl std::error::Error for ActorDriverScriptsParseError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorDriverScriptManifest {
     pub step: u64,
     pub phase: Phase,
@@ -9259,7 +9411,7 @@ pub struct ActorGameDriver {
 
 impl ActorGameDriver {
     pub fn new() -> Self {
-        Self::with_attract_script(AttractScript::red_label_title())
+        Self::with_scripts(ActorDriverScripts::default())
     }
 
     pub fn with_attract_script(attract_script: AttractScript) -> Self {
@@ -9272,6 +9424,26 @@ impl ActorGameDriver {
 
     pub fn with_attract_and_wave_scripts(
         attract_script: AttractScript,
+        wave_script: ActorWaveScript,
+    ) -> Self {
+        Self::with_attract_behavior_and_wave_scripts(
+            attract_script,
+            ActorBehaviorScript::default(),
+            wave_script,
+        )
+    }
+
+    pub fn with_scripts(scripts: ActorDriverScripts) -> Self {
+        Self::with_attract_behavior_and_wave_scripts(
+            scripts.attract_script,
+            scripts.behavior_script,
+            scripts.wave_script,
+        )
+    }
+
+    pub fn with_attract_behavior_and_wave_scripts(
+        attract_script: AttractScript,
+        behavior_script: ActorBehaviorScript,
         wave_script: ActorWaveScript,
     ) -> Self {
         let mut driver = Self {
@@ -9294,7 +9466,7 @@ impl ActorGameDriver {
             high_scores: HighScoreTable::default(),
             high_score_initials: HighScoreInitialsState::EMPTY,
             attract_script: attract_script.clone(),
-            behavior_script: ActorBehaviorScript::default(),
+            behavior_script,
             wave_script,
             wave_spawn_allocations: BTreeMap::new(),
             enemy_reserve: EnemyReserveSnapshot::default(),
@@ -22689,6 +22861,141 @@ mod tests {
                 .expect("embedded wave script should parse")
                 .manifest()
         );
+    }
+
+    #[test]
+    fn driver_script_bundle_parses_and_installs_custom_scripts() {
+        let scripts = ActorDriverScripts::parse_texts(
+            "text 1 forever 12 20 CUSTOM DRIVER\n",
+            "\
+            default player_takes_enemy_collision_damage false\n\
+            kind lander lander_mode drift\n\
+            kind lander lander_drift_speed 5\n",
+            "\
+            name bundled custom waves\n\
+            wave 1\n\
+            lander 80 214\n\
+            human 100 214\n",
+        )
+        .expect("driver script bundle should parse");
+        let expected_attract = scripts.attract_script.manifest();
+        let expected_wave = scripts.wave_script.manifest();
+        let mut driver = ActorGameDriver::with_scripts(scripts);
+
+        let attract = driver.step(GameInput::NONE);
+        assert!(attract.draws.iter().any(|draw| {
+            draw.text.as_deref() == Some("CUSTOM DRIVER") && draw.position == Point::new(12, 20)
+        }));
+
+        let attract_manifest = driver.script_manifest();
+        assert_eq!(attract_manifest.attract_script, expected_attract);
+        assert_eq!(attract_manifest.wave_script, expected_wave);
+        assert!(
+            !attract_manifest
+                .behavior_script
+                .default_profile
+                .player_takes_enemy_collision_damage
+        );
+        let attract_wave_lander = attract_manifest
+            .current_wave_profile
+            .behavior_script
+            .kind_profile(ActorKind::Lander)
+            .expect("wave profile should inherit bundled lander behavior");
+        assert_eq!(attract_wave_lander.lander_mode, LanderBehaviorMode::Drift);
+        assert_eq!(attract_wave_lander.lander_drift_speed, 5);
+
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        let playing = step_until_driver_player_start_completes(&mut driver, 1);
+        let playing_manifest = driver.script_manifest();
+
+        assert_eq!(playing.phase, Phase::Playing);
+        assert!(
+            !playing_manifest
+                .behavior_script
+                .default_profile
+                .player_takes_enemy_collision_damage
+        );
+        let playing_lander = playing_manifest
+            .behavior_script
+            .kind_profile(ActorKind::Lander)
+            .expect("playing behavior should come from bundled wave profile");
+        assert_eq!(playing_lander.lander_mode, LanderBehaviorMode::Drift);
+        assert_eq!(playing_lander.lander_drift_speed, 5);
+    }
+
+    #[test]
+    fn driver_script_bundle_reports_sectioned_parse_errors() {
+        let error = ActorDriverScripts::parse_texts(
+            "text 1 forever 12 20 CUSTOM DRIVER\n",
+            "kind lander lander_mode drift\n",
+            "\
+            name broken wave\n\
+            lander 80 214\n",
+        )
+        .expect_err("wave script should reject spawn before wave");
+
+        assert_eq!(error.section, ActorDriverScriptSection::Wave);
+        assert_eq!(error.line, 2);
+        assert!(
+            error
+                .to_string()
+                .contains("actor driver wave script line 2")
+        );
+        assert!(error.message.contains("wave action must appear"));
+    }
+
+    #[test]
+    fn wave_script_text_parser_can_inherit_custom_base_behavior() {
+        let behavior_script = ActorBehaviorScript::parse_text(
+            "\
+            default player_takes_enemy_collision_damage false\n\
+            kind lander lander_mode drift\n\
+            kind lander lander_drift_speed 6\n",
+        )
+        .expect("base behavior script should parse");
+        let wave_script = ActorWaveScript::parse_text_with_base_behavior(
+            "\
+            name inherited wave behavior\n\
+            source_wave 1 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n\
+            wave 2\n\
+            lander 80 214\n",
+            &behavior_script,
+        )
+        .expect("wave script should inherit base behavior");
+        let manifest = wave_script.manifest();
+
+        assert_eq!(manifest.waves.len(), 2);
+        for profile in &manifest.waves {
+            assert!(
+                !profile
+                    .behavior_script
+                    .default_profile
+                    .player_takes_enemy_collision_damage
+            );
+        }
+        let source_lander = manifest.waves[0]
+            .behavior_script
+            .kind_profile(ActorKind::Lander)
+            .expect("source wave should keep source lander behavior");
+        assert_eq!(
+            source_lander.lander_fire_period_steps,
+            ActorSourceWaveProfile::for_wave(1)
+                .lander_behavior()
+                .lander_fire_period_steps
+        );
+        let clean_lander = manifest.waves[1]
+            .behavior_script
+            .kind_profile(ActorKind::Lander)
+            .expect("clean wave should inherit base kind behavior");
+        assert_eq!(clean_lander.lander_mode, LanderBehaviorMode::Drift);
+        assert_eq!(clean_lander.lander_drift_speed, 6);
     }
 
     #[test]
