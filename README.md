@@ -127,10 +127,11 @@ backed by `assets/red-label/wave-table.tsv` for active wave size, lander and
 bomber movement speed, source family counts including direct mutants and
 swarmers, lander fire cadence, baiter entry/shot/seek timing, and scripted
 hostile/human spawn records. Read-only script manifests expose the configured
-attract events, driver behavior, wave profiles, and source wave-table metadata
-for source-backed profiles, while each `StepReport` carries the effective
-per-step behavior manifest after transient input overrides such as `XYZZY`
-invincibility. Behavior scripts can also be parsed from checked text lines that
+attract events, driver behavior, reusable wave/spawn behavior presets, wave
+profiles, and source wave-table metadata for source-backed profiles, while
+each `StepReport` carries the effective per-step behavior manifest after
+transient input overrides such as `XYZZY` invincibility. Behavior scripts can
+also be parsed from checked text lines that
 update default, actor-kind, or actor-id profiles. Wave scripts can be parsed
 from checked text lines that name wave profiles, reusable behavior presets,
 per-wave behavior updates, and `lander` / `bomber` / `pod` / `mutant` /

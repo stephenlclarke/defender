@@ -216,9 +216,13 @@ the parser fallback.
 `AttractScript::manifest`, `ActorBehaviorScript::manifest`,
 `ActorWaveScript::manifest`, and `ActorGameDriver::script_manifest` expose
 read-only snapshots of configured attract events, driver behavior, and wave
-scripts for custom drivers and test tooling. Source-backed wave profiles carry
-the exact `ActorSourceWaveProfile` expanded from `assets/red-label/wave-table.tsv`
-in those manifests; hand-scripted custom waves leave that field empty.
+scripts for custom drivers and test tooling. Wave manifests also expose parsed
+`behavior_preset` and `spawn_behavior_preset` definitions by normalized name,
+so tooling can verify or serialize reusable level-difficulty blocks instead of
+only inspecting their resolved per-wave effects. Source-backed wave profiles
+carry the exact `ActorSourceWaveProfile` expanded from
+`assets/red-label/wave-table.tsv` in those manifests; hand-scripted custom
+waves leave that field empty.
 `StepReport::behavior_script` carries the effective behavior manifest used for
 that simulation step, after transient input overrides such as `XYZZY`
 invincibility have been applied.

@@ -3451,10 +3451,21 @@ pub struct ActorWaveProfileManifest {
 pub struct ActorWaveScript {
     name: String,
     waves: Vec<ActorWaveProfile>,
+    behavior_presets: Vec<ActorWaveBehaviorPresetManifest>,
+    spawn_behavior_presets: Vec<ActorWaveSpawnBehaviorPresetManifest>,
 }
 
 impl ActorWaveScript {
-    pub fn new(name: impl Into<String>, mut waves: Vec<ActorWaveProfile>) -> Self {
+    pub fn new(name: impl Into<String>, waves: Vec<ActorWaveProfile>) -> Self {
+        Self::with_presets(name, waves, Vec::new(), Vec::new())
+    }
+
+    fn with_presets(
+        name: impl Into<String>,
+        mut waves: Vec<ActorWaveProfile>,
+        behavior_presets: Vec<ActorWaveBehaviorPresetManifest>,
+        spawn_behavior_presets: Vec<ActorWaveSpawnBehaviorPresetManifest>,
+    ) -> Self {
         if waves.is_empty() {
             waves.push(Self::source_backed_profile(1));
         }
@@ -3462,6 +3473,8 @@ impl ActorWaveScript {
         Self {
             name: name.into(),
             waves,
+            behavior_presets,
+            spawn_behavior_presets,
         }
     }
 
@@ -3537,6 +3550,8 @@ impl ActorWaveScript {
     pub fn manifest(&self) -> ActorWaveScriptManifest {
         ActorWaveScriptManifest {
             name: self.name.clone(),
+            behavior_presets: self.behavior_presets.clone(),
+            spawn_behavior_presets: self.spawn_behavior_presets.clone(),
             waves: self.waves.iter().map(ActorWaveProfile::manifest).collect(),
         }
     }
@@ -4125,17 +4140,43 @@ impl ParsedActorWaveScript {
     }
 
     fn finish(self) -> Result<ActorWaveScript, ActorWaveScriptParseError> {
-        if self.waves.is_empty() {
+        let Self {
+            name,
+            waves,
+            behavior_presets,
+            spawn_behavior_presets,
+        } = self;
+        if waves.is_empty() {
             return Err(ActorWaveScriptParseError::new(
                 0,
                 "wave script needs at least one wave",
             ));
         }
-        Ok(ActorWaveScript::new(
-            self.name,
-            self.waves
+        Ok(ActorWaveScript::with_presets(
+            name,
+            waves
                 .into_iter()
                 .map(ParsedActorWaveProfile::finish)
+                .collect(),
+            behavior_presets
+                .into_iter()
+                .map(|(name, updates)| ActorWaveBehaviorPresetManifest {
+                    name,
+                    updates: updates.into_iter().map(|update| update.line).collect(),
+                })
+                .collect(),
+            spawn_behavior_presets
+                .into_iter()
+                .map(|(name, updates)| ActorWaveSpawnBehaviorPresetManifest {
+                    name,
+                    updates: updates
+                        .into_iter()
+                        .map(|update| ActorWaveSpawnBehaviorPresetUpdateManifest {
+                            field: update.field,
+                            values: update.values,
+                        })
+                        .collect(),
+                })
                 .collect(),
         ))
     }
@@ -4591,7 +4632,27 @@ fn reject_extra_wave_fields<'a>(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorWaveScriptManifest {
     pub name: String,
+    pub behavior_presets: Vec<ActorWaveBehaviorPresetManifest>,
+    pub spawn_behavior_presets: Vec<ActorWaveSpawnBehaviorPresetManifest>,
     pub waves: Vec<ActorWaveProfileManifest>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorWaveBehaviorPresetManifest {
+    pub name: String,
+    pub updates: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorWaveSpawnBehaviorPresetManifest {
+    pub name: String,
+    pub updates: Vec<ActorWaveSpawnBehaviorPresetUpdateManifest>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorWaveSpawnBehaviorPresetUpdateManifest {
+    pub field: String,
+    pub values: Vec<String>,
 }
 
 impl Default for ActorWaveScript {
@@ -22672,6 +22733,13 @@ mod tests {
                 ))
         );
         assert_eq!(attract_manifest.wave_script.name, "manifest-test");
+        assert!(attract_manifest.wave_script.behavior_presets.is_empty());
+        assert!(
+            attract_manifest
+                .wave_script
+                .spawn_behavior_presets
+                .is_empty()
+        );
         assert_eq!(attract_manifest.current_wave_profile.source_wave, None);
         assert_eq!(
             attract_manifest.current_wave_profile.lander_spawns[0].position,
@@ -23253,6 +23321,62 @@ mod tests {
         );
         assert_eq!(clean_wave_lander.lander_seek_speed, 7);
         assert_eq!(manifest.waves[2].source_wave, None);
+    }
+
+    #[test]
+    fn parsed_wave_script_manifest_exposes_reusable_behavior_presets() {
+        let wave_script = concat!(
+            "name preset manifest\n",
+            "behavior_preset Hard-Lander kind lander lander_mode chase_player\n",
+            "behavior_preset Hard-Lander kind lander lander_seek_speed 7\n",
+            "spawn_behavior_preset Fast-Slot lander_mode chase_player\n",
+            "spawn_behavior_preset Fast-Slot lander_seek_speed 9\n",
+            "source_wave 1 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
+            "use_behavior hard_lander\n",
+            "use_spawn_behavior lander 0 fast_slot\n",
+        )
+        .parse::<ActorWaveScript>()
+        .expect("preset manifest wave script should parse");
+        let manifest = wave_script.manifest();
+
+        assert_eq!(
+            manifest.behavior_presets,
+            [ActorWaveBehaviorPresetManifest {
+                name: "hard_lander".to_string(),
+                updates: vec![
+                    "kind lander lander_mode chase_player".to_string(),
+                    "kind lander lander_seek_speed 7".to_string(),
+                ],
+            }]
+        );
+        assert_eq!(
+            manifest.spawn_behavior_presets,
+            [ActorWaveSpawnBehaviorPresetManifest {
+                name: "fast_slot".to_string(),
+                updates: vec![
+                    ActorWaveSpawnBehaviorPresetUpdateManifest {
+                        field: "lander_mode".to_string(),
+                        values: vec!["chase_player".to_string()],
+                    },
+                    ActorWaveSpawnBehaviorPresetUpdateManifest {
+                        field: "lander_seek_speed".to_string(),
+                        values: vec!["9".to_string()],
+                    },
+                ],
+            }]
+        );
+        let lander_behavior = manifest.waves[0]
+            .behavior_script
+            .kind_profile(ActorKind::Lander)
+            .expect("behavior preset should still apply to wave profile");
+        assert_eq!(lander_behavior.lander_seek_speed, 7);
+        assert_eq!(manifest.waves[0].spawn_behavior_profiles.len(), 1);
+        assert_eq!(
+            manifest.waves[0].spawn_behavior_profiles[0]
+                .profile
+                .lander_seek_speed,
+            9
+        );
     }
 
     #[test]

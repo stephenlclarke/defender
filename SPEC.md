@@ -819,9 +819,10 @@ reintroduce legacy implementation terminology.
   profile constructors or checked text profile updates. The built-in baseline
   behavior is embedded from `assets/red-label/actor-behavior.script`.
   Read-only script manifests expose persistent attract event, driver behavior,
-  wave-profile configuration, and source wave-table metadata for source-backed
-  wave profiles, and every `StepReport` includes the effective behavior
-  manifest after transient input overrides such as `XYZZY`
+  reusable wave/spawn behavior preset definitions, wave-profile configuration,
+  and source wave-table metadata for source-backed wave profiles, and every
+  `StepReport` includes the effective behavior manifest after transient input
+  overrides such as `XYZZY`
   invincibility.
   `ActorWaveScript` names a driver-owned progression script whose wave profiles
   apply behavior scripts plus hostile and initial-human spawn records when play

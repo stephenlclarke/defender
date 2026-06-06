@@ -35,10 +35,11 @@ verification tools.
   baiter fallback motion can now be script-selected between drift and
   player-chase behavior while source-backed fixed-point metadata remains the
   higher-priority movement source. Read-only script manifests now expose the
-  configured attract events, behavior profiles, and wave profiles so custom
-  drivers can inspect their installed scripts without actor-thread
-  introspection. Attract, behavior, and wave scripts can now be parsed from
-  checked text lines before installation in a custom driver, and the built-in
+  configured attract events, behavior profiles, reusable wave/spawn behavior
+  preset definitions, and wave profiles so custom drivers can inspect their
+  installed scripts without actor-thread introspection. Attract, behavior, and
+  wave scripts can now be parsed from checked text lines before installation in
+  a custom driver, and the built-in
   actor attract, behavior, and wave scripts are embedded from
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and
@@ -907,6 +908,37 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 05:50 BST`: Completed the actor wave preset manifest cycle.
+  `ActorWaveScriptManifest` now preserves parsed `behavior_preset` definitions
+  as normalized names plus checked update lines, and parsed
+  `spawn_behavior_preset` definitions as normalized names plus structured
+  profile-field/value updates. Constructor-built wave scripts report empty
+  preset lists, while parsed scripts expose both the reusable preset blocks and
+  their resolved per-wave effects. This lets custom-driver tooling inspect or
+  serialize reusable level-difficulty and specific actor-slot tuning without
+  reaching into parser internals or actor threads. Added focused manifest
+  regressions for normalized behavior/spawn preset export, resolved wave
+  effects, and empty constructor preset lists. README, SPEC, and the actor
+  architecture guide now document preset manifest visibility. No legacy code,
+  tests, or scaffolding were safe to remove in this slice because the changed
+  surface is the active actor wave manifest API and its custom-driver
+  documentation. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780721020254889>.
+  Validation passed with `cargo test
+  parsed_wave_script_manifest_exposes_reusable_behavior_presets --lib
+  --features legacy-tools`, `cargo test
+  driver_script_manifest_exports_current_wave_and_spawns --lib --features
+  legacy-tools`, `cargo test wave_script --lib --features legacy-tools`,
+  `cargo test actor_game --all-targets --features legacy-tools`, `cargo test
+  actor_smoke --all-targets --features legacy-tools`, `cargo test actor_live
+  --all-targets --features legacy-tools`, `cargo check --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features
+  legacy-tools -- -D warnings`, `make actor-smoke`, `make actor-wgpu-smoke`
+  with `frame_source: actor_game`, `cargo fmt --check`, `markdownlint README.md
+  SPEC.md PLAN.md docs/actor-architecture.md
+  docs/fidelity/mame-golden-clips.md docs/fidelity/release-closure-audit.md
+  assets/sounds/README.md assets/red-label/README.md`, and `git diff --check`.
 
 - `2026-06-06 05:41 BST`: Completed the actor spawn behavior preset scripting
   cycle. Checked wave scripts now accept
