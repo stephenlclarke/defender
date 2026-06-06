@@ -248,6 +248,22 @@ mod public_api_tests {
     }
 
     #[test]
+    fn retired_oldsrc_snapshot_is_removed() {
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let old_source_tree = manifest_dir.join("oldsrc");
+        let active_legacy_oracle = manifest_dir.join("src_legacy");
+
+        assert!(
+            !old_source_tree.exists(),
+            "retired oldsrc snapshot must not remain in the clean actor workspace"
+        );
+        assert!(
+            active_legacy_oracle.exists(),
+            "src_legacy stays as the explicit legacy-tools oracle boundary"
+        );
+    }
+
+    #[test]
     fn legacy_equivalence_tests_use_crate_private_oracle_wiring() {
         let oracle_equivalence_tests_rs = include_str!("../src_legacy/oracle_equivalence_tests.rs");
 

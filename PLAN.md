@@ -881,6 +881,17 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-06 03:24 BST`: Completed the retired `oldsrc/` cleanup cycle. The
+  unused pre-clean source snapshot has been removed from the tracked workspace,
+  leaving `src_legacy/` as the only intentional legacy boundary for explicit
+  `legacy-tools` oracle/evidence builds. A new root architecture guard asserts
+  that `oldsrc/` stays absent while `src_legacy/` remains present, so future
+  cleanup does not accidentally reintroduce the stale source tree or delete the
+  required oracle boundary. No protected media was touched, and no additional
+  legacy modules were safe to remove because `src_legacy/` still owns ROM,
+  trace, sound-board, and oracle evidence used by the release gate. Slack cycle
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780712532505379`.
 - `2026-06-06 02:34 BST`: Completed the organic terrain-blow proof-promotion
   cycle. The passing
   `target/reference-media/organic-terrain-blow-smartmix-check/report.json`

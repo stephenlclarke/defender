@@ -65,8 +65,7 @@ impl Default for RandState {
 impl RandState {
     /// Red-label `RAND` translation.
     ///
-    /// Source: `defa7.src` `RAND`, as cited in `README.md` source materials
-    /// and preserved in the archived prototype notes under `oldsrc/src/game.rs`.
+    /// Source: `defa7.src` `RAND`, as cited in `README.md` source materials.
     pub fn advance(&mut self) {
         let product_low = self.seed.wrapping_mul(3).wrapping_add(17);
         let mut a = self.lseed >> 3;

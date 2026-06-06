@@ -1,9 +1,8 @@
 //! Clean-slate Defender red-label reimplementation.
 //!
-//! The old prototype implementation lives under `oldsrc/`. New code is
-//! organized around a deterministic arcade core that can be checked against
-//! the original red-label ROM behavior, with presentation and compatibility
-//! features layered around it.
+//! This tree is retained only as explicit `legacy-tools` oracle evidence. New
+//! code is organized around the clean deterministic arcade core under `src/`
+//! and is checked against the original red-label ROM behavior.
 
 pub mod app;
 pub mod assets;
