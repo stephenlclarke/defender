@@ -155,9 +155,10 @@ behavior, and wave scripts are embedded from
 `assets/red-label/actor-waves.script`, so the default driver and custom drivers
 share the same checked script parser path. `ActorDriverScripts::parse_texts`
 can parse and install all three scripts as one checked custom-driver
-configuration; bundled wave parsing inherits the parsed behavior script as its
-base before applying wave-local or source-backed overrides. The attract script
-now includes
+configuration, while `ActorDriverScripts::parse_text` accepts one sectioned
+script with `[attract]`, `[behavior]`, and `[wave]` blocks; bundled wave
+parsing inherits the parsed behavior script as its base before applying
+wave-local or source-backed overrides. The attract script now includes
 the source `ELECV` presents message, source-style Hall-of-Fame table rows,
 source-offset scoring/instruction labels, the source `CREDV` credits
 label/count, and a scriptable scoring scanner surface alongside Williams reveal
@@ -219,10 +220,12 @@ Custom attract drivers can construct scripts in Rust or parse checked text
 lines for text, static sprites, Williams reveal, Defender wordmark coalescence,
 red-label message-table labels, high-score rows, and credit-count events before
 passing the script to `ActorGameDriver`.
-Custom driver tooling can also use `ActorDriverScripts::parse_texts` to check
-and install attract, behavior, and wave text together; the parsed behavior
-script becomes the baseline inherited by clean wave records and any source wave
-fields that are not explicitly owned by the red-label wave table.
+Custom driver tooling can also use `ActorDriverScripts::parse_text` with
+`[attract]`, `[behavior]`, and `[wave]` sections, or `parse_texts` with three
+separate sources, to check and install attract, behavior, and wave text
+together. The parsed behavior script becomes the baseline inherited by clean
+wave records and any source wave fields that are not explicitly owned by the
+red-label wave table.
 Checked wave scripts can declare clean initial `lander`, `bomber`, `pod`,
 `mutant`, `swarmer`, `baiter`, and `human` spawn rows before the driver
 allocates actor ids for the wave.

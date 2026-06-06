@@ -40,7 +40,9 @@ verification tools.
   installed scripts without actor-thread introspection. Attract, behavior, and
   wave scripts can now be parsed from checked text lines before installation in
   a custom driver, and `ActorDriverScripts::parse_texts` can install all three
-  as one checked custom-driver bundle whose wave parser inherits the parsed
+  as one checked custom-driver bundle, while `ActorDriverScripts::parse_text`
+  accepts a single sectioned custom-driver script with `[attract]`,
+  `[behavior]`, and `[wave]` blocks. Bundled wave parsing inherits the parsed
   behavior baseline before applying wave-local/source-backed overrides. The
   built-in
   actor attract, behavior, and wave scripts are embedded from
@@ -911,6 +913,31 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 06:09 BST`: Completed the sectioned actor driver script cycle.
+  `ActorDriverScripts::parse_text` now accepts one checked custom-driver
+  script with `[attract]`, `[behavior]`, and `[wave]` sections, then delegates
+  each section to the existing attract, behavior, and base-inheriting wave
+  parsers. The delegated section buffers preserve original source line numbers,
+  so malformed wave or behavior lines in a combined custom-driver script still
+  report their real file line. Added focused regressions for sectioned script
+  runtime installation, custom attract drawing, inherited playing behavior, and
+  sectioned/unknown-section parse errors. README, SPEC, the actor architecture
+  guide, and `assets/red-label/README.md` now document the sectioned custom
+  driver script form. No legacy code, tests, or scaffolding were safe to remove
+  because the changed surface is the active custom-driver parser API. Slack
+  start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780722411442889>.
+  Validation passed with `cargo test sectioned_driver_script --lib --features
+  legacy-tools`, `cargo test driver_script_bundle --lib --features
+  legacy-tools`, `cargo test wave_script --lib --features legacy-tools`,
+  `cargo test actor_game --all-targets --features legacy-tools`, `cargo check
+  --all-targets --features legacy-tools`, `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`, `make actor-smoke`, `make
+  actor-wgpu-smoke`, `cargo fmt --check`, `markdownlint README.md SPEC.md
+  PLAN.md docs/actor-architecture.md docs/fidelity/mame-golden-clips.md
+  docs/fidelity/release-closure-audit.md assets/sounds/README.md
+  assets/red-label/README.md`, and `git diff --check`.
 
 - `2026-06-06 06:01 BST`: Completed the actor driver script bundle cycle.
   Added `ActorDriverScripts` as a checked attract/behavior/wave script bundle

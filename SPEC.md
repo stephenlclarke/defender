@@ -819,9 +819,10 @@ reintroduce legacy implementation terminology.
   profile constructors or checked text profile updates. The built-in baseline
   behavior is embedded from `assets/red-label/actor-behavior.script`.
   `ActorDriverScripts::parse_texts` can parse the attract, behavior, and wave
-  text as one custom-driver configuration; wave parsing in that bundle inherits
-  the parsed behavior script as its base before applying per-wave or
-  source-backed overrides.
+  text as one custom-driver configuration, and `ActorDriverScripts::parse_text`
+  accepts one sectioned script with `[attract]`, `[behavior]`, and `[wave]`
+  blocks. Wave parsing in either bundle form inherits the parsed behavior
+  script as its base before applying per-wave or source-backed overrides.
   Read-only script manifests expose persistent attract event, driver behavior,
   reusable wave/spawn behavior preset definitions, wave-profile configuration,
   and source wave-table metadata for source-backed wave profiles, and every

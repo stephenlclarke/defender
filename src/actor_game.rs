@@ -9200,6 +9200,15 @@ impl ActorDriverScripts {
         }
     }
 
+    pub fn parse_text(source: &str) -> Result<Self, ActorDriverScriptsParseError> {
+        let sections = ParsedActorDriverScriptSections::parse(source)?;
+        Self::parse_texts(
+            sections.attract.as_str(),
+            sections.behavior.as_str(),
+            sections.wave.as_str(),
+        )
+    }
+
     pub fn parse_texts(
         attract_source: &str,
         behavior_source: &str,
@@ -9234,6 +9243,7 @@ impl Default for ActorDriverScripts {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActorDriverScriptSection {
+    Driver,
     Attract,
     Behavior,
     Wave,
@@ -9275,6 +9285,7 @@ impl ActorDriverScriptsParseError {
 impl fmt::Display for ActorDriverScriptsParseError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let section = match self.section {
+            ActorDriverScriptSection::Driver => "driver",
             ActorDriverScriptSection::Attract => "attract",
             ActorDriverScriptSection::Behavior => "behavior",
             ActorDriverScriptSection::Wave => "wave",
@@ -9288,6 +9299,142 @@ impl fmt::Display for ActorDriverScriptsParseError {
 }
 
 impl std::error::Error for ActorDriverScriptsParseError {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ActorDriverScriptBundleSection {
+    Attract,
+    Behavior,
+    Wave,
+}
+
+impl ActorDriverScriptBundleSection {
+    fn parse(line_number: usize, token: &str) -> Result<Self, ActorDriverScriptsParseError> {
+        match normalize_script_token(token).as_str() {
+            "attract" | "attract_script" => Ok(Self::Attract),
+            "behavior" | "behaviour" | "behavior_script" | "behaviour_script" => Ok(Self::Behavior),
+            "wave" | "waves" | "wave_script" => Ok(Self::Wave),
+            _ => Err(ActorDriverScriptsParseError::new(
+                ActorDriverScriptSection::Driver,
+                line_number,
+                format!("unknown driver script section `{token}`"),
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct ParsedActorDriverScriptSections {
+    attract: String,
+    behavior: String,
+    wave: String,
+    saw_attract: bool,
+    saw_behavior: bool,
+    saw_wave: bool,
+}
+
+impl ParsedActorDriverScriptSections {
+    fn parse(source: &str) -> Result<Self, ActorDriverScriptsParseError> {
+        let mut sections = Self::default();
+        let mut current = None;
+        for (line_index, raw_line) in source.lines().enumerate() {
+            let line_number = line_index + 1;
+            let line = raw_line
+                .split_once('#')
+                .map_or(raw_line, |(before_comment, _)| before_comment)
+                .trim();
+            if line.is_empty() {
+                continue;
+            }
+            if let Some(section) = parse_actor_driver_script_section_header(line_number, line)? {
+                current = Some(section);
+                sections.mark_seen(section);
+                continue;
+            }
+            let Some(section) = current else {
+                return Err(ActorDriverScriptsParseError::new(
+                    ActorDriverScriptSection::Driver,
+                    line_number,
+                    "driver script line must appear inside [attract], [behavior], or [wave]",
+                ));
+            };
+            sections.push_line(section, line_number, line);
+        }
+        sections.require_sections()?;
+        Ok(sections)
+    }
+
+    fn mark_seen(&mut self, section: ActorDriverScriptBundleSection) {
+        match section {
+            ActorDriverScriptBundleSection::Attract => self.saw_attract = true,
+            ActorDriverScriptBundleSection::Behavior => self.saw_behavior = true,
+            ActorDriverScriptBundleSection::Wave => self.saw_wave = true,
+        }
+    }
+
+    fn push_line(
+        &mut self,
+        section: ActorDriverScriptBundleSection,
+        line_number: usize,
+        line: &str,
+    ) {
+        let target = match section {
+            ActorDriverScriptBundleSection::Attract => &mut self.attract,
+            ActorDriverScriptBundleSection::Behavior => &mut self.behavior,
+            ActorDriverScriptBundleSection::Wave => &mut self.wave,
+        };
+        append_source_line_with_original_number(target, line_number, line);
+    }
+
+    fn require_sections(&self) -> Result<(), ActorDriverScriptsParseError> {
+        if !self.saw_attract {
+            return Err(ActorDriverScriptsParseError::new(
+                ActorDriverScriptSection::Attract,
+                0,
+                "driver script needs an [attract] section",
+            ));
+        }
+        if !self.saw_behavior {
+            return Err(ActorDriverScriptsParseError::new(
+                ActorDriverScriptSection::Behavior,
+                0,
+                "driver script needs a [behavior] section",
+            ));
+        }
+        if !self.saw_wave {
+            return Err(ActorDriverScriptsParseError::new(
+                ActorDriverScriptSection::Wave,
+                0,
+                "driver script needs a [wave] section",
+            ));
+        }
+        Ok(())
+    }
+}
+
+fn parse_actor_driver_script_section_header(
+    line_number: usize,
+    line: &str,
+) -> Result<Option<ActorDriverScriptBundleSection>, ActorDriverScriptsParseError> {
+    let Some(name) = line
+        .strip_prefix('[')
+        .and_then(|rest| rest.strip_suffix(']'))
+    else {
+        return Ok(None);
+    };
+    Ok(Some(ActorDriverScriptBundleSection::parse(
+        line_number,
+        name.trim(),
+    )?))
+}
+
+fn append_source_line_with_original_number(target: &mut String, line_number: usize, line: &str) {
+    let current_line_count = target.lines().count();
+    for _ in current_line_count..line_number.saturating_sub(1) {
+        target.push('\n');
+    }
+    target.push_str(line);
+    target.push('\n');
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorDriverScriptManifest {
@@ -22931,6 +23078,60 @@ mod tests {
     }
 
     #[test]
+    fn sectioned_driver_script_parses_and_installs_custom_scripts() {
+        let scripts = ActorDriverScripts::parse_text(
+            "\
+            [attract]\n\
+            text 1 forever 12 20 SECTIONED DRIVER\n\
+            [behavior]\n\
+            default player_takes_enemy_collision_damage false\n\
+            kind lander lander_mode drift\n\
+            kind lander lander_drift_speed 4\n\
+            [wave]\n\
+            name sectioned waves\n\
+            wave 1\n\
+            lander 80 214\n\
+            human 100 214\n",
+        )
+        .expect("sectioned driver script should parse");
+        let expected_attract = scripts.attract_script.manifest();
+        let expected_wave = scripts.wave_script.manifest();
+        let mut driver = ActorGameDriver::with_scripts(scripts);
+
+        let attract = driver.step(GameInput::NONE);
+        assert!(attract.draws.iter().any(|draw| {
+            draw.text.as_deref() == Some("SECTIONED DRIVER") && draw.position == Point::new(12, 20)
+        }));
+        assert_eq!(driver.script_manifest().attract_script, expected_attract);
+        assert_eq!(driver.script_manifest().wave_script, expected_wave);
+
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        let playing = step_until_driver_player_start_completes(&mut driver, 1);
+        let manifest = driver.script_manifest();
+
+        assert_eq!(playing.phase, Phase::Playing);
+        assert!(
+            !manifest
+                .behavior_script
+                .default_profile
+                .player_takes_enemy_collision_damage
+        );
+        let lander = manifest
+            .behavior_script
+            .kind_profile(ActorKind::Lander)
+            .expect("sectioned wave should inherit bundled behavior");
+        assert_eq!(lander.lander_mode, LanderBehaviorMode::Drift);
+        assert_eq!(lander.lander_drift_speed, 4);
+    }
+
+    #[test]
     fn driver_script_bundle_reports_sectioned_parse_errors() {
         let error = ActorDriverScripts::parse_texts(
             "text 1 forever 12 20 CUSTOM DRIVER\n",
@@ -22949,6 +23150,46 @@ mod tests {
                 .contains("actor driver wave script line 2")
         );
         assert!(error.message.contains("wave action must appear"));
+    }
+
+    #[test]
+    fn sectioned_driver_script_preserves_source_line_errors() {
+        let error = ActorDriverScripts::parse_text(
+            "\
+            [attract]\n\
+            text 1 forever 12 20 SECTIONED DRIVER\n\
+            [behavior]\n\
+            kind lander lander_mode drift\n\
+            [wave]\n\
+            name broken sectioned waves\n\
+            lander 80 214\n",
+        )
+        .expect_err("sectioned wave script should reject spawn before wave");
+
+        assert_eq!(error.section, ActorDriverScriptSection::Wave);
+        assert_eq!(error.line, 7);
+        assert!(
+            error
+                .to_string()
+                .contains("actor driver wave script line 7")
+        );
+        assert!(error.message.contains("wave action must appear"));
+
+        let error = ActorDriverScripts::parse_text(
+            "\
+            [attract]\n\
+            text 1 forever 12 20 SECTIONED DRIVER\n\
+            [driver]\n\
+            noop\n",
+        )
+        .expect_err("unknown section should fail before parsing content");
+        assert_eq!(error.section, ActorDriverScriptSection::Driver);
+        assert_eq!(error.line, 3);
+        assert!(
+            error
+                .message
+                .contains("unknown driver script section `driver`")
+        );
     }
 
     #[test]

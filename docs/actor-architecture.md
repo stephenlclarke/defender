@@ -213,10 +213,26 @@ The built-in baseline profile is the embedded checked script
 parses that asset at startup and the raw arcade profile remains available as
 the parser fallback.
 `ActorDriverScripts::parse_texts` checks attract, behavior, and wave text as
-one custom-driver configuration. The parsed behavior script becomes the base
-used while parsing the bundled wave script, so clean wave records inherit
-driver-wide tuning and source-backed wave records preserve that tuning unless
-the red-label wave table owns the specific family field.
+one custom-driver configuration. `ActorDriverScripts::parse_text` accepts a
+single sectioned script using `[attract]`, `[behavior]`, and `[wave]` headers:
+
+```text
+[attract]
+text 1 forever 12 20 CUSTOM DRIVER
+[behavior]
+kind lander lander_mode drift
+[wave]
+name custom opening
+wave 1
+lander 80 214
+human 100 214
+```
+
+The parsed behavior script becomes the base used while parsing the bundled wave
+script, so clean wave records inherit driver-wide tuning and source-backed wave
+records preserve that tuning unless the red-label wave table owns the specific
+family field. Sectioned parser errors preserve the original source line number
+when a delegated attract, behavior, or wave line is malformed.
 
 `AttractScript::manifest`, `ActorBehaviorScript::manifest`,
 `ActorWaveScript::manifest`, and `ActorGameDriver::script_manifest` expose
@@ -364,8 +380,8 @@ source_waves 18 20 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1
 
 `behavior` lines reuse the `ActorBehaviorScript` parser for the current wave;
 when parsed through `parse_text_with_base_behavior` or
-`ActorDriverScripts::parse_texts`, each new clean wave starts from the supplied
-base behavior script instead of the arcade fallback.
+`ActorDriverScripts::parse_text` / `parse_texts`, each new clean wave starts
+from the supplied base behavior script instead of the arcade fallback.
 `behavior_preset <name> ...` stores one checked behavior update in a reusable
 named block, and repeated lines append to that block. `use_behavior <name>`
 replays the named updates onto the current wave profile, preserving existing
