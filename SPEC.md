@@ -787,9 +787,9 @@ reintroduce legacy implementation terminology.
   path. `--actor-script-check <path>` parses the same file, samples one
   headless attract actor step, then credits/starts the actor runtime through
   the first playable wave and prints script manifest, first-frame, source-wave,
-  spawned world, and effective behavior counts/modes without opening a window.
-  `examples/actor-custom-attract.script` is the checked editable sample for
-  that flow.
+  spawned world, reserve/source-state, and effective behavior counts/modes
+  without opening a window. `examples/actor-custom-attract.script` is the
+  checked editable sample for that flow.
 - Runtime renderer selection has been removed.
 - `--input-profile planetoid` is the default input profile.
 - `--input-profile cabinet` exposes a MAME-style cabinet keyboard profile.
@@ -837,8 +837,9 @@ reintroduce legacy implementation terminology.
   launched through `ActorRuntimeAdapter::with_scripts` for custom-driver
   runtime checks. The live actor runtime exposes the same path through
   `--actor-script <path>` and the headless check path through
-  `--actor-script-check <path>`, including first-play behavior summaries for
-  damage, fire cadence, and actor movement modes.
+  `--actor-script-check <path>`, including first-play reserve/source-state
+  reporting and behavior summaries for damage, fire cadence, and actor movement
+  modes.
   Read-only script manifests expose persistent attract event, driver behavior,
   reusable wave/spawn behavior preset definitions, wave-profile configuration,
   and source wave-table metadata for source-backed wave profiles, and every

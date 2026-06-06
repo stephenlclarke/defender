@@ -123,7 +123,8 @@ CLI rejects combining it with `--live-smoke` because that command still uses
 the clean-game smoke path. `--actor-script-check <path>` parses the same script
 headlessly, samples the first attract actor step, then credits/starts the actor
 runtime through the first playable wave and prints manifest, first-frame, source
-wave, spawned world, and effective behavior counts/modes; the checked
+wave, spawned world, reserve/source-state, and effective behavior counts/modes;
+the checked
 `examples/actor-custom-attract.script` file is a minimal editable custom-driver
 starting point. Actor high-score entry now accepts live initials/backspace
 through the actor input surface and draws the in-progress initials row from

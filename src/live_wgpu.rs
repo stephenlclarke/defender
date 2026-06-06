@@ -113,6 +113,15 @@ pub(crate) struct ActorScriptCheckReport {
     pub(crate) first_playing_source_swarmers: u8,
     pub(crate) first_playing_world_enemies: usize,
     pub(crate) first_playing_world_humans: usize,
+    pub(crate) first_playing_reserve_landers: u8,
+    pub(crate) first_playing_reserve_bombers: u8,
+    pub(crate) first_playing_reserve_pods: u8,
+    pub(crate) first_playing_reserve_mutants: u8,
+    pub(crate) first_playing_reserve_swarmers: u8,
+    pub(crate) first_playing_source_background_left: u16,
+    pub(crate) first_playing_source_rng_seed: Option<u8>,
+    pub(crate) first_playing_source_rng_hseed: Option<u8>,
+    pub(crate) first_playing_source_rng_lseed: Option<u8>,
     pub(crate) first_playing_player_takes_enemy_collision_damage: bool,
     pub(crate) first_playing_player_laser_cooldown_steps: u8,
     pub(crate) first_playing_lander_mode: String,
@@ -247,8 +256,13 @@ impl LiveSmokeReport {
 
 impl ActorScriptCheckReport {
     pub(crate) fn to_text(&self) -> String {
+        let source_rng = source_rng_summary(
+            self.first_playing_source_rng_seed,
+            self.first_playing_source_rng_hseed,
+            self.first_playing_source_rng_lseed,
+        );
         format!(
-            "actor script check passed\n  path: {}\n  attract_events: {}\n  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n  clean_exit: {}\n",
+            "actor script check passed\n  path: {}\n  attract_events: {}\n  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_source_state: background_left=0x{:04x},rng={}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n  clean_exit: {}\n",
             self.path,
             self.attract_events,
             self.behavior_kind_profiles,
@@ -265,6 +279,13 @@ impl ActorScriptCheckReport {
             self.first_playing_source_swarmers,
             self.first_playing_world_enemies,
             self.first_playing_world_humans,
+            self.first_playing_reserve_landers,
+            self.first_playing_reserve_bombers,
+            self.first_playing_reserve_pods,
+            self.first_playing_reserve_mutants,
+            self.first_playing_reserve_swarmers,
+            self.first_playing_source_background_left,
+            source_rng,
             self.first_playing_player_takes_enemy_collision_damage,
             self.first_playing_player_laser_cooldown_steps,
             self.first_playing_lander_mode,
@@ -377,6 +398,9 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
     let frame = runtime.step(ActorGameInput::NONE);
     let playing = run_actor_script_check_to_first_playing_wave(&mut runtime)?;
     let profile = playing.state.wave_profile;
+    let reserve = playing.state.world.enemy_reserve;
+    debug_assert_eq!(reserve, playing.report.enemy_reserve);
+    let source_rng = playing.report.source_rng;
     let player_behavior = first_playing_behavior_for(&playing, ActorKind::Player);
     let lander_behavior = first_playing_behavior_for(&playing, ActorKind::Lander);
     let mutant_behavior = first_playing_behavior_for(&playing, ActorKind::Mutant);
@@ -402,6 +426,15 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         first_playing_source_swarmers: profile.swarmers,
         first_playing_world_enemies: playing.state.world.enemies.len(),
         first_playing_world_humans: playing.state.world.humans.len(),
+        first_playing_reserve_landers: reserve.landers,
+        first_playing_reserve_bombers: reserve.bombers,
+        first_playing_reserve_pods: reserve.pods,
+        first_playing_reserve_mutants: reserve.mutants,
+        first_playing_reserve_swarmers: reserve.swarmers,
+        first_playing_source_background_left: playing.report.source_background_left,
+        first_playing_source_rng_seed: source_rng.map(|source_rng| source_rng.seed),
+        first_playing_source_rng_hseed: source_rng.map(|source_rng| source_rng.hseed),
+        first_playing_source_rng_lseed: source_rng.map(|source_rng| source_rng.lseed),
         first_playing_player_takes_enemy_collision_damage: player_behavior
             .player_takes_enemy_collision_damage,
         first_playing_player_laser_cooldown_steps: player_behavior.player_laser_cooldown_steps,
@@ -423,6 +456,15 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         first_playing_baiter_fire_period_steps: baiter_behavior.baiter_fire_period_steps,
         clean_exit: true,
     })
+}
+
+fn source_rng_summary(seed: Option<u8>, hseed: Option<u8>, lseed: Option<u8>) -> String {
+    match (seed, hseed, lseed) {
+        (Some(seed), Some(hseed), Some(lseed)) => {
+            format!("seed=0x{seed:02x},hseed=0x{hseed:02x},lseed=0x{lseed:02x}")
+        }
+        _ => String::from("unavailable"),
+    }
 }
 
 fn first_playing_behavior_for(
@@ -2039,6 +2081,15 @@ mod tests {
         assert_eq!(report.first_playing_source_swarmers, 0);
         assert_eq!(report.first_playing_world_enemies, 2);
         assert_eq!(report.first_playing_world_humans, 2);
+        assert_eq!(report.first_playing_reserve_landers, 0);
+        assert_eq!(report.first_playing_reserve_bombers, 0);
+        assert_eq!(report.first_playing_reserve_pods, 0);
+        assert_eq!(report.first_playing_reserve_mutants, 0);
+        assert_eq!(report.first_playing_reserve_swarmers, 0);
+        assert_eq!(report.first_playing_source_background_left, 0);
+        assert_eq!(report.first_playing_source_rng_seed, Some(0xbe));
+        assert_eq!(report.first_playing_source_rng_hseed, Some(0xb1));
+        assert_eq!(report.first_playing_source_rng_lseed, Some(0x06));
         assert!(report.first_playing_player_takes_enemy_collision_damage);
         assert_eq!(report.first_playing_player_laser_cooldown_steps, 6);
         assert_eq!(report.first_playing_lander_mode, "drift");
@@ -2068,6 +2119,8 @@ mod tests {
                 "  first_playing_wave_size: 5\n",
                 "  first_playing_source_counts: landers=15,bombers=0,pods=0,mutants=0,swarmers=0\n",
                 "  first_playing_world_counts: enemies=2,humans=2\n",
+                "  first_playing_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0\n",
+                "  first_playing_source_state: background_left=0x0000,rng=seed=0xbe,hseed=0xb1,lseed=0x06\n",
                 "  first_playing_player_behavior: takes_enemy_collision_damage=true,laser_cooldown_steps=6\n",
                 "  first_playing_lander_behavior: mode=drift,seek_speed=1,drift_speed=3,fire_period_steps=96\n",
                 "  first_playing_hostile_modes: mutant=chase_player,bomber=drift,pod=drift,swarmer=chase_player,baiter=chase_player\n",
@@ -2105,6 +2158,11 @@ mod tests {
         assert_eq!(report.first_playing_source_swarmers, 1);
         assert_eq!(report.first_playing_world_enemies, 5);
         assert_eq!(report.first_playing_world_humans, 10);
+        assert_eq!(report.first_playing_reserve_landers, 0);
+        assert_eq!(report.first_playing_reserve_bombers, 0);
+        assert_eq!(report.first_playing_reserve_pods, 0);
+        assert_eq!(report.first_playing_reserve_mutants, 0);
+        assert_eq!(report.first_playing_reserve_swarmers, 0);
         assert!(report.to_text().contains(
             "first_playing_source_counts: landers=1,bombers=1,pods=1,mutants=1,swarmers=1"
         ));
@@ -2112,6 +2170,43 @@ mod tests {
             report
                 .to_text()
                 .contains("first_playing_world_counts: enemies=5,humans=10")
+        );
+    }
+
+    #[test]
+    fn actor_script_check_reports_reserve_and_source_state_at_play_start() {
+        let path = write_actor_script_file(
+            "actor-script-reserve-check",
+            concat!(
+                "[attract]\n",
+                "text 1 forever 12 20 RESERVE CHECK\n",
+                "[behavior]\n",
+                "kind lander lander_mode drift\n",
+                "[wave]\n",
+                "name reserve check waves\n",
+                "source_wave 1 wave_size 2 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
+                "reserve_full 3 2 1 1 1\n",
+            ),
+        );
+
+        let report = run_actor_script_check(&path).expect("reserve script should check");
+
+        assert_eq!(report.first_playing_world_enemies, 2);
+        assert_eq!(report.first_playing_world_humans, 10);
+        assert_eq!(report.first_playing_reserve_landers, 3);
+        assert_eq!(report.first_playing_reserve_bombers, 2);
+        assert_eq!(report.first_playing_reserve_pods, 1);
+        assert_eq!(report.first_playing_reserve_mutants, 1);
+        assert_eq!(report.first_playing_reserve_swarmers, 1);
+        assert_eq!(report.first_playing_source_background_left, 0);
+        assert!(report.first_playing_source_rng_seed.is_some());
+        assert!(report.to_text().contains(
+            "first_playing_reserve_counts: landers=3,bombers=2,pods=1,mutants=1,swarmers=1"
+        ));
+        assert!(
+            report
+                .to_text()
+                .contains("first_playing_source_state: background_left=0x0000,rng=seed=")
         );
     }
 
