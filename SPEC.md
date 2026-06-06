@@ -785,11 +785,13 @@ reintroduce legacy implementation terminology.
   script into that live actor runtime before the window opens; it is rejected
   with `--live-smoke` because that command still exercises the clean-game smoke
   path. `--actor-script-check <path>` parses the same file, samples one
-  headless attract actor step, then credits/starts the actor runtime through
-  the first playable wave and prints script manifest, first-frame, source-wave,
-  spawned world, reserve/source-state, and effective behavior counts/modes
-  without opening a window. The checker then uses the actor `XYZZY` overlay
-  smart-bomb path to assist progression and reports the source-shaped
+  headless attract actor step, reports declared attract-cycle milestones when
+  the script provides a bounded `cycle`, then credits/starts the actor runtime
+  through the first playable wave and prints script manifest, first-frame,
+  source-wave, spawned world, reserve/source-state, and effective behavior
+  counts/modes without opening a window. The checker then uses the actor
+  `XYZZY` overlay smart-bomb path to assist progression and reports the
+  source-shaped
   wave-clear survivor-bonus interstitial, its `0x80` wave-advance sleep
   window, next playable wave, and a bounded reserve activation batch sequence
   plus post-reserve wave-clear and `0x80` sleep interstitials when real actor
@@ -844,12 +846,12 @@ reintroduce legacy implementation terminology.
   launched through `ActorRuntimeAdapter::with_scripts` for custom-driver
   runtime checks. The live actor runtime exposes the same path through
   `--actor-script <path>` and the headless check path through
-  `--actor-script-check <path>`, including first-play reserve/source-state
-  reporting plus assisted wave-clear, next-wave, and reserve-activation batch
-  summaries for source/reserve counts, survivor-bonus cadence, `0x80` wave
-  sleep, restored family counts, batch status, post-reserve wave-clear and
-  sleep, post-reserve next playable wave, damage, fire cadence, and actor
-  movement modes.
+  `--actor-script-check <path>`, including bounded declared attract-cycle
+  milestone reporting, first-play reserve/source-state reporting plus assisted
+  wave-clear, next-wave, and reserve-activation batch summaries for
+  source/reserve counts, survivor-bonus cadence, `0x80` wave sleep, restored
+  family counts, batch status, post-reserve wave-clear and sleep, post-reserve
+  next playable wave, damage, fire cadence, and actor movement modes.
   Read-only script manifests expose persistent attract event, driver behavior,
   reusable wave/spawn behavior preset definitions, wave-profile configuration,
   and source wave-table metadata for source-backed wave profiles, and every

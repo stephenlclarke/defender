@@ -25,11 +25,12 @@ use crate::{
     actor_game::{
         ActorDriverScripts, ActorFrame, ActorId, ActorKind, ActorRuntimeAdapter, GameCommand,
         GameInput as ActorGameInput, HostileMovementMode, LanderBehaviorMode, Phase, SpawnRequest,
-        XyzzyController, XyzzyMode,
+        SpriteKey, VisualEffect, XyzzyController, XyzzyMode,
     },
     actor_smoke::ActorSmokeReport,
     audio::LiveAudioMode,
     game_smoke::GameSmokeReport,
+    renderer::{SpriteId, source_message_text},
 };
 #[cfg(all(not(test), not(coverage)))]
 use crate::{
@@ -53,6 +54,7 @@ const EXPECTED_OFFSCREEN_FIRST_FRAME_SIGNATURE: u64 = 0x8DAE_D38B_41A6_92A9;
 #[cfg(all(not(test), not(coverage)))]
 const EXPECTED_OFFSCREEN_LAST_FRAME_SIGNATURE: u64 = 0xFE80_CC2B_377E_8066;
 const ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT: usize = 512;
+const ACTOR_SCRIPT_CHECK_ATTRACT_CYCLE_STEP_LIMIT: u64 = 4096;
 const ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT: usize = 4096;
 const ACTOR_SCRIPT_CHECK_RESERVE_ACTIVATION_BATCH_LIMIT: usize = 8;
 
@@ -164,9 +166,27 @@ pub(crate) struct ActorScriptCheckWaveClearSummary {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ActorScriptCheckAttractCycleSummary {
+    pub(crate) cycle_steps: u64,
+    pub(crate) sampled_steps: u64,
+    pub(crate) attract_frames: u64,
+    pub(crate) non_attract_frames: u64,
+    pub(crate) draw_commands: usize,
+    pub(crate) scene_sprites: usize,
+    pub(crate) saw_williams_reveal: bool,
+    pub(crate) saw_defender_coalescence: bool,
+    pub(crate) saw_hall_of_fame: bool,
+    pub(crate) saw_scoring_surface: bool,
+    pub(crate) saw_final_scoring_label: bool,
+    pub(crate) saw_cycle_return: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ActorScriptCheckReport {
     pub(crate) path: String,
     pub(crate) attract_events: usize,
+    pub(crate) attract_cycle: Option<ActorScriptCheckAttractCycleSummary>,
+    pub(crate) attract_cycle_unavailable_reason: Option<String>,
     pub(crate) behavior_kind_profiles: usize,
     pub(crate) behavior_actor_profiles: usize,
     pub(crate) wave_profiles: usize,
@@ -344,6 +364,34 @@ impl ActorScriptCheckReport {
             self.first_playing_source_rng_hseed,
             self.first_playing_source_rng_lseed,
         );
+        let attract_cycle = self
+            .attract_cycle
+            .as_ref()
+            .map(|summary| {
+                format!(
+                    "  attract_cycle_steps: {}\n  attract_cycle_sampled_steps: {}\n  attract_cycle_frames: attract={},non_attract={}\n  attract_cycle_draws: {}\n  attract_cycle_scene_sprites: {}\n  attract_cycle_milestones: williams_reveal={},defender_coalescence={},hall_of_fame={},scoring_surface={},final_scoring_label={},cycle_return={}\n",
+                    summary.cycle_steps,
+                    summary.sampled_steps,
+                    summary.attract_frames,
+                    summary.non_attract_frames,
+                    summary.draw_commands,
+                    summary.scene_sprites,
+                    summary.saw_williams_reveal,
+                    summary.saw_defender_coalescence,
+                    summary.saw_hall_of_fame,
+                    summary.saw_scoring_surface,
+                    summary.saw_final_scoring_label,
+                    summary.saw_cycle_return,
+                )
+            })
+            .unwrap_or_else(|| {
+                format!(
+                    "  attract_cycle: unavailable,reason={}\n",
+                    self.attract_cycle_unavailable_reason
+                        .as_deref()
+                        .unwrap_or("not_sampled")
+                )
+            });
         let wave_clear = self
             .wave_clear
             .as_ref()
@@ -452,9 +500,10 @@ impl ActorScriptCheckReport {
                 )
             });
         format!(
-            "actor script check passed\n  path: {}\n  attract_events: {}\n  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_source_state: background_left=0x{:04x},rng={}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}{}{}{}{}{}  clean_exit: {}\n",
+            "actor script check passed\n  path: {}\n  attract_events: {}\n{}  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_source_state: background_left=0x{:04x},rng={}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}{}{}{}{}{}  clean_exit: {}\n",
             self.path,
             self.attract_events,
+            attract_cycle,
             self.behavior_kind_profiles,
             self.behavior_actor_profiles,
             self.wave_profiles,
@@ -664,6 +713,8 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
     let mut runtime = actor_runtime_from_script_path(Some(path))?;
     let manifest = runtime.driver().script_manifest();
     let frame = runtime.step(ActorGameInput::NONE);
+    let (attract_cycle, attract_cycle_unavailable_reason) =
+        actor_script_check_attract_cycle(&mut runtime, manifest.attract_script.cycle_steps, &frame);
     let playing = run_actor_script_check_to_first_playing_wave(&mut runtime)?;
     let first_playing = actor_script_check_playing_summary(&playing);
     let next_wave_progression =
@@ -685,6 +736,8 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
     Ok(ActorScriptCheckReport {
         path: path.display().to_string(),
         attract_events: manifest.attract_script.events.len(),
+        attract_cycle,
+        attract_cycle_unavailable_reason,
         behavior_kind_profiles: manifest.behavior_script.kind_profiles.len(),
         behavior_actor_profiles: manifest.behavior_script.actor_profiles.len(),
         wave_profiles: manifest.wave_script.waves.len(),
@@ -773,6 +826,108 @@ struct ActorScriptCheckReserveActivationSequence {
     post_reserve_next_playing_assist_steps: Option<u32>,
     post_reserve_next_playing: Option<ActorScriptCheckPlayingSummary>,
     post_reserve_next_playing_unavailable_reason: Option<String>,
+}
+
+fn actor_script_check_attract_cycle(
+    runtime: &mut ActorRuntimeAdapter,
+    cycle_steps: Option<u64>,
+    first_frame: &ActorFrame,
+) -> (Option<ActorScriptCheckAttractCycleSummary>, Option<String>) {
+    let Some(cycle_steps) = cycle_steps else {
+        return (None, Some(String::from("no_attract_cycle_declared")));
+    };
+    if cycle_steps > ACTOR_SCRIPT_CHECK_ATTRACT_CYCLE_STEP_LIMIT {
+        return (
+            None,
+            Some(format!(
+                "attract_cycle_exceeds_check_limit_{}",
+                ACTOR_SCRIPT_CHECK_ATTRACT_CYCLE_STEP_LIMIT
+            )),
+        );
+    }
+
+    let mut summary = ActorScriptCheckAttractCycleSummary {
+        cycle_steps,
+        ..ActorScriptCheckAttractCycleSummary::default()
+    };
+    actor_script_check_observe_attract_cycle_frame(&mut summary, first_frame);
+    for _ in 1..cycle_steps {
+        let frame = runtime.step(ActorGameInput::NONE);
+        actor_script_check_observe_attract_cycle_frame(&mut summary, &frame);
+    }
+    (Some(summary), None)
+}
+
+fn actor_script_check_observe_attract_cycle_frame(
+    summary: &mut ActorScriptCheckAttractCycleSummary,
+    frame: &ActorFrame,
+) {
+    let hall_title = source_message_text("HALLD_TITLE").expect("HALLD_TITLE message is checked in");
+    let final_scoring_label = source_message_text("SWARMV").expect("SWARMV message is checked in");
+    let mut cycle_has_first_williams_step = false;
+    let mut cycle_has_scoring_surface = false;
+    let mut cycle_has_final_label = false;
+
+    summary.sampled_steps = summary.sampled_steps.saturating_add(1);
+    if frame.report.phase == Phase::Attract {
+        summary.attract_frames = summary.attract_frames.saturating_add(1);
+    } else {
+        summary.non_attract_frames = summary.non_attract_frames.saturating_add(1);
+    }
+    summary.draw_commands = summary
+        .draw_commands
+        .saturating_add(frame.report.draws.len());
+    summary.scene_sprites = summary
+        .scene_sprites
+        .saturating_add(frame.scene.sprites.len());
+
+    for draw in &frame.report.draws {
+        if draw.sprite == SpriteKey::WilliamsLogo
+            && matches!(draw.effect, VisualEffect::WilliamsReveal { .. })
+        {
+            summary.saw_williams_reveal = true;
+        }
+        if draw.sprite == SpriteKey::DefenderCoalescence {
+            summary.saw_defender_coalescence = true;
+        }
+        if draw.text.as_deref() == Some(hall_title) {
+            summary.saw_hall_of_fame = true;
+        }
+        if matches!(draw.effect, VisualEffect::AttractScoringSurface { .. }) {
+            summary.saw_scoring_surface = true;
+            cycle_has_scoring_surface = true;
+        }
+        if draw.text.as_deref() == Some(final_scoring_label) {
+            summary.saw_final_scoring_label = true;
+            cycle_has_final_label = true;
+        }
+        if frame.report.step == summary.cycle_steps
+            && draw.sprite == SpriteKey::WilliamsLogo
+            && matches!(
+                draw.effect,
+                VisualEffect::WilliamsReveal { stroke_step: 1, .. }
+            )
+        {
+            cycle_has_first_williams_step = true;
+        }
+    }
+
+    for sprite in &frame.scene.sprites {
+        if sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL {
+            summary.saw_williams_reveal = true;
+        }
+        if SpriteId::attract_defender_wordmark_block(0) == Some(sprite.sprite) {
+            summary.saw_defender_coalescence = true;
+        }
+        if sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO {
+            summary.saw_hall_of_fame = true;
+        }
+    }
+
+    if frame.report.step == summary.cycle_steps {
+        summary.saw_cycle_return =
+            cycle_has_first_williams_step && !cycle_has_scoring_surface && !cycle_has_final_label;
+    }
 }
 
 fn actor_script_check_playing_summary(frame: &ActorFrame) -> ActorScriptCheckPlayingSummary {
@@ -2878,6 +3033,11 @@ mod tests {
 
         assert_eq!(report.path, path.display().to_string());
         assert_eq!(report.attract_events, 2);
+        assert!(report.attract_cycle.is_none());
+        assert_eq!(
+            report.attract_cycle_unavailable_reason.as_deref(),
+            Some("no_attract_cycle_declared")
+        );
         assert_eq!(report.behavior_kind_profiles, 2);
         assert_eq!(report.behavior_actor_profiles, 0);
         assert_eq!(report.wave_profiles, 1);
@@ -2993,6 +3153,7 @@ mod tests {
                 "actor script check passed\n",
                 "  path: examples/actor-custom-attract.script\n",
                 "  attract_events: 2\n",
+                "  attract_cycle: unavailable,reason=no_attract_cycle_declared\n",
                 "  behavior_kind_profiles: 2\n",
                 "  behavior_actor_profiles: 0\n",
                 "  wave_profiles: 1\n",
@@ -3039,6 +3200,55 @@ mod tests {
                 "  clean_exit: true\n",
             )
         );
+    }
+
+    #[test]
+    fn actor_script_check_reports_custom_attract_cycle_milestones() {
+        let path = write_actor_script_file(
+            "actor-script-attract-cycle-check",
+            concat!(
+                "[attract]\n",
+                "cycle 12\n",
+                "williams_logo 1 forever 12 20\n",
+                "defender_wordmark 2 4 48 36\n",
+                "message 3 3 HALLD_TITLE 0x3854\n",
+                "scoring_surface 4 6\n",
+                "message 5 4 SWARMV 0x5CA8\n",
+                "[behavior]\n",
+                "kind lander lander_mode drift\n",
+                "[wave]\n",
+                "name attract cycle check waves\n",
+                "wave 1\n",
+                "lander 80 214\n",
+                "human 100 214\n",
+            ),
+        );
+
+        let report = run_actor_script_check(&path).expect("attract cycle script should check");
+        let summary = report
+            .attract_cycle
+            .as_ref()
+            .expect("declared cycle should be sampled");
+
+        assert_eq!(summary.cycle_steps, 12);
+        assert_eq!(summary.sampled_steps, 12);
+        assert_eq!(summary.attract_frames, 12);
+        assert_eq!(summary.non_attract_frames, 0);
+        assert!(summary.draw_commands > 0);
+        assert!(summary.scene_sprites > 0);
+        assert!(summary.saw_williams_reveal);
+        assert!(summary.saw_defender_coalescence);
+        assert!(summary.saw_hall_of_fame);
+        assert!(summary.saw_scoring_surface);
+        assert!(summary.saw_final_scoring_label);
+        assert!(summary.saw_cycle_return);
+        assert!(report.attract_cycle_unavailable_reason.is_none());
+        assert!(report.to_text().contains("attract_cycle_steps: 12"));
+        assert!(report.to_text().contains(
+            "attract_cycle_milestones: williams_reveal=true,defender_coalescence=true,hall_of_fame=true,scoring_surface=true,final_scoring_label=true,cycle_return=true"
+        ));
+
+        let _ = fs::remove_file(path);
     }
 
     #[test]

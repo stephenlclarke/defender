@@ -86,10 +86,12 @@ evidence commands.
   boots the same live runtime through `ActorRuntimeAdapter::with_scripts`; it
   is not accepted with `--live-smoke` because that command remains the clean
   game smoke path. `--actor-script-check <path>` uses the same parser and
-  runtime constructor headlessly, samples the first attract actor step, then
-  credits/starts the actor runtime through the first playable wave and prints
-  attract/behavior/wave manifest counts plus first-frame, effective source-wave,
-  spawned world, reserve/source-state, and first-play behavior summaries. The
+  runtime constructor headlessly, samples the first attract actor step, reports
+  bounded declared attract-cycle milestones when a custom script provides a
+  `cycle`, then credits/starts the actor runtime through the first playable
+  wave and prints attract/behavior/wave manifest counts plus first-frame,
+  effective source-wave, spawned world, reserve/source-state, and first-play
+  behavior summaries. The
   checker then uses the actor `XYZZY` overlay smart-bomb path to assist
   progression and reports the source-shaped wave-clear survivor-bonus
   interstitial, its `0x80` wave-advance sleep window, next playable wave, and a
@@ -257,11 +259,12 @@ and can be launched directly with `ActorRuntimeAdapter::with_scripts` for
 custom-driver runtime smoke tests or through `--actor-script <path>` in the
 interactive actor live runtime. `--actor-script-check <path>` runs the same
 file-backed path without opening the window and reports the parsed script
-surface, first attract actor frame, first playable wave counts, and effective
-first-play reserve/source-state plus the behavior profile that actors receive
-through `StepReport`. It also samples the next playable wave with an actor
-`XYZZY` overlay smart-bomb assist loop, so progressive custom-driver wave
-profiles can be checked before live launch without bypassing actor commands.
+surface, first attract actor frame, declared attract-cycle milestones for
+bounded looping scripts, first playable wave counts, and effective first-play
+reserve/source-state plus the behavior profile that actors receive through
+`StepReport`. It also samples the next playable wave with an actor `XYZZY`
+overlay smart-bomb assist loop, so progressive custom-driver wave profiles can
+be checked before live launch without bypassing actor commands.
 The checker records the first `WaveCleared` report it observes, including the
 survivor count, visible source astronaut icons, awarded survivor points,
 world counts, and source interstitial sleep fields. It also records the first

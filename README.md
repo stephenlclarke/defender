@@ -121,7 +121,8 @@ custom-driver script into that actor live path before the window opens, so a
 custom `[attract]` / `[behavior]` / `[wave]` bundle can drive live play; the
 CLI rejects combining it with `--live-smoke` because that command still uses
 the clean-game smoke path. `--actor-script-check <path>` parses the same script
-headlessly, samples the first attract actor step, then credits/starts the actor
+headlessly, samples the first attract actor step, reports declared attract-cycle
+milestones when a bounded `cycle` is present, then credits/starts the actor
 runtime through the first playable wave and prints manifest, first-frame, source
 wave, spawned world, reserve/source-state, and effective behavior counts/modes;
 it also advances through the actor `XYZZY` overlay smart-bomb path to report the

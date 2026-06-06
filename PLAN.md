@@ -53,6 +53,7 @@ verification tools.
   `--live-smoke` so a custom actor script is never silently ignored by the
   clean-game smoke path. `--actor-script-check <path>` now runs the same parser
   and runtime constructor headlessly, samples the first attract actor step,
+  reports bounded declared attract-cycle milestones for custom attract scripts,
   credits/starts the actor runtime through the first playable wave, and reports
   manifest, first-frame, effective source-wave, spawned world counts,
   reserve/source-state, and the effective first-play behavior profile actors
@@ -945,6 +946,31 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-07 00:39 BST`: Completed the actor script custom-attract preflight
+  cycle. `--actor-script-check <path>` now samples a declared bounded
+  `[attract]` `cycle` before the same runtime is credited and started, then
+  reports `attract_cycle_*` step/frame/draw totals plus milestone booleans for
+  Williams reveal, Defender coalescence, Hall-of-Fame, scoring surface, final
+  scoring label, and cycle return. The focused custom-driver regression proves
+  a 12-step custom cycle reports all six milestones, `12` sampled attract
+  frames, zero non-attract frames, and nonzero draw/scene-sprite output. The
+  checked minimal example remains intentionally unbounded and now reports
+  `attract_cycle: unavailable,reason=no_attract_cycle_declared`, making the
+  absence of a loop explicit for script authors. No legacy code, tests, or
+  scaffolding were safe to remove because this slice hardens the active
+  custom-driver preflight. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780777234403239>.
+  Validation passed with `cargo fmt --check`, `cargo test actor_script_check
+  --all-targets --features legacy-tools`, `cargo test actor_script
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, `cargo run
+  --quiet --features legacy-tools -- --actor-script-check
+  examples/actor-custom-attract.script`, `make actor-smoke`, `make
+  actor-wgpu-smoke`, `make actor-attract-smoke`, `markdownlint README.md
+  SPEC.md PLAN.md docs/actor-architecture.md`, and `git diff --check`.
 
 - `2026-06-06 21:16 BST`: Completed the actor script post-reserve next-wave
   preflight cycle. After `post_reserve_wave_clear_*` and
