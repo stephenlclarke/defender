@@ -1,6 +1,6 @@
 # Defender Current Plan
 
-Last reviewed: `2026-06-05`
+Last reviewed: `2026-06-06`
 
 ## Goal
 
@@ -6428,3 +6428,27 @@ Exit gate:
   --lib --features legacy-tools`, and `cargo check --features legacy-tools`.
   Slack start:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780704479140879`.
+- `2026-06-06 01:27 BST`: Completed the organic smartmix terminal shell-row
+  projection cycle. The target4 terminal post-game branch now replays the
+  MAME-observed `BMBP1` shell rows as clean enemy-projectile snapshots, using
+  bounded source-sample interpolation so rows appear at state frames `5991`,
+  `6007`, `6075`, and `6128` and are absent again at `6088`. The focused
+  organic regression now samples those terminal shell positions alongside the
+  existing score, terrain-blow, residual-object, and sound-cadence assertions.
+  Regenerated ignored clean media for `organic-terrain-blow-smartmix` confirms
+  those rows in the clean debug TSV. The report-only all-axis comparator still
+  fails on broad visual metrics, with visual RMS `89.06` and MAE `40.78`;
+  audio remains green with envelope correlation `0.4431`, so this remains a
+  targeted visual-fidelity slice rather than an accepted organic all-axis
+  proof. No protected media was committed or accepted, and no legacy code,
+  tests, or scaffolding were safe to remove because the remaining mismatch
+  still depends on clean-vs-MAME reference tooling. Evidence runs included
+  `make reference-clean-capture ...` and `make reference-media-check ...`,
+  with the media check expectedly failing on visual metrics only. Validation
+  passed with `cargo fmt --check`, `cargo test
+  clean_game_organic_smartmix_terminal_death_and_terrain_blow_match_mame_window
+  --lib --features legacy-tools`, `cargo check --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  `markdownlint PLAN.md`, and `git diff --check`.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780705067501169`.

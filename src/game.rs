@@ -261,6 +261,13 @@ struct SourceTarget4TerminalPostGameTrack {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SourceTarget4TerminalShellTrack {
+    samples: &'static [(u16, i16, i16)],
+    x_velocity: u16,
+    y_velocity: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct SourceTarget4TerminalVisibleObject {
     kind: SourceTerminalObjectKind,
     position: ScreenPosition,
@@ -441,6 +448,60 @@ const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECTS_1057:
     0x13,
     0x88,
 )];
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_SHELL_TRACK_A: [(u16, i16, i16); 6] = [
+    (1026, 121, 121),
+    (1034, 90, 112),
+    (1044, 51, 100),
+    (1056, 4, 87),
+    (1060, 0, 86),
+    (1064, 0, 86),
+];
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_SHELL_TRACK_B: [(u16, i16, i16); 6] = [
+    (1047, 31, 56),
+    (1056, 35, 53),
+    (1060, 37, 51),
+    (1064, 39, 50),
+    (1075, 44, 46),
+    (1087, 49, 43),
+];
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_SHELL_TRACK_C: [(u16, i16, i16); 7] = [
+    (1053, 23, 136),
+    (1060, 26, 125),
+    (1075, 33, 103),
+    (1088, 39, 83),
+    (1104, 47, 59),
+    (1115, 52, 43),
+    (1128, 52, 43),
+];
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_SHELL_TRACK_D: [(u16, i16, i16); 4] = [
+    (1181, 7, 110),
+    (1182, 4, 109),
+    (1183, 2, 108),
+    (1189, 2, 108),
+];
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_SHELL_TRACKS: [SourceTarget4TerminalShellTrack;
+    4] = [
+    SourceTarget4TerminalShellTrack {
+        samples: &SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_SHELL_TRACK_A,
+        x_velocity: 0xFF1C,
+        y_velocity: 0xFEDC,
+    },
+    SourceTarget4TerminalShellTrack {
+        samples: &SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_SHELL_TRACK_B,
+        x_velocity: 0x0378,
+        y_velocity: 0xFFAC,
+    },
+    SourceTarget4TerminalShellTrack {
+        samples: &SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_SHELL_TRACK_C,
+        x_velocity: 0x0378,
+        y_velocity: 0xFE80,
+    },
+    SourceTarget4TerminalShellTrack {
+        samples: &SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_SHELL_TRACK_D,
+        x_velocity: 0x00A0,
+        y_velocity: 0xFED4,
+    },
+];
 const SOURCE_PLAYFIELD_START_RNG: SourceRandSnapshot = SourceRandSnapshot {
     seed: 0x52,
     hseed: 0x62,
@@ -3098,7 +3159,8 @@ impl WorldSnapshot {
         self.clear_terrain_blow_human_state();
         self.enemy_reserve = EnemyReserveSnapshot::default();
         self.projectiles.clear();
-        self.enemy_projectiles.clear();
+        self.enemy_projectiles =
+            source_target4_smartmix_terminal_post_game_enemy_projectiles(frame);
         self.enemy_appearances.clear();
         self.score_popups.clear();
         self.explosions
@@ -6613,6 +6675,22 @@ fn source_target4_smartmix_terminal_visible_objects(
     }
 }
 
+fn source_target4_smartmix_terminal_post_game_enemy_projectiles(
+    frame: u16,
+) -> Vec<EnemyProjectileSnapshot> {
+    SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_SHELL_TRACKS
+        .iter()
+        .filter_map(|track| {
+            let position = interpolate_source_post_game_position_bounded(track.samples, frame)?;
+            Some(EnemyProjectileSnapshot::source_fireball(
+                position,
+                track.x_velocity,
+                track.y_velocity,
+            ))
+        })
+        .collect()
+}
+
 fn source_terminal_post_game_visible_object(
     object: SourceTarget4TerminalVisibleObject,
 ) -> EnemySnapshot {
@@ -6813,6 +6891,18 @@ fn interpolate_source_post_game_position(
 
     let (_, x, y) = *samples.last()?;
     screen_position_from_signed(i32::from(x), i32::from(y))
+}
+
+fn interpolate_source_post_game_position_bounded(
+    samples: &[(u16, i16, i16)],
+    frame: u16,
+) -> Option<ScreenPosition> {
+    let last_frame = samples.last()?.0;
+    if frame > last_frame {
+        return None;
+    }
+
+    interpolate_source_post_game_position(samples, frame)
 }
 
 fn screen_position_from_signed(x: i32, y: i32) -> Option<ScreenPosition> {
@@ -25991,6 +26081,7 @@ mod tests {
         let mut state_samples = Vec::new();
         let mut sound_samples = Vec::new();
         let mut terminal_object_samples = Vec::new();
+        let mut terminal_shell_samples = Vec::new();
 
         for input_frame in 0..=6127u16 {
             let frame = game.step(organic_smartmix_input(input_frame));
@@ -26028,6 +26119,17 @@ mod tests {
                     mutant_count,
                     first_mutant_position,
                 ));
+            }
+            if matches!(state_frame, 5991 | 6007 | 6075 | 6088 | 6128) {
+                let mut positions = frame
+                    .state
+                    .world
+                    .enemy_projectiles
+                    .iter()
+                    .map(|projectile| projectile.position)
+                    .collect::<Vec<_>>();
+                positions.sort_by_key(|position| (position.x, position.y));
+                terminal_shell_samples.push((state_frame, positions));
             }
             if matches!(state_frame, 4779 | 4927 | 4947 | 5991 | 6007) {
                 let terrain_erased = frame
@@ -26176,6 +26278,23 @@ mod tests {
                     Some(ScreenPosition::new(19, 136))
                 ),
                 (6007, 0xE800, Some(0x7AC0), 0, 0, None),
+            ]
+        );
+        assert_eq!(
+            terminal_shell_samples,
+            vec![
+                (5991, vec![ScreenPosition::new(51, 100)]),
+                (
+                    6007,
+                    vec![
+                        ScreenPosition::new(0, 86),
+                        ScreenPosition::new(26, 125),
+                        ScreenPosition::new(37, 51),
+                    ],
+                ),
+                (6075, vec![ScreenPosition::new(52, 43)]),
+                (6088, vec![]),
+                (6128, vec![ScreenPosition::new(7, 110)]),
             ]
         );
         assert_eq!(
