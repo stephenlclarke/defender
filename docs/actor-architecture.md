@@ -339,6 +339,11 @@ source_waves 3 16
 actor before the driver has allocated its runtime actor id. They inherit the
 current wave/kind behavior at the point where the line is parsed and are then
 installed as actor-id behavior profiles when that spawn index is allocated.
+Indices are per actor kind and advance across the whole wave allocation stream:
+initial wave spawns consume the first indices, then source reserve/refill
+spawns, pod-created swarmers, baiters, and other command-applied later hostile
+spawns consume subsequent same-kind indices. This lets custom progression
+scripts tune a specific restored actor without changing the actor struct.
 `lander`, `bomber`, `pod`, and `human` lines add clean scripted spawn records;
 humans default to `grounded` and can also be declared as `falling <velocity>` or
 `carried <actor-id>`. The compatible `reserve` and `enemy_reserve` forms take

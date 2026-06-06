@@ -8537,6 +8537,7 @@ pub struct ActorGameDriver {
     attract_script: AttractScript,
     behavior_script: ActorBehaviorScript,
     wave_script: ActorWaveScript,
+    wave_spawn_allocations: BTreeMap<ActorKind, usize>,
     enemy_reserve: EnemyReserveSnapshot,
     source_target_cursor: Option<usize>,
     source_astronaut_cursor: Option<usize>,
@@ -8600,6 +8601,7 @@ impl ActorGameDriver {
             attract_script: attract_script.clone(),
             behavior_script: ActorBehaviorScript::default(),
             wave_script,
+            wave_spawn_allocations: BTreeMap::new(),
             enemy_reserve: EnemyReserveSnapshot::default(),
             source_target_cursor: None,
             source_astronaut_cursor: Some(0),
@@ -9217,13 +9219,16 @@ impl ActorGameDriver {
                     }
                 }
                 GameCommand::Spawn(SpawnRequest::Lander { position }) => {
-                    self.spawn_lander(position);
+                    let actor = self.spawn_lander(position);
+                    self.apply_next_wave_spawn_behavior(ActorKind::Lander, actor);
                 }
                 GameCommand::Spawn(SpawnRequest::Mutant { position, source }) => {
-                    self.spawn_mutant_from_spawn(ActorMutantSpawn { position, source });
+                    let actor = self.spawn_mutant_from_spawn(ActorMutantSpawn { position, source });
+                    self.apply_next_wave_spawn_behavior(ActorKind::Mutant, actor);
                 }
                 GameCommand::Spawn(SpawnRequest::Bomber { position }) => {
-                    self.spawn_bomber(position);
+                    let actor = self.spawn_bomber(position);
+                    self.apply_next_wave_spawn_behavior(ActorKind::Bomber, actor);
                 }
                 GameCommand::Spawn(SpawnRequest::Bomb { position, source }) => {
                     if bomb_shell_spawn_in_source_bounds(position, source)
@@ -9236,16 +9241,21 @@ impl ActorGameDriver {
                     }
                 }
                 GameCommand::Spawn(SpawnRequest::Pod { position }) => {
-                    self.spawn_pod(position);
+                    let actor = self.spawn_pod(position);
+                    self.apply_next_wave_spawn_behavior(ActorKind::Pod, actor);
                 }
                 GameCommand::Spawn(SpawnRequest::Swarmer { position, source }) => {
-                    self.spawn_swarmer_from_spawn(ActorSwarmerSpawn { position, source });
+                    let actor =
+                        self.spawn_swarmer_from_spawn(ActorSwarmerSpawn { position, source });
+                    self.apply_next_wave_spawn_behavior(ActorKind::Swarmer, actor);
                 }
                 GameCommand::Spawn(SpawnRequest::Baiter { position, source }) => {
-                    self.spawn_baiter_from_spawn(ActorBaiterSpawn { position, source });
+                    let actor = self.spawn_baiter_from_spawn(ActorBaiterSpawn { position, source });
+                    self.apply_next_wave_spawn_behavior(ActorKind::Baiter, actor);
                 }
                 GameCommand::Spawn(SpawnRequest::Human { position, mode }) => {
-                    self.spawn_human(position, mode);
+                    let actor = self.spawn_human(position, mode);
+                    self.apply_next_wave_spawn_behavior(ActorKind::Human, actor);
                 }
                 GameCommand::Spawn(SpawnRequest::Explosion {
                     position,
@@ -10005,6 +10015,7 @@ impl ActorGameDriver {
     fn apply_wave_profile(&mut self) {
         let wave_profile = self.wave_script.profile_for_wave(self.wave);
         self.behavior_script = wave_profile.behavior_script.clone();
+        self.wave_spawn_allocations.clear();
         self.enemy_reserve = wave_profile.enemy_reserve;
         self.source_target_cursor = Some(0);
         self.reset_source_astronaut_process();
@@ -10065,7 +10076,8 @@ impl ActorGameDriver {
                         commands.push(GameCommand::Spawn(SpawnRequest::Lander {
                             position: spawn.position,
                         }));
-                        self.spawn_lander_from_spawn(spawn);
+                        let actor = self.spawn_lander_from_spawn(spawn);
+                        self.apply_next_wave_spawn_behavior(ActorKind::Lander, actor);
                         index += 1;
                     } else {
                         let lander_count = reserve_kinds[index..]
@@ -10082,7 +10094,8 @@ impl ActorGameDriver {
                                 position: spawn.position,
                                 source: spawn.source,
                             }));
-                            self.spawn_mutant_from_spawn(spawn);
+                            let actor = self.spawn_mutant_from_spawn(spawn);
+                            self.apply_next_wave_spawn_behavior(ActorKind::Mutant, actor);
                         }
                         index += lander_count;
                     }
@@ -10103,7 +10116,8 @@ impl ActorGameDriver {
                         commands.push(GameCommand::Spawn(SpawnRequest::Bomber {
                             position: spawn.position,
                         }));
-                        self.spawn_bomber_from_spawn(spawn);
+                        let actor = self.spawn_bomber_from_spawn(spawn);
+                        self.apply_next_wave_spawn_behavior(ActorKind::Bomber, actor);
                     }
                     index += bomber_count;
                 }
@@ -10112,7 +10126,8 @@ impl ActorGameDriver {
                     commands.push(GameCommand::Spawn(SpawnRequest::Pod {
                         position: spawn.position,
                     }));
-                    self.spawn_pod_from_spawn(spawn);
+                    let actor = self.spawn_pod_from_spawn(spawn);
+                    self.apply_next_wave_spawn_behavior(ActorKind::Pod, actor);
                     index += 1;
                 }
                 ActorSourceEnemyKind::Mutant => {
@@ -10125,7 +10140,8 @@ impl ActorGameDriver {
                         position: spawn.position,
                         source: spawn.source,
                     }));
-                    self.spawn_mutant_from_spawn(spawn);
+                    let actor = self.spawn_mutant_from_spawn(spawn);
+                    self.apply_next_wave_spawn_behavior(ActorKind::Mutant, actor);
                     index += 1;
                 }
                 ActorSourceEnemyKind::Swarmer => {
@@ -10142,7 +10158,8 @@ impl ActorGameDriver {
                             position: spawn.position,
                             source: spawn.source,
                         }));
-                        self.spawn_swarmer_from_spawn(spawn);
+                        let actor = self.spawn_swarmer_from_spawn(spawn);
+                        self.apply_next_wave_spawn_behavior(ActorKind::Swarmer, actor);
                     }
                     index += swarmer_count;
                 }
@@ -10250,7 +10267,8 @@ impl ActorGameDriver {
             commands.push(GameCommand::Spawn(SpawnRequest::Lander {
                 position: spawn.position,
             }));
-            self.spawn_lander_from_spawn(spawn);
+            let actor = self.spawn_lander_from_spawn(spawn);
+            self.apply_next_wave_spawn_behavior(ActorKind::Lander, actor);
         }
         self.enemy_reserve.landers = self
             .enemy_reserve
@@ -10283,7 +10301,8 @@ impl ActorGameDriver {
             commands.push(GameCommand::Spawn(SpawnRequest::Lander {
                 position: spawn.position,
             }));
-            self.spawn_lander_from_spawn(spawn);
+            let actor = self.spawn_lander_from_spawn(spawn);
+            self.apply_next_wave_spawn_behavior(ActorKind::Lander, actor);
         }
         self.enemy_reserve.landers = self
             .enemy_reserve
@@ -10307,20 +10326,20 @@ impl ActorGameDriver {
 
     fn spawn_wave_hostiles(&mut self) {
         let wave_profile = self.wave_script.profile_for_wave(self.wave).clone();
-        for (spawn_index, spawn) in wave_profile.lander_spawns.iter().copied().enumerate() {
+        for spawn in wave_profile.lander_spawns.iter().copied() {
             let actor = self.spawn_lander_from_spawn(spawn);
             if let Some(target_index) = spawn.source.and_then(|source| source.target_human_index) {
                 self.source_target_cursor = Some(target_index);
             }
-            self.apply_wave_spawn_behavior(&wave_profile, ActorKind::Lander, spawn_index, actor);
+            self.apply_next_wave_spawn_behavior(ActorKind::Lander, actor);
         }
-        for (spawn_index, spawn) in wave_profile.bomber_spawns.iter().copied().enumerate() {
+        for spawn in wave_profile.bomber_spawns.iter().copied() {
             let actor = self.spawn_bomber_from_spawn(spawn);
-            self.apply_wave_spawn_behavior(&wave_profile, ActorKind::Bomber, spawn_index, actor);
+            self.apply_next_wave_spawn_behavior(ActorKind::Bomber, actor);
         }
-        for (spawn_index, spawn) in wave_profile.pod_spawns.iter().copied().enumerate() {
+        for spawn in wave_profile.pod_spawns.iter().copied() {
             let actor = self.spawn_pod_from_spawn(spawn);
-            self.apply_wave_spawn_behavior(&wave_profile, ActorKind::Pod, spawn_index, actor);
+            self.apply_next_wave_spawn_behavior(ActorKind::Pod, actor);
         }
     }
 
@@ -10388,16 +10407,22 @@ impl ActorGameDriver {
         None
     }
 
-    fn apply_wave_spawn_behavior(
-        &mut self,
-        wave_profile: &ActorWaveProfile,
-        kind: ActorKind,
-        spawn_index: usize,
-        actor: ActorId,
-    ) {
-        if let Some(profile) = wave_profile.spawn_behavior_profile(kind, spawn_index) {
+    fn apply_next_wave_spawn_behavior(&mut self, kind: ActorKind, actor: ActorId) {
+        let spawn_index = self.next_wave_spawn_index(kind);
+        if let Some(profile) = self
+            .wave_script
+            .profile_for_wave(self.wave)
+            .spawn_behavior_profile(kind, spawn_index)
+        {
             self.behavior_script.set_actor_behavior(actor, profile);
         }
+    }
+
+    fn next_wave_spawn_index(&mut self, kind: ActorKind) -> usize {
+        let next = self.wave_spawn_allocations.entry(kind).or_insert(0);
+        let spawn_index = *next;
+        *next = next.saturating_add(1);
+        spawn_index
     }
 
     fn start_survivor_bonus_if_wave_cleared(
@@ -10519,9 +10544,9 @@ impl ActorGameDriver {
 
     fn spawn_initial_humans(&mut self) {
         let wave_profile = self.wave_script.profile_for_wave(self.wave).clone();
-        for (spawn_index, spawn) in wave_profile.human_spawns.iter().copied().enumerate() {
+        for spawn in wave_profile.human_spawns.iter().copied() {
             let actor = self.spawn_human_from_spawn(spawn);
-            self.apply_wave_spawn_behavior(&wave_profile, ActorKind::Human, spawn_index, actor);
+            self.apply_next_wave_spawn_behavior(ActorKind::Human, actor);
         }
     }
 
@@ -22334,6 +22359,90 @@ mod tests {
         );
         assert!(landers[0].position.x < 80);
         assert_eq!(landers[1].position, Point::new(119, 214));
+    }
+
+    #[test]
+    fn parsed_wave_script_applies_spawn_index_behavior_to_reserve_allocations() {
+        let wave_script = "\
+            name reserve spawn behavior\n\
+            source_wave 2\n\
+            spawn_behavior lander 3 lander_mode chase_player\n\
+            spawn_behavior lander 3 lander_seek_speed 5\n"
+            .parse::<ActorWaveScript>()
+            .expect("reserve spawn behavior script should parse");
+        let mut driver = ActorGameDriver::with_wave_script(wave_script);
+        driver.phase = Phase::Playing;
+        driver.wave = 2;
+        driver.source_rng = SOURCE_PLAYFIELD_START_RNG;
+        driver.apply_wave_profile();
+        driver.spawn_player();
+        driver.spawn_wave_hostiles();
+        driver.spawn_initial_humans();
+        driver.arm_first_wave_early_lander_reserve_delay();
+
+        let initial = driver.step(GameInput::NONE);
+        let mut initial_landers = initial
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::Lander)
+            .collect::<Vec<_>>();
+        initial_landers.sort_by_key(|snapshot| snapshot.id);
+        assert_eq!(initial_landers.len(), 3);
+        assert!(
+            driver
+                .script_manifest()
+                .behavior_script
+                .actor_profile(initial_landers[0].id)
+                .is_none()
+        );
+        assert_eq!(
+            initial.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 17,
+                bombers: 2,
+                pods: 0,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+
+        destroy_source_counted_hostiles(&mut driver, &initial);
+        let restored = driver.step(GameInput::NONE);
+        let mut reserve_landers = restored
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::Lander)
+            .collect::<Vec<_>>();
+        reserve_landers.sort_by_key(|snapshot| snapshot.id);
+        let reserve_lander = reserve_landers
+            .first()
+            .expect("reserve should spawn replacement landers");
+
+        assert!(
+            restored
+                .commands
+                .iter()
+                .any(|command| matches!(command, GameCommand::Spawn(SpawnRequest::Lander { .. })))
+        );
+        assert_eq!(reserve_landers.len(), SOURCE_MAX_ACTIVE_WAVE_ENEMIES);
+        assert_eq!(
+            restored.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 12,
+                bombers: 2,
+                pods: 0,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+        let reserve_behavior = driver
+            .script_manifest()
+            .behavior_script
+            .actor_profile(reserve_lander.id)
+            .expect("reserve spawn index should receive actor-id behavior");
+        assert_eq!(
+            reserve_behavior.lander_mode,
+            LanderBehaviorMode::ChasePlayer
+        );
+        assert_eq!(reserve_behavior.lander_seek_speed, 5);
     }
 
     #[test]

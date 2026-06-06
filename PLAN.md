@@ -887,6 +887,27 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-06 04:26 BST`: Completed the actor wave spawn-behavior allocation
+  cycle. `ActorGameDriver` now tracks per-kind wave allocation indices across
+  the whole wave, so `spawn_behavior <kind> <index> ...` profiles apply not
+  only to initial wave spawns but also to source reserve/refill actors,
+  pod-created swarmers, baiters, and other command-applied later hostile
+  spawns. This keeps the actor rewrite non-frame-driven while making
+  custom/level scripts able to tune individual restored actors as the driver
+  allocates them. Added a parsed wave-script regression that targets the first
+  source wave-2 reserve lander at lander spawn index `3` and proves it receives
+  the configured actor-id behavior profile. README, SPEC, and actor
+  architecture docs now describe the full-wave spawn-index contract.
+  Validation passed with `cargo fmt --check`, the focused reserve-allocation
+  regression, the existing initial-spawn behavior regression, the `wave_script`
+  lib filter under `legacy-tools`, `cargo test actor_game --all-targets
+  --features legacy-tools`, `cargo test actor_smoke --all-targets
+  --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `make actor-smoke`, and `make actor-wgpu-smoke`
+  with `frame_source: actor_game`, `192` actor frames, `192` nonblank offscreen
+  frames, and zero temporary raster commands, touched-doc markdownlint, and
+  `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780715891123479`.
 - `2026-06-06 04:14 BST`: Completed the routine CI actor-smoke hardening
   cycle. `make ci` now routes through `make ci-smoke`, and `make ci-smoke`
   runs both the clean live-smoke path and the actor offscreen `wgpu` smoke

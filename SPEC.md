@@ -827,7 +827,10 @@ reintroduce legacy implementation terminology.
   starts and when hostile snapshots are cleared. `ActorWaveScript` can be built
   from Rust profile constructors or checked text wave/spawn records, including
   spawn-index behavior profiles that the driver installs as actor-id profiles
-  immediately after allocating wave actors. The built-in actor attract,
+  immediately after allocating wave actors. Spawn indices are per kind and
+  advance across the full wave allocation stream, covering initial wave actors,
+  source reserve/refill actors, and command-applied later hostile actors. The
+  built-in actor attract,
   behavior, and wave scripts are embedded from
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and

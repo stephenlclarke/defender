@@ -189,6 +189,10 @@ future camera-backed custom drivers can influence the same placement window as
 the clean path. Checked wave scripts keep the compatible
 `reserve <landers> <bombers> <pods> [swarmers]` form and add
 `reserve_full` / `enemy_reserve_full` for custom all-family reserve batches.
+`spawn_behavior <kind> <index> ...` now counts same-kind allocations across the
+whole wave, so custom scripts can target initial spawns, source reserve/refill
+spawns, and command-applied later hostile spawns with the same actor-id
+behavior profile mechanism.
 Later-wave actor landers now restore from source RNG placement/shot/velocity
 state, and later-wave humans restore from the source target-list distribution.
 Custom attract drivers can construct scripts in Rust or parse checked text
