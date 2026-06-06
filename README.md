@@ -135,11 +135,11 @@ update default, actor-kind, or actor-id profiles. Wave scripts can be parsed
 from checked text lines that name wave profiles, per-wave behavior updates, and
 `lander` / `bomber` / `pod` / `mutant` / `swarmer` / `baiter` / `human` spawn
 records, including spawn-index behavior profiles that become actor-id profiles
-after the driver allocates those wave actors. `source_wave <wave>` lines can
-also override individual source profile fields, letting custom drivers keep
-source-shaped allocation, movement, shots, baiter timing, and mutant hop
-behavior while tuning the counts and constants for a specific level. The
-built-in actor attract,
+after the driver allocates those wave actors. `source_wave <wave>` and
+`source_waves <first> <last>` lines can also override individual source profile
+fields, letting custom drivers keep source-shaped allocation, movement, shots,
+baiter timing, and mutant hop behavior while tuning the counts and constants
+for one level or a whole progression range. The built-in actor attract,
 behavior, and wave scripts are embedded from
 `assets/red-label/actor-attract.script`,
 `assets/red-label/actor-behavior.script`, and
@@ -212,10 +212,10 @@ allocates actor ids for the wave.
 Source-backed wave-profile manifests preserve the exact `ActorSourceWaveProfile`
 record expanded from `wave-table.tsv`, so custom drivers can inspect source
 active counts, movement, shot cadence, baiter timing, and mutant hop/shot
-settings without reading private driver state. Parsed `source_wave` overrides
-preserve that manifest field with the effective tuned profile, and actors read
-the same effective profile from `StepPrompt` instead of re-reading table
-defaults.
+settings without reading private driver state. Parsed `source_wave` and
+`source_waves` overrides preserve that manifest field with the effective tuned
+profile, and actors read the same effective profile from `StepPrompt` instead
+of re-reading table defaults.
 Source-backed landers, bombers, pods, swarmers, baiters, and humans publish
 their fixed-point metadata through snapshots, publish per-step movement/facing
 metadata for the clean state bridge, and advance fraction state during active

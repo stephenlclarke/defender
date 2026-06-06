@@ -80,14 +80,15 @@ verification tools.
   speed, lander fire cadence, source bomber/pod/direct-mutant/swarmer counts,
   baiter timing, and mutant hop/shot fields. Source-backed wave-profile
   manifests preserve the effective `ActorSourceWaveProfile` record expanded
-  from that table or tuned by parsed `source_wave` field overrides, so custom
-  drivers can inspect source progression values without driver internals. The
-  actor wave allocator follows the source active-family shape, so later waves
-  now seed bomber, pod, direct-mutant, and swarmer actors beside landers when
-  those counts are present. Source-backed actors consume the driver-owned
-  effective source wave profile from `StepPrompt`, so scripted level tuning
-  changes allocation, fixed-point movement, source AI shots, baiter cadence, and
-  mutant hop/shot behavior through the same data surface. Source-backed
+  from that table or tuned by parsed `source_wave` / `source_waves` field
+  overrides, so custom drivers can inspect source progression values without
+  driver internals. The actor wave allocator follows the source active-family
+  shape, so later waves now seed bomber, pod, direct-mutant, and swarmer actors
+  beside landers when those counts are present. Source-backed actors consume
+  the driver-owned effective source wave profile from `StepPrompt`, so scripted
+  level tuning changes allocation, fixed-point movement, source AI shots,
+  baiter cadence, and mutant hop/shot behavior through the same data surface
+  for one level or a whole source-backed range. Source-backed
   landers, bombers, pods, swarmers, and initial humans publish fixed-point
   metadata and advance actor-owned fraction state during active motion, and
   source landers prefer configured target slots before falling back to
@@ -898,6 +899,33 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 05:11 BST`: Completed the actor source-wave range override
+  cycle. `source_waves <first> <last>` script lines now accept the same checked
+  `<field> <value>` overrides as single `source_wave` lines and apply the
+  effective `ActorSourceWaveProfile` to every expanded source-backed wave in
+  the range. Added a parser/manifest regression proving the tuned active family
+  counts, direct mutant/swarmer slots, source metadata, and zero reserve
+  remainder are applied to both waves in a range, while the embedded
+  `actor-waves.script` default still expands source table values unchanged.
+  README, SPEC, `assets/red-label/README.md`, and the actor architecture guide
+  now document that custom drivers can tune one source-backed level or a whole
+  source-backed progression range through the same checked script syntax.
+  Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780718670474479>.
+  Validation passed with `cargo test
+  parsed_source_wave_range_overrides_apply_to_each_expanded_profile --lib
+  --features legacy-tools`, `cargo test source_wave --lib --features
+  legacy-tools`, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo test actor_live --all-targets --features legacy-tools`,
+  `cargo check --all-targets --features legacy-tools`, `cargo clippy
+  --all-targets --features legacy-tools -- -D warnings`, `make actor-smoke`,
+  `make actor-wgpu-smoke` with `frame_source: actor_game`, `cargo fmt
+  --check`, `markdownlint README.md SPEC.md PLAN.md docs/actor-architecture.md
+  docs/fidelity/mame-golden-clips.md
+  docs/fidelity/release-closure-audit.md assets/sounds/README.md
+  assets/red-label/README.md`, and `git diff --check`.
 
 - `2026-06-06 05:02 BST`: Completed the actor source-wave scripting
   override cycle. `source_wave <wave>` script lines now accept checked

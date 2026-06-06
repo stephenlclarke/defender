@@ -282,7 +282,8 @@ active family allocation, movement speed, fire cadence, mutant hop/shot
 behavior, and baiter entry pacing. The effective source profile is preserved in
 each wave manifest so custom drivers can inspect the same source progression
 values without reaching into driver internals; parsed `source_wave` overrides
-preserve the tuned profile rather than the table default. Wave `1` remains
+and `source_waves` range overrides preserve the tuned profile rather than the
+table default. Wave `1` remains
 lander-only; later source waves seed one lander, one bomber, one pod, one direct
 mutant, and one swarmer when those reserve counts are available before filling
 the rest of the active batch, matching the clean source allocator's family
@@ -342,6 +343,7 @@ baiter 170 104
 reserve 4 1 0
 source_waves 3 16
 source_wave 17 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1
+source_waves 18 20 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1
 ```
 
 `behavior` lines reuse the `ActorBehaviorScript` parser for the current wave.
@@ -364,14 +366,15 @@ set all five reserve families explicitly. `source_wave <wave>` and
 `source_waves <first> <last>` expand source-backed wave-table profiles,
 including source reserve counts and source wave-table metadata, into the same
 checked script, so the production default and custom level scripts use the same
-parser surface. A single `source_wave` line can also append `<field> <value>`
-pairs for any exposed `ActorSourceWaveProfile` field, which keeps source-shaped
-allocation, restore metadata, fixed-point movement, AI shots, baiter cadence,
-and mutant hop/shot behavior while letting a custom driver script tune the
-level constants. The driver copies the effective current profile into
-`StepPrompt`, so source-backed actors consume these overrides directly instead
-of re-reading `wave-table.tsv`. The parser sorts wave profiles by wave number,
-rejects duplicate waves, and reports malformed lines with source line numbers.
+parser surface. Either form can also append `<field> <value>` pairs for any
+exposed `ActorSourceWaveProfile` field. Single-wave overrides tune one level;
+range overrides apply the same source-shaped allocation, restore metadata,
+fixed-point movement, AI shots, baiter cadence, and mutant hop/shot constants
+to every expanded wave in the range. The driver copies the effective current
+profile into `StepPrompt`, so source-backed actors consume these overrides
+directly instead of re-reading `wave-table.tsv`. The parser sorts wave profiles
+by wave number, rejects duplicate waves, and reports malformed lines with
+source line numbers.
 
 Hostile projectile actors publish source-shaped shell metadata too: enemy
 lasers own and advance fixed-point velocity, fraction, and lifetime values,

@@ -871,8 +871,9 @@ reintroduce legacy implementation terminology.
   mutant hop/shot fields. Source-backed wave-profile manifests retain the
   effective `ActorSourceWaveProfile` record for custom driver inspection:
   source-table waves expose the expanded red-label values, while parsed
-  `source_wave <wave> <field> <value> ...` overrides expose the tuned profile
-  that actors receive in `StepPrompt`. The actor allocator
+  `source_wave <wave> <field> <value> ...` and
+  `source_waves <first> <last> <field> <value> ...` overrides expose the tuned
+  profile that actors receive in `StepPrompt`. The actor allocator
   follows the source active-family
   shape, so wave `1` remains lander-only while later waves can seed bomber,
   pod, direct-mutant, and swarmer actors beside source-RNG-restored landers

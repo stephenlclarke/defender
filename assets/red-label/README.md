@@ -47,7 +47,9 @@ Current files:
 - `actor-waves.script`: embedded actor-runtime wave progression script parsed
   by `ActorWaveScript`; its `source_waves` directive expands through
   `wave-table.tsv` so the default actor driver is configured from checked text
-  while retaining source-table wave values.
+  while retaining source-table wave values. Custom checked scripts can append
+  source-profile field overrides to `source_wave` or `source_waves` lines while
+  still using the same source-shaped actor allocation and movement path.
 - `audit-adjustments.tsv`: red-label `romc8.src` `AUDITG` / `MSGAUD`
   operator audit and adjustment message table, including the source CMOS cell
   offsets and display widths used by `DISAUD`.

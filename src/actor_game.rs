@@ -3647,7 +3647,7 @@ impl ParsedActorWaveScript {
             "source_waves" | "source_backed_waves" => {
                 let first = parse_wave_u16(line_number, parts.next(), "first wave")?.max(1);
                 let last = parse_wave_u16(line_number, parts.next(), "last wave")?.max(1);
-                reject_extra_wave_fields(line_number, parts)?;
+                let source_update_tokens = parts.collect::<Vec<_>>();
                 if last < first {
                     return Err(ActorWaveScriptParseError::new(
                         line_number,
@@ -3655,7 +3655,16 @@ impl ParsedActorWaveScript {
                     ));
                 }
                 for wave in first..=last {
-                    self.push_profile(line_number, ParsedActorWaveProfile::source_backed(wave))?;
+                    let mut source = ActorSourceWaveProfile::for_wave(wave);
+                    parse_source_wave_profile_updates(
+                        line_number,
+                        &mut source,
+                        source_update_tokens.iter().copied(),
+                    )?;
+                    self.push_profile(
+                        line_number,
+                        ParsedActorWaveProfile::source_backed_from_source(wave, source),
+                    )?;
                 }
                 Ok(())
             }
@@ -3863,10 +3872,6 @@ impl ParsedActorWaveProfile {
             enemy_reserve: EnemyReserveSnapshot::default(),
             spawn_behavior_profiles: Vec::new(),
         }
-    }
-
-    fn source_backed(wave: u16) -> Self {
-        Self::source_backed_from_source(wave, ActorSourceWaveProfile::for_wave(wave))
     }
 
     fn source_backed_from_source(wave: u16, source: ActorSourceWaveProfile) -> Self {
@@ -22741,6 +22746,64 @@ mod tests {
                 .mutants,
             1
         );
+    }
+
+    #[test]
+    fn parsed_source_wave_range_overrides_apply_to_each_expanded_profile() {
+        let wave_script = concat!(
+            "name ranged source shape\n",
+            "source_waves 1 2 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
+            "swarmer_x_velocity 64 swarmer_shot_time 11 baiter_time 24 ",
+            "mutant_x_velocity 48 mutant_random_y 2 mutant_shot_time 12\n",
+        )
+        .parse::<ActorWaveScript>()
+        .expect("source wave range overrides should parse");
+        let manifest = wave_script.manifest();
+
+        assert_eq!(
+            manifest
+                .waves
+                .iter()
+                .map(|profile| profile.wave)
+                .collect::<Vec<_>>(),
+            vec![1, 2]
+        );
+        for profile in &manifest.waves {
+            let source = profile
+                .source_wave
+                .expect("range override should preserve source metadata");
+            assert_eq!(source.wave_size, 5);
+            assert_eq!(source.landers, 1);
+            assert_eq!(source.bombers, 1);
+            assert_eq!(source.pods, 1);
+            assert_eq!(source.mutants, 1);
+            assert_eq!(source.swarmers, 1);
+            assert_eq!(source.swarmer_x_velocity, 64);
+            assert_eq!(source.swarmer_shot_time, 11);
+            assert_eq!(source.baiter_delay, 24);
+            assert_eq!(source.mutant_x_velocity, 48);
+            assert_eq!(source.mutant_random_y, 2);
+            assert_eq!(source.mutant_shot_time, 12);
+            assert_eq!(profile.lander_spawns.len(), 1);
+            assert_eq!(profile.bomber_spawns.len(), 1);
+            assert_eq!(profile.pod_spawns.len(), 1);
+            assert_eq!(profile.mutant_spawns.len(), 1);
+            assert_eq!(profile.swarmer_spawns.len(), 1);
+            assert_eq!(profile.enemy_reserve, EnemyReserveSnapshot::default());
+            assert!(profile.mutant_spawns[0].source.is_some());
+            assert!(profile.swarmer_spawns[0].source.is_some());
+        }
+
+        let second = wave_script.profile_for_wave(2);
+        assert_eq!(
+            second
+                .source_wave
+                .expect("wave 2 should use the effective range override")
+                .mutants,
+            1
+        );
+        assert_eq!(second.mutant_spawns.len(), 1);
+        assert_eq!(second.swarmer_spawns.len(), 1);
     }
 
     #[test]
