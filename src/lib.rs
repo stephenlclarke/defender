@@ -398,7 +398,10 @@ mod public_api_tests {
         assert!(platform_rs.contains("ArgClassification::Error"));
         assert!(platform_rs.contains("\"--live-smoke\""));
         assert!(platform_rs.contains("\"--game-smoke\""));
+        assert!(platform_rs.contains("\"--actor-smoke\""));
         assert!(platform_rs.contains("\"--actor-attract-smoke\""));
+        assert!(platform_rs.contains("\"--actor-post-game-smoke\""));
+        assert!(platform_rs.contains("\"--actor-wgpu-smoke\""));
         assert!(platform_rs.contains("RuntimeConfig::smoke()"));
         assert!(!platform_rs.contains(&accepted_runtime_call));
         assert!(!platform_rs.contains("crate::compatibility::"));
@@ -428,6 +431,14 @@ mod public_api_tests {
         );
         assert!(runtime_rs.contains("RuntimeCommand::FidelityScenarioList"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityScenarioInputWriter"));
+
+        let makefile = include_str!("../Makefile");
+        assert!(makefile.contains("actor-smoke:"));
+        assert!(makefile.contains("actor-wgpu-smoke:"));
+        assert!(makefile.contains("$(MAKE) actor-smoke"));
+        assert!(makefile.contains("$(MAKE) actor-wgpu-smoke"));
+        assert!(makefile.contains("cargo run -- --actor-smoke"));
+        assert!(makefile.contains("cargo run -- --actor-wgpu-smoke"));
         assert!(runtime_rs.contains("pub(crate) fn help_text()"));
         assert!(runtime_rs.contains("pub(crate) fn run_rom_report"));
         assert!(runtime_rs.contains("pub(crate) fn run_verify_roms"));

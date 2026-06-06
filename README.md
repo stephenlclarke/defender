@@ -383,8 +383,10 @@ make run-wgpu
 make live-wgpu
 make smoke-wgpu
 make game-smoke
+make actor-smoke
 make actor-attract-smoke
 make actor-post-game-smoke
+make actor-wgpu-smoke
 make live-smoke
 make ci
 make ci-doctor
@@ -647,8 +649,9 @@ make release-gate
 formatting, default and `legacy-tools` Rust tests, both clippy passes,
 clean-fidelity, reference-media helper tests, fresh MAME evidence package,
 accepted report gate and owner-review checklist, MAME doctor, short MAME
-recorder smoke, README media generation, game smoke, actor attract/post-game
-smoke, live smoke, docs lint, and diff hygiene.
+recorder smoke, README media generation, game smoke, actor play smoke, actor
+attract/post-game smoke, actor offscreen `wgpu` smoke, live smoke, docs lint,
+and diff hygiene.
 
 `make fidelity` runs formatting, default Rust targets, default clippy,
 `legacy-tools` Rust targets, `legacy-tools` clippy, Lua trace exporter

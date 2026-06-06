@@ -90,9 +90,10 @@ README media generation, game smoke, actor smoke gates, live smoke, docs lint,
 and diff hygiene.
 
 The accepted gate is green, including the repaired organic smartmix
-terrain-blow clip. Final closure still requires owner review of the bounded
-proof set plus a fresh full release-gate run after the actor rewrite slices.
-The proof boundaries and review checklist are tracked in
+terrain-blow clip, and the actor-era full `make release-gate` pass was rerun on
+`2026-06-06`. Final closure still requires owner review of the bounded proof
+set, or a new concrete MAME clip/input program showing a mismatch outside the
+accepted windows. The proof boundaries and review checklist are tracked in
 `docs/fidelity/release-closure-audit.md`.
 
 Post-R9 non-rewrite follow-ups are evidence and polish items, not active R9
@@ -985,8 +986,8 @@ make diff-check
 formatting, default and `legacy-tools` Rust tests, both clippy passes,
 clean-fidelity, reference-media helper tests, fresh owner-review evidence
 package, accepted report gate, MAME doctor, short MAME recorder smoke, README
-media generation, game smoke, actor attract/post-game smoke, live smoke, docs
-lint, and diff hygiene.
+media generation, game smoke, actor play smoke, actor attract/post-game smoke,
+actor offscreen `wgpu` smoke, live smoke, docs lint, and diff hygiene.
 
 `make fidelity` runs the broad gate: formatting, default Rust targets, default
 clippy, explicit `legacy-tools` Rust targets, `legacy-tools` clippy, trace

@@ -378,8 +378,10 @@ make reference-mame-doctor
 make reference-mame-smoke
 make readme-media
 cargo run -- --game-smoke
+cargo run -- --actor-smoke
 cargo run -- --actor-attract-smoke
 cargo run -- --actor-post-game-smoke
+cargo run -- --actor-wgpu-smoke
 cargo run -- --live-smoke
 markdownlint README.md SPEC.md PLAN.md docs/fidelity/mame-golden-clips.md \
   docs/fidelity/release-closure-audit.md assets/sounds/README.md
@@ -874,8 +876,9 @@ Exit gate:
    `make release-gate` pass is now green, including default and `legacy-tools`
    Rust tests, both clippy gates, `make clean-fidelity`, media helper tests,
    owner-review package/report gate, MAME doctor/smoke, README media, game
-   smoke, actor attract/post-game smoke, live smoke, docs lint, and diff
-   hygiene. Owner review remains before protected reference media replacement.
+   smoke, actor play smoke, actor attract/post-game smoke, actor offscreen
+   `wgpu` smoke, live smoke, docs lint, and diff hygiene. Owner review remains
+   before protected reference media replacement.
    The owner-review checklist in `docs/fidelity/release-closure-audit.md`
    defines the finite sign-off action and is printed by
    `make owner-review-package`: accept the current 28-report gate and proof
@@ -883,6 +886,27 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-06 04:04 BST`: Completed the actor release-gate hardening cycle.
+  `make release-gate` now runs the actor replacement play/render proof directly:
+  `make actor-smoke` verifies the actor runtime through attract, credit, play,
+  gameplay/audio events, sprite layers, native draw commands, and zero
+  temporary raster commands, and `make actor-wgpu-smoke` verifies the same
+  actor frame source through offscreen `wgpu` readback with
+  `frame_source: actor_game`. Added explicit Makefile targets for both smokes
+  and a public API drift guard so the CLI/Makefile release boundary cannot drop
+  them silently. README and SPEC now list the hardened actor play/offscreen
+  smoke gate, and the expanded release-gate command sequence in this plan is
+  synchronized with the Makefile. Validation passed with `cargo fmt --check`,
+  the focused `public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters`
+  guard under `legacy-tools`, `make -n release-gate`, `make actor-smoke`,
+  `make actor-wgpu-smoke`, and the full hardened `make release-gate`: default
+  all-target tests (`663`), `legacy-tools` all-target tests (`1614` passed,
+  `1` ignored), both clippy gates, `make clean-fidelity`, media helper tests,
+  owner-review package and the accepted `28`-report gate, MAME doctor/smoke,
+  README media, game smoke, actor smoke, actor attract/post-game smoke, actor
+  offscreen `wgpu` smoke, live smoke, docs lint, and `git diff --check`. Slack
+  cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780714340875129`.
 - `2026-06-06 03:50 BST`: Completed the actor-era release-gate revalidation
   cycle. Preflight smoke passed for `cargo run -- --actor-smoke`,
   `cargo run -- --actor-attract-smoke`, `cargo run -- --actor-post-game-smoke`,
