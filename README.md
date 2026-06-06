@@ -45,16 +45,16 @@ The accepted MAME-vs-clean report gate now covers sprite visuals, player laser
 visual/audio, reverse orientation, explosion/coalescence visuals, terrain blow,
 gameplay audio families, non-lander audio/visual presentation, playability,
 rescue/loss, death/respawn, smart bomb, hyperspace, and organic non-lander
-presentation. The current `make release-gate` path includes the accepted
-report gate, the owner-review evidence package, MAME doctor, a short MAME
-recorder smoke capture, README media generation, game smoke, actor smoke gates,
-live `wgpu` smoke, docs lint, and diff hygiene.
+presentation, plus organic last-human terrain-blow gameplay. The current
+`make release-gate` path includes the accepted report gate, the owner-review
+evidence package, MAME doctor, a short MAME recorder smoke capture, README
+media generation, game smoke, actor smoke gates, live `wgpu` smoke, docs lint,
+and diff hygiene.
 
-The accepted gate is still green, but final closure is no longer only an
-owner-review decision. A fresh organic smart-bomb/up-thrust search found a
-concrete last-human terrain-blow MAME candidate outside the accepted evidence
-windows; the current clean candidate is silent and visually divergent. That
-probe and the owner-review checklist are tracked in
+The accepted gate is green, including the repaired organic smartmix
+terrain-blow clip. Final closure still requires owner review of the bounded
+proof set plus a fresh full release-gate run after the actor rewrite slices.
+The proof boundaries and owner-review checklist are tracked in
 `docs/fidelity/release-closure-audit.md`.
 
 ## Actor-Oriented Rewrite Branch

@@ -870,17 +870,33 @@ Exit gate:
    to all-axis and fixing the clean-only post-game thrust/background audio
    leak. The current release-gate path now also includes actor smoke gates, so
    full release-gate status requires a fresh run after the actor rewrite
-   slices. A later scan found an unaccepted organic smart-bomb/up-thrust
-   terrain-blow candidate whose clean report currently fails; owner review and
-   classification or repair of that new concrete mismatch remain before
-   protected reference media replacement.
+   slices. The later organic smart-bomb/up-thrust terrain-blow candidate now
+   has a passing all-axis report and is accepted as organic last-human
+   terrain-blow proof in the report gate; owner review and a fresh full
+   release-gate run remain before protected reference media replacement.
    The owner-review checklist in `docs/fidelity/release-closure-audit.md`
    defines the finite sign-off action and is printed by
-   `make owner-review-package`: accept the current 27-report gate and proof
+   `make owner-review-package`: accept the current 28-report gate and proof
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
 
+- `2026-06-06 02:34 BST`: Completed the organic terrain-blow proof-promotion
+  cycle. The passing
+  `target/reference-media/organic-terrain-blow-smartmix-check/report.json`
+  is now part of `docs/fidelity/reference-report-gate.json` as the accepted
+  all-axis `organic terrain-blow smartmix` report. The manifest now has a
+  dedicated `organic_terrain_blow` coverage facet and raises the relevant
+  breadth floors to `28` accepted reports: `21` all-axis, `4` audio-only,
+  `3` visual-only, and `20` coverage requirements. The generated signoff
+  summary now counts `98` required non-empty media artifacts, `24` accepted
+  visual comparisons, and `25` accepted audio comparisons. README, SPEC,
+  PLAN, and `docs/fidelity/release-closure-audit.md` now describe the organic
+  smartmix terrain-blow clip as accepted evidence rather than an open failing
+  probe; final closure remains owner review plus a fresh full release-gate run.
+  Validation passed with `make reference-report-gate` and
+  `make reference-signoff-summary`. Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780709479376629`.
 - `2026-06-06 02:27 BST`: Completed the organic smartmix terminal flash
   parity cycle. The target4 terminal post-game branch now suppresses the
   generic terrain-blow flash across the terminal black phases and overlays

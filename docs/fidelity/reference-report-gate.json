@@ -4,7 +4,7 @@
       "name": "sprite shapes, colors, HUD, terrain, scanner, and starfield visuals",
       "coverage": "sprite_visuals",
       "accepted_axis": "visual",
-      "min_reports": 21
+      "min_reports": 22
     },
     {
       "name": "player laser visual shape, span, fizzle, tip, and endpoint",
@@ -34,13 +34,13 @@
       "name": "terrain-blow explosion visuals",
       "coverage": "terrain_blow_visual",
       "accepted_axis": "visual",
-      "min_reports": 1
+      "min_reports": 2
     },
     {
       "name": "terrain-blow sound command and waveform",
       "coverage": "terrain_blow_audio",
       "accepted_axis": "audio",
-      "min_reports": 1
+      "min_reports": 2
     },
     {
       "name": "materialization and pixel coalescence visuals",
@@ -52,7 +52,7 @@
       "name": "gameplay sound command timing and waveform families",
       "coverage": "gameplay_audio",
       "accepted_axis": "audio",
-      "min_reports": 22
+      "min_reports": 23
     },
     {
       "name": "thrust and background audio",
@@ -82,13 +82,13 @@
       "name": "core controls and playability",
       "coverage": "playability",
       "accepted_axis": "all",
-      "min_reports": 16
+      "min_reports": 17
     },
     {
       "name": "rescue, landing, and human-loss behavior",
       "coverage": "rescue_loss",
       "accepted_axis": "all",
-      "min_reports": 3
+      "min_reports": 4
     },
     {
       "name": "death, respawn, game-over, and attract return behavior",
@@ -113,6 +113,12 @@
       "coverage": "organic_non_lander_visual",
       "accepted_axis": "visual",
       "min_reports": 3
+    },
+    {
+      "name": "organic last-human terrain-blow gameplay",
+      "coverage": "organic_terrain_blow",
+      "accepted_axis": "all",
+      "min_reports": 1
     }
   ],
   "reports": [
@@ -326,6 +332,20 @@
         "terrain_blow_audio",
         "gameplay_audio",
         "playability"
+      ]
+    },
+    {
+      "name": "organic terrain-blow smartmix",
+      "path": "target/reference-media/organic-terrain-blow-smartmix-check/report.json",
+      "acceptance_mode": "all",
+      "coverage": [
+        "sprite_visuals",
+        "terrain_blow_visual",
+        "terrain_blow_audio",
+        "gameplay_audio",
+        "playability",
+        "rescue_loss",
+        "organic_terrain_blow"
       ]
     },
     {

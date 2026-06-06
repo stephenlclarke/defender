@@ -63,18 +63,19 @@ from these perspectives:
 - Reference report closure gate:
   `docs/fidelity/reference-report-gate.json` lists the accepted media reports
   and expected acceptance modes; `make reference-report-gate` currently passes
-  for `27` local reports: `20` full visual/audio reports, `4` audio-only
-  reports, and `3` visual-only reports. The same manifest now enforces `19`
+  for `28` local reports: `21` full visual/audio reports, `4` audio-only
+  reports, and `3` visual-only reports. The same manifest now enforces `20`
   semantic coverage requirements for the objective facets named in this audit:
   sprite visuals, player laser visual/audio, reverse orientation, explosion and
   coalescence visuals, terrain blow, gameplay audio families, non-lander audio
   and visuals, playability, rescue/loss, death/respawn, smart bomb,
-  hyperspace, and organic non-lander presentation. Each coverage requirement
-  now includes a `min_reports` breadth floor matching the current accepted
-  proof set for that facet, and the manifest loader rejects duplicate report
-  names, duplicate report paths, duplicate per-report coverage tags, and
-  duplicate coverage/axis requirement rows. Every manifest report row and local
-  accepted `report.json` file must declare an explicit matching
+  hyperspace, organic non-lander presentation, and organic last-human
+  terrain-blow gameplay. Each coverage requirement now includes a `min_reports`
+  breadth floor matching the current accepted proof set for that facet, and the
+  manifest loader rejects duplicate report names, duplicate report paths,
+  duplicate per-report coverage tags, and duplicate coverage/axis requirement
+  rows. Every manifest report row and local accepted `report.json` file must
+  declare an explicit matching
   `acceptance_mode`; each report coverage tag must be non-empty, declared by a
   semantic requirement, and compatible with the report's visual/audio/all
   acceptance mode. Manifest report paths must stay under
@@ -85,18 +86,19 @@ from these perspectives:
   be clean GIF captures, and accepted audio artifacts must be WAV files. The
   gate also verifies the local reference and clean candidate media files
   required by each accepted visual or audio axis; the current signoff summary
-  counts `94` required media artifacts and requires each one to be non-empty.
+  counts `98` required media artifacts and requires each one to be non-empty.
   Accepted visual axes must also report positive reference, candidate, and
   compared frame counts, and accepted audio axes must report positive
   reference, candidate, and compared sample counts. Accepted axes must not
   carry stale verifier `failures` entries.
-  A `2026-05-29 15:57 BST` report-inventory triage checked `99` local
-  `target/reference-media/**/report.json` files: `27` are accepted by the
-  manifest and `72` are unaccepted probe or historical reports. Ten unaccepted
-  reports currently have top-level `pass` status, but each is an offset/probe
-  duplicate of already accepted fire/reverse, smart-bomb, terrain-blow,
-  materialization-matrix, or down030 laser media. None was promoted because it
-  would not add a new bounded proof boundary beyond the accepted report set.
+  A `2026-06-06` report-inventory triage checked `192` local
+  `target/reference-media/**/report.json` files: `28` are accepted by the
+  manifest and `164` are unaccepted probe or historical reports. Ten
+  unaccepted reports currently have top-level `pass` status, but each is an
+  offset/probe duplicate of already accepted fire/reverse, smart-bomb,
+  terrain-blow, materialization-matrix, or down030 laser media. None was
+  promoted because it would not add a new bounded proof boundary beyond the
+  accepted report set.
   Status: proven locally for the current accepted report and coverage set.
 - Owner-review proof summary:
   `make reference-signoff-summary` validates the same accepted report manifest
@@ -202,15 +204,18 @@ from these perspectives:
   process in `organic_fire_smartbomb_mix_12000.debug.tsv` and
   `organic-terrain-blow-smartmix.debug.tsv`.
   Status: the scan is now a positive organic terrain-blow evidence source.
-  The accepted state-steered terrain-blow report remains green, but the
-  organic smartmix probe is still unaccepted. The current clean candidate now
-  reaches score `50`, keeps human snapshots empty, arms the destroyed-planet
-  state while preserving visible terrain, projects the six-lander/nine-mutant
-  residual object formation from the first compared frame, renders the live
-  scanner mini-terrain from source `MTERR` records while terrain is still
-  armed, starts visible terrain-blow explosions only at the organic post-game
-  `TERBLO` boundary, and emits the sampled `0xEE` cadence, but the regenerated
-  all-axis report still fails visual placement and audio waveform thresholds.
+  The accepted state-steered terrain-blow report remains green, and the organic
+  smartmix probe is now accepted as an all-axis organic last-human
+  terrain-blow proof. The current clean candidate reaches score `50`, keeps
+  human snapshots empty, arms the destroyed-planet state while preserving
+  visible terrain, projects the six-lander/nine-mutant residual object
+  formation from the first compared frame, renders the live scanner
+  mini-terrain from source `MTERR` records while terrain is still armed, starts
+  visible terrain-blow explosions only at the organic post-game `TERBLO`
+  boundary, emits the sampled `0xEE` cadence, and overlays only the
+  MAME-visible terminal flash windows. The regenerated all-axis report passes
+  with visual RMS `23.11`, visual MAE `3.42`, and audio envelope correlation
+  `0.4431`.
 - Laser/reverse implementation coverage:
   focused tests cover source-style sparse laser sprites, `LASP1` object
   evidence, far-side enemy collision before culling, capped-fire sound
@@ -379,37 +384,34 @@ complete without owner review or more MAME evidence:
   gap is bounded MAME media breadth, not a known static-sprite implementation
   path.
 - Organic last-human terrain-blow gameplay. The state-steered terrain blow
-  proves the routine window, and the latest scan now has organic evidence for
-  the last-human `TERBLO` branch. The bounded organic smartmix report at
+  proves the routine window, and the latest scan has organic evidence for the
+  last-human `TERBLO` branch. The bounded organic smartmix report at
   `target/reference-media/organic-terrain-blow-smartmix-check/report.json`
-  still fails all-axis acceptance. The stale clean state mismatch is repaired:
-  current clean reaches score `50`, enters terrain blow, keeps clean human
+  now passes all-axis acceptance and is part of the accepted report gate.
+  Current clean reaches score `50`, enters terrain blow, keeps clean human
   snapshots empty once the destroyed-planet branch is active, preserves the
   visible terrain while the source `TERBLO` process is armed, starts visible
   `TEREX` terrain explosions at post-game frame `1044`, projects the
   MAME-observed six-lander/nine-mutant residual object mix from state frame
   `5960` through the sampled terminal rows, renders source `MTERR`
-  mini-terrain in the live scanner until terrain erase, and emits the sampled
-  `0xEE` tail. The remaining implementation gap is all-axis media fidelity for
-  that organic branch: current regenerated metrics are visual RMS `90.88` /
-  MAE `42.76` against thresholds `38.00` / `28.00`, scanner RMS `99.90`, and
-  audio still fails waveform correlation despite nonzero clean terrain-blow
-  audio (`normalized_diff_rms=1.726`, `correlation=-0.005`,
-  `envelope_correlation=0.137`).
+  mini-terrain in the live scanner until terrain erase, emits the sampled
+  `0xEE` tail, and matches the terminal flash windows. The accepted report
+  metrics are visual RMS `23.11`, MAE `3.42`, scanner RMS `32.07`, and audio
+  envelope correlation `0.4431`.
 - Owner review of graphics, audio, and playability. `PLAN.md` still requires
   owner signoff before protected reference media replacement and final closure.
 
 ## Owner Review Checklist
 
-The release gate and accepted reports are green, but final closure still
-requires owner review of the bounded proof set plus regeneration and review of
-the organic smartmix terrain-blow report. Use this checklist for that review:
+The accepted reports are green, including the organic smartmix terrain-blow
+report, but final closure still requires owner review of the bounded proof set
+and a fresh full release-gate run. Use this checklist for that review:
 
 - Review the current accepted media report set in
   `docs/fidelity/reference-report-gate.json`; it is the bounded MAME-vs-clean
   evidence set for sprite visuals, lasers, explosions, coalescence, audio
-  families, controls, rescue/loss, death/respawn, smart bomb, hyperspace, and
-  non-lander coverage.
+  families, controls, rescue/loss, death/respawn, smart bomb, hyperspace,
+  non-lander coverage, and organic last-human terrain blow.
 - Generate and review `target/reference-media/reference-signoff-summary.md`
   with `make owner-review-package`; it is the deterministic coverage and
   metric matrix derived from the accepted manifest, local report JSON files,
@@ -424,7 +426,8 @@ the organic smartmix terrain-blow report. Use this checklist for that review:
   laser-hit, centered first laser-hit, non-lander target6, pickup/pull,
   catch, safe-landing, terrain-blow, enemy-explosion matrix,
   enemy-materialization matrix, live laser-hit materialization, isolated
-  non-lander sound-command, and organic non-lander reports.
+  non-lander sound-command, organic non-lander reports, and the organic
+  terrain-blow smartmix report.
 - Confirm that the remaining proof boundaries below are acceptable for release,
   or provide a new concrete MAME clip/input program showing a mismatch outside
   the accepted windows.
@@ -434,11 +437,12 @@ the organic smartmix terrain-blow report. Use this checklist for that review:
 
 ## Current Conclusion
 
-The implementation is release-gate green and all accepted bounded media targets
-pass, including the down030 post-death all-axis laser/materialize window. The
-enemy materialization matrix now also passes as a bounded visual proof for
-source coalescence across lander, mutant, bomber, pod, baiter, and swarmer
-families. The active goal is not yet proven complete because proof boundaries
-and owner review remain. New work should either address another coverage
-boundary with a bounded MAME-vs-clean clip or record owner acceptance that the
-current accepted clips are sufficient for release closure.
+All accepted bounded media targets pass, including the down030 post-death
+all-axis laser/materialize window and the organic smartmix last-human
+terrain-blow window. The enemy materialization matrix also passes as a bounded
+visual proof for source coalescence across lander, mutant, bomber, pod, baiter,
+and swarmer families. The active goal is not yet proven complete because a
+fresh full release-gate run and owner review remain. New work should either
+address another coverage boundary with a bounded MAME-vs-clean clip or record
+owner acceptance that the current accepted clips are sufficient for release
+closure.

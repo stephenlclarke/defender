@@ -89,11 +89,10 @@ owner-review package, accepted report gate, MAME doctor, MAME smoke recorder,
 README media generation, game smoke, actor smoke gates, live smoke, docs lint,
 and diff hygiene.
 
-The accepted gate is still green, but final closure is no longer only an
-owner-review decision. A fresh organic smart-bomb/up-thrust search found a
-concrete last-human terrain-blow MAME candidate outside the accepted evidence
-windows; the current clean candidate is silent and visually divergent. The
-probe and review checklist are tracked in
+The accepted gate is green, including the repaired organic smartmix
+terrain-blow clip. Final closure still requires owner review of the bounded
+proof set plus a fresh full release-gate run after the actor rewrite slices.
+The proof boundaries and review checklist are tracked in
 `docs/fidelity/release-closure-audit.md`.
 
 Post-R9 non-rewrite follow-ups are evidence and polish items, not active R9
