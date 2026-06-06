@@ -887,6 +887,20 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-06 04:14 BST`: Completed the routine CI actor-smoke hardening
+  cycle. `make ci` now routes through `make ci-smoke`, and `make ci-smoke`
+  runs both the clean live-smoke path and the actor offscreen `wgpu` smoke
+  path. GitHub Actions now runs `xvfb-run -a make ci-smoke`, and the public
+  API drift guard asserts the Makefile and workflow wiring so routine CI
+  cannot silently fall back to the clean-only smoke path. README and SPEC now
+  describe the clean-plus-actor CI smoke boundary. Validation passed with
+  `cargo fmt --check`, the focused
+  `public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters` guard
+  under `legacy-tools`, `make -n ci`, `make -n ci-smoke`, and `make ci-smoke`.
+  The actor smoke reported `frame_source: actor_game`, `192` actor frames,
+  `192` nonblank offscreen frames, and zero temporary raster commands. Slack
+  cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780715421136319`.
 - `2026-06-06 04:08 BST`: Completed the owner-review closure-audit sync cycle.
   `docs/fidelity/release-closure-audit.md` now marks the current hardened
   actor-era release gate as locally proven instead of pending a fresh run after

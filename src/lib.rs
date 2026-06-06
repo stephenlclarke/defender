@@ -433,12 +433,16 @@ mod public_api_tests {
         assert!(runtime_rs.contains("RuntimeCommand::FidelityScenarioInputWriter"));
 
         let makefile = include_str!("../Makefile");
+        assert!(makefile.contains("ci: fidelity ci-smoke"));
+        assert!(makefile.contains("ci-smoke: smoke-wgpu actor-wgpu-smoke"));
         assert!(makefile.contains("actor-smoke:"));
         assert!(makefile.contains("actor-wgpu-smoke:"));
         assert!(makefile.contains("$(MAKE) actor-smoke"));
         assert!(makefile.contains("$(MAKE) actor-wgpu-smoke"));
         assert!(makefile.contains("cargo run -- --actor-smoke"));
         assert!(makefile.contains("cargo run -- --actor-wgpu-smoke"));
+        let ci_workflow = include_str!("../.github/workflows/ci.yml");
+        assert!(ci_workflow.contains("xvfb-run -a make ci-smoke"));
         assert!(runtime_rs.contains("pub(crate) fn help_text()"));
         assert!(runtime_rs.contains("pub(crate) fn run_rom_report"));
         assert!(runtime_rs.contains("pub(crate) fn run_verify_roms"));

@@ -754,11 +754,11 @@ qualifying final-life post-game path, including high-score initials, the
 `make coverage-new-code` requires an explicit base and subtracts the accepted
 uncovered-line baseline in `tools/new_rust_coverage_baseline.txt`; refresh that
 baseline only when intentionally accepting existing uncovered debt. `make ci`
-adds the `wgpu` live smoke test. GitHub CI runs `make ci-doctor`, then
-`make fidelity`, then `xvfb-run -a make smoke-wgpu` so prerequisite, fidelity,
-coverage, and smoke failures are separated in the Actions UI. The
-`make smoke-doctor` target is Linux CI-oriented and expects `xvfb-run` plus
-`vulkaninfo`.
+adds the clean and actor offscreen `wgpu` smoke tests through `make ci-smoke`.
+GitHub CI runs `make ci-doctor`, then `make fidelity`, then
+`xvfb-run -a make ci-smoke` so prerequisite, fidelity, coverage, and smoke
+failures are separated in the Actions UI. The `make smoke-doctor` target is
+Linux CI-oriented and expects `xvfb-run` plus `vulkaninfo`.
 Slack completion notes are a best-effort project protocol outside CI; connector
 or token failures should be handled as Slack tooling failures, not Rust
 validation failures.

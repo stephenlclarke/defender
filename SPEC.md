@@ -1001,9 +1001,10 @@ Set `SCENARIOS="..."` to narrow the gate during focused implementation steps.
 
 GitHub CI keeps the expensive gates split by subsystem: `make ci-doctor`
 checks Lua, Python, coverage, and Linux smoke prerequisites; `make fidelity`
-runs the Rust, trace, and coverage gate; and `xvfb-run -a make smoke-wgpu`
-runs the no-device live smoke path. Coverage baseline refreshes must use the
-explicit `make coverage-new-code-baseline NEW_CODE_COVERAGE_BASE=...` command.
+runs the Rust, trace, and coverage gate; and `xvfb-run -a make ci-smoke` runs
+both clean and actor no-device offscreen `wgpu` smoke paths. Coverage baseline
+refreshes must use the explicit
+`make coverage-new-code-baseline NEW_CODE_COVERAGE_BASE=...` command.
 
 ## Active Constraints
 

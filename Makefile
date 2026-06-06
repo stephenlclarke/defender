@@ -1,4 +1,4 @@
-.PHONY: fmt test legacy-tools-test clippy legacy-tools-clippy fidelity release-gate clean-fidelity ci ci-doctor trace-doctor coverage-doctor smoke-doctor reference-media-doctor reference-mame-doctor trace-script-test media-script-test trace-fixtures reference-inputs reference-traces reference-fixtures-check reference-media-fetch reference-mame-capture reference-mame-smoke reference-clean-capture reference-window-scan reference-window-scan-organic reference-report-gate reference-signoff-summary reference-evidence-package owner-review-package reference-media-check coverage coverage-new-code coverage-new-code-baseline sq sq-ci sonar run run-wgpu live live-wgpu smoke-wgpu game-smoke actor-smoke actor-attract-smoke actor-post-game-smoke actor-wgpu-smoke live-smoke docs-lint diff-check readme-media
+.PHONY: fmt test legacy-tools-test clippy legacy-tools-clippy fidelity release-gate clean-fidelity ci ci-smoke ci-doctor trace-doctor coverage-doctor smoke-doctor reference-media-doctor reference-mame-doctor trace-script-test media-script-test trace-fixtures reference-inputs reference-traces reference-fixtures-check reference-media-fetch reference-mame-capture reference-mame-smoke reference-clean-capture reference-window-scan reference-window-scan-organic reference-report-gate reference-signoff-summary reference-evidence-package owner-review-package reference-media-check coverage coverage-new-code coverage-new-code-baseline sq sq-ci sonar run run-wgpu live live-wgpu smoke-wgpu game-smoke actor-smoke actor-attract-smoke actor-post-game-smoke actor-wgpu-smoke live-smoke docs-lint diff-check readme-media
 
 SONAR_SCANNER ?= sonar-scanner
 SONAR_ARGS ?= -Dsonar.qualitygate.wait=true
@@ -112,7 +112,9 @@ release-gate:
 clean-fidelity:
 	CLEAN_FIDELITY_SCENARIOS="$(SCENARIOS)" cargo test --lib --features legacy-tools clean_fidelity_reports_selected_scenarios -- --ignored --nocapture
 
-ci: fidelity smoke-wgpu
+ci: fidelity ci-smoke
+
+ci-smoke: smoke-wgpu actor-wgpu-smoke
 
 ci-doctor: trace-doctor coverage-doctor smoke-doctor
 
