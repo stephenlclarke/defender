@@ -54,9 +54,10 @@ verification tools.
   clean-game smoke path. `--actor-script-check <path>` now runs the same parser
   and runtime constructor headlessly, samples the first attract actor step,
   credits/starts the actor runtime through the first playable wave, and reports
-  manifest, first-frame, effective source-wave, and spawned world counts.
-  `examples/actor-custom-attract.script` provides a checked editable starting
-  point. The built-in actor attract, behavior, and
+  manifest, first-frame, effective source-wave, spawned world counts, and the
+  effective first-play behavior profile actors receive for movement/damage/fire
+  tuning. `examples/actor-custom-attract.script` provides a checked editable
+  starting point. The built-in actor attract, behavior, and
   wave scripts are embedded from
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and
@@ -931,6 +932,30 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 07:28 BST`: Completed the actor script effective-behavior
+  checker cycle. `--actor-script-check <path>` now derives a first-play
+  behavior summary from the same effective `StepReport::behavior_script` actors
+  receive after credit/start reaches the first playable wave. The report prints
+  player damage/cooldown, first lander movement/fire tuning, hostile family
+  movement modes, and swarmer/baiter fire periods alongside the existing
+  manifest and source/world counts. The focused regression proves a sectioned
+  custom-driver script can tune player damage, laser cooldown, wave-local
+  hostile modes, swarmer/baiter cadence, and a spawn-index lander override, and
+  that the headless checker reports those runtime-effective values before live
+  launch. No legacy code, tests, or scaffolding were safe to remove because this
+  slice hardens the active script-authoring gate. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780727063534209>.
+  Validation passed with `cargo fmt --check`, `cargo test actor_script_check
+  --all-targets --features legacy-tools`, `cargo test actor_script
+  --all-targets --features legacy-tools`, `cargo run --quiet --features
+  legacy-tools -- --actor-script-check examples/actor-custom-attract.script`,
+  `cargo test actor_live --all-targets --features legacy-tools`, `cargo test
+  actor_game --all-targets --features legacy-tools`, `cargo check
+  --all-targets --features legacy-tools`, `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`, `make actor-smoke`, `make
+  actor-wgpu-smoke`, `markdownlint README.md SPEC.md PLAN.md
+  docs/actor-architecture.md`, and `git diff --check`.
 
 - `2026-06-06 07:16 BST`: Completed the actor script gameplay-start checker
   cycle. `--actor-script-check <path>` still parses the sectioned custom-driver

@@ -89,7 +89,7 @@ evidence commands.
   runtime constructor headlessly, samples the first attract actor step, then
   credits/starts the actor runtime through the first playable wave and prints
   attract/behavior/wave manifest counts plus first-frame, effective source-wave,
-  and spawned world counts. The checked
+  spawned world, and first-play behavior summaries. The checked
   `examples/actor-custom-attract.script` file is the editable smoke-tested
   example. The shared live input state carries the same key
   bindings and `XYZZY` mode into actor steps. Actor high-score entry now
@@ -250,7 +250,8 @@ and can be launched directly with `ActorRuntimeAdapter::with_scripts` for
 custom-driver runtime smoke tests or through `--actor-script <path>` in the
 interactive actor live runtime. `--actor-script-check <path>` runs the same
 file-backed path without opening the window and reports the parsed script
-surface plus the first actor frame.
+surface, first attract actor frame, first playable wave counts, and effective
+first-play behavior profile that actors receive through `StepReport`.
 
 `AttractScript::manifest`, `ActorBehaviorScript::manifest`,
 `ActorWaveScript::manifest`, `ActorDriverScripts::manifest`, and
