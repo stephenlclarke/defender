@@ -138,9 +138,12 @@ per-wave behavior updates, and `lander` / `bomber` / `pod` / `mutant` /
 profiles that become actor-id profiles after the driver allocates those wave
 actors. `behavior_preset` definitions can be applied with `use_behavior` for
 one wave or `use_behavior_waves` for an existing wave range; `behavior_waves`
-and `spawn_behavior_waves` apply direct movement/fire/damage and spawn-index
-behavior updates across an existing wave range, so custom drivers can tune a
-whole progression band without repeating wave blocks. `source_wave <wave>` and
+applies direct movement/fire/damage updates across an existing wave range.
+`spawn_behavior_preset` definitions can be applied with `use_spawn_behavior`
+or `use_spawn_behavior_waves`, while `spawn_behavior_waves` applies direct
+spawn-index behavior updates across an existing wave range, so custom drivers
+can tune a whole progression band and specific actor slots without repeating
+wave blocks. `source_wave <wave>` and
 `source_waves <first> <last>` lines can also override individual source profile
 fields, letting custom drivers keep source-shaped allocation, movement, shots,
 baiter timing, and mutant hop behavior while tuning the counts and constants

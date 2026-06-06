@@ -327,9 +327,10 @@ player velocity into the source-shaped seek velocity.
 name hard opening
 behavior_preset hard_lander kind lander lander_mode chase_player
 behavior_preset hard_lander kind lander lander_seek_speed 7
+spawn_behavior_preset fast_slot lander_seek_speed 9
 wave 1
 use_behavior hard_lander
-spawn_behavior lander 0 lander_seek_speed 8
+use_spawn_behavior lander 0 fast_slot
 lander 80 96
 human 40 214
 wave 2
@@ -345,7 +346,8 @@ reserve 4 1 0
 source_waves 3 16
 use_behavior_waves 3 16 hard_lander
 behavior_waves 3 16 kind baiter baiter_fire_period_steps 30
-spawn_behavior_waves 3 16 lander 0 lander_seek_speed 9
+use_spawn_behavior_waves 3 16 lander 0 fast_slot
+spawn_behavior_waves 3 16 baiter 0 baiter_fire_period_steps 24
 source_wave 17 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1
 source_waves 18 20 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1
 ```
@@ -366,13 +368,19 @@ profiles they are tuning.
 actor before the driver has allocated its runtime actor id. They inherit the
 current wave/kind behavior at the point where the line is parsed and are then
 installed as actor-id behavior profiles when that spawn index is allocated.
+`spawn_behavior_preset <name> <field> <value>` stores a reusable spawn-index
+profile-field update, and repeated lines append to that preset.
+`use_spawn_behavior <kind> <index> <name>` applies that preset to one
+spawn-index profile in the current wave.
 Indices are per actor kind and advance across the whole wave allocation stream:
 initial wave spawns consume the first indices, then source reserve/refill
 spawns, pod-created swarmers, baiters, and other command-applied later hostile
 spawns consume subsequent same-kind indices. This lets custom progression
 scripts tune a specific restored actor without changing the actor struct.
 `spawn_behavior_waves <first> <last> <kind> <index> <field> <value>` applies
-the same spawn-index profile update across an existing wave range.
+the same direct spawn-index profile update across an existing wave range.
+`use_spawn_behavior_waves <first> <last> <kind> <index> <name>` applies a
+spawn behavior preset across an existing wave range.
 `lander`, `bomber`, `pod`, `mutant`, `swarmer`, `baiter`, and `human` lines add
 clean scripted spawn records; humans default to `grounded` and can also be
 declared as `falling <velocity>` or `carried <actor-id>`. The compatible

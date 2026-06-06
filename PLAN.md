@@ -79,7 +79,10 @@ verification tools.
   across existing source-backed progression bands. They can also define named
   checked behavior presets and apply them to one wave or an existing wave
   range, so custom drivers can reuse difficulty blocks while preserving
-  source-backed wave motion unless explicitly overridden. Default actor wave
+  source-backed wave motion unless explicitly overridden. Spawn-index behavior
+  can use named presets too, so custom drivers can reuse the same specific
+  actor-slot tuning across source reserve/refill progression without repeating
+  field lines. Default actor wave
   progression expands the checked wave script through
   `assets/red-label/wave-table.tsv` for active wave size, lander and bomber
   speed, lander fire cadence, source bomber/pod/direct-mutant/swarmer counts,
@@ -904,6 +907,43 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 05:41 BST`: Completed the actor spawn behavior preset scripting
+  cycle. Checked wave scripts now accept
+  `spawn_behavior_preset <name> <field> <value...>` definitions,
+  `use_spawn_behavior <kind> <index> <name>` for the current wave, and
+  `use_spawn_behavior_waves <first> <last> <kind> <index> <name>` for existing
+  wave ranges. Spawn presets are validated through the same behavior-profile
+  field parser as direct `spawn_behavior` lines, append repeated update lines
+  to one named block, and replay onto spawn-index behavior profiles without
+  resetting inherited wave/source behavior unless the preset explicitly changes
+  those fields. Undefined spawn preset uses are rejected with source line
+  numbers. Added focused parser/manifest regressions for current-wave and range
+  preset use, source-backed behavior preservation, actor-id behavior
+  installation after spawn allocation, undefined preset errors, and preset
+  validation errors. README, SPEC, `assets/red-label/README.md`, and the actor
+  architecture guide now document the spawn preset contract. No legacy code,
+  tests, or scaffolding were safe to remove in this slice because the changed
+  surface is the active actor wave parser and its custom-driver documentation.
+  Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780720541464139>.
+  Validation passed with `cargo test
+  parsed_wave_script_applies_spawn_behavior_presets_to_current_and_range_profiles
+  --lib --features legacy-tools`, `cargo test
+  parsed_wave_script_applies_spawn_behavior_preset_after_actor_allocation --lib
+  --features legacy-tools`, `cargo test
+  parsed_wave_script_reports_unknown_spawn_behavior_presets --lib --features
+  legacy-tools`, `cargo test wave_script_text_parser_reports_line_errors --lib
+  --features legacy-tools`, `cargo test wave_script --lib --features
+  legacy-tools`, `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`, `cargo test
+  actor_live --all-targets --features legacy-tools`, `cargo check
+  --all-targets --features legacy-tools`, `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`, `make actor-smoke`, `make
+  actor-wgpu-smoke` with `frame_source: actor_game`, `cargo fmt --check`,
+  `markdownlint README.md SPEC.md PLAN.md docs/actor-architecture.md
+  docs/fidelity/mame-golden-clips.md docs/fidelity/release-closure-audit.md
+  assets/sounds/README.md assets/red-label/README.md`, and `git diff --check`.
 
 - `2026-06-06 05:29 BST`: Completed the actor wave behavior preset scripting
   cycle. Checked wave scripts now accept

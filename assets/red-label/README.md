@@ -51,7 +51,9 @@ Current files:
   source-profile field overrides to `source_wave` or `source_waves` lines while
   still using the same source-shaped actor allocation and movement path, and
   can use `behavior_preset` plus `use_behavior` / `use_behavior_waves` or
-  direct `behavior_waves` / `spawn_behavior_waves` updates to tune movement and
+  `spawn_behavior_preset` plus `use_spawn_behavior` /
+  `use_spawn_behavior_waves`, with direct `behavior_waves` /
+  `spawn_behavior_waves` updates still available, to tune movement and
   spawn-index behavior across existing wave ranges.
 - `audit-adjustments.tsv`: red-label `romc8.src` `AUDITG` / `MSGAUD`
   operator audit and adjustment message table, including the source CMOS cell

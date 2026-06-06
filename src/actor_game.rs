@@ -3600,6 +3600,7 @@ struct ParsedActorWaveScript {
     name: String,
     waves: Vec<ParsedActorWaveProfile>,
     behavior_presets: BTreeMap<String, Vec<ParsedBehaviorPresetUpdate>>,
+    spawn_behavior_presets: BTreeMap<String, Vec<ParsedSpawnBehaviorPresetUpdate>>,
 }
 
 impl ParsedActorWaveScript {
@@ -3608,6 +3609,7 @@ impl ParsedActorWaveScript {
             name: "parsed-wave-script".to_string(),
             waves: Vec::new(),
             behavior_presets: BTreeMap::new(),
+            spawn_behavior_presets: BTreeMap::new(),
         }
     }
 
@@ -3642,6 +3644,14 @@ impl ParsedActorWaveScript {
                     ));
                 }
                 self.define_behavior_preset(line_number, name, behavior_line)
+            }
+            "spawn_behavior_preset" | "spawn_behaviour_preset" => {
+                let name = parse_wave_behavior_preset_name(line_number, parts.next())?;
+                let field = parts.next().ok_or_else(|| {
+                    ActorWaveScriptParseError::new(line_number, "missing behavior field")
+                })?;
+                let values = parts.collect::<Vec<_>>();
+                self.define_spawn_behavior_preset(line_number, name, field, &values)
             }
             "wave" => {
                 let wave = parse_wave_u16(line_number, parts.next(), "wave")?;
@@ -3740,6 +3750,21 @@ impl ParsedActorWaveScript {
                 apply_behavior_profile_field(line_number, profile, field, &values)
                     .map_err(|error| ActorWaveScriptParseError::new(error.line, error.message))
             }
+            "use_spawn_behavior"
+            | "use_spawn_behaviour"
+            | "apply_spawn_behavior_preset"
+            | "apply_spawn_behaviour_preset" => {
+                let kind = parse_wave_actor_kind(line_number, parts.next())?;
+                let spawn_index = parse_wave_usize(line_number, parts.next(), "spawn index")?;
+                let name = parse_wave_behavior_preset_name(line_number, parts.next())?;
+                reject_extra_wave_fields(line_number, parts)?;
+                self.apply_spawn_behavior_preset_to_current_wave(
+                    line_number,
+                    kind,
+                    spawn_index,
+                    &name,
+                )
+            }
             "spawn_behavior_waves"
             | "spawn_behaviour_waves"
             | "spawn_behavior_range"
@@ -3762,6 +3787,25 @@ impl ParsedActorWaveScript {
                         field,
                         values: &values,
                     },
+                )
+            }
+            "use_spawn_behavior_waves"
+            | "use_spawn_behaviour_waves"
+            | "spawn_behavior_preset_waves"
+            | "spawn_behaviour_preset_waves" => {
+                let first = parse_wave_u16(line_number, parts.next(), "first wave")?.max(1);
+                let last = parse_wave_u16(line_number, parts.next(), "last wave")?.max(1);
+                let kind = parse_wave_actor_kind(line_number, parts.next())?;
+                let spawn_index = parse_wave_usize(line_number, parts.next(), "spawn index")?;
+                let name = parse_wave_behavior_preset_name(line_number, parts.next())?;
+                reject_extra_wave_fields(line_number, parts)?;
+                self.apply_spawn_behavior_preset_to_wave_range(
+                    line_number,
+                    first,
+                    last,
+                    kind,
+                    spawn_index,
+                    &name,
                 )
             }
             "lander" => {
@@ -3862,6 +3906,26 @@ impl ParsedActorWaveScript {
         }
     }
 
+    fn define_spawn_behavior_preset(
+        &mut self,
+        line_number: usize,
+        name: String,
+        field: &str,
+        values: &[&str],
+    ) -> Result<(), ActorWaveScriptParseError> {
+        let mut validation = ActorBehaviorProfile::default();
+        apply_behavior_profile_field(line_number, &mut validation, field, values)
+            .map_err(|error| ActorWaveScriptParseError::new(error.line, error.message))?;
+        self.spawn_behavior_presets.entry(name).or_default().push(
+            ParsedSpawnBehaviorPresetUpdate {
+                line_number,
+                field: field.to_string(),
+                values: values.iter().map(|value| (*value).to_string()).collect(),
+            },
+        );
+        Ok(())
+    }
+
     fn define_behavior_preset(
         &mut self,
         line_number: usize,
@@ -3891,6 +3955,22 @@ impl ParsedActorWaveScript {
         })
     }
 
+    fn spawn_behavior_preset_updates(
+        &self,
+        line_number: usize,
+        name: &str,
+    ) -> Result<Vec<ParsedSpawnBehaviorPresetUpdate>, ActorWaveScriptParseError> {
+        self.spawn_behavior_presets
+            .get(name)
+            .cloned()
+            .ok_or_else(|| {
+                ActorWaveScriptParseError::new(
+                    line_number,
+                    format!("unknown spawn behavior preset `{name}`"),
+                )
+            })
+    }
+
     fn apply_behavior_preset_to_current_wave(
         &mut self,
         line_number: usize,
@@ -3899,6 +3979,20 @@ impl ParsedActorWaveScript {
         let updates = self.behavior_preset_updates(line_number, name)?;
         let profile = self.current_profile_mut(line_number)?;
         apply_behavior_preset_updates(&updates, &mut profile.behavior_script)
+    }
+
+    fn apply_spawn_behavior_preset_to_current_wave(
+        &mut self,
+        line_number: usize,
+        kind: ActorKind,
+        spawn_index: usize,
+        name: &str,
+    ) -> Result<(), ActorWaveScriptParseError> {
+        let updates = self.spawn_behavior_preset_updates(line_number, name)?;
+        let profile = self
+            .current_profile_mut(line_number)?
+            .spawn_behavior_profile_mut(kind, spawn_index);
+        apply_spawn_behavior_preset_updates(&updates, profile)
     }
 
     fn current_profile_mut(
@@ -4010,6 +4104,26 @@ impl ParsedActorWaveScript {
         Ok(())
     }
 
+    fn apply_spawn_behavior_preset_to_wave_range(
+        &mut self,
+        line_number: usize,
+        first: u16,
+        last: u16,
+        kind: ActorKind,
+        spawn_index: usize,
+        name: &str,
+    ) -> Result<(), ActorWaveScriptParseError> {
+        Self::validate_wave_range(line_number, first, last, "spawn behavior preset wave")?;
+        let updates = self.spawn_behavior_preset_updates(line_number, name)?;
+        for wave in first..=last {
+            let profile = self
+                .profile_for_wave_mut(line_number, wave)?
+                .spawn_behavior_profile_mut(kind, spawn_index);
+            apply_spawn_behavior_preset_updates(&updates, profile)?;
+        }
+        Ok(())
+    }
+
     fn finish(self) -> Result<ActorWaveScript, ActorWaveScriptParseError> {
         if self.waves.is_empty() {
             return Err(ActorWaveScriptParseError::new(
@@ -4031,6 +4145,13 @@ impl ParsedActorWaveScript {
 struct ParsedBehaviorPresetUpdate {
     line_number: usize,
     line: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ParsedSpawnBehaviorPresetUpdate {
+    line_number: usize,
+    field: String,
+    values: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -4141,6 +4262,18 @@ fn apply_behavior_preset_updates(
 ) -> Result<(), ActorWaveScriptParseError> {
     for update in updates {
         parse_behavior_script_line(update.line_number, &update.line, behavior_script)
+            .map_err(|error| ActorWaveScriptParseError::new(error.line, error.message))?;
+    }
+    Ok(())
+}
+
+fn apply_spawn_behavior_preset_updates(
+    updates: &[ParsedSpawnBehaviorPresetUpdate],
+    behavior_profile: &mut ActorBehaviorProfile,
+) -> Result<(), ActorWaveScriptParseError> {
+    for update in updates {
+        let values = update.values.iter().map(String::as_str).collect::<Vec<_>>();
+        apply_behavior_profile_field(update.line_number, behavior_profile, &update.field, &values)
             .map_err(|error| ActorWaveScriptParseError::new(error.line, error.message))?;
     }
     Ok(())
@@ -23149,6 +23282,122 @@ mod tests {
     }
 
     #[test]
+    fn parsed_wave_script_applies_spawn_behavior_presets_to_current_and_range_profiles() {
+        let wave_script = concat!(
+            "name spawn preset behavior\n",
+            "spawn_behavior_preset fast_slot lander_mode chase_player\n",
+            "spawn_behavior_preset fast_slot lander_seek_speed 9\n",
+            "source_waves 1 2 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
+            "use_spawn_behavior_waves 1 2 lander 0 fast_slot\n",
+            "wave 3\n",
+            "behavior kind lander lander_mode drift\n",
+            "behavior kind lander lander_drift_speed 4\n",
+            "use_spawn_behavior lander 1 fast_slot\n",
+            "lander 80 214\n",
+            "lander 120 214\n",
+        )
+        .parse::<ActorWaveScript>()
+        .expect("spawn behavior preset wave script should parse");
+        let manifest = wave_script.manifest();
+
+        assert_eq!(
+            manifest
+                .waves
+                .iter()
+                .map(|profile| profile.wave)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+        for profile in manifest.waves.iter().take(2) {
+            let source_lander = ActorSourceWaveProfile::for_wave(profile.wave).lander_behavior();
+            assert_eq!(profile.spawn_behavior_profiles.len(), 1);
+            assert_eq!(profile.spawn_behavior_profiles[0].kind, ActorKind::Lander);
+            assert_eq!(profile.spawn_behavior_profiles[0].spawn_index, 0);
+            let spawn_profile = profile.spawn_behavior_profiles[0].profile;
+            assert_eq!(spawn_profile.lander_mode, LanderBehaviorMode::ChasePlayer);
+            assert_eq!(spawn_profile.lander_seek_speed, 9);
+            assert_eq!(
+                spawn_profile.lander_fire_period_steps,
+                source_lander.lander_fire_period_steps
+            );
+        }
+
+        let clean_spawn = manifest.waves[2].spawn_behavior_profiles[0];
+        assert_eq!(clean_spawn.kind, ActorKind::Lander);
+        assert_eq!(clean_spawn.spawn_index, 1);
+        assert_eq!(
+            clean_spawn.profile.lander_mode,
+            LanderBehaviorMode::ChasePlayer
+        );
+        assert_eq!(clean_spawn.profile.lander_seek_speed, 9);
+        assert_eq!(clean_spawn.profile.lander_drift_speed, 4);
+    }
+
+    #[test]
+    fn parsed_wave_script_applies_spawn_behavior_preset_after_actor_allocation() {
+        let wave_script = "\
+            name spawn preset allocation\n\
+            spawn_behavior_preset fast_slot lander_mode chase_player\n\
+            spawn_behavior_preset fast_slot lander_seek_speed 5\n\
+            wave 1\n\
+            behavior kind lander lander_mode drift\n\
+            behavior kind lander lander_drift_speed 1\n\
+            use_spawn_behavior lander 1 fast_slot\n\
+            lander 80 214\n\
+            lander 120 214\n\
+            human 100 214\n"
+            .parse::<ActorWaveScript>()
+            .expect("spawn behavior preset script should parse");
+        let mut driver = ActorGameDriver::with_wave_script(wave_script);
+
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        let report = step_until_driver_player_start_completes(&mut driver, 1);
+        let landers = report
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::Lander)
+            .collect::<Vec<_>>();
+
+        assert_eq!(landers.len(), 2);
+        assert!(
+            driver
+                .script_manifest()
+                .behavior_script
+                .actor_profile(landers[0].id)
+                .is_none()
+        );
+        let second_behavior = driver
+            .script_manifest()
+            .behavior_script
+            .actor_profile(landers[1].id)
+            .expect("preset spawn index should receive actor-id behavior");
+        assert_eq!(second_behavior.lander_mode, LanderBehaviorMode::ChasePlayer);
+        assert_eq!(second_behavior.lander_seek_speed, 5);
+        assert_eq!(landers[0].position, Point::new(79, 214));
+        assert!(landers[1].position.x < 120);
+    }
+
+    #[test]
+    fn parsed_wave_script_reports_unknown_spawn_behavior_presets() {
+        let error = "\
+            name missing spawn preset\n\
+            source_wave 1\n\
+            use_spawn_behavior lander 0 missing\n"
+            .parse::<ActorWaveScript>()
+            .expect_err("spawn preset use should require a definition");
+
+        assert_eq!(error.line, 3);
+        assert_eq!(error.message, "unknown spawn behavior preset `missing`");
+    }
+
+    #[test]
     fn parsed_wave_script_applies_spawn_index_behavior_after_actor_allocation() {
         let wave_script = "\
             name spawn behavior\n\
@@ -23302,6 +23551,11 @@ mod tests {
         let error =
             ActorWaveScript::parse_text("behavior_preset hard kind lander no_such_field 1\n")
                 .expect_err("bad behavior preset update should fail");
+        assert_eq!(error.line, 1);
+        assert!(error.to_string().contains("unknown behavior field"));
+
+        let error = ActorWaveScript::parse_text("spawn_behavior_preset hard no_such_field 1\n")
+            .expect_err("bad spawn behavior preset update should fail");
         assert_eq!(error.line, 1);
         assert!(error.to_string().contains("unknown behavior field"));
     }
