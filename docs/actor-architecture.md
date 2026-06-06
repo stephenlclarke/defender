@@ -330,6 +330,9 @@ behavior kind lander lander_drift_speed 5
 lander 100 100
 bomber 120 80
 pod 160 88
+mutant 140 90
+swarmer 150 96
+baiter 170 104
 reserve 4 1 0
 source_waves 3 16
 ```
@@ -344,9 +347,10 @@ initial wave spawns consume the first indices, then source reserve/refill
 spawns, pod-created swarmers, baiters, and other command-applied later hostile
 spawns consume subsequent same-kind indices. This lets custom progression
 scripts tune a specific restored actor without changing the actor struct.
-`lander`, `bomber`, `pod`, and `human` lines add clean scripted spawn records;
-humans default to `grounded` and can also be declared as `falling <velocity>` or
-`carried <actor-id>`. The compatible `reserve` and `enemy_reserve` forms take
+`lander`, `bomber`, `pod`, `mutant`, `swarmer`, `baiter`, and `human` lines add
+clean scripted spawn records; humans default to `grounded` and can also be
+declared as `falling <velocity>` or `carried <actor-id>`. The compatible
+`reserve` and `enemy_reserve` forms take
 `<landers> <bombers> <pods> [swarmers]`; `reserve_full` and
 `enemy_reserve_full` take `<landers> <bombers> <pods> <mutants> <swarmers>` and
 set all five reserve families explicitly. `source_wave <wave>` and

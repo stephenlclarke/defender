@@ -826,6 +826,8 @@ reintroduce legacy implementation terminology.
   apply behavior scripts plus hostile and initial-human spawn records when play
   starts and when hostile snapshots are cleared. `ActorWaveScript` can be built
   from Rust profile constructors or checked text wave/spawn records, including
+  clean `lander`, `bomber`, `pod`, `mutant`, `swarmer`, `baiter`, and `human`
+  initial-spawn records. Wave scripts also support
   spawn-index behavior profiles that the driver installs as actor-id profiles
   immediately after allocating wave actors. Spawn indices are per kind and
   advance across the full wave allocation stream, covering initial wave actors,

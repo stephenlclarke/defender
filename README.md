@@ -199,6 +199,9 @@ Custom attract drivers can construct scripts in Rust or parse checked text
 lines for text, static sprites, Williams reveal, Defender wordmark coalescence,
 red-label message-table labels, high-score rows, and credit-count events before
 passing the script to `ActorGameDriver`.
+Checked wave scripts can declare clean initial `lander`, `bomber`, `pod`,
+`mutant`, `swarmer`, `baiter`, and `human` spawn rows before the driver
+allocates actor ids for the wave.
 Source-backed landers, bombers, pods, swarmers, baiters, and humans publish
 their fixed-point metadata through snapshots, publish per-step movement/facing
 metadata for the clean state bridge, and advance fraction state during active

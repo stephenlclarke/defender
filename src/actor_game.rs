@@ -3193,6 +3193,9 @@ pub struct ActorWaveProfile {
     pub lander_spawns: Vec<ActorLanderSpawn>,
     pub bomber_spawns: Vec<ActorBomberSpawn>,
     pub pod_spawns: Vec<ActorPodSpawn>,
+    pub mutant_spawns: Vec<ActorMutantSpawn>,
+    pub swarmer_spawns: Vec<ActorSwarmerSpawn>,
+    pub baiter_spawns: Vec<ActorBaiterSpawn>,
     pub human_spawns: Vec<ActorHumanSpawn>,
     pub enemy_reserve: EnemyReserveSnapshot,
     pub spawn_behavior_profiles: Vec<ActorWaveSpawnBehaviorProfile>,
@@ -3253,10 +3256,28 @@ impl ActorWaveProfile {
             lander_spawns,
             bomber_spawns,
             pod_spawns,
+            mutant_spawns: Vec::new(),
+            swarmer_spawns: Vec::new(),
+            baiter_spawns: Vec::new(),
             human_spawns,
             enemy_reserve: EnemyReserveSnapshot::default(),
             spawn_behavior_profiles: Vec::new(),
         }
+    }
+
+    pub fn with_mutant_spawns(mut self, mutant_spawns: Vec<ActorMutantSpawn>) -> Self {
+        self.mutant_spawns = mutant_spawns;
+        self
+    }
+
+    pub fn with_swarmer_spawns(mut self, swarmer_spawns: Vec<ActorSwarmerSpawn>) -> Self {
+        self.swarmer_spawns = swarmer_spawns;
+        self
+    }
+
+    pub fn with_baiter_spawns(mut self, baiter_spawns: Vec<ActorBaiterSpawn>) -> Self {
+        self.baiter_spawns = baiter_spawns;
+        self
     }
 
     pub fn with_enemy_reserve(mut self, enemy_reserve: EnemyReserveSnapshot) -> Self {
@@ -3308,6 +3329,27 @@ impl ActorWaveProfile {
         self.pod_spawns.iter().map(|spawn| spawn.position).collect()
     }
 
+    pub fn mutant_spawn_points(&self) -> Vec<Point> {
+        self.mutant_spawns
+            .iter()
+            .map(|spawn| spawn.position)
+            .collect()
+    }
+
+    pub fn swarmer_spawn_points(&self) -> Vec<Point> {
+        self.swarmer_spawns
+            .iter()
+            .map(|spawn| spawn.position)
+            .collect()
+    }
+
+    pub fn baiter_spawn_points(&self) -> Vec<Point> {
+        self.baiter_spawns
+            .iter()
+            .map(|spawn| spawn.position)
+            .collect()
+    }
+
     pub fn manifest(&self) -> ActorWaveProfileManifest {
         ActorWaveProfileManifest {
             wave: self.wave,
@@ -3315,6 +3357,9 @@ impl ActorWaveProfile {
             lander_spawns: self.lander_spawns.clone(),
             bomber_spawns: self.bomber_spawns.clone(),
             pod_spawns: self.pod_spawns.clone(),
+            mutant_spawns: self.mutant_spawns.clone(),
+            swarmer_spawns: self.swarmer_spawns.clone(),
+            baiter_spawns: self.baiter_spawns.clone(),
             human_spawns: self.human_spawns.clone(),
             enemy_reserve: self.enemy_reserve,
             spawn_behavior_profiles: self.spawn_behavior_profiles.clone(),
@@ -3336,6 +3381,9 @@ pub struct ActorWaveProfileManifest {
     pub lander_spawns: Vec<ActorLanderSpawn>,
     pub bomber_spawns: Vec<ActorBomberSpawn>,
     pub pod_spawns: Vec<ActorPodSpawn>,
+    pub mutant_spawns: Vec<ActorMutantSpawn>,
+    pub swarmer_spawns: Vec<ActorSwarmerSpawn>,
+    pub baiter_spawns: Vec<ActorBaiterSpawn>,
     pub human_spawns: Vec<ActorHumanSpawn>,
     pub enemy_reserve: EnemyReserveSnapshot,
     pub spawn_behavior_profiles: Vec<ActorWaveSpawnBehaviorProfile>,
@@ -3592,6 +3640,30 @@ impl ParsedActorWaveScript {
                     .push(ActorPodSpawn::new(position));
                 Ok(())
             }
+            "mutant" => {
+                let position = parse_wave_point(line_number, &mut parts)?;
+                reject_extra_wave_fields(line_number, parts)?;
+                self.current_profile_mut(line_number)?
+                    .mutant_spawns
+                    .push(ActorMutantSpawn::new(position));
+                Ok(())
+            }
+            "swarmer" => {
+                let position = parse_wave_point(line_number, &mut parts)?;
+                reject_extra_wave_fields(line_number, parts)?;
+                self.current_profile_mut(line_number)?
+                    .swarmer_spawns
+                    .push(ActorSwarmerSpawn::new(position));
+                Ok(())
+            }
+            "baiter" => {
+                let position = parse_wave_point(line_number, &mut parts)?;
+                reject_extra_wave_fields(line_number, parts)?;
+                self.current_profile_mut(line_number)?
+                    .baiter_spawns
+                    .push(ActorBaiterSpawn::new(position));
+                Ok(())
+            }
             "human" => {
                 let position = parse_wave_point(line_number, &mut parts)?;
                 let mode = parse_wave_human_mode(line_number, parts)?;
@@ -3694,6 +3766,9 @@ struct ParsedActorWaveProfile {
     lander_spawns: Vec<ActorLanderSpawn>,
     bomber_spawns: Vec<ActorBomberSpawn>,
     pod_spawns: Vec<ActorPodSpawn>,
+    mutant_spawns: Vec<ActorMutantSpawn>,
+    swarmer_spawns: Vec<ActorSwarmerSpawn>,
+    baiter_spawns: Vec<ActorBaiterSpawn>,
     human_spawns: Vec<ActorHumanSpawn>,
     enemy_reserve: EnemyReserveSnapshot,
     spawn_behavior_profiles: Vec<ActorWaveSpawnBehaviorProfile>,
@@ -3707,6 +3782,9 @@ impl ParsedActorWaveProfile {
             lander_spawns: Vec::new(),
             bomber_spawns: Vec::new(),
             pod_spawns: Vec::new(),
+            mutant_spawns: Vec::new(),
+            swarmer_spawns: Vec::new(),
+            baiter_spawns: Vec::new(),
             human_spawns: Vec::new(),
             enemy_reserve: EnemyReserveSnapshot::default(),
             spawn_behavior_profiles: Vec::new(),
@@ -3721,6 +3799,9 @@ impl ParsedActorWaveProfile {
             lander_spawns: profile.lander_spawns,
             bomber_spawns: profile.bomber_spawns,
             pod_spawns: profile.pod_spawns,
+            mutant_spawns: profile.mutant_spawns,
+            swarmer_spawns: profile.swarmer_spawns,
+            baiter_spawns: profile.baiter_spawns,
             human_spawns: profile.human_spawns,
             enemy_reserve: profile.enemy_reserve,
             spawn_behavior_profiles: profile.spawn_behavior_profiles,
@@ -3760,6 +3841,9 @@ impl ParsedActorWaveProfile {
             self.pod_spawns,
             self.human_spawns,
         )
+        .with_mutant_spawns(self.mutant_spawns)
+        .with_swarmer_spawns(self.swarmer_spawns)
+        .with_baiter_spawns(self.baiter_spawns)
         .with_enemy_reserve(self.enemy_reserve)
         .with_spawn_behavior_profiles(self.spawn_behavior_profiles)
     }
@@ -10340,6 +10424,18 @@ impl ActorGameDriver {
         for spawn in wave_profile.pod_spawns.iter().copied() {
             let actor = self.spawn_pod_from_spawn(spawn);
             self.apply_next_wave_spawn_behavior(ActorKind::Pod, actor);
+        }
+        for spawn in wave_profile.mutant_spawns.iter().copied() {
+            let actor = self.spawn_mutant_from_spawn(spawn);
+            self.apply_next_wave_spawn_behavior(ActorKind::Mutant, actor);
+        }
+        for spawn in wave_profile.swarmer_spawns.iter().copied() {
+            let actor = self.spawn_swarmer_from_spawn(spawn);
+            self.apply_next_wave_spawn_behavior(ActorKind::Swarmer, actor);
+        }
+        for spawn in wave_profile.baiter_spawns.iter().copied() {
+            let actor = self.spawn_baiter_from_spawn(spawn);
+            self.apply_next_wave_spawn_behavior(ActorKind::Baiter, actor);
         }
     }
 
@@ -22161,6 +22257,9 @@ mod tests {
             lander 100 100\n\
             bomber 120 80\n\
             pod 160 88\n\
+            mutant 140 90\n\
+            swarmer 150 96\n\
+            baiter 170 104\n\
             reserve_full 2 1 1 3 4\n\
             human 32 214 grounded\n\
             wave 1\n\
@@ -22226,6 +22325,18 @@ mod tests {
         assert_eq!(
             manifest.waves[1].pod_spawns[0].position,
             Point::new(160, 88)
+        );
+        assert_eq!(
+            manifest.waves[1].mutant_spawns[0].position,
+            Point::new(140, 90)
+        );
+        assert_eq!(
+            manifest.waves[1].swarmer_spawns[0].position,
+            Point::new(150, 96)
+        );
+        assert_eq!(
+            manifest.waves[1].baiter_spawns[0].position,
+            Point::new(170, 104)
         );
         assert_eq!(
             manifest.waves[1].enemy_reserve,
@@ -22309,6 +22420,50 @@ mod tests {
             .find(|snapshot| snapshot.kind == ActorKind::Lander)
             .expect("wave 2 should spawn a lander");
         assert_eq!(lander.position, Point::new(95, 100));
+    }
+
+    #[test]
+    fn parsed_wave_script_drives_custom_hostile_family_spawns() {
+        let wave_script = "\
+            name custom hostiles\n\
+            wave 1\n\
+            behavior kind mutant mutant_mode drift\n\
+            behavior kind swarmer swarmer_mode drift\n\
+            behavior kind swarmer swarmer_seek_speed 1\n\
+            behavior kind baiter baiter_mode drift\n\
+            behavior kind baiter baiter_seek_speed 1\n\
+            mutant 80 72\n\
+            swarmer 120 84\n\
+            baiter 160 96\n\
+            human 40 214\n"
+            .parse::<ActorWaveScript>()
+            .expect("custom hostile wave script should parse");
+        let mut driver = ActorGameDriver::with_wave_script(wave_script);
+
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        let report = step_until_driver_player_start_completes(&mut driver, 1);
+
+        assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
+        assert_eq!(driver.snapshot_count(ActorKind::Mutant), 1);
+        assert_eq!(driver.snapshot_count(ActorKind::Swarmer), 1);
+        assert_eq!(driver.snapshot_count(ActorKind::Baiter), 1);
+        assert_eq!(driver.snapshot_count(ActorKind::Human), 1);
+        assert!(report.snapshots.iter().any(|snapshot| {
+            snapshot.kind == ActorKind::Mutant && snapshot.position == Point::new(79, 72)
+        }));
+        assert!(report.snapshots.iter().any(|snapshot| {
+            snapshot.kind == ActorKind::Swarmer && snapshot.position == Point::new(119, 84)
+        }));
+        assert!(report.snapshots.iter().any(|snapshot| {
+            snapshot.kind == ActorKind::Baiter && snapshot.position == Point::new(159, 96)
+        }));
     }
 
     #[test]

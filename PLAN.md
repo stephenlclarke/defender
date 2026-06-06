@@ -71,9 +71,11 @@ verification tools.
   custom screens.
   `ActorWaveScript` now names per-wave progression data and applies behavior
   scripts plus hostile and initial-human spawn records as play starts and waves
-  are cleared. Wave scripts can now attach spawn-index behavior profiles that
-  become actor-id profiles after the driver allocates those actors. Default
-  actor wave progression expands the checked wave script through
+  are cleared. Checked wave scripts can declare clean `lander`, `bomber`,
+  `pod`, `mutant`, `swarmer`, `baiter`, and `human` initial-spawn records.
+  Wave scripts can now attach spawn-index behavior profiles that become
+  actor-id profiles after the driver allocates those actors. Default actor wave
+  progression expands the checked wave script through
   `assets/red-label/wave-table.tsv` for active wave size, lander and bomber
   speed, lander fire cadence, and source bomber/pod/swarmer counts. The actor wave
   allocator follows the source active-family shape, so later waves now seed
@@ -887,6 +889,24 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-06 04:36 BST`: Completed the actor hostile-family wave-script spawn
+  cycle. `ActorWaveProfile` and its manifest now carry clean initial
+  `mutant`, `swarmer`, and `baiter` spawn rows alongside existing lander,
+  bomber, pod, and human rows; checked text wave scripts parse the same
+  directives and `ActorGameDriver` allocates those actors through the
+  simulation-step prompt path before applying per-kind spawn-behavior profiles.
+  Added parser and driver regressions that prove custom hostile-family spawns
+  enter play and receive script-selected drift/speed behavior. README, SPEC,
+  and actor architecture docs now describe the full initial-spawn script
+  surface. Validation passed with `cargo fmt --check`, `cargo test wave_script
+  --lib --features legacy-tools`, `cargo test actor_game --all-targets
+  --features legacy-tools`, `cargo test actor_smoke --all-targets --features
+  legacy-tools`, `cargo test actor_live --all-targets --features
+  legacy-tools`, `make actor-smoke`, and `make actor-wgpu-smoke` with
+  `frame_source: actor_game`, `192` actor frames, `192` nonblank offscreen
+  frames, and zero temporary raster commands, touched-doc markdownlint, and
+  `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780716542840919`.
 - `2026-06-06 04:26 BST`: Completed the actor wave spawn-behavior allocation
   cycle. `ActorGameDriver` now tracks per-kind wave allocation indices across
   the whole wave, so `spawn_behavior <kind> <index> ...` profiles apply not
