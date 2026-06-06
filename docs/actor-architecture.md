@@ -95,7 +95,8 @@ evidence commands.
   interstitial, its `0x80` wave-advance sleep window, next playable wave, and a
   bounded reserve activation batch sequence plus post-reserve wave-clear and
   `0x80` sleep interstitials when real wave-clear/wave-start and reserve
-  activation emit their actor reports. The checked
+  activation emit their actor reports, then reports the next playable wave
+  after that post-reserve sleep. The checked
   `examples/actor-custom-attract.script` file is the editable smoke-tested
   example. The shared live input state carries the same key
   bindings and `XYZZY` mode into actor steps. Actor high-score entry now
@@ -273,7 +274,8 @@ each observed restored batch's spawned family counts, resulting source state,
 terminal batch status, and the first following `WaveCleared` interstitial after
 those source reserves are empty. It then records the later survivor-bonus
 report that enters the post-reserve source `0x80` wave-advance sleep before the
-next playable wave starts.
+next playable wave starts, and records the resulting post-reserve playable wave
+state once the actor driver reaches it.
 
 `AttractScript::manifest`, `ActorBehaviorScript::manifest`,
 `ActorWaveScript::manifest`, `ActorDriverScripts::manifest`, and

@@ -793,7 +793,8 @@ reintroduce legacy implementation terminology.
   wave-clear survivor-bonus interstitial, its `0x80` wave-advance sleep
   window, next playable wave, and a bounded reserve activation batch sequence
   plus post-reserve wave-clear and `0x80` sleep interstitials when real actor
-  wave-clear/wave-start and reserve-activation logic reaches them.
+  wave-clear/wave-start and reserve-activation logic reaches them, then reports
+  the next playable wave after that post-reserve sleep.
   `examples/actor-custom-attract.script` is the checked editable sample for
   that flow.
 - Runtime renderer selection has been removed.
@@ -847,7 +848,8 @@ reintroduce legacy implementation terminology.
   reporting plus assisted wave-clear, next-wave, and reserve-activation batch
   summaries for source/reserve counts, survivor-bonus cadence, `0x80` wave
   sleep, restored family counts, batch status, post-reserve wave-clear and
-  sleep, damage, fire cadence, and actor movement modes.
+  sleep, post-reserve next playable wave, damage, fire cadence, and actor
+  movement modes.
   Read-only script manifests expose persistent attract event, driver behavior,
   reusable wave/spawn behavior preset definitions, wave-profile configuration,
   and source wave-table metadata for source-backed wave profiles, and every

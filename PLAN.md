@@ -67,7 +67,8 @@ verification tools.
   including each batch's spawned family counts, resulting source/reserve state,
   terminal batch status, and the first following post-reserve wave-clear
   interstitial plus its `0x80` wave-advance sleep after those source reserves
-  are empty.
+  are empty, followed by the next playable wave state after that post-reserve
+  sleep.
   `examples/actor-custom-attract.script` provides a checked editable
   starting point. The built-in actor attract, behavior, and
   wave scripts are embedded from
@@ -944,6 +945,33 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 21:16 BST`: Completed the actor script post-reserve next-wave
+  preflight cycle. After `post_reserve_wave_clear_*` and
+  `post_reserve_wave_clear_advance_sleep_*`, `--actor-script-check <path>` now
+  continues through normal actor reports until the next playable wave starts
+  and reports it as `post_reserve_next_playing_*`. The reserve-heavy
+  custom-driver regression proves wave three becomes playable at cumulative
+  assist step `904`, with wave size `3`, source active counts
+  landers/bombers/pods/mutants/swarmers `1/1/1/0/0`, world counts
+  enemies/humans `3/10`, retained reserve counts `2/1/1/1/1`, and the
+  scripted wave-two behavior profile still active for lander seek speed `7`,
+  swarmer fire period `23`, and baiter fire period `31`. The minimal checked
+  example now reports `post_reserve_next_playing` as unavailable with reason
+  `next_playing_has_no_reserve`. No legacy code, tests, or scaffolding were
+  safe to remove because this slice hardens the active script-authoring
+  preflight. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780766410047449>.
+  Validation passed with `cargo fmt --check`, `cargo test actor_script_check
+  --all-targets --features legacy-tools`, `cargo test actor_script
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, `cargo run
+  --quiet --features legacy-tools -- --actor-script-check
+  examples/actor-custom-attract.script`, `make actor-smoke`, `make
+  actor-wgpu-smoke`, `markdownlint README.md SPEC.md PLAN.md
+  docs/actor-architecture.md`, and `git diff --check`.
 
 - `2026-06-06 18:17 BST`: Completed the actor script post-reserve
   wave-advance sleep checker cycle. After a checked reserve-heavy custom
