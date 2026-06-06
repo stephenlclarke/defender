@@ -126,14 +126,16 @@ non-source hostile drift/chase modes, and named `ActorWaveScript` progression
 backed by `assets/red-label/wave-table.tsv` for active wave size, lander and
 bomber movement speed, lander fire cadence, baiter entry/shot/seek timing, and
 scripted hostile/human spawn records. Read-only script manifests expose the
-configured attract events, driver behavior, and wave profiles, while each
-`StepReport` carries the effective per-step behavior manifest after transient
-input overrides such as `XYZZY` invincibility. Behavior scripts can also be
-parsed from checked text lines that update default, actor-kind, or actor-id
-profiles. Wave scripts can be parsed from checked text lines that name wave
-profiles, per-wave behavior updates, and lander/bomber/pod/human spawn
-records, including spawn-index behavior profiles that become actor-id profiles
-after the driver allocates those wave actors. The built-in actor attract,
+configured attract events, driver behavior, wave profiles, and source wave-table
+metadata for source-backed profiles, while each `StepReport` carries the
+effective per-step behavior manifest after transient input overrides such as
+`XYZZY` invincibility. Behavior scripts can also be parsed from checked text
+lines that update default, actor-kind, or actor-id profiles. Wave scripts can
+be parsed from checked text lines that name wave profiles, per-wave behavior
+updates, and `lander` / `bomber` / `pod` / `mutant` / `swarmer` / `baiter` /
+`human` spawn records, including spawn-index behavior profiles that become
+actor-id profiles after the driver allocates those wave actors. The built-in
+actor attract,
 behavior, and wave scripts are embedded from
 `assets/red-label/actor-attract.script`,
 `assets/red-label/actor-behavior.script`, and
@@ -202,6 +204,10 @@ passing the script to `ActorGameDriver`.
 Checked wave scripts can declare clean initial `lander`, `bomber`, `pod`,
 `mutant`, `swarmer`, `baiter`, and `human` spawn rows before the driver
 allocates actor ids for the wave.
+Source-backed wave-profile manifests preserve the exact `ActorSourceWaveProfile`
+record expanded from `wave-table.tsv`, so custom drivers can inspect source
+active counts, movement, shot cadence, baiter timing, and mutant hop/shot
+settings without reading private driver state.
 Source-backed landers, bombers, pods, swarmers, baiters, and humans publish
 their fixed-point metadata through snapshots, publish per-step movement/facing
 metadata for the clean state bridge, and advance fraction state during active

@@ -3189,6 +3189,7 @@ fn apply_actor_wave_delta(value: i32, delta: i32, floor: i32, ceiling: i32) -> i
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorWaveProfile {
     pub wave: u16,
+    pub source_wave: Option<ActorSourceWaveProfile>,
     pub behavior_script: ActorBehaviorScript,
     pub lander_spawns: Vec<ActorLanderSpawn>,
     pub bomber_spawns: Vec<ActorBomberSpawn>,
@@ -3252,6 +3253,7 @@ impl ActorWaveProfile {
     ) -> Self {
         Self {
             wave: wave.max(1),
+            source_wave: None,
             behavior_script,
             lander_spawns,
             bomber_spawns,
@@ -3267,6 +3269,16 @@ impl ActorWaveProfile {
 
     pub fn with_mutant_spawns(mut self, mutant_spawns: Vec<ActorMutantSpawn>) -> Self {
         self.mutant_spawns = mutant_spawns;
+        self
+    }
+
+    pub fn with_source_wave(mut self, source_wave: ActorSourceWaveProfile) -> Self {
+        self.source_wave = Some(source_wave);
+        self
+    }
+
+    fn with_optional_source_wave(mut self, source_wave: Option<ActorSourceWaveProfile>) -> Self {
+        self.source_wave = source_wave;
         self
     }
 
@@ -3353,6 +3365,7 @@ impl ActorWaveProfile {
     pub fn manifest(&self) -> ActorWaveProfileManifest {
         ActorWaveProfileManifest {
             wave: self.wave,
+            source_wave: self.source_wave,
             behavior_script: self.behavior_script.manifest(),
             lander_spawns: self.lander_spawns.clone(),
             bomber_spawns: self.bomber_spawns.clone(),
@@ -3377,6 +3390,7 @@ pub struct ActorWaveSpawnBehaviorProfile {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorWaveProfileManifest {
     pub wave: u16,
+    pub source_wave: Option<ActorSourceWaveProfile>,
     pub behavior_script: ActorBehaviorScriptManifest,
     pub lander_spawns: Vec<ActorLanderSpawn>,
     pub bomber_spawns: Vec<ActorBomberSpawn>,
@@ -3451,6 +3465,7 @@ impl ActorWaveScript {
             source.pod_spawns(),
             human_spawns,
         )
+        .with_source_wave(source)
         .with_enemy_reserve(source.enemy_reserve_after_active_batch())
     }
 
@@ -3762,6 +3777,7 @@ impl ParsedActorWaveScript {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ParsedActorWaveProfile {
     wave: u16,
+    source_wave: Option<ActorSourceWaveProfile>,
     behavior_script: ActorBehaviorScript,
     lander_spawns: Vec<ActorLanderSpawn>,
     bomber_spawns: Vec<ActorBomberSpawn>,
@@ -3778,6 +3794,7 @@ impl ParsedActorWaveProfile {
     fn new(wave: u16) -> Self {
         Self {
             wave: wave.max(1),
+            source_wave: None,
             behavior_script: ActorBehaviorScript::from_arcade_profile(),
             lander_spawns: Vec::new(),
             bomber_spawns: Vec::new(),
@@ -3795,6 +3812,7 @@ impl ParsedActorWaveProfile {
         let profile = ActorWaveScript::source_backed_profile(wave);
         Self {
             wave: profile.wave,
+            source_wave: profile.source_wave,
             behavior_script: profile.behavior_script,
             lander_spawns: profile.lander_spawns,
             bomber_spawns: profile.bomber_spawns,
@@ -3841,6 +3859,7 @@ impl ParsedActorWaveProfile {
             self.pod_spawns,
             self.human_spawns,
         )
+        .with_optional_source_wave(self.source_wave)
         .with_mutant_spawns(self.mutant_spawns)
         .with_swarmer_spawns(self.swarmer_spawns)
         .with_baiter_spawns(self.baiter_spawns)
@@ -18215,6 +18234,7 @@ mod tests {
         assert_eq!(first_source.mutant_shot_time, 32);
 
         let first = script.profile_for_wave(1);
+        assert_eq!(first.source_wave, Some(first_source));
         let first_lander = first
             .behavior_script
             .behavior_for(ActorId::new(1), ActorKind::Lander);
@@ -18286,6 +18306,10 @@ mod tests {
         assert_eq!(first_lander.lander_fire_period_steps, 64);
 
         let second = script.profile_for_wave(2);
+        assert_eq!(
+            second.source_wave,
+            Some(ActorSourceWaveProfile::for_wave(2))
+        );
         let second_lander = second
             .behavior_script
             .behavior_for(ActorId::new(1), ActorKind::Lander);
@@ -18413,6 +18437,7 @@ mod tests {
         assert_eq!(second_bomber.bomber_drift_speed, 1);
 
         let fifth = script.profile_for_wave(5);
+        assert_eq!(fifth.source_wave, Some(ActorSourceWaveProfile::for_wave(5)));
         let fifth_lander = fifth
             .behavior_script
             .behavior_for(ActorId::new(1), ActorKind::Lander);
@@ -18480,6 +18505,14 @@ mod tests {
         assert_eq!(
             parsed.manifest().waves.len(),
             usize::from(ACTOR_SOURCE_BACKED_WAVES)
+        );
+        assert_eq!(
+            parsed.manifest().waves[0].source_wave,
+            Some(ActorSourceWaveProfile::for_wave(1))
+        );
+        assert_eq!(
+            parsed.manifest().waves[4].source_wave,
+            Some(ActorSourceWaveProfile::for_wave(5))
         );
         assert_eq!(parsed.profile_for_wave(1).lander_spawns.len(), 5);
         assert_eq!(
@@ -22099,6 +22132,7 @@ mod tests {
                 ))
         );
         assert_eq!(attract_manifest.wave_script.name, "manifest-test");
+        assert_eq!(attract_manifest.current_wave_profile.source_wave, None);
         assert_eq!(
             attract_manifest.current_wave_profile.lander_spawns[0].position,
             Point::new(80, 96)

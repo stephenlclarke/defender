@@ -77,12 +77,16 @@ verification tools.
   actor-id profiles after the driver allocates those actors. Default actor wave
   progression expands the checked wave script through
   `assets/red-label/wave-table.tsv` for active wave size, lander and bomber
-  speed, lander fire cadence, and source bomber/pod/swarmer counts. The actor wave
-  allocator follows the source active-family shape, so later waves now seed
-  bomber and pod actors beside landers. Source-backed landers, bombers, pods,
-  swarmers, and initial humans publish fixed-point metadata and advance
-  actor-owned fraction state during active motion, and source landers prefer
-  configured target slots before falling back to nearest-human seeking. Source
+  speed, lander fire cadence, source bomber/pod/swarmer counts, baiter timing,
+  and mutant hop/shot fields. Source-backed wave-profile manifests preserve the
+  exact `ActorSourceWaveProfile` record expanded from that table, so custom
+  drivers can inspect source progression values without driver internals. The
+  actor wave allocator follows the source active-family shape, so later waves
+  now seed bomber and pod actors beside landers. Source-backed landers,
+  bombers, pods, swarmers, and initial humans publish fixed-point metadata and
+  advance actor-owned fraction state during active motion, and source landers
+  prefer configured target slots before falling back to nearest-human seeking.
+  Source
   wave profiles now retain post-active-batch enemy reserve counts, parsed wave
   scripts can set custom reserves with `reserve` / `enemy_reserve` or the
   all-family `reserve_full` / `enemy_reserve_full` form, and `StepReport` maps
@@ -889,6 +893,29 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-06 04:46 BST`: Completed the actor source-wave manifest
+  introspection cycle. `ActorWaveProfile` and `ActorWaveProfileManifest` now
+  preserve `source_wave: Option<ActorSourceWaveProfile>` so source-backed
+  `source_wave` / `source_waves` script entries expose the exact red-label
+  wave-table record used for active counts, source movement, shot cadence,
+  baiter timing, and mutant hop/shot behavior; hand-scripted custom waves leave
+  that field empty. Focused regressions now prove default, parsed embedded, and
+  driver current-wave manifests carry the source-backed values while custom
+  manifest waves remain source-free. README, SPEC, and actor architecture docs
+  now describe this custom-driver inspection surface. Validation passed with
+  `cargo fmt --check`, `cargo test source_wave --lib --features legacy-tools`,
+  `cargo test default_wave_script_uses_source_wave_table_values --lib
+  --features legacy-tools`, `cargo test
+  driver_script_manifest_exports_current_wave_and_spawns --lib --features
+  legacy-tools`, `cargo test actor_game --all-targets --features legacy-tools`,
+  `cargo test actor_smoke --all-targets --features legacy-tools`, `cargo test
+  actor_live --all-targets --features legacy-tools`, `cargo check
+  --all-targets --features legacy-tools`, `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`, `make actor-smoke`, and
+  `make actor-wgpu-smoke` with `frame_source: actor_game`, `192` actor frames,
+  `192` nonblank offscreen frames, and zero temporary raster commands,
+  touched-doc markdownlint, and `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780717157781079`.
 - `2026-06-06 04:36 BST`: Completed the actor hostile-family wave-script spawn
   cycle. `ActorWaveProfile` and its manifest now carry clean initial
   `mutant`, `swarmer`, and `baiter` spawn rows alongside existing lander,

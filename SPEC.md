@@ -819,8 +819,9 @@ reintroduce legacy implementation terminology.
   profile constructors or checked text profile updates. The built-in baseline
   behavior is embedded from `assets/red-label/actor-behavior.script`.
   Read-only script manifests expose persistent attract event, driver behavior,
-  and wave-profile configuration, and every `StepReport` includes the effective
-  behavior manifest after transient input overrides such as `XYZZY`
+  wave-profile configuration, and source wave-table metadata for source-backed
+  wave profiles, and every `StepReport` includes the effective behavior
+  manifest after transient input overrides such as `XYZZY`
   invincibility.
   `ActorWaveScript` names a driver-owned progression script whose wave profiles
   apply behavior scripts plus hostile and initial-human spawn records when play
@@ -866,7 +867,9 @@ reintroduce legacy implementation terminology.
   default actor wave progression expands
   that wave script through `assets/red-label/wave-table.tsv` for active
   wave size, lander and bomber movement speed, lander fire cadence, baiter
-  entry/shot/seek timing, and source bomber/pod counts. The actor allocator
+  entry/shot/seek timing, source bomber/pod/swarmer counts, and mutant
+  hop/shot fields. Source-backed wave-profile manifests retain that exact
+  `ActorSourceWaveProfile` record for custom driver inspection. The actor allocator
   follows the source active-family
   shape, so wave `1` remains lander-only while later waves can seed bomber and
   pod actors beside source-RNG-restored landers. Source-backed wave profiles

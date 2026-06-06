@@ -216,7 +216,9 @@ the parser fallback.
 `AttractScript::manifest`, `ActorBehaviorScript::manifest`,
 `ActorWaveScript::manifest`, and `ActorGameDriver::script_manifest` expose
 read-only snapshots of configured attract events, driver behavior, and wave
-scripts for custom drivers and test tooling.
+scripts for custom drivers and test tooling. Source-backed wave profiles carry
+the exact `ActorSourceWaveProfile` expanded from `assets/red-label/wave-table.tsv`
+in those manifests; hand-scripted custom waves leave that field empty.
 `StepReport::behavior_script` carries the effective behavior manifest used for
 that simulation step, after transient input overrides such as `XYZZY`
 invincibility have been applied.
@@ -277,7 +279,9 @@ current actor mapping uses source-backed
 `mutant_x_velocity`, `mutant_shot_time`, `baiter_time`, `baiter_shot_time`,
 `baiter_seek_probability`, `bombers`, `pods`, and `swarmers` to set active family
 allocation, movement speed, fire cadence, mutant hop/shot behavior, and baiter
-entry pacing. Wave `1` remains lander-only; later source waves seed one
+entry pacing. The expanded source profile is preserved in each wave manifest so
+custom drivers can inspect the same source progression values without reaching
+into driver internals. Wave `1` remains lander-only; later source waves seed one
 lander, one bomber, and one pod when those reserve counts are available before
 filling the rest of the active batch, matching the clean source allocator's
 family order. Each source-backed wave profile also carries the source enemy
@@ -355,9 +359,9 @@ declared as `falling <velocity>` or `carried <actor-id>`. The compatible
 `enemy_reserve_full` take `<landers> <bombers> <pods> <mutants> <swarmers>` and
 set all five reserve families explicitly. `source_wave <wave>` and
 `source_waves <first> <last>` expand source-backed wave-table profiles,
-including source reserve counts, into the same checked script, so the
-production default and custom level scripts use the same parser surface. The
-parser sorts wave profiles by wave number, rejects
+including source reserve counts and source wave-table metadata, into the same
+checked script, so the production default and custom level scripts use the same
+parser surface. The parser sorts wave profiles by wave number, rejects
 duplicate waves, and reports malformed lines with source line numbers.
 
 Hostile projectile actors publish source-shaped shell metadata too: enemy
