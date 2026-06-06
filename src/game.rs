@@ -268,6 +268,11 @@ struct SourceTarget4TerminalShellTrack {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SourceTarget4TerminalLateObjectTrack {
+    samples: [(u16, i16, i16); 14],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct SourceTarget4TerminalVisibleObject {
     kind: SourceTerminalObjectKind,
     position: ScreenPosition,
@@ -448,6 +453,243 @@ const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECTS_1057:
     0x13,
     0x88,
 )];
+const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_LATE_MUTANT_TRACKS:
+    [SourceTarget4TerminalLateObjectTrack; 13] = [
+    SourceTarget4TerminalLateObjectTrack {
+        samples: [
+            (1061, 87, 58),
+            (1076, 83, 56),
+            (1089, 80, 53),
+            (1105, 78, 54),
+            (1121, 76, 55),
+            (1126, 74, 54),
+            (1128, 230, 54),
+            (1129, 230, 54),
+            (1132, 230, 55),
+            (1135, 230, 56),
+            (1152, 232, 57),
+            (1168, 234, 55),
+            (1182, 237, 54),
+            (1193, 239, 52),
+        ],
+    },
+    SourceTarget4TerminalLateObjectTrack {
+        samples: [
+            (1061, 76, 136),
+            (1076, 71, 134),
+            (1089, 69, 131),
+            (1105, 67, 132),
+            (1121, 65, 131),
+            (1126, 62, 130),
+            (1128, 62, 130),
+            (1129, 61, 130),
+            (1132, 207, 131),
+            (1135, 207, 132),
+            (1152, 209, 133),
+            (1168, 211, 131),
+            (1182, 214, 130),
+            (1193, 216, 128),
+        ],
+    },
+    SourceTarget4TerminalLateObjectTrack {
+        samples: [
+            (1061, 70, 112),
+            (1076, 66, 110),
+            (1089, 64, 107),
+            (1105, 61, 108),
+            (1121, 197, 107),
+            (1126, 199, 106),
+            (1128, 199, 106),
+            (1129, 199, 106),
+            (1132, 199, 107),
+            (1135, 199, 108),
+            (1152, 201, 111),
+            (1168, 203, 109),
+            (1182, 206, 108),
+            (1193, 208, 106),
+        ],
+    },
+    SourceTarget4TerminalLateObjectTrack {
+        samples: [
+            (1061, 116, 82),
+            (1076, 112, 80),
+            (1089, 109, 77),
+            (1105, 107, 78),
+            (1121, 105, 77),
+            (1126, 103, 76),
+            (1128, 103, 76),
+            (1129, 103, 76),
+            (1132, 103, 77),
+            (1135, 103, 78),
+            (1152, 100, 81),
+            (1168, 98, 79),
+            (1182, 93, 78),
+            (1193, 90, 76),
+        ],
+    },
+    SourceTarget4TerminalLateObjectTrack {
+        samples: [
+            (1061, 139, 139),
+            (1076, 143, 137),
+            (1089, 145, 134),
+            (1105, 148, 135),
+            (1121, 150, 134),
+            (1126, 152, 133),
+            (1128, 152, 133),
+            (1129, 152, 133),
+            (1132, 152, 134),
+            (1135, 152, 135),
+            (1152, 154, 136),
+            (1168, 157, 134),
+            (1182, 159, 133),
+            (1193, 161, 131),
+        ],
+    },
+    SourceTarget4TerminalLateObjectTrack {
+        samples: [
+            (1061, 139, 51),
+            (1076, 143, 49),
+            (1089, 146, 51),
+            (1105, 148, 52),
+            (1121, 150, 51),
+            (1126, 152, 50),
+            (1128, 152, 50),
+            (1129, 152, 50),
+            (1132, 152, 51),
+            (1135, 152, 52),
+            (1152, 155, 53),
+            (1168, 157, 51),
+            (1182, 159, 50),
+            (1193, 161, 50),
+        ],
+    },
+    SourceTarget4TerminalLateObjectTrack {
+        samples: [
+            (1061, 135, 86),
+            (1076, 139, 84),
+            (1089, 142, 81),
+            (1105, 144, 82),
+            (1121, 146, 81),
+            (1126, 148, 80),
+            (1128, 148, 80),
+            (1129, 148, 80),
+            (1132, 148, 81),
+            (1135, 148, 82),
+            (1152, 151, 83),
+            (1168, 153, 81),
+            (1182, 155, 80),
+            (1193, 157, 80),
+        ],
+    },
+    SourceTarget4TerminalLateObjectTrack {
+        samples: [
+            (1061, 88, 120),
+            (1076, 84, 118),
+            (1089, 81, 115),
+            (1105, 79, 116),
+            (1121, 77, 115),
+            (1126, 75, 114),
+            (1128, 75, 114),
+            (1129, 75, 114),
+            (1132, 75, 115),
+            (1135, 75, 116),
+            (1152, 69, 117),
+            (1168, 65, 111),
+            (1182, 68, 112),
+            (1193, 71, 112),
+        ],
+    },
+    SourceTarget4TerminalLateObjectTrack {
+        samples: [
+            (1061, 156, 165),
+            (1076, 161, 163),
+            (1089, 163, 160),
+            (1105, 165, 161),
+            (1121, 168, 160),
+            (1126, 170, 159),
+            (1128, 170, 159),
+            (1129, 170, 159),
+            (1132, 170, 160),
+            (1135, 170, 159),
+            (1152, 172, 160),
+            (1168, 174, 158),
+            (1182, 177, 159),
+            (1193, 179, 159),
+        ],
+    },
+    SourceTarget4TerminalLateObjectTrack {
+        samples: [
+            (1061, 37, 55),
+            (1076, 165, 51),
+            (1089, 168, 52),
+            (1105, 170, 54),
+            (1121, 172, 53),
+            (1126, 174, 54),
+            (1128, 174, 54),
+            (1129, 174, 54),
+            (1132, 174, 53),
+            (1135, 174, 53),
+            (1152, 177, 54),
+            (1168, 179, 53),
+            (1182, 181, 55),
+            (1193, 183, 58),
+        ],
+    },
+    SourceTarget4TerminalLateObjectTrack {
+        samples: [
+            (1061, 102, 179),
+            (1076, 98, 187),
+            (1089, 96, 189),
+            (1105, 93, 196),
+            (1121, 91, 200),
+            (1126, 89, 204),
+            (1128, 89, 204),
+            (1129, 89, 204),
+            (1132, 89, 205),
+            (1135, 89, 204),
+            (1152, 87, 212),
+            (1168, 81, 224),
+            (1182, 77, 234),
+            (1193, 80, 235),
+        ],
+    },
+    SourceTarget4TerminalLateObjectTrack {
+        samples: [
+            (1061, 120, 162),
+            (1076, 116, 160),
+            (1089, 113, 157),
+            (1105, 111, 158),
+            (1121, 109, 157),
+            (1126, 107, 156),
+            (1128, 107, 156),
+            (1129, 107, 156),
+            (1132, 107, 157),
+            (1135, 107, 158),
+            (1152, 104, 161),
+            (1168, 102, 159),
+            (1182, 97, 160),
+            (1193, 94, 160),
+        ],
+    },
+    SourceTarget4TerminalLateObjectTrack {
+        samples: [
+            (1061, 99, 167),
+            (1076, 94, 165),
+            (1089, 92, 162),
+            (1105, 90, 163),
+            (1121, 88, 162),
+            (1126, 85, 161),
+            (1128, 85, 161),
+            (1129, 85, 161),
+            (1132, 85, 162),
+            (1135, 85, 163),
+            (1152, 80, 166),
+            (1168, 75, 164),
+            (1182, 75, 160),
+            (1193, 78, 157),
+        ],
+    },
+];
 const SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_SHELL_TRACK_A: [(u16, i16, i16); 6] = [
     (1026, 121, 121),
     (1034, 90, 112),
@@ -6642,6 +6884,11 @@ fn source_post_game_landers(frame: u16) -> Vec<EnemySnapshot> {
 fn source_target4_smartmix_terminal_post_game_enemies(frame: u16) -> Vec<EnemySnapshot> {
     let object_frame = frame
         .saturating_add(SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_OBJECT_SAMPLE_ALIGNMENT_FRAMES);
+    let late_residual_mutants =
+        source_target4_smartmix_terminal_late_residual_mutants(object_frame);
+    if !late_residual_mutants.is_empty() {
+        return late_residual_mutants;
+    }
     if object_frame >= SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_VISIBLE_OBJECT_FRAME {
         return source_target4_smartmix_terminal_visible_objects(object_frame)
             .iter()
@@ -6656,6 +6903,21 @@ fn source_target4_smartmix_terminal_post_game_enemies(frame: u16) -> Vec<EnemySn
             let position = interpolate_source_post_game_position(&track.samples, object_frame)?;
             Some(source_terminal_post_game_enemy_for_kind(
                 track.kind,
+                position,
+                object_frame,
+            ))
+        })
+        .collect()
+}
+
+fn source_target4_smartmix_terminal_late_residual_mutants(object_frame: u16) -> Vec<EnemySnapshot> {
+    SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_TERMINAL_LATE_MUTANT_TRACKS
+        .iter()
+        .filter_map(|track| {
+            let position =
+                interpolate_source_post_game_position_bounded(&track.samples, object_frame)?;
+            Some(source_terminal_post_game_enemy_for_kind(
+                SourceTerminalObjectKind::Mutant,
                 position,
                 object_frame,
             ))
@@ -26088,7 +26350,7 @@ mod tests {
             let state_frame = frame.state.frame;
             if matches!(
                 state_frame,
-                5960 | 5981 | 5990 | 5991 | 5995 | 5999 | 6003 | 6007
+                5960 | 5981 | 5990 | 5991 | 5995 | 5999 | 6003 | 6007 | 6075 | 6128
             ) {
                 let lander_count = frame
                     .state
@@ -26277,7 +26539,30 @@ mod tests {
                     1,
                     Some(ScreenPosition::new(19, 136))
                 ),
-                (6007, 0xE800, Some(0x7AC0), 0, 0, None),
+                (
+                    6007,
+                    0xE800,
+                    Some(0x7AC0),
+                    0,
+                    13,
+                    Some(ScreenPosition::new(87, 58))
+                ),
+                (
+                    6075,
+                    0x1B00,
+                    Some(0xADC0),
+                    0,
+                    13,
+                    Some(ScreenPosition::new(230, 54))
+                ),
+                (
+                    6128,
+                    0x42C0,
+                    Some(0xD580),
+                    0,
+                    13,
+                    Some(ScreenPosition::new(237, 54))
+                ),
             ]
         );
         assert_eq!(

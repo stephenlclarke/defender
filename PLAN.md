@@ -6452,3 +6452,30 @@ Exit gate:
   `markdownlint PLAN.md`, and `git diff --check`.
   Slack start:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780705067501169`.
+- `2026-06-06 01:42 BST`: Completed the organic smartmix late residual-mutant
+  projection cycle. The target4 terminal post-game branch now carries the
+  MAME-observed late `SCZP1` / `F8CE` object-table rows after state frame
+  `6007`, using bounded source-sampled tracks in object-frame coordinates
+  `1061-1193` with extra samples around visible wrap points. Clean debug now
+  preserves thirteen residual mutant rows at state frames `6007`, `6075`, and
+  `6128` instead of dropping the terminal objects once the early visible table
+  ended. The focused organic regression now asserts those late counts and first
+  row positions alongside the existing terminal shell, terrain-blow, score, and
+  sound-cadence checks. Regenerated ignored clean media/debug for
+  `organic-terrain-blow-smartmix` confirms the new late rows. The all-axis
+  report remains unaccepted and still fails on the same broad visual boundary:
+  visual RMS moved from `89.06` to `89.56` and MAE from `40.78` to `41.17`,
+  while audio remains green with envelope correlation `0.4431`. This means the
+  remaining organic smartmix blocker is still the unresolved flash/timeline and
+  source-footprint mismatch, not absence of late residual rows. No protected
+  media was committed or accepted, and no legacy code, tests, or scaffolding
+  were safe to remove because the clean-vs-MAME reference tooling is still
+  needed for the open organic proof boundary. Evidence runs included
+  `make reference-clean-capture ...` and `make reference-media-check ...`,
+  with the media check expectedly failing on visual metrics. Validation passed
+  with `cargo fmt --check`, `cargo test
+  clean_game_organic_smartmix_terminal_death_and_terrain_blow_match_mame_window
+  --lib --features legacy-tools`, `cargo check --features legacy-tools`, and
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`. Slack
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780705822870009`.
