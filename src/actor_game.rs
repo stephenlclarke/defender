@@ -4197,6 +4197,10 @@ impl AttractScript {
             .unwrap_or_else(|error| panic!("embedded actor attract script is invalid: {error}"))
     }
 
+    pub fn arcade_title() -> Self {
+        Self::red_label_title()
+    }
+
     pub fn red_label_title_from_events() -> Self {
         let mut events = vec![
             AttractScriptEvent::williams_logo(

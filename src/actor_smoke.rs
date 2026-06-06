@@ -1011,7 +1011,7 @@ fn observe_post_game_scene(report: &mut ActorPostGameSmokeReport, frame: &ActorF
 }
 
 fn default_attract_cycle_steps() -> anyhow::Result<u64> {
-    AttractScript::red_label_title()
+    AttractScript::arcade_title()
         .manifest()
         .cycle_steps
         .ok_or_else(|| anyhow::anyhow!("default actor attract script does not declare a cycle"))

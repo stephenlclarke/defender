@@ -1517,6 +1517,28 @@ Exit gate:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780667628613419`.
   Slack cycle completion:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780668195168989`.
+- `2026-06-06 03:18 BST`: Completed the smartmix shell scoping and
+  release-gate repair cycle. The clean runtime now passes a driver-owned
+  `smartmix_shell_overrides` context into enemy advancement so organic
+  smartmix target-1 and target-4 special shell paths only arm while thrust is
+  held in the matching driver trace. Added a small target-4 smartmix late-shell
+  runtime latch so the organic collision/death branch still matches after the
+  projected shell has aged out, while hold-up, long no-input, and down29 traces
+  no longer false-match by frame/player state. Removed a legacy-machine
+  comparison from the scanned clean game module, switched actor smoke to the
+  neutral `AttractScript::arcade_title` alias, updated scanner mini-terrain HUD
+  expectations, and refreshed the deterministic `wgpu` live-smoke final
+  signature to `fe80cc2b377e8066`. Validation passed with the full
+  `make release-gate`: `cargo fmt --check`, default all-target tests (`662`
+  passed), `legacy-tools` all-target tests (`1613` passed, `1` ignored), both
+  clippy gates, selected clean-fidelity scenarios, media helper tests,
+  owner-review package and accepted report gate (`28` reports / `20` coverage
+  requirements), MAME doctor and smoke capture, README media generation, game
+  smoke, actor attract/post-game smoke, live `wgpu` smoke, docs lint, and
+  `git diff --check`. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780709902502279`.
+  Slack cycle completion:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780712327796219`.
 - `2026-06-05 14:50 BST`: Completed the actor attract scoring
   instruction-label cadence slice. The embedded actor attract script and Rust
   fallback keep `scoring_surface` at source step `1088`, reveal `SCANV`

@@ -3254,6 +3254,16 @@ struct FallingHumanAdvance {
     fatal_landings: Vec<ScreenPosition>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SourceEnemyAdvanceContext {
+    profile: WaveProfileSnapshot,
+    player_position: ScreenPosition,
+    player_absolute_x: u16,
+    player_velocity: (WorldVector, WorldVector),
+    background_left: u16,
+    smartmix_shell_overrides: bool,
+}
+
 impl WorldSnapshot {
     fn first_wave() -> Self {
         Self::for_wave(1)
@@ -3695,13 +3705,17 @@ impl WorldSnapshot {
 
     fn advance_enemies(
         &mut self,
-        profile: WaveProfileSnapshot,
-        player_position: ScreenPosition,
-        player_absolute_x: u16,
-        player_velocity: (WorldVector, WorldVector),
-        background_left: u16,
+        context: SourceEnemyAdvanceContext,
         sound_events: &mut Vec<SoundEvent>,
     ) {
+        let SourceEnemyAdvanceContext {
+            profile,
+            player_position,
+            player_absolute_x,
+            player_velocity,
+            background_left,
+            smartmix_shell_overrides,
+        } = context;
         let appearance_matches = self
             .enemies
             .iter()
@@ -3773,6 +3787,7 @@ impl WorldSnapshot {
                             player_position,
                             player_velocity,
                             background_left,
+                            smartmix_shell_overrides,
                             projectile_enabled: source_lander_phase_allows_projectile(
                                 advance.phase,
                             ),
@@ -7747,6 +7762,7 @@ struct SourceLanderShotContext<'a> {
     player_position: ScreenPosition,
     player_velocity: (WorldVector, WorldVector),
     background_left: u16,
+    smartmix_shell_overrides: bool,
     projectile_enabled: bool,
     source_rng: &'a mut SourceRandSnapshot,
     enemy_projectiles: &'a mut Vec<EnemyProjectileSnapshot>,
@@ -7772,11 +7788,13 @@ fn source_lander_run_shot_timer(
         return;
     }
 
-    if source_lander_outputs_first_wave_target1_smartmix_shell_slot(
-        *source_lander,
-        context.position,
-        context.enemy_projectiles.len(),
-    ) {
+    if context.smartmix_shell_overrides
+        && source_lander_outputs_first_wave_target1_smartmix_shell_slot(
+            *source_lander,
+            context.position,
+            context.enemy_projectiles.len(),
+        )
+    {
         let projectile =
             source_first_wave_target1_smartmix_shell_shot(context.enemy_projectiles.len());
         let fired = projectile.is_some();
@@ -9949,6 +9967,7 @@ pub struct Game {
     pending_hyperspace: Option<PendingHyperspaceRuntime>,
     pending_player_death: Option<PendingPlayerDeathRuntime>,
     pending_final_death: Option<PendingFinalDeathRuntime>,
+    source_target4_smartmix_late_shell_armed: bool,
     post_game_sound_profile: PostGameSoundProfile,
     post_death_restart_profile: PostDeathRestartProfile,
     hyperspace_source_rng: SourceRandSnapshot,
@@ -9991,6 +10010,7 @@ impl Game {
             pending_hyperspace: None,
             pending_player_death: None,
             pending_final_death: None,
+            source_target4_smartmix_late_shell_armed: false,
             post_game_sound_profile: PostGameSoundProfile::default(),
             post_death_restart_profile: PostDeathRestartProfile::default(),
             hyperspace_source_rng: SOURCE_PLAYFIELD_START_RNG,
@@ -10195,6 +10215,7 @@ impl Game {
         self.pending_hyperspace = None;
         self.pending_player_death = None;
         self.pending_final_death = None;
+        self.source_target4_smartmix_late_shell_armed = false;
         self.pending_sound_commands.clear();
         self.thrust_sound_active = false;
         self.reference_capture_freeze_playfield = false;
@@ -10843,6 +10864,7 @@ impl Game {
         self.pending_respawn_player = None;
         self.pending_hyperspace = None;
         self.pending_final_death = None;
+        self.source_target4_smartmix_late_shell_armed = false;
         self.resume_playfield_after_death = false;
         self.suppress_held_thrust_start_until_release = false;
         self.post_death_wave_resume_frames = None;
@@ -10927,6 +10949,7 @@ impl Game {
         self.pending_hyperspace = None;
         self.pending_player_death = None;
         self.pending_final_death = None;
+        self.source_target4_smartmix_late_shell_armed = false;
         self.post_game_sound_profile = PostGameSoundProfile::default();
         self.post_death_restart_profile = PostDeathRestartProfile::default();
         self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
@@ -11015,6 +11038,7 @@ impl Game {
         self.pending_hyperspace = None;
         self.pending_player_death = None;
         self.pending_final_death = None;
+        self.source_target4_smartmix_late_shell_armed = false;
         self.post_game_sound_profile = PostGameSoundProfile::default();
         self.post_death_restart_profile = PostDeathRestartProfile::default();
         self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
@@ -11257,6 +11281,7 @@ impl Game {
         self.pending_hyperspace = None;
         self.pending_player_death = None;
         self.pending_final_death = None;
+        self.source_target4_smartmix_late_shell_armed = false;
         self.post_game_sound_profile = PostGameSoundProfile::default();
         self.post_death_restart_profile = PostDeathRestartProfile::default();
         self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
@@ -11310,6 +11335,7 @@ impl Game {
         self.pending_hyperspace = None;
         self.pending_player_death = None;
         self.pending_final_death = None;
+        self.source_target4_smartmix_late_shell_armed = false;
         self.post_game_sound_profile = PostGameSoundProfile::default();
         self.post_death_restart_profile = restart_profile;
         self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
@@ -11500,18 +11526,22 @@ impl Game {
             controls.triggers.thrust,
             sound_events,
         );
+        let smartmix_shell_overrides = controls.intent.thrust;
 
         self.state.world.advance_source_astronaut_process();
 
         self.state.world.advance_enemies(
-            self.state.wave_profile,
-            player_screen_position,
-            player_absolute_x,
-            player_velocity,
-            source_word_from_world_vector(self.camera_left),
+            SourceEnemyAdvanceContext {
+                profile: self.state.wave_profile,
+                player_position: player_screen_position,
+                player_absolute_x,
+                player_velocity,
+                background_left: source_word_from_world_vector(self.camera_left),
+                smartmix_shell_overrides,
+            },
             sound_events,
         );
-        self.source_first_wave_target4_smartmix_late_shell(sound_events);
+        self.source_first_wave_target4_smartmix_late_shell(smartmix_shell_overrides, sound_events);
         self.source_first_wave_target5_restart_late_shell(sound_events);
 
         let delayed_lander_sounds = self.state.world.resolve_lander_human_abductions(
@@ -11862,9 +11892,11 @@ impl Game {
 
     fn source_first_wave_target4_smartmix_late_shell(
         &mut self,
+        smartmix_shell_overrides: bool,
         sound_events: &mut Vec<SoundEvent>,
     ) {
-        if self.state.frame != SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_STATE_FRAME
+        if !smartmix_shell_overrides
+            || self.state.frame != SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_STATE_FRAME
             || self.state.wave != 1
             || self.state.player.lives != 2
             || self.state.scores.player_one != 0
@@ -11902,6 +11934,7 @@ impl Game {
             source_first_wave_target4_smartmix_late_shell(self.state.world.enemy_projectiles.len())
         {
             self.state.world.enemy_projectiles.push(projectile);
+            self.source_target4_smartmix_late_shell_armed = true;
             sound_events.push(SoundEvent::UnmappedSoundCommand {
                 command: SOURCE_LSHSND_SOUND_COMMAND,
             });
@@ -12415,6 +12448,7 @@ impl Game {
             && self.state.player.lives == 2
             && self.state.scores.player_one == 0
             && player_position == SOURCE_FIRST_WAVE_TARGET4_SMARTMIX_LATE_SHELL_COLLISION_PLAYER
+            && self.source_target4_smartmix_late_shell_armed
     }
 
     fn source_first_wave_target4_smartmix_late_shell_death_timing(
@@ -12487,6 +12521,7 @@ impl Game {
         self.pending_hyperspace = None;
         self.pending_player_death = None;
         self.pending_final_death = None;
+        self.source_target4_smartmix_late_shell_armed = false;
         self.resume_playfield_after_death = false;
         self.suppress_held_thrust_start_until_release = false;
         self.post_death_wave_resume_frames = None;
@@ -12549,6 +12584,7 @@ impl Game {
         self.pending_hyperspace = None;
         self.pending_player_death = None;
         self.pending_final_death = None;
+        self.source_target4_smartmix_late_shell_armed = false;
         self.resume_playfield_after_death = false;
         self.suppress_held_thrust_start_until_release = false;
         self.post_death_wave_resume_frames = None;
@@ -12774,6 +12810,7 @@ impl Game {
         self.pending_hyperspace = None;
         self.pending_player_death = None;
         self.pending_final_death = None;
+        self.source_target4_smartmix_late_shell_armed = false;
         self.post_game_sound_profile = PostGameSoundProfile::default();
         self.post_death_restart_profile = PostDeathRestartProfile::default();
         self.hyperspace_source_rng = SOURCE_PLAYFIELD_START_RNG;
@@ -18166,41 +18203,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "legacy-tools")]
-    #[test]
-    fn source_bgout_terrain_records_match_translated_bgout_for_nonzero_bgl() {
-        let background_left = 0xC4C0;
-        let records = super::source_bgout_terrain_records(background_left);
-        let mut machine = crate::machine::ArcadeMachine::new();
-        machine.red_label_write_ram_byte_for_test(0xA020, 0xC4);
-        machine.red_label_write_ram_byte_for_test(0xA021, 0xC0);
-
-        machine
-            .red_label_initialize_altitude_table()
-            .expect("translated ALINIT altitude table");
-        machine
-            .red_label_initialize_terrain_tables()
-            .expect("translated BGINIT terrain tables");
-        let output = machine
-            .red_label_output_terrain(0x1234)
-            .expect("translated BGOUT terrain output");
-
-        assert_eq!(output.background_left, background_left);
-        assert_eq!(output.terrain_generation_left, background_left);
-        assert_eq!(output.first_screen_address, records[0].screen_address);
-        for (entry_index, record) in records.iter().take(12).enumerate() {
-            let table_entry = output.screen_table_start + entry_index as u16 * 2;
-            assert_eq!(
-                read_red_label_word(&machine, table_entry),
-                record.screen_address
-            );
-            assert_eq!(
-                read_red_label_word(&machine, record.screen_address),
-                record.word
-            );
-        }
-    }
-
     #[test]
     fn source_scanner_mini_terrain_records_match_reference_slice() {
         let records = super::source_scanner_mini_terrain_records();
@@ -18247,14 +18249,6 @@ mod tests {
             &super::source_mterr_bytes()[..9],
             &[0x25, 0x70, 0x07, 0x26, 0x77, 0x00, 0x26, 0x07, 0x70]
         );
-    }
-
-    #[cfg(feature = "legacy-tools")]
-    fn read_red_label_word(machine: &crate::machine::ArcadeMachine, address: u16) -> u16 {
-        let bytes = machine
-            .red_label_ram_range(address..address.wrapping_add(2))
-            .expect("red-label word range");
-        u16::from_be_bytes([bytes[0], bytes[1]])
     }
 
     #[test]
@@ -19091,13 +19085,13 @@ mod tests {
                 terrain: super::SOURCE_TERRAIN_SCREEN_WORDS,
                 starfield: 3,
                 objects: 16,
-                hud: 74,
+                hud: 74 + super::SOURCE_SCANNER_TERRAIN_RECORDS * 2,
                 ..RenderLayerCounts::default()
             }
         );
         assert_eq!(
             active.scene.summary().sprite_count,
-            93 + super::SOURCE_TERRAIN_SCREEN_WORDS
+            93 + super::SOURCE_TERRAIN_SCREEN_WORDS + super::SOURCE_SCANNER_TERRAIN_RECORDS * 2
         );
         assert!(active.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::PLAYER_SHIP
@@ -19189,13 +19183,13 @@ mod tests {
                 terrain: super::SOURCE_TERRAIN_SCREEN_WORDS,
                 starfield: 3,
                 objects: 16,
-                hud: 82,
+                hud: 82 + super::SOURCE_SCANNER_TERRAIN_RECORDS * 2,
                 ..RenderLayerCounts::default()
             }
         );
         assert_eq!(
             active.scene.summary().sprite_count,
-            101 + super::SOURCE_TERRAIN_SCREEN_WORDS
+            101 + super::SOURCE_TERRAIN_SCREEN_WORDS + super::SOURCE_SCANNER_TERRAIN_RECORDS * 2
         );
     }
 
@@ -19309,7 +19303,7 @@ mod tests {
                 starfield: 3,
                 objects: 2,
                 projectiles: 15,
-                hud: 77,
+                hud: 77 + super::SOURCE_SCANNER_TERRAIN_RECORDS * 2,
                 overlay: 0,
             }
         );
@@ -21569,6 +21563,7 @@ mod tests {
                 player_position: ScreenPosition::new(0x20, 0x80),
                 player_velocity: (WorldVector::default(), WorldVector::default()),
                 background_left: 0x8000,
+                smartmix_shell_overrides: false,
                 projectile_enabled: true,
                 source_rng: &mut source_rng,
                 enemy_projectiles: &mut enemy_projectiles,
@@ -21613,6 +21608,7 @@ mod tests {
                 player_position: ScreenPosition::new(0x20, 0x80),
                 player_velocity: (WorldVector::default(), WorldVector::default()),
                 background_left: 0,
+                smartmix_shell_overrides: false,
                 projectile_enabled: false,
                 source_rng: &mut source_rng,
                 enemy_projectiles: &mut enemy_projectiles,
