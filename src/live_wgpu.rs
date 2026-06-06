@@ -53,6 +53,7 @@ const EXPECTED_OFFSCREEN_FIRST_FRAME_SIGNATURE: u64 = 0x8DAE_D38B_41A6_92A9;
 #[cfg(all(not(test), not(coverage)))]
 const EXPECTED_OFFSCREEN_LAST_FRAME_SIGNATURE: u64 = 0xFE80_CC2B_377E_8066;
 const ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT: usize = 512;
+const ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT: usize = 4096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LiveInputProfile {
@@ -96,6 +97,41 @@ pub(crate) struct LiveSmokeReport {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ActorScriptCheckPlayingSummary {
+    pub(crate) wave: u16,
+    pub(crate) wave_size: u8,
+    pub(crate) source_landers: u8,
+    pub(crate) source_bombers: u8,
+    pub(crate) source_pods: u8,
+    pub(crate) source_mutants: u8,
+    pub(crate) source_swarmers: u8,
+    pub(crate) world_enemies: usize,
+    pub(crate) world_humans: usize,
+    pub(crate) reserve_landers: u8,
+    pub(crate) reserve_bombers: u8,
+    pub(crate) reserve_pods: u8,
+    pub(crate) reserve_mutants: u8,
+    pub(crate) reserve_swarmers: u8,
+    pub(crate) source_background_left: u16,
+    pub(crate) source_rng_seed: Option<u8>,
+    pub(crate) source_rng_hseed: Option<u8>,
+    pub(crate) source_rng_lseed: Option<u8>,
+    pub(crate) player_takes_enemy_collision_damage: bool,
+    pub(crate) player_laser_cooldown_steps: u8,
+    pub(crate) lander_mode: String,
+    pub(crate) lander_seek_speed: i16,
+    pub(crate) lander_drift_speed: i16,
+    pub(crate) lander_fire_period_steps: u64,
+    pub(crate) mutant_mode: String,
+    pub(crate) bomber_mode: String,
+    pub(crate) pod_mode: String,
+    pub(crate) swarmer_mode: String,
+    pub(crate) baiter_mode: String,
+    pub(crate) swarmer_fire_period_steps: u64,
+    pub(crate) baiter_fire_period_steps: u64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ActorScriptCheckReport {
     pub(crate) path: String,
     pub(crate) attract_events: usize,
@@ -135,6 +171,8 @@ pub(crate) struct ActorScriptCheckReport {
     pub(crate) first_playing_baiter_mode: String,
     pub(crate) first_playing_swarmer_fire_period_steps: u64,
     pub(crate) first_playing_baiter_fire_period_steps: u64,
+    pub(crate) next_playing_assist_steps: Option<u32>,
+    pub(crate) next_playing: Option<ActorScriptCheckPlayingSummary>,
     pub(crate) clean_exit: bool,
 }
 
@@ -261,8 +299,25 @@ impl ActorScriptCheckReport {
             self.first_playing_source_rng_hseed,
             self.first_playing_source_rng_lseed,
         );
+        let next_playing = self
+            .next_playing
+            .as_ref()
+            .map(|summary| {
+                format!(
+                    "  next_playing_assist_steps: {}\n{}",
+                    self.next_playing_assist_steps.unwrap_or_default(),
+                    playing_summary_to_text("next_playing", summary),
+                )
+            })
+            .unwrap_or_else(|| {
+                format!(
+                    "  next_playing_wave: unavailable_after_assist_steps={}\n",
+                    self.next_playing_assist_steps
+                        .unwrap_or(ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT as u32)
+                )
+            });
         format!(
-            "actor script check passed\n  path: {}\n  attract_events: {}\n  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_source_state: background_left=0x{:04x},rng={}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n  clean_exit: {}\n",
+            "actor script check passed\n  path: {}\n  attract_events: {}\n  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_source_state: background_left=0x{:04x},rng={}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}  clean_exit: {}\n",
             self.path,
             self.attract_events,
             self.behavior_kind_profiles,
@@ -299,9 +354,50 @@ impl ActorScriptCheckReport {
             self.first_playing_baiter_mode,
             self.first_playing_swarmer_fire_period_steps,
             self.first_playing_baiter_fire_period_steps,
+            next_playing,
             self.clean_exit
         )
     }
+}
+
+fn playing_summary_to_text(prefix: &str, summary: &ActorScriptCheckPlayingSummary) -> String {
+    let source_rng = source_rng_summary(
+        summary.source_rng_seed,
+        summary.source_rng_hseed,
+        summary.source_rng_lseed,
+    );
+    format!(
+        "  {prefix}_wave: {}\n  {prefix}_wave_size: {}\n  {prefix}_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  {prefix}_world_counts: enemies={},humans={}\n  {prefix}_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  {prefix}_source_state: background_left=0x{:04x},rng={}\n  {prefix}_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  {prefix}_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  {prefix}_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  {prefix}_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n",
+        summary.wave,
+        summary.wave_size,
+        summary.source_landers,
+        summary.source_bombers,
+        summary.source_pods,
+        summary.source_mutants,
+        summary.source_swarmers,
+        summary.world_enemies,
+        summary.world_humans,
+        summary.reserve_landers,
+        summary.reserve_bombers,
+        summary.reserve_pods,
+        summary.reserve_mutants,
+        summary.reserve_swarmers,
+        summary.source_background_left,
+        source_rng,
+        summary.player_takes_enemy_collision_damage,
+        summary.player_laser_cooldown_steps,
+        summary.lander_mode,
+        summary.lander_seek_speed,
+        summary.lander_drift_speed,
+        summary.lander_fire_period_steps,
+        summary.mutant_mode,
+        summary.bomber_mode,
+        summary.pod_mode,
+        summary.swarmer_mode,
+        summary.baiter_mode,
+        summary.swarmer_fire_period_steps,
+        summary.baiter_fire_period_steps,
+    )
 }
 
 impl From<GameSmokeReport> for LiveSmokeReport {
@@ -397,17 +493,15 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
     let manifest = runtime.driver().script_manifest();
     let frame = runtime.step(ActorGameInput::NONE);
     let playing = run_actor_script_check_to_first_playing_wave(&mut runtime)?;
-    let profile = playing.state.wave_profile;
-    let reserve = playing.state.world.enemy_reserve;
-    debug_assert_eq!(reserve, playing.report.enemy_reserve);
-    let source_rng = playing.report.source_rng;
-    let player_behavior = first_playing_behavior_for(&playing, ActorKind::Player);
-    let lander_behavior = first_playing_behavior_for(&playing, ActorKind::Lander);
-    let mutant_behavior = first_playing_behavior_for(&playing, ActorKind::Mutant);
-    let bomber_behavior = first_playing_behavior_for(&playing, ActorKind::Bomber);
-    let pod_behavior = first_playing_behavior_for(&playing, ActorKind::Pod);
-    let swarmer_behavior = first_playing_behavior_for(&playing, ActorKind::Swarmer);
-    let baiter_behavior = first_playing_behavior_for(&playing, ActorKind::Baiter);
+    let first_playing = actor_script_check_playing_summary(&playing);
+    let next_playing = run_actor_script_check_to_next_playing_wave(&mut runtime, &playing);
+    let (next_playing_assist_steps, next_playing) = match next_playing {
+        Some(next_playing) => (
+            Some(next_playing.assist_steps),
+            Some(actor_script_check_playing_summary(&next_playing.frame)),
+        ),
+        None => (Some(ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT as u32), None),
+    };
 
     Ok(ActorScriptCheckReport {
         path: path.display().to_string(),
@@ -417,45 +511,96 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         wave_profiles: manifest.wave_script.waves.len(),
         first_frame_phase: format!("{:?}", frame.state.phase),
         first_frame_draws: frame.report.draws.len(),
-        first_playing_wave: u16::from(playing.state.wave),
-        first_playing_wave_size: profile.wave_size,
-        first_playing_source_landers: profile.landers,
-        first_playing_source_bombers: profile.bombers,
-        first_playing_source_pods: profile.pods,
-        first_playing_source_mutants: profile.mutants,
-        first_playing_source_swarmers: profile.swarmers,
-        first_playing_world_enemies: playing.state.world.enemies.len(),
-        first_playing_world_humans: playing.state.world.humans.len(),
-        first_playing_reserve_landers: reserve.landers,
-        first_playing_reserve_bombers: reserve.bombers,
-        first_playing_reserve_pods: reserve.pods,
-        first_playing_reserve_mutants: reserve.mutants,
-        first_playing_reserve_swarmers: reserve.swarmers,
-        first_playing_source_background_left: playing.report.source_background_left,
-        first_playing_source_rng_seed: source_rng.map(|source_rng| source_rng.seed),
-        first_playing_source_rng_hseed: source_rng.map(|source_rng| source_rng.hseed),
-        first_playing_source_rng_lseed: source_rng.map(|source_rng| source_rng.lseed),
-        first_playing_player_takes_enemy_collision_damage: player_behavior
+        first_playing_wave: first_playing.wave,
+        first_playing_wave_size: first_playing.wave_size,
+        first_playing_source_landers: first_playing.source_landers,
+        first_playing_source_bombers: first_playing.source_bombers,
+        first_playing_source_pods: first_playing.source_pods,
+        first_playing_source_mutants: first_playing.source_mutants,
+        first_playing_source_swarmers: first_playing.source_swarmers,
+        first_playing_world_enemies: first_playing.world_enemies,
+        first_playing_world_humans: first_playing.world_humans,
+        first_playing_reserve_landers: first_playing.reserve_landers,
+        first_playing_reserve_bombers: first_playing.reserve_bombers,
+        first_playing_reserve_pods: first_playing.reserve_pods,
+        first_playing_reserve_mutants: first_playing.reserve_mutants,
+        first_playing_reserve_swarmers: first_playing.reserve_swarmers,
+        first_playing_source_background_left: first_playing.source_background_left,
+        first_playing_source_rng_seed: first_playing.source_rng_seed,
+        first_playing_source_rng_hseed: first_playing.source_rng_hseed,
+        first_playing_source_rng_lseed: first_playing.source_rng_lseed,
+        first_playing_player_takes_enemy_collision_damage: first_playing
             .player_takes_enemy_collision_damage,
-        first_playing_player_laser_cooldown_steps: player_behavior.player_laser_cooldown_steps,
-        first_playing_lander_mode: lander_behavior_mode_label(lander_behavior.lander_mode)
-            .to_string(),
-        first_playing_lander_seek_speed: lander_behavior.lander_seek_speed,
-        first_playing_lander_drift_speed: lander_behavior.lander_drift_speed,
-        first_playing_lander_fire_period_steps: lander_behavior.lander_fire_period_steps,
-        first_playing_mutant_mode: hostile_movement_mode_label(mutant_behavior.mutant_mode)
-            .to_string(),
-        first_playing_bomber_mode: hostile_movement_mode_label(bomber_behavior.bomber_mode)
-            .to_string(),
-        first_playing_pod_mode: hostile_movement_mode_label(pod_behavior.pod_mode).to_string(),
-        first_playing_swarmer_mode: hostile_movement_mode_label(swarmer_behavior.swarmer_mode)
-            .to_string(),
-        first_playing_baiter_mode: hostile_movement_mode_label(baiter_behavior.baiter_mode)
-            .to_string(),
-        first_playing_swarmer_fire_period_steps: swarmer_behavior.swarmer_fire_period_steps,
-        first_playing_baiter_fire_period_steps: baiter_behavior.baiter_fire_period_steps,
+        first_playing_player_laser_cooldown_steps: first_playing.player_laser_cooldown_steps,
+        first_playing_lander_mode: first_playing.lander_mode,
+        first_playing_lander_seek_speed: first_playing.lander_seek_speed,
+        first_playing_lander_drift_speed: first_playing.lander_drift_speed,
+        first_playing_lander_fire_period_steps: first_playing.lander_fire_period_steps,
+        first_playing_mutant_mode: first_playing.mutant_mode,
+        first_playing_bomber_mode: first_playing.bomber_mode,
+        first_playing_pod_mode: first_playing.pod_mode,
+        first_playing_swarmer_mode: first_playing.swarmer_mode,
+        first_playing_baiter_mode: first_playing.baiter_mode,
+        first_playing_swarmer_fire_period_steps: first_playing.swarmer_fire_period_steps,
+        first_playing_baiter_fire_period_steps: first_playing.baiter_fire_period_steps,
+        next_playing_assist_steps,
+        next_playing,
         clean_exit: true,
     })
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct ActorScriptCheckNextPlayingFrame {
+    frame: ActorFrame,
+    assist_steps: u32,
+}
+
+fn actor_script_check_playing_summary(frame: &ActorFrame) -> ActorScriptCheckPlayingSummary {
+    let profile = frame.report.source_wave;
+    let reserve = frame.state.world.enemy_reserve;
+    debug_assert_eq!(reserve, frame.report.enemy_reserve);
+    let source_rng = frame.report.source_rng;
+    let player_behavior = first_playing_behavior_for(frame, ActorKind::Player);
+    let lander_behavior = first_playing_behavior_for(frame, ActorKind::Lander);
+    let mutant_behavior = first_playing_behavior_for(frame, ActorKind::Mutant);
+    let bomber_behavior = first_playing_behavior_for(frame, ActorKind::Bomber);
+    let pod_behavior = first_playing_behavior_for(frame, ActorKind::Pod);
+    let swarmer_behavior = first_playing_behavior_for(frame, ActorKind::Swarmer);
+    let baiter_behavior = first_playing_behavior_for(frame, ActorKind::Baiter);
+
+    ActorScriptCheckPlayingSummary {
+        wave: frame.report.wave,
+        wave_size: profile.wave_size,
+        source_landers: profile.landers,
+        source_bombers: profile.bombers,
+        source_pods: profile.pods,
+        source_mutants: profile.mutants,
+        source_swarmers: profile.swarmers,
+        world_enemies: frame.state.world.enemies.len(),
+        world_humans: frame.state.world.humans.len(),
+        reserve_landers: reserve.landers,
+        reserve_bombers: reserve.bombers,
+        reserve_pods: reserve.pods,
+        reserve_mutants: reserve.mutants,
+        reserve_swarmers: reserve.swarmers,
+        source_background_left: frame.report.source_background_left,
+        source_rng_seed: source_rng.map(|source_rng| source_rng.seed),
+        source_rng_hseed: source_rng.map(|source_rng| source_rng.hseed),
+        source_rng_lseed: source_rng.map(|source_rng| source_rng.lseed),
+        player_takes_enemy_collision_damage: player_behavior.player_takes_enemy_collision_damage,
+        player_laser_cooldown_steps: player_behavior.player_laser_cooldown_steps,
+        lander_mode: lander_behavior_mode_label(lander_behavior.lander_mode).to_string(),
+        lander_seek_speed: lander_behavior.lander_seek_speed,
+        lander_drift_speed: lander_behavior.lander_drift_speed,
+        lander_fire_period_steps: lander_behavior.lander_fire_period_steps,
+        mutant_mode: hostile_movement_mode_label(mutant_behavior.mutant_mode).to_string(),
+        bomber_mode: hostile_movement_mode_label(bomber_behavior.bomber_mode).to_string(),
+        pod_mode: hostile_movement_mode_label(pod_behavior.pod_mode).to_string(),
+        swarmer_mode: hostile_movement_mode_label(swarmer_behavior.swarmer_mode).to_string(),
+        baiter_mode: hostile_movement_mode_label(baiter_behavior.baiter_mode).to_string(),
+        swarmer_fire_period_steps: swarmer_behavior.swarmer_fire_period_steps,
+        baiter_fire_period_steps: baiter_behavior.baiter_fire_period_steps,
+    }
 }
 
 fn source_rng_summary(seed: Option<u8>, hseed: Option<u8>, lseed: Option<u8>) -> String {
@@ -518,6 +663,48 @@ fn run_actor_script_check_to_first_playing_wave(
     anyhow::bail!(
         "actor script check did not reach the first playable wave within {ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT} actor steps"
     );
+}
+
+fn run_actor_script_check_to_next_playing_wave(
+    runtime: &mut ActorRuntimeAdapter,
+    first_playing: &ActorFrame,
+) -> Option<ActorScriptCheckNextPlayingFrame> {
+    let mut frame = first_playing.clone();
+    let first_wave = frame.report.wave;
+    for step in 1..=ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT {
+        let input = actor_script_check_next_wave_input(&frame);
+        frame = runtime.step(input);
+        if frame.report.phase == Phase::Playing
+            && frame.report.player_start.is_none()
+            && frame.report.wave > first_wave
+        {
+            return Some(ActorScriptCheckNextPlayingFrame {
+                frame,
+                assist_steps: step as u32,
+            });
+        }
+    }
+
+    None
+}
+
+fn actor_script_check_next_wave_input(frame: &ActorFrame) -> ActorGameInput {
+    if frame.report.phase == Phase::Playing
+        && frame.report.player_start.is_none()
+        && !frame.state.world.enemies.is_empty()
+    {
+        return ActorGameInput {
+            xyzzy: XyzzyMode {
+                active: true,
+                auto_fire: false,
+                invincible: true,
+                overlay_smart_bomb: true,
+            },
+            ..ActorGameInput::NONE
+        };
+    }
+
+    ActorGameInput::NONE
 }
 
 #[cfg(all(not(test), not(coverage)))]
@@ -2103,6 +2290,21 @@ mod tests {
         assert_eq!(report.first_playing_baiter_mode, "chase_player");
         assert_eq!(report.first_playing_swarmer_fire_period_steps, 58);
         assert_eq!(report.first_playing_baiter_fire_period_steps, 42);
+        assert_eq!(report.next_playing_assist_steps, Some(140));
+        let next_playing = report
+            .next_playing
+            .as_ref()
+            .expect("example script should reach the second wave");
+        assert_eq!(next_playing.wave, 2);
+        assert_eq!(next_playing.wave_size, 5);
+        assert_eq!(next_playing.source_landers, 20);
+        assert_eq!(next_playing.source_bombers, 3);
+        assert_eq!(next_playing.source_pods, 1);
+        assert_eq!(next_playing.source_mutants, 0);
+        assert_eq!(next_playing.source_swarmers, 0);
+        assert_eq!(next_playing.world_enemies, 2);
+        assert_eq!(next_playing.world_humans, 2);
+        assert_eq!(next_playing.lander_mode, "drift");
         assert!(report.clean_exit);
         assert_eq!(
             report.to_text(),
@@ -2125,6 +2327,17 @@ mod tests {
                 "  first_playing_lander_behavior: mode=drift,seek_speed=1,drift_speed=3,fire_period_steps=96\n",
                 "  first_playing_hostile_modes: mutant=chase_player,bomber=drift,pod=drift,swarmer=chase_player,baiter=chase_player\n",
                 "  first_playing_hostile_fire: swarmer_period_steps=58,baiter_period_steps=42\n",
+                "  next_playing_assist_steps: 140\n",
+                "  next_playing_wave: 2\n",
+                "  next_playing_wave_size: 5\n",
+                "  next_playing_source_counts: landers=20,bombers=3,pods=1,mutants=0,swarmers=0\n",
+                "  next_playing_world_counts: enemies=2,humans=2\n",
+                "  next_playing_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0\n",
+                "  next_playing_source_state: background_left=0x0000,rng=seed=0x82,hseed=0x35,lseed=0x88\n",
+                "  next_playing_player_behavior: takes_enemy_collision_damage=true,laser_cooldown_steps=6\n",
+                "  next_playing_lander_behavior: mode=drift,seek_speed=1,drift_speed=3,fire_period_steps=96\n",
+                "  next_playing_hostile_modes: mutant=chase_player,bomber=drift,pod=drift,swarmer=chase_player,baiter=chase_player\n",
+                "  next_playing_hostile_fire: swarmer_period_steps=58,baiter_period_steps=42\n",
                 "  clean_exit: true\n",
             )
         );
@@ -2207,6 +2420,76 @@ mod tests {
             report
                 .to_text()
                 .contains("first_playing_source_state: background_left=0x0000,rng=seed=")
+        );
+    }
+
+    #[test]
+    fn actor_script_check_reports_next_wave_progression_after_assisted_clear() {
+        let path = write_actor_script_file(
+            "actor-script-next-wave-check",
+            concat!(
+                "[attract]\n",
+                "text 1 forever 12 20 NEXT WAVE CHECK\n",
+                "[behavior]\n",
+                "kind lander lander_mode drift\n",
+                "[wave]\n",
+                "name next wave check waves\n",
+                "source_wave 1 wave_size 1 landers 1 bombers 0 pods 0 mutants 0 swarmers 0\n",
+                "behavior kind lander lander_mode drift\n",
+                "behavior kind lander lander_drift_speed 2\n",
+                "source_wave 2 wave_size 3 landers 1 bombers 1 pods 1 mutants 0 swarmers 0\n",
+                "reserve_full 2 1 0 0 0\n",
+                "behavior kind lander lander_mode chase_player\n",
+                "behavior kind lander lander_seek_speed 7\n",
+                "behavior kind swarmer swarmer_fire_period_steps 23\n",
+                "behavior kind baiter baiter_fire_period_steps 31\n",
+            ),
+        );
+
+        let report = run_actor_script_check(&path).expect("next wave script should check");
+        let next_playing = report
+            .next_playing
+            .as_ref()
+            .expect("checker should reach wave two with assist");
+
+        assert_eq!(report.first_playing_wave, 1);
+        assert_eq!(report.first_playing_world_enemies, 1);
+        assert_eq!(next_playing.wave, 2);
+        assert_eq!(next_playing.wave_size, 3);
+        assert_eq!(next_playing.source_landers, 1);
+        assert_eq!(next_playing.source_bombers, 1);
+        assert_eq!(next_playing.source_pods, 1);
+        assert_eq!(next_playing.source_mutants, 0);
+        assert_eq!(next_playing.source_swarmers, 0);
+        assert_eq!(next_playing.world_enemies, 3);
+        assert_eq!(next_playing.world_humans, 10);
+        assert_eq!(next_playing.reserve_landers, 2);
+        assert_eq!(next_playing.reserve_bombers, 1);
+        assert_eq!(next_playing.reserve_pods, 0);
+        assert_eq!(next_playing.reserve_mutants, 0);
+        assert_eq!(next_playing.reserve_swarmers, 0);
+        assert_eq!(next_playing.lander_mode, "chase_player");
+        assert_eq!(next_playing.lander_seek_speed, 7);
+        assert_eq!(next_playing.swarmer_fire_period_steps, 23);
+        assert_eq!(next_playing.baiter_fire_period_steps, 31);
+        assert!(report.next_playing_assist_steps.is_some_and(
+            |steps| steps > 0 && steps < super::ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT as u32
+        ));
+        assert!(report.to_text().contains(
+            "next_playing_source_counts: landers=1,bombers=1,pods=1,mutants=0,swarmers=0"
+        ));
+        assert!(report.to_text().contains(
+            "next_playing_reserve_counts: landers=2,bombers=1,pods=0,mutants=0,swarmers=0"
+        ));
+        assert!(
+            report
+                .to_text()
+                .contains("next_playing_lander_behavior: mode=chase_player,seek_speed=7")
+        );
+        assert!(
+            report.to_text().contains(
+                "next_playing_hostile_fire: swarmer_period_steps=23,baiter_period_steps=31"
+            )
         );
     }
 

@@ -57,6 +57,10 @@ verification tools.
   manifest, first-frame, effective source-wave, spawned world counts,
   reserve/source-state, and the effective first-play behavior profile actors
   receive for movement/damage/fire tuning.
+  It then uses the actor `XYZZY` overlay smart-bomb path to assist wave clear
+  and reports the next playable wave when the normal actor survivor-bonus and
+  wave-start logic reaches it, including source/reserve counts and effective
+  behavior.
   `examples/actor-custom-attract.script` provides a checked editable
   starting point. The built-in actor attract, behavior, and
   wave scripts are embedded from
@@ -933,6 +937,29 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 13:08 BST`: Completed the actor script next-wave checker cycle.
+  `--actor-script-check <path>` now keeps the first playable wave summary and
+  also advances the same actor runtime with the actor `XYZZY` overlay
+  smart-bomb path until the next playable wave starts, reporting the second
+  wave's source counts, spawned world counts, reserve/source-state, and
+  effective behavior summary when reached. The focused regression proves a
+  two-wave sectioned custom-driver script can change wave-two
+  source/reserve counts and behavior tuning, and that the headless checker
+  reports those installed values after real actor wave-clear and wave-start
+  progression. No legacy code, tests, or scaffolding were safe to remove
+  because this slice hardens the active script-authoring gate. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780728333355649>.
+  Validation passed with `cargo fmt --check`, `cargo test actor_script_check
+  --all-targets --features legacy-tools`, `cargo test actor_script
+  --all-targets --features legacy-tools`, `cargo run --quiet --features
+  legacy-tools -- --actor-script-check examples/actor-custom-attract.script`,
+  `cargo test actor_live --all-targets --features legacy-tools`, `cargo test
+  actor_game --all-targets --features legacy-tools`, `cargo check
+  --all-targets --features legacy-tools`, `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`, `make actor-smoke`, `make
+  actor-wgpu-smoke`, `markdownlint README.md SPEC.md PLAN.md
+  docs/actor-architecture.md`, and `git diff --check`.
 
 - `2026-06-06 07:39 BST`: Completed the actor script reserve/source-state
   checker cycle. `--actor-script-check <path>` now reports first-play enemy

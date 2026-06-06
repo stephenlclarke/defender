@@ -90,7 +90,9 @@ evidence commands.
   credits/starts the actor runtime through the first playable wave and prints
   attract/behavior/wave manifest counts plus first-frame, effective source-wave,
   spawned world, reserve/source-state, and first-play behavior summaries. The
-  checked
+  checker then uses the actor `XYZZY` overlay smart-bomb path to assist
+  progression and reports the next playable wave when real wave-clear/wave-start
+  logic reaches it. The checked
   `examples/actor-custom-attract.script` file is the editable smoke-tested
   example. The shared live input state carries the same key
   bindings and `XYZZY` mode into actor steps. Actor high-score entry now
@@ -253,7 +255,9 @@ interactive actor live runtime. `--actor-script-check <path>` runs the same
 file-backed path without opening the window and reports the parsed script
 surface, first attract actor frame, first playable wave counts, and effective
 first-play reserve/source-state plus the behavior profile that actors receive
-through `StepReport`.
+through `StepReport`. It also samples the next playable wave with an actor
+`XYZZY` overlay smart-bomb assist loop, so progressive custom-driver wave
+profiles can be checked before live launch without bypassing actor commands.
 
 `AttractScript::manifest`, `ActorBehaviorScript::manifest`,
 `ActorWaveScript::manifest`, `ActorDriverScripts::manifest`, and
