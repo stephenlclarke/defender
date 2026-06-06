@@ -162,7 +162,7 @@ const SOURCE_POST_GAME_ENEMY_DEATH_SOUND_SEQUENCE: [(u16, u8); 9] = [
     (351, SOURCE_BACKGROUND_END_SOUND_COMMAND),
     (351, SOURCE_BACKGROUND_END_SOUND_COMMAND),
 ];
-const SOURCE_POST_GAME_TARGET4_SMARTMIX_TERMINAL_SOUND_SEQUENCE: [(u16, u8); 16] = [
+const SOURCE_POST_GAME_TARGET4_SMARTMIX_TERMINAL_SOUND_SEQUENCE: [(u16, u8); 34] = [
     (1026, SOURCE_LSKSND_SOUND_COMMAND),
     (1027, SOURCE_LSKSND_SOUND_COMMAND),
     (1028, SOURCE_LSKSND_SOUND_COMMAND),
@@ -179,6 +179,24 @@ const SOURCE_POST_GAME_TARGET4_SMARTMIX_TERMINAL_SOUND_SEQUENCE: [(u16, u8); 16]
     (1052, SOURCE_AHSND_SOUND_COMMAND),
     (1056, SOURCE_AHSND_SOUND_COMMAND),
     (1060, SOURCE_AHSND_SOUND_COMMAND),
+    (1065, SOURCE_AHSND_SOUND_COMMAND),
+    (1070, SOURCE_AHSND_SOUND_COMMAND),
+    (1075, SOURCE_AHSND_SOUND_COMMAND),
+    (1081, SOURCE_AHSND_SOUND_COMMAND),
+    (1088, SOURCE_AHSND_SOUND_COMMAND),
+    (1097, SOURCE_AHSND_SOUND_COMMAND),
+    (1104, SOURCE_AHSND_SOUND_COMMAND),
+    (1111, SOURCE_AHSND_SOUND_COMMAND),
+    (1120, SOURCE_AHSND_SOUND_COMMAND),
+    (1128, SOURCE_AHSND_SOUND_COMMAND),
+    (1134, SOURCE_AHSND_SOUND_COMMAND),
+    (1141, SOURCE_LASSND_SOUND_COMMAND),
+    (1145, SOURCE_AHSND_SOUND_COMMAND),
+    (1151, SOURCE_AHSND_SOUND_COMMAND),
+    (1157, SOURCE_CANNON_SOUND_COMMAND),
+    (1167, SOURCE_CANNON_SOUND_COMMAND),
+    (1177, SOURCE_THRUST_SOUND_COMMAND),
+    (1181, SOURCE_SSHSND_SOUND_COMMAND),
 ];
 const SOURCE_POST_GAME_OBJECT_START_FRAME: u16 = 102;
 const SOURCE_POST_GAME_APPEARANCE_FIRST_FRAME: u16 = 102;
@@ -25974,7 +25992,7 @@ mod tests {
         let mut sound_samples = Vec::new();
         let mut terminal_object_samples = Vec::new();
 
-        for input_frame in 0..=6006u16 {
+        for input_frame in 0..=6127u16 {
             let frame = game.step(organic_smartmix_input(input_frame));
             let state_frame = frame.state.frame;
             if matches!(
@@ -26054,7 +26072,31 @@ mod tests {
             }
             if matches!(
                 state_frame,
-                4781 | 4782 | 4790 | 4798 | 4927 | 5973..=5983 | 5991 | 5995 | 5999 | 6003 | 6007
+                4781 | 4782 | 4790 | 4798 | 4927 | 5973
+                    ..=5983
+                        | 5991
+                        | 5995
+                        | 5999
+                        | 6003
+                        | 6007
+                        | 6012
+                        | 6017
+                        | 6022
+                        | 6028
+                        | 6035
+                        | 6044
+                        | 6051
+                        | 6058
+                        | 6067
+                        | 6075
+                        | 6081
+                        | 6088
+                        | 6092
+                        | 6098
+                        | 6104
+                        | 6114
+                        | 6124
+                        | 6128
             ) {
                 sound_samples.push((state_frame, frame.events.sounds().to_vec()));
             }
@@ -26070,6 +26112,9 @@ mod tests {
         let thrust = SoundEvent::UnmappedSoundCommand {
             command: super::SOURCE_THRUST_SOUND_COMMAND,
         };
+        let laser = source_laser_fire_sound_event();
+        let mutant_shot =
+            source_enemy_shot_sound_event(EnemyKind::Mutant).expect("mutant shot sound");
 
         assert_eq!(
             terminal_object_samples,
@@ -26232,6 +26277,24 @@ mod tests {
                 (5999, vec![source_bomb_collision_sound_event()]),
                 (6003, vec![source_bomb_collision_sound_event()]),
                 (6007, vec![source_bomb_collision_sound_event()]),
+                (6012, vec![source_bomb_collision_sound_event()]),
+                (6017, vec![source_bomb_collision_sound_event()]),
+                (6022, vec![source_bomb_collision_sound_event()]),
+                (6028, vec![source_bomb_collision_sound_event()]),
+                (6035, vec![source_bomb_collision_sound_event()]),
+                (6044, vec![source_bomb_collision_sound_event()]),
+                (6051, vec![source_bomb_collision_sound_event()]),
+                (6058, vec![source_bomb_collision_sound_event()]),
+                (6067, vec![source_bomb_collision_sound_event()]),
+                (6075, vec![source_bomb_collision_sound_event()]),
+                (6081, vec![source_bomb_collision_sound_event()]),
+                (6088, vec![laser]),
+                (6092, vec![source_bomb_collision_sound_event()]),
+                (6098, vec![source_bomb_collision_sound_event()]),
+                (6104, vec![cannon]),
+                (6114, vec![cannon]),
+                (6124, vec![thrust]),
+                (6128, vec![mutant_shot]),
             ]
         );
     }

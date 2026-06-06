@@ -6404,3 +6404,27 @@ Exit gate:
   organic regression, terrain-blow regression tests, Cargo check/clippy,
   touched-doc `markdownlint`, and `git diff --check`. Slack start:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780698365603889`.
+- `2026-06-06 01:15 BST`: Completed the organic smartmix terminal
+  sound-cadence cycle. The target4 terminal post-game sound sequence now
+  carries the remaining MAME-observed rows from state frames `6012-6128`:
+  the extended `0xEE` terrain-blow tail, `0xEB` laser fire at `6088`,
+  `0xE8` cannon rows at `6104` and `6114`, `0xE9` thrust at `6124`, and
+  `0xF6` mutant shot at `6128`. The focused organic regression now samples
+  those rows through the post-game sound profile and asserts the mapped clean
+  `SoundEvent` stream. Regenerated ignored media for
+  `organic-terrain-blow-smartmix` confirms the clean sound event trace now
+  maps to the MAME command cadence over the bounded window; the report-only
+  comparator now passes audio checks with envelope correlation `0.4431`
+  (`0.0171` in the previous safe baseline) while visual RMS `89.06` and MAE
+  `40.78` remain above threshold. This leaves the organic smartmix visual
+  proof boundary open rather than accepting the all-axis clip. No protected
+  media was committed or accepted, and no legacy code, tests, or scaffolding
+  were safe to remove because the remaining work still depends on the
+  clean-vs-MAME reference tooling. Evidence runs included
+  `make reference-clean-capture ...` and `make reference-media-check ...`,
+  with the media check expectedly failing on visual metrics only. Validation
+  passed with `cargo fmt --check`, `cargo test
+  clean_game_organic_smartmix_terminal_death_and_terrain_blow_match_mame_window
+  --lib --features legacy-tools`, and `cargo check --features legacy-tools`.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780704479140879`.
