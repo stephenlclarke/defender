@@ -109,10 +109,12 @@ verification tools.
   driver internals. The actor wave allocator follows the source active-family
   shape, so later waves now seed bomber, pod, direct-mutant, and swarmer actors
   beside landers when those counts are present. Source-backed actors consume
-  the driver-owned effective source wave profile from `StepPrompt`, so scripted
-  level tuning changes allocation, fixed-point movement, source AI shots,
-  baiter cadence, and mutant hop/shot behavior through the same data surface
-  for one level or a whole source-backed range. Source-backed
+  the driver-owned effective source wave profile from `StepPrompt`, and
+  `StepReport` carries that same profile into `ActorStateBridge` so clean
+  `GameState::wave_profile` mirrors script-expanded or script-overridden source
+  progression. Scripted level tuning changes allocation, fixed-point movement,
+  source AI shots, baiter cadence, and mutant hop/shot behavior through the
+  same data surface for one level or a whole source-backed range. Source-backed
   landers, bombers, pods, swarmers, and initial humans publish fixed-point
   metadata and advance actor-owned fraction state during active motion, and
   source landers prefer configured target slots before falling back to
@@ -927,6 +929,30 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 07:04 BST`: Completed the actor effective source-wave state
+  bridge cycle. `StepReport` now carries the same effective
+  `ActorSourceWaveProfile` that actors receive through `StepPrompt`, and
+  `ActorStateBridge` adapts it into clean `GameState::wave_profile` so custom
+  `source_wave` / `source_waves` script overrides remain visible through the
+  runtime state contract. The focused regression extends the custom source-wave
+  script test to prove overridden family counts, shot timers, baiter timing,
+  and mutant/swarmer tuning reach both `StepReport` and clean `GameState`;
+  source-only `wave_time` stays on the clean table value. README, SPEC, PLAN,
+  and the actor architecture guide document the report/state bridge contract.
+  No legacy code, tests, or scaffolding were safe to remove in this slice
+  because the change tightens the active actor-to-clean runtime bridge. Slack
+  start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780725747441859>.
+  Validation passed with `cargo test
+  parsed_source_wave_overrides_drive_source_shaped_custom_wave --lib --features
+  legacy-tools`, `cargo test actor_state_bridge --lib --features
+  legacy-tools`, `cargo fmt --check`, `cargo test wave_script --lib --features
+  legacy-tools`, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo test actor_live --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, `make
+  actor-smoke`, and `make actor-wgpu-smoke`.
 
 - `2026-06-06 06:54 BST`: Completed the actor source-RNG state bridge cycle.
   `ActorStateBridge` now preserves `StepReport::source_rng` in the clean

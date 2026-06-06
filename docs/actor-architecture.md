@@ -50,9 +50,9 @@ evidence commands.
   actor-specific `ActorFrame`: the original `StepReport`, an actor-derived
   clean `GameState`, a clean gameplay/audio `GameEvents` batch, and the clean
   `RenderScene`. `ActorStateBridge` maps actor phase, score, stock,
-  high-score-entry state, the driver-owned source RNG snapshot, and published
-  actor snapshots with velocity/facing metadata plus hostile-projectile source
-  metadata into the clean state
+  high-score-entry state, the effective source-wave profile, the driver-owned
+  source RNG snapshot, and published actor snapshots with velocity/facing
+  metadata plus hostile-projectile source metadata into the clean state
   contract without making the actor simulation display-frame driven.
   `StepPrompt` and `StepReport` also carry the driver-owned source RNG snapshot
   for playing steps, so source actors can make seeded movement decisions from

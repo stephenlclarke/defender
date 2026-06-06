@@ -77,11 +77,12 @@ renderer path.
 the original report, an actor-derived clean `GameState`, clean gameplay/audio
 `GameEvents`, and the clean `RenderScene`. The state bridge maps actor phase,
 current player, player count, per-player scores/stocks, high-score state, and
-published actor snapshots with movement velocity/facing metadata plus
-hostile-projectile source metadata into the clean runtime contract without
-making actor behavior display-frame driven. Two-player actor starts now require
-two credits, consume both credits, initialize player one as active, publish both
-player score/stock snapshots, and suppress false `GameStarted` events for
+the effective source-wave profile alongside published actor snapshots with
+movement velocity/facing metadata plus hostile-projectile source metadata into
+the clean runtime contract without making actor behavior display-frame driven.
+Two-player actor starts now require two credits, consume both credits,
+initialize player one as active, publish both player score/stock snapshots, and
+suppress false `GameStarted` events for
 blocked two-player start requests. All accepted actor starts now publish the
 source-length start interval and delay actor playfield spawning plus
 `WaveStarted` until that interval completes. Start audio follows the same
@@ -200,7 +201,8 @@ uses the source active-family
 shape, so later waves can introduce bomber, pod, direct mutant, and swarmer
 actor families alongside landers instead of remaining lander-only. Source wave
 profiles now retain the source enemy reserve counts after the active batch,
-expose those counts through `StepReport` and the clean state bridge, and
+expose those counts plus the effective source-wave profile through
+`StepReport` and the clean state bridge, and
 activate source-restored reserve batches before the driver can publish
 `WaveCleared`. Lander reserves fill the next active batch first; once landers
 are exhausted, bomber, pod, direct mutant, and swarmer reserves use their source

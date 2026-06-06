@@ -6521,6 +6521,7 @@ pub struct StepReport {
     pub player_switch: Option<PlayerSwitchReport>,
     pub player_start: Option<PlayerStartReport>,
     pub high_scores: [u32; 5],
+    pub source_wave: ActorSourceWaveProfile,
     pub high_score_initials: HighScoreInitialsState,
     pub high_score_initial_accepted: bool,
     pub high_score_submitted: bool,
@@ -6599,7 +6600,7 @@ impl ActorStateBridge {
             current_player: report.current_player,
             player_count: report.player_count,
             wave,
-            wave_profile: WaveProfileSnapshot::for_wave(wave.max(1)),
+            wave_profile: actor_wave_profile_for_report(report),
             player: player_snapshot_for_report(report),
             player_stocks: report.player_stocks,
             scores: ScoreSnapshot {
@@ -6633,6 +6634,34 @@ fn clean_phase(phase: Phase) -> GamePhase {
 
 fn clean_wave(wave: u16) -> u8 {
     u8::try_from(wave.max(1)).unwrap_or(u8::MAX)
+}
+
+fn actor_wave_profile_for_report(report: &StepReport) -> WaveProfileSnapshot {
+    let mut profile = WaveProfileSnapshot::for_wave(clean_wave(report.wave));
+    let source = report.source_wave;
+    profile.landers = source.landers;
+    profile.bombers = source.bombers;
+    profile.pods = source.pods;
+    profile.mutants = source.mutants;
+    profile.swarmers = source.swarmers;
+    profile.lander_x_velocity = source.lander_x_velocity;
+    profile.lander_y_velocity_msb = source.lander_y_velocity_msb;
+    profile.lander_y_velocity_lsb = source.lander_y_velocity_lsb;
+    profile.mutant_random_y = source.mutant_random_y;
+    profile.mutant_y_velocity_msb = source.mutant_y_velocity_msb;
+    profile.mutant_y_velocity_lsb = source.mutant_y_velocity_lsb;
+    profile.mutant_x_velocity = source.mutant_x_velocity;
+    profile.swarmer_x_velocity = source.swarmer_x_velocity;
+    profile.wave_size = source.wave_size;
+    profile.lander_shot_time = source.lander_shot_time;
+    profile.bomber_x_velocity = source.bomber_x_velocity;
+    profile.mutant_shot_time = source.mutant_shot_time;
+    profile.swarmer_shot_time = source.swarmer_shot_time;
+    profile.swarmer_acceleration_mask = source.swarmer_acceleration_mask;
+    profile.baiter_delay = source.baiter_delay;
+    profile.baiter_shot_time = source.baiter_shot_time;
+    profile.baiter_seek_probability = source.baiter_seek_probability;
+    profile
 }
 
 fn attract_snapshot_for_report(report: &StepReport) -> AttractPresentationSnapshot {
@@ -9852,6 +9881,7 @@ impl ActorGameDriver {
             player_switch,
             player_start,
             high_scores: self.high_scores.entries(),
+            source_wave: self.current_source_wave_profile(),
             high_score_initials: self.high_score_initials,
             high_score_initial_accepted: high_score_entry_step.accepted,
             high_score_submitted: high_score_entry_step.submitted,
@@ -16319,6 +16349,7 @@ mod tests {
             player_switch: None,
             player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
+            source_wave: ActorSourceWaveProfile::for_wave(1),
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,
@@ -16529,6 +16560,7 @@ mod tests {
             player_switch: None,
             player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
+            source_wave: ActorSourceWaveProfile::for_wave(1),
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,
@@ -16655,6 +16687,7 @@ mod tests {
             player_switch: None,
             player_start: None,
             high_scores: [12_000, 10_000, 7_500, 5_000, 2_500],
+            source_wave: ActorSourceWaveProfile::for_wave(2),
             high_score_initials: HighScoreInitialsState {
                 initials: [Some('R'), None, None],
                 cursor: 1,
@@ -16822,6 +16855,7 @@ mod tests {
             player_switch: None,
             player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
+            source_wave: ActorSourceWaveProfile::for_wave(3),
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,
@@ -23792,6 +23826,26 @@ mod tests {
         assert!(report.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Swarmer && snapshot.source_swarmer.is_some()
         }));
+        assert_eq!(report.source_wave.wave_size, 5);
+        assert_eq!(report.source_wave.mutant_x_velocity, 48);
+        assert_eq!(report.source_wave.swarmer_shot_time, 11);
+        let state_profile = report.game_state().wave_profile;
+        assert_eq!(state_profile.wave_size, 5);
+        assert_eq!(state_profile.landers, 1);
+        assert_eq!(state_profile.bombers, 1);
+        assert_eq!(state_profile.pods, 1);
+        assert_eq!(state_profile.mutants, 1);
+        assert_eq!(state_profile.swarmers, 1);
+        assert_eq!(state_profile.swarmer_x_velocity, 64);
+        assert_eq!(state_profile.swarmer_shot_time, 11);
+        assert_eq!(state_profile.baiter_delay, 24);
+        assert_eq!(state_profile.mutant_x_velocity, 48);
+        assert_eq!(state_profile.mutant_random_y, 2);
+        assert_eq!(state_profile.mutant_shot_time, 12);
+        assert_eq!(
+            state_profile.wave_time,
+            WaveProfileSnapshot::for_wave(1).wave_time
+        );
         assert_eq!(
             driver
                 .script_manifest()
