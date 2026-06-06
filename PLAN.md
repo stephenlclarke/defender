@@ -868,12 +868,14 @@ Exit gate:
    `make clean-fidelity` were green in the `2026-05-29 15:54 BST`
    release-gate validation cycle after promoting the PRBP1 pod up-thrust proof
    to all-axis and fixing the clean-only post-game thrust/background audio
-   leak. The current release-gate path now also includes actor smoke gates, so
-   full release-gate status requires a fresh run after the actor rewrite
-   slices. The later organic smart-bomb/up-thrust terrain-blow candidate now
-   has a passing all-axis report and is accepted as organic last-human
-   terrain-blow proof in the report gate; owner review and a fresh full
-   release-gate run remain before protected reference media replacement.
+   leak. The later organic smart-bomb/up-thrust terrain-blow candidate now has
+   a passing all-axis report and is accepted as organic last-human terrain-blow
+   proof in the report gate. The actor-era `2026-06-06 03:50 BST` full
+   `make release-gate` pass is now green, including default and `legacy-tools`
+   Rust tests, both clippy gates, `make clean-fidelity`, media helper tests,
+   owner-review package/report gate, MAME doctor/smoke, README media, game
+   smoke, actor attract/post-game smoke, live smoke, docs lint, and diff
+   hygiene. Owner review remains before protected reference media replacement.
    The owner-review checklist in `docs/fidelity/release-closure-audit.md`
    defines the finite sign-off action and is printed by
    `make owner-review-package`: accept the current 28-report gate and proof
@@ -881,6 +883,20 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-06 03:50 BST`: Completed the actor-era release-gate revalidation
+  cycle. Preflight smoke passed for `cargo run -- --actor-smoke`,
+  `cargo run -- --actor-attract-smoke`, `cargo run -- --actor-post-game-smoke`,
+  `cargo run -- --live-smoke`, and `cargo run -- --game-smoke`, with clean
+  exits, no missing sprite regions, and zero temporary raster commands where
+  reported. The full `make release-gate` then passed: default all-target tests
+  (`663`), `legacy-tools` all-target tests (`1614` passed, `1` ignored), both
+  clippy gates, `make clean-fidelity` across the selected scenarios,
+  `make media-script-test`, `make owner-review-package` and the accepted
+  `28`-report gate, `make reference-mame-doctor`, `make reference-mame-smoke`,
+  `make readme-media`, release smoke targets, docs lint, and `git diff
+  --check`. No runtime patch was needed; remaining closure is owner review or a
+  new concrete MAME mismatch/input program. Slack cycle start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780713702846769`.
 - `2026-06-06 03:35 BST`: Completed the actor two-player source-prompt
   proof-hardening cycle. The two-player start/switch regressions now assert the
   full source message-glyph run in the rendered actor scene, including exact

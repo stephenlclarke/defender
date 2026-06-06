@@ -52,10 +52,11 @@ media generation, game smoke, actor smoke gates, live `wgpu` smoke, docs lint,
 and diff hygiene.
 
 The accepted gate is green, including the repaired organic smartmix
-terrain-blow clip. Final closure still requires owner review of the bounded
-proof set plus a fresh full release-gate run after the actor rewrite slices.
-The proof boundaries and owner-review checklist are tracked in
-`docs/fidelity/release-closure-audit.md`.
+terrain-blow clip, and the actor-era full `make release-gate` pass was rerun on
+`2026-06-06`. Final closure still requires owner review of the bounded proof
+set, or a new concrete MAME clip/input program showing a mismatch outside the
+accepted windows. The proof boundaries and owner-review checklist are tracked
+in `docs/fidelity/release-closure-audit.md`.
 
 ## Actor-Oriented Rewrite Branch
 

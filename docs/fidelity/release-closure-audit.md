@@ -404,8 +404,9 @@ complete without owner review or more MAME evidence:
 ## Owner Review Checklist
 
 The accepted reports are green, including the organic smartmix terrain-blow
-report, but final closure still requires owner review of the bounded proof set
-and a fresh full release-gate run. Use this checklist for that review:
+report, and the actor-era full `make release-gate` pass was rerun on
+`2026-06-06`. Final closure still requires owner review of the bounded proof
+set. Use this checklist for that review:
 
 - Review the current accepted media report set in
   `docs/fidelity/reference-report-gate.json`; it is the bounded MAME-vs-clean
@@ -417,10 +418,10 @@ and a fresh full release-gate run. Use this checklist for that review:
   metric matrix derived from the accepted manifest, local report JSON files,
   and freshly regenerated reference-window scan JSON files. The same target
   prints this checklist so review is anchored to the latest local evidence.
-- Run `make release-gate` before final closure so the full local validation
-  path, fresh evidence package, accepted report gate, smoke checks, docs lint,
-  short MAME recorder smoke, and diff hygiene are exercised from one
-  reproducible target.
+- Re-run `make release-gate` after any further runtime/evidence changes so the
+  full local validation path, fresh evidence package, accepted report gate,
+  smoke checks, docs lint, short MAME recorder smoke, and diff hygiene are
+  exercised from one reproducible target.
 - Review the generated local media under `target/reference-media/`, especially
   the delayed-start fire/reverse, delayed-start thrust/reverse, first
   laser-hit, centered first laser-hit, non-lander target6, pickup/pull,
@@ -442,7 +443,6 @@ all-axis laser/materialize window and the organic smartmix last-human
 terrain-blow window. The enemy materialization matrix also passes as a bounded
 visual proof for source coalescence across lander, mutant, bomber, pod, baiter,
 and swarmer families. The active goal is not yet proven complete because a
-fresh full release-gate run and owner review remain. New work should either
-address another coverage boundary with a bounded MAME-vs-clean clip or record
-owner acceptance that the current accepted clips are sufficient for release
-closure.
+fresh owner review remains. New work should either address another coverage
+boundary with a bounded MAME-vs-clean clip or record owner acceptance that the
+current accepted clips are sufficient for release closure.
