@@ -6398,6 +6398,7 @@ impl ActorRenderSceneBridge {
         }
         if report.phase == Phase::Playing
             && let Some(terrain_blow) = report.terrain_blow
+            && terrain_blow.terrain_erased()
         {
             let flash_tint = source_terrain_blow_flash_tint(terrain_blow.source_elapsed_frames);
             if flash_tint.rgba[3] != 0 {
@@ -14866,6 +14867,24 @@ mod tests {
         assert!(scene.sprites.iter().any(|sprite| {
             SpriteId::SCORE_DIGITS.contains(&sprite.sprite) && sprite.layer == RenderLayer::Hud
         }));
+    }
+
+    #[test]
+    fn actor_render_scene_bridge_ignores_armed_terrain_flash_until_erased() {
+        let mut driver = started_driver();
+        let mut report = driver.step(GameInput::NONE);
+        let mut terrain_blow = TerrainBlowSnapshot::source_armed_terrain_visible();
+        terrain_blow.source_elapsed_frames = 2;
+        report.terrain_blow = Some(terrain_blow);
+
+        let scene = report.render_scene();
+
+        assert!(!terrain_blow.terrain_erased());
+        assert_ne!(
+            source_terrain_blow_flash_tint(terrain_blow.source_elapsed_frames),
+            Color { rgba: [0; 4] }
+        );
+        assert_eq!(scene.clear_color, Color { rgba: [0; 4] });
     }
 
     #[test]

@@ -595,16 +595,19 @@ Exit gate:
    nine-mutant residual object mix before `TERBLO`, and the sampled `0xEE`
    terrain-blow tail at frames `5991`, `5995`, `5999`, `6003`, and `6007`.
    The current regenerated report improves from stale no-audio/static-clean
-   evidence but still fails with visual RMS `89.06` / MAE `40.78` and audio
-   waveform correlation below threshold. A `2026-06-06` terminal-flash
+   evidence but still fails with visual RMS `89.11` / MAE `40.82`; audio passes
+   with envelope correlation `0.4431`. A `2026-06-06` terminal-flash
    experiment confirmed that directly replaying the organic `pcram0` rows, or
    a sampled visible-video flash table, is not yet safe: report-only visual
-   metrics worsened to RMS `90.18` / MAE `42.40` and then RMS `97.41` / MAE
-   `47.39`, so the generic source terrain-blow flash remains in place until
-   the organic media frame alignment is solved. The state-steered `TERBLO` clip
-   remains the accepted bounded
-   terrain-blow evidence, and the organic smartmix TERBLO cadence remains the
-   concrete follow-up rather than a missing-evidence boundary. A follow-up
+   metrics worsened, so the generic source terrain-blow flash remains in place
+   until the organic media frame alignment is solved. A follow-up
+   `2026-06-06` guard hardening now prevents the armed-but-not-erased terrain
+   blow state from applying flash clear color in either clean source rendering
+   or actor rendering; the organic report remains at the same visual-fail /
+   audio-pass baseline instead of taking the flash-table regression. The
+   state-steered `TERBLO` clip remains the accepted bounded terrain-blow
+   evidence, and the organic smartmix TERBLO cadence remains the concrete
+   follow-up rather than a missing-evidence boundary. A follow-up
    non-lander trace inventory identified `extended_hold_up_7000`, frames
    `5811-7000`, as the
    next finite organic visual media target. Its input program is
@@ -879,6 +882,23 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-06 02:15 BST`: Completed the armed terrain-blow render guard cycle.
+  The clean source renderer and actor render bridge now apply terrain-blow flash
+  clear color only after `TerrainBlowSnapshot::terrain_erased()` is true, so the
+  armed-but-not-erased source state keeps its neutral clear color and, on the
+  source renderer path, continues to draw terrain tiles. The unsafe organic
+  `pcram0` flash-table experiment was not kept because it regressed the
+  smartmix media gate; the prior source terrain-blow flash cadence remains in
+  place. Focused regressions now exercise both render paths at an elapsed frame
+  that would otherwise have produced a visible flash. Validation passed with
+  `cargo fmt --check`, `cargo test armed_terrain --lib --features
+  legacy-tools`, `cargo test terrain_blow --lib --features legacy-tools`,
+  `cargo check --features legacy-tools`, `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`, and the regenerated report-only
+  organic terrain-blow smartmix media check. That report remains visual-fail at
+  RMS `89.11` / MAE `40.82`; audio passes with envelope correlation `0.4431`.
+  Slack start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780707473389519`.
 - `2026-06-05 22:30 BST`: Completed the actor two-player prompt hardening
   cycle. Focused actor regressions now prove the source `PLYR1`/`PLYR2` plus
   `GO` switch prompt persists across every step of the source `0x60`

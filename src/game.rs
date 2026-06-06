@@ -12848,6 +12848,7 @@ impl Game {
         }
         if let Some(terrain_blow) = self.state.world.terrain_blow
             && show_playfield
+            && terrain_blow.terrain_erased()
         {
             let flash_tint = source_terrain_blow_flash_tint(terrain_blow.source_elapsed_frames);
             if flash_tint.rgba[3] != 0 {
@@ -17207,8 +17208,8 @@ mod tests {
         START_PLAYFIELD_DELAY_FRAMES, START_SOUND_DELAY_FRAMES, ScannerRadarBlipKind,
         ScannerRadarSnapshot, ScannerRadarStage, ScorePopupKind, SoundEvent, SourceBaiterSnapshot,
         SourceBomberSnapshot, SourceLanderSnapshot, SourceMutantSnapshot, SourcePodSnapshot,
-        SourceRandSnapshot, SourceSwarmerSnapshot, TerrainBlowStage, WaveProfileSnapshot,
-        WorldSnapshot, WorldVector, push_source_explosion_cloud_pixels,
+        SourceRandSnapshot, SourceSwarmerSnapshot, TerrainBlowSnapshot, TerrainBlowStage,
+        WaveProfileSnapshot, WorldSnapshot, WorldVector, push_source_explosion_cloud_pixels,
         source_astronaut_catch_sound_event, source_astronaut_hit_sound_event,
         source_astronaut_safe_landing_sound_event, source_bomb_collision_sound_event,
         source_enemy_hit_sound_event, source_enemy_shot_sound_event, source_explosion_size_for_age,
@@ -29664,6 +29665,26 @@ mod tests {
             sprite.sprite == SpriteId::TERRAIN_EXPLOSION && sprite.layer == RenderLayer::Objects
         }));
         assert!(frame.events.sounds().is_empty());
+    }
+
+    #[test]
+    fn clean_scene_keeps_armed_terrain_visible_without_flash_tint() {
+        let mut game = credited_started_game();
+        let mut terrain_blow = TerrainBlowSnapshot::source_armed_terrain_visible();
+        terrain_blow.source_elapsed_frames = 2;
+        game.state.world.terrain_blow = Some(terrain_blow);
+
+        let scene = game.scene();
+
+        assert!(!terrain_blow.terrain_erased());
+        assert_ne!(
+            source_terrain_blow_flash_tint(terrain_blow.source_elapsed_frames),
+            Color { rgba: [0; 4] }
+        );
+        assert_eq!(scene.clear_color, Color { rgba: [0; 4] });
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::TERRAIN_TILE && sprite.layer == RenderLayer::Terrain
+        }));
     }
 
     #[test]
