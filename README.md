@@ -119,8 +119,10 @@ that actor live path. `--actor-script <path>` loads one checked sectioned
 custom-driver script into that actor live path before the window opens, so a
 custom `[attract]` / `[behavior]` / `[wave]` bundle can drive live play; the
 CLI rejects combining it with `--live-smoke` because that command still uses
-the clean-game smoke path. Actor high-score entry now accepts live
-initials/backspace
+the clean-game smoke path. `--actor-script-check <path>` parses the same script
+headlessly, boots one actor step, and prints manifest/frame counts; the checked
+`examples/actor-custom-attract.script` file is a minimal editable custom-driver
+starting point. Actor high-score entry now accepts live initials/backspace
 through the actor input surface and draws the in-progress initials row from
 actor state.
 The current slice includes same-contract keyboard profiles, `XYZZY` overlay
@@ -396,6 +398,8 @@ Common commands:
 ```sh
 cargo run
 cargo run -- --actor-live # explicit actor-live alias
+cargo run -- --actor-script-check examples/actor-custom-attract.script
+cargo run -- --actor-script examples/actor-custom-attract.script
 cargo run -- --actor-script /path/to/driver.script
 cargo run -- --input-profile planetoid
 cargo run -- --input-profile cabinet

@@ -84,9 +84,13 @@ evidence commands.
   `--actor-script <path>` parses one checked sectioned actor driver script and
   boots the same live runtime through `ActorRuntimeAdapter::with_scripts`; it
   is not accepted with `--live-smoke` because that command remains the clean
-  game smoke path. The shared live input state carries the same key bindings
-  and `XYZZY` mode into actor steps. Actor high-score entry now consumes
-  initials/backspace from
+  game smoke path. `--actor-script-check <path>` uses the same parser and
+  runtime constructor headlessly, steps one actor frame, and prints
+  attract/behavior/wave manifest counts plus first-frame draw counts. The
+  checked `examples/actor-custom-attract.script` file is the editable
+  smoke-tested example. The shared live input state carries the same key
+  bindings and `XYZZY` mode into actor steps. Actor high-score entry now
+  consumes initials/backspace from
   that input surface, updates driver-owned initials state, enters the 60-step
   Hall-of-Fame game-over stall after a three-letter entry is submitted, and
   returns to attract after the stall.
@@ -241,7 +245,9 @@ sectioned text implements `str::parse::<ActorDriverScripts>()`, can be
 inspected through `ActorDriverScripts::manifest()` before a driver is created,
 and can be launched directly with `ActorRuntimeAdapter::with_scripts` for
 custom-driver runtime smoke tests or through `--actor-script <path>` in the
-interactive actor live runtime.
+interactive actor live runtime. `--actor-script-check <path>` runs the same
+file-backed path without opening the window and reports the parsed script
+surface plus the first actor frame.
 
 `AttractScript::manifest`, `ActorBehaviorScript::manifest`,
 `ActorWaveScript::manifest`, `ActorDriverScripts::manifest`, and

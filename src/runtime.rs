@@ -43,6 +43,11 @@ impl<B: RuntimeBackend> RuntimeHost<B> {
         self.backend.run_command(RuntimeCommand::GameSmoke)
     }
 
+    pub(crate) fn run_actor_script_check(&self, path: PathBuf) -> anyhow::Result<()> {
+        self.backend
+            .run_command(RuntimeCommand::ActorScriptCheck { path })
+    }
+
     pub(crate) fn run_actor_smoke(&self) -> anyhow::Result<()> {
         self.backend.run_command(RuntimeCommand::ActorSmoke)
     }
@@ -129,6 +134,9 @@ pub(crate) enum RuntimeCommand {
         path: PathBuf,
     },
     GameSmoke,
+    ActorScriptCheck {
+        path: PathBuf,
+    },
     ActorSmoke,
     ActorAttractSmoke,
     ActorPostGameSmoke,
@@ -214,6 +222,11 @@ impl RuntimeBackend for InstalledRuntimeBackend {
             RuntimeCommand::RomReport { path } => run_rom_report_command(path),
             RuntimeCommand::VerifyRoms { path } => run_verify_roms_command(path),
             RuntimeCommand::GameSmoke => crate::game_smoke::run(),
+            RuntimeCommand::ActorScriptCheck { path } => {
+                let report = crate::live_wgpu::run_actor_script_check(&path)?;
+                print!("{}", report.to_text());
+                Ok(())
+            }
             RuntimeCommand::ActorSmoke => crate::actor_smoke::run(),
             RuntimeCommand::ActorAttractSmoke => crate::actor_smoke::run_attract_cycle(),
             RuntimeCommand::ActorPostGameSmoke => crate::actor_smoke::run_post_game(),
@@ -399,6 +412,10 @@ pub(crate) fn run_game_smoke() -> anyhow::Result<()> {
     RuntimeHost::current().run_game_smoke()
 }
 
+pub(crate) fn run_actor_script_check(path: PathBuf) -> anyhow::Result<()> {
+    RuntimeHost::current().run_actor_script_check(path)
+}
+
 pub(crate) fn run_actor_smoke() -> anyhow::Result<()> {
     RuntimeHost::current().run_actor_smoke()
 }
@@ -462,6 +479,7 @@ pub(crate) fn help_text() -> &'static str {
         "  cargo run -- --actor-script /path/to/driver.script\n",
         "  cargo run -- --live-smoke\n",
         "  cargo run -- --game-smoke\n",
+        "  cargo run -- --actor-script-check /path/to/driver.script\n",
         "  cargo run -- --actor-smoke\n",
         "  cargo run -- --actor-attract-smoke\n",
         "  cargo run -- --actor-post-game-smoke\n",
@@ -612,6 +630,25 @@ mod tests {
 
         let observed = calls.borrow();
         assert_eq!(observed.as_slice(), &[RuntimeCommand::GameSmoke]);
+    }
+
+    #[test]
+    fn runtime_host_launches_actor_script_check_separately() {
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let host = RuntimeHost::with_backend(RecordingBackend {
+            calls: Rc::clone(&calls),
+        });
+
+        host.run_actor_script_check(PathBuf::from("driver.script"))
+            .expect("runtime host should run actor script check command");
+
+        let observed = calls.borrow();
+        assert_eq!(
+            observed.as_slice(),
+            &[RuntimeCommand::ActorScriptCheck {
+                path: PathBuf::from("driver.script"),
+            }]
+        );
     }
 
     #[test]
@@ -950,6 +987,13 @@ mod tests {
     }
 
     #[test]
+    fn installed_backend_runs_actor_script_check() {
+        RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run_actor_script_check(PathBuf::from("examples/actor-custom-attract.script"))
+            .expect("installed backend should run actor script check");
+    }
+
+    #[test]
     fn installed_backend_runs_actor_smoke() {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
             .run_actor_smoke()
@@ -1088,6 +1132,7 @@ mod tests {
         assert!(text.contains("--input-profile cabinet"));
         assert!(text.contains("--live-smoke"));
         assert!(text.contains("--game-smoke"));
+        assert!(text.contains("--actor-script-check /path/to/driver.script"));
         assert!(text.contains("--actor-smoke"));
         assert!(text.contains("--actor-attract-smoke"));
         assert!(text.contains("--actor-post-game-smoke"));

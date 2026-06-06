@@ -110,6 +110,9 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
         CliClassification::Runtime(config) => crate::runtime::run(&config),
         CliClassification::Help => crate::runtime::run_help(),
         CliClassification::Error(error) => Err(error.into()),
+        CliClassification::ActorScriptCheck(request) => {
+            crate::runtime::run_actor_script_check(request.path)
+        }
         CliClassification::ActorSmoke => crate::runtime::run_actor_smoke(),
         CliClassification::ActorAttractSmoke => crate::runtime::run_actor_attract_smoke(),
         CliClassification::ActorPostGameSmoke => crate::runtime::run_actor_post_game_smoke(),
@@ -131,6 +134,7 @@ enum CliClassification {
     FidelityScenarioInputWriter(ScenarioInputWriterRequest),
     Runtime(RuntimeConfig),
     GameSmoke,
+    ActorScriptCheck(ActorScriptCheckRequest),
     ActorSmoke,
     ActorAttractSmoke,
     ActorPostGameSmoke,
@@ -185,6 +189,11 @@ struct ScenarioInputWriterRequest {
     path: PathBuf,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ActorScriptCheckRequest {
+    path: PathBuf,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct RuntimeCliClassifier;
 
@@ -231,6 +240,9 @@ impl RuntimeCliClassifier {
                     return CliClassification::FidelityScenarioInputWriter(request);
                 }
                 ArgClassification::GameSmoke => return CliClassification::GameSmoke,
+                ArgClassification::ActorScriptCheck(request) => {
+                    return CliClassification::ActorScriptCheck(request);
+                }
                 ArgClassification::ActorSmoke => return CliClassification::ActorSmoke,
                 ArgClassification::ActorAttractSmoke => {
                     return CliClassification::ActorAttractSmoke;
@@ -292,6 +304,22 @@ impl RuntimeCliClassifier {
                     return ArgClassification::Error(CleanCliError::TooManyActorSmokeArgs);
                 }
                 ArgClassification::ActorSmoke
+            }
+            "--actor-script-check" => {
+                if live_option_seen {
+                    return ArgClassification::Error(CleanCliError::LiveOptionsWithCommand(
+                        "--actor-script-check",
+                    ));
+                }
+                let Some(path) = args.next() else {
+                    return ArgClassification::Error(CleanCliError::MissingActorScriptCheckPath);
+                };
+                if args.next().is_some() {
+                    return ArgClassification::Error(CleanCliError::TooManyActorScriptCheckArgs);
+                }
+                ArgClassification::ActorScriptCheck(ActorScriptCheckRequest {
+                    path: PathBuf::from(path),
+                })
             }
             "--actor-attract-smoke" => {
                 if live_option_seen {
@@ -559,6 +587,7 @@ enum ArgClassification {
     FidelityScenarioList,
     FidelityScenarioInputWriter(ScenarioInputWriterRequest),
     GameSmoke,
+    ActorScriptCheck(ActorScriptCheckRequest),
     ActorSmoke,
     ActorAttractSmoke,
     ActorPostGameSmoke,
@@ -583,6 +612,8 @@ enum CleanCliError {
     MissingVerifyRomsPath,
     TooManyVerifyRomsArgs,
     TooManyGameSmokeArgs,
+    MissingActorScriptCheckPath,
+    TooManyActorScriptCheckArgs,
     TooManyActorSmokeArgs,
     TooManyActorAttractSmokeArgs,
     TooManyActorPostGameSmokeArgs,
@@ -655,6 +686,15 @@ impl fmt::Display for CleanCliError {
                 write!(
                     formatter,
                     "--game-smoke does not accept additional arguments"
+                )
+            }
+            Self::MissingActorScriptCheckPath => {
+                write!(formatter, "--actor-script-check requires a script path")
+            }
+            Self::TooManyActorScriptCheckArgs => {
+                write!(
+                    formatter,
+                    "--actor-script-check only accepts one script path"
                 )
             }
             Self::TooManyActorSmokeArgs => {
@@ -818,7 +858,7 @@ mod tests {
     };
 
     use super::{
-        AudioOutput, CleanCliError, CliClassification, ControlProfile,
+        ActorScriptCheckRequest, AudioOutput, CleanCliError, CliClassification, ControlProfile,
         FidelityReferenceTraceFixtureDirectoryRequest, FidelityTraceCheckRequest,
         FidelityTraceFixtureDirectoryRequest, FidelityTraceInputsFileRequest,
         FidelityTraceInputsRequest, FidelityTraceRequest, RomReportRequest, RunMode,
@@ -930,6 +970,19 @@ mod tests {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--actor-smoke"])),
             CliClassification::ActorSmoke
+        );
+    }
+
+    #[test]
+    fn clean_cli_owns_actor_script_check_command() {
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&[
+                "--actor-script-check",
+                "examples/actor-custom-attract.script",
+            ])),
+            CliClassification::ActorScriptCheck(ActorScriptCheckRequest {
+                path: PathBuf::from("examples/actor-custom-attract.script"),
+            })
         );
     }
 
@@ -1236,6 +1289,29 @@ mod tests {
             (
                 vec!["--actor-smoke", "--mute"],
                 CleanCliError::TooManyActorSmokeArgs,
+            ),
+        ] {
+            assert_eq!(
+                RuntimeCliClassifier::classify(args(&values)),
+                CliClassification::Error(error)
+            );
+        }
+    }
+
+    #[test]
+    fn clean_cli_rejects_malformed_actor_script_check_args() {
+        for (values, error) in [
+            (
+                vec!["--mute", "--actor-script-check", "driver.script"],
+                CleanCliError::LiveOptionsWithCommand("--actor-script-check"),
+            ),
+            (
+                vec!["--actor-script-check"],
+                CleanCliError::MissingActorScriptCheckPath,
+            ),
+            (
+                vec!["--actor-script-check", "driver.script", "extra"],
+                CleanCliError::TooManyActorScriptCheckArgs,
             ),
         ] {
             assert_eq!(
@@ -1590,6 +1666,14 @@ mod tests {
             "--game-smoke does not accept additional arguments"
         );
         assert_eq!(
+            CleanCliError::MissingActorScriptCheckPath.to_string(),
+            "--actor-script-check requires a script path"
+        );
+        assert_eq!(
+            CleanCliError::TooManyActorScriptCheckArgs.to_string(),
+            "--actor-script-check only accepts one script path"
+        );
+        assert_eq!(
             CleanCliError::TooManyActorSmokeArgs.to_string(),
             "--actor-smoke does not accept additional arguments"
         );
@@ -1722,6 +1806,15 @@ mod tests {
     fn actor_smoke_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&["--actor-smoke"]))
             .expect("actor smoke CLI should run through configured runtime");
+    }
+
+    #[test]
+    fn actor_script_check_cli_entrypoint_accepts_supported_args() {
+        super::run_with_args(args(&[
+            "--actor-script-check",
+            "examples/actor-custom-attract.script",
+        ]))
+        .expect("actor script check CLI should run through configured runtime");
     }
 
     #[test]

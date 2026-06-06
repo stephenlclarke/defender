@@ -399,6 +399,7 @@ mod public_api_tests {
         assert!(platform_rs.contains("ArgClassification::Error"));
         assert!(platform_rs.contains("\"--live-smoke\""));
         assert!(platform_rs.contains("\"--actor-script\""));
+        assert!(platform_rs.contains("\"--actor-script-check\""));
         assert!(platform_rs.contains("\"--game-smoke\""));
         assert!(platform_rs.contains("\"--actor-smoke\""));
         assert!(platform_rs.contains("\"--actor-attract-smoke\""));

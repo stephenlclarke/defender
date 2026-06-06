@@ -51,8 +51,11 @@ verification tools.
   accepts `--actor-script <path>` to load one checked sectioned custom-driver
   script before the window opens, while rejecting that option with
   `--live-smoke` so a custom actor script is never silently ignored by the
-  clean-game smoke path. The built-in actor attract, behavior, and wave scripts
-  are embedded from
+  clean-game smoke path. `--actor-script-check <path>` now runs the same parser
+  and runtime constructor headlessly for one actor step and reports manifest
+  plus first-frame counts, and `examples/actor-custom-attract.script` provides
+  a checked editable starting point. The built-in actor attract, behavior, and
+  wave scripts are embedded from
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and
   `assets/red-label/actor-waves.script` through the same parser path. The
@@ -920,6 +923,32 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 06:46 BST`: Completed the actor script check tooling cycle.
+  Added `--actor-script-check <path>` as a headless custom-driver validation
+  command: it reads a sectioned actor driver script, parses it as
+  `ActorDriverScripts`, boots `ActorRuntimeAdapter::with_scripts`, steps one
+  actor frame, and prints attract, behavior, wave, first-frame phase, and draw
+  counts. Added the checked `examples/actor-custom-attract.script` sample as a
+  minimal custom attract/behavior/wave bundle that can be checked before live
+  launch. Focused regressions cover CLI classification, malformed arguments,
+  runtime command dispatch, installed backend execution, the report text, and
+  the example script's parsed/drawn surface. README, SPEC, and the actor
+  architecture guide now document the check-then-launch workflow. No legacy
+  code, tests, or scaffolding were safe to remove because this slice adds the
+  active script-authoring validation path. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780724548401479>.
+  Validation passed with `cargo test actor_script_check --all-targets`, `cargo
+  run -- --actor-script-check examples/actor-custom-attract.script`, `cargo
+  test actor_script --all-targets`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, `make
+  actor-smoke`, `make actor-wgpu-smoke`, `cargo fmt --check`, `markdownlint
+  README.md SPEC.md PLAN.md docs/actor-architecture.md
+  docs/fidelity/mame-golden-clips.md docs/fidelity/release-closure-audit.md
+  assets/sounds/README.md assets/red-label/README.md`, and `git diff
+  --check`.
 
 - `2026-06-06 06:34 BST`: Completed the actor script file runtime-loading
   cycle. `--actor-script <path>` is now a live actor runtime option: the CLI

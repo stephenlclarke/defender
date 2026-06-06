@@ -90,6 +90,18 @@ pub(crate) struct LiveSmokeReport {
     pub(crate) clean_exit: bool,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ActorScriptCheckReport {
+    pub(crate) path: String,
+    pub(crate) attract_events: usize,
+    pub(crate) behavior_kind_profiles: usize,
+    pub(crate) behavior_actor_profiles: usize,
+    pub(crate) wave_profiles: usize,
+    pub(crate) first_frame_phase: String,
+    pub(crate) first_frame_draws: usize,
+    pub(crate) clean_exit: bool,
+}
+
 impl LiveSmokeReport {
     pub(crate) fn to_text(&self) -> String {
         let frame_size = self
@@ -206,6 +218,22 @@ impl LiveSmokeReport {
     }
 }
 
+impl ActorScriptCheckReport {
+    pub(crate) fn to_text(&self) -> String {
+        format!(
+            "actor script check passed\n  path: {}\n  attract_events: {}\n  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  clean_exit: {}\n",
+            self.path,
+            self.attract_events,
+            self.behavior_kind_profiles,
+            self.behavior_actor_profiles,
+            self.wave_profiles,
+            self.first_frame_phase,
+            self.first_frame_draws,
+            self.clean_exit
+        )
+    }
+}
+
 impl From<GameSmokeReport> for LiveSmokeReport {
     fn from(report: GameSmokeReport) -> Self {
         Self {
@@ -292,6 +320,23 @@ pub(crate) fn actor_runtime_from_script_path(
         .parse::<ActorDriverScripts>()
         .with_context(|| format!("parsing actor driver script {}", path.display()))?;
     Ok(ActorRuntimeAdapter::with_scripts(scripts))
+}
+
+pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptCheckReport> {
+    let mut runtime = actor_runtime_from_script_path(Some(path))?;
+    let manifest = runtime.driver().script_manifest();
+    let frame = runtime.step(crate::actor_game::GameInput::NONE);
+
+    Ok(ActorScriptCheckReport {
+        path: path.display().to_string(),
+        attract_events: manifest.attract_script.events.len(),
+        behavior_kind_profiles: manifest.behavior_script.kind_profiles.len(),
+        behavior_actor_profiles: manifest.behavior_script.actor_profiles.len(),
+        wave_profiles: manifest.wave_script.waves.len(),
+        first_frame_phase: format!("{:?}", frame.state.phase),
+        first_frame_draws: frame.report.draws.len(),
+        clean_exit: true,
+    })
 }
 
 #[cfg(all(not(test), not(coverage)))]
@@ -1633,7 +1678,7 @@ mod tests {
 
     use super::{
         LiveInputState, LiveSmokeReport, actor_runtime_from_script_path, run_actor_live,
-        run_actor_wgpu_smoke, run_smoke,
+        run_actor_script_check, run_actor_wgpu_smoke, run_smoke,
     };
 
     #[test]
@@ -1832,6 +1877,35 @@ mod tests {
         assert!(format!("{parse_error:#}").contains("actor driver wave script line 6"));
 
         let _ = fs::remove_file(malformed);
+    }
+
+    #[test]
+    fn actor_script_check_report_summarizes_example_driver_script() {
+        let path = std::path::Path::new("examples/actor-custom-attract.script");
+        let report = run_actor_script_check(path).expect("example actor script should check");
+
+        assert_eq!(report.path, path.display().to_string());
+        assert_eq!(report.attract_events, 2);
+        assert_eq!(report.behavior_kind_profiles, 2);
+        assert_eq!(report.behavior_actor_profiles, 0);
+        assert_eq!(report.wave_profiles, 1);
+        assert_eq!(report.first_frame_phase, "Attract");
+        assert_eq!(report.first_frame_draws, 2);
+        assert!(report.clean_exit);
+        assert_eq!(
+            report.to_text(),
+            concat!(
+                "actor script check passed\n",
+                "  path: examples/actor-custom-attract.script\n",
+                "  attract_events: 2\n",
+                "  behavior_kind_profiles: 2\n",
+                "  behavior_actor_profiles: 0\n",
+                "  wave_profiles: 1\n",
+                "  first_frame_phase: Attract\n",
+                "  first_frame_draws: 2\n",
+                "  clean_exit: true\n",
+            )
+        );
     }
 
     #[test]
