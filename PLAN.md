@@ -58,13 +58,14 @@ verification tools.
   reserve/source-state, and the effective first-play behavior profile actors
   receive for movement/damage/fire tuning.
   It then uses the actor `XYZZY` overlay smart-bomb path to assist wave clear
-  and reports the source-shaped wave-clear survivor-bonus interstitial before
-  the next playable wave when the normal actor survivor-bonus and wave-start
-  logic reaches them, including source/reserve counts and effective behavior.
-  When that next wave still has enemy reserves, the checker keeps stepping
-  through smart-bomb cooldown and reserve activation to report a bounded
-  restored reserve batch sequence, including each batch's spawned family
-  counts, resulting source/reserve state, and terminal batch status.
+  and reports the source-shaped wave-clear survivor-bonus interstitial plus the
+  source `0x80` wave-advance sleep before the next playable wave when the
+  normal actor survivor-bonus and wave-start logic reaches them, including
+  source/reserve counts and effective behavior. When that next wave still has
+  enemy reserves, the checker keeps stepping through smart-bomb cooldown and
+  reserve activation to report a bounded restored reserve batch sequence,
+  including each batch's spawned family counts, resulting source/reserve state,
+  and terminal batch status.
   `examples/actor-custom-attract.script` provides a checked editable
   starting point. The built-in actor attract, behavior, and
   wave scripts are embedded from
@@ -941,6 +942,32 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 16:58 BST`: Completed the actor script wave-advance sleep
+  checker cycle. `--actor-script-check <path>` now reports the first
+  survivor-bonus report that enters the source `0x80` wave-advance sleep after
+  all survivor awards have been rendered and scored. The report includes
+  cumulative assist steps, next wave, score, world enemy/human counts, survivor
+  count, visible survivor icons, remaining awards, awarded points as `none`,
+  astronaut sleep at `0`, and wave-advance sleep at `128`, while continuing
+  through the same actor `XYZZY` overlay smart-bomb path to next-wave and
+  reserve-batch preflight. The focused regressions prove the checked example
+  enters wave-advance sleep at assist step `12` with two icons and score `500`,
+  and the custom ten-survivor script enters it at assist step `44` with ten
+  icons and score `1150` before wave two/reserves. No legacy code, tests, or
+  scaffolding were safe to remove because this slice hardens the active
+  script-authoring preflight. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780760941145729>.
+  Validation passed with `cargo fmt --check`, `cargo test actor_script_check
+  --all-targets --features legacy-tools`, `cargo test actor_script
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, `cargo run
+  --quiet --features legacy-tools -- --actor-script-check
+  examples/actor-custom-attract.script`, `make actor-smoke`, `make
+  actor-wgpu-smoke`, `markdownlint README.md SPEC.md PLAN.md
+  docs/actor-architecture.md`, and `git diff --check`.
 
 - `2026-06-06 16:45 BST`: Completed the actor script wave-clear
   interstitial checker cycle. `--actor-script-check <path>` now reports the
