@@ -125,7 +125,8 @@ headlessly, samples the first attract actor step, then credits/starts the actor
 runtime through the first playable wave and prints manifest, first-frame, source
 wave, spawned world, reserve/source-state, and effective behavior counts/modes;
 it also advances through the actor `XYZZY` overlay smart-bomb path to report the
-next playable wave when progression reaches it. The checked
+next playable wave and the first restored reserve batch when progression reaches
+them. The checked
 `examples/actor-custom-attract.script` file is a minimal editable custom-driver
 starting point. Actor high-score entry now accepts live initials/backspace
 through the actor input surface and draws the in-progress initials row from

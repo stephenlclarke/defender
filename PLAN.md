@@ -60,7 +60,10 @@ verification tools.
   It then uses the actor `XYZZY` overlay smart-bomb path to assist wave clear
   and reports the next playable wave when the normal actor survivor-bonus and
   wave-start logic reaches it, including source/reserve counts and effective
-  behavior.
+  behavior. When that next wave still has enemy reserves, the checker keeps
+  stepping through smart-bomb cooldown and reserve activation to report the
+  first restored reserve batch's spawned family counts and resulting
+  source/reserve state.
   `examples/actor-custom-attract.script` provides a checked editable
   starting point. The built-in actor attract, behavior, and
   wave scripts are embedded from
@@ -937,6 +940,31 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 16:19 BST`: Completed the actor script reserve-activation
+  checker cycle. `--actor-script-check <path>` now extends the assisted
+  next-wave preflight into the first restored reserve batch when a checked
+  script's next playable wave still has reserves. The checker drives this
+  through the actor `XYZZY` overlay smart-bomb path, preserving the source
+  smart-bomb cooldown and reserve-activation logic, then reports the restored
+  family spawn counts, wave/source counts, spawned world counts, remaining
+  reserve/source-state, and effective behavior summary. The focused regression
+  proves a two-wave custom-driver script restores two lander reserve rows
+  first, leaves the bomber reserve queued for the following batch, and reports
+  those runtime-effective values before live launch. No legacy code, tests, or
+  scaffolding were safe to remove because this slice hardens the active
+  script-authoring gate. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780758849795749>.
+  Validation passed with `cargo fmt --check`, `cargo test actor_script_check
+  --all-targets --features legacy-tools`, `cargo test actor_script
+  --all-targets --features legacy-tools`, `cargo run --quiet --features
+  legacy-tools -- --actor-script-check examples/actor-custom-attract.script`,
+  `cargo test actor_live --all-targets --features legacy-tools`, `cargo test
+  actor_game --all-targets --features legacy-tools`, `cargo check
+  --all-targets --features legacy-tools`, `cargo clippy --all-targets
+  --features legacy-tools -- -D warnings`, `make actor-smoke`, `make
+  actor-wgpu-smoke`, `markdownlint README.md SPEC.md PLAN.md
+  docs/actor-architecture.md`, and `git diff --check`.
 
 - `2026-06-06 13:08 BST`: Completed the actor script next-wave checker cycle.
   `--actor-script-check <path>` now keeps the first playable wave summary and
