@@ -6479,3 +6479,27 @@ Exit gate:
   `cargo clippy --all-targets --features legacy-tools -- -D warnings`. Slack
   start:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780705822870009`.
+- `2026-06-06 01:55 BST`: Completed the organic smartmix late residual
+  visibility-gating cycle. The target4 terminal post-game branch now treats
+  late `SCZP1` / `F8CE` rows as render-visible only when the MAME debug object
+  slot has nonzero display coordinates, replacing the previous bounded
+  memory-position interpolation with the 168 visible display rows observed
+  across object frames `1127-1193`. The focused organic regression now asserts
+  no rendered residual mutants at state frame `6007`, then the MAME-visible
+  counts and first display positions at state frames `6073`, `6075`, `6088`,
+  `6098`, `6114`, `6124`, and `6128`. Regenerated ignored clean media/debug
+  for `organic-terrain-blow-smartmix` confirms the new display-gated rows. The
+  report-only all-axis comparator remains unaccepted but improves the previous
+  overdraw regression: visual RMS moved from `89.56` to `89.11` and MAE from
+  `41.17` to `40.82`, while audio remains green with envelope correlation
+  `0.4431`. No protected media was committed or accepted, and no legacy code,
+  tests, or scaffolding were safe to remove because the remaining visual
+  mismatch still depends on clean-vs-MAME reference tooling. Evidence runs
+  included `make reference-clean-capture ...` and `make reference-media-check
+  ...`, with the media check expectedly failing on visual metrics. Validation
+  passed with `cargo fmt`, `cargo test
+  clean_game_organic_smartmix_terminal_death_and_terrain_blow_match_mame_window
+  --lib --features legacy-tools`, `cargo check --features legacy-tools`, and
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`. Slack
+  start:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780706710052279`.
