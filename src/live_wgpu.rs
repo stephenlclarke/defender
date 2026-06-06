@@ -22,7 +22,10 @@ use winit::{
 #[cfg(any(test, all(not(test), not(coverage))))]
 use crate::game::GameInput;
 use crate::{
-    actor_game::{ActorDriverScripts, ActorRuntimeAdapter, XyzzyController, XyzzyMode},
+    actor_game::{
+        ActorDriverScripts, ActorFrame, ActorRuntimeAdapter, GameInput as ActorGameInput, Phase,
+        XyzzyController, XyzzyMode,
+    },
     actor_smoke::ActorSmokeReport,
     audio::LiveAudioMode,
     game_smoke::GameSmokeReport,
@@ -48,6 +51,7 @@ const MAX_STEPS_PER_TICK: u32 = 5;
 const EXPECTED_OFFSCREEN_FIRST_FRAME_SIGNATURE: u64 = 0x8DAE_D38B_41A6_92A9;
 #[cfg(all(not(test), not(coverage)))]
 const EXPECTED_OFFSCREEN_LAST_FRAME_SIGNATURE: u64 = 0xFE80_CC2B_377E_8066;
+const ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT: usize = 512;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LiveInputProfile {
@@ -99,6 +103,15 @@ pub(crate) struct ActorScriptCheckReport {
     pub(crate) wave_profiles: usize,
     pub(crate) first_frame_phase: String,
     pub(crate) first_frame_draws: usize,
+    pub(crate) first_playing_wave: u16,
+    pub(crate) first_playing_wave_size: u8,
+    pub(crate) first_playing_source_landers: u8,
+    pub(crate) first_playing_source_bombers: u8,
+    pub(crate) first_playing_source_pods: u8,
+    pub(crate) first_playing_source_mutants: u8,
+    pub(crate) first_playing_source_swarmers: u8,
+    pub(crate) first_playing_world_enemies: usize,
+    pub(crate) first_playing_world_humans: usize,
     pub(crate) clean_exit: bool,
 }
 
@@ -221,7 +234,7 @@ impl LiveSmokeReport {
 impl ActorScriptCheckReport {
     pub(crate) fn to_text(&self) -> String {
         format!(
-            "actor script check passed\n  path: {}\n  attract_events: {}\n  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  clean_exit: {}\n",
+            "actor script check passed\n  path: {}\n  attract_events: {}\n  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  clean_exit: {}\n",
             self.path,
             self.attract_events,
             self.behavior_kind_profiles,
@@ -229,6 +242,15 @@ impl ActorScriptCheckReport {
             self.wave_profiles,
             self.first_frame_phase,
             self.first_frame_draws,
+            self.first_playing_wave,
+            self.first_playing_wave_size,
+            self.first_playing_source_landers,
+            self.first_playing_source_bombers,
+            self.first_playing_source_pods,
+            self.first_playing_source_mutants,
+            self.first_playing_source_swarmers,
+            self.first_playing_world_enemies,
+            self.first_playing_world_humans,
             self.clean_exit
         )
     }
@@ -325,7 +347,9 @@ pub(crate) fn actor_runtime_from_script_path(
 pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptCheckReport> {
     let mut runtime = actor_runtime_from_script_path(Some(path))?;
     let manifest = runtime.driver().script_manifest();
-    let frame = runtime.step(crate::actor_game::GameInput::NONE);
+    let frame = runtime.step(ActorGameInput::NONE);
+    let playing = run_actor_script_check_to_first_playing_wave(&mut runtime)?;
+    let profile = playing.state.wave_profile;
 
     Ok(ActorScriptCheckReport {
         path: path.display().to_string(),
@@ -335,8 +359,41 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         wave_profiles: manifest.wave_script.waves.len(),
         first_frame_phase: format!("{:?}", frame.state.phase),
         first_frame_draws: frame.report.draws.len(),
+        first_playing_wave: u16::from(playing.state.wave),
+        first_playing_wave_size: profile.wave_size,
+        first_playing_source_landers: profile.landers,
+        first_playing_source_bombers: profile.bombers,
+        first_playing_source_pods: profile.pods,
+        first_playing_source_mutants: profile.mutants,
+        first_playing_source_swarmers: profile.swarmers,
+        first_playing_world_enemies: playing.state.world.enemies.len(),
+        first_playing_world_humans: playing.state.world.humans.len(),
         clean_exit: true,
     })
+}
+
+fn run_actor_script_check_to_first_playing_wave(
+    runtime: &mut ActorRuntimeAdapter,
+) -> anyhow::Result<ActorFrame> {
+    runtime.step(ActorGameInput {
+        coin: true,
+        ..ActorGameInput::NONE
+    });
+    runtime.step(ActorGameInput {
+        start_one: true,
+        ..ActorGameInput::NONE
+    });
+
+    for _ in 0..ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT {
+        let frame = runtime.step(ActorGameInput::NONE);
+        if frame.report.phase == Phase::Playing && frame.report.player_start.is_none() {
+            return Ok(frame);
+        }
+    }
+
+    anyhow::bail!(
+        "actor script check did not reach the first playable wave within {ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT} actor steps"
+    );
 }
 
 #[cfg(all(not(test), not(coverage)))]
@@ -1891,6 +1948,15 @@ mod tests {
         assert_eq!(report.wave_profiles, 1);
         assert_eq!(report.first_frame_phase, "Attract");
         assert_eq!(report.first_frame_draws, 2);
+        assert_eq!(report.first_playing_wave, 1);
+        assert_eq!(report.first_playing_wave_size, 5);
+        assert_eq!(report.first_playing_source_landers, 15);
+        assert_eq!(report.first_playing_source_bombers, 0);
+        assert_eq!(report.first_playing_source_pods, 0);
+        assert_eq!(report.first_playing_source_mutants, 0);
+        assert_eq!(report.first_playing_source_swarmers, 0);
+        assert_eq!(report.first_playing_world_enemies, 2);
+        assert_eq!(report.first_playing_world_humans, 2);
         assert!(report.clean_exit);
         assert_eq!(
             report.to_text(),
@@ -1903,8 +1969,50 @@ mod tests {
                 "  wave_profiles: 1\n",
                 "  first_frame_phase: Attract\n",
                 "  first_frame_draws: 2\n",
+                "  first_playing_wave: 1\n",
+                "  first_playing_wave_size: 5\n",
+                "  first_playing_source_counts: landers=15,bombers=0,pods=0,mutants=0,swarmers=0\n",
+                "  first_playing_world_counts: enemies=2,humans=2\n",
                 "  clean_exit: true\n",
             )
+        );
+    }
+
+    #[test]
+    fn actor_script_check_reports_source_wave_overrides_at_play_start() {
+        let path = write_actor_script_file(
+            "actor-script-source-wave-check",
+            concat!(
+                "[attract]\n",
+                "text 1 forever 12 20 SOURCE CHECK\n",
+                "[behavior]\n",
+                "kind lander lander_mode drift\n",
+                "[wave]\n",
+                "name source check waves\n",
+                "source_wave 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
+                "swarmer_x_velocity 64 swarmer_shot_time 11 baiter_time 24 ",
+                "mutant_x_velocity 48 mutant_random_y 2 mutant_shot_time 12\n",
+            ),
+        );
+
+        let report = run_actor_script_check(&path).expect("source wave script should check");
+
+        assert_eq!(report.first_playing_wave, 1);
+        assert_eq!(report.first_playing_wave_size, 5);
+        assert_eq!(report.first_playing_source_landers, 1);
+        assert_eq!(report.first_playing_source_bombers, 1);
+        assert_eq!(report.first_playing_source_pods, 1);
+        assert_eq!(report.first_playing_source_mutants, 1);
+        assert_eq!(report.first_playing_source_swarmers, 1);
+        assert_eq!(report.first_playing_world_enemies, 5);
+        assert_eq!(report.first_playing_world_humans, 10);
+        assert!(report.to_text().contains(
+            "first_playing_source_counts: landers=1,bombers=1,pods=1,mutants=1,swarmers=1"
+        ));
+        assert!(
+            report
+                .to_text()
+                .contains("first_playing_world_counts: enemies=5,humans=10")
         );
     }
 

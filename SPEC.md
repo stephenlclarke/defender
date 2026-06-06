@@ -784,10 +784,12 @@ reintroduce legacy implementation terminology.
   phase. `--actor-script <path>` loads one checked sectioned actor driver
   script into that live actor runtime before the window opens; it is rejected
   with `--live-smoke` because that command still exercises the clean-game smoke
-  path. `--actor-script-check <path>` parses the same file, boots one headless
-  actor step, and prints script manifest plus first-frame counts without opening
-  a window. `examples/actor-custom-attract.script` is the checked editable
-  sample for that flow.
+  path. `--actor-script-check <path>` parses the same file, samples one
+  headless attract actor step, then credits/starts the actor runtime through
+  the first playable wave and prints script manifest, first-frame, source-wave,
+  and spawned world counts without opening a window.
+  `examples/actor-custom-attract.script` is the checked editable sample for
+  that flow.
 - Runtime renderer selection has been removed.
 - `--input-profile planetoid` is the default input profile.
 - `--input-profile cabinet` exposes a MAME-style cabinet keyboard profile.

@@ -52,9 +52,11 @@ verification tools.
   script before the window opens, while rejecting that option with
   `--live-smoke` so a custom actor script is never silently ignored by the
   clean-game smoke path. `--actor-script-check <path>` now runs the same parser
-  and runtime constructor headlessly for one actor step and reports manifest
-  plus first-frame counts, and `examples/actor-custom-attract.script` provides
-  a checked editable starting point. The built-in actor attract, behavior, and
+  and runtime constructor headlessly, samples the first attract actor step,
+  credits/starts the actor runtime through the first playable wave, and reports
+  manifest, first-frame, effective source-wave, and spawned world counts.
+  `examples/actor-custom-attract.script` provides a checked editable starting
+  point. The built-in actor attract, behavior, and
   wave scripts are embedded from
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and
@@ -929,6 +931,30 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 07:16 BST`: Completed the actor script gameplay-start checker
+  cycle. `--actor-script-check <path>` still parses the sectioned custom-driver
+  script and samples the first attract actor step, but now also credits and
+  starts the same actor runtime until the first playable wave is active. The
+  report prints the effective first-wave source counts and spawned world
+  enemies/humans, so script authors can prove custom `[wave]` and
+  `source_wave` settings survive into gameplay before opening the live window.
+  Focused regressions cover the checked example script's two custom landers/two
+  humans and a source-backed override that produces one lander, bomber, pod,
+  mutant, and swarmer at play start. No legacy code, tests, or scaffolding were
+  safe to remove because this slice hardens the active script-authoring gate.
+  Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780726281836709>.
+  Validation passed with `cargo fmt --check`, `cargo test actor_script_check
+  --all-targets --features legacy-tools`, `cargo run --quiet --features
+  legacy-tools -- --actor-script-check examples/actor-custom-attract.script`,
+  `cargo test actor_script --all-targets --features legacy-tools`, `cargo test
+  actor_live --all-targets --features legacy-tools`, `cargo test actor_game
+  --all-targets --features legacy-tools`, `cargo check --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features
+  legacy-tools -- -D warnings`, `make actor-smoke`, `make
+  actor-wgpu-smoke`, `markdownlint README.md SPEC.md PLAN.md
+  docs/actor-architecture.md`, and `git diff --check`.
 
 - `2026-06-06 07:04 BST`: Completed the actor effective source-wave state
   bridge cycle. `StepReport` now carries the same effective

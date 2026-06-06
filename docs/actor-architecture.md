@@ -86,10 +86,12 @@ evidence commands.
   boots the same live runtime through `ActorRuntimeAdapter::with_scripts`; it
   is not accepted with `--live-smoke` because that command remains the clean
   game smoke path. `--actor-script-check <path>` uses the same parser and
-  runtime constructor headlessly, steps one actor frame, and prints
-  attract/behavior/wave manifest counts plus first-frame draw counts. The
-  checked `examples/actor-custom-attract.script` file is the editable
-  smoke-tested example. The shared live input state carries the same key
+  runtime constructor headlessly, samples the first attract actor step, then
+  credits/starts the actor runtime through the first playable wave and prints
+  attract/behavior/wave manifest counts plus first-frame, effective source-wave,
+  and spawned world counts. The checked
+  `examples/actor-custom-attract.script` file is the editable smoke-tested
+  example. The shared live input state carries the same key
   bindings and `XYZZY` mode into actor steps. Actor high-score entry now
   consumes initials/backspace from
   that input surface, updates driver-owned initials state, enters the 60-step
