@@ -61,9 +61,9 @@ verification tools.
   and reports the next playable wave when the normal actor survivor-bonus and
   wave-start logic reaches it, including source/reserve counts and effective
   behavior. When that next wave still has enemy reserves, the checker keeps
-  stepping through smart-bomb cooldown and reserve activation to report the
-  first restored reserve batch's spawned family counts and resulting
-  source/reserve state.
+  stepping through smart-bomb cooldown and reserve activation to report a
+  bounded restored reserve batch sequence, including each batch's spawned
+  family counts, resulting source/reserve state, and terminal batch status.
   `examples/actor-custom-attract.script` provides a checked editable
   starting point. The built-in actor attract, behavior, and
   wave scripts are embedded from
@@ -940,6 +940,32 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-06 16:33 BST`: Completed the actor script reserve-activation
+  sequence checker cycle. `--actor-script-check <path>` now extends assisted
+  next-wave preflight into a bounded reserve activation batch sequence instead
+  of stopping at the first restored batch. The checker still drives the same
+  actor `XYZZY` overlay smart-bomb path, preserving real smart-bomb detonation,
+  source reserve cooldown, wave-clear, and reserve activation behavior, then
+  reports each observed batch's cumulative assist steps, restored family spawn
+  counts, wave/source/world/reserve/source-state, and the terminal batch
+  status. The focused custom-driver regression now queues lander, bomber, pod,
+  mutant, and swarmer reserves and proves the source ordering: lander reserves
+  restore first, the next mixed batch restores bomber/pod/mutant, and the final
+  batch restores swarmer before reporting `reserve_empty`. No legacy code,
+  tests, or scaffolding were safe to remove because this slice hardens the
+  active script-authoring preflight. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780759603875789>.
+  Validation passed with `cargo fmt --check`, `cargo test actor_script_check
+  --all-targets --features legacy-tools`, `cargo test actor_script
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo test actor_game --all-targets --features
+  legacy-tools`, `cargo check --all-targets --features legacy-tools`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, `cargo run
+  --quiet --features legacy-tools -- --actor-script-check
+  examples/actor-custom-attract.script`, `make actor-smoke`, `make
+  actor-wgpu-smoke`, `markdownlint README.md SPEC.md PLAN.md
+  docs/actor-architecture.md`, and `git diff --check`.
 
 - `2026-06-06 16:19 BST`: Completed the actor script reserve-activation
   checker cycle. `--actor-script-check <path>` now extends the assisted

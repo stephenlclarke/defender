@@ -54,6 +54,7 @@ const EXPECTED_OFFSCREEN_FIRST_FRAME_SIGNATURE: u64 = 0x8DAE_D38B_41A6_92A9;
 const EXPECTED_OFFSCREEN_LAST_FRAME_SIGNATURE: u64 = 0xFE80_CC2B_377E_8066;
 const ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT: usize = 512;
 const ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT: usize = 4096;
+const ACTOR_SCRIPT_CHECK_RESERVE_ACTIVATION_BATCH_LIMIT: usize = 8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LiveInputProfile {
@@ -189,8 +190,8 @@ pub(crate) struct ActorScriptCheckReport {
     pub(crate) first_playing_baiter_fire_period_steps: u64,
     pub(crate) next_playing_assist_steps: Option<u32>,
     pub(crate) next_playing: Option<ActorScriptCheckPlayingSummary>,
-    pub(crate) reserve_activation: Option<ActorScriptCheckReserveActivationSummary>,
-    pub(crate) reserve_activation_unavailable_reason: Option<String>,
+    pub(crate) reserve_activation_batches: Vec<ActorScriptCheckReserveActivationSummary>,
+    pub(crate) reserve_activation_status: String,
     pub(crate) clean_exit: bool,
 }
 
@@ -334,29 +335,27 @@ impl ActorScriptCheckReport {
                         .unwrap_or(ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT as u32)
                 )
             });
-        let reserve_activation = self
-            .reserve_activation
-            .as_ref()
-            .map(|summary| {
-                format!(
-                    "  reserve_activation_assist_steps: {}\n  reserve_activation_spawned_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n{}",
-                    summary.assist_steps,
-                    summary.spawned_counts.landers,
-                    summary.spawned_counts.bombers,
-                    summary.spawned_counts.pods,
-                    summary.spawned_counts.mutants,
-                    summary.spawned_counts.swarmers,
-                    playing_summary_to_text("reserve_activation", &summary.playing),
-                )
-            })
-            .unwrap_or_else(|| {
-                format!(
-                    "  reserve_activation_wave: unavailable,reason={}\n",
-                    self.reserve_activation_unavailable_reason
-                        .as_deref()
-                        .unwrap_or("not_sampled")
-                )
-            });
+        let mut reserve_activation = format!(
+            "  reserve_activation_batches: {}\n",
+            self.reserve_activation_batches.len()
+        );
+        for (index, summary) in self.reserve_activation_batches.iter().enumerate() {
+            let prefix = format!("reserve_activation_{}", index + 1);
+            reserve_activation.push_str(&format!(
+                "  {prefix}_assist_steps: {}\n  {prefix}_spawned_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n{}",
+                summary.assist_steps,
+                summary.spawned_counts.landers,
+                summary.spawned_counts.bombers,
+                summary.spawned_counts.pods,
+                summary.spawned_counts.mutants,
+                summary.spawned_counts.swarmers,
+                playing_summary_to_text(&prefix, &summary.playing),
+            ));
+        }
+        reserve_activation.push_str(&format!(
+            "  reserve_activation_status: {}\n",
+            self.reserve_activation_status
+        ));
         format!(
             "actor script check passed\n  path: {}\n  attract_events: {}\n  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_source_state: background_left=0x{:04x},rng={}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}  clean_exit: {}\n",
             self.path,
@@ -538,13 +537,7 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
     let first_playing = actor_script_check_playing_summary(&playing);
     let next_playing_frame = run_actor_script_check_to_next_playing_wave(&mut runtime, &playing);
     let reserve_activation =
-        actor_script_check_reserve_activation(&mut runtime, next_playing_frame.as_ref());
-    let (reserve_activation, reserve_activation_unavailable_reason) = match reserve_activation {
-        ActorScriptCheckReserveActivationResult::Activated(activation) => (Some(*activation), None),
-        ActorScriptCheckReserveActivationResult::Unavailable(reason) => {
-            (None, Some(reason.to_string()))
-        }
-    };
+        actor_script_check_reserve_activations(&mut runtime, next_playing_frame.as_ref());
     let (next_playing_assist_steps, next_playing) = match next_playing_frame {
         Some(next_playing_frame) => (
             Some(next_playing_frame.assist_steps),
@@ -597,8 +590,8 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         first_playing_baiter_fire_period_steps: first_playing.baiter_fire_period_steps,
         next_playing_assist_steps,
         next_playing,
-        reserve_activation,
-        reserve_activation_unavailable_reason,
+        reserve_activation_batches: reserve_activation.batches,
+        reserve_activation_status: reserve_activation.status,
         clean_exit: true,
     })
 }
@@ -609,10 +602,10 @@ struct ActorScriptCheckNextPlayingFrame {
     assist_steps: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum ActorScriptCheckReserveActivationResult {
-    Activated(Box<ActorScriptCheckReserveActivationSummary>),
-    Unavailable(&'static str),
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct ActorScriptCheckReserveActivationSequence {
+    batches: Vec<ActorScriptCheckReserveActivationSummary>,
+    status: String,
 }
 
 fn actor_script_check_playing_summary(frame: &ActorFrame) -> ActorScriptCheckPlayingSummary {
@@ -748,18 +741,21 @@ fn run_actor_script_check_to_next_playing_wave(
     None
 }
 
-fn actor_script_check_reserve_activation(
+fn actor_script_check_reserve_activations(
     runtime: &mut ActorRuntimeAdapter,
     next_playing: Option<&ActorScriptCheckNextPlayingFrame>,
-) -> ActorScriptCheckReserveActivationResult {
+) -> ActorScriptCheckReserveActivationSequence {
     let Some(next_playing) = next_playing else {
-        return ActorScriptCheckReserveActivationResult::Unavailable("next_playing_unavailable");
+        return ActorScriptCheckReserveActivationSequence::unavailable("next_playing_unavailable");
     };
     if actor_script_check_reserve_total(next_playing.frame.report.enemy_reserve) == 0 {
-        return ActorScriptCheckReserveActivationResult::Unavailable("next_playing_has_no_reserve");
+        return ActorScriptCheckReserveActivationSequence::unavailable(
+            "next_playing_has_no_reserve",
+        );
     }
 
     let mut frame = next_playing.frame.clone();
+    let mut batches = Vec::new();
     let wave = frame.report.wave;
     for step in 1..=ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT {
         let previous_reserve = frame.report.enemy_reserve;
@@ -771,22 +767,50 @@ fn actor_script_check_reserve_activation(
             && actor_script_check_reserve_total(previous_reserve) > 0
             && !spawned_counts.is_empty()
         {
-            return ActorScriptCheckReserveActivationResult::Activated(Box::new(
-                ActorScriptCheckReserveActivationSummary {
-                    assist_steps: step as u32,
-                    spawned_counts,
-                    playing: actor_script_check_playing_summary(&frame),
-                },
-            ));
+            batches.push(ActorScriptCheckReserveActivationSummary {
+                assist_steps: step as u32,
+                spawned_counts,
+                playing: actor_script_check_playing_summary(&frame),
+            });
+            if actor_script_check_reserve_total(frame.report.enemy_reserve) == 0 {
+                return ActorScriptCheckReserveActivationSequence::new(batches, "reserve_empty");
+            }
+            if batches.len() >= ACTOR_SCRIPT_CHECK_RESERVE_ACTIVATION_BATCH_LIMIT {
+                return ActorScriptCheckReserveActivationSequence::new(
+                    batches,
+                    "batch_limit_reached",
+                );
+            }
         }
         if frame.report.wave > wave {
-            return ActorScriptCheckReserveActivationResult::Unavailable(
-                "wave_advanced_before_reserve_activation",
-            );
+            let status = if batches.is_empty() {
+                "wave_advanced_before_reserve_activation"
+            } else {
+                "wave_advanced_before_reserve_empty"
+            };
+            return ActorScriptCheckReserveActivationSequence::new(batches, status);
         }
     }
 
-    ActorScriptCheckReserveActivationResult::Unavailable("reserve_activation_not_reached")
+    let status = if batches.is_empty() {
+        "reserve_activation_not_reached"
+    } else {
+        "step_limit_reached"
+    };
+    ActorScriptCheckReserveActivationSequence::new(batches, status)
+}
+
+impl ActorScriptCheckReserveActivationSequence {
+    fn new(batches: Vec<ActorScriptCheckReserveActivationSummary>, status: &str) -> Self {
+        Self {
+            batches,
+            status: status.to_string(),
+        }
+    }
+
+    fn unavailable(status: &str) -> Self {
+        Self::new(Vec::new(), status)
+    }
 }
 
 fn actor_script_check_reserve_total(reserve: crate::game::EnemyReserveSnapshot) -> u8 {
@@ -2454,10 +2478,10 @@ mod tests {
         assert_eq!(next_playing.world_enemies, 2);
         assert_eq!(next_playing.world_humans, 2);
         assert_eq!(next_playing.lander_mode, "drift");
-        assert!(report.reserve_activation.is_none());
+        assert!(report.reserve_activation_batches.is_empty());
         assert_eq!(
-            report.reserve_activation_unavailable_reason.as_deref(),
-            Some("next_playing_has_no_reserve")
+            report.reserve_activation_status,
+            "next_playing_has_no_reserve"
         );
         assert!(report.clean_exit);
         assert_eq!(
@@ -2492,7 +2516,8 @@ mod tests {
                 "  next_playing_lander_behavior: mode=drift,seek_speed=1,drift_speed=3,fire_period_steps=96\n",
                 "  next_playing_hostile_modes: mutant=chase_player,bomber=drift,pod=drift,swarmer=chase_player,baiter=chase_player\n",
                 "  next_playing_hostile_fire: swarmer_period_steps=58,baiter_period_steps=42\n",
-                "  reserve_activation_wave: unavailable,reason=next_playing_has_no_reserve\n",
+                "  reserve_activation_batches: 0\n",
+                "  reserve_activation_status: next_playing_has_no_reserve\n",
                 "  clean_exit: true\n",
             )
         );
@@ -2593,7 +2618,7 @@ mod tests {
                 "behavior kind lander lander_mode drift\n",
                 "behavior kind lander lander_drift_speed 2\n",
                 "source_wave 2 wave_size 3 landers 1 bombers 1 pods 1 mutants 0 swarmers 0\n",
-                "reserve_full 2 1 0 0 0\n",
+                "reserve_full 2 1 1 1 1\n",
                 "behavior kind lander lander_mode chase_player\n",
                 "behavior kind lander lander_seek_speed 7\n",
                 "behavior kind swarmer swarmer_fire_period_steps 23\n",
@@ -2606,10 +2631,10 @@ mod tests {
             .next_playing
             .as_ref()
             .expect("checker should reach wave two with assist");
-        let reserve_activation = report
-            .reserve_activation
-            .as_ref()
-            .expect("checker should reach a wave-two reserve activation");
+        assert_eq!(report.reserve_activation_batches.len(), 3);
+        let first_activation = &report.reserve_activation_batches[0];
+        let second_activation = &report.reserve_activation_batches[1];
+        let third_activation = &report.reserve_activation_batches[2];
 
         assert_eq!(report.first_playing_wave, 1);
         assert_eq!(report.first_playing_world_enemies, 1);
@@ -2624,9 +2649,9 @@ mod tests {
         assert_eq!(next_playing.world_humans, 10);
         assert_eq!(next_playing.reserve_landers, 2);
         assert_eq!(next_playing.reserve_bombers, 1);
-        assert_eq!(next_playing.reserve_pods, 0);
-        assert_eq!(next_playing.reserve_mutants, 0);
-        assert_eq!(next_playing.reserve_swarmers, 0);
+        assert_eq!(next_playing.reserve_pods, 1);
+        assert_eq!(next_playing.reserve_mutants, 1);
+        assert_eq!(next_playing.reserve_swarmers, 1);
         assert_eq!(next_playing.lander_mode, "chase_player");
         assert_eq!(next_playing.lander_seek_speed, 7);
         assert_eq!(next_playing.swarmer_fire_period_steps, 23);
@@ -2634,28 +2659,56 @@ mod tests {
         assert!(report.next_playing_assist_steps.is_some_and(
             |steps| steps > 0 && steps < super::ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT as u32
         ));
-        assert_eq!(reserve_activation.assist_steps, 244);
-        assert_eq!(reserve_activation.spawned_counts.landers, 2);
-        assert_eq!(reserve_activation.spawned_counts.bombers, 0);
-        assert_eq!(reserve_activation.spawned_counts.pods, 0);
-        assert_eq!(reserve_activation.spawned_counts.mutants, 0);
-        assert_eq!(reserve_activation.spawned_counts.swarmers, 0);
-        assert_eq!(reserve_activation.playing.wave, 2);
-        assert_eq!(reserve_activation.playing.world_enemies, 2);
-        assert_eq!(reserve_activation.playing.world_humans, 10);
-        assert_eq!(reserve_activation.playing.reserve_landers, 0);
-        assert_eq!(reserve_activation.playing.reserve_bombers, 1);
-        assert_eq!(reserve_activation.playing.reserve_pods, 0);
-        assert_eq!(reserve_activation.playing.reserve_mutants, 0);
-        assert_eq!(reserve_activation.playing.reserve_swarmers, 0);
-        assert_eq!(reserve_activation.playing.lander_mode, "chase_player");
-        assert_eq!(reserve_activation.playing.lander_seek_speed, 7);
-        assert!(report.reserve_activation_unavailable_reason.is_none());
+        assert_eq!(first_activation.assist_steps, 244);
+        assert_eq!(first_activation.spawned_counts.landers, 2);
+        assert_eq!(first_activation.spawned_counts.bombers, 0);
+        assert_eq!(first_activation.spawned_counts.pods, 0);
+        assert_eq!(first_activation.spawned_counts.mutants, 0);
+        assert_eq!(first_activation.spawned_counts.swarmers, 0);
+        assert_eq!(first_activation.playing.wave, 2);
+        assert_eq!(first_activation.playing.world_enemies, 2);
+        assert_eq!(first_activation.playing.world_humans, 10);
+        assert_eq!(first_activation.playing.reserve_landers, 0);
+        assert_eq!(first_activation.playing.reserve_bombers, 1);
+        assert_eq!(first_activation.playing.reserve_pods, 1);
+        assert_eq!(first_activation.playing.reserve_mutants, 1);
+        assert_eq!(first_activation.playing.reserve_swarmers, 1);
+        assert_eq!(first_activation.playing.lander_mode, "chase_player");
+        assert_eq!(first_activation.playing.lander_seek_speed, 7);
+
+        assert!(second_activation.assist_steps > first_activation.assist_steps);
+        assert_eq!(second_activation.spawned_counts.landers, 0);
+        assert_eq!(second_activation.spawned_counts.bombers, 1);
+        assert_eq!(second_activation.spawned_counts.pods, 1);
+        assert_eq!(second_activation.spawned_counts.mutants, 1);
+        assert_eq!(second_activation.spawned_counts.swarmers, 0);
+        assert_eq!(second_activation.playing.wave, 2);
+        assert_eq!(second_activation.playing.world_enemies, 3);
+        assert_eq!(second_activation.playing.reserve_landers, 0);
+        assert_eq!(second_activation.playing.reserve_bombers, 0);
+        assert_eq!(second_activation.playing.reserve_pods, 0);
+        assert_eq!(second_activation.playing.reserve_mutants, 0);
+        assert_eq!(second_activation.playing.reserve_swarmers, 1);
+
+        assert!(third_activation.assist_steps > second_activation.assist_steps);
+        assert_eq!(third_activation.spawned_counts.landers, 0);
+        assert_eq!(third_activation.spawned_counts.bombers, 0);
+        assert_eq!(third_activation.spawned_counts.pods, 0);
+        assert_eq!(third_activation.spawned_counts.mutants, 0);
+        assert_eq!(third_activation.spawned_counts.swarmers, 1);
+        assert_eq!(third_activation.playing.wave, 2);
+        assert_eq!(third_activation.playing.world_enemies, 1);
+        assert_eq!(third_activation.playing.reserve_landers, 0);
+        assert_eq!(third_activation.playing.reserve_bombers, 0);
+        assert_eq!(third_activation.playing.reserve_pods, 0);
+        assert_eq!(third_activation.playing.reserve_mutants, 0);
+        assert_eq!(third_activation.playing.reserve_swarmers, 0);
+        assert_eq!(report.reserve_activation_status, "reserve_empty");
         assert!(report.to_text().contains(
             "next_playing_source_counts: landers=1,bombers=1,pods=1,mutants=0,swarmers=0"
         ));
         assert!(report.to_text().contains(
-            "next_playing_reserve_counts: landers=2,bombers=1,pods=0,mutants=0,swarmers=0"
+            "next_playing_reserve_counts: landers=2,bombers=1,pods=1,mutants=1,swarmers=1"
         ));
         assert!(
             report
@@ -2667,12 +2720,24 @@ mod tests {
                 "next_playing_hostile_fire: swarmer_period_steps=23,baiter_period_steps=31"
             )
         );
+        assert!(report.to_text().contains("reserve_activation_batches: 3"));
         assert!(report.to_text().contains(
-            "reserve_activation_spawned_counts: landers=2,bombers=0,pods=0,mutants=0,swarmers=0"
+            "reserve_activation_1_spawned_counts: landers=2,bombers=0,pods=0,mutants=0,swarmers=0"
         ));
         assert!(report.to_text().contains(
-            "reserve_activation_reserve_counts: landers=0,bombers=1,pods=0,mutants=0,swarmers=0"
+            "reserve_activation_2_spawned_counts: landers=0,bombers=1,pods=1,mutants=1,swarmers=0"
         ));
+        assert!(report.to_text().contains(
+            "reserve_activation_3_spawned_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=1"
+        ));
+        assert!(report.to_text().contains(
+            "reserve_activation_3_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0"
+        ));
+        assert!(
+            report
+                .to_text()
+                .contains("reserve_activation_status: reserve_empty")
+        );
     }
 
     #[test]

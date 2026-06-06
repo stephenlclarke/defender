@@ -92,8 +92,8 @@ evidence commands.
   spawned world, reserve/source-state, and first-play behavior summaries. The
   checker then uses the actor `XYZZY` overlay smart-bomb path to assist
   progression and reports the next playable wave when real wave-clear/wave-start
-  logic reaches it, plus the first restored reserve batch when reserve
-  activation emits restored actor spawns. The checked
+  logic reaches it, plus a bounded reserve activation batch sequence when
+  reserve activation emits restored actor spawns. The checked
   `examples/actor-custom-attract.script` file is the editable smoke-tested
   example. The shared live input state carries the same key
   bindings and `XYZZY` mode into actor steps. Actor high-score entry now
@@ -261,8 +261,8 @@ through `StepReport`. It also samples the next playable wave with an actor
 profiles can be checked before live launch without bypassing actor commands.
 When that next wave still has enemy reserves, the checker keeps stepping the
 same actor path through smart-bomb cooldown and reserve activation, then reports
-the first restored reserve batch's spawned family counts and resulting source
-state.
+each observed restored batch's spawned family counts, resulting source state,
+and terminal batch status.
 
 `AttractScript::manifest`, `ActorBehaviorScript::manifest`,
 `ActorWaveScript::manifest`, `ActorDriverScripts::manifest`, and
