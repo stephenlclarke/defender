@@ -595,8 +595,13 @@ Exit gate:
    nine-mutant residual object mix before `TERBLO`, and the sampled `0xEE`
    terrain-blow tail at frames `5991`, `5995`, `5999`, `6003`, and `6007`.
    The current regenerated report improves from stale no-audio/static-clean
-   evidence but still fails with visual RMS `90.73` / MAE `42.59` and audio
-   waveform correlation below threshold. The state-steered `TERBLO` clip
+   evidence but still fails with visual RMS `89.06` / MAE `40.78` and audio
+   waveform correlation below threshold. A `2026-06-06` terminal-flash
+   experiment confirmed that directly replaying the organic `pcram0` rows, or
+   a sampled visible-video flash table, is not yet safe: report-only visual
+   metrics worsened to RMS `90.18` / MAE `42.40` and then RMS `97.41` / MAE
+   `47.39`, so the generic source terrain-blow flash remains in place until
+   the organic media frame alignment is solved. The state-steered `TERBLO` clip
    remains the accepted bounded
    terrain-blow evidence, and the organic smartmix TERBLO cadence remains the
    concrete follow-up rather than a missing-evidence boundary. A follow-up
