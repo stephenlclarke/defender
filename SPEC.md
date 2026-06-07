@@ -229,7 +229,9 @@ tree:
   remain in source world space, while actor render and collision paths project
   their draw/collision bodies through the current background word so player
   thrust scrolls the view instead of carrying aliens, fireballs, or bomb shells
-  with the ship.
+  with the ship. Falling-human rescue uses the same projected human body, while
+  clean state keeps the source high byte/fraction for scanner and object
+  evidence.
   Final-human removal starts a driver-owned source terrain-blow snapshot,
   erases clean terrain and scanner terrain, emits source flash windows,
   projects `TEREX` terrain explosion actors through the source

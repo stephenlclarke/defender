@@ -356,8 +356,10 @@ landscape moves underneath the player instead of staying fixed on a single
 screen. Source-backed hostile, human, enemy-shot, and bomb actors remain in
 source world space, but their draw and collision bodies are projected through
 the current background word so thrust scrolling moves the playfield relative to
-those objects instead of carrying them with the player. Removing the last human
-starts a driver-owned source
+those objects instead of carrying them with the player. Falling-human rescue
+uses the same projected human body, while clean state keeps the source high
+byte/fraction for scanner and object evidence. Removing the last human starts a
+driver-owned source
 `TerrainBlowSnapshot`: clean terrain and scanner terrain are erased, source
 flash windows tint the playfield, `TEREX` terrain explosion actors use the
 source birth positions and terrain-explosion growth/lifetime curve, and the

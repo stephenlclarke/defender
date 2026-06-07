@@ -178,7 +178,9 @@ verification tools.
   world space while actor render and collision paths project their
   draw/collision bodies through the current background word, so thrust
   scrolling moves the view instead of carrying aliens, fireballs, or bomb
-  shells with the player. Source swarmer
+  shells with the player. Falling-human rescue uses the same projected human
+  body while clean state keeps the source high byte/fraction for scanner and
+  object evidence. Source swarmer
   reserves use `PLRES`/`RSW0` phony-object placement before the same
   mini-swarmer runtime used by pod destruction. Source
   rematerialization now publishes the `SEED/HSEED` background word into
@@ -988,6 +990,25 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-07 20:12 BST`: Completed the source-backed human world-space
+  follow-up cycle. The prior projection fix already projected `source_human`
+  draw/collision bodies, and this cycle tightened the missing gameplay path:
+  falling-human rescue now compares the player against the projected
+  source-backed human body instead of the raw source high byte. Added focused
+  regressions proving clean state keeps source human high-byte/fraction world
+  evidence stable across background scroll, the render scene projects the human
+  through `source_background_left`, projected human collision bodies match the
+  rendered position, and falling rescue works when the player intersects the
+  projected body. Validation passed with the new focused human render/rescue
+  regressions, the existing source-object projection regression, `cargo fmt
+  --check`, `cargo check --all-targets --features legacy-tools`, `cargo clippy
+  --all-targets --features legacy-tools -- -D warnings`, `cargo run --
+  --actor-smoke`, `cargo run -- --live-smoke`, `make docs-lint`, and `make
+  diff-check`. Remaining plan work is still about `2%`, mostly
+  owner-review/protected-media closure after concrete live defects. Slack step
+  start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780859214063609>.
 
 - `2026-06-07 19:59 BST`: Completed the actor source-world projection cycle
   for the reported thrust bug where aliens, enemy bullets, and bombs appeared

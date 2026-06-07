@@ -15531,6 +15531,20 @@ impl Human {
         Rect::from_center(self.position, 4, 8)
     }
 
+    fn screen_bounds(&self, background_left: u16) -> Option<Rect> {
+        let bounds = self.bounds();
+        let Some(source) = self.source else {
+            return Some(bounds);
+        };
+        let position = actor_source_project_screen_position(
+            self.position,
+            source.x_fraction,
+            background_left,
+        )?;
+        let delta = Velocity::new(position.x - self.position.x, position.y - self.position.y);
+        Some(translate_rect(bounds, delta))
+    }
+
     fn update_grounded(
         &mut self,
         source_rng: Option<ActorSourceRngSnapshot>,
@@ -15598,9 +15612,14 @@ impl Human {
             (velocity + behavior.human_fall_acceleration).min(behavior.human_max_fall_speed);
         self.position = self.position.offset(Velocity::new(0, next_velocity));
 
-        if prompt.snapshots.iter().any(|snapshot| {
-            snapshot.kind == ActorKind::Player && intersects_snapshot(snapshot, self.bounds())
-        }) {
+        if self
+            .screen_bounds(prompt.source_background_left)
+            .is_some_and(|bounds| {
+                prompt.snapshots.iter().any(|snapshot| {
+                    snapshot.kind == ActorKind::Player && intersects_snapshot(snapshot, bounds)
+                })
+            })
+        {
             commands.push(GameCommand::Destroy(self.id));
             commands.push(GameCommand::AddScore(HUMAN_RESCUE_SCORE));
             commands.push(GameCommand::Spawn(SpawnRequest::ScorePopup {
@@ -16926,6 +16945,45 @@ mod tests {
     }
 
     #[test]
+    fn actor_render_projects_source_world_humans_against_scrolling_background() {
+        let still_report = actor_source_projection_report_for_test(0);
+        let scrolled_report = actor_source_projection_report_for_test(0x0100);
+
+        let still_state = still_report.game_state();
+        let scrolled_state = scrolled_report.game_state();
+        assert_eq!(
+            still_state.world.humans[0].position,
+            ScreenPosition::new(0x2E, 220)
+        );
+        assert_eq!(
+            scrolled_state.world.humans[0].position,
+            ScreenPosition::new(0x2E, 220)
+        );
+        assert_eq!(still_state.world.humans[0].source_x_fraction, 0x80);
+        assert_eq!(scrolled_state.world.humans[0].source_x_fraction, 0x80);
+
+        let still = still_report.render_scene();
+        let scrolled = scrolled_report.render_scene();
+        assert_eq!(
+            sprite_position_for_test(&still, SpriteId::HUMAN, RenderLayer::Objects),
+            Some([186.0, 220.0])
+        );
+        assert_eq!(
+            sprite_position_for_test(&scrolled, SpriteId::HUMAN, RenderLayer::Objects),
+            Some([182.0, 220.0])
+        );
+
+        let source_human = still_report
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Human)
+            .expect("source-backed human snapshot should be present");
+        let projected = actor_collision_body_for_snapshot(source_human, 0)
+            .expect("source-backed human should be projected while visible");
+        assert_eq!(projected.position, Point::new(186, 220));
+    }
+
+    #[test]
     fn actor_collisions_project_source_world_hostiles_against_background() {
         let mut lander = actor_snapshot(2, ActorKind::Lander, Point::new(0x30, 80));
         lander.bounds = Some(Rect::from_center(lander.position, 8, 8));
@@ -16951,6 +17009,48 @@ mod tests {
         assert!(
             actor_collision_body_for_snapshot(&lander, 0x4000).is_none(),
             "offscreen source-backed hostiles should not collide with screen-space player/laser bodies"
+        );
+    }
+
+    #[test]
+    fn source_backed_falling_human_rescue_uses_projected_world_position() {
+        let mut human = Human::with_source(
+            ActorId::new(7),
+            Point::new(0x40, 100),
+            HumanMode::Falling { velocity: 0 },
+            Some(ActorSourceHumanMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                picture_frame: 0,
+                target_slot_index: 0,
+            }),
+        );
+        let mut player = actor_snapshot(1, ActorKind::Player, Point::new(128, 101));
+        player.bounds = Some(Rect::from_center(player.position, 18, 10));
+        let mut prompt = playing_player_prompt_for_test(GameInput::NONE, 0x2000);
+        prompt.snapshots = vec![player];
+
+        let reply = human.update(&prompt);
+
+        assert_eq!(reply.snapshot.position, Point::new(0x40, 101));
+        assert_eq!(
+            reply.snapshot.source_human.map(|source| source.x_fraction),
+            Some(0)
+        );
+        assert!(
+            reply
+                .commands
+                .contains(&GameCommand::Destroy(ActorId::new(7)))
+        );
+        assert!(
+            reply
+                .commands
+                .contains(&GameCommand::AddScore(HUMAN_RESCUE_SCORE))
+        );
+        assert!(
+            reply
+                .commands
+                .contains(&GameCommand::PlaySound(SoundCue::HumanRescued))
         );
     }
 
@@ -27207,6 +27307,14 @@ mod tests {
             lifetime_ticks: 12,
         });
 
+        let mut human = actor_snapshot(5, ActorKind::Human, Point::new(0x2E, 220));
+        human.source_human = Some(ActorSourceHumanMetadata {
+            x_fraction: 0x80,
+            y_fraction: 0,
+            picture_frame: 2,
+            target_slot_index: 4,
+        });
+
         StepReport {
             step: 123,
             phase: Phase::Playing,
@@ -27237,7 +27345,7 @@ mod tests {
             source_background_left,
             source_rng: None,
             terrain_blow: None,
-            snapshots: vec![player, lander, enemy_laser, bomb],
+            snapshots: vec![player, lander, enemy_laser, bomb, human],
             draws: vec![
                 DrawCommand::sprite(
                     ActorId::new(1),
@@ -27247,6 +27355,12 @@ mod tests {
                 DrawCommand::sprite(ActorId::new(2), SpriteKey::Lander, Point::new(0x30, 80)),
                 DrawCommand::sprite(ActorId::new(3), SpriteKey::EnemyLaser, Point::new(0x31, 96)),
                 DrawCommand::sprite(ActorId::new(4), SpriteKey::Bomb, Point::new(0x31, 104)),
+                DrawCommand::sprite_with_effect(
+                    ActorId::new(5),
+                    SpriteKey::Human,
+                    Point::new(0x2E, 220),
+                    VisualEffect::SourceHumanFrame { frame: 2 },
+                ),
             ],
             sounds: Vec::new(),
             commands: Vec::new(),
