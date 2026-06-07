@@ -246,7 +246,9 @@ tree:
 - `src/live_wgpu.rs`: also owns `--actor-wgpu-smoke`, which reuses the actor
   smoke input sequence, renders actor `RenderScene` frames through the offscreen
   `wgpu` texture/readback path, and checks nonblank dynamic readback evidence
-  for the actor runtime. It also owns default interactive actor live play and
+  for the actor runtime. `--live-smoke` now uses the same actor frame source
+  instead of the old clean `Game` smoke source. It also owns default
+  interactive actor live play and
   the explicit `--actor-live` alias, which step `ActorRuntimeAdapter`,
   submits actor-derived clean `GameFrame` values to the live audio runtime, and
   draws actor scenes with the existing `wgpu` presenter. The actor live input
@@ -282,9 +284,9 @@ tree:
   live and smoke launches.
 - `src/live_wgpu.rs`: the crate-private WGPU live launcher that owns the
   `winit` event loop, `wgpu` surface/device lifecycle, clean input mapping,
-  clean `Game` stepping, clean audio event submission, native sprite draw-plan
-  execution, and the clean `Game` frame source plus offscreen `wgpu`
-  render/readback evidence for `--live-smoke`.
+  actor runtime stepping, clean audio event submission, native sprite draw-plan
+  execution, and the actor frame source plus offscreen `wgpu` render/readback
+  evidence for `--live-smoke`.
 - `src/roms.rs`: the crate-private optional ROM verification facade that owns
   the temporary ROM metadata, scan, and loader bridge.
 - `src/audio.rs`: gameplay-facing `SoundEvent` batches, the live audio worker
@@ -320,8 +322,8 @@ private `runtime` bridge, while the internal oracle uses the crate-private
 `accepted` facade when `legacy-tools` is enabled.
 `src_legacy/accepted_behavior.rs` performs the current legacy-machine
 adaptation into neutral accepted-behavior contracts before the public clean
-gameplay types see it. `src/live_wgpu.rs` owns clean config-driven interactive
-`wgpu` launches and routes `--live-smoke` through clean `Game` smoke frames.
+gameplay types see it. `src/live_wgpu.rs` owns actor config-driven interactive
+`wgpu` launches and routes `--live-smoke` through actor smoke frames.
 `src/roms.rs` owns the temporary ROM metadata, scan, and loader bridge for
 optional verification commands. `src/fidelity_manifest.rs` owns the temporary
 scenario manifest and input expansion bridge for fidelity scenario commands.
@@ -356,10 +358,9 @@ bind groups, and indexed draws.
 clean `Game` world seeds terrain, starfield, source-profile active enemy
 batches, human, and projectile snapshots for playing waves and renders them as
 atlas-backed scene sprites.
-`--live-smoke` reuses that clean frame source, renders it through an offscreen
-`wgpu` target, reads back pixel signatures, checks selected first/last
-signatures, and reports
-`frame_source: clean_game`, `legacy_presenter_used: false`, sprite counts,
+`--live-smoke` reuses the actor smoke frame source, renders it through an
+offscreen `wgpu` target, reads back pixel signatures, and reports
+`frame_source: actor_game`, `legacy_presenter_used: false`, sprite counts,
 temporary-raster counts, and offscreen render evidence.
 Operator controls are
 sampled through `OperatorControlSystem`, emitting diagnostics, audits, and
@@ -761,10 +762,9 @@ reintroduce legacy implementation terminology.
 - Live play uses the clean windowed `wgpu` backend, steps actor runtime reports,
   submits actor-derived clean audio events, and executes native sprite draw
   plans.
-- `--live-smoke` steps clean `Game` frames through `NativeSceneRenderer` and
+- `--live-smoke` steps actor runtime frames through `NativeSceneRenderer` and
   renders them through offscreen `wgpu` texture/readback evidence without using
-  the legacy live presenter for smoke frame generation. The smoke gate checks
-  selected first/last offscreen frame signatures.
+  the legacy live presenter for smoke frame generation.
 - `--game-smoke` runs a clean game, gameplay sprite coverage, native
   draw-command pipeline and instance coverage, native draw-plan, `wgpu`
   frame-plan ordered sprite-only begin-pass/viewport/projection and sprite
@@ -790,8 +790,8 @@ reintroduce legacy implementation terminology.
   initials/backspace through actor input for the actor-owned high-score-entry
   phase. `--actor-script <path>` loads one checked sectioned actor driver
   script into that live actor runtime before the window opens; it is rejected
-  with `--live-smoke` because that command still exercises the clean-game smoke
-  path. `--actor-script-check <path>` parses the same file, samples one
+  with `--live-smoke` because that command uses the built-in actor smoke
+  script. `--actor-script-check <path>` parses the same file, samples one
   headless attract actor step, reports declared attract-cycle milestones when
   the script provides a bounded `cycle`, then credits/starts the actor runtime
   through the first playable wave and prints script manifest, first-frame,

@@ -52,8 +52,8 @@ verification tools.
   accepts `--actor-script <path>` to load one checked sectioned custom-driver
   script before the window opens, while rejecting that option with
   `--live-smoke` so a custom actor script is never silently ignored by the
-  clean-game smoke path. `--actor-script-check <path>` now runs the same parser
-  and runtime constructor headlessly, samples the first attract actor step,
+  built-in actor smoke path. `--actor-script-check <path>` now runs the same
+  parser and runtime constructor headlessly, samples the first attract actor step,
   reports bounded declared attract-cycle milestones for custom attract scripts,
   credits/starts the actor runtime through the first playable wave, and reports
   manifest, first-frame, effective source-wave, spawned world counts,
@@ -974,6 +974,26 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-07 18:13 BST`: Completed the actor live-smoke and gameplay
+  regression cycle. `--live-smoke` now uses the actor smoke/offscreen `wgpu`
+  path and reports `frame_source: actor_game` with `192` actor frames,
+  `0` clean-game frames, `192` nonblank offscreen frames, and zero temporary
+  raster commands. Retired the clean game smoke helper surface that only
+  existed for the old live-smoke route, while keeping explicit `--game-smoke`
+  available as a separate clean-frame evidence command. Added focused actor
+  regressions proving same-step credit plus `1` starts one-player play,
+  second-credit plus `2` starts two-player play, and a one-player non-final
+  death stays in `Playing`, does not render attract, and respawns without
+  emitting game-over. README, SPEC, the release audit, and the active plan now
+  describe actor-backed live smoke and the correct `1`/`2` start controls.
+  Validation passed with `cargo fmt --check`, focused Rust regressions for the
+  start/death/live-smoke/CLI error paths, `cargo run -- --game-smoke`,
+  `cargo run -- --live-smoke`, `cargo run -- --actor-post-game-smoke`,
+  `cargo check --all-targets --features legacy-tools`,
+  `cargo clippy --all-targets --features legacy-tools -- -D warnings`,
+  docs markdownlint, and `git diff --check`. Slack step start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780851810731939>.
 
 - `2026-06-07 17:50 BST`: Completed the post-cleanup full release-gate
   verification cycle after removing the retired legacy runtime adapters.

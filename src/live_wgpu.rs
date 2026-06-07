@@ -29,13 +29,12 @@ use crate::{
     },
     actor_smoke::ActorSmokeReport,
     audio::LiveAudioMode,
-    game_smoke::GameSmokeReport,
     renderer::{SpriteId, source_message_text},
 };
 #[cfg(all(not(test), not(coverage)))]
 use crate::{
     audio::LiveAudioRuntime,
-    game::{Game, GameFrame},
+    game::GameFrame,
     renderer::{
         GpuRendererSettings, NativeSceneRenderer, SceneDrawPlan, SpriteBindGroupRole,
         SpriteBufferRole, SpriteBufferUpload, SpriteRenderPassEncoderCommand, SurfaceSize,
@@ -49,10 +48,6 @@ const INITIAL_WINDOW_WIDTH: u32 = 1_024;
 const INITIAL_WINDOW_HEIGHT: u32 = 768;
 #[cfg(all(not(test), not(coverage)))]
 const MAX_STEPS_PER_TICK: u32 = 5;
-#[cfg(all(not(test), not(coverage)))]
-const EXPECTED_OFFSCREEN_FIRST_FRAME_SIGNATURE: u64 = 0x8DAE_D38B_41A6_92A9;
-#[cfg(all(not(test), not(coverage)))]
-const EXPECTED_OFFSCREEN_LAST_FRAME_SIGNATURE: u64 = 0xFE80_CC2B_377E_8066;
 const ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT: usize = 512;
 const ACTOR_SCRIPT_CHECK_ATTRACT_CYCLE_STEP_LIMIT: u64 = 4096;
 const ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT: usize = 4096;
@@ -407,44 +402,6 @@ impl LiveSmokeReport {
             self.injected_inputs.join(","),
             self.clean_exit
         )
-    }
-
-    #[cfg(all(not(test), not(coverage)))]
-    fn validate_offscreen_wgpu(&self) -> anyhow::Result<()> {
-        if self.offscreen_wgpu_frames != self.rendered_frames {
-            anyhow::bail!(
-                "wgpu live smoke rendered {} offscreen frame(s), expected {}",
-                self.offscreen_wgpu_frames,
-                self.rendered_frames
-            );
-        }
-        if self.offscreen_non_blank_frames != self.rendered_frames {
-            anyhow::bail!(
-                "wgpu live smoke rendered {} nonblank offscreen frame(s), expected {}",
-                self.offscreen_non_blank_frames,
-                self.rendered_frames
-            );
-        }
-        if self.offscreen_distinct_frame_signatures < 3 {
-            anyhow::bail!("wgpu live smoke did not produce dynamic offscreen frame signatures");
-        }
-        let Some(first_frame_signature) = self.offscreen_first_frame_signature else {
-            anyhow::bail!("wgpu live smoke did not record an offscreen frame signature");
-        };
-        if first_frame_signature != EXPECTED_OFFSCREEN_FIRST_FRAME_SIGNATURE {
-            anyhow::bail!(
-                "wgpu live smoke first offscreen frame signature {first_frame_signature:016x} did not match expected {EXPECTED_OFFSCREEN_FIRST_FRAME_SIGNATURE:016x}"
-            );
-        }
-        let Some(last_frame_signature) = self.offscreen_last_frame_signature else {
-            anyhow::bail!("wgpu live smoke did not record a final offscreen frame signature");
-        };
-        if last_frame_signature != EXPECTED_OFFSCREEN_LAST_FRAME_SIGNATURE {
-            anyhow::bail!(
-                "wgpu live smoke last offscreen frame signature {last_frame_signature:016x} did not match expected {EXPECTED_OFFSCREEN_LAST_FRAME_SIGNATURE:016x}"
-            );
-        }
-        Ok(())
     }
 
     #[cfg(all(not(test), not(coverage)))]
@@ -1004,43 +961,6 @@ fn spawned_actor_samples_summary(samples: &[ActorScriptCheckSpawnedActorSample])
         .map(|sample| format!("{}@{},{}", sample.kind, sample.x, sample.y))
         .collect::<Vec<_>>()
         .join(";")
-}
-
-impl From<GameSmokeReport> for LiveSmokeReport {
-    fn from(report: GameSmokeReport) -> Self {
-        Self {
-            frame_source: "clean_game",
-            legacy_presenter_used: false,
-            window_created: false,
-            rendered_frames: report.frames,
-            first_frame_size: report.first_frame_size,
-            distinct_frame_signatures: report.distinct_scene_signatures,
-            saw_non_blank_frame: report.sprite_frames > 0,
-            saw_attract: report.saw_attract,
-            saw_credit: report.saw_credit,
-            saw_playing: report.saw_playing,
-            attract_visual_frames: report.attract_frames,
-            credit_visual_frames: report.credited_frames,
-            playing_visual_frames: report.playing_frames,
-            attract_distinct_frame_signatures: usize::from(report.saw_attract),
-            credit_distinct_frame_signatures: usize::from(report.saw_credit),
-            playing_distinct_frame_signatures: usize::from(report.saw_playing),
-            clean_game_frames: report.frames,
-            actor_frames: 0,
-            sprite_frames: report.sprite_frames,
-            sprite_instances: report.sprite_instances,
-            sprite_draw_commands: report.sprite_draw_commands,
-            temporary_raster_frames: report.raster_frames,
-            temporary_raster_commands: report.temporary_raster_commands,
-            offscreen_wgpu_frames: 0,
-            offscreen_non_blank_frames: 0,
-            offscreen_distinct_frame_signatures: 0,
-            offscreen_first_frame_signature: None,
-            offscreen_last_frame_signature: None,
-            injected_inputs: report.injected_inputs,
-            clean_exit: report.clean_exit,
-        }
-    }
 }
 
 impl From<ActorSmokeReport> for LiveSmokeReport {
@@ -2576,16 +2496,16 @@ pub(crate) fn run_smoke(
     _input_profile: LiveInputProfile,
     _cmos_path: Option<&Path>,
 ) -> anyhow::Result<LiveSmokeReport> {
-    let game_report = crate::game_smoke::default_smoke_report()?;
-    let offscreen_report = pollster::block_on(render_offscreen_smoke())?;
-    let mut report = LiveSmokeReport::from(game_report);
+    let actor_report = crate::actor_smoke::default_smoke_report()?;
+    let offscreen_report = pollster::block_on(render_actor_offscreen_smoke())?;
+    let mut report = LiveSmokeReport::from(actor_report);
     report.saw_non_blank_frame = offscreen_report.non_blank_frames > 0;
     report.offscreen_wgpu_frames = offscreen_report.frames;
     report.offscreen_non_blank_frames = offscreen_report.non_blank_frames;
     report.offscreen_distinct_frame_signatures = offscreen_report.distinct_frame_signatures;
     report.offscreen_first_frame_signature = offscreen_report.first_frame_signature;
     report.offscreen_last_frame_signature = offscreen_report.last_frame_signature;
-    report.validate_offscreen_wgpu()?;
+    report.validate_actor_offscreen_wgpu()?;
     Ok(report)
 }
 
@@ -2614,7 +2534,7 @@ pub(crate) fn run_smoke(
     _input_profile: LiveInputProfile,
     _cmos_path: Option<&Path>,
 ) -> anyhow::Result<LiveSmokeReport> {
-    crate::game_smoke::default_smoke_report().map(LiveSmokeReport::from)
+    crate::actor_smoke::default_smoke_report().map(LiveSmokeReport::from)
 }
 
 #[cfg(all(not(test), not(coverage)))]
@@ -3001,35 +2921,6 @@ struct OffscreenWgpuSmokeReport {
     distinct_frame_signatures: usize,
     first_frame_signature: Option<u64>,
     last_frame_signature: Option<u64>,
-}
-
-#[cfg(all(not(test), not(coverage)))]
-async fn render_offscreen_smoke() -> anyhow::Result<OffscreenWgpuSmokeReport> {
-    let mut renderer = WgpuOffscreenRenderer::new().await?;
-    let mut game = Game::new();
-    let mut signatures = BTreeSet::new();
-    let mut report = OffscreenWgpuSmokeReport::default();
-
-    for _ in 0..crate::game_smoke::smoke_visual_warmup_frames() {
-        game.step(GameInput::NONE);
-    }
-
-    for frame_index in 0..crate::game_smoke::smoke_frame_count() {
-        let frame = game.step(crate::game_smoke::smoke_game_input(frame_index));
-        let rendered = renderer.render_scene(&frame.scene)?;
-        report.frames = report.frames.saturating_add(1);
-        if rendered.non_blank {
-            report.non_blank_frames = report.non_blank_frames.saturating_add(1);
-        }
-        report
-            .first_frame_signature
-            .get_or_insert(rendered.signature);
-        report.last_frame_signature = Some(rendered.signature);
-        signatures.insert(rendered.signature);
-    }
-
-    report.distinct_frame_signatures = signatures.len();
-    Ok(report)
 }
 
 #[cfg(all(not(test), not(coverage)))]
@@ -3898,7 +3789,7 @@ mod tests {
     #[test]
     fn live_smoke_report_formats_current_cli_output() {
         let report = LiveSmokeReport {
-            frame_source: "clean_game",
+            frame_source: "actor_game",
             legacy_presenter_used: false,
             window_created: false,
             rendered_frames: 3,
@@ -3914,8 +3805,8 @@ mod tests {
             attract_distinct_frame_signatures: 1,
             credit_distinct_frame_signatures: 1,
             playing_distinct_frame_signatures: 1,
-            clean_game_frames: 3,
-            actor_frames: 0,
+            clean_game_frames: 0,
+            actor_frames: 3,
             sprite_frames: 3,
             sprite_instances: 12,
             sprite_draw_commands: 4,
@@ -3934,7 +3825,7 @@ mod tests {
             report.to_text(),
             concat!(
                 "wgpu live smoke passed\n",
-                "  frame_source: clean_game\n",
+                "  frame_source: actor_game\n",
                 "  legacy_presenter_used: false\n",
                 "  window_created: false\n",
                 "  rendered_frames: 3\n",
@@ -3944,8 +3835,8 @@ mod tests {
                 "  saw_attract: true (visual_frames: 1, visual_signatures: 1)\n",
                 "  saw_credit: true (visual_frames: 1, visual_signatures: 1)\n",
                 "  saw_playing: true (visual_frames: 1, visual_signatures: 1)\n",
-                "  clean_game_frames: 3\n",
-                "  actor_frames: 0\n",
+                "  clean_game_frames: 0\n",
+                "  actor_frames: 3\n",
                 "  sprite_frames: 3\n",
                 "  sprite_instances: 12\n",
                 "  sprite_draw_commands: 4\n",
@@ -3963,14 +3854,14 @@ mod tests {
     }
 
     #[test]
-    fn live_smoke_uses_clean_game_frame_source() {
-        let report = run_smoke(super::LiveInputProfile::Test, None).expect("clean live smoke");
+    fn live_smoke_uses_actor_frame_source() {
+        let report = run_smoke(super::LiveInputProfile::Test, None).expect("actor live smoke");
 
-        assert_eq!(report.frame_source, "clean_game");
+        assert_eq!(report.frame_source, "actor_game");
         assert!(!report.legacy_presenter_used);
         assert!(!report.window_created);
-        assert_eq!(report.clean_game_frames, report.rendered_frames);
-        assert_eq!(report.actor_frames, 0);
+        assert_eq!(report.clean_game_frames, 0);
+        assert_eq!(report.actor_frames, report.rendered_frames);
         assert_eq!(report.temporary_raster_frames, 0);
         assert_eq!(report.temporary_raster_commands, 0);
         assert!(report.sprite_frames > 0);

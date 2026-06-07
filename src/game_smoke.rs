@@ -483,21 +483,6 @@ pub(crate) fn default_smoke_report() -> anyhow::Result<GameSmokeReport> {
     smoke_report(SMOKE_FRAMES)
 }
 
-#[cfg(all(not(test), not(coverage)))]
-pub(crate) const fn smoke_frame_count() -> u32 {
-    SMOKE_FRAMES
-}
-
-#[cfg(all(not(test), not(coverage)))]
-pub(crate) const fn smoke_visual_warmup_frames() -> u32 {
-    SMOKE_VISUAL_WARMUP_FRAMES
-}
-
-#[cfg(all(not(test), not(coverage)))]
-pub(crate) fn smoke_game_input(frame_index: u32) -> GameInput {
-    smoke_input(frame_index).value
-}
-
 pub(crate) fn smoke_report(frames: u32) -> anyhow::Result<GameSmokeReport> {
     if frames == 0 {
         bail!("clean game smoke frame count must be positive");

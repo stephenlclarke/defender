@@ -18338,6 +18338,38 @@ mod tests {
     }
 
     #[test]
+    fn actor_one_player_start_accepts_same_step_credit_and_start_button() {
+        let mut runtime = ActorRuntimeAdapter::new();
+
+        let started = runtime.step(GameInput {
+            coin: true,
+            start_one: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(started.report.phase, Phase::Playing);
+        assert_eq!(started.state.phase, GamePhase::Playing);
+        assert_eq!(started.report.credits, 0);
+        assert_eq!(started.report.current_player, 1);
+        assert_eq!(started.report.player_count, 1);
+        assert!(started.events.gameplay().contains(&GameEvent::CreditAdded));
+        assert!(started.events.gameplay().contains(&GameEvent::GameStarted));
+        assert_eq!(
+            started.report.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS,
+                player: 1,
+            })
+        );
+        assert!(started.state.world.enemies.is_empty());
+
+        let active = step_until_player_start_completes(&mut runtime, 1);
+        assert_eq!(active.report.phase, Phase::Playing);
+        assert!(active.events.gameplay().contains(&GameEvent::WaveStarted));
+        assert!(!active.state.world.enemies.is_empty());
+    }
+
+    #[test]
     fn actor_one_player_start_uses_source_playfield_delay_without_source_prompt() {
         let mut driver = ActorGameDriver::new();
         driver.credits = 1;
@@ -18407,6 +18439,46 @@ mod tests {
                 || enemy.kind == CleanEnemyKind::Bomber
                 || enemy.kind == CleanEnemyKind::Pod
         }));
+    }
+
+    #[test]
+    fn actor_two_player_start_accepts_two_key_after_second_credit() {
+        let mut runtime = ActorRuntimeAdapter::new();
+
+        let credited = runtime.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(credited.report.phase, Phase::Attract);
+        assert_eq!(credited.report.credits, 1);
+
+        let started = runtime.step(GameInput {
+            coin: true,
+            start_two: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(started.report.phase, Phase::Playing);
+        assert_eq!(started.state.phase, GamePhase::Playing);
+        assert_eq!(started.report.credits, 0);
+        assert_eq!(started.report.current_player, 1);
+        assert_eq!(started.report.player_count, 2);
+        assert!(started.events.gameplay().contains(&GameEvent::CreditAdded));
+        assert!(started.events.gameplay().contains(&GameEvent::GameStarted));
+        assert_eq!(
+            started.report.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS,
+                player: 1,
+            })
+        );
+        assert_source_message(&started.report, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
+
+        let active = step_until_player_start_completes(&mut runtime, 1);
+        assert_eq!(active.report.phase, Phase::Playing);
+        assert_eq!(active.report.player_count, 2);
+        assert!(active.events.gameplay().contains(&GameEvent::WaveStarted));
+        assert!(!active.state.world.enemies.is_empty());
     }
 
     #[test]
@@ -18522,6 +18594,65 @@ mod tests {
             PlayerStockSnapshot::new(4, 2)
         );
         assert!(scored.events.gameplay().contains(&GameEvent::BonusAwarded));
+    }
+
+    #[test]
+    fn actor_one_player_non_final_death_stays_in_play_and_respawns() {
+        let mut driver = ActorGameDriver::new();
+        driver.phase = Phase::Playing;
+        driver.wave = 1;
+        driver.current_player = 1;
+        driver.player_count = 1;
+        driver.lives = 2;
+        driver.smart_bombs = 3;
+        driver.spawn_player();
+        driver.spawn_enemy_laser_from_spawn(Point::new(42, 120), Velocity::new(0, 0), None);
+        let mut runtime = ActorRuntimeAdapter::with_driver(driver);
+
+        let killed = runtime.step(GameInput::NONE);
+
+        assert_eq!(killed.report.phase, Phase::Playing);
+        assert_eq!(killed.state.phase, GamePhase::Playing);
+        assert_eq!(killed.report.lives, 1);
+        assert_eq!(
+            killed.state.player_stocks[0],
+            PlayerStockSnapshot::new(1, 3)
+        );
+        assert!(
+            killed
+                .events
+                .gameplay()
+                .contains(&GameEvent::PlayerDestroyed)
+        );
+        assert!(!killed.events.gameplay().contains(&GameEvent::GameOver));
+        assert!(!killed.report.sounds.contains(&SoundCue::GameOver));
+        assert!(killed.report.player_switch.is_none());
+        assert!(killed.report.player_start.is_none());
+        assert!(
+            !killed
+                .report
+                .draws
+                .iter()
+                .any(|draw| matches!(draw.effect, VisualEffect::WilliamsReveal { .. }))
+        );
+        assert!(!killed.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL
+                && sprite.layer == RenderLayer::Overlay
+        }));
+        assert_eq!(runtime.driver().snapshot_count(ActorKind::Player), 0);
+
+        let respawned = runtime.step(GameInput::NONE);
+
+        assert_eq!(respawned.report.phase, Phase::Playing);
+        assert_eq!(respawned.state.phase, GamePhase::Playing);
+        assert_eq!(respawned.report.lives, 1);
+        assert_eq!(
+            respawned.state.player_stocks[0],
+            PlayerStockSnapshot::new(1, 3)
+        );
+        assert_eq!(runtime.driver().snapshot_count(ActorKind::Player), 1);
+        assert!(!respawned.events.gameplay().contains(&GameEvent::GameOver));
+        assert!(!respawned.report.sounds.contains(&SoundCue::GameOver));
     }
 
     #[test]

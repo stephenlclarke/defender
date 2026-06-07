@@ -43,11 +43,10 @@ from these perspectives:
   through the fresh `2026-06-07` release gate. Actor play smoke proves the
   actor runtime through attract, credit, play, gameplay/audio events, sprite
   layers, native draw commands, and zero temporary raster commands.
-  Actor `wgpu` smoke rendered the actor frame source through offscreen readback
-  with `frame_source: actor_game`, `192` nonblank offscreen frames, and
-  `0` temporary raster commands. Live smoke rendered the clean frame source
-  through `320` nonblank offscreen `wgpu` frames.
-  Status: proven for the clean and actor smoke paths.
+  Actor `wgpu` smoke and live smoke render the actor frame source through
+  offscreen readback with `frame_source: actor_game`, nonblank offscreen
+  `wgpu` frames, and `0` temporary raster commands.
+  Status: proven for the actor smoke paths.
 - Clean runtime fidelity-debt scan:
   a `2026-05-29` bounded scan checked production clean runtime source for
   `TODO`, `FIXME`, `placeholder`, `stub`, `approximate`, `guess`,

@@ -655,7 +655,7 @@ impl fmt::Display for CleanCliError {
             ),
             Self::ActorScriptWithLiveSmoke => write!(
                 formatter,
-                "--actor-script requires the actor live runtime; --live-smoke uses the clean smoke path"
+                "--actor-script is only supported by interactive actor live play and --actor-script-check; --live-smoke uses the built-in actor smoke script"
             ),
             Self::RemovedRendererSelection => {
                 write!(
@@ -1631,7 +1631,7 @@ mod tests {
         );
         assert_eq!(
             CleanCliError::ActorScriptWithLiveSmoke.to_string(),
-            "--actor-script requires the actor live runtime; --live-smoke uses the clean smoke path"
+            "--actor-script is only supported by interactive actor live play and --actor-script-check; --live-smoke uses the built-in actor smoke script"
         );
         assert_eq!(
             CleanCliError::RemovedRendererSelection.to_string(),
@@ -1787,7 +1787,7 @@ mod tests {
     #[test]
     fn live_smoke_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&["--live-smoke", "--input-profile", "test", "--mute"]))
-            .expect("clean live-smoke CLI should run through configured runtime");
+            .expect("actor live-smoke CLI should run through configured runtime");
     }
 
     #[test]

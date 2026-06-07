@@ -20,10 +20,10 @@ time, so normal play does not need a local ROM or asset directory.
 
 Live play uses the actor runtime through a clean windowed `wgpu` renderer: it
 steps actor-owned simulation reports, submits clean audio events, and executes
-`NativeSceneRenderer` sprite draw plans. `--live-smoke` is the clean runtime
-smoke path and reports sprite/temporary-raster evidence plus offscreen `wgpu`
-render/readback signatures, including checked first/last frame signatures,
-without using the legacy live presenter for frame generation.
+`NativeSceneRenderer` sprite draw plans. `--live-smoke` is now the actor
+runtime smoke path and reports actor sprite evidence plus offscreen `wgpu`
+render/readback signatures without using the legacy live presenter for frame
+generation.
 
 ## Current Fidelity Status
 
@@ -120,8 +120,8 @@ bindings/XYZZY input state. `--actor-live` remains as an explicit alias for
 that actor live path. `--actor-script <path>` loads one checked sectioned
 custom-driver script into that actor live path before the window opens, so a
 custom `[attract]` / `[behavior]` / `[wave]` bundle can drive live play; the
-CLI rejects combining it with `--live-smoke` because that command still uses
-the clean-game smoke path. `--actor-script-check <path>` parses the same script
+CLI rejects combining it with `--live-smoke` because that command uses the
+built-in actor smoke script. `--actor-script-check <path>` parses the same script
 headlessly, samples the first attract actor step, reports declared attract-cycle
 milestones when a bounded `cycle` is present, then credits/starts the actor
 runtime through the first playable wave and prints manifest, first-frame, source
@@ -665,7 +665,8 @@ Planetoid-style keys onto Defender cabinet actions:
 - `5`: left coin slot
 - `6`: center coin slot
 - `7`: right coin slot
-- `1` or `ENTER`: one-player start when credit or free play is available
+- `1`: one-player start when credit or free play is available
+- `2`: two-player start when two credits or free play are available
 - `A`: move up
 - `Z`: move down
 - `SHIFT`: thrust
@@ -688,8 +689,9 @@ profile, `5` inserts a left-slot coin and `1` starts a one-player game;
 `ENTER` is not a start key.
 
 To start a normal one-player game from a fresh session, press `5`, then `1`.
-The red-label start path intentionally blocks no-credit starts unless the
-cabinet is configured for free play.
+To start a normal two-player game, press `5` twice, then `2`. The red-label
+start path intentionally blocks no-credit starts unless the cabinet is
+configured for free play.
 
 ## Persistence
 
@@ -820,10 +822,9 @@ Hall-of-fame display scenes also draw source-backed headings, the expanded
 Defender logo, underline bars, and both visible high-score tables as rank,
 initials, and score text. Pass `SCENARIOS="attract_boot start_game"` to narrow
 the scenario set during focused work.
-`cargo run -- --live-smoke` runs the clean live-smoke frame source and reports
-`frame_source: clean_game`, `legacy_presenter_used: false`, sprite counts,
-temporary-raster counts, and offscreen `wgpu` frame readback counts with
-checked first/last frame signatures.
+`cargo run -- --live-smoke` runs the actor live-smoke frame source and reports
+`frame_source: actor_game`, `legacy_presenter_used: false`, sprite counts,
+temporary-raster counts, and offscreen `wgpu` frame readback counts.
 `cargo run -- --actor-attract-smoke` runs the default actor attract sequence
 without inputs through the full checked script cycle and reports milestone,
 draw-plan, silence, and cycle-return evidence.
@@ -949,8 +950,8 @@ fixture checks. Historical live, CMOS, terminal, and presenter adapters that are
 no longer compiled from `src/lib.rs` have been removed rather than kept parked.
 `src_legacy/accepted_behavior.rs` owns the temporary accepted-machine adapter
 for the internal oracle.
-`src/live_wgpu.rs` owns clean config-driven interactive `wgpu` launches and
-routes `--live-smoke` through clean `Game` smoke frames. `src/roms.rs` owns the
+`src/live_wgpu.rs` owns actor config-driven interactive `wgpu` launches and
+routes `--live-smoke` through actor smoke frames. `src/roms.rs` owns the
 temporary ROM metadata, scan, and loader bridge for optional verification
 commands.
 `src/fidelity_manifest.rs` owns the temporary scenario manifest and input
@@ -977,11 +978,11 @@ command/draw/instance plus ordered sprite-only begin-pass, viewport, and
 projection upload coverage, and prepares sprite-only native draw plans plus
 frame-level `wgpu` command, resource bind-group, pipeline-layout bind-group,
 pipeline descriptor shape, encoder command-shape, and upload plans without
-entering the legacy live presenter. `--live-smoke` still reuses that clean frame
-source, renders the smoke frames through an offscreen `wgpu` target, reads back
-pixel signatures, checks the selected first/last signatures, and reports
-live-smoke evidence with `legacy_presenter_used: false`. `--actor-smoke` is the
-actor-runtime counterpart: it steps `ActorRuntimeAdapter`, verifies attract,
+entering the legacy live presenter. `--live-smoke` now reuses the actor smoke
+frame source, renders the smoke frames through an offscreen `wgpu` target,
+reads back pixel signatures, and reports live-smoke evidence with
+`frame_source: actor_game` and `legacy_presenter_used: false`. `--actor-smoke`
+steps `ActorRuntimeAdapter`, verifies attract,
 credited attract, playing, clean gameplay/audio events, required actor sprite
 families, projectile/HUD/overlay layers, native sprite draw commands, native
 pipelines, and frame-level `wgpu` command plans without entering the legacy
