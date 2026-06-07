@@ -1,6 +1,6 @@
 # Defender Current Specification
 
-Last reviewed: `2026-06-05`
+Last reviewed: `2026-06-07`
 
 ## Purpose
 
@@ -789,8 +789,10 @@ reintroduce legacy implementation terminology.
   the script provides a bounded `cycle`, then credits/starts the actor runtime
   through the first playable wave and prints script manifest, first-frame,
   source-wave, spawned world, reserve/source-state, source-backed actor
-  placement samples, and effective behavior counts/modes without opening a
-  window. The checker then uses the actor
+  placement samples, playable hostile projectile source metadata, source
+  sound-command bytes, a bounded first hostile source projectile sample when
+  one appears, and effective behavior counts/modes without opening a window.
+  The checker then uses the actor
   `XYZZY` overlay smart-bomb path to assist progression and reports the
   source-shaped
   wave-clear survivor-bonus interstitial, its `0x80` wave-advance sleep
@@ -852,7 +854,8 @@ reintroduce legacy implementation terminology.
   `--actor-script-check <path>`, including bounded declared attract-cycle
   milestone reporting, first-play reserve/source-state reporting plus assisted
   wave-clear, next-wave, and reserve-activation batch summaries for
-  source/reserve counts, survivor-bonus cadence, `0x80` wave sleep, restored
+  source/reserve counts, source actor/projectile samples, source
+  sound-command bytes, survivor-bonus cadence, `0x80` wave sleep, restored
   family counts, batch status, post-reserve wave-clear and sleep, post-reserve
   next playable wave, damage, fire cadence, and actor movement modes.
   Read-only script manifests expose persistent attract event, driver behavior,
