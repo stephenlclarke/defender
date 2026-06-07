@@ -794,8 +794,10 @@ reintroduce legacy implementation terminology.
   command, a bounded first player-laser-hit explosion/sound sample when a
   script produces one, a parser-backed hostile laser-hit matrix for lander,
   mutant, bomber, pod, swarmer, and baiter score/explosion/sound evidence, a
-  bounded first hostile source projectile sample when one appears, and
-  effective behavior counts/modes without opening a window. The checker
+  parser-backed hostile projectile matrix for lander, mutant, swarmer, and
+  baiter shot-command and projectile-metadata evidence, a bounded first hostile
+  source projectile sample when one appears, and effective behavior counts/modes
+  without opening a window. The checker
   then uses the actor
   `XYZZY` overlay smart-bomb path to assist progression and reports the
   source-shaped

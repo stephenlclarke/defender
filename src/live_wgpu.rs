@@ -124,6 +124,20 @@ pub(crate) struct ActorScriptCheckSourceProjectileSample {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ActorScriptCheckProjectileSpawnSample {
+    pub(crate) kind: String,
+    pub(crate) x: i16,
+    pub(crate) y: i16,
+    pub(crate) velocity_dx: i16,
+    pub(crate) velocity_dy: i16,
+    pub(crate) source_x_fraction: Option<u8>,
+    pub(crate) source_y_fraction: Option<u8>,
+    pub(crate) source_x_velocity: Option<u16>,
+    pub(crate) source_y_velocity: Option<u16>,
+    pub(crate) lifetime_ticks: Option<u8>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ActorScriptCheckPlayerLaserSample {
     pub(crate) x: i16,
     pub(crate) y: i16,
@@ -207,6 +221,14 @@ pub(crate) struct ActorScriptCheckReserveActivationSummary {
 pub(crate) struct ActorScriptCheckFirstSourceProjectileSummary {
     pub(crate) sample_steps: u32,
     pub(crate) samples: Vec<ActorScriptCheckSourceProjectileSample>,
+    pub(crate) sound_commands: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ActorScriptCheckHostileProjectileSample {
+    pub(crate) kind: String,
+    pub(crate) sample_steps: u32,
+    pub(crate) samples: Vec<ActorScriptCheckProjectileSpawnSample>,
     pub(crate) sound_commands: Vec<u8>,
 }
 
@@ -304,6 +326,7 @@ pub(crate) struct ActorScriptCheckReport {
     pub(crate) first_player_laser_hit: Option<ActorScriptCheckFirstPlayerLaserHitSummary>,
     pub(crate) first_player_laser_hit_unavailable_reason: Option<String>,
     pub(crate) hostile_laser_hit_matrix: Vec<ActorScriptCheckHostileLaserHitSample>,
+    pub(crate) hostile_projectile_matrix: Vec<ActorScriptCheckHostileProjectileSample>,
     pub(crate) first_source_projectile: Option<ActorScriptCheckFirstSourceProjectileSummary>,
     pub(crate) first_source_projectile_unavailable_reason: Option<String>,
     pub(crate) first_playing_player_takes_enemy_collision_damage: bool,
@@ -572,6 +595,10 @@ impl ActorScriptCheckReport {
             "  hostile_laser_hit_matrix: {}\n",
             hostile_laser_hit_matrix_summary(&self.hostile_laser_hit_matrix)
         );
+        let hostile_projectile_matrix = format!(
+            "  hostile_projectile_matrix: {}\n",
+            hostile_projectile_matrix_summary(&self.hostile_projectile_matrix)
+        );
         let first_source_projectile = self
             .first_source_projectile
             .as_ref()
@@ -659,7 +686,7 @@ impl ActorScriptCheckReport {
                 )
             });
         format!(
-            "actor script check passed\n  path: {}\n  attract_events: {}\n{}  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_source_state: background_left=0x{:04x},rng={}\n  first_playing_source_actor_samples: {}\n  first_playing_source_projectile_samples: {}\n  first_playing_sound_commands: {}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}{}{}{}{}{}{}{}{}{}  clean_exit: {}\n",
+            "actor script check passed\n  path: {}\n  attract_events: {}\n{}  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_source_state: background_left=0x{:04x},rng={}\n  first_playing_source_actor_samples: {}\n  first_playing_source_projectile_samples: {}\n  first_playing_sound_commands: {}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}{}{}{}{}{}{}{}{}{}{}  clean_exit: {}\n",
             self.path,
             self.attract_events,
             attract_cycle,
@@ -703,6 +730,7 @@ impl ActorScriptCheckReport {
             first_player_laser,
             first_player_laser_hit,
             hostile_laser_hit_matrix,
+            hostile_projectile_matrix,
             first_source_projectile,
             wave_clear,
             wave_clear_advance_sleep,
@@ -831,6 +859,35 @@ fn source_projectile_samples_summary(samples: &[ActorScriptCheckSourceProjectile
         .join(";")
 }
 
+fn projectile_spawn_samples_summary(samples: &[ActorScriptCheckProjectileSpawnSample]) -> String {
+    if samples.is_empty() {
+        return String::from("none");
+    }
+
+    samples
+        .iter()
+        .map(|sample| {
+            let source = match (
+                sample.source_x_fraction,
+                sample.source_y_fraction,
+                sample.source_x_velocity,
+                sample.source_y_velocity,
+                sample.lifetime_ticks,
+            ) {
+                (Some(x_fraction), Some(y_fraction), Some(x_velocity), Some(y_velocity), Some(lifetime_ticks)) => format!(
+                    "source=frac=0x{x_fraction:02x}/0x{y_fraction:02x},vel=0x{x_velocity:04x}/0x{y_velocity:04x},life={lifetime_ticks}"
+                ),
+                _ => String::from("source=none"),
+            };
+            format!(
+                "{}@{},{}[velocity={}/{},{}]",
+                sample.kind, sample.x, sample.y, sample.velocity_dx, sample.velocity_dy, source,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
 fn player_laser_samples_summary(samples: &[ActorScriptCheckPlayerLaserSample]) -> String {
     if samples.is_empty() {
         return String::from("none");
@@ -886,6 +943,28 @@ fn hostile_laser_hit_matrix_summary(samples: &[ActorScriptCheckHostileLaserHitSa
                 explosion_samples_summary(&sample.explosion_samples),
                 sound_commands_summary(&sample.sound_commands),
                 spawned_counts_summary(&sample.spawned_counts),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
+fn hostile_projectile_matrix_summary(
+    samples: &[ActorScriptCheckHostileProjectileSample],
+) -> String {
+    if samples.is_empty() {
+        return String::from("none");
+    }
+
+    samples
+        .iter()
+        .map(|sample| {
+            format!(
+                "{}@{}[samples={},sounds={}]",
+                sample.kind,
+                sample.sample_steps,
+                projectile_spawn_samples_summary(&sample.samples),
+                sound_commands_summary(&sample.sound_commands),
             )
         })
         .collect::<Vec<_>>()
@@ -1034,6 +1113,7 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
     let (first_player_laser_hit, first_player_laser_hit_unavailable_reason) =
         actor_script_check_first_player_laser_hit(scripts.clone())?;
     let hostile_laser_hit_matrix = actor_script_check_hostile_laser_hit_matrix()?;
+    let hostile_projectile_matrix = actor_script_check_hostile_projectile_matrix()?;
     let (first_source_projectile, first_source_projectile_unavailable_reason) =
         actor_script_check_first_source_projectile(scripts)?;
     let next_wave_progression =
@@ -1088,6 +1168,7 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         first_player_laser_hit,
         first_player_laser_hit_unavailable_reason,
         hostile_laser_hit_matrix,
+        hostile_projectile_matrix,
         first_source_projectile,
         first_source_projectile_unavailable_reason,
         first_playing_player_takes_enemy_collision_damage: first_playing
@@ -1306,6 +1387,113 @@ fn actor_script_check_first_source_projectile(
             ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_STEP_LIMIT
         )),
     ))
+}
+
+fn actor_script_check_hostile_projectile_matrix()
+-> anyhow::Result<Vec<ActorScriptCheckHostileProjectileSample>> {
+    [
+        ActorKind::Lander,
+        ActorKind::Mutant,
+        ActorKind::Swarmer,
+        ActorKind::Baiter,
+    ]
+    .into_iter()
+    .map(actor_script_check_hostile_projectile_matrix_sample_for)
+    .collect()
+}
+
+fn actor_script_check_hostile_projectile_matrix_sample_for(
+    kind: ActorKind,
+) -> anyhow::Result<ActorScriptCheckHostileProjectileSample> {
+    let kind_label = actor_script_check_source_actor_kind_label(kind);
+    let source = actor_script_check_hostile_projectile_matrix_script(kind);
+    let scripts = ActorDriverScripts::parse_text(&source).with_context(|| {
+        format!("parsing built-in hostile projectile matrix script `{kind_label}`")
+    })?;
+    let mut runtime = ActorRuntimeAdapter::with_scripts(scripts);
+    let mut frame = run_actor_script_check_to_first_playing_wave(&mut runtime)
+        .with_context(|| format!("starting hostile projectile matrix script `{kind_label}`"))?;
+
+    for sample_steps in 0..=ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_STEP_LIMIT {
+        let samples = actor_script_check_projectile_spawn_command_samples(&frame);
+        if !samples.is_empty() {
+            let sound_commands = actor_script_check_projectile_sound_commands(&frame);
+            return Ok(ActorScriptCheckHostileProjectileSample {
+                kind: kind_label.to_string(),
+                sample_steps: sample_steps as u32,
+                samples,
+                sound_commands,
+            });
+        }
+
+        if sample_steps == ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_STEP_LIMIT {
+            break;
+        }
+
+        frame = runtime.step(actor_script_check_hostile_projectile_matrix_input(kind));
+    }
+
+    anyhow::bail!(
+        "hostile projectile matrix script `{kind_label}` did not observe a projectile after {} steps",
+        ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_STEP_LIMIT
+    );
+}
+
+fn actor_script_check_hostile_projectile_matrix_input(kind: ActorKind) -> ActorGameInput {
+    if kind == ActorKind::Swarmer {
+        return ActorGameInput {
+            thrust: true,
+            ..ActorGameInput::NONE
+        };
+    }
+
+    ActorGameInput::NONE
+}
+
+fn actor_script_check_hostile_projectile_matrix_script(kind: ActorKind) -> String {
+    let source_wave = match kind {
+        ActorKind::Lander => {
+            "source_wave 2 wave_size 1 landers 1 bombers 0 pods 0 mutants 0 swarmers 0 lander_shot_time 1\n"
+        }
+        ActorKind::Mutant => {
+            "source_wave 1 wave_size 1 landers 0 bombers 0 pods 0 mutants 1 swarmers 0 mutant_shot_time 1 mutant_x_velocity 48 mutant_random_y 2\n"
+        }
+        ActorKind::Swarmer => {
+            concat!(
+                "source_wave 1 wave_size 0 landers 0 bombers 0 pods 0 mutants 0 swarmers 0\n",
+                "swarmer 62 120\n",
+            )
+        }
+        ActorKind::Baiter => {
+            concat!(
+                "source_wave 1 wave_size 0 landers 0 bombers 0 pods 0 mutants 0 swarmers 0 ",
+                "baiter_time 1 baiter_shot_time 1 lander_shot_time 255\n",
+                "lander 220 120\n",
+            )
+        }
+        _ => "",
+    };
+    format!(
+        concat!(
+            "[attract]\n",
+            "text 1 forever 12 20 PROJECTILE MATRIX\n",
+            "[behavior]\n",
+            "kind player player_takes_enemy_collision_damage false\n",
+            "kind player player_speed 16\n",
+            "kind lander lander_mode drift\n",
+            "kind lander lander_drift_speed 0\n",
+            "kind lander lander_fire_period_steps 18446744073709551615\n",
+            "kind swarmer swarmer_mode drift\n",
+            "kind swarmer swarmer_seek_speed 0\n",
+            "kind swarmer swarmer_fire_period_steps 1\n",
+            "[wave]\n",
+            "name hostile projectile matrix {kind_label}\n",
+            "{source_wave}",
+            "human 100 214\n",
+        ),
+        kind_label = actor_script_check_source_actor_kind_label(kind),
+        source_wave = source_wave
+    )
 }
 
 fn actor_script_check_first_player_laser(
@@ -1655,6 +1843,45 @@ fn actor_script_check_source_projectile_samples(
             })
         })
         .take(ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_SAMPLE_LIMIT)
+        .collect()
+}
+
+fn actor_script_check_projectile_spawn_command_samples(
+    frame: &ActorFrame,
+) -> Vec<ActorScriptCheckProjectileSpawnSample> {
+    frame
+        .report
+        .commands
+        .iter()
+        .filter_map(|command| match command {
+            GameCommand::Spawn(SpawnRequest::EnemyLaser {
+                position,
+                velocity,
+                source,
+            }) => Some(("enemy_laser", *position, *velocity, *source)),
+            GameCommand::Spawn(SpawnRequest::Bomb { position, source }) => Some((
+                "bomb",
+                *position,
+                crate::actor_game::Velocity::default(),
+                *source,
+            )),
+            _ => None,
+        })
+        .take(ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_SAMPLE_LIMIT)
+        .map(
+            |(kind, position, velocity, source)| ActorScriptCheckProjectileSpawnSample {
+                kind: kind.to_string(),
+                x: position.x,
+                y: position.y,
+                velocity_dx: velocity.dx,
+                velocity_dy: velocity.dy,
+                source_x_fraction: source.map(|source| source.x_fraction),
+                source_y_fraction: source.map(|source| source.y_fraction),
+                source_x_velocity: source.map(|source| source.x_velocity),
+                source_y_velocity: source.map(|source| source.y_velocity),
+                lifetime_ticks: source.map(|source| source.lifetime_ticks),
+            },
+        )
         .collect()
 }
 
@@ -4071,6 +4298,11 @@ mod tests {
                 "pod@2[score_delta=1000,score=1000,explosions=pod@62,120[source_center=none],sounds=0xfa,spawns=landers=0,bombers=0,pods=0,mutants=0,swarmers=6];",
                 "swarmer@2[score_delta=150,score=150,explosions=swarmer@62,120[source_center=none],sounds=0xf8,spawns=none];",
                 "baiter@2[score_delta=200,score=200,explosions=baiter@62,120[source_center=none],sounds=0xf8,spawns=none]\n",
+                "  hostile_projectile_matrix: ",
+                "lander@1[samples=enemy_laser@210,45[velocity=-3/3,source=frac=0xe9/0x60,vel=0xfd00/0x0300,life=90],sounds=0xfc];",
+                "mutant@454[samples=enemy_laser@0,222[velocity=1/-1,source=frac=0x50/0x00,vel=0x009c/0xfe5c,life=90],sounds=0xf6];",
+                "swarmer@0[samples=enemy_laser@62,120[velocity=3/0,source=none],sounds=0xf3];",
+                "baiter@79[samples=enemy_laser@28,120[velocity=1/-1,source=frac=0x00/0x00,vel=0x002c/0xffc4,life=20],sounds=0xfc]\n",
                 "  first_source_projectile: unavailable,reason=source_projectile_not_observed_after_512_steps\n",
                 "  wave_clear_assist_steps: 4\n",
                 "  wave_clear_next_wave: 2\n",
@@ -4291,6 +4523,63 @@ mod tests {
         assert!(text.contains(
             "pod@2[score_delta=1000,score=1000,explosions=pod@62,120[source_center=none],sounds=0xfa,spawns=landers=0,bombers=0,pods=0,mutants=0,swarmers=6]"
         ));
+    }
+
+    #[test]
+    fn actor_script_check_reports_hostile_projectile_matrix() {
+        let path = std::path::Path::new("examples/actor-custom-attract.script");
+        let report = run_actor_script_check(path).expect("example actor script should check");
+
+        let expected = [
+            ("lander", 0xfc),
+            ("mutant", 0xf6),
+            ("swarmer", 0xf3),
+            ("baiter", 0xfc),
+        ];
+
+        assert_eq!(report.hostile_projectile_matrix.len(), expected.len());
+        for (kind, sound_command) in expected {
+            let sample = report
+                .hostile_projectile_matrix
+                .iter()
+                .find(|sample| sample.kind == kind)
+                .unwrap_or_else(|| panic!("missing hostile projectile matrix sample for {kind}"));
+            assert_eq!(sample.sound_commands, [sound_command], "{kind} sound");
+            assert!(
+                !sample.samples.is_empty(),
+                "{kind} should publish a projectile sample"
+            );
+            assert!(
+                sample
+                    .samples
+                    .iter()
+                    .all(|projectile| projectile.kind == "enemy_laser"),
+                "{kind} projectile kind"
+            );
+            if kind == "swarmer" {
+                assert!(
+                    sample
+                        .samples
+                        .iter()
+                        .all(|projectile| projectile.lifetime_ticks.is_none()),
+                    "{kind} should be a clean scripted shot"
+                );
+            } else {
+                assert!(
+                    sample
+                        .samples
+                        .iter()
+                        .all(|projectile| projectile.lifetime_ticks.unwrap_or_default() > 0),
+                    "{kind} source projectile metadata"
+                );
+            }
+        }
+
+        let text = report.to_text();
+        assert!(text.contains("hostile_projectile_matrix: lander@"));
+        assert!(text.contains("sounds=0xfc"));
+        assert!(text.contains("swarmer@"));
+        assert!(text.contains("sounds=0xf3"));
     }
 
     #[test]

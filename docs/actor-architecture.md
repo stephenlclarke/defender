@@ -96,8 +96,10 @@ evidence commands.
   command, a bounded first player-laser-hit explosion/sound sample when a
   script produces one, a parser-backed hostile laser-hit matrix for lander,
   mutant, bomber, pod, swarmer, and baiter score/explosion/sound evidence, a
-  bounded first hostile source projectile sample when one appears, and
-  first-play behavior summaries. The checker then uses the actor `XYZZY`
+  parser-backed hostile projectile matrix for lander, mutant, swarmer, and
+  baiter shot-command and projectile-metadata evidence, a bounded first hostile
+  source projectile sample when one appears, and first-play behavior summaries.
+  The checker then uses the actor `XYZZY`
   overlay smart-bomb path to assist
   progression and reports the source-shaped wave-clear survivor-bonus
   interstitial, its `0x80` wave-advance sleep window, next playable wave, and a

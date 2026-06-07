@@ -64,9 +64,11 @@ verification tools.
   red-label sound command, the first player-laser-hit explosion plus its
   red-label hit command when a script produces one, a parser-backed hostile
   laser-hit matrix for lander, mutant, bomber, pod, swarmer, and baiter
-  score/explosion/sound evidence, and the first hostile source projectile plus
-  its associated red-label hostile shot command when a script produces one,
-  without mutating the main assisted progression check.
+  score/explosion/sound evidence, a parser-backed hostile projectile matrix for
+  lander, mutant, swarmer, and baiter shot-command and projectile-metadata
+  evidence, and the first hostile source projectile plus its associated
+  red-label hostile shot command when a script produces one, without mutating
+  the main assisted progression check.
   It then uses the actor `XYZZY` overlay smart-bomb path to assist wave clear
   and reports the source-shaped wave-clear survivor-bonus interstitial plus the
   source `0x80` wave-advance sleep before the next playable wave when the
@@ -956,6 +958,30 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-07 11:51 BST`: Completed the actor script-check hostile projectile
+  matrix cycle. `--actor-script-check <path>` now builds bounded
+  parser-backed custom-driver probes for lander, mutant, swarmer, and baiter
+  shot families and reports the first projectile spawn sample, velocity, source
+  metadata when available, sample step, and red-label shot command evidence.
+  The checked matrix pins `0xFC` lander shot, `0xF6` mutant shot, `0xF3`
+  swarmer shot, and `0xFC` baiter shot evidence. Bomber and pod direct-shot
+  rows are intentionally excluded because the current source-backed actor table
+  exposes bombs/pod-hit spawning but no direct shot command family for those
+  actors. No legacy code, tests, or scaffolding were safe to remove because
+  this slice expands the active custom-driver preflight evidence surface for
+  hostile projectile/audio fidelity. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780820837740689>.
+  Validation passed with `cargo fmt --check`, `cargo test actor_script_check
+  --all-targets --features legacy-tools`, `cargo test actor_script
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, `cargo run --quiet --features legacy-tools --
+  --actor-script-check examples/actor-custom-attract.script`, `make
+  actor-smoke`, `make actor-wgpu-smoke`, `make actor-attract-smoke`,
+  `markdownlint README.md SPEC.md PLAN.md docs/actor-architecture.md`, and
+  `git diff --check`.
 
 - `2026-06-07 09:20 BST`: Completed the actor script-check hostile
   laser-hit matrix cycle. `--actor-script-check <path>` now builds a bounded
