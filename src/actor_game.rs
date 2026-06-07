@@ -8418,7 +8418,7 @@ fn actor_attract_scoring_laser_enemy_anchor(
     position: [f32; 2],
 ) -> [f32; 2] {
     let size = actor_attract_scoring_enemy_size(enemy);
-    [position[0] + size[0] / 2.0, position[1] + size[1] / 2.0]
+    [position[0] + size[0], position[1] + size[1] / 2.0]
 }
 
 fn push_actor_scoring_sparse_laser(
@@ -18332,6 +18332,38 @@ mod tests {
         }));
     }
 
+    fn assert_attract_scoring_laser_reaches_target_edge(
+        scene: &RenderScene,
+        enemy: ActorAttractScoringEnemyKind,
+        target_position: [f32; 2],
+    ) {
+        let expected_sprite = actor_attract_scoring_enemy_sprite(enemy);
+        let target_size = actor_attract_scoring_enemy_size(enemy);
+        assert!(
+            scene.sprites.iter().any(|sprite| {
+                sprite.sprite == expected_sprite
+                    && sprite.layer == RenderLayer::Objects
+                    && sprite.position == target_position
+                    && sprite.size == target_size
+            }),
+            "scoring laser test must use the visible source target"
+        );
+        let target_right_edge = target_position[0] + target_size[0] - 1.0;
+        let laser_right_edge = scene
+            .sprites
+            .iter()
+            .filter(|sprite| {
+                sprite.sprite == SpriteId::PLAYER_PROJECTILE
+                    && sprite.layer == RenderLayer::Projectiles
+            })
+            .map(|sprite| sprite.position[0] + sprite.size[0] - 1.0)
+            .fold(f32::NEG_INFINITY, f32::max);
+        assert!(
+            laser_right_edge >= target_right_edge,
+            "attract scoring laser should visibly reach the {enemy:?} edge before explosion: laser={laser_right_edge}, target={target_right_edge}"
+        );
+    }
+
     #[test]
     fn actor_attract_scoring_surface_projects_laser_fragments_and_legend_transfer() {
         let mut laser_scene = RenderScene::empty(0, ACTOR_RENDER_SURFACE);
@@ -18358,30 +18390,45 @@ mod tests {
             .iter()
             .find(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
             .expect("rescue laser should still render the target lander");
-        let laser_contact = actor_attract_scoring_laser_enemy_anchor(
+        assert_attract_scoring_laser_reaches_target_edge(
+            &laser_scene,
             ActorAttractScoringEnemyKind::Lander,
             laser_target.position,
-        );
-        let laser_right_edge = laser_scene
-            .sprites
-            .iter()
-            .filter(|sprite| {
-                sprite.sprite == SpriteId::PLAYER_PROJECTILE
-                    && sprite.layer == RenderLayer::Projectiles
-            })
-            .map(|sprite| sprite.position[0])
-            .fold(f32::NEG_INFINITY, f32::max);
-        assert!(
-            laser_right_edge >= laser_contact[0] - 1.0,
-            "attract scoring laser should visibly reach the target center before explosion"
         );
         assert_eq!(
             actor_attract_scoring_laser_enemy_anchor(
                 ActorAttractScoringEnemyKind::Lander,
                 [20.0, 40.0]
             ),
-            [25.0, 44.0]
+            [30.0, 44.0]
         );
+        assert_eq!(
+            actor_attract_scoring_laser_enemy_anchor(
+                ActorAttractScoringEnemyKind::Swarmer,
+                [20.0, 40.0]
+            ),
+            [26.0, 42.0]
+        );
+
+        for (legend_index, entry) in ACTOR_ATTRACT_SCORING_LEGEND.iter().enumerate() {
+            let mut legend_laser_scene = RenderScene::empty(0, ACTOR_RENDER_SURFACE);
+            let legend_laser_step = actor_attract_scoring_display_step_for_stage(
+                ActorAttractScoringStage::LegendLaser(legend_index),
+                2,
+            );
+            push_attract_scoring_demo_scene(
+                &mut legend_laser_scene,
+                actor_attract_scoring_tick_for_display_step(legend_laser_step),
+            );
+            assert_attract_scoring_laser_reaches_target_edge(
+                &legend_laser_scene,
+                entry.enemy,
+                actor_attract_scoring_scene_position(
+                    ATTRACT_SCORING_LEGEND_SOURCE_X16,
+                    actor_attract_scoring_legend_source_y16(),
+                ),
+            );
+        }
 
         let mut explosion_scene = RenderScene::empty(0, ACTOR_RENDER_SURFACE);
         let rescue_fall_step =

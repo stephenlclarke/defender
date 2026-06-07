@@ -14687,7 +14687,7 @@ fn attract_scoring_laser_ship_anchor(position: [f32; 2]) -> [f32; 2] {
 fn attract_scoring_laser_enemy_anchor(kind: EnemyKind, position: [f32; 2]) -> [f32; 2] {
     let (width, height) = enemy_sprite_size(kind);
     [
-        position[0] + f32::from(width) / 2.0,
+        position[0] + f32::from(width),
         position[1] + f32::from(height / 2),
     ]
 }
@@ -18394,7 +18394,11 @@ mod tests {
         );
         assert_eq!(
             super::attract_scoring_laser_enemy_anchor(EnemyKind::Lander, [20.0, 40.0]),
-            [25.0, 44.0]
+            [30.0, 44.0]
+        );
+        assert_eq!(
+            super::attract_scoring_laser_enemy_anchor(EnemyKind::Swarmer, [20.0, 40.0]),
+            [26.0, 42.0]
         );
         assert_eq!(
             super::attract_scoring_object_sprite(
