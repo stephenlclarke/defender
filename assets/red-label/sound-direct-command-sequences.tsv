@@ -1,7 +1,0 @@
-callsite	source_file	source_line	source_label	sound_number	write_index	write_kind	port_b	command	source
-player_death_stop	defa7.src	1386	PDTH5	0x13	1	idle	0x3F	0xFF	https://github.com/mwenge/defender/blob/master/src/defa7.src#L1384-L1386
-player_death_stop	defa7.src	1386	PDTH5	0x13	2	command	0x2C	0xEC	https://github.com/mwenge/defender/blob/master/src/defa7.src#L1384-L1386
-game_over_stop	defa7.src	1430	PLE2	0x13	1	idle	0x3F	0xFF	https://github.com/mwenge/defender/blob/master/src/defa7.src#L1428-L1430
-game_over_stop	defa7.src	1430	PLE2	0x13	2	command	0x2C	0xEC	https://github.com/mwenge/defender/blob/master/src/defa7.src#L1428-L1430
-lander_pull_tick	defb6.src	821	LNDFX0	0x12	1	idle	0x3F	0xFF	https://github.com/mwenge/defender/blob/master/src/defb6.src#L819-L821
-lander_pull_tick	defb6.src	821	LNDFX0	0x12	2	command	0x2D	0xED	https://github.com/mwenge/defender/blob/master/src/defb6.src#L819-L821

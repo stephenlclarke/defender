@@ -1,6 +1,0 @@
-routine	address	register	width_nibbles	x_advance	operation	source
-SRAMRead	0xF813	A	2	2	read_byte	https://computerarcheology.com/Arcade/Defender/RAMUse.html
-RdSRAMbyte	0xF822	A	2	2	read_byte_page_safe	https://computerarcheology.com/Arcade/Defender/RAMUse.html
-SRAMWordRd	0xF838	D	4	4	read_word	https://computerarcheology.com/Arcade/Defender/RAMUse.html
-SRAMByteRd	0xF83A	B	2	2	read_byte	https://computerarcheology.com/Arcade/Defender/RAMUse.html
-SRAMWrite	0xF842	A	2	2	write_byte	https://computerarcheology.com/Arcade/Defender/RAMUse.html

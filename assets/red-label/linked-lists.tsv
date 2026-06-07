@@ -1,8 +1,0 @@
-list	head_symbol	head_address	entry_table	link_field	source
-active_process	ACTIVE	0xA05F	process	PLINK	https://github.com/mwenge/defender/blob/master/src/phr6.src#L248-L255;https://github.com/mwenge/defender/blob/master/src/defa7.src#L3119-L3126
-free_process	FREE	0xA061	process	PLINK	https://github.com/mwenge/defender/blob/master/src/phr6.src#L248-L255;https://github.com/mwenge/defender/blob/master/src/defa7.src#L1037-L1043
-free_super_process	SPFREE	0xA069	super_process	PLINK	https://github.com/mwenge/defender/blob/master/src/phr6.src#L248-L255;https://github.com/mwenge/defender/blob/master/src/defa7.src#L1046-L1052
-active_object	OPTR	0xA065	object	OLINK	https://github.com/mwenge/defender/blob/master/src/phr6.src#L248-L255;https://github.com/mwenge/defender/blob/master/src/defa7.src#L133-L134
-free_object	OFREE	0xA067	object	OLINK	https://github.com/mwenge/defender/blob/master/src/phr6.src#L248-L255;https://github.com/mwenge/defender/blob/master/src/defa7.src#L1070-L1077
-inactive_object	IPTR	0xA06B	object	OLINK	https://github.com/mwenge/defender/blob/master/src/phr6.src#L248-L255;https://github.com/mwenge/defender/blob/master/src/defa7.src#L1078-L1080
-shell_object	SPTR	0xA06D	object	OLINK	https://github.com/mwenge/defender/blob/master/src/phr6.src#L248-L255;https://github.com/mwenge/defender/blob/master/src/defa7.src#L2557-L2597

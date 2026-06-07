@@ -1,9 +1,0 @@
-bit	name	routine	process_type	status_mask	source
-0x01	fire	LFIRE	0x00	0xE8	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1843-L1860
-0x02	thrust				https://github.com/mwenge/defender/blob/master/src/defb6.src#L1843-L1860
-0x04	smart_bomb	SBOMB	0x00	0xF8	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1843-L1860
-0x08	hyperspace	HYPER	0x00	0xF8	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1843-L1860
-0x10	start_two	ST2	0x00	0x00	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1843-L1860
-0x20	start_one	ST1	0x00	0x00	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1843-L1860
-0x40	reverse	REV	0x00	0xE8	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1843-L1860
-0x80	altitude_down				https://github.com/mwenge/defender/blob/master/src/defb6.src#L1843-L1860

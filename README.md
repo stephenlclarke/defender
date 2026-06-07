@@ -172,8 +172,10 @@ rules.
   `cargo run -- --actor-script /path/to/driver.script`.
 - The checked custom-driver starting point is
   `examples/actor-custom-attract.script`.
-- Runtime red-label tables and scripts live under `assets/red-label/`.
-- Production sprite assets live under `assets/sprites/`.
+- The retained source-derived actor scripts and tables live under
+  `assets/red-label/`.
+- The retained sprite source image is `assets/sprites/font-sheet.png`; object
+  and terrain sprites are generated from the source-derived tables.
 - Committed README media lives at `docs/defender.png` and
   `docs/start-sequence.gif`.
 

@@ -1,5 +1,6 @@
 SONAR_TOKEN
 .DS_Store
+.venv/
 .vscode/
 CODEX.md
 AGENTS.md
