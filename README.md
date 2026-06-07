@@ -130,10 +130,11 @@ source-shaped wave-clear survivor-bonus interstitial, its `0x80` wave-advance
 sleep window, next playable wave, and a bounded reserve activation batch sequence
 plus post-reserve wave-clear and `0x80` sleep interstitials when progression reaches
 them, followed by the next playable wave after that post-reserve sleep. The checked
-`examples/actor-custom-attract.script` file is a minimal editable custom-driver
-starting point. Actor high-score entry now accepts live initials/backspace
-through the actor input surface and draws the in-progress initials row from
-actor state.
+`examples/actor-custom-attract.script` file is a bounded editable
+custom-driver starting point with Williams reveal, Defender coalescence,
+Hall-of-Fame, credit, and scoring-surface attract actions. Actor high-score
+entry now accepts live initials/backspace through the actor input surface and
+draws the in-progress initials row from actor state.
 The current slice includes same-contract keyboard profiles, `XYZZY` overlay
 state, thread-backed actors, a data-driven `AttractScript` for custom attract
 drivers, `ActorBehaviorScript` profiles for level-wide and per-actor movement

@@ -3032,17 +3032,29 @@ mod tests {
         let report = run_actor_script_check(path).expect("example actor script should check");
 
         assert_eq!(report.path, path.display().to_string());
-        assert_eq!(report.attract_events, 2);
-        assert!(report.attract_cycle.is_none());
-        assert_eq!(
-            report.attract_cycle_unavailable_reason.as_deref(),
-            Some("no_attract_cycle_declared")
-        );
+        assert_eq!(report.attract_events, 8);
+        let attract_cycle = report
+            .attract_cycle
+            .as_ref()
+            .expect("example script should declare a checked attract cycle");
+        assert_eq!(attract_cycle.cycle_steps, 96);
+        assert_eq!(attract_cycle.sampled_steps, 96);
+        assert_eq!(attract_cycle.attract_frames, 96);
+        assert_eq!(attract_cycle.non_attract_frames, 0);
+        assert_eq!(attract_cycle.draw_commands, 193);
+        assert_eq!(attract_cycle.scene_sprites, 19009);
+        assert!(attract_cycle.saw_williams_reveal);
+        assert!(attract_cycle.saw_defender_coalescence);
+        assert!(attract_cycle.saw_hall_of_fame);
+        assert!(attract_cycle.saw_scoring_surface);
+        assert!(attract_cycle.saw_final_scoring_label);
+        assert!(attract_cycle.saw_cycle_return);
+        assert!(report.attract_cycle_unavailable_reason.is_none());
         assert_eq!(report.behavior_kind_profiles, 2);
         assert_eq!(report.behavior_actor_profiles, 0);
         assert_eq!(report.wave_profiles, 1);
         assert_eq!(report.first_frame_phase, "Attract");
-        assert_eq!(report.first_frame_draws, 2);
+        assert_eq!(report.first_frame_draws, 1);
         assert_eq!(report.first_playing_wave, 1);
         assert_eq!(report.first_playing_wave_size, 5);
         assert_eq!(report.first_playing_source_landers, 15);
@@ -3152,13 +3164,18 @@ mod tests {
             concat!(
                 "actor script check passed\n",
                 "  path: examples/actor-custom-attract.script\n",
-                "  attract_events: 2\n",
-                "  attract_cycle: unavailable,reason=no_attract_cycle_declared\n",
+                "  attract_events: 8\n",
+                "  attract_cycle_steps: 96\n",
+                "  attract_cycle_sampled_steps: 96\n",
+                "  attract_cycle_frames: attract=96,non_attract=0\n",
+                "  attract_cycle_draws: 193\n",
+                "  attract_cycle_scene_sprites: 19009\n",
+                "  attract_cycle_milestones: williams_reveal=true,defender_coalescence=true,hall_of_fame=true,scoring_surface=true,final_scoring_label=true,cycle_return=true\n",
                 "  behavior_kind_profiles: 2\n",
                 "  behavior_actor_profiles: 0\n",
                 "  wave_profiles: 1\n",
                 "  first_frame_phase: Attract\n",
-                "  first_frame_draws: 2\n",
+                "  first_frame_draws: 1\n",
                 "  first_playing_wave: 1\n",
                 "  first_playing_wave_size: 5\n",
                 "  first_playing_source_counts: landers=15,bombers=0,pods=0,mutants=0,swarmers=0\n",

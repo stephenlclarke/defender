@@ -797,8 +797,9 @@ reintroduce legacy implementation terminology.
   plus post-reserve wave-clear and `0x80` sleep interstitials when real actor
   wave-clear/wave-start and reserve-activation logic reaches them, then reports
   the next playable wave after that post-reserve sleep.
-  `examples/actor-custom-attract.script` is the checked editable sample for
-  that flow.
+  `examples/actor-custom-attract.script` is the checked bounded editable
+  sample for that flow, including Williams reveal, Defender coalescence,
+  Hall-of-Fame, credit, and scoring-surface attract actions.
 - Runtime renderer selection has been removed.
 - `--input-profile planetoid` is the default input profile.
 - `--input-profile cabinet` exposes a MAME-style cabinet keyboard profile.

@@ -70,9 +70,10 @@ verification tools.
   interstitial plus its `0x80` wave-advance sleep after those source reserves
   are empty, followed by the next playable wave state after that post-reserve
   sleep.
-  `examples/actor-custom-attract.script` provides a checked editable
-  starting point. The built-in actor attract, behavior, and
-  wave scripts are embedded from
+  `examples/actor-custom-attract.script` provides a checked bounded editable
+  starting point with Williams reveal, Defender coalescence, Hall-of-Fame,
+  credit, and scoring-surface attract actions. The built-in actor attract,
+  behavior, and wave scripts are embedded from
   `assets/red-label/actor-attract.script`,
   `assets/red-label/actor-behavior.script`, and
   `assets/red-label/actor-waves.script` through the same parser path. The
@@ -946,6 +947,31 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-07 02:19 BST`: Completed the bounded custom attract example cycle.
+  `examples/actor-custom-attract.script` now declares a 96-step `[attract]`
+  `cycle` and exercises script-authored Williams reveal, `ELECV`, Defender
+  coalescence, Hall-of-Fame title/logo, credits, scoring surface, and `SWARMV`
+  final scoring label actions before cycling back to the Williams reveal. The
+  example keeps the same small custom behavior/wave starter so it remains
+  editable while proving custom drivers can script attract graphics through the
+  actor runtime. `--actor-script-check examples/actor-custom-attract.script`
+  now reports eight attract events, 96 sampled attract frames, zero non-attract
+  frames, 193 draw commands, 19009 scene sprites, all six attract milestone
+  booleans true, and unchanged first-play gameplay/wave progression. No legacy
+  code, tests, or scaffolding were safe to remove because this slice hardens
+  the active checked custom-driver example. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780789716828879>.
+  Validation passed with `cargo fmt --check`, `cargo test actor_script_check
+  --all-targets --features legacy-tools`, `cargo test actor_script
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, `cargo run --quiet --features legacy-tools --
+  --actor-script-check examples/actor-custom-attract.script`, `make
+  actor-smoke`, `make actor-wgpu-smoke`, `make actor-attract-smoke`,
+  `markdownlint README.md SPEC.md PLAN.md docs/actor-architecture.md`, and
+  `git diff --check`.
 
 - `2026-06-07 00:39 BST`: Completed the actor script custom-attract preflight
   cycle. `--actor-script-check <path>` now samples a declared bounded

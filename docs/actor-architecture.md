@@ -99,8 +99,10 @@ evidence commands.
   `0x80` sleep interstitials when real wave-clear/wave-start and reserve
   activation emit their actor reports, then reports the next playable wave
   after that post-reserve sleep. The checked
-  `examples/actor-custom-attract.script` file is the editable smoke-tested
-  example. The shared live input state carries the same key
+  `examples/actor-custom-attract.script` file is the bounded editable
+  smoke-tested example, including Williams reveal, Defender coalescence,
+  Hall-of-Fame, credit, and scoring-surface attract actions. The shared live
+  input state carries the same key
   bindings and `XYZZY` mode into actor steps. Actor high-score entry now
   consumes initials/backspace from
   that input surface, updates driver-owned initials state, enters the 60-step
