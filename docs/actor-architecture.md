@@ -92,9 +92,10 @@ evidence commands.
   wave and prints attract/behavior/wave manifest counts plus first-frame,
   effective source-wave, spawned world, reserve/source-state, source-backed
   actor placement samples, playable hostile projectile source metadata, source
-  sound-command bytes, a bounded first hostile source projectile sample when
-  one appears, and first-play behavior summaries. The checker then uses the
-  actor `XYZZY` overlay smart-bomb path to assist
+  sound-command bytes, a bounded first player-laser sample with its `0xEB`
+  command, a bounded first hostile source projectile sample when one appears,
+  and first-play behavior summaries. The checker then uses the actor `XYZZY`
+  overlay smart-bomb path to assist
   progression and reports the source-shaped wave-clear survivor-bonus
   interstitial, its `0x80` wave-advance sleep window, next playable wave, and a
   bounded reserve activation batch sequence with restored spawn positions plus
@@ -266,10 +267,11 @@ file-backed path without opening the window and reports the parsed script
 surface, first attract actor frame, declared attract-cycle milestones for
 bounded looping scripts, first playable wave counts, source-backed actor
 placement samples, playable hostile projectile source metadata, source
-sound-command bytes, a bounded first hostile source projectile sample when one
-appears, and effective first-play reserve/source-state plus the behavior
-profile that actors receive through `StepReport`. It also samples the next
-playable wave with an actor `XYZZY` overlay smart-bomb assist loop, so
+sound-command bytes, a bounded first player-laser sample with its `0xEB`
+command, a bounded first hostile source projectile sample when one appears, and
+effective first-play reserve/source-state plus the behavior profile that actors
+receive through `StepReport`. It also samples the next playable wave with an
+actor `XYZZY` overlay smart-bomb assist loop, so
 progressive custom-driver wave profiles can be checked before live launch
 without bypassing actor commands.
 The checker records the first `WaveCleared` report it observes, including the

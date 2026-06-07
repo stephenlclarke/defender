@@ -124,6 +124,15 @@ pub(crate) struct ActorScriptCheckSourceProjectileSample {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ActorScriptCheckPlayerLaserSample {
+    pub(crate) x: i16,
+    pub(crate) y: i16,
+    pub(crate) velocity_dx: i16,
+    pub(crate) velocity_dy: i16,
+    pub(crate) direction: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ActorScriptCheckPlayingSummary {
     pub(crate) wave: u16,
     pub(crate) wave_size: u8,
@@ -193,6 +202,13 @@ pub(crate) struct ActorScriptCheckFirstSourceProjectileSummary {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ActorScriptCheckFirstPlayerLaserSummary {
+    pub(crate) sample_steps: u32,
+    pub(crate) samples: Vec<ActorScriptCheckPlayerLaserSample>,
+    pub(crate) sound_commands: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ActorScriptCheckWaveClearSummary {
     pub(crate) assist_steps: u32,
     pub(crate) next_wave: u16,
@@ -255,6 +271,8 @@ pub(crate) struct ActorScriptCheckReport {
     pub(crate) first_playing_source_actor_samples: Vec<ActorScriptCheckSourceActorSample>,
     pub(crate) first_playing_source_projectile_samples: Vec<ActorScriptCheckSourceProjectileSample>,
     pub(crate) first_playing_sound_commands: Vec<u8>,
+    pub(crate) first_player_laser: Option<ActorScriptCheckFirstPlayerLaserSummary>,
+    pub(crate) first_player_laser_unavailable_reason: Option<String>,
     pub(crate) first_source_projectile: Option<ActorScriptCheckFirstSourceProjectileSummary>,
     pub(crate) first_source_projectile_unavailable_reason: Option<String>,
     pub(crate) first_playing_player_takes_enemy_collision_damage: bool,
@@ -480,6 +498,25 @@ impl ActorScriptCheckReport {
                         .unwrap_or(ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT as u32)
                 )
             });
+        let first_player_laser = self
+            .first_player_laser
+            .as_ref()
+            .map(|summary| {
+                format!(
+                    "  first_player_laser_sample_steps: {}\n  first_player_laser_samples: {}\n  first_player_laser_sound_commands: {}\n",
+                    summary.sample_steps,
+                    player_laser_samples_summary(&summary.samples),
+                    sound_commands_summary(&summary.sound_commands),
+                )
+            })
+            .unwrap_or_else(|| {
+                format!(
+                    "  first_player_laser: unavailable,reason={}\n",
+                    self.first_player_laser_unavailable_reason
+                        .as_deref()
+                        .unwrap_or("not_sampled")
+                )
+            });
         let first_source_projectile = self
             .first_source_projectile
             .as_ref()
@@ -567,7 +604,7 @@ impl ActorScriptCheckReport {
                 )
             });
         format!(
-            "actor script check passed\n  path: {}\n  attract_events: {}\n{}  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_source_state: background_left=0x{:04x},rng={}\n  first_playing_source_actor_samples: {}\n  first_playing_source_projectile_samples: {}\n  first_playing_sound_commands: {}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}{}{}{}{}{}{}  clean_exit: {}\n",
+            "actor script check passed\n  path: {}\n  attract_events: {}\n{}  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_source_state: background_left=0x{:04x},rng={}\n  first_playing_source_actor_samples: {}\n  first_playing_source_projectile_samples: {}\n  first_playing_sound_commands: {}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}{}{}{}{}{}{}{}  clean_exit: {}\n",
             self.path,
             self.attract_events,
             attract_cycle,
@@ -608,6 +645,7 @@ impl ActorScriptCheckReport {
             self.first_playing_baiter_mode,
             self.first_playing_swarmer_fire_period_steps,
             self.first_playing_baiter_fire_period_steps,
+            first_player_laser,
             first_source_projectile,
             wave_clear,
             wave_clear_advance_sleep,
@@ -730,6 +768,23 @@ fn source_projectile_samples_summary(samples: &[ActorScriptCheckSourceProjectile
                 sample.source_x_velocity,
                 sample.source_y_velocity,
                 sample.lifetime_ticks,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
+fn player_laser_samples_summary(samples: &[ActorScriptCheckPlayerLaserSample]) -> String {
+    if samples.is_empty() {
+        return String::from("none");
+    }
+
+    samples
+        .iter()
+        .map(|sample| {
+            format!(
+                "laser@{},{}[velocity={}/{},direction={}]",
+                sample.x, sample.y, sample.velocity_dx, sample.velocity_dy, sample.direction,
             )
         })
         .collect::<Vec<_>>()
@@ -862,6 +917,8 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         actor_script_check_attract_cycle(&mut runtime, manifest.attract_script.cycle_steps, &frame);
     let playing = run_actor_script_check_to_first_playing_wave(&mut runtime)?;
     let first_playing = actor_script_check_playing_summary(&playing);
+    let (first_player_laser, first_player_laser_unavailable_reason) =
+        actor_script_check_first_player_laser(scripts.clone())?;
     let (first_source_projectile, first_source_projectile_unavailable_reason) =
         actor_script_check_first_source_projectile(scripts)?;
     let next_wave_progression =
@@ -911,6 +968,8 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         first_playing_source_actor_samples: first_playing.source_actor_samples,
         first_playing_source_projectile_samples: first_playing.source_projectile_samples,
         first_playing_sound_commands: first_playing.sound_commands,
+        first_player_laser,
+        first_player_laser_unavailable_reason,
         first_source_projectile,
         first_source_projectile_unavailable_reason,
         first_playing_player_takes_enemy_collision_damage: first_playing
@@ -1131,6 +1190,63 @@ fn actor_script_check_first_source_projectile(
     ))
 }
 
+fn actor_script_check_first_player_laser(
+    scripts: ActorDriverScripts,
+) -> anyhow::Result<(
+    Option<ActorScriptCheckFirstPlayerLaserSummary>,
+    Option<String>,
+)> {
+    let mut runtime = ActorRuntimeAdapter::with_scripts(scripts);
+    let mut frame = run_actor_script_check_to_first_playing_wave(&mut runtime)?;
+    let mut recent_laser_sound_commands = Vec::new();
+
+    for sample_steps in 0..=ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT {
+        let samples = actor_script_check_player_laser_samples(&frame);
+        if !samples.is_empty() {
+            let sound_commands = actor_script_check_laser_sound_commands(&frame);
+            let sound_commands = if sound_commands.is_empty() {
+                recent_laser_sound_commands
+            } else {
+                sound_commands
+            };
+            return Ok((
+                Some(ActorScriptCheckFirstPlayerLaserSummary {
+                    sample_steps: sample_steps as u32,
+                    samples,
+                    sound_commands,
+                }),
+                None,
+            ));
+        }
+
+        if sample_steps == ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT {
+            break;
+        }
+
+        let input = if sample_steps == 0 {
+            ActorGameInput {
+                fire: true,
+                ..ActorGameInput::NONE
+            }
+        } else {
+            ActorGameInput::NONE
+        };
+        frame = runtime.step(input);
+        let sound_commands = actor_script_check_laser_sound_commands(&frame);
+        if !sound_commands.is_empty() {
+            recent_laser_sound_commands = sound_commands;
+        }
+    }
+
+    Ok((
+        None,
+        Some(format!(
+            "player_laser_not_observed_after_{}_steps",
+            ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT
+        )),
+    ))
+}
+
 fn actor_script_check_playing_summary(frame: &ActorFrame) -> ActorScriptCheckPlayingSummary {
     let profile = frame.report.source_wave;
     let reserve = frame.state.world.enemy_reserve;
@@ -1277,12 +1393,47 @@ fn actor_script_check_source_projectile_samples(
         .collect()
 }
 
+fn actor_script_check_player_laser_samples(
+    frame: &ActorFrame,
+) -> Vec<ActorScriptCheckPlayerLaserSample> {
+    frame
+        .report
+        .snapshots
+        .iter()
+        .filter(|snapshot| snapshot.kind == ActorKind::Laser && snapshot.alive)
+        .take(ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_SAMPLE_LIMIT)
+        .map(|snapshot| ActorScriptCheckPlayerLaserSample {
+            x: snapshot.position.x,
+            y: snapshot.position.y,
+            velocity_dx: snapshot.velocity.dx,
+            velocity_dy: snapshot.velocity.dy,
+            direction: snapshot
+                .direction
+                .map(direction_label)
+                .unwrap_or("none")
+                .to_string(),
+        })
+        .collect()
+}
+
 fn actor_script_check_sound_commands(frame: &ActorFrame) -> Vec<u8> {
     frame
         .report
         .sounds
         .iter()
         .filter_map(|sound| sound.source_sound_command())
+        .collect()
+}
+
+fn actor_script_check_laser_sound_commands(frame: &ActorFrame) -> Vec<u8> {
+    frame
+        .report
+        .sounds
+        .iter()
+        .filter_map(|sound| match sound {
+            SoundCue::Laser => sound.source_sound_command(),
+            _ => None,
+        })
         .collect()
 }
 
@@ -1299,6 +1450,13 @@ fn actor_script_check_projectile_sound_commands(frame: &ActorFrame) -> Vec<u8> {
             _ => None,
         })
         .collect()
+}
+
+fn direction_label(direction: crate::actor_game::Direction) -> &'static str {
+    match direction {
+        crate::actor_game::Direction::Left => "left",
+        crate::actor_game::Direction::Right => "right",
+    }
 }
 
 fn source_rng_summary(seed: Option<u8>, hseed: Option<u8>, lseed: Option<u8>) -> String {
@@ -3180,9 +3338,9 @@ mod tests {
     use crate::GameInput;
 
     use super::{
-        ActorScriptCheckSourceActorSample, ActorScriptCheckSourceProjectileSample,
-        ActorScriptCheckSpawnedActorSample, LiveInputState, LiveSmokeReport,
-        actor_runtime_from_script_path, run_actor_live, run_actor_script_check,
+        ActorScriptCheckPlayerLaserSample, ActorScriptCheckSourceActorSample,
+        ActorScriptCheckSourceProjectileSample, ActorScriptCheckSpawnedActorSample, LiveInputState,
+        LiveSmokeReport, actor_runtime_from_script_path, run_actor_live, run_actor_script_check,
         run_actor_wgpu_smoke, run_smoke,
     };
 
@@ -3434,6 +3592,24 @@ mod tests {
         assert!(report.first_playing_source_actor_samples.is_empty());
         assert!(report.first_playing_source_projectile_samples.is_empty());
         assert_eq!(report.first_playing_sound_commands, [0xea]);
+        assert_eq!(
+            report
+                .first_player_laser
+                .as_ref()
+                .expect("example checker should sample player laser"),
+            &super::ActorScriptCheckFirstPlayerLaserSummary {
+                sample_steps: 2,
+                samples: vec![ActorScriptCheckPlayerLaserSample {
+                    x: 62,
+                    y: 120,
+                    velocity_dx: 8,
+                    velocity_dy: 0,
+                    direction: "right".to_string(),
+                }],
+                sound_commands: vec![0xeb],
+            }
+        );
+        assert!(report.first_player_laser_unavailable_reason.is_none());
         assert!(report.first_source_projectile.is_none());
         assert_eq!(
             report.first_source_projectile_unavailable_reason.as_deref(),
@@ -3555,6 +3731,9 @@ mod tests {
                 "  first_playing_lander_behavior: mode=drift,seek_speed=1,drift_speed=3,fire_period_steps=96\n",
                 "  first_playing_hostile_modes: mutant=chase_player,bomber=drift,pod=drift,swarmer=chase_player,baiter=chase_player\n",
                 "  first_playing_hostile_fire: swarmer_period_steps=58,baiter_period_steps=42\n",
+                "  first_player_laser_sample_steps: 2\n",
+                "  first_player_laser_samples: laser@62,120[velocity=8/0,direction=right]\n",
+                "  first_player_laser_sound_commands: 0xeb\n",
                 "  first_source_projectile: unavailable,reason=source_projectile_not_observed_after_512_steps\n",
                 "  wave_clear_assist_steps: 4\n",
                 "  wave_clear_next_wave: 2\n",
@@ -3637,6 +3816,58 @@ mod tests {
         assert!(report.to_text().contains(
             "attract_cycle_milestones: williams_reveal=true,defender_coalescence=true,hall_of_fame=true,scoring_surface=true,final_scoring_label=true,cycle_return=true"
         ));
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn actor_script_check_reports_player_laser_sample_and_sound() {
+        let path = write_actor_script_file(
+            "actor-script-player-laser-check",
+            concat!(
+                "[attract]\n",
+                "text 1 forever 12 20 LASER CHECK\n",
+                "[behavior]\n",
+                "kind lander lander_mode drift\n",
+                "kind laser laser_speed 3\n",
+                "kind laser laser_lifetime_steps 5\n",
+                "[wave]\n",
+                "name laser check waves\n",
+                "wave 1\n",
+                "lander 90 120\n",
+                "human 100 214\n",
+            ),
+        );
+
+        let report = run_actor_script_check(&path).expect("laser script should check");
+        let first_laser = report
+            .first_player_laser
+            .as_ref()
+            .expect("checker should sample the first player laser");
+
+        assert_eq!(first_laser.sample_steps, 2);
+        assert_eq!(first_laser.sound_commands, [0xeb]);
+        assert_eq!(
+            first_laser.samples,
+            vec![ActorScriptCheckPlayerLaserSample {
+                x: 57,
+                y: 120,
+                velocity_dx: 3,
+                velocity_dy: 0,
+                direction: "right".to_string(),
+            }]
+        );
+        assert!(report.first_player_laser_unavailable_reason.is_none());
+        assert!(
+            report
+                .to_text()
+                .contains("first_player_laser_samples: laser@57,120[velocity=3/0,direction=right]")
+        );
+        assert!(
+            report
+                .to_text()
+                .contains("first_player_laser_sound_commands: 0xeb")
+        );
 
         let _ = fs::remove_file(path);
     }

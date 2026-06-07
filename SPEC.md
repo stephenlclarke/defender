@@ -790,9 +790,10 @@ reintroduce legacy implementation terminology.
   through the first playable wave and prints script manifest, first-frame,
   source-wave, spawned world, reserve/source-state, source-backed actor
   placement samples, playable hostile projectile source metadata, source
-  sound-command bytes, a bounded first hostile source projectile sample when
-  one appears, and effective behavior counts/modes without opening a window.
-  The checker then uses the actor
+  sound-command bytes, a bounded first player-laser sample with its `0xEB`
+  command, a bounded first hostile source projectile sample when one appears,
+  and effective behavior counts/modes without opening a window. The checker
+  then uses the actor
   `XYZZY` overlay smart-bomb path to assist progression and reports the
   source-shaped
   wave-clear survivor-bonus interstitial, its `0x80` wave-advance sleep
@@ -854,10 +855,11 @@ reintroduce legacy implementation terminology.
   `--actor-script-check <path>`, including bounded declared attract-cycle
   milestone reporting, first-play reserve/source-state reporting plus assisted
   wave-clear, next-wave, and reserve-activation batch summaries for
-  source/reserve counts, source actor/projectile samples, source
-  sound-command bytes, survivor-bonus cadence, `0x80` wave sleep, restored
-  family counts, batch status, post-reserve wave-clear and sleep, post-reserve
-  next playable wave, damage, fire cadence, and actor movement modes.
+  source/reserve counts, source actor/projectile samples, player-laser samples,
+  source sound-command bytes, survivor-bonus cadence, `0x80` wave sleep,
+  restored family counts, batch status, post-reserve wave-clear and sleep,
+  post-reserve next playable wave, damage, fire cadence, and actor movement
+  modes.
   Read-only script manifests expose persistent attract event, driver behavior,
   reusable wave/spawn behavior preset definitions, wave-profile configuration,
   and source wave-table metadata for source-backed wave profiles, and every

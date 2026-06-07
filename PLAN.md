@@ -57,11 +57,13 @@ verification tools.
   credits/starts the actor runtime through the first playable wave, and reports
   manifest, first-frame, effective source-wave, spawned world counts,
   reserve/source-state, source-backed actor placement samples, first-play
-  source projectile and source sound-command samples, and the effective
-  first-play behavior profile actors receive for movement/damage/fire tuning.
-  It also runs a bounded independent sample pass to report the first hostile
-  source projectile plus its associated red-label hostile shot command when a
-  script produces one without mutating the main assisted progression check.
+  source projectile and source sound-command samples, player-laser
+  position/velocity/audio samples, and the effective first-play behavior
+  profile actors receive for movement/damage/fire tuning. It also runs bounded
+  independent sample passes to report the first player laser plus its `0xEB`
+  red-label sound command and the first hostile source projectile plus its
+  associated red-label hostile shot command when a script produces one, without
+  mutating the main assisted progression check.
   It then uses the actor `XYZZY` overlay smart-bomb path to assist wave clear
   and reports the source-shaped wave-clear survivor-bonus interstitial plus the
   source `0x80` wave-advance sleep before the next playable wave when the
@@ -951,6 +953,31 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-07 07:36 BST`: Completed the actor script-check player-laser
+  preflight cycle. `--actor-script-check <path>` now runs a bounded
+  independent first-player-laser sample pass in a separate actor runtime: it
+  reaches the first playable wave, sends one fire input, retains the `0xEB`
+  laser sound command, and reports the first live `Laser` actor sample with
+  position, velocity, and direction without mutating the main
+  wave-clear/reserve assist timeline. The checked example now reports
+  `first_player_laser_*` for `laser@62,120` with velocity `8/0`, direction
+  `right`, and command `0xEB`; a focused custom-driver regression pins
+  script-tuned `laser_speed 3` as `laser@57,120` with velocity `3/0` and the
+  same red-label laser command. No legacy code, tests, or scaffolding were safe
+  to remove because this slice extends the active custom-driver preflight
+  evidence surface for laser/audio fidelity. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780813454137549>.
+  Validation passed with `cargo fmt --check`, `cargo test actor_script_check
+  --all-targets --features legacy-tools`, `cargo test actor_script
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, `cargo run --quiet --features legacy-tools --
+  --actor-script-check examples/actor-custom-attract.script`, `make
+  actor-smoke`, `make actor-wgpu-smoke`, `make actor-attract-smoke`,
+  `markdownlint README.md SPEC.md PLAN.md docs/actor-architecture.md`, and
+  `git diff --check`.
 
 - `2026-06-07 07:15 BST`: Completed the actor script-check projectile/audio
   sample cycle. `--actor-script-check <path>` now reports
