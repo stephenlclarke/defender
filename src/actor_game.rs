@@ -8418,7 +8418,7 @@ fn actor_attract_scoring_laser_enemy_anchor(
     position: [f32; 2],
 ) -> [f32; 2] {
     let size = actor_attract_scoring_enemy_size(enemy);
-    [position[0] + size[0] / 4.0, position[1] + size[1] / 2.0]
+    [position[0] + size[0] / 2.0, position[1] + size[1] / 2.0]
 }
 
 fn push_actor_scoring_sparse_laser(
@@ -18353,6 +18353,35 @@ mod tests {
                 && sprite.size == PLAYER_EXPLOSION_PIXEL_SCENE_SIZE
                 && sprite.tint == SOURCE_LASER_BODY_TINT
         }));
+        let laser_target = laser_scene
+            .sprites
+            .iter()
+            .find(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
+            .expect("rescue laser should still render the target lander");
+        let laser_contact = actor_attract_scoring_laser_enemy_anchor(
+            ActorAttractScoringEnemyKind::Lander,
+            laser_target.position,
+        );
+        let laser_right_edge = laser_scene
+            .sprites
+            .iter()
+            .filter(|sprite| {
+                sprite.sprite == SpriteId::PLAYER_PROJECTILE
+                    && sprite.layer == RenderLayer::Projectiles
+            })
+            .map(|sprite| sprite.position[0])
+            .fold(f32::NEG_INFINITY, f32::max);
+        assert!(
+            laser_right_edge >= laser_contact[0] - 1.0,
+            "attract scoring laser should visibly reach the target center before explosion"
+        );
+        assert_eq!(
+            actor_attract_scoring_laser_enemy_anchor(
+                ActorAttractScoringEnemyKind::Lander,
+                [20.0, 40.0]
+            ),
+            [25.0, 44.0]
+        );
 
         let mut explosion_scene = RenderScene::empty(0, ACTOR_RENDER_SURFACE);
         let rescue_fall_step =
