@@ -27,6 +27,7 @@ use crate::{
         push_source_bgout_terrain_sprites, push_source_explosion_cloud_pixels,
         source_explosion_render_scale, source_explosion_size_for_age,
         source_terrain_blow_flash_tint, source_terrain_explosion_size_for_age,
+        source_wave_landscape_tint,
     },
     renderer::{
         Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
@@ -6871,6 +6872,10 @@ fn actor_enemies_for_report(report: &StepReport) -> Vec<CleanEnemySnapshot> {
 }
 
 fn clean_enemy_snapshot(snapshot: &ActorSnapshot) -> Option<CleanEnemySnapshot> {
+    if snapshot.kind == ActorKind::Lander && snapshot.bounds.is_none() {
+        return None;
+    }
+
     let kind = match snapshot.kind {
         ActorKind::Lander => CleanEnemyKind::Lander,
         ActorKind::Mutant => CleanEnemyKind::Mutant,
@@ -7224,10 +7229,14 @@ impl ActorRenderSceneBridge {
             && report.player_start.is_none()
             && report.terrain_blow.is_none()
         {
-            push_source_bgout_terrain_sprites(&mut scene, report.source_background_left);
+            push_source_bgout_terrain_sprites(
+                &mut scene,
+                report.source_background_left,
+                source_wave_landscape_tint(report.wave),
+            );
         }
         if let Some(state) = &state {
-            push_actor_playing_top_display_border(&mut scene);
+            push_actor_playing_top_display_border(&mut scene, report.wave);
             push_scanner_radar_sprites(&mut scene, &state.world.scanner);
         }
         for draw in &report.draws {
@@ -7603,7 +7612,7 @@ fn push_attract_scoring_top_display_border(scene: &mut RenderScene) {
     }
 }
 
-fn push_actor_playing_top_display_border(scene: &mut RenderScene) {
+fn push_actor_playing_top_display_border(scene: &mut RenderScene, wave: u16) {
     for (screen_address, size) in SOURCE_TOP_DISPLAY_BORDER_SEGMENTS {
         scene.push_sprite(SceneSprite {
             sprite: SpriteId::TOP_DISPLAY_BORDER_WORD,
@@ -7613,7 +7622,7 @@ fn push_actor_playing_top_display_border(scene: &mut RenderScene) {
             tint: if matches!(screen_address, 0x4C07 | 0x4C28) {
                 SOURCE_VISUAL_STATE.top_display_scanner_marker_tint()
             } else {
-                SOURCE_VISUAL_STATE.top_display_border_tint()
+                source_wave_landscape_tint(wave)
             },
         });
     }
@@ -11664,12 +11673,13 @@ impl ActorGameDriver {
             || self.pending_survivor_bonus.is_some()
             || self.pending_player_start.is_some()
             || !actor_enemy_reserve_is_empty(self.enemy_reserve)
-            || self.has_hostile_snapshots()
+            || self.has_wave_clear_hostile_snapshots()
             || commands_spawn_hostiles(commands)
         {
             return false;
         }
 
+        self.clear_nonblocking_wave_hostiles();
         self.pending_survivor_bonus = Some(PendingSurvivorBonus::new(
             self.wave,
             self.wave.saturating_add(1),
@@ -11689,6 +11699,24 @@ impl ActorGameDriver {
         self.snapshots
             .values()
             .any(|snapshot| is_hostile(snapshot.kind))
+    }
+
+    fn has_wave_clear_hostile_snapshots(&self) -> bool {
+        self.snapshots.values().any(snapshot_blocks_wave_clear)
+    }
+
+    fn clear_nonblocking_wave_hostiles(&mut self) {
+        let targets = self
+            .snapshots
+            .values()
+            .filter(|snapshot| is_hostile(snapshot.kind) && !snapshot_blocks_wave_clear(snapshot))
+            .map(|snapshot| snapshot.id)
+            .collect::<Vec<_>>();
+        for id in targets {
+            self.snapshots.remove(&id);
+            self.actors.remove(&id);
+            self.behavior_script.remove_actor_behavior(id);
+        }
     }
 
     fn pod_swarmer_spawn_commands(&mut self, position: Point) -> Vec<GameCommand> {
@@ -11766,7 +11794,7 @@ impl ActorGameDriver {
     fn source_wave_enemy_total(&self) -> usize {
         self.snapshots
             .values()
-            .filter(|snapshot| is_hostile(snapshot.kind))
+            .filter(|snapshot| snapshot_blocks_wave_clear(snapshot))
             .count()
     }
 
@@ -11904,6 +11932,10 @@ fn is_hostile(kind: ActorKind) -> bool {
             | ActorKind::Pod
             | ActorKind::Swarmer
     )
+}
+
+fn snapshot_blocks_wave_clear(snapshot: &ActorSnapshot) -> bool {
+    is_hostile(snapshot.kind) && snapshot.bounds.is_some()
 }
 
 fn clears_for_next_wave(kind: ActorKind) -> bool {
@@ -20487,6 +20519,21 @@ mod tests {
                 target_human_index: Some(3),
             })
         );
+        assert_eq!(
+            report
+                .game_state()
+                .world
+                .enemies
+                .iter()
+                .filter(|enemy| {
+                    matches!(enemy.kind, CleanEnemyKind::Lander)
+                        && enemy
+                            .source_lander
+                            .is_some_and(|source| source.y_velocity == 0x0090)
+                })
+                .count(),
+            1
+        );
 
         let refill_ids = refill_landers
             .iter()
@@ -20507,6 +20554,100 @@ mod tests {
                 .sounds
                 .contains(&SoundCue::SourceCommand(SOURCE_APPEAR_SOUND_COMMAND))
         );
+    }
+
+    #[test]
+    fn hidden_first_wave_refill_lanes_do_not_block_wave_advance() {
+        let mut driver = started_driver();
+        driver.set_kind_behavior(
+            ActorKind::Player,
+            ActorBehaviorProfile {
+                player_takes_enemy_collision_damage: false,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        driver.set_kind_behavior(
+            ActorKind::Lander,
+            ActorBehaviorProfile {
+                lander_mode: LanderBehaviorMode::Drift,
+                ..ActorBehaviorProfile::default()
+            },
+        );
+        let early_reserve = step_until_first_wave_early_reserve_materializes(&mut driver);
+        let destroy_three_landers = early_reserve
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::Lander)
+            .take(3)
+            .map(|snapshot| GameCommand::Destroy(snapshot.id))
+            .collect::<Vec<_>>();
+        driver.apply_commands(&destroy_three_landers);
+        driver.step(GameInput::NONE);
+
+        let mut refill = None;
+        for _ in 0..=SOURCE_FIRST_WAVE_LANDER_REFILL_DELAY_STEPS {
+            let report = driver.step(GameInput::NONE);
+            if report
+                .commands
+                .iter()
+                .any(|command| matches!(command, GameCommand::Spawn(SpawnRequest::Lander { .. })))
+            {
+                refill = Some(report);
+                break;
+            }
+        }
+        let refill = refill.expect("first-wave refill should materialize before clear proof");
+        assert!(
+            refill.snapshots.iter().any(|snapshot| {
+                snapshot.kind == ActorKind::Lander && snapshot.bounds.is_none()
+            })
+        );
+
+        let destroy_visible_hostiles = refill
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot_blocks_wave_clear(snapshot))
+            .map(|snapshot| GameCommand::Destroy(snapshot.id))
+            .collect::<Vec<_>>();
+        assert!(!destroy_visible_hostiles.is_empty());
+        driver.apply_commands(&destroy_visible_hostiles);
+
+        let cleared = driver.step(GameInput::NONE);
+        assert!(
+            cleared
+                .commands
+                .contains(&GameCommand::WaveCleared { next_wave: 2 })
+        );
+        assert!(cleared.survivor_bonus.is_some());
+        assert!(
+            cleared.snapshots.iter().all(|snapshot| {
+                snapshot.kind != ActorKind::Lander || snapshot.bounds.is_some()
+            })
+        );
+        assert!(cleared.game_state().world.enemies.iter().all(|enemy| {
+            !matches!(enemy.kind, CleanEnemyKind::Lander)
+                || enemy
+                    .source_lander
+                    .is_none_or(|source| source.y_velocity != 0x0090)
+        }));
+
+        let next_wave = step_until_wave_started(&mut driver, 2);
+        assert_eq!(next_wave.wave, 2);
+        assert!(
+            next_wave
+                .commands
+                .contains(&GameCommand::AdvanceWave { wave: 2 })
+        );
+        let next_scene = next_wave.render_scene();
+        assert!(next_scene.sprites.iter().any(|sprite| {
+            sprite.layer == RenderLayer::Terrain && sprite.tint == source_wave_landscape_tint(2)
+        }));
+        assert!(next_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::TOP_DISPLAY_BORDER_WORD
+                && sprite.position != source_screen_position(0x4C07)
+                && sprite.position != source_screen_position(0x4C28)
+                && sprite.tint == source_wave_landscape_tint(2)
+        }));
     }
 
     #[test]

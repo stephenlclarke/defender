@@ -167,8 +167,13 @@ verification tools.
   intact for refill behavior. Once active first-wave landers fall below the
   source threshold, the actor driver now runs the source 47-step refill cadence,
   restores the fixed refill rows, keeps the four hidden lanes live without
-  leaking draw/collision output, and materializes only the target-3 lane with
-  the delayed `0xEA` cue. Source swarmer
+  leaking draw/collision output or clean scanner/object evidence, and
+  materializes only the target-3 lane with the delayed `0xEA` cue. Those hidden
+  lanes are source bookkeeping evidence, not wave-clear blockers: after the
+  visible source-counted hostiles are gone and reserves are empty, survivor
+  bonus and next-wave progression can start. Gameplay terrain and the
+  non-marker top-display separator now follow the documented eight-wave color
+  cycle: blue, green, red, orange, yellow, purple, brown, then black. Source swarmer
   reserves use `PLRES`/`RSW0` phony-object placement before the same
   mini-swarmer runtime used by pod destruction. Source
   rematerialization now publishes the `SEED/HSEED` background word into
@@ -978,6 +983,31 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-07 19:39 BST`: Completed the actor wave-progression and
+  landscape-color fidelity cycle. Verified the expected wraparound/wave
+  behavior and eight-wave separator color order against web/source references,
+  including Doug Mahugh's Defender notes, Arcade History's wave-rollover notes,
+  Giant Bomb's wraparound/HUD gameplay summary, and the local
+  `assets/red-label/wave-table.tsv`/source-backed actor wave scripts. The
+  actor driver now distinguishes source-counted reserve bookkeeping from
+  visible, interactive hostiles that block wave clear, so hidden first-wave
+  refill lanes no longer leak into clean scanner/object state or hold the game
+  after every visible alien is destroyed. The survivor-bonus path now clears
+  those hidden noninteractive lanes and advances to the next wave after the
+  source `0x80` sleep. Gameplay `BGOUT` terrain and non-marker top-display
+  border segments now tint from the documented eight-wave cycle
+  blue/green/red/orange/yellow/purple/brown/black, with wave 9 wrapping to
+  wave 1. Validation passed for the hidden-refill wave-advance regression,
+  actor refill suppression, actor gameplay renderer, clean terrain projection,
+  clean top-display border, explicit wave-color cycle, `cargo fmt --check`,
+  `cargo check --all-targets --features legacy-tools`, `cargo clippy
+  --all-targets --features legacy-tools -- -D warnings`, `cargo run --
+  --actor-smoke`, `cargo run -- --live-smoke`, `make docs-lint`, and `make
+  diff-check`.
+  Remaining plan work is still about `2%`, mostly owner-review/protected-media
+  closure after concrete live defects. Slack step start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780856917370399>.
 
 - `2026-06-07 19:24 BST`: Completed the actor gameplay HUD/side-scrolling
   regression cycle. Actor gameplay scenes now populate clean object evidence

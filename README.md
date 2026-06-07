@@ -238,8 +238,10 @@ and keeps the remaining first-wave lander reserve for later refill behavior. The
 actor driver also schedules the source 47-step first-wave lander refill once
 active landers fall below the source threshold, restores the fixed refill rows,
 and keeps the four hidden lanes live without drawing or colliding while the
-target-3 lane materializes with the delayed `0xEA` cue. When
-no source human targets remain, actor reserve lander rows now follow the source
+target-3 lane materializes with the delayed `0xEA` cue. Those hidden lanes stay
+out of the clean scanner/object state and do not block wave completion after the
+visible source-counted enemies are gone and reserves are empty. When no source
+human targets remain, actor reserve lander rows now follow the source
 schizoid fallback and restore as source-shaped mutants instead of targetless
 landers. Direct mutant restores consume the driver-owned source background word
 published through `StepPrompt` / `StepReport`, so source rematerialization and
@@ -392,7 +394,10 @@ red-label X/facing/Y branch and the source `HYP2` `LSEED > 0xC0` delayed
 death-risk path. Player hazard collisions now decrement driver-owned life stock
 and respawn a replacement player when lives remain, while final-life hits still
 enter game-over/high-score flow. Baiters do not block wave
-completion once source-counted wave enemies are gone, and explosion draws carry
+completion once source-counted wave enemies are gone. Gameplay terrain plus the
+non-marker top-display separator follows the eight-wave
+blue/green/red/orange/yellow/purple/brown/black cycle, wrapping back to blue on
+wave 9. Explosion draws carry
 lander, mutant, bomber, pod, swarmer, baiter, bomb, player, and human variant
 metadata through the actor render and clean-state bridges. Actor explosion
 rendering now uses draw age with the clean source explosion-size curve, keeping

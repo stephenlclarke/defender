@@ -218,9 +218,14 @@ tree:
   hostiles have already been cleared. It also owns the first-wave refill
   scheduler: when active landers fall below the source threshold and five
   landers remain reserved, it waits the source 47-step delay, restores the fixed
-  refill rows, keeps hidden lanes live without draw/collision output, and
-  materializes the target-3 lane with the delayed `0xEA` cue.
-  Playing reports project the source `BGOUT` terrain into state/render output.
+  refill rows, keeps hidden lanes live without draw/collision output or clean
+  scanner/object projection, and materializes the target-3 lane with the delayed
+  `0xEA` cue. Hidden lanes are source bookkeeping evidence only; they do not
+  block wave completion once visible source-counted enemies are gone and reserves
+  are empty. Playing reports project the source `BGOUT` terrain into
+  state/render output, and gameplay terrain plus non-marker top-display
+  separator tint follows the eight-wave blue/green/red/orange/yellow/purple/
+  brown/black cycle.
   Final-human removal starts a driver-owned source terrain-blow snapshot,
   erases clean terrain and scanner terrain, emits source flash windows,
   projects `TEREX` terrain explosion actors through the source
@@ -423,7 +428,9 @@ game-exec pacing cadence, accelerates the timer when the remaining source
 wave-enemy total is low, excludes active baiters from that source `WVCHK`
 count, and respects the source active-baiter cap. Active baiters therefore do
 not block reserve activation or wave clear when no source-counted enemies
-remain. Spawned baiters retain source shot-timer, picture-cycle, sleep, and
+remain; neither do hidden first-wave refill lanes after the visible,
+source-counted refill lane is gone. Spawned baiters retain source shot-timer,
+picture-cycle, sleep, and
 velocity state, pursue the player through source seek rules, fire source
 `SHOOT` fireball shells with source RNG X/Y projection and player-velocity
 contribution, emit source `USHSND` command evidence only when the shared shell

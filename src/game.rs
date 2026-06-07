@@ -933,6 +933,7 @@ const SOURCE_SCANNER_TERRAIN_TINT: Color = Color::from_rgba(174, 81, 0, 255);
 const ATTRACT_SCORING_SCANNER_TERRAIN_PIXEL_SIZE: [f32; 2] = SOURCE_SCANNER_TERRAIN_PIXEL_SIZE;
 const ATTRACT_SCORING_SCANNER_TERRAIN_TINT: Color = SOURCE_SCANNER_TERRAIN_TINT;
 const ATTRACT_SCORING_SCANNER_BORDER_TINT: Color = Color::from_rgba(38, 0, 160, 255);
+const SOURCE_WAVE_LANDSCAPE_COLOR_BYTES: [u8; 8] = [0x81, 0x28, 0x07, 0x2F, 0x3F, 0x87, 0x15, 0x00];
 const SOURCE_WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255];
 const SOURCE_WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255];
 const SOURCE_NORMAL_PALETTE_BYTES: [u8; 16] = [
@@ -1278,12 +1279,17 @@ impl SourceVisualStateSnapshot {
         Color::WHITE
     }
 
+    #[cfg(test)]
     pub(crate) fn top_display_border_tint(self) -> Color {
         source_video_word_tint(self.top_display_border_word)
     }
 
     pub(crate) fn top_display_scanner_marker_tint(self) -> Color {
         source_video_word_tint(self.top_display_scanner_marker_word)
+    }
+
+    pub(crate) fn wave_landscape_tint(self, wave: u16) -> Color {
+        source_wave_landscape_tint(wave)
     }
 
     pub(crate) fn scanner_object_blip_tint(self, source_color_word: u16) -> Color {
@@ -12956,6 +12962,7 @@ impl Game {
             push_source_bgout_terrain_sprites(
                 &mut scene,
                 source_word_from_world_vector(self.camera_left),
+                SOURCE_VISUAL_STATE.wave_landscape_tint(u16::from(self.state.wave)),
             );
         }
         if self.state.phase != GamePhase::Attract || self.state.post_game_playfield.is_some() {
@@ -13929,6 +13936,12 @@ fn source_pseudo_color_tint(value: u8) -> Color {
     )
 }
 
+pub(crate) fn source_wave_landscape_tint(wave: u16) -> Color {
+    let wave = wave.max(1);
+    let index = usize::from((wave - 1) % SOURCE_WAVE_LANDSCAPE_COLOR_BYTES.len() as u16);
+    source_pseudo_color_tint(SOURCE_WAVE_LANDSCAPE_COLOR_BYTES[index])
+}
+
 pub(crate) fn source_terrain_blow_flash_tint(elapsed: u16) -> Color {
     let color = SOURCE_TERRAIN_BLOW_FLASH_WINDOWS
         .iter()
@@ -14243,14 +14256,18 @@ struct SourceTerrainGenerationState {
     flavor_1_pointer: usize,
 }
 
-pub(crate) fn push_source_bgout_terrain_sprites(scene: &mut RenderScene, background_left: u16) {
+pub(crate) fn push_source_bgout_terrain_sprites(
+    scene: &mut RenderScene,
+    background_left: u16,
+    tint: Color,
+) {
     for record in source_bgout_terrain_records(background_left) {
         scene.push_sprite(SceneSprite {
             sprite: source_terrain_word_sprite(record.word),
             layer: RenderLayer::Terrain,
             position: source_screen_position(record.screen_address),
             size: SOURCE_TERRAIN_WORD_SIZE,
-            tint: Color::WHITE,
+            tint,
         });
     }
 }
@@ -15620,7 +15637,7 @@ fn top_display_border_segment_tint(screen_address: u16, state: &GameState) -> Co
     if matches!(screen_address, 0x4C07 | 0x4C28) {
         SOURCE_VISUAL_STATE.top_display_scanner_marker_tint()
     } else {
-        SOURCE_VISUAL_STATE.top_display_border_tint()
+        SOURCE_VISUAL_STATE.wave_landscape_tint(u16::from(state.wave))
     }
 }
 
@@ -28254,7 +28271,10 @@ mod tests {
             super::source_screen_position(expected_records[0].screen_address)
         );
         assert_eq!(terrain_sprites[0].size, super::SOURCE_TERRAIN_WORD_SIZE);
-        assert_eq!(terrain_sprites[0].tint, Color::WHITE);
+        assert_eq!(
+            terrain_sprites[0].tint,
+            super::source_wave_landscape_tint(1)
+        );
         assert_eq!(
             terrain_sprites[1].position[0] + terrain_sprites[1].size[0],
             terrain_sprites[0].position[0]
@@ -28271,7 +28291,27 @@ mod tests {
             terrain_sprites
                 .iter()
                 .all(|sprite| sprite.size == super::SOURCE_TERRAIN_WORD_SIZE
-                    && sprite.tint == Color::WHITE)
+                    && sprite.tint == super::source_wave_landscape_tint(1))
+        );
+    }
+
+    #[test]
+    fn source_wave_landscape_tint_cycles_every_eight_waves() {
+        let cycle = (1..=8)
+            .map(super::source_wave_landscape_tint)
+            .collect::<Vec<_>>();
+
+        assert_eq!(cycle[0], super::source_pseudo_color_tint(0x81));
+        assert_eq!(cycle[1], super::source_pseudo_color_tint(0x28));
+        assert_eq!(cycle[2], super::source_pseudo_color_tint(0x07));
+        assert_eq!(cycle[3], super::source_pseudo_color_tint(0x2F));
+        assert_eq!(cycle[4], super::source_pseudo_color_tint(0x3F));
+        assert_eq!(cycle[5], super::source_pseudo_color_tint(0x87));
+        assert_eq!(cycle[6], super::source_pseudo_color_tint(0x15));
+        assert_eq!(cycle[7], super::source_pseudo_color_tint(0x00));
+        assert_eq!(
+            super::source_wave_landscape_tint(9),
+            super::source_wave_landscape_tint(1)
         );
     }
 
