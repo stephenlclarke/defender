@@ -1503,56 +1503,6 @@ impl WaveProfileSnapshot {
         }
     }
 
-    #[cfg(all(test, feature = "legacy-tools"))]
-    pub(crate) fn from_raw_source_profile(wave: u8, raw: Self) -> Self {
-        let mut profile = raw;
-        for _ in 0..source_getwv_inter_wall_delta_iterations(wave) {
-            profile.apply_source_inter_wave_delta();
-        }
-        profile
-    }
-
-    #[cfg(all(test, feature = "legacy-tools"))]
-    fn apply_source_inter_wave_delta(&mut self) {
-        self.landers = wave_table_inter_delta_u8("landers", self.landers);
-        self.bombers = wave_table_inter_delta_u8("bombers", self.bombers);
-        self.pods = wave_table_inter_delta_u8("pods", self.pods);
-        self.mutants = wave_table_inter_delta_u8("mutants", self.mutants);
-        self.swarmers = wave_table_inter_delta_u8("swarmers", self.swarmers);
-        self.lander_x_velocity =
-            wave_table_inter_delta_u8("lander_x_velocity", self.lander_x_velocity);
-        self.lander_y_velocity_msb =
-            wave_table_inter_delta_u8("lander_y_velocity_msb", self.lander_y_velocity_msb);
-        self.lander_y_velocity_lsb =
-            wave_table_inter_delta_u8("lander_y_velocity_lsb", self.lander_y_velocity_lsb);
-        self.mutant_random_y = wave_table_inter_delta_u8("mutant_random_y", self.mutant_random_y);
-        self.mutant_y_velocity_msb =
-            wave_table_inter_delta_u8("mutant_y_velocity_msb", self.mutant_y_velocity_msb);
-        self.mutant_y_velocity_lsb =
-            wave_table_inter_delta_u8("mutant_y_velocity_lsb", self.mutant_y_velocity_lsb);
-        self.mutant_x_velocity =
-            wave_table_inter_delta_u8("mutant_x_velocity", self.mutant_x_velocity);
-        self.swarmer_x_velocity =
-            wave_table_inter_delta_u8("swarmer_x_velocity", self.swarmer_x_velocity);
-        self.wave_time = wave_table_inter_delta_u32("wave_time", self.wave_time);
-        self.wave_size = wave_table_inter_delta_u8("wave_size", self.wave_size);
-        self.lander_shot_time =
-            wave_table_inter_delta_u32("lander_shot_time", self.lander_shot_time);
-        self.bomber_x_velocity =
-            wave_table_inter_delta_u8("bomber_x_velocity", self.bomber_x_velocity);
-        self.mutant_shot_time =
-            wave_table_inter_delta_u32("mutant_shot_time", self.mutant_shot_time);
-        self.swarmer_shot_time =
-            wave_table_inter_delta_u32("swarmer_shot_time", self.swarmer_shot_time);
-        self.swarmer_acceleration_mask =
-            wave_table_inter_delta_u8("swarmer_acceleration_mask", self.swarmer_acceleration_mask);
-        self.baiter_delay = wave_table_inter_delta_u32("baiter_time", self.baiter_delay);
-        self.baiter_shot_time =
-            wave_table_inter_delta_u32("baiter_shot_time", self.baiter_shot_time);
-        self.baiter_seek_probability =
-            wave_table_inter_delta_u8("baiter_seek_probability", self.baiter_seek_probability);
-    }
-
     fn apply_source_intra_wave_delta(&mut self) {
         self.landers = wave_table_intra_delta_u8("landers", self.landers);
         self.bombers = wave_table_intra_delta_u8("bombers", self.bombers);
@@ -1669,45 +1619,6 @@ fn wave_table_intra_delta_value(key: &str, value: i32) -> i32 {
         let floor = parse_wave_table_i32(fields[2], key, "floor");
         let intra_delta = parse_wave_table_i32(fields[3], key, "intra_delta");
         return apply_wave_table_delta(value, intra_delta, floor, ceiling);
-    }
-
-    panic!("missing red-label wave table key {key}");
-}
-
-#[cfg(all(test, feature = "legacy-tools"))]
-fn wave_table_inter_delta_u8(key: &str, value: u8) -> u8 {
-    u8::try_from(wave_table_inter_delta_value(key, i32::from(value)))
-        .expect("red-label inter-wave profile value should fit u8")
-}
-
-#[cfg(all(test, feature = "legacy-tools"))]
-fn wave_table_inter_delta_u32(key: &str, value: u32) -> u32 {
-    u32::try_from(wave_table_inter_delta_value(
-        key,
-        i32::try_from(value).expect("red-label profile value should fit i32"),
-    ))
-    .expect("red-label inter-wave profile value should be non-negative")
-}
-
-#[cfg(all(test, feature = "legacy-tools"))]
-fn wave_table_inter_delta_value(key: &str, value: i32) -> i32 {
-    let mut lines = SOURCE_WAVE_TABLE_TSV.lines();
-    let header = lines
-        .next()
-        .expect("red-label wave table should have header");
-    assert_eq!(header, SOURCE_WAVE_TABLE_HEADER);
-
-    for line in lines.map(str::trim).filter(|line| !line.is_empty()) {
-        let fields = line.split('\t').collect::<Vec<_>>();
-        assert_eq!(fields.len(), 9, "red-label wave table row width changed");
-        if fields[0] != key {
-            continue;
-        }
-
-        let ceiling = parse_wave_table_i32(fields[1], key, "ceiling");
-        let floor = parse_wave_table_i32(fields[2], key, "floor");
-        let inter_delta = parse_wave_table_i32(fields[4], key, "inter_delta");
-        return apply_wave_table_delta(value, inter_delta, floor, ceiling);
     }
 
     panic!("missing red-label wave table key {key}");
@@ -16504,16 +16415,6 @@ pub(crate) fn source_explosion_frame_index(size: u16) -> Option<u8> {
         return None;
     }
     u8::try_from(offset / SOURCE_EXPLOSION_SIZE_DELTA).ok()
-}
-
-#[cfg(feature = "legacy-tools")]
-pub(crate) fn source_player_explosion_color_index_for_pointer(
-    color_pointer: u16,
-    color_table_address: u16,
-) -> Option<u8> {
-    let offset = color_pointer.checked_sub(color_table_address)?;
-    let index = u8::try_from(offset).ok()?;
-    (usize::from(index) < SOURCE_PLAYER_EXPLOSION_COLORS.len()).then_some(index)
 }
 
 fn player_explosion_random_seed_step(seed: u16) -> u16 {

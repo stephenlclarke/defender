@@ -496,6 +496,195 @@ impl SceneRaster {
     }
 }
 
+pub fn render_scene_to_rgba(
+    scene: &RenderScene,
+    target: SurfaceSize,
+) -> Result<SceneRaster, SceneRasterError> {
+    let atlas = TextureAtlas::default_sprites();
+    render_scene_with_atlas_to_rgba(scene, target, &atlas)
+}
+
+pub fn render_scene_with_atlas_to_rgba(
+    scene: &RenderScene,
+    target: SurfaceSize,
+    atlas: &TextureAtlas,
+) -> Result<SceneRaster, SceneRasterError> {
+    let Some(pixel_buffer_length) = target.rgba_len() else {
+        return Err(SceneRasterError::PixelBufferTooLarge { surface: target });
+    };
+
+    let clear_color = opaque_scene_clear_color(scene);
+    let mut pixels = Vec::with_capacity(pixel_buffer_length);
+    for _ in 0..pixel_buffer_length / 4 {
+        pixels.extend_from_slice(&clear_color);
+    }
+
+    let layout = ViewportLayout::fit(scene.surface, target);
+    if !layout.is_empty() {
+        if let Some(raster) = scene.raster() {
+            blit_scene_raster_nearest(&mut pixels, target, layout, raster);
+        }
+
+        let mut indexed_sprites: Vec<_> = scene.sprites.iter().enumerate().collect();
+        indexed_sprites.sort_by_key(|(index, sprite)| (render_layer_order(sprite.layer), *index));
+
+        for (_, sprite) in indexed_sprites {
+            blit_scene_sprite_nearest(&mut pixels, target, layout, atlas, sprite);
+        }
+    }
+
+    SceneRaster::from_rgba(target, pixels)
+}
+
+fn opaque_scene_clear_color(scene: &RenderScene) -> [u8; 4] {
+    match scene.clear_color.rgba {
+        [_, _, _, 0] => [0, 0, 0, 255],
+        color => color,
+    }
+}
+
+fn render_layer_order(layer: RenderLayer) -> u8 {
+    match layer {
+        RenderLayer::Terrain => 0,
+        RenderLayer::Starfield => 1,
+        RenderLayer::Objects => 2,
+        RenderLayer::Projectiles => 3,
+        RenderLayer::Hud => 4,
+        RenderLayer::Overlay => 5,
+    }
+}
+
+fn blit_scene_raster_nearest(
+    pixels: &mut [u8],
+    target: SurfaceSize,
+    layout: ViewportLayout,
+    raster: &SceneRaster,
+) {
+    if raster.surface.is_empty() {
+        return;
+    }
+
+    for target_y in layout.origin[1]..layout.origin[1] + layout.size.height {
+        let viewport_y = target_y - layout.origin[1];
+        let source_y =
+            nearest_source_coordinate(viewport_y, layout.size.height, raster.surface.height);
+        for target_x in layout.origin[0]..layout.origin[0] + layout.size.width {
+            let viewport_x = target_x - layout.origin[0];
+            let source_x =
+                nearest_source_coordinate(viewport_x, layout.size.width, raster.surface.width);
+            let source_index =
+                rgba_index(raster.surface, source_x, source_y).expect("raster index in bounds");
+            let target_index =
+                rgba_index(target, target_x, target_y).expect("target index in bounds");
+            blend_rgba(
+                &mut pixels[target_index..target_index + 4],
+                &raster.pixels()[source_index..source_index + 4],
+            );
+        }
+    }
+}
+
+fn blit_scene_sprite_nearest(
+    pixels: &mut [u8],
+    target: SurfaceSize,
+    layout: ViewportLayout,
+    atlas: &TextureAtlas,
+    sprite: &SceneSprite,
+) {
+    if sprite.size[0] <= 0.0 || sprite.size[1] <= 0.0 {
+        return;
+    }
+
+    let Some(region) = atlas.region(sprite.sprite) else {
+        return;
+    };
+
+    let target_x = layout.origin[0] as i32 + (sprite.position[0] * layout.scale).round() as i32;
+    let target_y = layout.origin[1] as i32 + (sprite.position[1] * layout.scale).round() as i32;
+    let target_width = scaled_sprite_extent(sprite.size[0], layout.scale);
+    let target_height = scaled_sprite_extent(sprite.size[1], layout.scale);
+    let clip_left = target_x.max(0) as u32;
+    let clip_top = target_y.max(0) as u32;
+    let clip_right = (target_x + target_width as i32).clamp(0, target.width as i32) as u32;
+    let clip_bottom = (target_y + target_height as i32).clamp(0, target.height as i32) as u32;
+
+    if clip_left >= clip_right || clip_top >= clip_bottom {
+        return;
+    }
+
+    for y in clip_top..clip_bottom {
+        let local_y = (y as i32 - target_y) as u32;
+        let source_y = nearest_source_coordinate(local_y, target_height, region.size[1]);
+        for x in clip_left..clip_right {
+            let local_x = (x as i32 - target_x) as u32;
+            let source_x = nearest_source_coordinate(local_x, target_width, region.size[0]);
+            let atlas_x = region.origin[0] + source_x;
+            let atlas_y = region.origin[1] + source_y;
+            let Some(source_index) = rgba_index(atlas.surface, atlas_x, atlas_y) else {
+                continue;
+            };
+            let tinted = tint_rgba(&atlas.pixels()[source_index..source_index + 4], sprite.tint);
+            if tinted[3] == 0 {
+                continue;
+            }
+            let target_index = rgba_index(target, x, y).expect("target index in bounds");
+            blend_rgba(&mut pixels[target_index..target_index + 4], &tinted);
+        }
+    }
+}
+
+fn scaled_sprite_extent(extent: f32, scale: f32) -> u32 {
+    (extent * scale).round().max(1.0) as u32
+}
+
+fn nearest_source_coordinate(
+    target_coordinate: u32,
+    target_extent: u32,
+    source_extent: u32,
+) -> u32 {
+    if target_extent == 0 || source_extent == 0 {
+        return 0;
+    }
+
+    ((u64::from(target_coordinate) * u64::from(source_extent)) / u64::from(target_extent))
+        .min(u64::from(source_extent.saturating_sub(1))) as u32
+}
+
+fn rgba_index(surface: SurfaceSize, x: u32, y: u32) -> Option<usize> {
+    if x >= surface.width || y >= surface.height {
+        return None;
+    }
+
+    let row_offset = (y as usize).checked_mul(surface.width as usize)?;
+    let pixel_offset = row_offset.checked_add(x as usize)?;
+    pixel_offset.checked_mul(4)
+}
+
+fn tint_rgba(source: &[u8], tint: Color) -> [u8; 4] {
+    [
+        multiply_u8(source[0], tint.rgba[0]),
+        multiply_u8(source[1], tint.rgba[1]),
+        multiply_u8(source[2], tint.rgba[2]),
+        multiply_u8(source[3], tint.rgba[3]),
+    ]
+}
+
+fn multiply_u8(left: u8, right: u8) -> u8 {
+    ((u16::from(left) * u16::from(right) + 127) / 255) as u8
+}
+
+fn blend_rgba(destination: &mut [u8], source: &[u8]) {
+    let alpha = u16::from(source[3]);
+    let inverse_alpha = 255 - alpha;
+    for channel in 0..3 {
+        destination[channel] = ((u16::from(source[channel]) * alpha
+            + u16::from(destination[channel]) * inverse_alpha
+            + 127)
+            / 255) as u8;
+    }
+    destination[3] = 255;
+}
+
 impl std::fmt::Display for SceneRasterError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -4384,8 +4573,8 @@ mod tests {
         SpriteVertexBufferBinding, SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas,
         ViewportLayout, WgpuFrameCommand, WgpuFramePlan, WgpuPassPlan, WgpuViewportCommand,
         decode_source_object_image_rgba, pseudo_color_rgba, push_source_controlled_message_sprites,
-        push_source_text_bytes_sprites, source_message_text, source_screen_position,
-        source_screen_position_with_offset,
+        push_source_text_bytes_sprites, render_scene_with_atlas_to_rgba, source_message_text,
+        source_screen_position, source_screen_position_with_offset,
     };
     use crate::renderer::{
         EmbeddedSprite, WHITE_RGBA, decode_source_attract_williams_logo_rgba,
@@ -5783,7 +5972,7 @@ mod tests {
     }
 
     #[test]
-    fn render_scene_from_raster_keeps_temporary_fidelity_payload() {
+    fn render_scene_from_raster_keeps_cpu_raster_payload() {
         let scene = RenderScene::from_rgba(
             21,
             SurfaceSize::new(2, 1),
@@ -5811,6 +6000,75 @@ mod tests {
         assert_eq!(scene.surface, SurfaceSize::new(2, 1));
         assert_eq!(scene.summary().raster_count, 1);
         assert_eq!(raster.into_pixels(), vec![1, 2, 3, 255, 4, 5, 6, 255]);
+    }
+
+    #[test]
+    fn render_scene_to_rgba_draws_atlas_sprites_without_gpu() {
+        let atlas = TextureAtlas::with_rgba(
+            SurfaceSize::new(1, 1),
+            vec![AtlasRegion {
+                sprite: SpriteId(0xAA),
+                origin: [0, 0],
+                size: [1, 1],
+            }],
+            vec![120, 200, 40, 255],
+        )
+        .expect("atlas");
+        let mut scene = RenderScene::empty(23, SurfaceSize::new(2, 2));
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId(0xAA),
+            layer: RenderLayer::Objects,
+            position: [0.0, 0.0],
+            size: [1.0, 1.0],
+            tint: Color::WHITE,
+        });
+
+        let raster = render_scene_with_atlas_to_rgba(&scene, SurfaceSize::new(2, 2), &atlas)
+            .expect("rasterized scene");
+
+        assert_eq!(&raster.pixels()[0..4], [120, 200, 40, 255]);
+        assert_eq!(&raster.pixels()[4..8], [0, 0, 0, 255]);
+    }
+
+    #[test]
+    fn render_scene_to_rgba_respects_layer_order_for_readme_media() {
+        let atlas = TextureAtlas::with_rgba(
+            SurfaceSize::new(2, 1),
+            vec![
+                AtlasRegion {
+                    sprite: SpriteId(1),
+                    origin: [0, 0],
+                    size: [1, 1],
+                },
+                AtlasRegion {
+                    sprite: SpriteId(2),
+                    origin: [1, 0],
+                    size: [1, 1],
+                },
+            ],
+            vec![255, 0, 0, 255, 0, 255, 0, 255],
+        )
+        .expect("atlas");
+        let mut scene = RenderScene::empty(24, SurfaceSize::new(1, 1));
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId(2),
+            layer: RenderLayer::Terrain,
+            position: [0.0, 0.0],
+            size: [1.0, 1.0],
+            tint: Color::WHITE,
+        });
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId(1),
+            layer: RenderLayer::Hud,
+            position: [0.0, 0.0],
+            size: [1.0, 1.0],
+            tint: Color::WHITE,
+        });
+
+        let raster = render_scene_with_atlas_to_rgba(&scene, SurfaceSize::new(1, 1), &atlas)
+            .expect("rasterized scene");
+
+        assert_eq!(raster.pixels(), [255, 0, 0, 255]);
     }
 
     #[test]

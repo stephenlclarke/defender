@@ -24,7 +24,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev lua5.4 mesa-vulkan-drivers vulkan-tools xvfb
+          sudo apt-get install -y libasound2-dev mesa-vulkan-drivers vulkan-tools xvfb
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -37,20 +37,16 @@ jobs:
           tool: cargo-llvm-cov
 
       - name: Diagnose CI prerequisites
-        env:
-          LUA: lua5.4
         run: make ci-doctor
 
-      - name: Run fidelity gate
+      - name: Run accepted runtime checks
         env:
-          LUA: lua5.4
           NEW_CODE_COVERAGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-        run: make fidelity
+        run: make ci
 
       - name: Run wgpu smoke gates
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
-          LUA: lua5.4
         run: xvfb-run -a make ci-smoke
 
   leaks:

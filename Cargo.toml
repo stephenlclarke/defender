@@ -5,29 +5,14 @@ edition = "2024"
 autobins = false
 default-run = "defender"
 
-[features]
-default = []
-legacy-tools = ["dep:crossterm"]
-
 [[bin]]
 name = "defender"
 path = "src/main.rs"
-
-[[example]]
-name = "generate_readme_media"
-path = "examples/generate_readme_media.rs"
-required-features = ["legacy-tools"]
-
-[[example]]
-name = "generate_reference_candidate_media"
-path = "examples/generate_reference_candidate_media.rs"
-required-features = ["legacy-tools"]
 
 [dependencies]
 anyhow = "1.0"
 bytemuck = { version = "1.25.0", features = ["derive"] }
 cpal = "0.17.3"
-crossterm = { version = "0.29", optional = true }
 png = "0.18"
 pollster = "0.4.0"
 wgpu = "29.0.3"

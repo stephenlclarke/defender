@@ -16232,6 +16232,37 @@ fn explosion_lifetime_steps(kind: ExplosionKind, behavior: ActorBehaviorProfile)
 mod tests {
     use super::*;
 
+    fn source_projectile_at_screen(
+        position: Point,
+        background_left: u16,
+    ) -> (Point, ActorSourceEnemyProjectileMetadata) {
+        let screen_x = u16::try_from(position.x).expect("test screen x should be non-negative");
+        let absolute_x = background_left.wrapping_add(screen_x << SOURCE_OBJECT_SCREEN_X_SHIFT);
+        let [x, x_fraction] = absolute_x.to_be_bytes();
+        (
+            Point::new(i16::from(x), position.y),
+            ActorSourceEnemyProjectileMetadata {
+                x_fraction,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                lifetime_ticks: 0,
+            },
+        )
+    }
+
+    fn spawn_enemy_laser_at_screen(driver: &mut ActorGameDriver, position: Point) -> ActorId {
+        let (source_position, source) =
+            source_projectile_at_screen(position, driver.source_background_left);
+        driver.spawn_enemy_laser_from_spawn(source_position, Velocity::new(0, 0), Some(source))
+    }
+
+    fn spawn_bomb_at_screen(driver: &mut ActorGameDriver, position: Point) -> ActorId {
+        let (source_position, source) =
+            source_projectile_at_screen(position, driver.source_background_left);
+        driver.spawn_bomb(source_position, Some(source))
+    }
+
     #[test]
     fn actor_sound_cues_expose_red_label_sound_commands() {
         let expected = [
@@ -19392,7 +19423,9 @@ mod tests {
         assert_source_message_scene(&started.scene, "PLYR1", SOURCE_PLAYER_START_PROMPT_SCREEN);
 
         let status = runtime.step(GameInput::NONE);
-        assert_text(&status.report, "2UP 000000");
+        assert_text(&status.report, "WAVE 01");
+        assert_text(&status.report, "CREDIT 00");
+        assert_eq!(status.state.scores.player_two, 0);
         assert_eq!(status.events.sounds(), &[SoundEvent::GameStarted]);
         assert_eq!(
             status.report.player_start,
@@ -19471,7 +19504,7 @@ mod tests {
         driver.lives = 2;
         driver.smart_bombs = 3;
         driver.spawn_player();
-        driver.spawn_enemy_laser_from_spawn(Point::new(42, 120), Velocity::new(0, 0), None);
+        spawn_enemy_laser_at_screen(&mut driver, Point::new(42, 120));
         let mut runtime = ActorRuntimeAdapter::with_driver(driver);
 
         let killed = runtime.step(GameInput::NONE);
@@ -19532,7 +19565,7 @@ mod tests {
         driver.player_two_lives = 3;
         driver.player_two_smart_bombs = 3;
         driver.spawn_player();
-        driver.spawn_enemy_laser_from_spawn(Point::new(42, 120), Velocity::new(0, 0), None);
+        spawn_enemy_laser_at_screen(&mut driver, Point::new(42, 120));
         let mut runtime = ActorRuntimeAdapter::with_driver(driver);
 
         let killed = runtime.step(GameInput::NONE);
@@ -19622,7 +19655,7 @@ mod tests {
         driver.player_two_lives = 2;
         driver.player_two_smart_bombs = 1;
         driver.spawn_player();
-        driver.spawn_enemy_laser_from_spawn(Point::new(42, 120), Velocity::new(0, 0), None);
+        spawn_enemy_laser_at_screen(&mut driver, Point::new(42, 120));
         let mut runtime = ActorRuntimeAdapter::with_driver(driver);
 
         let killed = runtime.step(GameInput::NONE);
@@ -19689,7 +19722,7 @@ mod tests {
         driver.player_two_lives = 0;
         driver.player_two_smart_bombs = 1;
         driver.spawn_player();
-        driver.spawn_enemy_laser_from_spawn(Point::new(42, 120), Velocity::new(0, 0), None);
+        spawn_enemy_laser_at_screen(&mut driver, Point::new(42, 120));
         let mut runtime = ActorRuntimeAdapter::with_driver(driver);
 
         let killed = runtime.step(GameInput::NONE);
@@ -19743,7 +19776,7 @@ mod tests {
         driver.player_two_lives = 1;
         driver.player_two_smart_bombs = 2;
         driver.spawn_player();
-        driver.spawn_enemy_laser_from_spawn(Point::new(42, 120), Velocity::new(0, 0), None);
+        spawn_enemy_laser_at_screen(&mut driver, Point::new(42, 120));
         let mut runtime = ActorRuntimeAdapter::with_driver(driver);
 
         let killed = runtime.step(GameInput::NONE);
@@ -19884,7 +19917,7 @@ mod tests {
         driver.lives = 1;
         driver.score = 12_000;
         driver.spawn_player();
-        driver.spawn_enemy_laser_from_spawn(Point::new(42, 120), Velocity::default(), None);
+        spawn_enemy_laser_at_screen(&mut driver, Point::new(42, 120));
 
         let game_over = driver.step(GameInput::NONE);
         assert_eq!(game_over.phase, Phase::HighScoreEntry);
@@ -22035,7 +22068,7 @@ mod tests {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
-        driver.spawn_enemy_laser_from_spawn(Point::new(42, 120), Velocity::new(0, 0), None);
+        spawn_enemy_laser_at_screen(&mut driver, Point::new(42, 120));
 
         let report = driver.step(GameInput::NONE);
 
@@ -22058,7 +22091,7 @@ mod tests {
         driver.phase = Phase::Playing;
         driver.lives = 1;
         driver.spawn_player();
-        driver.spawn_enemy_laser_from_spawn(Point::new(42, 120), Velocity::new(0, 0), None);
+        spawn_enemy_laser_at_screen(&mut driver, Point::new(42, 120));
 
         let report = driver.step(GameInput::NONE);
 
@@ -22075,7 +22108,7 @@ mod tests {
         driver.lives = 3;
         driver.smart_bombs = INITIAL_SMART_BOMBS;
         driver.spawn_player();
-        driver.spawn_enemy_laser_from_spawn(Point::new(42, 120), Velocity::new(0, 0), None);
+        spawn_enemy_laser_at_screen(&mut driver, Point::new(42, 120));
         driver.spawn_bomb_for_test(Point::new(90, 120));
 
         let report = driver.step(GameInput {
@@ -22406,7 +22439,7 @@ mod tests {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
-        driver.spawn_enemy_laser_from_spawn(Point::new(42, 120), Velocity::new(0, 0), None);
+        spawn_enemy_laser_at_screen(&mut driver, Point::new(42, 120));
 
         let report = driver.step(GameInput {
             xyzzy: XyzzyMode {
@@ -26875,7 +26908,7 @@ mod tests {
         driver.phase = Phase::Playing;
         driver.lives = 1;
         driver.spawn_player();
-        driver.spawn_bomb_for_test(Point::new(42, 120));
+        spawn_bomb_at_screen(&mut driver, Point::new(42, 120));
 
         let report = driver.step(GameInput::NONE);
 
