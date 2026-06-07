@@ -388,6 +388,8 @@ const SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MAX: u16 = 0xA600;
 const SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_TOP_LEFT: Point = Point::new(0x20, 0xA2);
 const SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER: Point = Point::new(0x21, 0xA9);
 const SOURCE_TARGET6_MUTANT_VISUAL_X_CORRECTION: u16 = 0x0168;
+const SOURCE_OBJECT_ACTIVE_LEFT_BUFFER: u16 = 100 * 32;
+const SOURCE_OBJECT_ACTIVE_WINDOW: u16 = 500 * 32;
 const SOURCE_OBJECT_SCREEN_X_SHIFT: u8 = 6;
 const SOURCE_OBJECT_VISIBLE_WIDTH: u16 = 292;
 const BOMBER_DRIFT_SPEED: i16 = 1;
@@ -7240,7 +7242,7 @@ impl ActorRenderSceneBridge {
             push_scanner_radar_sprites(&mut scene, &state.world.scanner);
         }
         for draw in &report.draws {
-            self.push_draw(&mut scene, report.phase, draw);
+            self.push_draw(&mut scene, report, draw);
         }
         push_actor_player_switch_prompt_sprites(&mut scene, report);
         push_actor_final_game_over_prompt_sprites(&mut scene, report);
@@ -7250,9 +7252,9 @@ impl ActorRenderSceneBridge {
         scene
     }
 
-    fn push_draw(&self, scene: &mut RenderScene, phase: Phase, draw: &DrawCommand) {
+    fn push_draw(&self, scene: &mut RenderScene, report: &StepReport, draw: &DrawCommand) {
         if let Some(text) = &draw.text {
-            let layer = if phase == Phase::Attract {
+            let layer = if report.phase == Phase::Attract {
                 RenderLayer::Overlay
             } else {
                 RenderLayer::Hud
@@ -7302,7 +7304,7 @@ impl ActorRenderSceneBridge {
             | VisualEffect::SourceBomberFrame { .. }
             | VisualEffect::SourcePod
             | VisualEffect::SourceBaiterFrame { .. }
-            | VisualEffect::SourceHumanFrame { .. } => self.push_static_sprite(scene, draw),
+            | VisualEffect::SourceHumanFrame { .. } => self.push_static_sprite(scene, report, draw),
         }
     }
 
@@ -7429,8 +7431,11 @@ impl ActorRenderSceneBridge {
         });
     }
 
-    fn push_static_sprite(&self, scene: &mut RenderScene, draw: &DrawCommand) {
-        let Some(sprite) = actor_scene_sprite(draw.sprite, draw.position) else {
+    fn push_static_sprite(&self, scene: &mut RenderScene, report: &StepReport, draw: &DrawCommand) {
+        let Some(position) = actor_draw_screen_position(report, draw) else {
+            return;
+        };
+        let Some(sprite) = actor_scene_sprite(draw.sprite, position) else {
             return;
         };
         scene.push_sprite(sprite);
@@ -8888,6 +8893,74 @@ fn point_position(point: Point) -> [f32; 2] {
     [f32::from(point.x), f32::from(point.y)]
 }
 
+fn actor_draw_screen_position(report: &StepReport, draw: &DrawCommand) -> Option<Point> {
+    if report.phase != Phase::Playing {
+        return Some(draw.position);
+    }
+
+    let Some(snapshot) = report
+        .snapshots
+        .iter()
+        .find(|snapshot| snapshot.id == draw.actor && snapshot.alive)
+    else {
+        return Some(draw.position);
+    };
+
+    actor_project_source_backed_draw(snapshot, draw.position, report.source_background_left)
+}
+
+fn actor_project_source_backed_draw(
+    snapshot: &ActorSnapshot,
+    draw_position: Point,
+    background_left: u16,
+) -> Option<Point> {
+    let Some(x_fraction) = actor_source_backed_x_fraction(snapshot) else {
+        return Some(draw_position);
+    };
+    if draw_position != snapshot.position && snapshot.kind != ActorKind::Human {
+        return Some(draw_position);
+    }
+    actor_source_project_screen_position(draw_position, x_fraction, background_left)
+}
+
+fn actor_source_backed_x_fraction(snapshot: &ActorSnapshot) -> Option<u8> {
+    snapshot
+        .source_lander
+        .map(|source| source.x_fraction)
+        .or_else(|| snapshot.source_bomber.map(|source| source.x_fraction))
+        .or_else(|| snapshot.source_pod.map(|source| source.x_fraction))
+        .or_else(|| snapshot.source_swarmer.map(|source| source.x_fraction))
+        .or_else(|| snapshot.source_baiter.map(|source| source.x_fraction))
+        .or_else(|| snapshot.source_mutant.map(|source| source.x_fraction))
+        .or_else(|| snapshot.source_human.map(|source| source.x_fraction))
+        .or_else(|| {
+            snapshot
+                .source_enemy_projectile
+                .map(|source| source.x_fraction)
+        })
+}
+
+fn actor_source_project_screen_position(
+    position: Point,
+    x_fraction: u8,
+    background_left: u16,
+) -> Option<Point> {
+    let x16 = actor_source_absolute_x(position, x_fraction);
+    let active_left = background_left.wrapping_sub(SOURCE_OBJECT_ACTIVE_LEFT_BUFFER);
+    if x16.wrapping_sub(active_left) >= SOURCE_OBJECT_ACTIVE_WINDOW {
+        return None;
+    }
+    let screen_word = x16.wrapping_sub(background_left);
+    if screen_word & 0x8000 != 0 {
+        return None;
+    }
+    let screen_x = screen_word >> SOURCE_OBJECT_SCREEN_X_SHIFT;
+    if screen_x >= SOURCE_OBJECT_VISIBLE_WIDTH {
+        return None;
+    }
+    Some(Point::new(screen_x as i16, position.y))
+}
+
 fn williams_reveal_visible_pixel_count(stroke_step: u16, total_pixels: usize) -> usize {
     if total_pixels == 0 {
         return 0;
@@ -10279,7 +10352,9 @@ impl ActorGameDriver {
         let bodies = self
             .snapshots
             .values()
-            .filter_map(ActorSnapshot::collision_body)
+            .filter_map(|snapshot| {
+                actor_collision_body_for_snapshot(snapshot, self.source_background_left)
+            })
             .collect::<Vec<_>>();
         let mut destroyed = BTreeSet::new();
         for laser in bodies.iter().filter(|body| body.kind == ActorKind::Laser) {
@@ -11919,6 +11994,15 @@ fn center_of(bounds: Rect) -> Point {
     )
 }
 
+fn translate_rect(bounds: Rect, delta: Velocity) -> Rect {
+    Rect::new(
+        bounds.left.saturating_add(delta.dx),
+        bounds.top.saturating_add(delta.dy),
+        bounds.right.saturating_add(delta.dx),
+        bounds.bottom.saturating_add(delta.dy),
+    )
+}
+
 fn manhattan_distance(left: Point, right: Point) -> i16 {
     (left.x - right.x).abs() + (left.y - right.y).abs()
 }
@@ -12017,6 +12101,38 @@ fn is_player_hazard(kind: ActorKind) -> bool {
             | ActorKind::Baiter
             | ActorKind::EnemyLaser
     )
+}
+
+fn actor_collision_body_for_snapshot(
+    snapshot: &ActorSnapshot,
+    background_left: u16,
+) -> Option<CollisionBody> {
+    let body = snapshot.collision_body()?;
+    actor_project_source_backed_collision_body(snapshot, body, background_left)
+}
+
+fn actor_project_source_backed_collision_body(
+    snapshot: &ActorSnapshot,
+    body: CollisionBody,
+    background_left: u16,
+) -> Option<CollisionBody> {
+    let Some(x_fraction) = actor_source_backed_x_fraction(snapshot) else {
+        return Some(body);
+    };
+    if center_of(body.bounds) != snapshot.position && snapshot.kind != ActorKind::Human {
+        return Some(body);
+    }
+    let position =
+        actor_source_project_screen_position(snapshot.position, x_fraction, background_left)?;
+    let delta = Velocity::new(
+        position.x - snapshot.position.x,
+        position.y - snapshot.position.y,
+    );
+    Some(CollisionBody {
+        position,
+        bounds: translate_rect(body.bounds, delta),
+        ..body
+    })
 }
 
 fn is_player_enemy_collision_target(kind: ActorKind) -> bool {
@@ -16775,6 +16891,67 @@ mod tests {
             sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
                 && sprite.layer == RenderLayer::Objects
         }));
+    }
+
+    #[test]
+    fn actor_render_projects_source_world_objects_against_scrolling_background() {
+        let still = actor_source_projection_report_for_test(0).render_scene();
+        let scrolled = actor_source_projection_report_for_test(0x0100).render_scene();
+
+        assert_eq!(
+            sprite_position_for_test(&still, SpriteId::PLAYER_SHIP, RenderLayer::Objects),
+            Some([128.0, 100.0])
+        );
+        assert_eq!(
+            sprite_position_for_test(&scrolled, SpriteId::PLAYER_SHIP, RenderLayer::Objects),
+            Some([128.0, 100.0])
+        );
+        assert_eq!(
+            sprite_position_for_test(&still, SpriteId::ENEMY_LANDER, RenderLayer::Objects),
+            Some([192.0, 80.0])
+        );
+        assert_eq!(
+            sprite_position_for_test(&scrolled, SpriteId::ENEMY_LANDER, RenderLayer::Objects),
+            Some([188.0, 80.0])
+        );
+
+        let still_projectiles =
+            sprite_positions_for_test(&still, SpriteId::ENEMY_BOMB, RenderLayer::Projectiles);
+        let scrolled_projectiles =
+            sprite_positions_for_test(&scrolled, SpriteId::ENEMY_BOMB, RenderLayer::Projectiles);
+        assert!(still_projectiles.contains(&[196.0, 96.0]));
+        assert!(still_projectiles.contains(&[196.0, 104.0]));
+        assert!(scrolled_projectiles.contains(&[192.0, 96.0]));
+        assert!(scrolled_projectiles.contains(&[192.0, 104.0]));
+    }
+
+    #[test]
+    fn actor_collisions_project_source_world_hostiles_against_background() {
+        let mut lander = actor_snapshot(2, ActorKind::Lander, Point::new(0x30, 80));
+        lander.bounds = Some(Rect::from_center(lander.position, 8, 8));
+        lander.source_lander = Some(ActorSourceLanderMetadata {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 0,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: None,
+        });
+
+        let projected = actor_collision_body_for_snapshot(&lander, 0)
+            .expect("source-backed lander should be projected while visible");
+        assert_eq!(projected.position, Point::new(192, 80));
+        assert!(
+            projected
+                .bounds
+                .intersects(Rect::from_center(Point::new(192, 80), 10, 2))
+        );
+        assert!(
+            actor_collision_body_for_snapshot(&lander, 0x4000).is_none(),
+            "offscreen source-backed hostiles should not collide with screen-space player/laser bodies"
+        );
     }
 
     #[test]
@@ -26994,6 +27171,111 @@ mod tests {
         let mut snapshot = actor_snapshot(id, kind, position);
         snapshot.velocity = velocity;
         snapshot
+    }
+
+    fn actor_source_projection_report_for_test(source_background_left: u16) -> StepReport {
+        let mut player = actor_snapshot(1, ActorKind::Player, Point::new(128, 100));
+        player.direction = Some(Direction::Right);
+
+        let mut lander = actor_snapshot(2, ActorKind::Lander, Point::new(0x30, 80));
+        lander.source_lander = Some(ActorSourceLanderMetadata {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 0,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: None,
+        });
+
+        let mut enemy_laser = actor_snapshot(3, ActorKind::EnemyLaser, Point::new(0x31, 96));
+        enemy_laser.source_enemy_projectile = Some(ActorSourceEnemyProjectileMetadata {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            lifetime_ticks: 12,
+        });
+
+        let mut bomb = actor_snapshot(4, ActorKind::Bomb, Point::new(0x31, 104));
+        bomb.source_enemy_projectile = Some(ActorSourceEnemyProjectileMetadata {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            lifetime_ticks: 12,
+        });
+
+        StepReport {
+            step: 123,
+            phase: Phase::Playing,
+            wave: 1,
+            current_player: 1,
+            player_count: 1,
+            score: 0,
+            player_scores: [0, 0],
+            credits: 0,
+            lives: 3,
+            smart_bombs: 3,
+            smart_bomb_flash_steps_remaining: 0,
+            player_stocks: [PlayerStockSnapshot::new(3, 3); 2],
+            next_bonus: SOURCE_REPLAY_SCORE,
+            player_death_sleep_remaining: None,
+            game_over_hall_of_fame_stall_remaining: None,
+            player_switch: None,
+            player_start: None,
+            high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
+            source_wave: ActorSourceWaveProfile::for_wave(1),
+            high_score_initials: HighScoreInitialsState::EMPTY,
+            high_score_initial_accepted: false,
+            high_score_submitted: false,
+            bonus_awarded: false,
+            survivor_bonus: None,
+            behavior_script: ActorBehaviorScript::default().manifest(),
+            enemy_reserve: EnemyReserveSnapshot::default(),
+            source_background_left,
+            source_rng: None,
+            terrain_blow: None,
+            snapshots: vec![player, lander, enemy_laser, bomb],
+            draws: vec![
+                DrawCommand::sprite(
+                    ActorId::new(1),
+                    SpriteKey::PlayerRight,
+                    Point::new(128, 100),
+                ),
+                DrawCommand::sprite(ActorId::new(2), SpriteKey::Lander, Point::new(0x30, 80)),
+                DrawCommand::sprite(ActorId::new(3), SpriteKey::EnemyLaser, Point::new(0x31, 96)),
+                DrawCommand::sprite(ActorId::new(4), SpriteKey::Bomb, Point::new(0x31, 104)),
+            ],
+            sounds: Vec::new(),
+            commands: Vec::new(),
+        }
+    }
+
+    fn sprite_position_for_test(
+        scene: &RenderScene,
+        sprite: SpriteId,
+        layer: RenderLayer,
+    ) -> Option<[f32; 2]> {
+        scene
+            .sprites
+            .iter()
+            .find(|candidate| candidate.sprite == sprite && candidate.layer == layer)
+            .map(|candidate| candidate.position)
+    }
+
+    fn sprite_positions_for_test(
+        scene: &RenderScene,
+        sprite: SpriteId,
+        layer: RenderLayer,
+    ) -> Vec<[f32; 2]> {
+        scene
+            .sprites
+            .iter()
+            .filter(|candidate| candidate.sprite == sprite && candidate.layer == layer)
+            .map(|candidate| candidate.position)
+            .collect()
     }
 
     fn source_mutant_prompt_for_test(

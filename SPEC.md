@@ -225,7 +225,11 @@ tree:
   are empty. Playing reports project the source `BGOUT` terrain into
   state/render output, and gameplay terrain plus non-marker top-display
   separator tint follows the eight-wave blue/green/red/orange/yellow/purple/
-  brown/black cycle.
+  brown/black cycle. Source-backed hostile, human, enemy-shot, and bomb actors
+  remain in source world space, while actor render and collision paths project
+  their draw/collision bodies through the current background word so player
+  thrust scrolls the view instead of carrying aliens, fireballs, or bomb shells
+  with the ship.
   Final-human removal starts a driver-owned source terrain-blow snapshot,
   erases clean terrain and scanner terrain, emits source flash windows,
   projects `TEREX` terrain explosion actors through the source

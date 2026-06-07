@@ -353,7 +353,11 @@ actor scenes also project the source top-display border plus scanner terrain
 and radar blips, and actor player thrust now scrolls the wrapped
 `source_background_left` word once the ship reaches the center band so the
 landscape moves underneath the player instead of staying fixed on a single
-screen. Removing the last human starts a driver-owned source
+screen. Source-backed hostile, human, enemy-shot, and bomb actors remain in
+source world space, but their draw and collision bodies are projected through
+the current background word so thrust scrolling moves the playfield relative to
+those objects instead of carrying them with the player. Removing the last human
+starts a driver-owned source
 `TerrainBlowSnapshot`: clean terrain and scanner terrain are erased, source
 flash windows tint the playfield, `TEREX` terrain explosion actors use the
 source birth positions and terrain-explosion growth/lifetime curve, and the

@@ -173,7 +173,12 @@ verification tools.
   visible source-counted hostiles are gone and reserves are empty, survivor
   bonus and next-wave progression can start. Gameplay terrain and the
   non-marker top-display separator now follow the documented eight-wave color
-  cycle: blue, green, red, orange, yellow, purple, brown, then black. Source swarmer
+  cycle: blue, green, red, orange, yellow, purple, brown, then black.
+  Source-backed hostile, human, enemy-shot, and bomb actors stay in source
+  world space while actor render and collision paths project their
+  draw/collision bodies through the current background word, so thrust
+  scrolling moves the view instead of carrying aliens, fireballs, or bomb
+  shells with the player. Source swarmer
   reserves use `PLRES`/`RSW0` phony-object placement before the same
   mini-swarmer runtime used by pod destruction. Source
   rematerialization now publishes the `SEED/HSEED` background word into
@@ -983,6 +988,28 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-07 19:59 BST`: Completed the actor source-world projection cycle
+  for the reported thrust bug where aliens, enemy bullets, and bombs appeared
+  to travel with the player. Source-backed hostile, human, enemy-shot, and bomb
+  actor snapshots still own source world positions/fractions, but
+  `ActorRenderSceneBridge` now projects their draw positions through the
+  current `source_background_left` before submitting scene sprites. The actor
+  collision resolver now builds the same projected screen-space bodies for
+  source-backed hostile/projectile snapshots, so player lasers and player
+  damage use the visual position rather than the raw source high byte. Added
+  focused regressions proving a thrust-scrolled background shifts projected
+  lander/fireball/bomb sprites while the player stays centered, and that
+  source-backed hostile collision bodies use the same projection/offscreen
+  culling. Validation passed with the new render/collision regressions, the
+  existing actor render-bridge projectile/explosion regression, `cargo fmt
+  --check`, `cargo check --all-targets --features legacy-tools`, `cargo clippy
+  --all-targets --features legacy-tools -- -D warnings`, `cargo run --
+  --actor-smoke`, `cargo run -- --live-smoke`, `make docs-lint`, and `make
+  diff-check`. Remaining plan work is still about `2%`, mostly
+  owner-review/protected-media closure after concrete live defects. Slack step
+  start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780858040302769>.
 
 - `2026-06-07 19:39 BST`: Completed the actor wave-progression and
   landscape-color fidelity cycle. Verified the expected wraparound/wave
