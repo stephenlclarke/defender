@@ -949,23 +949,36 @@ mod public_api_tests {
     }
 
     #[test]
-    fn retired_runtime_legacy_adapters_are_not_active_crate_wiring() {
+    fn retired_runtime_legacy_adapters_are_removed() {
         let lib_rs = include_str!("lib.rs");
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
 
         for (module, path) in [
             ("app", "app"),
+            ("audio", "audio"),
             ("cmos_storage", "cmos_storage"),
+            ("kitty", "kitty"),
+            ("lib", "lib"),
             ("live", "live"),
+            ("main", "main"),
+            ("presentation", "presentation"),
+            ("terminal", "terminal"),
             ("wgpu_presenter", "wgpu_presenter"),
         ] {
+            assert!(
+                !manifest_dir.join(format!("src_legacy/{path}.rs")).exists(),
+                "retired runtime adapter {module} must be removed from src_legacy"
+            );
             assert!(
                 !lib_rs.contains(&format!("#[path = \"../src_legacy/{path}.rs\"]")),
                 "retired runtime adapter {module} must not be compiled from clean src/lib.rs"
             );
-            assert!(
-                !lib_rs.contains(&format!("mod {module};")),
-                "retired runtime adapter {module} must not be an active root module"
-            );
+            if !matches!(module, "audio" | "lib" | "main") {
+                assert!(
+                    !lib_rs.contains(&format!("mod {module};")),
+                    "retired runtime adapter {module} must not be an active root module"
+                );
+            }
         }
     }
 
@@ -995,11 +1008,16 @@ mod public_api_tests {
     #[test]
     fn legacy_terminal_session_is_not_active_crate_wiring() {
         let lib_rs = include_str!("lib.rs");
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let module_declaration = format!("{} {};", "mod", "terminal");
 
         assert!(
+            !manifest_dir.join("src_legacy/terminal.rs").exists(),
+            "terminal session code must not remain parked after runtime retirement"
+        );
+        assert!(
             !lib_rs.contains("#[path = \"../src_legacy/terminal.rs\"]"),
-            "terminal session code must stay parked outside active crate wiring"
+            "terminal session code must stay outside active crate wiring"
         );
         assert!(
             !lib_rs.contains(&module_declaration),

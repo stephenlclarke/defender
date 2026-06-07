@@ -975,6 +975,22 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-07 17:30 BST`: Completed the bounded legacy-retirement audit cycle.
+  Removed retired historical runtime adapter files from `src_legacy/`:
+  `app.rs`, `audio.rs`, `cmos_storage.rs`, `kitty.rs`, `lib.rs`, `live.rs`,
+  `main.rs`, `presentation.rs`, `terminal.rs`, and `wgpu_presenter.rs`.
+  Strengthened public API/source guards so those files must stay absent while
+  the still-needed `legacy-tools` oracle modules remain feature-gated and
+  crate-private. README and SPEC now state that these adapters were removed
+  rather than kept parked. No active oracle, ROM, trace, sound, video, or
+  accepted-behavior modules were safe to remove because the release gate and
+  owner-review evidence still depend on them. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780849627419489>.
+  Validation passed with `cargo check --all-targets`, `cargo check
+  --all-targets --features legacy-tools`, `cargo test public_api_tests --lib
+  --features legacy-tools`, `cargo fmt --check`, `make docs-lint`, and
+  `git diff --check`.
+
 - `2026-06-07 11:51 BST`: Completed the actor script-check hostile projectile
   matrix cycle. `--actor-script-check <path>` now builds bounded
   parser-backed custom-driver probes for lander, mutant, swarmer, and baiter

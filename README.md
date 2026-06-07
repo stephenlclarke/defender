@@ -857,7 +857,9 @@ The primary source tree is now the clean rewrite under `src/`; the converted
 implementation is parked under `src_legacy/` and is compiled only when the
 explicit `legacy-tools` feature is enabled. Clean runtime launch goes through
 the private `src/runtime.rs` bridge without compiling the accepted machine,
-legacy live core, CMOS storage, or retired raster presenter in default builds.
+legacy live core, CMOS storage, terminal renderer, or retired raster presenter
+in default builds; those retired runtime adapters have been removed from
+`src_legacy/`.
 The internal oracle reaches accepted behavior through the crate-private
 `src/accepted.rs` facade before `src/oracle.rs` adapts it to gameplay state
 when `legacy-tools` is enabled.
@@ -914,8 +916,9 @@ Clean rewrite modules:
   live and smoke launches.
 - `src/live_wgpu.rs`: the crate-private WGPU live launcher that owns the
   `winit` event loop, `wgpu` surface/device lifecycle, clean input mapping,
-  clean `Game` stepping, clean audio event submission, native sprite draw-plan
-  execution, and the clean `Game` frame source for `--live-smoke`.
+  actor runtime stepping, actor-derived clean audio event submission, native
+  sprite draw-plan execution, and the clean `Game` frame source for
+  `--live-smoke`.
 - `src/roms.rs`: the crate-private optional ROM verification facade that owns
   the temporary ROM metadata, scan, and loader bridge.
 - `src/audio.rs`: gameplay-facing sound events, the bounded live-audio runtime,
@@ -941,10 +944,11 @@ Clean rewrite modules:
 
 Legacy source-shaped modules under `src_legacy/` still own the accepted arcade
 behavior, assets, hardware models, ROM verification, rendering, input,
-sound-board command evidence, legacy fidelity trace generation and threaded
-fixture checks, plus parked historical live, CMOS, and presenter code that is
-no longer compiled from `src/lib.rs`. `src_legacy/accepted_behavior.rs` owns
-the temporary accepted-machine adapter for the internal oracle.
+sound-board command evidence, legacy fidelity trace generation, and threaded
+fixture checks. Historical live, CMOS, terminal, and presenter adapters that are
+no longer compiled from `src/lib.rs` have been removed rather than kept parked.
+`src_legacy/accepted_behavior.rs` owns the temporary accepted-machine adapter
+for the internal oracle.
 `src/live_wgpu.rs` owns clean config-driven interactive `wgpu` launches and
 routes `--live-smoke` through clean `Game` smoke frames. `src/roms.rs` owns the
 temporary ROM metadata, scan, and loader bridge for optional verification
@@ -1244,16 +1248,16 @@ and separate raster-tooling evidence into one ordered scene command stream.
 The clean smoke and live smoke gates require zero temporary raster commands for
 the active gameplay path. It also records the centered viewport layout plus GPU-ready
 clear color, viewport command, and scene-projection constants for the target
-surface. Live presentation now steps clean gameplay frames directly; parked
-Kitty graphics, terminal-session code, legacy live code, CMOS storage, and the
-old `wgpu` presenter remain historical compatibility evidence outside default
-crate wiring. The legacy video renderer owns its remaining `TerminalGeometry`
-value type directly so it does not pull terminal session setup into active
-builds. Generated long-trace sample data is nested under the legacy machine
-oracle because it is historical fixture evidence, not a clean root adapter. A
-public API guard scans clean module sources so new production code cannot
-import low-level legacy root modules, bypass the accepted-behavior facade, or
-reintroduce legacy implementation terminology.
+surface. Live presentation now steps the actor runtime directly; historical
+Kitty graphics, terminal-session, legacy live, CMOS storage, and old `wgpu`
+presenter adapters have been removed from `src_legacy/`. The legacy video
+renderer owns its remaining `TerminalGeometry` value type directly so it does
+not pull terminal session setup into active builds. Generated long-trace sample
+data is nested under the legacy machine oracle because it is historical fixture
+evidence, not a clean root adapter. A public API guard scans clean module
+sources so new production code cannot import low-level legacy root modules,
+bypass the accepted-behavior facade, or reintroduce legacy implementation
+terminology.
 
 ## Assets And ROMs
 

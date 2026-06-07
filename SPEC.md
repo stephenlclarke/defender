@@ -139,9 +139,10 @@ tree:
 - `src/lib.rs`: clean public crate wiring plus explicit `legacy-tools`
   adapters to the legacy oracle tree and a doc-hidden README media facade wired
   from `src_legacy/readme_media.rs`. Default production builds do not compile
-  the accepted machine, legacy live core, CMOS storage, or retired `wgpu`
-  presenter. Machine process/state contracts, red-label math types, and
-  low-level asset, board, memory, ROM, sound, PIA, and video modules must
+  the accepted machine, legacy live core, CMOS storage, terminal renderer, or
+  retired `wgpu` presenter; those retired runtime adapters have been removed
+  from `src_legacy/`. Machine process/state contracts, red-label math types,
+  and low-level asset, board, memory, ROM, sound, PIA, and video modules must
   remain feature-gated and crate-private. Generated long-trace sample fixtures
   must stay private to the legacy machine oracle instead of being root-wired
   here.
@@ -312,11 +313,11 @@ tree:
 The converted implementation is parked under `src_legacy/`. It still owns the
 accepted arcade behavior, hardware models, ROM verification, rendering, input,
 sound-board command evidence, legacy fidelity trace generation, and test
-helpers for explicit `legacy-tools` builds. Historical live, CMOS, and retired
-`wgpu` presenter code remain parked there but are no longer compiled from
-`src/lib.rs`. Those root adapters are feature-gated and crate-private. Clean
-runtime launch goes through the private `runtime` bridge, while the internal
-oracle uses the crate-private `accepted` facade when `legacy-tools` is enabled.
+helpers for explicit `legacy-tools` builds. Historical live, CMOS, terminal, and
+retired `wgpu` presenter adapters that are no longer compiled from `src/lib.rs`
+have been removed rather than kept parked. Clean runtime launch goes through the
+private `runtime` bridge, while the internal oracle uses the crate-private
+`accepted` facade when `legacy-tools` is enabled.
 `src_legacy/accepted_behavior.rs` performs the current legacy-machine
 adaptation into neutral accepted-behavior contracts before the public clean
 gameplay types see it. `src/live_wgpu.rs` owns clean config-driven interactive
@@ -745,9 +746,8 @@ presence, optional sprite execution with command, draw, and instance totals,
 and an ordered sprite-only stream predicate plus separate raster-tooling
 evidence into one ordered scene command stream. The clean smoke and live smoke
 gates require zero temporary raster commands for the active gameplay path.
-Kitty graphics and terminal-session code remain
-parked there as historical compatibility evidence, but they are not part of the
-active runtime or compatibility API surface. The legacy video renderer owns its
+Kitty graphics and terminal-session runtime adapters have been removed rather
+than kept as parked historical code. The legacy video renderer owns its
 remaining `TerminalGeometry` value type directly instead of importing terminal
 session setup. Generated long-trace sample data is nested under the legacy
 machine oracle because it is historical fixture evidence, not a clean root
