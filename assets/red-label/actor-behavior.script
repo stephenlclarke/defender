@@ -1,7 +1,7 @@
 # Actor runtime baseline behavior profile.
 # Format: default <field> <value...>
 
-default player_speed 2
+default player_speed 1
 default player_laser_cooldown_steps 8
 default player_hyperspace_hidden_steps 33
 default player_hyperspace_rematerialize_x 128

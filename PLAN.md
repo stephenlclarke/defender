@@ -176,6 +176,9 @@ verification tools.
   cycle: blue, green, red, orange, yellow, purple, brown, then black.
   Player altitude is clamped to the source playfield top, so the ship cannot
   move above the bottom of the HUD/top-display separator.
+  The red-label actor behavior profile uses a one-pixel default player
+  movement step, halving the prior default thrust speed while preserving
+  behavior-script overrides.
   Source-backed hostile, human, enemy-shot, and bomb actors stay in source
   world space while actor render and collision paths project their
   draw/collision bodies through the current background word, so thrust
@@ -992,6 +995,23 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-07 20:34 BST`: Completed the actor player thrust speed tuning
+  cycle. The Rust fallback `PLAYER_SPEED` and embedded
+  `assets/red-label/actor-behavior.script` default now use a one-pixel player
+  movement step, halving the previous default thrust speed while leaving
+  behavior-script overrides intact. Updated the center-scroll regression for
+  one-pixel background-word deltas, added focused default-thrust and embedded
+  behavior-profile regressions, and documented the current tuning contract.
+  Validation passed with `cargo fmt --check`, focused default-thrust,
+  thrust-scroll, embedded-behavior, parser, and script-override regressions,
+  `cargo check --all-targets --features legacy-tools`, `cargo clippy
+  --all-targets --features legacy-tools -- -D warnings`, `cargo run --
+  --actor-smoke`, `cargo run -- --live-smoke`, `make docs-lint`, and
+  `make diff-check`. Remaining plan work is still about `2%`, mostly
+  owner-review/protected-media closure after concrete live defects. Slack step
+  start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780860505955589>.
 
 - `2026-06-07 20:23 BST`: Completed the actor player HUD-bound clamp cycle.
   The player bounds now use the source playfield top (`SOURCE_PLAYFIELD_Y_MIN`)

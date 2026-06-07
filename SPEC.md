@@ -227,7 +227,10 @@ tree:
   separator tint follows the eight-wave blue/green/red/orange/yellow/purple/
   brown/black cycle. Player altitude is clamped to the source playfield top, so
   the ship cannot move above the bottom of the HUD/top-display separator.
-  Source-backed hostile, human, enemy-shot, and bomb actors
+  The red-label actor behavior profile uses a one-pixel default player
+  movement step, halving the prior default thrust speed while preserving
+  behavior-script overrides. Source-backed hostile, human, enemy-shot, and bomb
+  actors
   remain in source world space, while actor render and collision paths project
   their draw/collision bodies through the current background word so player
   thrust scrolls the view instead of carrying aliens, fireballs, or bomb shells

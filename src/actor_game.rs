@@ -54,7 +54,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-const PLAYER_SPEED: i16 = 2;
+const PLAYER_SPEED: i16 = 1;
 const ACTOR_RENDER_SURFACE: SurfaceSize = SurfaceSize::new(292, 240);
 const INITIAL_PLAYER_LIVES: u8 = 3;
 const INITIAL_SMART_BOMBS: u8 = 3;
@@ -17655,7 +17655,7 @@ mod tests {
         assert!(
             right
                 .commands
-                .contains(&GameCommand::SetSourceBackgroundLeft(0x0000))
+                .contains(&GameCommand::SetSourceBackgroundLeft(0xFF00))
         );
 
         let reversed = player.update(&playing_player_prompt_for_test(
@@ -17677,7 +17677,7 @@ mod tests {
         assert_eq!(left.snapshot.position.x, PLAYER_SCROLL_CENTER_X);
         assert!(
             left.commands
-                .contains(&GameCommand::SetSourceBackgroundLeft(0xFF00))
+                .contains(&GameCommand::SetSourceBackgroundLeft(0x0000))
         );
     }
 
@@ -17703,6 +17703,29 @@ mod tests {
                     && draw.position.y == PLAYER_PLAYFIELD_TOP_Y
             }));
         }
+    }
+
+    #[test]
+    fn player_default_thrust_moves_at_half_previous_speed() {
+        let player_id = ActorId::new(1);
+        let mut player = PlayerShip::new(player_id, Point::new(42, 120));
+
+        let report = player.update(&playing_player_prompt_for_test(
+            GameInput {
+                thrust: true,
+                ..GameInput::NONE
+            },
+            0,
+        ));
+
+        assert_eq!(ActorBehaviorProfile::default().player_speed, 1);
+        assert_eq!(report.snapshot.position.x, 43);
+        assert_eq!(report.snapshot.velocity, Velocity::new(1, 0));
+        assert!(
+            report
+                .commands
+                .contains(&GameCommand::PlaySound(SoundCue::Thrust))
+        );
     }
 
     #[test]
@@ -24095,6 +24118,7 @@ mod tests {
             parsed.manifest().default_profile,
             ActorBehaviorProfile::arcade_default()
         );
+        assert_eq!(parsed.manifest().default_profile.player_speed, 1);
         assert!(parsed.manifest().kind_profiles.is_empty());
         assert!(parsed.manifest().actor_profiles.is_empty());
     }
