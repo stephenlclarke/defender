@@ -218,10 +218,12 @@ verification tools.
   source-positioned enemy explosion, mutant-hit cue, and score award before the
   normal player-death command path.
   It also has a persistent `StatusDisplay` actor that draws
-  score, high score, wave, lives, smart-bomb stock, credits, and
-  high-score-entry rows from the same `StepPrompt` state as gameplay actors
-  while staying inert during attract so custom attract scripts retain control of
-  that screen. Actor `StepPrompt`/`StepReport` values now carry the driver-owned
+  compact gameplay wave/credit text and high-score-entry rows from the same
+  `StepPrompt` state as gameplay actors, while the actor render bridge draws
+  source-backed score digits and stock icons at compact top-display positions
+  without crossing the scanner frame. It stays inert during attract so custom
+  attract scripts retain control of that screen. Actor `StepPrompt`/`StepReport`
+  values now carry the driver-owned
   current player, player count, per-player scores, and per-player stock
   snapshots. Credit-gated actor evidence starts preserve red-label admission:
   one-player starts consume one credit, two-player starts require and consume
@@ -995,6 +997,23 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-07 20:47 BST`: Completed the actor gameplay HUD text alignment
+  cycle. The actor render bridge now draws compact source-backed player score
+  digits plus life/smart-bomb stock icons at the same top-display positions as
+  the clean gameplay renderer, while `StatusDisplay` keeps only compact
+  wave/credit text in normal play. Removed the long `HIGH`, `LIVES`, and
+  `BOMBS` gameplay label strings that crossed the scanner frame, moved the
+  remaining wave text into the left display band, and added a focused
+  regression proving no HUD message glyphs render over the scanner box.
+  Validation passed with `cargo fmt --check`, focused status-display and actor
+  render-bridge regressions, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools -- -D
+  warnings`, `cargo run -- --actor-smoke`, `cargo run -- --live-smoke`, `make
+  docs-lint`, and `make diff-check`. Remaining plan work is still about `2%`,
+  mostly owner-review/protected-media closure after concrete live defects.
+  Slack step start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780861185437389>.
 
 - `2026-06-07 20:34 BST`: Completed the actor player thrust speed tuning
   cycle. The Rust fallback `PLAYER_SPEED` and embedded

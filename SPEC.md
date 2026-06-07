@@ -572,7 +572,9 @@ credit-gated red-label admission contract. Scenes draw player-one and player-two
 score fields from source-backed digit sprites with six-position leading-zero
 blanking, and playing scenes draw player-one and player-two life-stock and
 smart-bomb-stock HUD sprites with source-backed display caps, positions, and
-the reclassified stock sprite targets. Playing scenes also draw the source
+the reclassified stock sprite targets. Gameplay status text is restricted to
+compact wave/credit rows and does not cross the scanner/top-display frame.
+Playing scenes also draw the source
 `BORDER` top-display frame geometry as clean HUD sprites: the bottom display
 line from `0x0028`, scanner side boundaries from `0x2F08` and `0x7008`, the
 top scanner boundary from `0x2F07`, and scanner marker bars from `0x4C07` and

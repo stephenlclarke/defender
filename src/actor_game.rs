@@ -351,13 +351,27 @@ const SOURCE_TARGET_LIST_ENTRY_COUNT: usize = 32;
 const STATUS_SCORE_POSITION: Point = Point::new(8, 6);
 const STATUS_HIGH_SCORE_POSITION: Point = Point::new(94, 6);
 const STATUS_PLAYER_TWO_SCORE_POSITION: Point = Point::new(208, 6);
-const STATUS_WAVE_POSITION: Point = Point::new(8, 18);
-const STATUS_LIVES_POSITION: Point = Point::new(86, 18);
-const STATUS_SMART_BOMBS_POSITION: Point = Point::new(140, 18);
+const STATUS_WAVE_POSITION: Point = Point::new(8, 32);
 const STATUS_CREDITS_POSITION: Point = Point::new(176, 226);
 const SOURCE_CREDITS_MESSAGE_LABEL: &str = "CREDV";
 const SOURCE_PRESENTS_MESSAGE_LABEL: &str = "ELECV";
 const SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN: u16 = 0x3258;
+const ACTOR_HUD_SCORE_DIGIT_DISPLAY_COUNT: usize = 6;
+const ACTOR_HUD_SCORE_DISPLAY_MAX: u32 = 999_999;
+const ACTOR_HUD_PLAYER_ONE_SCORE_ORIGIN: [f32; 2] = [18.0, 21.0];
+const ACTOR_HUD_PLAYER_TWO_SCORE_ORIGIN: [f32; 2] = [214.0, 21.0];
+const ACTOR_HUD_SCORE_DIGIT_STEP: [f32; 2] = [8.0, 0.0];
+const ACTOR_HUD_SCORE_DIGIT_SIZE: [f32; 2] = [6.0, 8.0];
+const ACTOR_HUD_PLAYER_LIFE_STOCK_DISPLAY_LIMIT: u8 = 5;
+const ACTOR_HUD_SMART_BOMB_STOCK_DISPLAY_LIMIT: u8 = 3;
+const ACTOR_HUD_PLAYER_ONE_LIFE_STOCK_ORIGIN: [f32; 2] = [18.0, 13.0];
+const ACTOR_HUD_PLAYER_TWO_LIFE_STOCK_ORIGIN: [f32; 2] = [214.0, 13.0];
+const ACTOR_HUD_PLAYER_LIFE_STOCK_STEP: [f32; 2] = [12.0, 0.0];
+const ACTOR_HUD_PLAYER_LIFE_STOCK_SIZE: [f32; 2] = [10.0, 4.0];
+const ACTOR_HUD_PLAYER_ONE_SMART_BOMB_STOCK_ORIGIN: [f32; 2] = [70.0, 20.0];
+const ACTOR_HUD_PLAYER_TWO_SMART_BOMB_STOCK_ORIGIN: [f32; 2] = [266.0, 20.0];
+const ACTOR_HUD_SMART_BOMB_STOCK_STEP: [f32; 2] = [0.0, 4.0];
+const ACTOR_HUD_SMART_BOMB_STOCK_SIZE: [f32; 2] = [6.0, 3.0];
 const STATUS_FINAL_SCORE_POSITION: Point = Point::new(56, 92);
 const STATUS_HIGH_SCORE_TABLE_TITLE_POSITION: Point = Point::new(78, 112);
 const STATUS_HIGH_SCORE_TABLE_START_Y: i16 = 128;
@@ -7242,6 +7256,7 @@ impl ActorRenderSceneBridge {
             push_actor_playing_top_display_border(&mut scene, report.wave);
             push_scanner_radar_sprites(&mut scene, &state.world.scanner);
         }
+        push_actor_playing_hud_sprites(&mut scene, report);
         for draw in &report.draws {
             self.push_draw(&mut scene, report, draw);
         }
@@ -8992,6 +9007,127 @@ fn williams_logo_phase_tint(color_phase: u8) -> Color {
         1 => Color::from_rgba(0xFF, 0xD8, 0x40, 0xFF),
         2 => Color::from_rgba(0x80, 0xE8, 0xFF, 0xFF),
         _ => Color::from_rgba(0xFF, 0x80, 0xE8, 0xFF),
+    }
+}
+
+fn push_actor_playing_hud_sprites(scene: &mut RenderScene, report: &StepReport) {
+    if report.phase != Phase::Playing {
+        return;
+    }
+
+    push_actor_player_score_sprites(
+        scene,
+        report.player_scores[0],
+        ACTOR_HUD_PLAYER_ONE_SCORE_ORIGIN,
+    );
+    if report.player_count > 1 {
+        push_actor_player_score_sprites(
+            scene,
+            report.player_scores[1],
+            ACTOR_HUD_PLAYER_TWO_SCORE_ORIGIN,
+        );
+    }
+    push_actor_player_stock_sprites(
+        scene,
+        report.player_stocks[0],
+        ACTOR_HUD_PLAYER_ONE_LIFE_STOCK_ORIGIN,
+        ACTOR_HUD_PLAYER_ONE_SMART_BOMB_STOCK_ORIGIN,
+    );
+    if report.player_count > 1 {
+        push_actor_player_stock_sprites(
+            scene,
+            report.player_stocks[1],
+            ACTOR_HUD_PLAYER_TWO_LIFE_STOCK_ORIGIN,
+            ACTOR_HUD_PLAYER_TWO_SMART_BOMB_STOCK_ORIGIN,
+        );
+    }
+}
+
+fn push_actor_player_score_sprites(scene: &mut RenderScene, score: u32, origin: [f32; 2]) {
+    for (index, digit) in actor_visible_score_digits(score).iter().enumerate() {
+        let Some(digit) = digit else {
+            continue;
+        };
+        let Some(sprite) = SpriteId::score_digit(*digit) else {
+            continue;
+        };
+        scene.push_sprite(SceneSprite {
+            sprite,
+            layer: RenderLayer::Hud,
+            position: [
+                origin[0] + ACTOR_HUD_SCORE_DIGIT_STEP[0] * index as f32,
+                origin[1] + ACTOR_HUD_SCORE_DIGIT_STEP[1] * index as f32,
+            ],
+            size: ACTOR_HUD_SCORE_DIGIT_SIZE,
+            tint: SOURCE_VISUAL_STATE.hud_tint(),
+        });
+    }
+}
+
+fn actor_visible_score_digits(score: u32) -> [Option<u8>; ACTOR_HUD_SCORE_DIGIT_DISPLAY_COUNT] {
+    let score = score.min(ACTOR_HUD_SCORE_DISPLAY_MAX);
+    let mut place = 100_000;
+    let mut digits = [None; ACTOR_HUD_SCORE_DIGIT_DISPLAY_COUNT];
+    let mut non_zero_seen = false;
+
+    for (index, digit) in digits.iter_mut().enumerate() {
+        let value = ((score / place) % 10) as u8;
+        let counter = ACTOR_HUD_SCORE_DIGIT_DISPLAY_COUNT - index;
+        if value == 0 && counter > 2 && !non_zero_seen {
+            *digit = None;
+        } else {
+            non_zero_seen = true;
+            *digit = Some(value);
+        }
+        place /= 10;
+    }
+
+    digits
+}
+
+fn push_actor_player_stock_sprites(
+    scene: &mut RenderScene,
+    stock: PlayerStockSnapshot,
+    life_origin: [f32; 2],
+    smart_bomb_origin: [f32; 2],
+) {
+    push_actor_stock_sprite_series(
+        scene,
+        SpriteId::PLAYER_LIFE_STOCK,
+        stock.lives.min(ACTOR_HUD_PLAYER_LIFE_STOCK_DISPLAY_LIMIT),
+        life_origin,
+        ACTOR_HUD_PLAYER_LIFE_STOCK_STEP,
+        ACTOR_HUD_PLAYER_LIFE_STOCK_SIZE,
+    );
+    push_actor_stock_sprite_series(
+        scene,
+        SpriteId::SMART_BOMB_STOCK,
+        stock
+            .smart_bombs
+            .min(ACTOR_HUD_SMART_BOMB_STOCK_DISPLAY_LIMIT),
+        smart_bomb_origin,
+        ACTOR_HUD_SMART_BOMB_STOCK_STEP,
+        ACTOR_HUD_SMART_BOMB_STOCK_SIZE,
+    );
+}
+
+fn push_actor_stock_sprite_series(
+    scene: &mut RenderScene,
+    sprite: SpriteId,
+    count: u8,
+    origin: [f32; 2],
+    step: [f32; 2],
+    size: [f32; 2],
+) {
+    for index in 0..count {
+        let index = f32::from(index);
+        scene.push_sprite(SceneSprite {
+            sprite,
+            layer: RenderLayer::Hud,
+            position: [origin[0] + step[0] * index, origin[1] + step[1] * index],
+            size,
+            tint: SOURCE_VISUAL_STATE.hud_tint(),
+        });
     }
 }
 
@@ -12443,17 +12579,7 @@ impl StatusDisplay {
     }
 
     fn playing_draws(&self, prompt: &StepPrompt) -> Vec<DrawCommand> {
-        let mut draws = vec![
-            DrawCommand::text(
-                self.id,
-                STATUS_SCORE_POSITION,
-                format!("1UP {}", format_status_score(prompt.player_scores[0])),
-            ),
-            DrawCommand::text(
-                self.id,
-                STATUS_HIGH_SCORE_POSITION,
-                format!("HIGH {}", format_status_score(prompt.high_scores[0])),
-            ),
+        vec![
             DrawCommand::text(
                 self.id,
                 STATUS_WAVE_POSITION,
@@ -12461,28 +12587,10 @@ impl StatusDisplay {
             ),
             DrawCommand::text(
                 self.id,
-                STATUS_LIVES_POSITION,
-                format!("LIVES {:02}", prompt.lives.min(99)),
-            ),
-            DrawCommand::text(
-                self.id,
-                STATUS_SMART_BOMBS_POSITION,
-                format!("BOMBS {:02}", prompt.smart_bombs.min(99)),
-            ),
-            DrawCommand::text(
-                self.id,
                 STATUS_CREDITS_POSITION,
                 format!("CREDIT {:02}", prompt.credits.min(99)),
             ),
-        ];
-        if prompt.player_count > 1 {
-            draws.push(DrawCommand::text(
-                self.id,
-                STATUS_PLAYER_TWO_SCORE_POSITION,
-                format!("2UP {}", format_status_score(prompt.player_scores[1])),
-            ));
-        }
-        draws
+        ]
     }
 
     fn high_score_entry_draws(&self, prompt: &StepPrompt) -> Vec<DrawCommand> {
@@ -19707,12 +19815,66 @@ mod tests {
                 .iter()
                 .any(|snapshot| snapshot.kind == ActorKind::StatusDisplay)
         );
-        assert_text(&report, "1UP 009875");
-        assert_text(&report, "HIGH 010000");
         assert_text(&report, "WAVE 07");
-        assert_text(&report, "LIVES 02");
-        assert_text(&report, "BOMBS 01");
         assert_text(&report, "CREDIT 03");
+        assert_no_text(&report, "1UP 009875");
+        assert_no_text(&report, "HIGH 010000");
+        assert_no_text(&report, "LIVES 02");
+        assert_no_text(&report, "BOMBS 01");
+
+        let scene = report.render_scene();
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_DIGIT_9
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [34.0, 21.0]
+                && sprite.size == ACTOR_HUD_SCORE_DIGIT_SIZE
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_DIGIT_8
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [42.0, 21.0]
+                && sprite.size == ACTOR_HUD_SCORE_DIGIT_SIZE
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_DIGIT_7
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [50.0, 21.0]
+                && sprite.size == ACTOR_HUD_SCORE_DIGIT_SIZE
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_DIGIT_5
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [58.0, 21.0]
+                && sprite.size == ACTOR_HUD_SCORE_DIGIT_SIZE
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_LIFE_STOCK
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [18.0, 13.0]
+                && sprite.size == ACTOR_HUD_PLAYER_LIFE_STOCK_SIZE
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_LIFE_STOCK
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [30.0, 13.0]
+                && sprite.size == ACTOR_HUD_PLAYER_LIFE_STOCK_SIZE
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SMART_BOMB_STOCK
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [70.0, 20.0]
+                && sprite.size == ACTOR_HUD_SMART_BOMB_STOCK_SIZE
+        }));
+        assert!(
+            !scene.sprites.iter().any(|sprite| {
+                SpriteId::MESSAGE_GLYPHS.contains(&sprite.sprite)
+                    && sprite.layer == RenderLayer::Hud
+                    && sprite.position[0] >= 94.0
+                    && sprite.position[0] < 224.0
+                    && sprite.position[1] < 40.0
+            }),
+            "gameplay status text must not overlap the scanner frame"
+        );
     }
 
     #[test]
@@ -27638,6 +27800,16 @@ mod tests {
                 .iter()
                 .any(|draw| draw.text.as_deref() == Some(value)),
             "expected draw text {value:?}"
+        );
+    }
+
+    fn assert_no_text(report: &StepReport, value: &str) {
+        assert!(
+            !report
+                .draws
+                .iter()
+                .any(|draw| draw.text.as_deref() == Some(value)),
+            "unexpected draw text {value:?}"
         );
     }
 

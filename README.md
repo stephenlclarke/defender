@@ -325,8 +325,9 @@ source-positioned enemy explosion, hit sound, and scoring on player contact.
 It also includes Williams title animation
 metadata, the coalescing Defender wordmark surface, lander target-slot seeking,
 an actor-owned
-status display for score, high score, wave, lives, smart-bomb stock, credits,
-and high-score-entry rows, pickup/carry/conversion, source-shaped
+status display for compact gameplay wave/credit text and high-score-entry rows,
+source-backed score digit and stock-icon HUD sprites, pickup/carry/conversion,
+source-shaped
 converted-mutant metadata,
 falling-human rescue and safe landing scores, score popups, hostile projectile
 actors for lander shots, source-command-backed sound cues for player laser,
@@ -357,7 +358,10 @@ screen. Player altitude is clamped to the source playfield top, so the ship
 cannot move above the bottom of the HUD/top-display separator. The shipped
 red-label actor behavior profile now uses a one-pixel player movement step,
 halving the previous default thrust speed while leaving behavior-script
-overrides available for targeted checks. Source-backed hostile, human,
+overrides available for targeted checks. Gameplay HUD score and stock display
+now uses the compact source-backed digit and stock-icon sprite layout, and the
+long status labels no longer render across the scanner/top-display frame.
+Source-backed hostile, human,
 enemy-shot, and bomb actors remain in
 source world space, but their draw and collision bodies are projected through
 the current background word so thrust scrolling moves the playfield relative to
