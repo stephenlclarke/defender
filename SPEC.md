@@ -791,8 +791,10 @@ reintroduce legacy implementation terminology.
   source-wave, spawned world, reserve/source-state, source-backed actor
   placement samples, playable hostile projectile source metadata, source
   sound-command bytes, a bounded first player-laser sample with its `0xEB`
-  command, a bounded first hostile source projectile sample when one appears,
-  and effective behavior counts/modes without opening a window. The checker
+  command, a bounded first player-laser-hit explosion/sound sample when a
+  script produces one, a bounded first hostile source projectile sample when
+  one appears, and effective behavior counts/modes without opening a window.
+  The checker
   then uses the actor
   `XYZZY` overlay smart-bomb path to assist progression and reports the
   source-shaped

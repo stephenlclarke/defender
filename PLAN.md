@@ -61,9 +61,10 @@ verification tools.
   position/velocity/audio samples, and the effective first-play behavior
   profile actors receive for movement/damage/fire tuning. It also runs bounded
   independent sample passes to report the first player laser plus its `0xEB`
-  red-label sound command and the first hostile source projectile plus its
-  associated red-label hostile shot command when a script produces one, without
-  mutating the main assisted progression check.
+  red-label sound command, the first player-laser-hit explosion plus its
+  red-label hit command when a script produces one, and the first hostile
+  source projectile plus its associated red-label hostile shot command when a
+  script produces one, without mutating the main assisted progression check.
   It then uses the actor `XYZZY` overlay smart-bomb path to assist wave clear
   and reports the source-shaped wave-clear survivor-bonus interstitial plus the
   source `0x80` wave-advance sleep before the next playable wave when the
@@ -953,6 +954,31 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-07 08:28 BST`: Completed the actor script-check laser-hit
+  explosion/audio preflight cycle. `--actor-script-check <path>` now runs a
+  bounded independent first-player-laser-hit sample pass in a separate actor
+  runtime: it reaches the first playable wave, sends one fire input, and
+  reports the first explosion spawn plus cumulative score and mapped hit sound
+  command when a script makes the shot collide, without mutating the main
+  wave-clear/reserve assist timeline. The checked example now reports
+  `first_player_laser_hit: unavailable` with the bounded no-hit reason, while a
+  focused custom-driver regression pins a still lander at `62,120` producing
+  `lander@62,120[source_center=none]`, cumulative score `250`, and the
+  red-label lander-hit command `0xF9`. No legacy code, tests, or scaffolding
+  were safe to remove because this slice extends the active custom-driver
+  preflight evidence surface for explosion/audio fidelity. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780814751016189>.
+  Validation passed with `cargo fmt --check`, `cargo test actor_script_check
+  --all-targets --features legacy-tools`, `cargo test actor_script
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, `cargo run --quiet --features legacy-tools --
+  --actor-script-check examples/actor-custom-attract.script`, `make
+  actor-smoke`, `make actor-wgpu-smoke`, `make actor-attract-smoke`,
+  `markdownlint README.md SPEC.md PLAN.md docs/actor-architecture.md`, and
+  `git diff --check`.
 
 - `2026-06-07 07:36 BST`: Completed the actor script-check player-laser
   preflight cycle. `--actor-script-check <path>` now runs a bounded
