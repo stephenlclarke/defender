@@ -979,6 +979,22 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-07 19:09 BST`: Completed the actor/live reverse-input regression
+  cycle. Planetoid controls now bind `SHIFT` to reverse and `SPACE` to thrust
+  across the actor keyboard mapper, live `wgpu` physical/logical keymap, and
+  README controls. Live input drains reverse as a press pulse, while
+  `PlayerShip` also guards against repeated direct reverse input so a held
+  reverse request flips direction once and stays facing that way until release
+  and repress. Added focused actor runtime, actor mapper, live input-state, and
+  live keymap regressions. Validation passed with `cargo fmt --check`, focused
+  reverse/keymap/input tests, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools -- -D
+  warnings`, `cargo run -- --live-smoke`, `make docs-lint`, and `make
+  diff-check`. Remaining plan work is still about `2%`, concentrated on
+  owner-review/protected-media closure rather than this input defect. Slack
+  step start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780855086832799>.
+
 - `2026-06-07 18:38 BST`: Completed the actor live-start and final game-over
   regression cycle. Interactive live actor construction now enables explicit
   free-play admission, so a fresh live run accepts `1` for one player and `2`

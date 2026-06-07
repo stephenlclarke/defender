@@ -674,8 +674,8 @@ Planetoid-style keys onto Defender cabinet actions:
 - `2`: two-player start
 - `A`: move up
 - `Z`: move down
-- `SHIFT`: thrust
-- `SPACE`: reverse
+- `SHIFT`: reverse
+- `SPACE`: thrust
 - `ENTER`: fire while playing
 - `TAB`: smart bomb
 - `H`: hyperspace

@@ -9,6 +9,8 @@ use std::{
 use std::{fs, path::Path};
 
 use anyhow::Context;
+#[cfg(test)]
+use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
 #[cfg(all(not(test), not(coverage)))]
 use winit::{
     application::ApplicationHandler,
@@ -3641,7 +3643,7 @@ impl LiveInputState {
             start_two: take_bool(&mut self.start_two),
             altitude_up: self.altitude_up,
             altitude_down: self.altitude_down,
-            reverse: self.reverse,
+            reverse: take_bool(&mut self.reverse),
             thrust: self.thrust,
             fire: self.fire,
             smart_bomb: self.smart_bomb,
@@ -3681,7 +3683,7 @@ fn live_control_from_winit(profile: LiveInputProfile, event: &KeyEvent) -> Optio
         .or_else(|| logical_control(profile, &event.logical_key))
 }
 
-#[cfg(all(not(test), not(coverage)))]
+#[cfg(any(test, all(not(test), not(coverage))))]
 fn physical_control(profile: LiveInputProfile, physical_key: &PhysicalKey) -> Option<LiveControl> {
     let PhysicalKey::Code(code) = physical_key else {
         return None;
@@ -3700,15 +3702,15 @@ fn physical_control(profile: LiveInputProfile, physical_key: &PhysicalKey) -> Op
     }
 }
 
-#[cfg(all(not(test), not(coverage)))]
+#[cfg(any(test, all(not(test), not(coverage))))]
 fn gameplay_physical_control(profile: LiveInputProfile, code: KeyCode) -> Option<LiveControl> {
     match profile {
         LiveInputProfile::Planetoid => match code {
             KeyCode::Enter | KeyCode::NumpadEnter => Some(LiveControl::Fire),
-            KeyCode::ShiftLeft | KeyCode::ShiftRight => Some(LiveControl::Thrust),
+            KeyCode::ShiftLeft | KeyCode::ShiftRight => Some(LiveControl::Reverse),
             KeyCode::KeyA => Some(LiveControl::AltitudeUp),
             KeyCode::KeyZ => Some(LiveControl::AltitudeDown),
-            KeyCode::Space => Some(LiveControl::Reverse),
+            KeyCode::Space => Some(LiveControl::Thrust),
             KeyCode::Tab => Some(LiveControl::SmartBomb),
             KeyCode::KeyH => Some(LiveControl::Hyperspace),
             _ => None,
@@ -3726,7 +3728,7 @@ fn gameplay_physical_control(profile: LiveInputProfile, code: KeyCode) -> Option
     }
 }
 
-#[cfg(all(not(test), not(coverage)))]
+#[cfg(any(test, all(not(test), not(coverage))))]
 fn logical_control(profile: LiveInputProfile, logical_key: &Key) -> Option<LiveControl> {
     match logical_key {
         Key::Named(NamedKey::Escape) => Some(LiveControl::Quit),
@@ -3744,7 +3746,7 @@ fn logical_control(profile: LiveInputProfile, logical_key: &Key) -> Option<LiveC
             (profile != LiveInputProfile::Planetoid).then_some(LiveControl::AltitudeDown)
         }
         Key::Named(NamedKey::Shift) => {
-            (profile == LiveInputProfile::Planetoid).then_some(LiveControl::Thrust)
+            (profile == LiveInputProfile::Planetoid).then_some(LiveControl::Reverse)
         }
         Key::Named(NamedKey::F1) => Some(LiveControl::ServiceAutoUp),
         Key::Named(NamedKey::F2) => Some(LiveControl::ServiceAdvance),
@@ -3754,7 +3756,7 @@ fn logical_control(profile: LiveInputProfile, logical_key: &Key) -> Option<LiveC
     }
 }
 
-#[cfg(all(not(test), not(coverage)))]
+#[cfg(any(test, all(not(test), not(coverage))))]
 fn character_control(profile: LiveInputProfile, text: &str) -> Option<LiveControl> {
     let value = single_character(text)?;
     match value.to_ascii_lowercase() {
@@ -3763,7 +3765,7 @@ fn character_control(profile: LiveInputProfile, text: &str) -> Option<LiveContro
         '5' => Some(LiveControl::Coin),
         'a' if profile == LiveInputProfile::Planetoid => Some(LiveControl::AltitudeUp),
         'z' if profile == LiveInputProfile::Planetoid => Some(LiveControl::AltitudeDown),
-        ' ' if profile == LiveInputProfile::Planetoid => Some(LiveControl::Reverse),
+        ' ' if profile == LiveInputProfile::Planetoid => Some(LiveControl::Thrust),
         'h' => Some(LiveControl::Hyperspace),
         'f' if profile != LiveInputProfile::Planetoid => Some(LiveControl::Fire),
         't' if profile != LiveInputProfile::Planetoid => Some(LiveControl::Thrust),
@@ -3774,7 +3776,7 @@ fn character_control(profile: LiveInputProfile, text: &str) -> Option<LiveContro
     }
 }
 
-#[cfg(all(not(test), not(coverage)))]
+#[cfg(any(test, all(not(test), not(coverage))))]
 fn single_character(text: &str) -> Option<char> {
     let mut chars = text.chars();
     let value = chars.next()?;
@@ -3792,6 +3794,7 @@ mod tests {
         GameInput,
         actor_game::{GameInput as ActorGameInput, Phase, PlayerStartReport},
     };
+    use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
 
     use super::{
         ActorScriptCheckExplosionSample, ActorScriptCheckPlayerLaserSample,
@@ -5246,7 +5249,6 @@ mod tests {
                 thrust: true,
                 altitude_up: true,
                 altitude_down: true,
-                reverse: true,
                 fire: true,
                 smart_bomb: true,
                 hyperspace: true,
@@ -5264,6 +5266,58 @@ mod tests {
         input.apply(super::LiveControl::Hyperspace, false);
         input.apply(super::LiveControl::ServiceAutoUp, false);
         assert_eq!(input.drain_game_input(), GameInput::NONE);
+    }
+
+    #[test]
+    fn live_input_state_emits_reverse_as_press_pulse() {
+        let mut input = LiveInputState::default();
+
+        input.apply(super::LiveControl::Reverse, true);
+        assert!(input.drain_game_input().reverse);
+        assert!(!input.drain_game_input().reverse);
+        assert!(!input.drain_game_input().reverse);
+
+        input.apply(super::LiveControl::Reverse, false);
+        assert!(!input.drain_game_input().reverse);
+
+        input.apply(super::LiveControl::Reverse, true);
+        assert!(input.drain_game_input().reverse);
+    }
+
+    #[test]
+    fn planetoid_live_keymap_binds_shift_to_reverse_and_space_to_thrust() {
+        assert_eq!(
+            super::physical_control(
+                super::LiveInputProfile::Planetoid,
+                &PhysicalKey::Code(KeyCode::ShiftLeft),
+            ),
+            Some(super::LiveControl::Reverse)
+        );
+        assert_eq!(
+            super::physical_control(
+                super::LiveInputProfile::Planetoid,
+                &PhysicalKey::Code(KeyCode::ShiftRight),
+            ),
+            Some(super::LiveControl::Reverse)
+        );
+        assert_eq!(
+            super::physical_control(
+                super::LiveInputProfile::Planetoid,
+                &PhysicalKey::Code(KeyCode::Space),
+            ),
+            Some(super::LiveControl::Thrust)
+        );
+        assert_eq!(
+            super::logical_control(
+                super::LiveInputProfile::Planetoid,
+                &Key::Named(NamedKey::Shift),
+            ),
+            Some(super::LiveControl::Reverse)
+        );
+        assert_eq!(
+            super::character_control(super::LiveInputProfile::Planetoid, " "),
+            Some(super::LiveControl::Thrust)
+        );
     }
 
     fn write_actor_script_file(label: &str, source: &str) -> std::path::PathBuf {

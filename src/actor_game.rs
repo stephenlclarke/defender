@@ -957,12 +957,14 @@ impl KeyboardMapper {
                 event.transition,
                 &mut step.input.altitude_down,
             ),
-            KeyboardKey::LeftShift | KeyboardKey::RightShift => set_held_control(
+            KeyboardKey::LeftShift | KeyboardKey::RightShift if active => {
+                step.input.reverse = true;
+            }
+            KeyboardKey::Character(' ') => set_held_control(
                 &mut self.held.thrust,
                 event.transition,
                 &mut step.input.thrust,
             ),
-            KeyboardKey::Character(' ') if active => step.input.reverse = true,
             KeyboardKey::Tab if active => step.input.smart_bomb = true,
             KeyboardKey::Character('h' | 'H') if active => step.input.hyperspace = true,
             KeyboardKey::Function(2) if active => step.input.service_advance = true,
@@ -12413,6 +12415,7 @@ struct PlayerShip {
     id: ActorId,
     position: Point,
     direction: Direction,
+    reverse_held: bool,
     laser_cooldown: u8,
     hyperspace_steps_remaining: u8,
     hyperspace_entry_lseed: Option<u8>,
@@ -12425,6 +12428,7 @@ impl PlayerShip {
             id,
             position,
             direction: Direction::Right,
+            reverse_held: false,
             laser_cooldown: 0,
             hyperspace_steps_remaining: 0,
             hyperspace_entry_lseed: None,
@@ -12566,7 +12570,7 @@ impl AssetActor for PlayerShip {
                     velocity.dx += self.direction.sign() * behavior.player_speed;
                     commands.push(GameCommand::PlaySound(SoundCue::Thrust));
                 }
-                if prompt.input.reverse {
+                if prompt.input.reverse && !self.reverse_held {
                     self.direction = match self.direction {
                         Direction::Left => Direction::Right,
                         Direction::Right => Direction::Left,
@@ -12604,6 +12608,7 @@ impl AssetActor for PlayerShip {
                     self.enter_hyperspace(behavior);
                 }
             }
+            self.reverse_held = prompt.input.reverse;
             if !death_due && !self.is_hidden_for_hyperspace() {
                 draws.push(DrawCommand::sprite(
                     self.id,
@@ -17150,6 +17155,44 @@ mod tests {
     }
 
     #[test]
+    fn player_reverse_input_flips_once_until_released() {
+        let mut runtime = ActorRuntimeAdapter::new();
+        runtime.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        runtime.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        let active = step_until_player_start_completes(&mut runtime, 1);
+        assert_eq!(active.state.player.direction, CleanDirection::Right);
+
+        let reversed = runtime.step(GameInput {
+            reverse: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(reversed.state.player.direction, CleanDirection::Left);
+
+        for _ in 0..6 {
+            let held = runtime.step(GameInput {
+                reverse: true,
+                ..GameInput::NONE
+            });
+            assert_eq!(held.state.player.direction, CleanDirection::Left);
+        }
+
+        let released = runtime.step(GameInput::NONE);
+        assert_eq!(released.state.player.direction, CleanDirection::Left);
+
+        let reversed_again = runtime.step(GameInput {
+            reverse: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(reversed_again.state.player.direction, CleanDirection::Right);
+    }
+
+    #[test]
     fn attract_actor_accepts_credit_and_start_commands() {
         let mut driver = ActorGameDriver::new();
 
@@ -19286,6 +19329,49 @@ mod tests {
         assert!(step.input.high_score_reset);
         assert!(step.input.auto_up_manual_down);
         assert!(step.input.tilt);
+    }
+
+    #[test]
+    fn planetoid_mapper_binds_shift_to_reverse_and_space_to_thrust() {
+        let mut mapper = KeyboardMapper::new(KeyboardProfile::Planetoid);
+
+        let mut shift_poll = KeyboardPoll::default();
+        mapper.map_event(
+            KeyboardEvent::press(KeyboardKey::LeftShift),
+            &mut shift_poll,
+        );
+        mapper.finish_poll(&mut shift_poll);
+        assert!(shift_poll.input.reverse);
+        assert!(!shift_poll.input.thrust);
+
+        let mut no_repeat_poll = KeyboardPoll::default();
+        mapper.finish_poll(&mut no_repeat_poll);
+        assert!(!no_repeat_poll.input.reverse);
+        assert!(!no_repeat_poll.input.thrust);
+
+        let mut space_poll = KeyboardPoll::default();
+        mapper.map_event(
+            KeyboardEvent::press(KeyboardKey::Character(' ')),
+            &mut space_poll,
+        );
+        mapper.finish_poll(&mut space_poll);
+        assert!(space_poll.input.thrust);
+        assert!(!space_poll.input.reverse);
+
+        let mut held_space_poll = KeyboardPoll::default();
+        mapper.finish_poll(&mut held_space_poll);
+        assert!(held_space_poll.input.thrust);
+        assert!(!held_space_poll.input.reverse);
+
+        let mut release_poll = KeyboardPoll::default();
+        mapper.map_event(
+            KeyboardEvent::release(KeyboardKey::Character(' ')),
+            &mut release_poll,
+        );
+        let mut released_space_poll = KeyboardPoll::default();
+        mapper.finish_poll(&mut released_space_poll);
+        assert!(!released_space_poll.input.thrust);
+        assert!(!released_space_poll.input.reverse);
     }
 
     #[test]
