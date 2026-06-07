@@ -128,7 +128,8 @@ const SOURCE_FIRST_WAVE_EARLY_RESERVE_RNG: ActorSourceRng = ActorSourceRng {
 const SOURCE_FIRST_WAVE_LANDER_REFILL_ACTIVE_THRESHOLD: usize = 8;
 const SOURCE_FIRST_WAVE_LANDER_REFILL_DELAY_STEPS: u8 = 47;
 const SOURCE_FIRST_WAVE_LANDER_REFILL_APPEAR_SOUND_DELAY_STEPS: u8 = 1;
-const PLAYER_BOUNDS: Rect = Rect::new(0, 18, 255, 220);
+const PLAYER_PLAYFIELD_TOP_Y: i16 = SOURCE_PLAYFIELD_Y_MIN as i16;
+const PLAYER_BOUNDS: Rect = Rect::new(0, PLAYER_PLAYFIELD_TOP_Y, 255, 220);
 const PLAYER_SCROLL_CENTER_X: i16 = 128;
 const SOURCE_BACKGROUND_WORD_PER_PIXEL: u16 = 0x0100;
 const LASER_SPEED: i16 = 8;
@@ -17678,6 +17679,30 @@ mod tests {
             left.commands
                 .contains(&GameCommand::SetSourceBackgroundLeft(0xFF00))
         );
+    }
+
+    #[test]
+    fn player_altitude_up_clamps_to_playfield_below_hud() {
+        let player_id = ActorId::new(1);
+        let mut player = PlayerShip::new(
+            player_id,
+            Point::new(PLAYER_SCROLL_CENTER_X, PLAYER_PLAYFIELD_TOP_Y + 1),
+        );
+
+        for _ in 0..8 {
+            let report = player.update(&playing_player_prompt_for_test(
+                GameInput {
+                    altitude_up: true,
+                    ..GameInput::NONE
+                },
+                0,
+            ));
+            assert_eq!(report.snapshot.position.y, PLAYER_PLAYFIELD_TOP_Y);
+            assert!(report.draws.iter().any(|draw| {
+                matches!(draw.sprite, SpriteKey::PlayerRight | SpriteKey::PlayerLeft)
+                    && draw.position.y == PLAYER_PLAYFIELD_TOP_Y
+            }));
+        }
     }
 
     #[test]

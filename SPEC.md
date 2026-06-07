@@ -225,7 +225,9 @@ tree:
   are empty. Playing reports project the source `BGOUT` terrain into
   state/render output, and gameplay terrain plus non-marker top-display
   separator tint follows the eight-wave blue/green/red/orange/yellow/purple/
-  brown/black cycle. Source-backed hostile, human, enemy-shot, and bomb actors
+  brown/black cycle. Player altitude is clamped to the source playfield top, so
+  the ship cannot move above the bottom of the HUD/top-display separator.
+  Source-backed hostile, human, enemy-shot, and bomb actors
   remain in source world space, while actor render and collision paths project
   their draw/collision bodies through the current background word so player
   thrust scrolls the view instead of carrying aliens, fireballs, or bomb shells

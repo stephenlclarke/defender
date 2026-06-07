@@ -353,7 +353,9 @@ actor scenes also project the source top-display border plus scanner terrain
 and radar blips, and actor player thrust now scrolls the wrapped
 `source_background_left` word once the ship reaches the center band so the
 landscape moves underneath the player instead of staying fixed on a single
-screen. Source-backed hostile, human, enemy-shot, and bomb actors remain in
+screen. Player altitude is clamped to the source playfield top, so the ship
+cannot move above the bottom of the HUD/top-display separator. Source-backed
+hostile, human, enemy-shot, and bomb actors remain in
 source world space, but their draw and collision bodies are projected through
 the current background word so thrust scrolling moves the playfield relative to
 those objects instead of carrying them with the player. Falling-human rescue

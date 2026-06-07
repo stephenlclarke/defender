@@ -174,6 +174,8 @@ verification tools.
   bonus and next-wave progression can start. Gameplay terrain and the
   non-marker top-display separator now follow the documented eight-wave color
   cycle: blue, green, red, orange, yellow, purple, brown, then black.
+  Player altitude is clamped to the source playfield top, so the ship cannot
+  move above the bottom of the HUD/top-display separator.
   Source-backed hostile, human, enemy-shot, and bomb actors stay in source
   world space while actor render and collision paths project their
   draw/collision bodies through the current background word, so thrust
@@ -990,6 +992,20 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-07 20:23 BST`: Completed the actor player HUD-bound clamp cycle.
+  The player bounds now use the source playfield top (`SOURCE_PLAYFIELD_Y_MIN`)
+  instead of allowing the ship to move up into the HUD/top-display band. Added
+  a focused `PlayerShip` regression proving repeated altitude-up input clamps
+  the player draw/snapshot Y position to the bottom of the HUD separator.
+  Validation passed with the new focused clamp regression, the existing thrust
+  scroll regression, `cargo fmt --check`, `cargo check --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features
+  legacy-tools -- -D warnings`, `cargo run -- --actor-smoke`, `cargo run --
+  --live-smoke`, `make docs-lint`, and `make diff-check`. Remaining plan work
+  is still about `2%`, mostly owner-review/protected-media closure after
+  concrete live defects. Slack step start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780860071189189>.
 
 - `2026-06-07 20:12 BST`: Completed the source-backed human world-space
   follow-up cycle. The prior projection fix already projected `source_human`
