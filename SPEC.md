@@ -547,7 +547,10 @@ the source start/stop sound events on press and release. One-player credited
 starts consume one credit,
 while two-player starts require and consume two credits, set
 `player_count` to two, enter play as player one, and expose the player-one and
-player-two top-display fields immediately. Scenes draw player-one and player-two
+player-two top-display fields immediately. The interactive live actor adapter
+enables free-play admission so `1` and `2` can start a fresh live run without a
+manual coin input; actor smoke and script-check evidence paths keep the
+credit-gated red-label admission contract. Scenes draw player-one and player-two
 score fields from source-backed digit sprites with six-position leading-zero
 blanking, and playing scenes draw player-one and player-two life-stock and
 smart-bomb-stock HUD sprites with source-backed display caps, positions, and
@@ -604,8 +607,10 @@ playfield entry path. During that switch sleep, scenes draw source-backed
 `0x3C78` and `0x3E88`; actor regressions now prove those glyphs persist across
 the whole switch sleep, clear at the handoff, and give way to the next
 player-start prompt before `WaveStarted`. If no player has remaining stock, the
-clean game enters the final game-over return path. Non-final deaths with
-remaining stock enter a death-cloud pause and then respawn the next stocked
+clean game enters the final game-over return path; actor final deaths now expose
+that path as a finite `player_death_sleep_remaining` `GAME OVER` interstitial
+before Williams attract drawing resumes. Non-final deaths with remaining stock
+enter a death-cloud pause and then respawn the next stocked
 player through the same clean player-start path; two-player games rotate to the
 other stocked player per the source `PLE02` loop, and one-player games wrap back
 to player one. After

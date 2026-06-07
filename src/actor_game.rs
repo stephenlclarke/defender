@@ -100,6 +100,7 @@ const SOURCE_ACSND_SOUND_TAIL_SEQUENCE: [(u8, u8); 2] = [
     (20, SOURCE_ACSND_SOUND_COMMAND),
 ];
 const SOURCE_PLAYER_SWITCH_SLEEP_STEPS: u8 = 0x60;
+const SOURCE_FINAL_GAME_OVER_SLEEP_STEPS: u8 = 40;
 const SOURCE_START_SOUND_DELAY_STEPS: u8 = 1;
 const SOURCE_START_PLAYFIELD_DELAY_STEPS: u8 = 138;
 const SOURCE_SHELL_X_MAX: i16 = 0x98;
@@ -186,6 +187,7 @@ const SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES: [(&str, u16); 7] = [
     ("SWRMPV", 0x40A8),
     ("SWARMV", 0x5CA8),
 ];
+const SOURCE_FINAL_GAME_OVER_SCREEN: u16 = 0x3E80;
 const SOURCE_PLAYER_START_PROMPT_SCREEN: u16 = 0x3C80;
 const SOURCE_PLAYER_SWITCH_LABEL_SCREEN: u16 = 0x3C78;
 const SOURCE_PLAYER_SWITCH_GAME_OVER_SCREEN: u16 = 0x3E88;
@@ -941,6 +943,7 @@ impl KeyboardMapper {
                 step.input.fire = true;
             }
             KeyboardKey::Character('1') if active => step.input.start_one = true,
+            KeyboardKey::Character('2') if active => step.input.start_two = true,
             KeyboardKey::Character('5') if active => step.input.coin = true,
             KeyboardKey::Character('6') if active => step.input.coin_two = true,
             KeyboardKey::Character('7') if active => step.input.coin_three = true,
@@ -6355,6 +6358,7 @@ pub struct StepPrompt {
     pub smart_bombs: u8,
     pub smart_bomb_pending: bool,
     pub player_stocks: [PlayerStockSnapshot; 2],
+    pub player_death_sleep_remaining: Option<u8>,
     pub game_over_hall_of_fame_stall_remaining: Option<u8>,
     pub player_switch: Option<PlayerSwitchReport>,
     pub player_start: Option<PlayerStartReport>,
@@ -6517,6 +6521,7 @@ pub struct StepReport {
     pub smart_bomb_flash_steps_remaining: u8,
     pub player_stocks: [PlayerStockSnapshot; 2],
     pub next_bonus: u32,
+    pub player_death_sleep_remaining: Option<u8>,
     pub game_over_hall_of_fame_stall_remaining: Option<u8>,
     pub player_switch: Option<PlayerSwitchReport>,
     pub player_start: Option<PlayerStartReport>,
@@ -6739,6 +6744,13 @@ fn high_score_entry_for_report(report: &StepReport) -> Option<HighScoreEntrySnap
 }
 
 fn game_over_snapshot_for_report(report: &StepReport) -> GameOverSnapshot {
+    if let Some(remaining) = report.player_death_sleep_remaining {
+        return GameOverSnapshot {
+            player_death_sleep_remaining: Some(remaining),
+            ..GameOverSnapshot::NONE
+        };
+    }
+
     if let Some(player_switch) = report.player_switch {
         return GameOverSnapshot {
             player_switch_sleep_remaining: Some(player_switch.sleep_steps_remaining),
@@ -7186,6 +7198,7 @@ impl ActorRenderSceneBridge {
             self.push_draw(&mut scene, report.phase, draw);
         }
         push_actor_player_switch_prompt_sprites(&mut scene, report);
+        push_actor_final_game_over_prompt_sprites(&mut scene, report);
         push_actor_player_start_prompt_sprites(&mut scene, report);
         push_actor_wave_completion_status_sprites(&mut scene, report);
         push_actor_survivor_bonus_icon_sprites(&mut scene, report);
@@ -7467,6 +7480,19 @@ fn push_actor_player_switch_prompt_sprites(scene: &mut RenderScene, report: &Ste
         scene,
         "GO",
         SOURCE_PLAYER_SWITCH_GAME_OVER_SCREEN,
+        RenderLayer::Overlay,
+    );
+}
+
+fn push_actor_final_game_over_prompt_sprites(scene: &mut RenderScene, report: &StepReport) {
+    if report.player_death_sleep_remaining.is_none() {
+        return;
+    }
+
+    push_actor_source_message_sprites(
+        scene,
+        "GO",
+        SOURCE_FINAL_GAME_OVER_SCREEN,
         RenderLayer::Overlay,
     );
 }
@@ -9006,8 +9032,16 @@ impl ActorRuntimeAdapter {
         Self::with_driver(ActorGameDriver::new())
     }
 
+    pub fn new_with_free_play_admission() -> Self {
+        Self::with_driver(ActorGameDriver::new().with_free_play_admission(true))
+    }
+
     pub fn with_scripts(scripts: ActorDriverScripts) -> Self {
         Self::with_driver(ActorGameDriver::with_scripts(scripts))
+    }
+
+    pub fn with_scripts_and_free_play_admission(scripts: ActorDriverScripts) -> Self {
+        Self::with_driver(ActorGameDriver::with_scripts(scripts).with_free_play_admission(true))
     }
 
     pub fn with_driver(driver: ActorGameDriver) -> Self {
@@ -9605,6 +9639,8 @@ pub struct ActorGameDriver {
     smart_bomb_flash_steps_remaining: u8,
     pending_sound_commands: Vec<PendingActorSoundCommand>,
     terrain_blow: Option<TerrainBlowSnapshot>,
+    free_play_admission: bool,
+    player_death_sleep_remaining: Option<u8>,
     game_over_hall_of_fame_stall_remaining: Option<u8>,
     pending_survivor_bonus: Option<PendingSurvivorBonus>,
     pending_player_switch: Option<PendingPlayerSwitch>,
@@ -9689,6 +9725,8 @@ impl ActorGameDriver {
             smart_bomb_flash_steps_remaining: 0,
             pending_sound_commands: Vec::new(),
             terrain_blow: None,
+            free_play_admission: false,
+            player_death_sleep_remaining: None,
             game_over_hall_of_fame_stall_remaining: None,
             pending_survivor_bonus: None,
             pending_player_switch: None,
@@ -9702,6 +9740,19 @@ impl ActorGameDriver {
         driver.spawn_actor(ScriptedAttractProgram::new(script_id, attract_script));
         driver.spawn_actor(StatusDisplay::new(status_id));
         driver
+    }
+
+    pub fn with_free_play_admission(mut self, enabled: bool) -> Self {
+        self.free_play_admission = enabled;
+        self
+    }
+
+    pub fn set_free_play_admission(&mut self, enabled: bool) {
+        self.free_play_admission = enabled;
+    }
+
+    pub fn free_play_admission(&self) -> bool {
+        self.free_play_admission
     }
 
     pub fn step(&mut self, input: GameInput) -> StepReport {
@@ -9796,6 +9847,7 @@ impl ActorGameDriver {
             smart_bombs: self.active_stock().smart_bombs,
             smart_bomb_pending: self.pending_smart_bomb_detonation_steps.is_some(),
             player_stocks: self.player_stocks(),
+            player_death_sleep_remaining: self.player_death_sleep_remaining,
             game_over_hall_of_fame_stall_remaining: self.game_over_hall_of_fame_stall_remaining,
             player_switch: prompt_player_switch,
             player_start: prompt_player_start,
@@ -9877,6 +9929,7 @@ impl ActorGameDriver {
             smart_bomb_flash_steps_remaining: self.smart_bomb_flash_steps_remaining,
             player_stocks: self.player_stocks(),
             next_bonus: self.next_bonus,
+            player_death_sleep_remaining: self.player_death_sleep_remaining,
             game_over_hall_of_fame_stall_remaining: self.game_over_hall_of_fame_stall_remaining,
             player_switch,
             player_start,
@@ -9897,7 +9950,7 @@ impl ActorGameDriver {
             sounds: delayed_sounds,
             commands,
         };
-        self.advance_game_over_hall_of_fame_return();
+        self.advance_game_over_return();
         report
     }
 
@@ -10259,15 +10312,15 @@ impl ActorGameDriver {
                     applied.sounds.push(SoundCue::Credit);
                 }
                 GameCommand::StartOnePlayer => {
-                    if self.phase == Phase::Attract && self.credits > 0 {
-                        self.credits = self.credits.saturating_sub(1);
+                    if self.start_admitted(1) {
+                        self.consume_start_credits(1);
                         self.start_play(1);
                         self.pending_start_sound_steps = Some(SOURCE_START_SOUND_DELAY_STEPS);
                     }
                 }
                 GameCommand::StartTwoPlayer => {
-                    if self.phase == Phase::Attract && self.credits > 1 {
-                        self.credits = self.credits.saturating_sub(2);
+                    if self.start_admitted(2) {
+                        self.consume_start_credits(2);
                         self.start_play(2);
                         self.pending_start_sound_steps = Some(SOURCE_START_SOUND_DELAY_STEPS);
                     }
@@ -10419,6 +10472,19 @@ impl ActorGameDriver {
         applied
     }
 
+    fn start_admitted(&self, player_count: u8) -> bool {
+        self.phase == Phase::Attract
+            && (self.free_play_admission || self.credits >= player_count.clamp(1, 2))
+    }
+
+    fn consume_start_credits(&mut self, player_count: u8) {
+        if self.free_play_admission {
+            return;
+        }
+
+        self.credits = self.credits.saturating_sub(player_count.clamp(1, 2));
+    }
+
     fn active_source_shell_count(&self) -> usize {
         self.snapshots
             .values()
@@ -10516,6 +10582,7 @@ impl ActorGameDriver {
 
     fn begin_player_switch(&mut self, from_player: u8, to_player: u8) {
         self.phase = Phase::GameOver;
+        self.player_death_sleep_remaining = None;
         self.game_over_hall_of_fame_stall_remaining = None;
         self.pending_survivor_bonus = None;
         self.pending_player_switch = Some(PendingPlayerSwitch::new(from_player, to_player));
@@ -10556,6 +10623,7 @@ impl ActorGameDriver {
         self.current_player = player;
         self.wave = 1;
         self.high_score_initials = HighScoreInitialsState::EMPTY;
+        self.player_death_sleep_remaining = None;
         self.game_over_hall_of_fame_stall_remaining = None;
         self.pending_survivor_bonus = None;
         self.pending_player_switch = None;
@@ -10860,6 +10928,7 @@ impl ActorGameDriver {
         self.source_background_left = 0;
         self.reset_source_shell_scan();
         self.high_score_initials = HighScoreInitialsState::EMPTY;
+        self.player_death_sleep_remaining = None;
         self.game_over_hall_of_fame_stall_remaining = None;
         self.pending_survivor_bonus = None;
         self.pending_player_switch = None;
@@ -10878,6 +10947,7 @@ impl ActorGameDriver {
         self.phase = if self.high_scores.qualifies(active_score) {
             Phase::HighScoreEntry
         } else {
+            self.player_death_sleep_remaining = Some(SOURCE_FINAL_GAME_OVER_SLEEP_STEPS);
             Phase::GameOver
         };
         self.baiter_timer_steps = None;
@@ -10897,6 +10967,7 @@ impl ActorGameDriver {
         self.high_score_initials = frame.state;
         if frame.submitted {
             self.phase = Phase::GameOver;
+            self.player_death_sleep_remaining = None;
             self.game_over_hall_of_fame_stall_remaining = Some(SOURCE_HIGH_SCORE_HALL_STALL_STEPS);
         }
         HighScoreEntryStep {
@@ -10919,6 +10990,7 @@ impl ActorGameDriver {
         self.player_two_smart_bombs = INITIAL_SMART_BOMBS;
         self.next_bonus = SOURCE_REPLAY_SCORE;
         self.high_score_initials = HighScoreInitialsState::EMPTY;
+        self.player_death_sleep_remaining = None;
         self.game_over_hall_of_fame_stall_remaining = None;
         self.pending_survivor_bonus = None;
         self.pending_player_switch = None;
@@ -10943,6 +11015,7 @@ impl ActorGameDriver {
 
     fn start_pending_wave(&mut self) {
         self.wave = self.wave.saturating_add(1);
+        self.player_death_sleep_remaining = None;
         self.pending_survivor_bonus = None;
         self.pending_player_switch = None;
         self.pending_player_start = None;
@@ -11055,10 +11128,22 @@ impl ActorGameDriver {
             .saturating_sub(1);
     }
 
-    fn advance_game_over_hall_of_fame_return(&mut self) {
+    fn advance_game_over_return(&mut self) {
         if self.phase != Phase::GameOver {
             return;
         }
+        if let Some(remaining) = self.player_death_sleep_remaining {
+            let next = remaining.saturating_sub(1);
+            if next > 0 {
+                self.player_death_sleep_remaining = Some(next);
+                return;
+            }
+
+            self.player_death_sleep_remaining = None;
+            self.phase = Phase::Attract;
+            return;
+        }
+
         let Some(remaining) = self.game_over_hall_of_fame_stall_remaining else {
             return;
         };
@@ -12107,14 +12192,13 @@ impl AssetActor for ScriptedAttractProgram {
                 self.elapsed_steps = 0;
                 Vec::new()
             }
+            Phase::GameOver if prompt.player_death_sleep_remaining.is_some() => {
+                self.elapsed_steps = 0;
+                Vec::new()
+            }
             Phase::GameOver => {
-                self.elapsed_steps = self.elapsed_steps.saturating_add(1);
-                self.script.draws_for(
-                    self.id,
-                    self.elapsed_steps,
-                    &prompt.high_scores,
-                    prompt.credits,
-                )
+                self.elapsed_steps = 0;
+                Vec::new()
             }
             Phase::Playing | Phase::HighScoreEntry => {
                 self.elapsed_steps = 0;
@@ -16345,6 +16429,7 @@ mod tests {
             smart_bomb_flash_steps_remaining: 0,
             player_stocks: [PlayerStockSnapshot::new(3, 3); 2],
             next_bonus: SOURCE_REPLAY_SCORE,
+            player_death_sleep_remaining: None,
             game_over_hall_of_fame_stall_remaining: None,
             player_switch: None,
             player_start: None,
@@ -16556,6 +16641,7 @@ mod tests {
             smart_bomb_flash_steps_remaining: 0,
             player_stocks: [PlayerStockSnapshot::new(3, 3); 2],
             next_bonus: SOURCE_REPLAY_SCORE,
+            player_death_sleep_remaining: None,
             game_over_hall_of_fame_stall_remaining: None,
             player_switch: None,
             player_start: None,
@@ -16683,6 +16769,7 @@ mod tests {
                 PlayerStockSnapshot::new(3, 3),
             ],
             next_bonus: 20_000,
+            player_death_sleep_remaining: None,
             game_over_hall_of_fame_stall_remaining: None,
             player_switch: None,
             player_start: None,
@@ -16851,6 +16938,7 @@ mod tests {
             smart_bomb_flash_steps_remaining: 0,
             player_stocks: [PlayerStockSnapshot::new(3, 3); 2],
             next_bonus: SOURCE_REPLAY_SCORE,
+            player_death_sleep_remaining: None,
             game_over_hall_of_fame_stall_remaining: None,
             player_switch: None,
             player_start: None,
@@ -18338,6 +18426,96 @@ mod tests {
     }
 
     #[test]
+    fn actor_credit_gated_start_buttons_block_without_credit() {
+        let mut runtime = ActorRuntimeAdapter::new();
+
+        let one_blocked = runtime.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(one_blocked.report.phase, Phase::Attract);
+        assert_eq!(one_blocked.report.credits, 0);
+        assert!(
+            !one_blocked
+                .events
+                .gameplay()
+                .contains(&GameEvent::GameStarted)
+        );
+
+        let two_blocked = runtime.step(GameInput {
+            start_two: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(two_blocked.report.phase, Phase::Attract);
+        assert_eq!(two_blocked.report.credits, 0);
+        assert_eq!(two_blocked.report.player_count, 1);
+        assert!(
+            !two_blocked
+                .events
+                .gameplay()
+                .contains(&GameEvent::GameStarted)
+        );
+    }
+
+    #[test]
+    fn actor_free_play_admission_starts_without_inserted_credit() {
+        let mut one_player = ActorRuntimeAdapter::new_with_free_play_admission();
+
+        let one_started = one_player.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(one_started.report.phase, Phase::Playing);
+        assert_eq!(one_started.report.credits, 0);
+        assert_eq!(one_started.report.player_count, 1);
+        assert!(
+            one_started
+                .events
+                .gameplay()
+                .contains(&GameEvent::GameStarted)
+        );
+        assert_eq!(
+            one_started.report.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS,
+                player: 1,
+            })
+        );
+
+        let mut two_player = ActorRuntimeAdapter::new_with_free_play_admission();
+
+        let two_started = two_player.step(GameInput {
+            start_two: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(two_started.report.phase, Phase::Playing);
+        assert_eq!(two_started.report.credits, 0);
+        assert_eq!(two_started.report.player_count, 2);
+        assert!(
+            two_started
+                .events
+                .gameplay()
+                .contains(&GameEvent::GameStarted)
+        );
+        assert_eq!(
+            two_started.report.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: SOURCE_START_PLAYFIELD_DELAY_STEPS,
+                player: 1,
+            })
+        );
+        assert_source_message(
+            &two_started.report,
+            "PLYR1",
+            SOURCE_PLAYER_START_PROMPT_SCREEN,
+        );
+    }
+
+    #[test]
     fn actor_one_player_start_accepts_same_step_credit_and_start_button() {
         let mut runtime = ActorRuntimeAdapter::new();
 
@@ -18834,7 +19012,36 @@ mod tests {
         assert!(killed.report.player_switch.is_none());
         assert!(killed.report.sounds.contains(&SoundCue::GameOver));
         assert!(killed.events.gameplay().contains(&GameEvent::GameOver));
-        assert_eq!(killed.state.game_over, GameOverSnapshot::NONE);
+        assert_eq!(
+            killed.state.game_over,
+            GameOverSnapshot {
+                player_death_sleep_remaining: Some(SOURCE_FINAL_GAME_OVER_SLEEP_STEPS),
+                ..GameOverSnapshot::NONE
+            }
+        );
+        assert_source_message(&killed.report, "GO", SOURCE_FINAL_GAME_OVER_SCREEN);
+        assert_source_message_scene(&killed.scene, "GO", SOURCE_FINAL_GAME_OVER_SCREEN);
+        assert!(
+            !killed
+                .report
+                .draws
+                .iter()
+                .any(|draw| matches!(draw.effect, VisualEffect::WilliamsReveal { .. }))
+        );
+
+        let returned = step_until_final_game_over_sleep_returns_to_attract(&mut runtime);
+
+        assert_eq!(returned.report.phase, Phase::Attract);
+        assert_eq!(returned.state.phase, GamePhase::Attract);
+        assert_eq!(returned.state.game_over, GameOverSnapshot::NONE);
+        assert!(returned.report.player_death_sleep_remaining.is_none());
+        assert!(
+            returned
+                .report
+                .draws
+                .iter()
+                .any(|draw| matches!(draw.effect, VisualEffect::WilliamsReveal { .. }))
+        );
     }
 
     #[test]
@@ -19047,6 +19254,7 @@ mod tests {
             KeyboardKey::Character('6'),
             KeyboardKey::Character('7'),
             KeyboardKey::Enter,
+            KeyboardKey::Character('2'),
             KeyboardKey::Character('A'),
             KeyboardKey::Character('Z'),
             KeyboardKey::LeftShift,
@@ -19066,6 +19274,7 @@ mod tests {
         assert!(step.input.coin_two);
         assert!(step.input.coin_three);
         assert!(step.input.start_one);
+        assert!(step.input.start_two);
         assert!(step.input.fire);
         assert!(step.input.altitude_up);
         assert!(step.input.altitude_down);
@@ -20845,6 +21054,7 @@ mod tests {
             smart_bombs: 3,
             smart_bomb_pending: false,
             player_stocks: [PlayerStockSnapshot::new(3, 3); 2],
+            player_death_sleep_remaining: None,
             game_over_hall_of_fame_stall_remaining: None,
             player_switch: None,
             player_start: None,
@@ -26012,6 +26222,36 @@ mod tests {
         panic!("source smart bomb should detonate after the source delay");
     }
 
+    fn step_until_final_game_over_sleep_returns_to_attract(
+        runtime: &mut ActorRuntimeAdapter,
+    ) -> ActorFrame {
+        for expected_sleep in (1..SOURCE_FINAL_GAME_OVER_SLEEP_STEPS).rev() {
+            let waiting = runtime.step(GameInput::NONE);
+            assert_eq!(waiting.report.phase, Phase::GameOver);
+            assert_eq!(
+                waiting.report.player_death_sleep_remaining,
+                Some(expected_sleep)
+            );
+            assert_eq!(
+                waiting.state.game_over.player_death_sleep_remaining,
+                Some(expected_sleep)
+            );
+            assert_source_message(&waiting.report, "GO", SOURCE_FINAL_GAME_OVER_SCREEN);
+            assert_source_message_scene(&waiting.scene, "GO", SOURCE_FINAL_GAME_OVER_SCREEN);
+            assert!(
+                !waiting
+                    .report
+                    .draws
+                    .iter()
+                    .any(|draw| matches!(draw.effect, VisualEffect::WilliamsReveal { .. }))
+            );
+        }
+
+        let returned = runtime.step(GameInput::NONE);
+        assert_no_source_message(&returned.report, "GO", SOURCE_FINAL_GAME_OVER_SCREEN);
+        returned
+    }
+
     fn step_until_player_switch_completes(
         runtime: &mut ActorRuntimeAdapter,
         to_player: u8,
@@ -26390,6 +26630,7 @@ mod tests {
             smart_bombs: INITIAL_SMART_BOMBS,
             smart_bomb_pending: false,
             player_stocks: [PlayerStockSnapshot::new(3, INITIAL_SMART_BOMBS); 2],
+            player_death_sleep_remaining: None,
             game_over_hall_of_fame_stall_remaining: None,
             player_switch: None,
             player_start: None,

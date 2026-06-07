@@ -1000,6 +1000,7 @@ impl From<ActorSmokeReport> for LiveSmokeReport {
     }
 }
 
+#[cfg(any(test, coverage))]
 pub(crate) fn actor_runtime_from_script_path(
     actor_script_path: Option<&Path>,
 ) -> anyhow::Result<ActorRuntimeAdapter> {
@@ -1009,6 +1010,17 @@ pub(crate) fn actor_runtime_from_script_path(
     Ok(ActorRuntimeAdapter::with_scripts(actor_scripts_from_path(
         path,
     )?))
+}
+
+pub(crate) fn actor_live_runtime_from_script_path(
+    actor_script_path: Option<&Path>,
+) -> anyhow::Result<ActorRuntimeAdapter> {
+    let Some(path) = actor_script_path else {
+        return Ok(ActorRuntimeAdapter::new_with_free_play_admission());
+    };
+    Ok(ActorRuntimeAdapter::with_scripts_and_free_play_admission(
+        actor_scripts_from_path(path)?,
+    ))
 }
 
 fn actor_scripts_from_path(path: &Path) -> anyhow::Result<ActorDriverScripts> {
@@ -2487,7 +2499,7 @@ pub(crate) fn run_actor_live(
     _cmos_path: Option<&Path>,
     actor_script_path: Option<&Path>,
 ) -> anyhow::Result<()> {
-    let _runtime = actor_runtime_from_script_path(actor_script_path)?;
+    let _runtime = actor_live_runtime_from_script_path(actor_script_path)?;
     Ok(())
 }
 
@@ -2546,7 +2558,7 @@ fn run_actor_live_app(
 ) -> anyhow::Result<()> {
     let event_loop =
         winit::event_loop::EventLoop::new().context("creating actor wgpu event loop")?;
-    let runtime = actor_runtime_from_script_path(actor_script_path)?;
+    let runtime = actor_live_runtime_from_script_path(actor_script_path)?;
     let mut app = ActorLiveApp::new(
         input_profile,
         LiveAudioRuntime::for_mode(audio_mode),
@@ -3776,14 +3788,17 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    use crate::GameInput;
+    use crate::{
+        GameInput,
+        actor_game::{GameInput as ActorGameInput, Phase, PlayerStartReport},
+    };
 
     use super::{
         ActorScriptCheckExplosionSample, ActorScriptCheckPlayerLaserSample,
         ActorScriptCheckSourceActorSample, ActorScriptCheckSourceProjectileSample,
         ActorScriptCheckSpawnedActorSample, ActorScriptCheckSpawnedCounts, LiveInputState,
-        LiveSmokeReport, actor_runtime_from_script_path, run_actor_live, run_actor_script_check,
-        run_actor_wgpu_smoke, run_smoke,
+        LiveSmokeReport, actor_live_runtime_from_script_path, actor_runtime_from_script_path,
+        run_actor_live, run_actor_script_check, run_actor_wgpu_smoke, run_smoke,
     };
 
     #[test]
@@ -3900,6 +3915,47 @@ mod tests {
             None,
         )
         .expect("actor live entrypoint should be wired");
+    }
+
+    #[test]
+    fn actor_live_runtime_admits_fresh_start_buttons_without_manual_coin() {
+        let mut one_player =
+            actor_live_runtime_from_script_path(None).expect("live runtime should construct");
+
+        let one_started = one_player.step(ActorGameInput {
+            start_one: true,
+            ..ActorGameInput::NONE
+        });
+
+        assert_eq!(one_started.report.phase, Phase::Playing);
+        assert_eq!(one_started.report.credits, 0);
+        assert_eq!(one_started.report.player_count, 1);
+        assert!(matches!(
+            one_started.report.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: 1..,
+                player: 1,
+            })
+        ));
+
+        let mut two_player =
+            actor_live_runtime_from_script_path(None).expect("live runtime should construct");
+
+        let two_started = two_player.step(ActorGameInput {
+            start_two: true,
+            ..ActorGameInput::NONE
+        });
+
+        assert_eq!(two_started.report.phase, Phase::Playing);
+        assert_eq!(two_started.report.credits, 0);
+        assert_eq!(two_started.report.player_count, 2);
+        assert!(matches!(
+            two_started.report.player_start,
+            Some(PlayerStartReport {
+                delay_steps_remaining: 1..,
+                player: 1,
+            })
+        ));
     }
 
     #[test]

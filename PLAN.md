@@ -206,11 +206,12 @@ verification tools.
   while staying inert during attract so custom attract scripts retain control of
   that screen. Actor `StepPrompt`/`StepReport` values now carry the driver-owned
   current player, player count, per-player scores, and per-player stock
-  snapshots. `StartTwoPlayer` now requires two actor credits, consumes both,
-  initializes player one as active in a two-player session, publishes both
-  player score/stock snapshots through `ActorStateBridge`, and blocked
-  two-player start requests no longer emit false clean `GameStarted` /
-  `WaveStarted` events. Score and replay-bonus stock awards route through the
+  snapshots. Credit-gated actor evidence starts preserve red-label admission:
+  one-player starts consume one credit, two-player starts require and consume
+  two credits, and blocked start requests no longer emit false clean
+  `GameStarted` / `WaveStarted` events. Normal interactive live play enables
+  actor free-play admission so `1` and `2` start from a fresh run without first
+  pressing a coin key. Score and replay-bonus stock awards route through the
   active player fields so the actor bridge can represent player-two score and
   stock ownership. Accepted one-player and two-player starts now publish a
   source-length actor player-start delay and delay actor playfield spawning plus
@@ -229,7 +230,10 @@ verification tools.
   source sleep, prove it clears at the handoff, and verify the next
   player-start prompt owns the delayed start interval. The remaining
   two-player fidelity boundary is MAME media proof beyond that source-message
-  report/render contract. Actor high-score initials
+  report/render contract. Actor low-score final deaths now expose a finite
+  `player_death_sleep_remaining` `GAME OVER` interstitial, suppress attract
+  drawing during that countdown, and return to Williams attract only after the
+  countdown completes. Actor high-score initials
   submission now reports accepted and submitted initials through the clean event
   bridge, enters a finite 60-step
   Hall-of-Fame game-over stall through `GameOverSnapshot`, draws the source
@@ -974,6 +978,26 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-07 18:38 BST`: Completed the actor live-start and final game-over
+  regression cycle. Interactive live actor construction now enables explicit
+  free-play admission, so a fresh live run accepts `1` for one player and `2`
+  for two players without requiring a manual `5` coin insertion. The default
+  actor driver, actor smoke, and script-check evidence paths remain
+  credit-gated for red-label verification. Low-score final deaths now publish a
+  finite `player_death_sleep_remaining` `GAME OVER` interstitial through
+  `StepReport` / `GameOverSnapshot`, render the source `GO` prompt at
+  `0x3E80`, suppress attract-script drawing during the countdown, and return to
+  the Williams attract reveal only after the countdown completes. The Planetoid
+  actor keyboard mapper now also maps `2` to the two-player start action,
+  matching the live `wgpu` key contract. Validation passed with `cargo fmt
+  --check`, focused actor start/final-death/key-mapper regressions, the focused
+  live-runtime no-coin start regression, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools -- -D
+  warnings`, `cargo run -- --live-smoke`, `cargo run --
+  --actor-post-game-smoke`, `cargo run -- --actor-smoke`, `make docs-lint`,
+  and `make diff-check`. Slack step start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780852879218859>.
 
 - `2026-06-07 18:13 BST`: Completed the actor live-smoke and gameplay
   regression cycle. `--live-smoke` now uses the actor smoke/offscreen `wgpu`

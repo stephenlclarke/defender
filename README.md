@@ -81,25 +81,30 @@ current player, player count, per-player scores/stocks, high-score state, and
 the effective source-wave profile alongside published actor snapshots with
 movement velocity/facing metadata plus hostile-projectile source metadata into
 the clean runtime contract without making actor behavior display-frame driven.
-Two-player actor starts now require two credits, consume both credits,
-initialize player one as active, publish both player score/stock snapshots, and
-suppress false `GameStarted` events for
-blocked two-player start requests. All accepted actor starts now publish the
-source-length start interval and delay actor playfield spawning plus
+Credit-gated actor evidence starts preserve the red-label admission rules:
+one-player starts consume one credit, two-player starts require and consume two
+credits, and blocked start requests suppress false `GameStarted` events. Normal
+interactive live play enables actor free-play admission so `1` or `2` can start
+from a fresh run without first pressing a coin key. All accepted actor starts
+now publish the source-length start interval and delay actor playfield spawning
+plus
 `WaveStarted` until that interval completes. Start audio follows the same
 source cadence: the accepted-start report is silent, the start sound is emitted
 on the following actor step, and the source `0xEA` appearance cue is emitted as
 the delayed playfield starts. One-player starts keep the playfield empty without
-drawing the two-player source label. Credited two-player starts render the
-source `PLAYER ONE` prompt during the same delay. Actor player deaths now
-decrement the active player's stock and, when the other player has stock, enter
-a source-length `0x60` player-switch sleep exposed through `GameOverSnapshot`;
+drawing the two-player source label. Two-player starts render the source
+`PLAYER ONE` prompt during the same delay. Actor player deaths now decrement
+the active player's stock and, when the other player has stock, enter a
+source-length `0x60` player-switch sleep exposed through `GameOverSnapshot`;
 the render bridge projects the source `PLAYER ONE` / `PLAYER TWO` plus
 `GAME OVER` switch prompts before the next stocked player's source start prompt
 and delayed actor playfield turn. Actor regressions now lock that the full
 source-glyph switch prompt persists across the full source switch sleep, clears
 at the handoff, and that the next player-start prompt owns the delayed start
-interval.
+interval. Low-score final deaths now publish a finite final `GAME OVER` sleep
+through `GameOverSnapshot::player_death_sleep_remaining`, suppress attract
+drawing during that interval, and return to the Williams attract reveal only
+after the countdown completes.
 `--actor-smoke` exercises that actor frame path through a
 scripted attract/play input sequence and the native draw planner, proving actor
 events, audio, sprites, projectiles, HUD text, overlays, and `wgpu` command-plan
@@ -665,8 +670,8 @@ Planetoid-style keys onto Defender cabinet actions:
 - `5`: left coin slot
 - `6`: center coin slot
 - `7`: right coin slot
-- `1`: one-player start when credit or free play is available
-- `2`: two-player start when two credits or free play are available
+- `1`: one-player start
+- `2`: two-player start
 - `A`: move up
 - `Z`: move down
 - `SHIFT`: thrust
@@ -684,14 +689,15 @@ The current MAME-backed red-label runtime evidence returns through
 `GAME OVER` into the Hall of Fame page without a player initials prompt, even
 when all all-time high-score slots are seeded to zero.
 
-Use `--input-profile cabinet` for a MAME-style cabinet profile. In that
-profile, `5` inserts a left-slot coin and `1` starts a one-player game;
-`ENTER` is not a start key.
+Interactive live play defaults to actor free-play admission. From a fresh
+session, press `1` for one player or `2` for two players; coin keys remain
+available for credit-display and evidence workflows.
 
-To start a normal one-player game from a fresh session, press `5`, then `1`.
-To start a normal two-player game, press `5` twice, then `2`. The red-label
-start path intentionally blocks no-credit starts unless the cabinet is
-configured for free play.
+Use `--input-profile cabinet` for a MAME-style cabinet key layout. In that
+profile, `5` inserts a left-slot coin, `1` starts a one-player game, `2` starts
+a two-player game, and `ENTER` is not a start key. The actor smoke and
+script-check paths keep the red-label credit-gated admission contract for
+source-style verification.
 
 ## Persistence
 
