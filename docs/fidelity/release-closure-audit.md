@@ -58,7 +58,7 @@ from these perspectives:
   Status: proven as source hygiene for current clean runtime debt markers.
 - Release validation:
   the release gate in `PLAN.md` passed most recently on
-  `2026-06-07 13:19 BST`. It includes default and `legacy-tools` Rust
+  `2026-06-07 17:50 BST`. It includes default and `legacy-tools` Rust
   tests, both clippy passes, clean fidelity, media script tests,
   owner-review package generation, the accepted-report gate, MAME doctor,
   MAME smoke recording, README media, game smoke, actor play smoke, actor
@@ -410,8 +410,8 @@ complete without owner review or more MAME evidence:
 
 The accepted reports are green, including the organic smartmix terrain-blow
 report, and the actor-era full `make release-gate` pass was rerun on
-`2026-06-07`. Final closure still requires owner review of the bounded proof
-set. Use this checklist for that review:
+`2026-06-07 17:50 BST`. Final closure still requires owner review of the
+bounded proof set. Use this checklist for that review:
 
 - Review the current accepted media report set in
   `docs/fidelity/reference-report-gate.json`; it is the bounded MAME-vs-clean

@@ -377,7 +377,7 @@ verification tools.
   clean GIF artifacts; accepted audio proof uses WAV artifacts. The generated
   signoff summary exposes both the manifest and local report acceptance modes.
 - The latest full `make release-gate` pass completed on
-  `2026-06-07 13:19 BST`. There are no known active implementation blockers in
+  `2026-06-07 17:50 BST`. There are no known active implementation blockers in
   the tracked plan. Final closure requires owner review of the accepted proof
   set, or a new concrete MAME clip/input program showing a mismatch outside the
   accepted windows.
@@ -960,7 +960,7 @@ Exit gate:
    to all-axis and fixing the clean-only post-game thrust/background audio
    leak. The later organic smart-bomb/up-thrust terrain-blow candidate now has
    a passing all-axis report and is accepted as organic last-human terrain-blow
-   proof in the report gate. The latest actor-era `2026-06-07 13:19 BST`
+   proof in the report gate. The latest actor-era `2026-06-07 17:50 BST`
    full `make release-gate` pass is green, including default and
    `legacy-tools` Rust tests, both clippy gates, `make clean-fidelity`, media
    helper tests, owner-review package/report gate, MAME doctor/smoke, README
@@ -974,6 +974,18 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-07 17:50 BST`: Completed the post-cleanup full release-gate
+  verification cycle after removing the retired legacy runtime adapters.
+  `make release-gate` passed end to end: formatting, default and `legacy-tools`
+  Rust tests, both clippy passes, `make clean-fidelity`, media helper tests,
+  owner-review package/report gate, MAME doctor/smoke, README media, game
+  smoke, actor play smoke, actor attract/post-game smoke, actor offscreen
+  `wgpu` smoke with `frame_source: actor_game`, live smoke, docs lint, and diff
+  hygiene. The owner-review package again reported 28 accepted reports across
+  20 coverage requirements, and the short MAME recorder smoke regenerated
+  ignored MP4/WAV artifacts successfully. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780850391414769>.
 
 - `2026-06-07 17:30 BST`: Completed the bounded legacy-retirement audit cycle.
   Removed retired historical runtime adapter files from `src_legacy/`:

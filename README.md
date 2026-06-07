@@ -54,10 +54,10 @@ and diff hygiene.
 
 The accepted gate is green, including the repaired organic smartmix
 terrain-blow clip, and the actor-era full `make release-gate` pass was rerun on
-`2026-06-07`. Final closure still requires owner review of the bounded proof
-set, or a new concrete MAME clip/input program showing a mismatch outside the
-accepted windows. The proof boundaries and owner-review checklist are tracked
-in `docs/fidelity/release-closure-audit.md`.
+`2026-06-07 17:50 BST`. Final closure still requires owner review of the
+bounded proof set, or a new concrete MAME clip/input program showing a mismatch
+outside the accepted windows. The proof boundaries and owner-review checklist
+are tracked in `docs/fidelity/release-closure-audit.md`.
 
 ## Actor-Oriented Rewrite Branch
 
