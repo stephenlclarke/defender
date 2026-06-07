@@ -18,11 +18,12 @@ use crate::{
         PlayerStockSnapshot, ProjectileSnapshot as CleanProjectileSnapshot,
         SOURCE_TERRAIN_BLOW_COMPLETE_FRAME, SOURCE_TERRAIN_BLOW_FLASH_COLOR_BYTES,
         SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER, SOURCE_TERRAIN_BLOW_START_SOUND_FRAMES,
-        SOURCE_TERRAIN_EXPLOSION_LIFETIME_FRAMES, ScorePopupKind as CleanScorePopupKind,
-        ScorePopupSnapshot as CleanScorePopupSnapshot, ScoreSnapshot, SoundEvent,
-        SourceBaiterSnapshot, SourceBomberSnapshot, SourceLanderSnapshot, SourceMutantSnapshot,
-        SourcePodSnapshot, SourceRandSnapshot, SourceSwarmerSnapshot, TerrainBlowSnapshot,
-        TerrainBlowStage, TerrainSegment, WaveProfileSnapshot, WorldSnapshot, WorldVector,
+        SOURCE_TERRAIN_EXPLOSION_LIFETIME_FRAMES, SOURCE_VISUAL_STATE,
+        ScorePopupKind as CleanScorePopupKind, ScorePopupSnapshot as CleanScorePopupSnapshot,
+        ScoreSnapshot, SoundEvent, SourceBaiterSnapshot, SourceBomberSnapshot,
+        SourceLanderSnapshot, SourceMutantSnapshot, SourcePodSnapshot, SourceRandSnapshot,
+        SourceSwarmerSnapshot, TerrainBlowSnapshot, TerrainBlowStage, TerrainSegment,
+        WaveProfileSnapshot, WorldSnapshot, WorldVector, push_scanner_radar_sprites,
         push_source_bgout_terrain_sprites, push_source_explosion_cloud_pixels,
         source_explosion_render_scale, source_explosion_size_for_age,
         source_terrain_blow_flash_tint, source_terrain_explosion_size_for_age,
@@ -127,6 +128,8 @@ const SOURCE_FIRST_WAVE_LANDER_REFILL_ACTIVE_THRESHOLD: usize = 8;
 const SOURCE_FIRST_WAVE_LANDER_REFILL_DELAY_STEPS: u8 = 47;
 const SOURCE_FIRST_WAVE_LANDER_REFILL_APPEAR_SOUND_DELAY_STEPS: u8 = 1;
 const PLAYER_BOUNDS: Rect = Rect::new(0, 18, 255, 220);
+const PLAYER_SCROLL_CENTER_X: i16 = 128;
+const SOURCE_BACKGROUND_WORD_PER_PIXEL: u16 = 0x0100;
 const LASER_SPEED: i16 = 8;
 const LASER_LIFETIME: u16 = 34;
 const LANDER_FIRE_PERIOD: u64 = 96;
@@ -6777,6 +6780,8 @@ fn world_snapshot_for_report(report: &StepReport) -> WorldSnapshot {
         return WorldSnapshot::default();
     }
 
+    let phase = clean_phase(report.phase);
+    let player = player_snapshot_for_report(report);
     let mut world = WorldSnapshot {
         terrain: actor_playfield_terrain_segments(report),
         terrain_blow: report.terrain_blow,
@@ -6790,7 +6795,12 @@ fn world_snapshot_for_report(report: &StepReport) -> WorldSnapshot {
         source_rng: report.source_rng.map(clean_source_rng).unwrap_or_default(),
         ..WorldSnapshot::default()
     };
-    world.scanner.enabled = report.phase == Phase::Playing && report.terrain_blow.is_none();
+    world.sync_actor_presentation(
+        phase,
+        report.step,
+        actor_world_word(report.source_background_left),
+        player.position,
+    );
     world
 }
 
@@ -7095,6 +7105,24 @@ fn world_vector(value: i16) -> WorldVector {
     WorldVector::from_subpixels(i32::from(value) * WorldVector::SUBPIXELS_PER_PIXEL)
 }
 
+fn actor_world_word(value: u16) -> WorldVector {
+    WorldVector::from_subpixels(i32::from(value) << 8)
+}
+
+fn scroll_background_right(background_left: u16, pixels: i16) -> u16 {
+    background_left.wrapping_add(source_background_pixel_delta(pixels))
+}
+
+fn scroll_background_left(background_left: u16, pixels: i16) -> u16 {
+    background_left.wrapping_sub(source_background_pixel_delta(pixels))
+}
+
+fn source_background_pixel_delta(pixels: i16) -> u16 {
+    u16::try_from(pixels.max(0))
+        .unwrap_or(u16::MAX)
+        .wrapping_mul(SOURCE_BACKGROUND_WORD_PER_PIXEL)
+}
+
 fn screen_position(point: Point) -> ScreenPosition {
     ScreenPosition::new(screen_coordinate(point.x), screen_coordinate(point.y))
 }
@@ -7178,6 +7206,8 @@ impl ActorRenderSceneBridge {
 
     pub fn render_scene_for_report(&self, report: &StepReport) -> RenderScene {
         let mut scene = RenderScene::empty(report.step, self.surface);
+        let state = (report.phase == Phase::Playing && report.player_start.is_none())
+            .then(|| report.game_state());
         if report.phase == Phase::Playing && report.smart_bomb_flash_steps_remaining > 0 {
             scene.clear_color = Color::WHITE;
         }
@@ -7195,6 +7225,10 @@ impl ActorRenderSceneBridge {
             && report.terrain_blow.is_none()
         {
             push_source_bgout_terrain_sprites(&mut scene, report.source_background_left);
+        }
+        if let Some(state) = &state {
+            push_actor_playing_top_display_border(&mut scene);
+            push_scanner_radar_sprites(&mut scene, &state.world.scanner);
         }
         for draw in &report.draws {
             self.push_draw(&mut scene, report.phase, draw);
@@ -7565,6 +7599,22 @@ fn push_attract_scoring_top_display_border(scene: &mut RenderScene) {
             ),
             size,
             tint: ATTRACT_SCORING_SCANNER_BORDER_TINT,
+        });
+    }
+}
+
+fn push_actor_playing_top_display_border(scene: &mut RenderScene) {
+    for (screen_address, size) in SOURCE_TOP_DISPLAY_BORDER_SEGMENTS {
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::TOP_DISPLAY_BORDER_WORD,
+            layer: RenderLayer::Hud,
+            position: source_screen_position(screen_address),
+            size,
+            tint: if matches!(screen_address, 0x4C07 | 0x4C28) {
+                SOURCE_VISUAL_STATE.top_display_scanner_marker_tint()
+            } else {
+                SOURCE_VISUAL_STATE.top_display_border_tint()
+            },
         });
     }
 }
@@ -12457,6 +12507,56 @@ impl PlayerShip {
             })
     }
 
+    fn step_horizontal_motion(position_x: i16, dx: i16, background_left: u16) -> (i16, u16) {
+        if dx == 0 {
+            return (position_x, background_left);
+        }
+
+        if dx > 0 {
+            return Self::step_right_motion(position_x, dx, background_left);
+        }
+
+        Self::step_left_motion(position_x, dx.saturating_abs(), background_left)
+    }
+
+    fn step_right_motion(position_x: i16, dx: i16, background_left: u16) -> (i16, u16) {
+        let next_x = position_x.saturating_add(dx);
+        if position_x >= PLAYER_SCROLL_CENTER_X {
+            return (
+                PLAYER_SCROLL_CENTER_X,
+                scroll_background_right(background_left, dx),
+            );
+        }
+        if next_x <= PLAYER_SCROLL_CENTER_X {
+            return (next_x, background_left);
+        }
+
+        let scroll_pixels = next_x.saturating_sub(PLAYER_SCROLL_CENTER_X);
+        (
+            PLAYER_SCROLL_CENTER_X,
+            scroll_background_right(background_left, scroll_pixels),
+        )
+    }
+
+    fn step_left_motion(position_x: i16, dx: i16, background_left: u16) -> (i16, u16) {
+        let next_x = position_x.saturating_sub(dx);
+        if position_x <= PLAYER_SCROLL_CENTER_X {
+            return (
+                PLAYER_SCROLL_CENTER_X,
+                scroll_background_left(background_left, dx),
+            );
+        }
+        if next_x >= PLAYER_SCROLL_CENTER_X {
+            return (next_x, background_left);
+        }
+
+        let scroll_pixels = PLAYER_SCROLL_CENTER_X.saturating_sub(next_x);
+        (
+            PLAYER_SCROLL_CENTER_X,
+            scroll_background_left(background_left, scroll_pixels),
+        )
+    }
+
     fn hyperspace_rematerialization(
         &self,
         behavior: ActorBehaviorProfile,
@@ -12559,15 +12659,22 @@ impl AssetActor for PlayerShip {
             }
             let input_blocked = was_hidden || self.hyperspace_death_steps_remaining.is_some();
             if !death_due && !input_blocked {
-                let mut velocity = Velocity::default();
+                let mut next_position = self.position;
+                let mut source_background_left = prompt.source_background_left;
                 if prompt.input.altitude_up {
-                    velocity.dy -= behavior.player_speed;
+                    next_position.y = next_position.y.saturating_sub(behavior.player_speed);
                 }
                 if prompt.input.altitude_down {
-                    velocity.dy += behavior.player_speed;
+                    next_position.y = next_position.y.saturating_add(behavior.player_speed);
                 }
                 if prompt.input.thrust {
-                    velocity.dx += self.direction.sign() * behavior.player_speed;
+                    let (next_x, next_background_left) = Self::step_horizontal_motion(
+                        next_position.x,
+                        self.direction.sign() * behavior.player_speed,
+                        source_background_left,
+                    );
+                    next_position.x = next_x;
+                    source_background_left = next_background_left;
                     commands.push(GameCommand::PlaySound(SoundCue::Thrust));
                 }
                 if prompt.input.reverse && !self.reverse_held {
@@ -12576,7 +12683,13 @@ impl AssetActor for PlayerShip {
                         Direction::Right => Direction::Left,
                     };
                 }
-                self.position = PLAYER_BOUNDS.clamp_point(self.position.offset(velocity));
+                self.position.y =
+                    clamp_i16(next_position.y, PLAYER_BOUNDS.top, PLAYER_BOUNDS.bottom);
+                self.position.x =
+                    clamp_i16(next_position.x, PLAYER_BOUNDS.left, PLAYER_BOUNDS.right);
+                if source_background_left != prompt.source_background_left {
+                    commands.push(GameCommand::SetSourceBackgroundLeft(source_background_left));
+                }
                 self.laser_cooldown = self.laser_cooldown.saturating_sub(1);
                 if prompt.input.wants_fire() && self.laser_cooldown == 0 {
                     self.laser_cooldown = behavior.player_laser_cooldown_steps;
@@ -16058,8 +16171,13 @@ mod tests {
         let mut driver = started_driver();
 
         let report = driver.step(GameInput::NONE);
+        let state = report.game_state();
         let scene = report.render_scene();
 
+        assert!(state.world.scanner.enabled);
+        assert!(state.world.scanner.scan_left.is_some());
+        assert!(state.world.scanner.player_blip.is_some());
+        assert!(state.world.object_evidence.detail_count > 0);
         assert_eq!(scene.frame, report.step);
         assert!(scene.sprites.iter().any(|sprite| {
             matches!(
@@ -16075,6 +16193,25 @@ mod tests {
         }));
         assert!(scene.sprites.iter().any(|sprite| {
             SpriteId::SCORE_DIGITS.contains(&sprite.sprite) && sprite.layer == RenderLayer::Hud
+        }));
+        assert!(
+            scene
+                .sprites
+                .iter()
+                .filter(|sprite| sprite.sprite == SpriteId::TOP_DISPLAY_BORDER_WORD)
+                .count()
+                >= SOURCE_TOP_DISPLAY_BORDER_SEGMENTS.len()
+        );
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::TOP_DISPLAY_BORDER_WORD
+                && sprite.tint == SOURCE_VISUAL_STATE.top_display_scanner_marker_tint()
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL
+                && sprite.layer == RenderLayer::Hud
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCANNER_PLAYER_BLIP && sprite.layer == RenderLayer::Hud
         }));
     }
 
@@ -17190,6 +17327,48 @@ mod tests {
             ..GameInput::NONE
         });
         assert_eq!(reversed_again.state.player.direction, CleanDirection::Right);
+    }
+
+    #[test]
+    fn player_thrust_scrolls_wrapping_background_after_reaching_center() {
+        let player_id = ActorId::new(1);
+        let mut player = PlayerShip::new(player_id, Point::new(PLAYER_SCROLL_CENTER_X, 120));
+
+        let right = player.update(&playing_player_prompt_for_test(
+            GameInput {
+                thrust: true,
+                ..GameInput::NONE
+            },
+            0xFE00,
+        ));
+        assert_eq!(right.snapshot.position.x, PLAYER_SCROLL_CENTER_X);
+        assert!(
+            right
+                .commands
+                .contains(&GameCommand::SetSourceBackgroundLeft(0x0000))
+        );
+
+        let reversed = player.update(&playing_player_prompt_for_test(
+            GameInput {
+                reverse: true,
+                ..GameInput::NONE
+            },
+            0x0100,
+        ));
+        assert_eq!(reversed.snapshot.direction, Some(Direction::Left));
+
+        let left = player.update(&playing_player_prompt_for_test(
+            GameInput {
+                thrust: true,
+                ..GameInput::NONE
+            },
+            0x0100,
+        ));
+        assert_eq!(left.snapshot.position.x, PLAYER_SCROLL_CENTER_X);
+        assert!(
+            left.commands
+                .contains(&GameCommand::SetSourceBackgroundLeft(0xFF00))
+        );
     }
 
     #[test]
@@ -26691,6 +26870,37 @@ mod tests {
             player_position,
             player_velocity,
         )
+    }
+
+    fn playing_player_prompt_for_test(input: GameInput, source_background_left: u16) -> StepPrompt {
+        StepPrompt {
+            step: 1,
+            phase: Phase::Playing,
+            input,
+            wave: 1,
+            source_wave: ActorSourceWaveProfile::for_wave(1),
+            current_player: 1,
+            player_count: 1,
+            score: 0,
+            player_scores: [0, 0],
+            credits: 0,
+            lives: INITIAL_PLAYER_LIVES,
+            smart_bombs: INITIAL_SMART_BOMBS,
+            smart_bomb_pending: false,
+            player_stocks: [PlayerStockSnapshot::new(INITIAL_PLAYER_LIVES, INITIAL_SMART_BOMBS); 2],
+            player_death_sleep_remaining: None,
+            game_over_hall_of_fame_stall_remaining: None,
+            player_switch: None,
+            player_start: None,
+            high_scores: [0; 5],
+            high_score_initials: HighScoreInitialsState::EMPTY,
+            snapshots: Vec::new(),
+            behavior_script: ActorBehaviorScript::default(),
+            source_background_left,
+            source_rng: None,
+            source_human_walk_target_slot: None,
+            source_shell_scan_tick: false,
+        }
     }
 
     fn source_mutant_prompt_with_source_wave_for_test(

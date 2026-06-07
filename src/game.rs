@@ -4667,6 +4667,18 @@ impl WorldSnapshot {
         self.expanded_objects = evidence;
     }
 
+    pub(crate) fn sync_actor_presentation(
+        &mut self,
+        phase: GamePhase,
+        frame: u64,
+        scan_anchor: WorldVector,
+        player_position: (WorldVector, WorldVector),
+    ) {
+        self.refresh_object_evidence();
+        self.sync_clean_lifecycle_evidence();
+        self.sync_scanner_radar(phase, frame, scan_anchor, player_position);
+    }
+
     fn sync_scanner_radar(
         &mut self,
         phase: GamePhase,

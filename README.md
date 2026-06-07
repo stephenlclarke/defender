@@ -346,13 +346,17 @@ sequence on its own cadence, and hold source reserve activation behind the
 source smart-bomb cooldown. `XYZZY` overlay smart bombs use the same delayed
 command path without consuming stock.
 Actor playing reports now expose the source playfield terrain through the
-clean state bridge and render it from the source `BGOUT` records. Removing the
-last human starts a driver-owned source `TerrainBlowSnapshot`: clean terrain
-and scanner terrain are erased, source flash windows tint the playfield,
-`TEREX` terrain explosion actors use the source birth positions and
-terrain-explosion growth/lifetime curve, and the actor sound stream emits the
-source `AHSND` / `TBSND` command cadence plus tail commands instead of the
-normal human-loss cue.
+clean state bridge and render it from the source `BGOUT` records. Gameplay
+actor scenes also project the source top-display border plus scanner terrain
+and radar blips, and actor player thrust now scrolls the wrapped
+`source_background_left` word once the ship reaches the center band so the
+landscape moves underneath the player instead of staying fixed on a single
+screen. Removing the last human starts a driver-owned source
+`TerrainBlowSnapshot`: clean terrain and scanner terrain are erased, source
+flash windows tint the playfield, `TEREX` terrain explosion actors use the
+source birth positions and terrain-explosion growth/lifetime curve, and the
+actor sound stream emits the source `AHSND` / `TBSND` command cadence plus tail
+commands instead of the normal human-loss cue.
 Actor score awards now use the same replay-bonus threshold model as the clean
 score system, so threshold crossings add life/smart-bomb stock and emit
 `BonusAwarded` through the actor event bridge. Score and replay-bonus stock

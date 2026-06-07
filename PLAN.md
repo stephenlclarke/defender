@@ -979,6 +979,24 @@ Exit gate:
 
 ## Current Work Log
 
+- `2026-06-07 19:24 BST`: Completed the actor gameplay HUD/side-scrolling
+  regression cycle. Actor gameplay scenes now populate clean object evidence
+  and scanner state through a crate-visible `WorldSnapshot` presentation sync,
+  then render the source top-display border plus scanner terrain and player
+  radar blip through the existing clean scanner renderer. Actor player thrust
+  now moves the ship toward the center band and then emits wrapped
+  `SetSourceBackgroundLeft` commands so the `BGOUT` terrain scrolls beneath the
+  player in both directions instead of staying fixed on one screen. Added
+  focused regressions for gameplay scanner/HUD visibility and wrapped
+  left/right background scrolling. Validation passed with focused actor HUD,
+  player scroll, and reverse regressions, `cargo run -- --actor-smoke`, `cargo
+  run -- --live-smoke`, `cargo fmt --check`, `cargo check --all-targets
+  --features legacy-tools`, `cargo clippy --all-targets --features legacy-tools
+  -- -D warnings`, `make docs-lint`, and `make diff-check`. Remaining plan
+  work is still about `2%`, mostly owner-review/protected-media closure after
+  these concrete live defects. Slack step start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780855892937019>.
+
 - `2026-06-07 19:09 BST`: Completed the actor/live reverse-input regression
   cycle. Planetoid controls now bind `SHIFT` to reverse and `SPACE` to thrust
   across the actor keyboard mapper, live `wgpu` physical/logical keymap, and
