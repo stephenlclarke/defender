@@ -28,11 +28,13 @@ sources or by an accepted fixture.
 
 ## Current Fidelity Contract
 
-The clean runtime is the production runtime. Normal play uses clean `Game`
-frames through clean platform, audio, and `wgpu` renderer modules; the converted
-machine remains feature-gated behind `legacy-tools` for developer evidence and
-comparison tooling. Current Rust behavior is accepted only when backed by
-red-label source/MAME evidence or by the accepted fixture/report gates.
+The clean runtime is the production runtime. Normal play uses the actor runtime
+through clean platform, audio, and `wgpu` renderer modules; the clean `Game`
+frame path remains available for smoke, fidelity, and oracle evidence commands.
+The converted machine remains feature-gated behind `legacy-tools` for developer
+evidence and comparison tooling. Current Rust behavior is accepted only when
+backed by red-label source/MAME evidence or by the accepted fixture/report
+gates.
 
 Earlier owner review rejected the clean media for concrete gameplay-facing
 fidelity defects: player laser shape, reverse-facing player orientation, and
@@ -91,7 +93,7 @@ and diff hygiene.
 
 The accepted gate is green, including the repaired organic smartmix
 terrain-blow clip, and the actor-era full `make release-gate` pass was rerun on
-`2026-06-06`. Final closure still requires owner review of the bounded proof
+`2026-06-07`. Final closure still requires owner review of the bounded proof
 set, or a new concrete MAME clip/input program showing a mismatch outside the
 accepted windows. The proof boundaries and review checklist are tracked in
 `docs/fidelity/release-closure-audit.md`.
@@ -113,6 +115,10 @@ local MAME/reference trace refreshes where local ROM inputs are available.
   `assets/arcade/` unless explicitly reclassified with stronger provenance.
 - Keep local ROMs and generated MAME reference traces out of normal runtime
   requirements.
+- Treat converted frame, ROM, and memory-oriented red-label implementation code
+  as temporary oracle/evidence scaffolding. Remove it, or keep it only behind
+  `legacy-tools`, as soon as actor/system behavior plus accepted MAME-backed
+  artifacts make the adapter unnecessary.
 - Preserve exact source-visible mutations in tests: RAM, CMOS, video RAM,
   palette RAM, process lists, object lists, shell lists, scheduler state,
   sound commands, and snapshots.
@@ -752,8 +758,9 @@ reintroduce legacy implementation terminology.
 
 ## Current Behavior Surface
 
-- Live play uses the clean windowed `wgpu` backend, steps clean `Game` frames,
-  submits clean audio events, and executes native sprite draw plans.
+- Live play uses the clean windowed `wgpu` backend, steps actor runtime reports,
+  submits actor-derived clean audio events, and executes native sprite draw
+  plans.
 - `--live-smoke` steps clean `Game` frames through `NativeSceneRenderer` and
   renders them through offscreen `wgpu` texture/readback evidence without using
   the legacy live presenter for smoke frame generation. The smoke gate checks

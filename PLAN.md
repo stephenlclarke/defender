@@ -16,9 +16,10 @@ verification tools.
 ## Current Baseline
 
 - Active branch for the actor-architecture cycle: `dev/actor-game-architecture`.
-- The production baseline came from `rewrite`; the actor rewrite is being kept
-  isolated until it has enough MAME-backed behavior to replace the live game
-  loop safely.
+- The production baseline came from `rewrite`; normal interactive live play now
+  uses the actor runtime through the clean platform/audio/`wgpu` bridge, while
+  the clean `Game` path remains available for smoke, fidelity, and oracle
+  evidence commands.
 - The actor rewrite now has focused coverage for same-contract input,
   `XYZZY`, data-driven `AttractScript` custom driver sequencing,
   Williams/Defender attract metadata, player/lander/laser/explosion basics,
@@ -375,6 +376,11 @@ verification tools.
   `target/reference-media/clean/`. Accepted visual proof uses MAME MP4 and
   clean GIF artifacts; accepted audio proof uses WAV artifacts. The generated
   signoff summary exposes both the manifest and local report acceptance modes.
+- The latest full `make release-gate` pass completed on
+  `2026-06-07 13:19 BST`. There are no known active implementation blockers in
+  the tracked plan. Final closure requires owner review of the accepted proof
+  set, or a new concrete MAME clip/input program showing a mismatch outside the
+  accepted windows.
 - Attract/scoring silence is not automatically a bug. Only add attract sound
   where the MAME golden capture or sound-command evidence proves it exists.
 
@@ -393,6 +399,10 @@ verification tools.
   `assets/arcade/`.
 - Production modules must describe game concepts. ROM labels, assembler names,
   and memory-table details belong in legacy/tooling/evidence boundaries.
+- Treat converted frame, ROM, and memory-oriented red-label code as temporary
+  oracle/evidence scaffolding. As soon as an actor/system implementation and
+  accepted MAME-backed artifacts no longer require a legacy adapter, remove it
+  or keep it only behind `legacy-tools` until the next bounded retirement slice.
 - Do not add new open-ended roadmap phases. Any new work must map to the finite
   milestones below or be recorded as a specific blocker.
 
@@ -502,7 +512,13 @@ make reference-media-check \
 5. Treat failures as bounded graphics/audio/playability tasks. Fix the clean
    implementation, not the reference.
 
-## Remaining Milestones
+## Finite Milestones
+
+The milestones below are the finite route used for the rewrite. Current local
+evidence says the implementation, harness, graphics, audio, playability, and
+release gates have been executed; `M6` remains open only for owner approval of
+the bounded proof set, or for a new concrete MAME mismatch that expands the
+work.
 
 ### M1: Golden Artifact Inventory
 
@@ -944,8 +960,8 @@ Exit gate:
    to all-axis and fixing the clean-only post-game thrust/background audio
    leak. The later organic smart-bomb/up-thrust terrain-blow candidate now has
    a passing all-axis report and is accepted as organic last-human terrain-blow
-   proof in the report gate. The hardened actor-era `2026-06-06 04:04 BST`
-   full `make release-gate` pass is now green, including default and
+   proof in the report gate. The latest actor-era `2026-06-07 13:19 BST`
+   full `make release-gate` pass is green, including default and
    `legacy-tools` Rust tests, both clippy gates, `make clean-fidelity`, media
    helper tests, owner-review package/report gate, MAME doctor/smoke, README
    media, game smoke, actor play smoke, actor attract/post-game smoke, actor

@@ -18,19 +18,20 @@ arcade behavior. The runtime is self-contained: red-label tables, ROM metadata,
 trace schema, video data, and sound command fixtures are embedded at build
 time, so normal play does not need a local ROM or asset directory.
 
-Live play uses a clean windowed `wgpu` renderer: it steps clean `Game` frames,
-submits clean audio events, and executes `NativeSceneRenderer` sprite draw
-plans. `--live-smoke` is the clean runtime smoke path and reports
-sprite/temporary-raster evidence plus offscreen `wgpu` render/readback
-signatures, including checked first/last frame signatures, without using the
-legacy live presenter for frame generation.
+Live play uses the actor runtime through a clean windowed `wgpu` renderer: it
+steps actor-owned simulation reports, submits clean audio events, and executes
+`NativeSceneRenderer` sprite draw plans. `--live-smoke` is the clean runtime
+smoke path and reports sprite/temporary-raster evidence plus offscreen `wgpu`
+render/readback signatures, including checked first/last frame signatures,
+without using the legacy live presenter for frame generation.
 
 ## Current Fidelity Status
 
-The clean runtime is the production runtime. Normal play steps clean `Game`
-frames through clean platform, audio, and `wgpu` renderer modules, while the
-converted machine remains feature-gated behind `legacy-tools` for developer
-evidence and comparison tooling.
+The clean runtime is the production runtime. Normal play steps the actor runtime
+through clean platform, audio, and `wgpu` renderer modules, while the clean
+`Game` frame path remains available for smoke, fidelity, and oracle evidence
+commands. The converted machine remains feature-gated behind `legacy-tools` for
+developer evidence and comparison tooling.
 
 Earlier owner review rejected the clean media for concrete gameplay-facing
 fidelity defects: laser shape, reverse-facing player orientation, and live
@@ -53,16 +54,16 @@ and diff hygiene.
 
 The accepted gate is green, including the repaired organic smartmix
 terrain-blow clip, and the actor-era full `make release-gate` pass was rerun on
-`2026-06-06`. Final closure still requires owner review of the bounded proof
+`2026-06-07`. Final closure still requires owner review of the bounded proof
 set, or a new concrete MAME clip/input program showing a mismatch outside the
 accepted windows. The proof boundaries and owner-review checklist are tracked
 in `docs/fidelity/release-closure-audit.md`.
 
 ## Actor-Oriented Rewrite Branch
 
-`src/actor_game.rs` starts an isolated actor-oriented Rust rewrite on the
-`dev/actor-game-architecture` branch. It keeps the current runtime available
-for fidelity evidence while introducing a driver-owned prompt/reply model where
+`src/actor_game.rs` owns the actor-oriented Rust rewrite on the
+`dev/actor-game-architecture` branch. It keeps legacy/frame tooling available
+only for fidelity evidence while using a driver-owned prompt/reply model where
 each asset owns its motion, draw description, sound cues, and interactions.
 This branch is not display-frame driven: `ActorGameDriver::step` advances a
 simulation turn and emits a `StepReport`, while renderers are expected to draw

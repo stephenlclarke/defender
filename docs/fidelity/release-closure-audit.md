@@ -1,6 +1,6 @@
 # Release Closure Audit
 
-Last reviewed: `2026-06-06`
+Last reviewed: `2026-06-07`
 
 This audit maps the active fidelity goal to current evidence. It is deliberately
 stricter than the release gate: green tests and media reports prove the covered
@@ -40,7 +40,7 @@ from these perspectives:
   `cargo run -- --game-smoke`, `cargo run -- --actor-smoke`,
   `cargo run -- --actor-attract-smoke`, `cargo run -- --actor-post-game-smoke`,
   `cargo run -- --actor-wgpu-smoke`, and `cargo run -- --live-smoke` passed
-  through the hardened `2026-06-06` release gate. Actor play smoke proves the
+  through the fresh `2026-06-07` release gate. Actor play smoke proves the
   actor runtime through attract, credit, play, gameplay/audio events, sprite
   layers, native draw commands, and zero temporary raster commands.
   Actor `wgpu` smoke rendered the actor frame source through offscreen readback
@@ -57,9 +57,8 @@ from these perspectives:
   that the smoke gates require to remain zero in the active gameplay path.
   Status: proven as source hygiene for current clean runtime debt markers.
 - Release validation:
-  the release gate in `PLAN.md` passed on `2026-06-06 04:04 BST` after
-  `0b927ac` hardened the gate to include both actor play smoke and actor
-  offscreen `wgpu` smoke. The gate includes default and `legacy-tools` Rust
+  the release gate in `PLAN.md` passed most recently on
+  `2026-06-07 13:19 BST`. It includes default and `legacy-tools` Rust
   tests, both clippy passes, clean fidelity, media script tests,
   owner-review package generation, the accepted-report gate, MAME doctor,
   MAME smoke recording, README media, game smoke, actor play smoke, actor
@@ -411,7 +410,7 @@ complete without owner review or more MAME evidence:
 
 The accepted reports are green, including the organic smartmix terrain-blow
 report, and the actor-era full `make release-gate` pass was rerun on
-`2026-06-06`. Final closure still requires owner review of the bounded proof
+`2026-06-07`. Final closure still requires owner review of the bounded proof
 set. Use this checklist for that review:
 
 - Review the current accepted media report set in
