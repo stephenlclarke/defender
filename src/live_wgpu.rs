@@ -57,6 +57,7 @@ const ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT: usize = 512;
 const ACTOR_SCRIPT_CHECK_ATTRACT_CYCLE_STEP_LIMIT: u64 = 4096;
 const ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT: usize = 4096;
 const ACTOR_SCRIPT_CHECK_RESERVE_ACTIVATION_BATCH_LIMIT: usize = 8;
+const ACTOR_SCRIPT_CHECK_SOURCE_ACTOR_SAMPLE_LIMIT: usize = 8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LiveInputProfile {
@@ -100,6 +101,15 @@ pub(crate) struct LiveSmokeReport {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ActorScriptCheckSourceActorSample {
+    pub(crate) kind: String,
+    pub(crate) x: i16,
+    pub(crate) y: i16,
+    pub(crate) source_x_fraction: u8,
+    pub(crate) source_y_fraction: u8,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ActorScriptCheckPlayingSummary {
     pub(crate) wave: u16,
     pub(crate) wave_size: u8,
@@ -132,6 +142,14 @@ pub(crate) struct ActorScriptCheckPlayingSummary {
     pub(crate) baiter_mode: String,
     pub(crate) swarmer_fire_period_steps: u64,
     pub(crate) baiter_fire_period_steps: u64,
+    pub(crate) source_actor_samples: Vec<ActorScriptCheckSourceActorSample>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ActorScriptCheckSpawnedActorSample {
+    pub(crate) kind: String,
+    pub(crate) x: i16,
+    pub(crate) y: i16,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -147,6 +165,7 @@ pub(crate) struct ActorScriptCheckSpawnedCounts {
 pub(crate) struct ActorScriptCheckReserveActivationSummary {
     pub(crate) assist_steps: u32,
     pub(crate) spawned_counts: ActorScriptCheckSpawnedCounts,
+    pub(crate) spawned_samples: Vec<ActorScriptCheckSpawnedActorSample>,
     pub(crate) playing: ActorScriptCheckPlayingSummary,
 }
 
@@ -210,6 +229,7 @@ pub(crate) struct ActorScriptCheckReport {
     pub(crate) first_playing_source_rng_seed: Option<u8>,
     pub(crate) first_playing_source_rng_hseed: Option<u8>,
     pub(crate) first_playing_source_rng_lseed: Option<u8>,
+    pub(crate) first_playing_source_actor_samples: Vec<ActorScriptCheckSourceActorSample>,
     pub(crate) first_playing_player_takes_enemy_collision_damage: bool,
     pub(crate) first_playing_player_laser_cooldown_steps: u8,
     pub(crate) first_playing_lander_mode: String,
@@ -440,13 +460,14 @@ impl ActorScriptCheckReport {
         for (index, summary) in self.reserve_activation_batches.iter().enumerate() {
             let prefix = format!("reserve_activation_{}", index + 1);
             reserve_activation.push_str(&format!(
-                "  {prefix}_assist_steps: {}\n  {prefix}_spawned_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n{}",
+                "  {prefix}_assist_steps: {}\n  {prefix}_spawned_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  {prefix}_spawned_samples: {}\n{}",
                 summary.assist_steps,
                 summary.spawned_counts.landers,
                 summary.spawned_counts.bombers,
                 summary.spawned_counts.pods,
                 summary.spawned_counts.mutants,
                 summary.spawned_counts.swarmers,
+                spawned_actor_samples_summary(&summary.spawned_samples),
                 playing_summary_to_text(&prefix, &summary.playing),
             ));
         }
@@ -500,7 +521,7 @@ impl ActorScriptCheckReport {
                 )
             });
         format!(
-            "actor script check passed\n  path: {}\n  attract_events: {}\n{}  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_source_state: background_left=0x{:04x},rng={}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}{}{}{}{}{}  clean_exit: {}\n",
+            "actor script check passed\n  path: {}\n  attract_events: {}\n{}  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_source_state: background_left=0x{:04x},rng={}\n  first_playing_source_actor_samples: {}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}{}{}{}{}{}  clean_exit: {}\n",
             self.path,
             self.attract_events,
             attract_cycle,
@@ -525,6 +546,7 @@ impl ActorScriptCheckReport {
             self.first_playing_reserve_swarmers,
             self.first_playing_source_background_left,
             source_rng,
+            source_actor_samples_summary(&self.first_playing_source_actor_samples),
             self.first_playing_player_takes_enemy_collision_damage,
             self.first_playing_player_laser_cooldown_steps,
             self.first_playing_lander_mode,
@@ -588,7 +610,7 @@ fn playing_summary_to_text(prefix: &str, summary: &ActorScriptCheckPlayingSummar
         summary.source_rng_lseed,
     );
     format!(
-        "  {prefix}_wave: {}\n  {prefix}_wave_size: {}\n  {prefix}_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  {prefix}_world_counts: enemies={},humans={}\n  {prefix}_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  {prefix}_source_state: background_left=0x{:04x},rng={}\n  {prefix}_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  {prefix}_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  {prefix}_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  {prefix}_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n",
+        "  {prefix}_wave: {}\n  {prefix}_wave_size: {}\n  {prefix}_source_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  {prefix}_world_counts: enemies={},humans={}\n  {prefix}_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  {prefix}_source_state: background_left=0x{:04x},rng={}\n  {prefix}_source_actor_samples: {}\n  {prefix}_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  {prefix}_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  {prefix}_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  {prefix}_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n",
         summary.wave,
         summary.wave_size,
         summary.source_landers,
@@ -605,6 +627,7 @@ fn playing_summary_to_text(prefix: &str, summary: &ActorScriptCheckPlayingSummar
         summary.reserve_swarmers,
         summary.source_background_left,
         source_rng,
+        source_actor_samples_summary(&summary.source_actor_samples),
         summary.player_takes_enemy_collision_damage,
         summary.player_laser_cooldown_steps,
         summary.lander_mode,
@@ -619,6 +642,35 @@ fn playing_summary_to_text(prefix: &str, summary: &ActorScriptCheckPlayingSummar
         summary.swarmer_fire_period_steps,
         summary.baiter_fire_period_steps,
     )
+}
+
+fn source_actor_samples_summary(samples: &[ActorScriptCheckSourceActorSample]) -> String {
+    if samples.is_empty() {
+        return String::from("none");
+    }
+
+    samples
+        .iter()
+        .map(|sample| {
+            format!(
+                "{}@{},{}[frac=0x{:02x}/0x{:02x}]",
+                sample.kind, sample.x, sample.y, sample.source_x_fraction, sample.source_y_fraction
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
+fn spawned_actor_samples_summary(samples: &[ActorScriptCheckSpawnedActorSample]) -> String {
+    if samples.is_empty() {
+        return String::from("none");
+    }
+
+    samples
+        .iter()
+        .map(|sample| format!("{}@{},{}", sample.kind, sample.x, sample.y))
+        .collect::<Vec<_>>()
+        .join(";")
 }
 
 impl From<GameSmokeReport> for LiveSmokeReport {
@@ -761,6 +813,7 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         first_playing_source_rng_seed: first_playing.source_rng_seed,
         first_playing_source_rng_hseed: first_playing.source_rng_hseed,
         first_playing_source_rng_lseed: first_playing.source_rng_lseed,
+        first_playing_source_actor_samples: first_playing.source_actor_samples,
         first_playing_player_takes_enemy_collision_damage: first_playing
             .player_takes_enemy_collision_damage,
         first_playing_player_laser_cooldown_steps: first_playing.player_laser_cooldown_steps,
@@ -975,6 +1028,72 @@ fn actor_script_check_playing_summary(frame: &ActorFrame) -> ActorScriptCheckPla
         baiter_mode: hostile_movement_mode_label(baiter_behavior.baiter_mode).to_string(),
         swarmer_fire_period_steps: swarmer_behavior.swarmer_fire_period_steps,
         baiter_fire_period_steps: baiter_behavior.baiter_fire_period_steps,
+        source_actor_samples: actor_script_check_source_actor_samples(frame),
+    }
+}
+
+fn actor_script_check_source_actor_samples(
+    frame: &ActorFrame,
+) -> Vec<ActorScriptCheckSourceActorSample> {
+    frame
+        .report
+        .snapshots
+        .iter()
+        .filter(|snapshot| snapshot.alive)
+        .filter_map(|snapshot| {
+            actor_script_check_source_actor_fraction(snapshot).map(
+                |(source_x_fraction, source_y_fraction)| ActorScriptCheckSourceActorSample {
+                    kind: actor_script_check_source_actor_kind_label(snapshot.kind).to_string(),
+                    x: snapshot.position.x,
+                    y: snapshot.position.y,
+                    source_x_fraction,
+                    source_y_fraction,
+                },
+            )
+        })
+        .take(ACTOR_SCRIPT_CHECK_SOURCE_ACTOR_SAMPLE_LIMIT)
+        .collect()
+}
+
+fn actor_script_check_source_actor_fraction(
+    snapshot: &crate::actor_game::ActorSnapshot,
+) -> Option<(u8, u8)> {
+    match snapshot.kind {
+        ActorKind::Lander => snapshot
+            .source_lander
+            .map(|source| (source.x_fraction, source.y_fraction)),
+        ActorKind::Mutant => snapshot
+            .source_mutant
+            .map(|source| (source.x_fraction, source.y_fraction)),
+        ActorKind::Bomber => snapshot
+            .source_bomber
+            .map(|source| (source.x_fraction, source.y_fraction)),
+        ActorKind::Pod => snapshot
+            .source_pod
+            .map(|source| (source.x_fraction, source.y_fraction)),
+        ActorKind::Swarmer => snapshot
+            .source_swarmer
+            .map(|source| (source.x_fraction, source.y_fraction)),
+        ActorKind::Baiter => snapshot
+            .source_baiter
+            .map(|source| (source.x_fraction, source.y_fraction)),
+        ActorKind::Human => snapshot
+            .source_human
+            .map(|source| (source.x_fraction, source.y_fraction)),
+        _ => None,
+    }
+}
+
+fn actor_script_check_source_actor_kind_label(kind: ActorKind) -> &'static str {
+    match kind {
+        ActorKind::Lander => "lander",
+        ActorKind::Mutant => "mutant",
+        ActorKind::Bomber => "bomber",
+        ActorKind::Pod => "pod",
+        ActorKind::Swarmer => "swarmer",
+        ActorKind::Baiter => "baiter",
+        ActorKind::Human => "human",
+        _ => "actor",
     }
 }
 
@@ -1164,6 +1283,7 @@ fn actor_script_check_reserve_activations(
         let input = actor_script_check_assist_input(&frame);
         frame = runtime.step(input);
         let spawned_counts = actor_script_check_spawned_counts(&frame);
+        let spawned_samples = actor_script_check_spawned_actor_samples(&frame);
         if frame.report.phase == Phase::Playing
             && frame.report.wave == wave
             && actor_script_check_reserve_total(previous_reserve) > 0
@@ -1172,6 +1292,7 @@ fn actor_script_check_reserve_activations(
             batches.push(ActorScriptCheckReserveActivationSummary {
                 assist_steps: step as u32,
                 spawned_counts,
+                spawned_samples,
                 playing: actor_script_check_playing_summary(&frame),
             });
             if actor_script_check_reserve_total(frame.report.enemy_reserve) == 0 {
@@ -1451,6 +1572,37 @@ fn actor_script_check_spawned_counts(frame: &ActorFrame) -> ActorScriptCheckSpaw
         }
     }
     counts
+}
+
+fn actor_script_check_spawned_actor_samples(
+    frame: &ActorFrame,
+) -> Vec<ActorScriptCheckSpawnedActorSample> {
+    frame
+        .report
+        .commands
+        .iter()
+        .filter_map(|command| match command {
+            GameCommand::Spawn(SpawnRequest::Lander { position }) => Some(("lander", *position)),
+            GameCommand::Spawn(SpawnRequest::Bomber { position }) => Some(("bomber", *position)),
+            GameCommand::Spawn(SpawnRequest::Pod { position }) => Some(("pod", *position)),
+            GameCommand::Spawn(SpawnRequest::Mutant { position, .. }) => {
+                Some(("mutant", *position))
+            }
+            GameCommand::Spawn(SpawnRequest::Swarmer { position, .. }) => {
+                Some(("swarmer", *position))
+            }
+            GameCommand::Spawn(SpawnRequest::Baiter { position, .. }) => {
+                Some(("baiter", *position))
+            }
+            _ => None,
+        })
+        .take(ACTOR_SCRIPT_CHECK_SOURCE_ACTOR_SAMPLE_LIMIT)
+        .map(|(kind, position)| ActorScriptCheckSpawnedActorSample {
+            kind: kind.to_string(),
+            x: position.x,
+            y: position.y,
+        })
+        .collect()
 }
 
 impl ActorScriptCheckSpawnedCounts {
@@ -2824,8 +2976,9 @@ mod tests {
     use crate::GameInput;
 
     use super::{
-        LiveInputState, LiveSmokeReport, actor_runtime_from_script_path, run_actor_live,
-        run_actor_script_check, run_actor_wgpu_smoke, run_smoke,
+        ActorScriptCheckSourceActorSample, ActorScriptCheckSpawnedActorSample, LiveInputState,
+        LiveSmokeReport, actor_runtime_from_script_path, run_actor_live, run_actor_script_check,
+        run_actor_wgpu_smoke, run_smoke,
     };
 
     #[test]
@@ -3073,6 +3226,7 @@ mod tests {
         assert_eq!(report.first_playing_source_rng_seed, Some(0xbe));
         assert_eq!(report.first_playing_source_rng_hseed, Some(0xb1));
         assert_eq!(report.first_playing_source_rng_lseed, Some(0x06));
+        assert!(report.first_playing_source_actor_samples.is_empty());
         assert!(report.first_playing_player_takes_enemy_collision_damage);
         assert_eq!(report.first_playing_player_laser_cooldown_steps, 6);
         assert_eq!(report.first_playing_lander_mode, "drift");
@@ -3182,6 +3336,7 @@ mod tests {
                 "  first_playing_world_counts: enemies=2,humans=2\n",
                 "  first_playing_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0\n",
                 "  first_playing_source_state: background_left=0x0000,rng=seed=0xbe,hseed=0xb1,lseed=0x06\n",
+                "  first_playing_source_actor_samples: none\n",
                 "  first_playing_player_behavior: takes_enemy_collision_damage=true,laser_cooldown_steps=6\n",
                 "  first_playing_lander_behavior: mode=drift,seek_speed=1,drift_speed=3,fire_period_steps=96\n",
                 "  first_playing_hostile_modes: mutant=chase_player,bomber=drift,pod=drift,swarmer=chase_player,baiter=chase_player\n",
@@ -3205,6 +3360,7 @@ mod tests {
                 "  next_playing_world_counts: enemies=2,humans=2\n",
                 "  next_playing_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0\n",
                 "  next_playing_source_state: background_left=0x0000,rng=seed=0x82,hseed=0x35,lseed=0x88\n",
+                "  next_playing_source_actor_samples: none\n",
                 "  next_playing_player_behavior: takes_enemy_collision_damage=true,laser_cooldown_steps=6\n",
                 "  next_playing_lander_behavior: mode=drift,seek_speed=1,drift_speed=3,fire_period_steps=96\n",
                 "  next_playing_hostile_modes: mutant=chase_player,bomber=drift,pod=drift,swarmer=chase_player,baiter=chase_player\n",
@@ -3301,6 +3457,67 @@ mod tests {
         assert_eq!(report.first_playing_reserve_pods, 0);
         assert_eq!(report.first_playing_reserve_mutants, 0);
         assert_eq!(report.first_playing_reserve_swarmers, 0);
+        assert_eq!(
+            report.first_playing_source_actor_samples,
+            vec![
+                ActorScriptCheckSourceActorSample {
+                    kind: "lander".to_string(),
+                    x: 251,
+                    y: 44,
+                    source_x_fraction: 0x33,
+                    source_y_fraction: 0xe0,
+                },
+                ActorScriptCheckSourceActorSample {
+                    kind: "bomber".to_string(),
+                    x: 227,
+                    y: 104,
+                    source_x_fraction: 0xe0,
+                    source_y_fraction: 0x00,
+                },
+                ActorScriptCheckSourceActorSample {
+                    kind: "pod".to_string(),
+                    x: 184,
+                    y: 72,
+                    source_x_fraction: 0x20,
+                    source_y_fraction: 0x00,
+                },
+                ActorScriptCheckSourceActorSample {
+                    kind: "mutant".to_string(),
+                    x: 148,
+                    y: 96,
+                    source_x_fraction: 0x00,
+                    source_y_fraction: 0x00,
+                },
+                ActorScriptCheckSourceActorSample {
+                    kind: "swarmer".to_string(),
+                    x: 236,
+                    y: 66,
+                    source_x_fraction: 0x00,
+                    source_y_fraction: 0x00,
+                },
+                ActorScriptCheckSourceActorSample {
+                    kind: "human".to_string(),
+                    x: 24,
+                    y: 224,
+                    source_x_fraction: 0xc3,
+                    source_y_fraction: 0x00,
+                },
+                ActorScriptCheckSourceActorSample {
+                    kind: "human".to_string(),
+                    x: 28,
+                    y: 225,
+                    source_x_fraction: 0x81,
+                    source_y_fraction: 0x00,
+                },
+                ActorScriptCheckSourceActorSample {
+                    kind: "human".to_string(),
+                    x: 78,
+                    y: 224,
+                    source_x_fraction: 0x30,
+                    source_y_fraction: 0x00,
+                },
+            ]
+        );
         assert!(report.to_text().contains(
             "first_playing_source_counts: landers=1,bombers=1,pods=1,mutants=1,swarmers=1"
         ));
@@ -3309,6 +3526,9 @@ mod tests {
                 .to_text()
                 .contains("first_playing_world_counts: enemies=5,humans=10")
         );
+        assert!(report.to_text().contains(
+            "first_playing_source_actor_samples: lander@251,44[frac=0x33/0xe0];bomber@227,104[frac=0xe0/0x00];pod@184,72[frac=0x20/0x00];mutant@148,96[frac=0x00/0x00];swarmer@236,66[frac=0x00/0x00]"
+        ));
     }
 
     #[test]
@@ -3454,6 +3674,21 @@ mod tests {
         assert_eq!(first_activation.spawned_counts.pods, 0);
         assert_eq!(first_activation.spawned_counts.mutants, 0);
         assert_eq!(first_activation.spawned_counts.swarmers, 0);
+        assert_eq!(
+            first_activation.spawned_samples,
+            vec![
+                ActorScriptCheckSpawnedActorSample {
+                    kind: "lander".to_string(),
+                    x: 222,
+                    y: 44,
+                },
+                ActorScriptCheckSpawnedActorSample {
+                    kind: "lander".to_string(),
+                    x: 251,
+                    y: 44,
+                },
+            ]
+        );
         assert_eq!(first_activation.playing.wave, 2);
         assert_eq!(first_activation.playing.world_enemies, 2);
         assert_eq!(first_activation.playing.world_humans, 10);
@@ -3471,6 +3706,26 @@ mod tests {
         assert_eq!(second_activation.spawned_counts.pods, 1);
         assert_eq!(second_activation.spawned_counts.mutants, 1);
         assert_eq!(second_activation.spawned_counts.swarmers, 0);
+        assert_eq!(
+            second_activation.spawned_samples,
+            vec![
+                ActorScriptCheckSpawnedActorSample {
+                    kind: "bomber".to_string(),
+                    x: 171,
+                    y: 80,
+                },
+                ActorScriptCheckSpawnedActorSample {
+                    kind: "pod".to_string(),
+                    x: 36,
+                    y: 135,
+                },
+                ActorScriptCheckSpawnedActorSample {
+                    kind: "mutant".to_string(),
+                    x: 106,
+                    y: 141,
+                },
+            ]
+        );
         assert_eq!(second_activation.playing.wave, 2);
         assert_eq!(second_activation.playing.world_enemies, 3);
         assert_eq!(second_activation.playing.reserve_landers, 0);
@@ -3485,6 +3740,14 @@ mod tests {
         assert_eq!(third_activation.spawned_counts.pods, 0);
         assert_eq!(third_activation.spawned_counts.mutants, 0);
         assert_eq!(third_activation.spawned_counts.swarmers, 1);
+        assert_eq!(
+            third_activation.spawned_samples,
+            vec![ActorScriptCheckSpawnedActorSample {
+                kind: "swarmer".to_string(),
+                x: 173,
+                y: 124,
+            }]
+        );
         assert_eq!(third_activation.playing.wave, 2);
         assert_eq!(third_activation.playing.world_enemies, 1);
         assert_eq!(third_activation.playing.reserve_landers, 0);
@@ -3588,12 +3851,25 @@ mod tests {
         assert!(report.to_text().contains(
             "reserve_activation_1_spawned_counts: landers=2,bombers=0,pods=0,mutants=0,swarmers=0"
         ));
+        assert!(
+            report
+                .to_text()
+                .contains("reserve_activation_1_spawned_samples: lander@222,44;lander@251,44")
+        );
         assert!(report.to_text().contains(
             "reserve_activation_2_spawned_counts: landers=0,bombers=1,pods=1,mutants=1,swarmers=0"
         ));
         assert!(report.to_text().contains(
+            "reserve_activation_2_spawned_samples: bomber@171,80;pod@36,135;mutant@106,141"
+        ));
+        assert!(report.to_text().contains(
             "reserve_activation_3_spawned_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=1"
         ));
+        assert!(
+            report
+                .to_text()
+                .contains("reserve_activation_3_spawned_samples: swarmer@173,124")
+        );
         assert!(report.to_text().contains(
             "reserve_activation_3_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0"
         ));

@@ -788,15 +788,17 @@ reintroduce legacy implementation terminology.
   headless attract actor step, reports declared attract-cycle milestones when
   the script provides a bounded `cycle`, then credits/starts the actor runtime
   through the first playable wave and prints script manifest, first-frame,
-  source-wave, spawned world, reserve/source-state, and effective behavior
-  counts/modes without opening a window. The checker then uses the actor
+  source-wave, spawned world, reserve/source-state, source-backed actor
+  placement samples, and effective behavior counts/modes without opening a
+  window. The checker then uses the actor
   `XYZZY` overlay smart-bomb path to assist progression and reports the
   source-shaped
   wave-clear survivor-bonus interstitial, its `0x80` wave-advance sleep
   window, next playable wave, and a bounded reserve activation batch sequence
-  plus post-reserve wave-clear and `0x80` sleep interstitials when real actor
-  wave-clear/wave-start and reserve-activation logic reaches them, then reports
-  the next playable wave after that post-reserve sleep.
+  with restored spawn positions plus post-reserve wave-clear and `0x80` sleep
+  interstitials when real actor wave-clear/wave-start and reserve-activation
+  logic reaches them, then reports the next playable wave after that
+  post-reserve sleep.
   `examples/actor-custom-attract.script` is the checked bounded editable
   sample for that flow, including Williams reveal, Defender coalescence,
   Hall-of-Fame, credit, and scoring-surface attract actions.

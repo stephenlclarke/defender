@@ -56,8 +56,9 @@ verification tools.
   reports bounded declared attract-cycle milestones for custom attract scripts,
   credits/starts the actor runtime through the first playable wave, and reports
   manifest, first-frame, effective source-wave, spawned world counts,
-  reserve/source-state, and the effective first-play behavior profile actors
-  receive for movement/damage/fire tuning.
+  reserve/source-state, source-backed actor placement samples, and the
+  effective first-play behavior profile actors receive for movement/damage/fire
+  tuning.
   It then uses the actor `XYZZY` overlay smart-bomb path to assist wave clear
   and reports the source-shaped wave-clear survivor-bonus interstitial plus the
   source `0x80` wave-advance sleep before the next playable wave when the
@@ -66,10 +67,10 @@ verification tools.
   enemy reserves, the checker keeps stepping through smart-bomb cooldown and
   reserve activation to report a bounded restored reserve batch sequence,
   including each batch's spawned family counts, resulting source/reserve state,
-  terminal batch status, and the first following post-reserve wave-clear
-  interstitial plus its `0x80` wave-advance sleep after those source reserves
-  are empty, followed by the next playable wave state after that post-reserve
-  sleep.
+  restored spawn positions, terminal batch status, and the first following
+  post-reserve wave-clear interstitial plus its `0x80` wave-advance sleep after
+  those source reserves are empty, followed by the next playable wave state
+  after that post-reserve sleep.
   `examples/actor-custom-attract.script` provides a checked bounded editable
   starting point with Williams reveal, Defender coalescence, Hall-of-Fame,
   credit, and scoring-surface attract actions. The built-in actor attract,
@@ -947,6 +948,31 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-07 03:18 BST`: Completed the actor script-check source placement
+  sample cycle. `--actor-script-check <path>` now reports bounded
+  `*_source_actor_samples` for first-play, next-wave, reserve-activation, and
+  post-reserve playable summaries, including actor family, screen position, and
+  source X/Y fractions for source-backed lander, bomber, pod, mutant, swarmer,
+  baiter, and human snapshots. Reserve activation summaries also report
+  `*_spawned_samples`, which capture the restored spawn command positions for
+  each observed batch. The focused source-wave regression now pins the first
+  bounded source-backed placement samples, and the reserve-heavy custom-driver
+  regression now pins restored lander, bomber, pod, mutant, and swarmer reserve
+  positions. No legacy code, tests, or scaffolding were safe to remove because
+  this slice extends the active custom-driver preflight evidence surface. Slack
+  start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780797797302969>.
+  Validation passed with `cargo fmt --check`, `cargo test actor_script_check
+  --all-targets --features legacy-tools`, `cargo test actor_script
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, `cargo run --quiet --features legacy-tools --
+  --actor-script-check examples/actor-custom-attract.script`, `make
+  actor-smoke`, `make actor-wgpu-smoke`, `make actor-attract-smoke`,
+  `markdownlint README.md SPEC.md PLAN.md docs/actor-architecture.md`, and
+  `git diff --check`.
 
 - `2026-06-07 02:19 BST`: Completed the bounded custom attract example cycle.
   `examples/actor-custom-attract.script` now declares a 96-step `[attract]`

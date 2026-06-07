@@ -90,15 +90,15 @@ evidence commands.
   bounded declared attract-cycle milestones when a custom script provides a
   `cycle`, then credits/starts the actor runtime through the first playable
   wave and prints attract/behavior/wave manifest counts plus first-frame,
-  effective source-wave, spawned world, reserve/source-state, and first-play
-  behavior summaries. The
+  effective source-wave, spawned world, reserve/source-state, source-backed
+  actor placement samples, and first-play behavior summaries. The
   checker then uses the actor `XYZZY` overlay smart-bomb path to assist
   progression and reports the source-shaped wave-clear survivor-bonus
   interstitial, its `0x80` wave-advance sleep window, next playable wave, and a
-  bounded reserve activation batch sequence plus post-reserve wave-clear and
-  `0x80` sleep interstitials when real wave-clear/wave-start and reserve
-  activation emit their actor reports, then reports the next playable wave
-  after that post-reserve sleep. The checked
+  bounded reserve activation batch sequence with restored spawn positions plus
+  post-reserve wave-clear and `0x80` sleep interstitials when real
+  wave-clear/wave-start and reserve activation emit their actor reports, then
+  reports the next playable wave after that post-reserve sleep. The checked
   `examples/actor-custom-attract.script` file is the bounded editable
   smoke-tested example, including Williams reveal, Defender coalescence,
   Hall-of-Fame, credit, and scoring-surface attract actions. The shared live
@@ -262,11 +262,12 @@ custom-driver runtime smoke tests or through `--actor-script <path>` in the
 interactive actor live runtime. `--actor-script-check <path>` runs the same
 file-backed path without opening the window and reports the parsed script
 surface, first attract actor frame, declared attract-cycle milestones for
-bounded looping scripts, first playable wave counts, and effective first-play
-reserve/source-state plus the behavior profile that actors receive through
-`StepReport`. It also samples the next playable wave with an actor `XYZZY`
-overlay smart-bomb assist loop, so progressive custom-driver wave profiles can
-be checked before live launch without bypassing actor commands.
+bounded looping scripts, first playable wave counts, source-backed actor
+placement samples, and effective first-play reserve/source-state plus the
+behavior profile that actors receive through `StepReport`. It also samples the
+next playable wave with an actor `XYZZY` overlay smart-bomb assist loop, so
+progressive custom-driver wave profiles can be checked before live launch
+without bypassing actor commands.
 The checker records the first `WaveCleared` report it observes, including the
 survivor count, visible source astronaut icons, awarded survivor points,
 world counts, and source interstitial sleep fields. It also records the first
@@ -275,12 +276,12 @@ so custom wave scripts can verify that next-wave spawning remains delayed by
 the actor driver rather than by a display-frame shortcut.
 When that next wave still has enemy reserves, the checker keeps stepping the
 same actor path through smart-bomb cooldown and reserve activation, then reports
-each observed restored batch's spawned family counts, resulting source state,
-terminal batch status, and the first following `WaveCleared` interstitial after
-those source reserves are empty. It then records the later survivor-bonus
-report that enters the post-reserve source `0x80` wave-advance sleep before the
-next playable wave starts, and records the resulting post-reserve playable wave
-state once the actor driver reaches it.
+each observed restored batch's spawned family counts, restored spawn positions,
+resulting source state, terminal batch status, and the first following
+`WaveCleared` interstitial after those source reserves are empty. It then
+records the later survivor-bonus report that enters the post-reserve source
+`0x80` wave-advance sleep before the next playable wave starts, and records the
+resulting post-reserve playable wave state once the actor driver reaches it.
 
 `AttractScript::manifest`, `ActorBehaviorScript::manifest`,
 `ActorWaveScript::manifest`, `ActorDriverScripts::manifest`, and
