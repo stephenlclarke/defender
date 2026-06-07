@@ -792,9 +792,10 @@ reintroduce legacy implementation terminology.
   placement samples, playable hostile projectile source metadata, source
   sound-command bytes, a bounded first player-laser sample with its `0xEB`
   command, a bounded first player-laser-hit explosion/sound sample when a
-  script produces one, a bounded first hostile source projectile sample when
-  one appears, and effective behavior counts/modes without opening a window.
-  The checker
+  script produces one, a parser-backed hostile laser-hit matrix for lander,
+  mutant, bomber, pod, swarmer, and baiter score/explosion/sound evidence, a
+  bounded first hostile source projectile sample when one appears, and
+  effective behavior counts/modes without opening a window. The checker
   then uses the actor
   `XYZZY` overlay smart-bomb path to assist progression and reports the
   source-shaped

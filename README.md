@@ -128,14 +128,16 @@ wave, spawned world, reserve/source-state, source-backed actor placement
 samples, playable hostile projectile source metadata, source sound-command
 bytes, a bounded first player-laser sample with its `0xEB` command, a bounded
 first player-laser-hit explosion/sound sample when a script produces one, a
-bounded first hostile source projectile sample when one appears, and effective
-behavior counts/modes; it also advances through the actor `XYZZY` overlay
-smart-bomb path to report the source-shaped wave-clear survivor-bonus
-interstitial, its `0x80` wave-advance sleep window, next playable wave, and a
-bounded reserve activation batch sequence with restored spawn positions plus
-post-reserve wave-clear and `0x80` sleep interstitials when progression reaches
-them, followed by the next playable wave after that post-reserve sleep. The
-checked `examples/actor-custom-attract.script` file is a bounded editable
+parser-backed hostile laser-hit matrix for lander, mutant, bomber, pod,
+swarmer, and baiter score/explosion/sound evidence, a bounded first hostile
+source projectile sample when one appears, and effective behavior counts/modes;
+it also advances through the actor `XYZZY` overlay smart-bomb path to report
+the source-shaped wave-clear survivor-bonus interstitial, its `0x80`
+wave-advance sleep window, next playable wave, and a bounded reserve activation
+batch sequence with restored spawn positions plus post-reserve wave-clear and
+`0x80` sleep interstitials when progression reaches them, followed by the next
+playable wave after that post-reserve sleep. The checked
+`examples/actor-custom-attract.script` file is a bounded editable
 custom-driver starting point with Williams reveal, Defender coalescence,
 Hall-of-Fame, credit, and scoring-surface attract actions. Actor high-score
 entry now accepts live initials/backspace through the actor input surface and

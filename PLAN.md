@@ -62,9 +62,11 @@ verification tools.
   profile actors receive for movement/damage/fire tuning. It also runs bounded
   independent sample passes to report the first player laser plus its `0xEB`
   red-label sound command, the first player-laser-hit explosion plus its
-  red-label hit command when a script produces one, and the first hostile
-  source projectile plus its associated red-label hostile shot command when a
-  script produces one, without mutating the main assisted progression check.
+  red-label hit command when a script produces one, a parser-backed hostile
+  laser-hit matrix for lander, mutant, bomber, pod, swarmer, and baiter
+  score/explosion/sound evidence, and the first hostile source projectile plus
+  its associated red-label hostile shot command when a script produces one,
+  without mutating the main assisted progression check.
   It then uses the actor `XYZZY` overlay smart-bomb path to assist wave clear
   and reports the source-shaped wave-clear survivor-bonus interstitial plus the
   source `0x80` wave-advance sleep before the next playable wave when the
@@ -954,6 +956,31 @@ Exit gate:
    boundaries, or provide a new concrete MAME mismatch/input program.
 
 ## Current Work Log
+
+- `2026-06-07 09:20 BST`: Completed the actor script-check hostile
+  laser-hit matrix cycle. `--actor-script-check <path>` now builds a bounded
+  parser-backed hit-matrix probe from sectioned custom-driver scripts for
+  lander, mutant, bomber, pod, swarmer, and baiter targets. Each generated
+  probe reaches the first playable wave, freezes target motion/fire timers,
+  sends one fire input, and reports sample step, score delta, cumulative
+  score, explosion metadata, hit sound command, and spawned counts without
+  mutating the main example-script wave-clear/reserve assist timeline. The
+  checked matrix pins `0xF9` lander hit, `0xE8` mutant hit, `0xFE` bomber hit,
+  `0xFA` pod hit with six spawned swarmers, `0xF8` swarmer hit, and `0xF8`
+  baiter hit. No legacy code, tests, or scaffolding were safe to remove because
+  this slice expands the active custom-driver preflight evidence surface for
+  hostile-family score/explosion/audio fidelity. Slack start:
+  <https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1780817708724449>.
+  Validation passed with `cargo fmt --check`, `cargo test actor_script_check
+  --all-targets --features legacy-tools`, `cargo test actor_script
+  --all-targets --features legacy-tools`, `cargo test actor_live --all-targets
+  --features legacy-tools`, `cargo check --all-targets --features
+  legacy-tools`, `cargo clippy --all-targets --features legacy-tools --
+  -D warnings`, `cargo run --quiet --features legacy-tools --
+  --actor-script-check examples/actor-custom-attract.script`, `make
+  actor-smoke`, `make actor-wgpu-smoke`, `make actor-attract-smoke`,
+  `markdownlint README.md SPEC.md PLAN.md docs/actor-architecture.md`, and
+  `git diff --check`.
 
 - `2026-06-07 08:28 BST`: Completed the actor script-check laser-hit
   explosion/audio preflight cycle. `--actor-script-check <path>` now runs a
