@@ -783,7 +783,7 @@ impl RenderScene {
 }
 
 pub fn source_message_text(label: &str) -> Option<&'static str> {
-    SOURCE_MESSAGES_TSV.lines().skip(1).find_map(|line| {
+    MESSAGE_TEXT_TABLE_TSV.lines().skip(1).find_map(|line| {
         if line.trim().is_empty() {
             return None;
         }
@@ -802,7 +802,7 @@ pub fn source_message_text(label: &str) -> Option<&'static str> {
 pub fn source_screen_position(screen_address: u16) -> [f32; 2] {
     let [column, row] = screen_address.to_be_bytes();
     [
-        f32::from(column) * SOURCE_SCREEN_COLUMN_PIXELS,
+        f32::from(column) * SCREEN_COLUMN_WIDTH_PIXELS,
         f32::from(row),
     ]
 }
@@ -841,7 +841,7 @@ pub fn push_source_message_sprites(
                 tint: Color::WHITE,
             });
         }
-        cursor_x += size[0] as f32 + SOURCE_SCREEN_COLUMN_PIXELS;
+        cursor_x += size[0] as f32 + SCREEN_COLUMN_WIDTH_PIXELS;
     }
 }
 
@@ -865,7 +865,7 @@ pub fn push_source_text_bytes_sprites(
                 tint: Color::WHITE,
             });
         }
-        cursor_x += size[0] as f32 + SOURCE_SCREEN_COLUMN_PIXELS;
+        cursor_x += size[0] as f32 + SCREEN_COLUMN_WIDTH_PIXELS;
     }
 }
 
@@ -878,7 +878,7 @@ pub fn push_source_controlled_message_sprites(
     let mut layout = SourceMessageTextLayout {
         top_left: top_left_screen_address,
         cursor: top_left_screen_address,
-        line_spacing: SOURCE_MESSAGE_LINE_SPACING,
+        line_spacing: MESSAGE_LINE_SPACING_ROWS,
     };
 
     for word in text.split_whitespace() {
@@ -903,7 +903,7 @@ fn source_text_byte_sprite(byte: u8) -> Option<(Option<SpriteId>, [u32; 2])> {
     }
 
     if byte.is_ascii_digit() {
-        return Some((SpriteId::score_digit(byte - b'0'), SOURCE_SCORE_DIGIT_SIZE));
+        return Some((SpriteId::score_digit(byte - b'0'), SCORE_DIGIT_PIXEL_SIZE));
     }
 
     let character = char::from(byte);
@@ -923,7 +923,7 @@ fn source_text_cursor_after_bytes(mut cursor: u16, bytes: &[u8]) -> u16 {
 
 fn source_text_cursor_advance(cursor: u16, width_pixels: u32) -> u16 {
     let [column, row] = cursor.to_be_bytes();
-    let width_columns = u8::try_from(width_pixels / u32::from(SOURCE_SCREEN_COLUMN_PIXELS_U8))
+    let width_columns = u8::try_from(width_pixels / u32::from(SCREEN_COLUMN_WIDTH_PIXELS_U8))
         .expect("source glyph width fits in u8");
     u16::from_be_bytes([column.wrapping_add(width_columns).wrapping_add(1), row])
 }
@@ -1139,9 +1139,9 @@ impl ObjectPicturePalette {
             one: WHITE_RGBA,
             a: WHITE_RGBA,
             c: WHITE_RGBA,
-            d: pseudo_color_rgba(SOURCE_TIE_COLOR_TABLE[offset]),
-            e: pseudo_color_rgba(SOURCE_TIE_COLOR_TABLE[offset + 1]),
-            f: pseudo_color_rgba(SOURCE_TIE_COLOR_TABLE[offset + 2]),
+            d: pseudo_color_rgba(BOMBER_COLOR_SEQUENCE[offset]),
+            e: pseudo_color_rgba(BOMBER_COLOR_SEQUENCE[offset + 1]),
+            f: pseudo_color_rgba(BOMBER_COLOR_SEQUENCE[offset + 2]),
         }
     }
 
@@ -1192,26 +1192,26 @@ const TRANSPARENT_RGBA: [u8; 4] = [0, 0, 0, 0];
 const PICTURE_COLOR_TABLE: [u8; 16] = [
     0x00, 0x00, 0x07, 0x28, 0x2F, 0x81, 0xA4, 0x15, 0xC7, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
-const SOURCE_TIE_COLOR_TABLE: [u8; 9] = [0x81, 0x81, 0x2F, 0x81, 0x2F, 0x07, 0x2F, 0x81, 0x07];
-const SOURCE_OBJECT_COLOR_TABLE: [u8; 37] = [
+const BOMBER_COLOR_SEQUENCE: [u8; 9] = [0x81, 0x81, 0x2F, 0x81, 0x2F, 0x07, 0x2F, 0x81, 0x07]; // original: SOURCE_TIE_COLOR_TABLE
+const OBJECT_COLOR_SEQUENCE: [u8; 37] = [
     0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x37, 0x2F, 0x27, 0x1F, 0x17, 0x47, 0x47, 0x87,
     0x87, 0xC7, 0xC7, 0xC6, 0xC5, 0xCC, 0xCB, 0xCA, 0xDA, 0xE8, 0xF8, 0xF9, 0xFA, 0xFB, 0xFD, 0xFF,
     0xBF, 0x3F, 0x3E, 0x3C, 0x00,
-];
-const SOURCE_WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255];
-const SOURCE_WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255];
+]; // original: SOURCE_OBJECT_COLOR_TABLE
+const WILLIAMS_RED_GREEN_DAC_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255]; // original: SOURCE_WILLIAMS_RED_GREEN_LEVELS
+const WILLIAMS_BLUE_DAC_LEVELS: [u8; 4] = [0, 95, 160, 255]; // original: SOURCE_WILLIAMS_BLUE_LEVELS
 const FONT_SHEET_PNG: &[u8] = include_bytes!("../assets/sprites/font-sheet.png");
 const ARCADE_SCORE_DIGITS_TSV: &str = include_str!("../assets/red-label/score-digits.tsv");
-const SOURCE_MESSAGE_GLYPHS_TSV: &str = include_str!("../assets/red-label/message-glyphs.tsv");
-const SOURCE_MESSAGES_TSV: &str = include_str!("../assets/red-label/messages.tsv");
-const SOURCE_OBJECT_IMAGES_TSV: &str = include_str!("../assets/red-label/object-images.tsv");
-const SOURCE_SCORE_DIGIT_SIZE: [u32; 2] = [6, 8];
+const MESSAGE_GLYPH_TABLE_TSV: &str = include_str!("../assets/red-label/message-glyphs.tsv"); // original: SOURCE_MESSAGE_GLYPHS_TSV
+const MESSAGE_TEXT_TABLE_TSV: &str = include_str!("../assets/red-label/messages.tsv"); // original: SOURCE_MESSAGES_TSV
+const OBJECT_IMAGE_TABLE_TSV: &str = include_str!("../assets/red-label/object-images.tsv"); // original: SOURCE_OBJECT_IMAGES_TSV
+const SCORE_DIGIT_PIXEL_SIZE: [u32; 2] = [6, 8]; // original: SOURCE_SCORE_DIGIT_SIZE
 const MESSAGE_GLYPH_ATLAS_START: [u32; 2] = [0, 104];
 const MESSAGE_GLYPH_ATLAS_ROW_STEP: u32 = 16;
 const MESSAGE_GLYPH_ATLAS_GAP: u32 = 2;
-const SOURCE_SCREEN_COLUMN_PIXELS_U8: u8 = 2;
-const SOURCE_SCREEN_COLUMN_PIXELS: f32 = SOURCE_SCREEN_COLUMN_PIXELS_U8 as f32;
-const SOURCE_MESSAGE_LINE_SPACING: u8 = 0x0A;
+const SCREEN_COLUMN_WIDTH_PIXELS_U8: u8 = 2; // original: SOURCE_SCREEN_COLUMN_PIXELS_U8
+const SCREEN_COLUMN_WIDTH_PIXELS: f32 = SCREEN_COLUMN_WIDTH_PIXELS_U8 as f32; // original: SOURCE_SCREEN_COLUMN_PIXELS
+const MESSAGE_LINE_SPACING_ROWS: u8 = 0x0A; // original: SOURCE_MESSAGE_LINE_SPACING
 const ASTRONAUT_EXPLOSION_BYTES: [u8; 32] = [
     0x00, 0x00, 0x0D, 0x6C, 0x6C, 0x0D, 0x00, 0x00, 0x06, 0xE6, 0xC8, 0x83, 0x82, 0xC8, 0xEC, 0x06,
     0x60, 0x6D, 0x8C, 0x28, 0x28, 0x8C, 0x6D, 0x60, 0x00, 0x00, 0xE0, 0xC6, 0xC6, 0xE0, 0x00, 0x00,
@@ -1240,30 +1240,30 @@ const TERRAIN_EXPLOSION_GRID: ObjectPictureGrid = ObjectPictureGrid {
     bytes: &TERRAIN_EXPLOSION_BYTES,
     palette: ObjectPicturePalette::burst(),
 };
-const SOURCE_DEFENDER_LOGO_COLUMNS: u8 = 0x3C;
-const SOURCE_DEFENDER_LOGO_ROWS: u8 = 0x18;
-const SOURCE_DEFENDER_LOGO_BYTES: usize =
-    SOURCE_DEFENDER_LOGO_COLUMNS as usize * SOURCE_DEFENDER_LOGO_ROWS as usize;
+const HALL_OF_FAME_DEFENDER_LOGO_COLUMNS: u8 = 0x3C; // original: SOURCE_DEFENDER_LOGO_COLUMNS
+const HALL_OF_FAME_DEFENDER_LOGO_ROWS: u8 = 0x18; // original: SOURCE_DEFENDER_LOGO_ROWS
+const HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT: usize =
+    HALL_OF_FAME_DEFENDER_LOGO_COLUMNS as usize * HALL_OF_FAME_DEFENDER_LOGO_ROWS as usize; // original: SOURCE_DEFENDER_LOGO_BYTES
 pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS: usize = 15;
 pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS: usize = 1;
 pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT: usize =
     ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS * ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS;
-const SOURCE_ATTRACT_COPYRIGHT_COLUMNS: u8 = 40;
-const SOURCE_ATTRACT_COPYRIGHT_ROWS: u8 = 8;
-const SOURCE_ATTRACT_COPYRIGHT_BYTES: [u8; 80] = [
+const COPYRIGHT_STRIP_COLUMNS: u8 = 40; // original: SOURCE_ATTRACT_COPYRIGHT_COLUMNS
+const COPYRIGHT_STRIP_ROWS: u8 = 8; // original: SOURCE_ATTRACT_COPYRIGHT_ROWS
+const COPYRIGHT_STRIP_BYTES: [u8; 80] = [
     0x3E, 0x41, 0x41, 0x22, 0x00, 0x3E, 0x41, 0x41, 0x3E, 0x00, 0x7F, 0x09, 0x09, 0x06, 0x00, 0x03,
     0x04, 0x78, 0x04, 0x03, 0x00, 0x7F, 0x09, 0x19, 0x66, 0x00, 0x41, 0x7F, 0x41, 0x00, 0x3E, 0x41,
     0x49, 0x3A, 0x00, 0x7F, 0x08, 0x08, 0x7F, 0x00, 0x01, 0x01, 0x7F, 0x01, 0x01, 0x00, 0x1C, 0x22,
     0x5D, 0x63, 0x55, 0x22, 0x1C, 0x22, 0x7F, 0x4B, 0x45, 0x22, 0x1C, 0x00, 0x00, 0x00, 0x42, 0x7F,
     0x40, 0x00, 0x26, 0x49, 0x49, 0x3E, 0x00, 0x36, 0x49, 0x49, 0x36, 0x00, 0x3E, 0x41, 0x41, 0x3E,
-];
-const SOURCE_ATTRACT_WILLIAMS_LOGO_COLUMNS: u8 = 46;
-const SOURCE_ATTRACT_WILLIAMS_LOGO_ROWS: u8 = 19;
-const SOURCE_ATTRACT_WILLIAMS_LOGO_PIXELS: usize =
-    SOURCE_ATTRACT_WILLIAMS_LOGO_COLUMNS as usize * 2 * SOURCE_ATTRACT_WILLIAMS_LOGO_ROWS as usize;
-const SOURCE_ATTRACT_WILLIAMS_LOGO_FIRST_COLUMN: u8 = 0x36;
-const SOURCE_ATTRACT_WILLIAMS_LOGO_FIRST_ROW: u8 = 0x3C;
-const SOURCE_ATTRACT_WILLIAMS_LOGO_TABLE: [u8; 351] = [
+]; // original: SOURCE_ATTRACT_COPYRIGHT_BYTES
+const WILLIAMS_LOGO_COLUMNS: u8 = 46; // original: SOURCE_ATTRACT_WILLIAMS_LOGO_COLUMNS
+const WILLIAMS_LOGO_ROWS: u8 = 19; // original: SOURCE_ATTRACT_WILLIAMS_LOGO_ROWS
+const WILLIAMS_LOGO_PIXEL_COUNT: usize =
+    WILLIAMS_LOGO_COLUMNS as usize * 2 * WILLIAMS_LOGO_ROWS as usize; // original: SOURCE_ATTRACT_WILLIAMS_LOGO_PIXELS
+const WILLIAMS_LOGO_FIRST_SCREEN_COLUMN: u8 = 0x36; // original: SOURCE_ATTRACT_WILLIAMS_LOGO_FIRST_COLUMN
+const WILLIAMS_LOGO_FIRST_SCREEN_ROW: u8 = 0x3C; // original: SOURCE_ATTRACT_WILLIAMS_LOGO_FIRST_ROW
+const WILLIAMS_LOGO_DRAW_PROGRAM_BYTES: [u8; 351] = [
     0xFE, 0x74, 0x40, 0x11, 0x11, 0x85, 0x81, 0x81, 0x81, 0x88, 0x82, 0x82, 0x22, 0x24, 0x22, 0x42,
     0x24, 0x24, 0x24, 0x44, 0x24, 0x44, 0x49, 0x44, 0x94, 0x41, 0x88, 0x14, 0x41, 0x88, 0x14, 0x41,
     0x88, 0x94, 0x41, 0x88, 0x94, 0x49, 0x88, 0x14, 0x98, 0x58, 0x94, 0x98, 0x18, 0x94, 0x46, 0x66,
@@ -1286,8 +1286,8 @@ const SOURCE_ATTRACT_WILLIAMS_LOGO_TABLE: [u8; 351] = [
     0xA8, 0x82, 0x44, 0xA8, 0x22, 0x20, 0xFE, 0x87, 0x40, 0x44, 0x11, 0x88, 0x24, 0xFE, 0x9A, 0x3F,
     0x44, 0x11, 0x88, 0x24, 0xFE, 0xC1, 0x3F, 0x44, 0x44, 0x44, 0x11, 0x11, 0x11, 0x11, 0x88, 0x88,
     0x88, 0x22, 0x22, 0x22, 0x20, 0xFE, 0xC3, 0x45, 0x22, 0x22, 0x44, 0x11, 0x81, 0x50, 0xFD,
-];
-const SOURCE_DEFENDER_LOGO_COMPRESSED: [u8; 366] = [
+]; // original: SOURCE_ATTRACT_WILLIAMS_LOGO_TABLE
+const HALL_OF_FAME_DEFENDER_LOGO_COMPRESSED_BYTES: [u8; 366] = [
     0x10, 0xD1, 0xBD, 0x29, 0xC2, 0x9C, 0x29, 0xCB, 0xEA, 0xC2, 0x8C, 0x29, 0xC2, 0x81, 0x0D, 0x10,
     0xC2, 0x8D, 0x29, 0xC2, 0x9C, 0x29, 0xCB, 0xEA, 0x42, 0x94, 0x29, 0x42, 0x81, 0x0C, 0x3F, 0x29,
     0xC2, 0x94, 0xC2, 0x9C, 0x29, 0xC1, 0x8D, 0xA4, 0x29, 0x42, 0x94, 0x29, 0x3F, 0x3E, 0x29, 0x42,
@@ -1311,7 +1311,7 @@ const SOURCE_DEFENDER_LOGO_COMPRESSED: [u8; 366] = [
     0x35, 0xC1, 0x52, 0xC3, 0x4C, 0x7F, 0x15, 0xC2, 0x7D, 0x34, 0xC1, 0x5C, 0x17, 0xCC, 0x36, 0xC3,
     0x5C, 0x14, 0x2D, 0x34, 0xC7, 0x1C, 0x14, 0xC2, 0x6E, 0x34, 0xD1, 0x4E, 0x15, 0xCC, 0x36, 0xC3,
     0x5C, 0x14, 0x2D, 0x34, 0xC7, 0x1C, 0x14, 0xC2, 0x51, 0xC2, 0x7D, 0x14, 0xF1, 0x4C,
-];
+]; // original: SOURCE_DEFENDER_LOGO_COMPRESSED
 
 impl TextureAtlas {
     pub fn new(surface: SurfaceSize, regions: Vec<AtlasRegion>) -> Self {
@@ -1689,7 +1689,7 @@ fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) ->
     let terrain_explosion = decode_picture_grid_rgba("TEREX", TERRAIN_EXPLOSION_GRID);
     let score_digits = decode_score_digit_sprites("score-digits.tsv", ARCADE_SCORE_DIGITS_TSV);
     let message_glyphs =
-        decode_message_glyph_sprites("message-glyphs.tsv", SOURCE_MESSAGE_GLYPHS_TSV);
+        decode_message_glyph_sprites("message-glyphs.tsv", MESSAGE_GLYPH_TABLE_TSV);
     let hall_of_fame_logo = decode_source_defender_logo_rgba();
     let attract_copyright_strip = decode_source_attract_copyright_strip_rgba();
     let attract_williams_logo = decode_source_attract_williams_logo_rgba();
@@ -2058,7 +2058,7 @@ fn decode_picture_bytes_rgba(
 }
 
 fn source_object_image_bytes(label: &'static str) -> Vec<u8> {
-    for line in SOURCE_OBJECT_IMAGES_TSV.lines().skip(1) {
+    for line in OBJECT_IMAGE_TABLE_TSV.lines().skip(1) {
         let mut columns = line.split('\t');
         let Some(image_label) = columns.next() else {
             continue;
@@ -2314,15 +2314,15 @@ fn picture_palette_color(index: u8, palette: ObjectPicturePalette) -> [u8; 4] {
 fn decode_source_defender_logo_rgba() -> EmbeddedSprite {
     let bytes = expand_source_defender_logo_bytes();
     let surface = SurfaceSize::new(
-        u32::from(SOURCE_DEFENDER_LOGO_COLUMNS) * 2,
-        u32::from(SOURCE_DEFENDER_LOGO_ROWS),
+        u32::from(HALL_OF_FAME_DEFENDER_LOGO_COLUMNS) * 2,
+        u32::from(HALL_OF_FAME_DEFENDER_LOGO_ROWS),
     );
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
     let palette = ObjectPicturePalette::defender_logo();
 
-    for column in 0..usize::from(SOURCE_DEFENDER_LOGO_COLUMNS) {
-        let source_column = column * usize::from(SOURCE_DEFENDER_LOGO_ROWS);
-        for row in 0..usize::from(SOURCE_DEFENDER_LOGO_ROWS) {
+    for column in 0..usize::from(HALL_OF_FAME_DEFENDER_LOGO_COLUMNS) {
+        let source_column = column * usize::from(HALL_OF_FAME_DEFENDER_LOGO_ROWS);
+        for row in 0..usize::from(HALL_OF_FAME_DEFENDER_LOGO_ROWS) {
             let value = bytes[source_column + row];
             let left = picture_palette_color(value >> 4, palette);
             let right = picture_palette_color(value & 0x0F, palette);
@@ -2337,15 +2337,15 @@ fn decode_source_defender_logo_rgba() -> EmbeddedSprite {
 
 fn decode_source_attract_copyright_strip_rgba() -> EmbeddedSprite {
     let surface = SurfaceSize::new(
-        u32::from(SOURCE_ATTRACT_COPYRIGHT_COLUMNS) * 2,
-        u32::from(SOURCE_ATTRACT_COPYRIGHT_ROWS),
+        u32::from(COPYRIGHT_STRIP_COLUMNS) * 2,
+        u32::from(COPYRIGHT_STRIP_ROWS),
     );
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
 
-    for column in 0..usize::from(SOURCE_ATTRACT_COPYRIGHT_COLUMNS) {
-        let left_bits = SOURCE_ATTRACT_COPYRIGHT_BYTES[column * 2];
-        let right_bits = SOURCE_ATTRACT_COPYRIGHT_BYTES[column * 2 + 1];
-        for row in 0..usize::from(SOURCE_ATTRACT_COPYRIGHT_ROWS) {
+    for column in 0..usize::from(COPYRIGHT_STRIP_COLUMNS) {
+        let left_bits = COPYRIGHT_STRIP_BYTES[column * 2];
+        let right_bits = COPYRIGHT_STRIP_BYTES[column * 2 + 1];
+        for row in 0..usize::from(COPYRIGHT_STRIP_ROWS) {
             let mask = 1u8 << row;
             let offset = ((row * surface.width as usize) + column * 2) * 4;
             if left_bits & mask != 0 {
@@ -2362,8 +2362,8 @@ fn decode_source_attract_copyright_strip_rgba() -> EmbeddedSprite {
 
 fn decode_source_attract_williams_logo_rgba() -> EmbeddedSprite {
     let surface = SurfaceSize::new(
-        u32::from(SOURCE_ATTRACT_WILLIAMS_LOGO_COLUMNS) * 2,
-        u32::from(SOURCE_ATTRACT_WILLIAMS_LOGO_ROWS),
+        u32::from(WILLIAMS_LOGO_COLUMNS) * 2,
+        u32::from(WILLIAMS_LOGO_ROWS),
     );
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
 
@@ -2392,11 +2392,11 @@ struct SourceAttractWilliamsLogoWalk {
 fn source_attract_williams_logo_walk() -> SourceAttractWilliamsLogoWalk {
     let mut path = Vec::new();
     let mut operation_pixel_counts = Vec::new();
-    let mut seen = [false; SOURCE_ATTRACT_WILLIAMS_LOGO_PIXELS];
+    let mut seen = [false; WILLIAMS_LOGO_PIXEL_COUNT];
     let mut pointer = 0usize;
     let mut cursor = 0u16;
 
-    while let Some(opcode) = SOURCE_ATTRACT_WILLIAMS_LOGO_TABLE.get(pointer).copied() {
+    while let Some(opcode) = WILLIAMS_LOGO_DRAW_PROGRAM_BYTES.get(pointer).copied() {
         pointer += 1;
         if opcode > 0xAA {
             let complemented = !opcode;
@@ -2406,10 +2406,10 @@ fn source_attract_williams_logo_walk() -> SourceAttractWilliamsLogoWalk {
             if complemented.wrapping_sub(1) != 0 {
                 break;
             }
-            let Some(cursor_high) = SOURCE_ATTRACT_WILLIAMS_LOGO_TABLE.get(pointer).copied() else {
+            let Some(cursor_high) = WILLIAMS_LOGO_DRAW_PROGRAM_BYTES.get(pointer).copied() else {
                 break;
             };
-            let Some(cursor_low) = SOURCE_ATTRACT_WILLIAMS_LOGO_TABLE.get(pointer + 1).copied()
+            let Some(cursor_low) = WILLIAMS_LOGO_DRAW_PROGRAM_BYTES.get(pointer + 1).copied()
             else {
                 break;
             };
@@ -2489,8 +2489,8 @@ fn push_source_attract_williams_logo_pixel(
     let Some([pixel_x, pixel_y]) = source_attract_williams_logo_pixel(cursor) else {
         return;
     };
-    let index = usize::from(pixel_y) * usize::from(SOURCE_ATTRACT_WILLIAMS_LOGO_COLUMNS) * 2
-        + usize::from(pixel_x);
+    let index =
+        usize::from(pixel_y) * usize::from(WILLIAMS_LOGO_COLUMNS) * 2 + usize::from(pixel_x);
     if !seen[index] {
         seen[index] = true;
         path.push([pixel_x, pixel_y]);
@@ -2500,11 +2500,9 @@ fn push_source_attract_williams_logo_pixel(
 fn source_attract_williams_logo_pixel(cursor: u16) -> Option<[u8; 2]> {
     let [x, y] = cursor.to_be_bytes();
     let column = x >> 1;
-    let relative_column = column.checked_sub(SOURCE_ATTRACT_WILLIAMS_LOGO_FIRST_COLUMN)?;
-    let relative_row = y.checked_sub(SOURCE_ATTRACT_WILLIAMS_LOGO_FIRST_ROW)?;
-    if relative_column >= SOURCE_ATTRACT_WILLIAMS_LOGO_COLUMNS
-        || relative_row >= SOURCE_ATTRACT_WILLIAMS_LOGO_ROWS
-    {
+    let relative_column = column.checked_sub(WILLIAMS_LOGO_FIRST_SCREEN_COLUMN)?;
+    let relative_row = y.checked_sub(WILLIAMS_LOGO_FIRST_SCREEN_ROW)?;
+    if relative_column >= WILLIAMS_LOGO_COLUMNS || relative_row >= WILLIAMS_LOGO_ROWS {
         return None;
     }
 
@@ -2515,13 +2513,13 @@ fn source_attract_williams_logo_pixel(cursor: u16) -> Option<[u8; 2]> {
     ])
 }
 
-fn expand_source_defender_logo_bytes() -> [u8; SOURCE_DEFENDER_LOGO_BYTES] {
-    let mut output = [0; SOURCE_DEFENDER_LOGO_BYTES];
+fn expand_source_defender_logo_bytes() -> [u8; HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT] {
+    let mut output = [0; HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT];
     let mut cursor = 0usize;
     let mut length = 0u8;
     let mut right_pixel_next = false;
 
-    for byte in SOURCE_DEFENDER_LOGO_COMPRESSED {
+    for byte in HALL_OF_FAME_DEFENDER_LOGO_COMPRESSED_BYTES {
         for nibble in [byte >> 4, byte & 0x0F] {
             if nibble & 0x0C == 0 {
                 length = nibble.wrapping_add(length).wrapping_shl(2);
@@ -2530,13 +2528,13 @@ fn expand_source_defender_logo_bytes() -> [u8; SOURCE_DEFENDER_LOGO_BYTES] {
 
             length = (nibble & 0x03).wrapping_add(length);
             let color = source_defender_logo_color_byte(nibble);
-            if cursor >= SOURCE_DEFENDER_LOGO_BYTES {
-                cursor = cursor + 1 - SOURCE_DEFENDER_LOGO_BYTES;
+            if cursor >= HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT {
+                cursor = cursor + 1 - HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT;
             }
 
             if right_pixel_next {
                 output[cursor] = (output[cursor] & 0xF0) | (color & 0x0F);
-                cursor += usize::from(SOURCE_DEFENDER_LOGO_ROWS);
+                cursor += usize::from(HALL_OF_FAME_DEFENDER_LOGO_ROWS);
                 length = length.wrapping_sub(1);
                 if length & 0x80 != 0 {
                     right_pixel_next = false;
@@ -2554,7 +2552,7 @@ fn expand_source_defender_logo_bytes() -> [u8; SOURCE_DEFENDER_LOGO_BYTES] {
                     break;
                 }
 
-                cursor += usize::from(SOURCE_DEFENDER_LOGO_ROWS);
+                cursor += usize::from(HALL_OF_FAME_DEFENDER_LOGO_ROWS);
                 length = length.wrapping_sub(1);
                 if length & 0x80 != 0 {
                     right_pixel_next = false;
@@ -2579,11 +2577,12 @@ pub(crate) fn source_attract_defender_appearance_pixels(
     const CHUNK_ROW_PAIRS: i32 = 12;
     const CHUNK_CENTER_X_BYTES: i32 = 2;
     const CHUNK_CENTER_Y_SCANLINES: i32 = 12;
-    const SOURCE_APPEARANCE_FINAL_TICK: u8 = 0x2E;
+    const DEFENDER_WORDMARK_FINAL_APPEARANCE_TICK: u8 = 0x2E;
 
     let source = expand_source_defender_logo_bytes();
     let mut pixels = BTreeMap::new();
-    let size = i32::from(SOURCE_APPEARANCE_FINAL_TICK.saturating_sub(appearance_tick)).max(1);
+    let size =
+        i32::from(DEFENDER_WORDMARK_FINAL_APPEARANCE_TICK.saturating_sub(appearance_tick)).max(1);
     let row_pair_step = size * 2;
 
     for chunk_index in 0..ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT {
@@ -2636,7 +2635,7 @@ pub(crate) fn source_attract_defender_appearance_pixels(
 fn draw_source_defender_logo_word(
     pixels: &mut BTreeMap<[u32; 2], [u8; 4]>,
     surface: SurfaceSize,
-    source: &[u8; SOURCE_DEFENDER_LOGO_BYTES],
+    source: &[u8; HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT],
     source_x: i32,
     source_y: i32,
     target_x_byte: i32,
@@ -2656,7 +2655,7 @@ fn draw_source_defender_logo_word(
             write_native_rgba_pixel(
                 pixels,
                 surface,
-                target_x_byte * i32::from(SOURCE_SCREEN_COLUMN_PIXELS_U8) + dx,
+                target_x_byte * i32::from(SCREEN_COLUMN_WIDTH_PIXELS_U8) + dx,
                 target_y + dy,
                 color,
             );
@@ -2671,7 +2670,7 @@ fn clear_source_defender_logo_word(
 ) {
     for dy in 0..2 {
         for dx in 0..2 {
-            let native_x = target_x_byte * i32::from(SOURCE_SCREEN_COLUMN_PIXELS_U8) + dx;
+            let native_x = target_x_byte * i32::from(SCREEN_COLUMN_WIDTH_PIXELS_U8) + dx;
             let native_y = target_y + dy;
             if native_x < 0 || native_y < 0 {
                 continue;
@@ -2686,21 +2685,21 @@ fn clear_source_defender_logo_word(
 }
 
 fn source_defender_logo_nibble(
-    source: &[u8; SOURCE_DEFENDER_LOGO_BYTES],
+    source: &[u8; HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT],
     native_x: i32,
     native_y: i32,
 ) -> Option<u8> {
     if native_x < 0
         || native_y < 0
-        || native_x >= i32::from(SOURCE_DEFENDER_LOGO_COLUMNS) * 2
-        || native_y >= i32::from(SOURCE_DEFENDER_LOGO_ROWS)
+        || native_x >= i32::from(HALL_OF_FAME_DEFENDER_LOGO_COLUMNS) * 2
+        || native_y >= i32::from(HALL_OF_FAME_DEFENDER_LOGO_ROWS)
     {
         return None;
     }
 
     let byte_column = usize::try_from(native_x / 2).ok()?;
     let row = usize::try_from(native_y).ok()?;
-    let packed = source[byte_column * usize::from(SOURCE_DEFENDER_LOGO_ROWS) + row];
+    let packed = source[byte_column * usize::from(HALL_OF_FAME_DEFENDER_LOGO_ROWS) + row];
     if native_x % 2 == 0 {
         Some(packed >> 4)
     } else {
@@ -2745,15 +2744,15 @@ fn pseudo_color_rgba(value: u8) -> [u8; 4] {
     }
 
     [
-        SOURCE_WILLIAMS_RED_GREEN_LEVELS[usize::from(value & 0x07)],
-        SOURCE_WILLIAMS_RED_GREEN_LEVELS[usize::from((value >> 3) & 0x07)],
-        SOURCE_WILLIAMS_BLUE_LEVELS[usize::from((value >> 6) & 0x03)],
+        WILLIAMS_RED_GREEN_DAC_LEVELS[usize::from(value & 0x07)],
+        WILLIAMS_RED_GREEN_DAC_LEVELS[usize::from((value >> 3) & 0x07)],
+        WILLIAMS_BLUE_DAC_LEVELS[usize::from((value >> 6) & 0x03)],
         255,
     ]
 }
 
 fn source_object_cycle_color(phase: usize) -> [u8; 4] {
-    pseudo_color_rgba(SOURCE_OBJECT_COLOR_TABLE[phase % (SOURCE_OBJECT_COLOR_TABLE.len() - 1)])
+    pseudo_color_rgba(OBJECT_COLOR_SEQUENCE[phase % (OBJECT_COLOR_SEQUENCE.len() - 1)])
 }
 
 fn blit_default_region(

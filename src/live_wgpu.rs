@@ -53,10 +53,10 @@ const MAX_STEPS_PER_TICK: u32 = 5;
 const ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT: usize = 512;
 const ACTOR_SCRIPT_CHECK_ATTRACT_CYCLE_STEP_LIMIT: u64 = 4096;
 const ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT: usize = 4096;
-const ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_STEP_LIMIT: usize = 512;
+const ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_STEP_LIMIT: usize = 512; // original: ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_STEP_LIMIT
 const ACTOR_SCRIPT_CHECK_RESERVE_ACTIVATION_BATCH_LIMIT: usize = 8;
-const ACTOR_SCRIPT_CHECK_SOURCE_ACTOR_SAMPLE_LIMIT: usize = 8;
-const ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_SAMPLE_LIMIT: usize = 8;
+const ACTOR_SCRIPT_CHECK_ACTOR_SAMPLE_LIMIT: usize = 8; // original: ACTOR_SCRIPT_CHECK_SOURCE_ACTOR_SAMPLE_LIMIT
+const ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_LIMIT: usize = 8; // original: ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_SAMPLE_LIMIT
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LiveInputProfile {
@@ -1284,7 +1284,7 @@ fn actor_script_check_first_source_projectile(
     let mut frame = run_actor_script_check_to_first_playing_wave(&mut runtime)?;
     let mut recent_projectile_sound_commands = actor_script_check_projectile_sound_commands(&frame);
 
-    for sample_steps in 0..=ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_STEP_LIMIT {
+    for sample_steps in 0..=ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_STEP_LIMIT {
         let samples = actor_script_check_source_projectile_samples(&frame);
         if !samples.is_empty() {
             let sound_commands = actor_script_check_projectile_sound_commands(&frame);
@@ -1303,7 +1303,7 @@ fn actor_script_check_first_source_projectile(
             ));
         }
 
-        if sample_steps == ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_STEP_LIMIT {
+        if sample_steps == ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_STEP_LIMIT {
             break;
         }
 
@@ -1318,7 +1318,7 @@ fn actor_script_check_first_source_projectile(
         None,
         Some(format!(
             "source_projectile_not_observed_after_{}_steps",
-            ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_STEP_LIMIT
+            ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_STEP_LIMIT
         )),
     ))
 }
@@ -1348,7 +1348,7 @@ fn actor_script_check_hostile_projectile_matrix_sample_for(
     let mut frame = run_actor_script_check_to_first_playing_wave(&mut runtime)
         .with_context(|| format!("starting hostile projectile matrix script `{kind_label}`"))?;
 
-    for sample_steps in 0..=ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_STEP_LIMIT {
+    for sample_steps in 0..=ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_STEP_LIMIT {
         let samples = actor_script_check_projectile_spawn_command_samples(&frame);
         if !samples.is_empty() {
             let sound_commands = actor_script_check_projectile_sound_commands(&frame);
@@ -1360,7 +1360,7 @@ fn actor_script_check_hostile_projectile_matrix_sample_for(
             });
         }
 
-        if sample_steps == ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_STEP_LIMIT {
+        if sample_steps == ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_STEP_LIMIT {
             break;
         }
 
@@ -1369,7 +1369,7 @@ fn actor_script_check_hostile_projectile_matrix_sample_for(
 
     anyhow::bail!(
         "hostile projectile matrix script `{kind_label}` did not observe a projectile after {} steps",
-        ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_STEP_LIMIT
+        ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_STEP_LIMIT
     );
 }
 
@@ -1704,7 +1704,7 @@ fn actor_script_check_source_actor_samples(
                 },
             )
         })
-        .take(ACTOR_SCRIPT_CHECK_SOURCE_ACTOR_SAMPLE_LIMIT)
+        .take(ACTOR_SCRIPT_CHECK_ACTOR_SAMPLE_LIMIT)
         .collect()
 }
 
@@ -1776,7 +1776,7 @@ fn actor_script_check_source_projectile_samples(
                 lifetime_ticks: source.lifetime_ticks,
             })
         })
-        .take(ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_SAMPLE_LIMIT)
+        .take(ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_LIMIT)
         .collect()
 }
 
@@ -1801,7 +1801,7 @@ fn actor_script_check_projectile_spawn_command_samples(
             )),
             _ => None,
         })
-        .take(ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_SAMPLE_LIMIT)
+        .take(ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_LIMIT)
         .map(
             |(kind, position, velocity, source)| ActorScriptCheckProjectileSpawnSample {
                 kind: kind.to_string(),
@@ -1827,7 +1827,7 @@ fn actor_script_check_player_laser_samples(
         .snapshots
         .iter()
         .filter(|snapshot| snapshot.kind == ActorKind::Laser && snapshot.alive)
-        .take(ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_SAMPLE_LIMIT)
+        .take(ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_LIMIT)
         .map(|snapshot| ActorScriptCheckPlayerLaserSample {
             x: snapshot.position.x,
             y: snapshot.position.y,
@@ -1863,7 +1863,7 @@ fn actor_script_check_explosion_command_samples(
             }),
             _ => None,
         })
-        .take(ACTOR_SCRIPT_CHECK_SOURCE_PROJECTILE_SAMPLE_LIMIT)
+        .take(ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_LIMIT)
         .collect()
 }
 
@@ -2442,7 +2442,7 @@ fn actor_script_check_spawned_actor_samples(
             }
             _ => None,
         })
-        .take(ACTOR_SCRIPT_CHECK_SOURCE_ACTOR_SAMPLE_LIMIT)
+        .take(ACTOR_SCRIPT_CHECK_ACTOR_SAMPLE_LIMIT)
         .map(|(kind, position)| ActorScriptCheckSpawnedActorSample {
             kind: kind.to_string(),
             x: position.x,

@@ -410,20 +410,20 @@ pub struct ProjectileMotionFrame {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ProjectileMotionSystem;
 
-const SOURCE_LASER_STEP_COLUMNS: i8 = 4;
-const SOURCE_RIGHT_LASER_EDGE_X: u8 = u8::MAX;
-const SOURCE_LEFT_LASER_EDGE_X: u8 = 0x00;
+const PLAYER_LASER_COLUMNS_PER_STEP: i8 = 4; // original: SOURCE_LASER_STEP_COLUMNS
+const SCREEN_RIGHT_EDGE_X: u8 = u8::MAX; // original: SOURCE_RIGHT_LASER_EDGE_X
+const SCREEN_LEFT_EDGE_X: u8 = 0x00; // original: SOURCE_LEFT_LASER_EDGE_X
 
 impl ProjectileMotionSystem {
     pub const fn velocity_for_direction(direction: Direction) -> ScreenVelocity {
         match direction {
-            Direction::Left => ScreenVelocity::new(-SOURCE_LASER_STEP_COLUMNS, 0),
-            Direction::Right => ScreenVelocity::new(SOURCE_LASER_STEP_COLUMNS, 0),
+            Direction::Left => ScreenVelocity::new(-PLAYER_LASER_COLUMNS_PER_STEP, 0),
+            Direction::Right => ScreenVelocity::new(PLAYER_LASER_COLUMNS_PER_STEP, 0),
         }
     }
 
     pub fn step(position: ScreenPosition, velocity: ScreenVelocity) -> ProjectileMotionFrame {
-        if source_laser_reached_screen_edge(position, velocity) {
+        if player_laser_reached_screen_edge(position, velocity) {
             return ProjectileMotionFrame {
                 position,
                 velocity,
@@ -448,14 +448,14 @@ impl ProjectileMotionSystem {
     }
 }
 
-const fn source_laser_reached_screen_edge(
+const fn player_laser_reached_screen_edge(
     position: ScreenPosition,
     velocity: ScreenVelocity,
 ) -> bool {
     if velocity.dx > 0 {
-        position.x == SOURCE_RIGHT_LASER_EDGE_X
+        position.x == SCREEN_RIGHT_EDGE_X
     } else if velocity.dx < 0 {
-        position.x == SOURCE_LEFT_LASER_EDGE_X
+        position.x == SCREEN_LEFT_EDGE_X
     } else {
         false
     }
