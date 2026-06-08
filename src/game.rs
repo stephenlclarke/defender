@@ -14669,7 +14669,7 @@ fn push_attract_scoring_laser_beam(
     push_arcade_laser_path(
         scene,
         start[0],
-        end[1],
+        start[1],
         end[0],
         end[1],
         u32::from(demo_tick),
@@ -18266,22 +18266,18 @@ mod tests {
         );
 
         let laser_scene = game.scene();
-        let projectile_y_range = laser_scene
+        let projectiles = laser_scene
             .sprites
             .iter()
             .filter(|sprite| {
                 sprite.sprite == SpriteId::PLAYER_PROJECTILE
                     && sprite.layer == RenderLayer::Projectiles
             })
-            .fold(None::<(f32, f32)>, |range, sprite| {
-                Some(match range {
-                    Some((min_y, max_y)) => {
-                        (min_y.min(sprite.position[1]), max_y.max(sprite.position[1]))
-                    }
-                    None => (sprite.position[1], sprite.position[1]),
-                })
-            })
-            .expect("attract scoring laser should render projectile pixels");
+            .collect::<Vec<_>>();
+        assert!(
+            !projectiles.is_empty(),
+            "attract scoring laser should render projectile pixels"
+        );
 
         assert!(laser_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::PLAYER_PROJECTILE
@@ -18289,10 +18285,12 @@ mod tests {
                 && sprite.size[0] >= 1.0
                 && sprite.size[1] == 1.0
         }));
-        assert!(
-            (projectile_y_range.1 - projectile_y_range.0).abs() < f32::EPSILON,
-            "MAME scoring-demo laser stays horizontal through the target center"
-        );
+        let player_ship = laser_scene
+            .sprites
+            .iter()
+            .find(|sprite| sprite.sprite == SpriteId::PLAYER_SHIP)
+            .expect("attract scoring laser should render the player ship");
+        let ship_anchor = super::attract_scoring_laser_ship_anchor(player_ship.position);
         let laser_target = laser_scene
             .sprites
             .iter()
@@ -18300,7 +18298,16 @@ mod tests {
             .expect("attract scoring laser should render the target lander");
         let target_center_y =
             super::attract_scoring_laser_enemy_anchor(EnemyKind::Lander, laser_target.position)[1];
-        assert_eq!(projectile_y_range, (target_center_y, target_center_y));
+        let leftmost = projectiles
+            .iter()
+            .min_by(|left, right| left.position[0].total_cmp(&right.position[0]))
+            .expect("attract scoring laser should have a source pixel");
+        assert!((leftmost.position[1] - ship_anchor[1]).abs() <= 1.0);
+        let rightmost = projectiles
+            .iter()
+            .max_by(|left, right| left.position[0].total_cmp(&right.position[0]))
+            .expect("attract scoring laser should have a target pixel");
+        assert!((rightmost.position[1] - target_center_y).abs() <= 1.0);
 
         let transfer_display_tick = super::attract_scoring_demo_tick_for_stage(
             super::AttractScoringDemoStage::LegendTransfer(0),
@@ -18386,24 +18393,34 @@ mod tests {
 
         super::push_attract_scoring_laser_beam(&mut scene, player, alien_target, 2);
 
-        let projectile_rows = scene
+        let projectiles = scene
             .sprites
             .iter()
             .filter(|sprite| {
                 sprite.sprite == SpriteId::PLAYER_PROJECTILE
                     && sprite.layer == RenderLayer::Projectiles
             })
-            .map(|sprite| sprite.position[1] as i32)
-            .collect::<std::collections::BTreeSet<_>>();
-        assert_eq!(projectile_rows.len(), 1);
+            .collect::<Vec<_>>();
+        let leftmost = projectiles
+            .iter()
+            .min_by(|left, right| left.position[0].total_cmp(&right.position[0]))
+            .expect("attract scoring helper should draw a source pixel");
         assert_eq!(
-            projectile_rows.into_iter().next(),
-            Some(
-                super::attract_scoring_laser_enemy_anchor(
-                    EnemyKind::Lander,
-                    super::attract_scoring_scene_position(alien_target.x16, alien_target.y16)
-                )[1] as i32
-            )
+            leftmost.position[1] as i32,
+            super::attract_scoring_laser_ship_anchor(super::attract_scoring_scene_position(
+                player.x16, player.y16
+            ))[1] as i32
+        );
+        let rightmost = projectiles
+            .iter()
+            .max_by(|left, right| left.position[0].total_cmp(&right.position[0]))
+            .expect("attract scoring helper should draw a target pixel");
+        assert_eq!(
+            rightmost.position[1] as i32,
+            super::attract_scoring_laser_enemy_anchor(
+                EnemyKind::Lander,
+                super::attract_scoring_scene_position(alien_target.x16, alien_target.y16)
+            )[1] as i32
         );
         assert_eq!(
             super::attract_scoring_laser_ship_anchor([20.0, 40.0]),

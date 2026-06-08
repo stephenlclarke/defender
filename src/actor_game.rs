@@ -8403,7 +8403,7 @@ fn push_actor_attract_scoring_laser_beam(
         }
         _ => target_position,
     };
-    push_actor_scoring_sparse_laser(scene, start[0], end[1], end[0], display_step);
+    push_actor_scoring_sparse_laser(scene, start[0], start[1], end[0], end[1], display_step);
 }
 
 fn actor_attract_scoring_laser_ship_anchor(position: [f32; 2]) -> [f32; 2] {
@@ -8424,8 +8424,9 @@ fn actor_attract_scoring_laser_enemy_anchor(
 fn push_actor_scoring_sparse_laser(
     scene: &mut RenderScene,
     start_x: f32,
-    y: f32,
+    start_y: f32,
     end_x: f32,
+    end_y: f32,
     display_step: u16,
 ) {
     let left = start_x.min(end_x).round() as i32;
@@ -8435,10 +8436,17 @@ fn push_actor_scoring_sparse_laser(
     }
 
     let direction = if end_x >= start_x { 1 } else { -1 };
+    let dx = end_x - start_x;
     let head_x = if direction > 0 { right - 1 } else { left };
     let mut x = left;
     let mut cell = 0_i32;
     while x <= right {
+        let progress = if dx.abs() < f32::EPSILON {
+            0.0
+        } else {
+            ((x as f32 - start_x) / dx).clamp(0.0, 1.0)
+        };
+        let y = (start_y + (end_y - start_y) * progress).round() as i32;
         let cells_from_head = if direction > 0 {
             (head_x - x).div_euclid(SOURCE_LASER_BYTE_PIXELS)
         } else {
@@ -8463,7 +8471,7 @@ fn push_actor_scoring_sparse_laser(
             };
             (byte, SOURCE_LASER_FIZZLE_TINT)
         };
-        push_actor_scoring_laser_byte(scene, x, y.round() as i32, byte, tint);
+        push_actor_scoring_laser_byte(scene, x, y, byte, tint);
         x += SOURCE_LASER_BYTE_PIXELS;
         cell += 1;
     }
@@ -18351,34 +18359,50 @@ mod tests {
         let target_right_edge = target_position[0] + target_size[0] - 1.0;
         let target_center_y =
             actor_attract_scoring_laser_enemy_anchor(enemy, target_position)[1].round();
-        let laser_right_edge = scene
+        let projectiles = scene
             .sprites
             .iter()
             .filter(|sprite| {
                 sprite.sprite == SpriteId::PLAYER_PROJECTILE
                     && sprite.layer == RenderLayer::Projectiles
             })
+            .collect::<Vec<_>>();
+        let laser_right_edge = projectiles
+            .iter()
             .map(|sprite| sprite.position[0] + sprite.size[0] - 1.0)
             .fold(f32::NEG_INFINITY, f32::max);
         assert!(
             laser_right_edge >= target_right_edge,
             "attract scoring laser should visibly reach the {enemy:?} edge before explosion: laser={laser_right_edge}, target={target_right_edge}"
         );
+        let ship_position = scene
+            .sprites
+            .iter()
+            .find(|sprite| {
+                sprite.sprite == SpriteId::PLAYER_SHIP && sprite.layer == RenderLayer::Objects
+            })
+            .expect("scoring laser test must render the player ship")
+            .position;
+        let ship_anchor = actor_attract_scoring_laser_ship_anchor(ship_position);
+        let leftmost = projectiles
+            .iter()
+            .min_by(|left, right| left.position[0].total_cmp(&right.position[0]))
+            .expect("scoring laser should render projectile pixels");
         assert!(
-            scene.sprites.iter().any(|sprite| {
-                sprite.sprite == SpriteId::PLAYER_PROJECTILE
-                    && sprite.layer == RenderLayer::Projectiles
-                    && (sprite.position[1] - target_center_y).abs() < f32::EPSILON
-            }),
-            "attract scoring laser should run through the {enemy:?} vertical center"
+            leftmost.position[0] <= ship_anchor[0] + SOURCE_LASER_BYTE_PIXELS as f32,
+            "attract scoring laser should visibly start at the player ship cannon"
         );
         assert!(
-            scene.sprites.iter().all(|sprite| {
-                sprite.sprite != SpriteId::PLAYER_PROJECTILE
-                    || sprite.layer != RenderLayer::Projectiles
-                    || (sprite.position[1] - target_center_y).abs() < f32::EPSILON
-            }),
-            "attract scoring laser should not stay on the ship row above the {enemy:?}"
+            (leftmost.position[1] - ship_anchor[1].round()).abs() <= 1.0,
+            "attract scoring laser should originate from the player ship cannon row"
+        );
+        let rightmost = projectiles
+            .iter()
+            .max_by(|left, right| left.position[0].total_cmp(&right.position[0]))
+            .expect("scoring laser should render projectile pixels");
+        assert!(
+            (rightmost.position[1] - target_center_y).abs() <= 1.0,
+            "attract scoring laser should end on the {enemy:?} vertical center"
         );
     }
 
