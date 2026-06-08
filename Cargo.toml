@@ -11,11 +11,15 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0"
-base64 = "0.22"
-crossterm = "0.29"
-libc = "0.2"
+bytemuck = { version = "1.25.0", features = ["derive"] }
+cpal = "0.17.3"
 png = "0.18"
-rodio = "0.21"
+pollster = "0.4.0"
+wgpu = "29.0.3"
+winit = "0.30.13"
 
 [dev-dependencies]
 gif = "0.13"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)'] }

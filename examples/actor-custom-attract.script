@@ -1,0 +1,21 @@
+[attract]
+cycle 96
+williams_logo 1 24 12 20
+message 20 20 ELECV 0x3986
+defender_wordmark 28 28 48 56
+message 52 20 HALLD_TITLE 0x3854
+sprite 52 20 defender_logo 96 72
+credits 52 20 16 208 88 208
+scoring_surface 72 24
+message 80 16 SWARMV 0x5CA8
+[behavior]
+kind player player_laser_cooldown_steps 6
+kind lander lander_mode drift
+kind lander lander_drift_speed 3
+[wave]
+name example custom driver waves
+wave 1
+lander 80 214
+lander 140 214
+human 100 214
+human 180 214

@@ -1,0 +1,29 @@
+# Actor runtime red-label attract title script.
+# Format: <action> <start-step> <duration|forever> <x> <y> [text]
+# message uses: <label> <top-left-screen-address> [offset-x offset-y]
+# high_scores adds: <row-height> <rows>
+# hall_scores uses: <todays-screen-address> <all-time-screen-address> <offset-x> <offset-y>
+# credits and credits_nonzero use: <label-x> <label-y> <count-x> <count-y>
+# cycle uses: <step-count>
+
+cycle 3367
+williams_logo 1 487 108 60
+message 236 252 ELECV 0x3258
+defender_wordmark 365 123 96 144
+credits_nonzero 1 487 176 226 248 226
+credits 488 forever 176 226 248 226
+message 488 600 HALLD_TITLE 0x3854 -11 -6
+message 488 600 HALLD_TODAYS 0x2268 -11 -6
+message 488 600 HALLD_ALL_TIME 0x6068 -11 -6
+message 488 600 HALLD_GREATEST 0x1E72 -11 -6
+message 488 600 HALLD_GREATEST 0x5F72 -11 -6
+sprite 488 600 defender_logo 85 50
+hall_scores 488 600 0x1886 0x5986 -11 -6
+scoring_surface 1088 forever
+message 1088 forever SCANV 0x4330 -11 -7
+message 1505 forever LANDV 0x1C70 -11 -7
+message 1691 forever MUTV 0x3C70 -11 -7
+message 1871 forever BAITV 0x5F70 -11 -7
+message 2051 forever BOMBV 0x1CA8 -11 -7
+message 2237 forever SWRMPV 0x40A8 -11 -7
+message 2417 forever SWARMV 0x5CA8 -11 -7

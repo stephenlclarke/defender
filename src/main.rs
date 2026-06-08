@@ -1,10 +1,14 @@
+#[cfg(all(not(test), not(coverage)))]
 fn main() {
-    std::process::exit(exit_code_for_result(defender::app::run()));
+    std::process::exit(exit_code_for_result(defender::platform::run()));
 }
 
+#[cfg(any(test, coverage))]
+fn main() {}
+
 fn exit_code_for_result(result: anyhow::Result<()>) -> i32 {
-    if let Err(err) = result {
-        eprintln!("defender: {err:#}");
+    if let Err(error) = result {
+        eprintln!("defender: {error:#}");
         1
     } else {
         0

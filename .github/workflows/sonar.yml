@@ -43,7 +43,12 @@ jobs:
         with:
           tool: cargo-llvm-cov
 
+      - name: Diagnose coverage prerequisites
+        run: make coverage-doctor
+
       - name: Generate coverage report
+        env:
+          NEW_CODE_COVERAGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: make sq-ci
 
       - name: SonarQube Scan
