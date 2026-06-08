@@ -8003,9 +8003,16 @@ fn actor_attract_scoring_objects_for_stage(
             } else {
                 ATTRACT_SCORING_RESCUE_ASCENT_STEPS + local_step
             };
-            let lander_y = ATTRACT_SCORING_LANDER_Y16
-                + i32::from(ATTRACT_SCORING_RESCUE_DESCENT_STEPS) * 0x00A0
-                - i32::from(rise_step) * 0x00B0;
+            let lander_y = if stage == ActorAttractScoringStage::RescueLaser {
+                actor_attract_scoring_laser_aligned_enemy_y16(
+                    ActorAttractScoringEnemyKind::Lander,
+                    ATTRACT_SCORING_PLAYER_Y16,
+                )
+            } else {
+                ATTRACT_SCORING_LANDER_Y16
+                    + i32::from(ATTRACT_SCORING_RESCUE_DESCENT_STEPS) * 0x00A0
+                    - i32::from(rise_step) * 0x00B0
+            };
             let human_y = ATTRACT_SCORING_HUMAN_Y16 - i32::from(rise_step) * 0x00B0;
             objects.push(actor_attract_scoring_enemy_object(
                 ActorAttractScoringEnemyKind::Lander,
@@ -8038,11 +8045,10 @@ fn actor_attract_scoring_objects_for_stage(
                 ship_y,
             ));
             if local_step < 12 {
-                let lander_y = ATTRACT_SCORING_LANDER_Y16
-                    + i32::from(ATTRACT_SCORING_RESCUE_DESCENT_STEPS) * 0x00A0
-                    - i32::from(
-                        ATTRACT_SCORING_RESCUE_ASCENT_STEPS + ATTRACT_SCORING_RESCUE_LASER_STEPS,
-                    ) * 0x00B0;
+                let lander_y = actor_attract_scoring_laser_aligned_enemy_y16(
+                    ActorAttractScoringEnemyKind::Lander,
+                    ATTRACT_SCORING_PLAYER_Y16,
+                );
                 objects.push(actor_attract_scoring_visual_enemy_object(
                     ActorAttractScoringEnemyKind::Lander,
                     ATTRACT_SCORING_LANDER_X16,
@@ -8186,10 +8192,15 @@ fn append_actor_attract_scoring_legend_objects(
     };
 
     let entry = ACTOR_ATTRACT_SCORING_LEGEND[index];
-    let source_y = actor_attract_scoring_legend_source_y16();
+    let source_y = actor_attract_scoring_legend_source_y16(entry.enemy, player_y16);
     match stage {
         ActorAttractScoringStage::LegendApproach(_) => {
-            let enemy_y = ATTRACT_SCORING_LEGEND_SOURCE_START_Y16 - i32::from(local_step) * 0x00C0;
+            let enemy_y = actor_attract_scoring_lerp_y16(
+                ATTRACT_SCORING_LEGEND_SOURCE_START_Y16,
+                source_y,
+                local_step,
+                ATTRACT_SCORING_LEGEND_APPROACH_STEPS,
+            );
             objects.push(actor_attract_scoring_enemy_object(
                 entry.enemy,
                 ATTRACT_SCORING_LEGEND_SOURCE_X16,
@@ -8247,9 +8258,30 @@ fn actor_attract_scoring_revealed_legend_entries(stage: ActorAttractScoringStage
     }
 }
 
-fn actor_attract_scoring_legend_source_y16() -> i32 {
-    ATTRACT_SCORING_LEGEND_SOURCE_START_Y16
-        - i32::from(ATTRACT_SCORING_LEGEND_APPROACH_STEPS) * 0x00C0
+fn actor_attract_scoring_legend_source_y16(
+    enemy: ActorAttractScoringEnemyKind,
+    player_y16: i32,
+) -> i32 {
+    actor_attract_scoring_laser_aligned_enemy_y16(enemy, player_y16)
+}
+
+fn actor_attract_scoring_laser_aligned_enemy_y16(
+    enemy: ActorAttractScoringEnemyKind,
+    player_y16: i32,
+) -> i32 {
+    let player_top_y = actor_attract_scoring_scene_position(0, player_y16)[1];
+    let ship_anchor_y = player_top_y + PLAYER_SHIP_SCENE_SIZE[1] / 2.0 + 1.0;
+    let target_top_y = ship_anchor_y - actor_attract_scoring_enemy_size(enemy)[1] / 2.0;
+    let native_y = target_top_y - ATTRACT_SCORING_OBJECT_REFERENCE_OFFSET[1];
+    (native_y.round() as i32) << 8
+}
+
+fn actor_attract_scoring_lerp_y16(start_y16: i32, end_y16: i32, step: u16, steps: u16) -> i32 {
+    let denominator = i64::from(steps.saturating_sub(1).max(1));
+    let numerator = i64::from(step.min(steps.saturating_sub(1)));
+    let start = i64::from(start_y16);
+    let delta = i64::from(end_y16 - start_y16);
+    (start + delta * numerator / denominator) as i32
 }
 
 fn actor_attract_scoring_enemy_object(
@@ -8403,7 +8435,7 @@ fn push_actor_attract_scoring_laser_beam(
         }
         _ => target_position,
     };
-    push_actor_scoring_sparse_laser(scene, start[0], start[1], end[0], end[1], display_step);
+    push_actor_scoring_sparse_laser(scene, start[0], start[1], end[0], display_step);
 }
 
 fn actor_attract_scoring_laser_ship_anchor(position: [f32; 2]) -> [f32; 2] {
@@ -8426,7 +8458,6 @@ fn push_actor_scoring_sparse_laser(
     start_x: f32,
     start_y: f32,
     end_x: f32,
-    end_y: f32,
     display_step: u16,
 ) {
     let left = start_x.min(end_x).round() as i32;
@@ -8436,17 +8467,11 @@ fn push_actor_scoring_sparse_laser(
     }
 
     let direction = if end_x >= start_x { 1 } else { -1 };
-    let dx = end_x - start_x;
+    let y = start_y.round() as i32;
     let head_x = if direction > 0 { right - 1 } else { left };
     let mut x = left;
     let mut cell = 0_i32;
     while x <= right {
-        let progress = if dx.abs() < f32::EPSILON {
-            0.0
-        } else {
-            ((x as f32 - start_x) / dx).clamp(0.0, 1.0)
-        };
-        let y = (start_y + (end_y - start_y) * progress).round() as i32;
         let cells_from_head = if direction > 0 {
             (head_x - x).div_euclid(SOURCE_LASER_BYTE_PIXELS)
         } else {
@@ -18396,13 +18421,23 @@ mod tests {
             (leftmost.position[1] - ship_anchor[1].round()).abs() <= 1.0,
             "attract scoring laser should originate from the player ship cannon row"
         );
+        assert!(
+            projectiles
+                .iter()
+                .all(|sprite| (sprite.position[1] - ship_anchor[1].round()).abs() <= 1.0),
+            "attract scoring laser should stay horizontal on the player ship cannon row"
+        );
+        assert!(
+            (target_center_y - ship_anchor[1].round()).abs() <= 1.0,
+            "attract scoring target should be on the player ship cannon row before the laser fires"
+        );
         let rightmost = projectiles
             .iter()
             .max_by(|left, right| left.position[0].total_cmp(&right.position[0]))
             .expect("scoring laser should render projectile pixels");
         assert!(
-            (rightmost.position[1] - target_center_y).abs() <= 1.0,
-            "attract scoring laser should end on the {enemy:?} vertical center"
+            (rightmost.position[1] - ship_anchor[1].round()).abs() <= 1.0,
+            "attract scoring laser should end on the player ship cannon row"
         );
     }
 
@@ -18467,7 +18502,10 @@ mod tests {
                 entry.enemy,
                 actor_attract_scoring_scene_position(
                     ATTRACT_SCORING_LEGEND_SOURCE_X16,
-                    actor_attract_scoring_legend_source_y16(),
+                    actor_attract_scoring_legend_source_y16(
+                        entry.enemy,
+                        actor_attract_scoring_legend_player_position().1,
+                    ),
                 ),
             );
         }
