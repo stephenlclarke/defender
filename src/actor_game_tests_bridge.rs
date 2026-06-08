@@ -1046,7 +1046,7 @@
 
         let scene = report.render_scene();
         let mut expected = RenderScene::empty(report.step, ACTOR_RENDER_SURFACE);
-        assert!(push_source_explosion_cloud_pixels(
+        assert!(push_explosion_cloud_pixels(
             &mut expected,
             CleanExplosionKind::Mutant,
             ScreenPosition::new(0x20, 0xA2),

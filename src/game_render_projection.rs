@@ -447,21 +447,21 @@ fn parse_source_hex_byte(value: &str) -> u8 {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct SourceObjectImagePixel {
+struct SpriteAssetPixel {
     x: u8,
     y: u8,
     tint: Color,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct SourceObjectImageSpec {
-    label: &'static str,
+struct SpriteAssetImageSpec {
+    asset_label: &'static str,
     rows: u8,
     bytes_per_row: u8,
 }
 
-fn source_object_image_pixels(spec: SourceObjectImageSpec) -> Vec<SourceObjectImagePixel> {
-    let bytes = source_object_image_bytes(spec.label);
+fn sprite_asset_pixels(spec: SpriteAssetImageSpec) -> Vec<SpriteAssetPixel> {
+    let bytes = sprite_asset_image_bytes(spec.asset_label);
     let expected_byte_count = usize::from(spec.rows) * usize::from(spec.bytes_per_row);
     if bytes.len() != expected_byte_count {
         return Vec::new();
@@ -471,15 +471,15 @@ fn source_object_image_pixels(spec: SourceObjectImageSpec) -> Vec<SourceObjectIm
         let source_column = column * usize::from(spec.rows);
         for row in 0..usize::from(spec.rows) {
             let value = bytes[source_column + row];
-            if let Some(tint) = source_picture_nibble_tint(value >> 4) {
-                pixels.push(SourceObjectImagePixel {
+            if let Some(tint) = sprite_asset_nibble_tint(value >> 4) {
+                pixels.push(SpriteAssetPixel {
                     x: (column * 2) as u8,
                     y: row as u8,
                     tint,
                 });
             }
-            if let Some(tint) = source_picture_nibble_tint(value & 0x0F) {
-                pixels.push(SourceObjectImagePixel {
+            if let Some(tint) = sprite_asset_nibble_tint(value & 0x0F) {
+                pixels.push(SpriteAssetPixel {
                     x: (column * 2 + 1) as u8,
                     y: row as u8,
                     tint,
@@ -490,7 +490,7 @@ fn source_object_image_pixels(spec: SourceObjectImageSpec) -> Vec<SourceObjectIm
     pixels
 }
 
-fn source_object_image_bytes(label: &'static str) -> Vec<u8> {
+fn sprite_asset_image_bytes(asset_label: &'static str) -> Vec<u8> {
     for line in OBJECT_IMAGES_TSV.lines().skip(1) {
         let mut columns = line.split('\t');
         let Some(image_label) = columns.next() else {
@@ -500,29 +500,29 @@ fn source_object_image_bytes(label: &'static str) -> Vec<u8> {
         let Some(hex_bytes) = columns.next() else {
             continue;
         };
-        if image_label == label {
-            return decode_source_hex_bytes(label, hex_bytes);
+        if image_label == asset_label {
+            return decode_sprite_asset_hex_bytes(asset_label, hex_bytes);
         }
     }
     Vec::new()
 }
 
-fn decode_source_hex_bytes(label: &'static str, hex_bytes: &str) -> Vec<u8> {
+fn decode_sprite_asset_hex_bytes(asset_label: &'static str, hex_bytes: &str) -> Vec<u8> {
     assert!(
         hex_bytes.len().is_multiple_of(2),
-        "source object image {label} hex byte string must be even length"
+        "sprite asset image {asset_label} hex byte string must be even length"
     );
     (0..hex_bytes.len())
         .step_by(2)
         .map(|start| {
             u8::from_str_radix(&hex_bytes[start..start + 2], 16).unwrap_or_else(|error| {
-                panic!("source object image {label} hex must parse: {error}")
+                panic!("sprite asset image {asset_label} hex must parse: {error}")
             })
         })
         .collect()
 }
 
-fn source_picture_nibble_tint(index: u8) -> Option<Color> {
+fn sprite_asset_nibble_tint(index: u8) -> Option<Color> {
     match index {
         0x0 => None,
         0x1 | 0xA | 0xC | 0xD | 0xE | 0xF => Some(Color::WHITE),
@@ -641,11 +641,11 @@ fn push_scanner_byte_pixels(
     }
 }
 
-fn source_expanded_object_uses_pixel_cloud(detail: &ExpandedObjectDetailSnapshot) -> bool {
+fn expanded_object_uses_pixel_cloud(detail: &ExpandedObjectDetailSnapshot) -> bool {
     match detail.kind {
         ExpandedObjectKind::Appearance => {
             source_appearance_size_scale(detail.size).is_some()
-                && source_expanded_object_image_spec(detail).is_some()
+                && pixel_cloud_sprite_asset(detail).is_some()
         }
         ExpandedObjectKind::Explosion => matches!(
             detail.mapped_sprite,
@@ -663,18 +663,18 @@ fn source_expanded_object_uses_pixel_cloud(detail: &ExpandedObjectDetailSnapshot
     }
 }
 
-pub(crate) fn push_source_explosion_cloud_pixels(
+pub(crate) fn push_explosion_cloud_pixels(
     scene: &mut RenderScene,
     kind: ExplosionKind,
     position: ScreenPosition,
-    source_center: Option<ScreenPosition>,
-    source_size: u16,
+    cloud_center: Option<ScreenPosition>,
+    growth_size: u16,
 ) -> bool {
     let mut explosion = ExplosionSnapshot::source_spawn(kind, position);
-    explosion.source_center = source_center;
-    explosion.source_size = source_size;
+    explosion.source_center = cloud_center;
+    explosion.source_size = growth_size;
     let detail = explosion.expanded_object_detail();
-    if !source_expanded_object_uses_pixel_cloud(&detail) {
+    if !expanded_object_uses_pixel_cloud(&detail) {
         return false;
     }
 
@@ -682,25 +682,25 @@ pub(crate) fn push_source_explosion_cloud_pixels(
     true
 }
 
-pub(crate) fn push_source_appearance_cloud_pixels(
+pub(crate) fn push_appearance_cloud_pixels(
     scene: &mut RenderScene,
     position: ScreenPosition,
-    picture_label: &'static str,
+    sprite_frame_label: &'static str,
     picture_size: (u8, u8),
     mapped_sprite: SpriteId,
-    source_size: u16,
+    growth_size: u16,
 ) -> bool {
     let detail = ExpandedObjectDetailSnapshot {
         kind: ExpandedObjectKind::Appearance,
-        size: source_size,
-        picture_label: Some(picture_label),
+        size: growth_size,
+        sprite_frame_label: Some(sprite_frame_label),
         picture_size: Some(picture_size),
         mapped_sprite: Some(mapped_sprite),
         center: Some(source_appearance_center(position, picture_size)),
         top_left: Some(position),
         ..ExpandedObjectDetailSnapshot::EMPTY
     };
-    if !source_expanded_object_uses_pixel_cloud(&detail) {
+    if !expanded_object_uses_pixel_cloud(&detail) {
         return false;
     }
 
@@ -718,7 +718,7 @@ fn push_expanded_object_explosion_pixels(
     let Some(center) = detail.center else {
         return;
     };
-    let Some(spec) = source_expanded_object_image_spec(detail) else {
+    let Some(spec) = pixel_cloud_sprite_asset(detail) else {
         return;
     };
     let Some(scale) = source_explosion_size_scale(detail.size) else {
@@ -727,11 +727,11 @@ fn push_expanded_object_explosion_pixels(
     let Some(explosion_frame) = detail.explosion_frame else {
         return;
     };
-    if explosion_frame < EXPANDED_OBJECT_EXPLOSION_VISIBLE_FRAME {
+    if explosion_frame < PIXEL_CLOUD_EXPLOSION_FIRST_VISIBLE_FRAME {
         return;
     }
     let tick = u32::from(explosion_frame);
-    push_source_expanded_object_picture_pixels(
+    push_expanded_object_pixel_cloud(
         scene,
         spec,
         top_left,
@@ -752,14 +752,14 @@ fn push_expanded_object_appearance_pixels(
     let Some(center) = detail.center else {
         return;
     };
-    let Some(spec) = source_expanded_object_image_spec(detail) else {
+    let Some(spec) = pixel_cloud_sprite_asset(detail) else {
         return;
     };
     let Some(scale) = source_appearance_size_scale(detail.size) else {
         return;
     };
     let tick = u32::from(source_appearance_tick(detail.size));
-    push_source_expanded_object_picture_pixels(
+    push_expanded_object_pixel_cloud(
         scene,
         spec,
         top_left,
@@ -770,100 +770,187 @@ fn push_expanded_object_appearance_pixels(
     );
 }
 
-const EXPANDED_OBJECT_EXPLOSION_VISIBLE_FRAME: u8 = 2; // original: SOURCE_EXPANDED_OBJECT_EXPLOSION_VISIBLE_FRAME
-fn source_expanded_object_image_spec(
-    detail: &ExpandedObjectDetailSnapshot,
-) -> Option<SourceObjectImageSpec> {
-    match detail.picture_label? {
-        "LNDP1" => Some(SourceObjectImageSpec {
-            label: "LND10",
-            rows: 8,
-            bytes_per_row: 5,
-        }),
-        "LNDP2" => Some(SourceObjectImageSpec {
-            label: "LND20",
-            rows: 8,
-            bytes_per_row: 5,
-        }),
-        "LNDP3" => Some(SourceObjectImageSpec {
-            label: "LND30",
-            rows: 8,
-            bytes_per_row: 5,
-        }),
-        "SCZP1" => Some(SourceObjectImageSpec {
-            label: "SCZD10",
-            rows: 8,
-            bytes_per_row: 5,
-        }),
-        "TIEP1" => Some(SourceObjectImageSpec {
-            label: "TIED10",
-            rows: 8,
-            bytes_per_row: 4,
-        }),
-        "TIEP2" => Some(SourceObjectImageSpec {
-            label: "TIED20",
-            rows: 8,
-            bytes_per_row: 4,
-        }),
-        "TIEP3" => Some(SourceObjectImageSpec {
-            label: "TIED30",
-            rows: 8,
-            bytes_per_row: 4,
-        }),
-        "TIEP4" => Some(SourceObjectImageSpec {
-            label: "TIED40",
-            rows: 8,
-            bytes_per_row: 4,
-        }),
-        "PRBP1" => Some(SourceObjectImageSpec {
-            label: "PRBD10",
-            rows: 8,
-            bytes_per_row: 4,
-        }),
-        "UFOP1" => Some(SourceObjectImageSpec {
-            label: "UFOD10",
-            rows: 4,
-            bytes_per_row: 6,
-        }),
-        "UFOP2" => Some(SourceObjectImageSpec {
-            label: "UFOD20",
-            rows: 4,
-            bytes_per_row: 6,
-        }),
-        "UFOP3" => Some(SourceObjectImageSpec {
-            label: "UFOD30",
-            rows: 4,
-            bytes_per_row: 6,
-        }),
-        "SWPIC1" => Some(SourceObjectImageSpec {
-            label: "SWMD10",
-            rows: 4,
-            bytes_per_row: 3,
-        }),
-        "SWXP1" => Some(SourceObjectImageSpec {
-            label: "SWXD10",
-            rows: 8,
-            bytes_per_row: 4,
-        }),
-        "TEREX" => Some(SourceObjectImageSpec {
-            label: "TERX0",
-            rows: 6,
-            bytes_per_row: 8,
-        }),
-        _ => None,
-    }
+const PIXEL_CLOUD_EXPLOSION_FIRST_VISIBLE_FRAME: u8 = 2; // original: SOURCE_EXPANDED_OBJECT_EXPLOSION_VISIBLE_FRAME
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct PixelCloudAsset {
+    sprite_frame_label: &'static str,
+    image: SpriteAssetImageSpec,
 }
 
-fn push_source_expanded_object_picture_pixels(
+const LANDER_FIRST_SPRITE_FRAME_LABEL: &str = "LNDP1"; // original: LNDP1
+const LANDER_SECOND_SPRITE_FRAME_LABEL: &str = "LNDP2"; // original: LNDP2
+const LANDER_THIRD_SPRITE_FRAME_LABEL: &str = "LNDP3"; // original: LNDP3
+const MUTANT_SPRITE_FRAME_LABEL: &str = "SCZP1"; // original: SCZP1
+const BOMBER_FIRST_SPRITE_FRAME_LABEL: &str = "TIEP1"; // original: TIEP1
+const BOMBER_SECOND_SPRITE_FRAME_LABEL: &str = "TIEP2"; // original: TIEP2
+const BOMBER_THIRD_SPRITE_FRAME_LABEL: &str = "TIEP3"; // original: TIEP3
+const BOMBER_FOURTH_SPRITE_FRAME_LABEL: &str = "TIEP4"; // original: TIEP4
+const POD_SPRITE_FRAME_LABEL: &str = "PRBP1"; // original: PRBP1
+const BAITER_FIRST_SPRITE_FRAME_LABEL: &str = "UFOP1"; // original: UFOP1
+const BAITER_SECOND_SPRITE_FRAME_LABEL: &str = "UFOP2"; // original: UFOP2
+const BAITER_THIRD_SPRITE_FRAME_LABEL: &str = "UFOP3"; // original: UFOP3
+const SWARMER_SPRITE_FRAME_LABEL: &str = "SWPIC1"; // original: SWPIC1
+const SWARMER_EXPLOSION_SPRITE_FRAME_LABEL: &str = "SWXP1"; // original: SWXP1
+const TERRAIN_EXPLOSION_SPRITE_FRAME_LABEL: &str = "TEREX"; // original: TEREX
+
+const LANDER_FIRST_PIXEL_CLOUD_ASSET_LABEL: &str = "LND10"; // original: LND10
+const LANDER_SECOND_PIXEL_CLOUD_ASSET_LABEL: &str = "LND20"; // original: LND20
+const LANDER_THIRD_PIXEL_CLOUD_ASSET_LABEL: &str = "LND30"; // original: LND30
+const MUTANT_PIXEL_CLOUD_ASSET_LABEL: &str = "SCZD10"; // original: SCZD10
+const BOMBER_FIRST_PIXEL_CLOUD_ASSET_LABEL: &str = "TIED10"; // original: TIED10
+const BOMBER_SECOND_PIXEL_CLOUD_ASSET_LABEL: &str = "TIED20"; // original: TIED20
+const BOMBER_THIRD_PIXEL_CLOUD_ASSET_LABEL: &str = "TIED30"; // original: TIED30
+const BOMBER_FOURTH_PIXEL_CLOUD_ASSET_LABEL: &str = "TIED40"; // original: TIED40
+const POD_PIXEL_CLOUD_ASSET_LABEL: &str = "PRBD10"; // original: PRBD10
+const BAITER_FIRST_PIXEL_CLOUD_ASSET_LABEL: &str = "UFOD10"; // original: UFOD10
+const BAITER_SECOND_PIXEL_CLOUD_ASSET_LABEL: &str = "UFOD20"; // original: UFOD20
+const BAITER_THIRD_PIXEL_CLOUD_ASSET_LABEL: &str = "UFOD30"; // original: UFOD30
+const SWARMER_PIXEL_CLOUD_ASSET_LABEL: &str = "SWMD10"; // original: SWMD10
+const SWARMER_EXPLOSION_PIXEL_CLOUD_ASSET_LABEL: &str = "SWXD10"; // original: SWXD10
+const TERRAIN_EXPLOSION_PIXEL_CLOUD_ASSET_LABEL: &str = "TERX0"; // original: TERX0
+
+const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
+    PixelCloudAsset {
+        sprite_frame_label: LANDER_FIRST_SPRITE_FRAME_LABEL,
+        image: SpriteAssetImageSpec {
+            asset_label: LANDER_FIRST_PIXEL_CLOUD_ASSET_LABEL,
+            rows: 8,
+            bytes_per_row: 5,
+        },
+    },
+    PixelCloudAsset {
+        sprite_frame_label: LANDER_SECOND_SPRITE_FRAME_LABEL,
+        image: SpriteAssetImageSpec {
+            asset_label: LANDER_SECOND_PIXEL_CLOUD_ASSET_LABEL,
+            rows: 8,
+            bytes_per_row: 5,
+        },
+    },
+    PixelCloudAsset {
+        sprite_frame_label: LANDER_THIRD_SPRITE_FRAME_LABEL,
+        image: SpriteAssetImageSpec {
+            asset_label: LANDER_THIRD_PIXEL_CLOUD_ASSET_LABEL,
+            rows: 8,
+            bytes_per_row: 5,
+        },
+    },
+    PixelCloudAsset {
+        sprite_frame_label: MUTANT_SPRITE_FRAME_LABEL,
+        image: SpriteAssetImageSpec {
+            asset_label: MUTANT_PIXEL_CLOUD_ASSET_LABEL,
+            rows: 8,
+            bytes_per_row: 5,
+        },
+    },
+    PixelCloudAsset {
+        sprite_frame_label: BOMBER_FIRST_SPRITE_FRAME_LABEL,
+        image: SpriteAssetImageSpec {
+            asset_label: BOMBER_FIRST_PIXEL_CLOUD_ASSET_LABEL,
+            rows: 8,
+            bytes_per_row: 4,
+        },
+    },
+    PixelCloudAsset {
+        sprite_frame_label: BOMBER_SECOND_SPRITE_FRAME_LABEL,
+        image: SpriteAssetImageSpec {
+            asset_label: BOMBER_SECOND_PIXEL_CLOUD_ASSET_LABEL,
+            rows: 8,
+            bytes_per_row: 4,
+        },
+    },
+    PixelCloudAsset {
+        sprite_frame_label: BOMBER_THIRD_SPRITE_FRAME_LABEL,
+        image: SpriteAssetImageSpec {
+            asset_label: BOMBER_THIRD_PIXEL_CLOUD_ASSET_LABEL,
+            rows: 8,
+            bytes_per_row: 4,
+        },
+    },
+    PixelCloudAsset {
+        sprite_frame_label: BOMBER_FOURTH_SPRITE_FRAME_LABEL,
+        image: SpriteAssetImageSpec {
+            asset_label: BOMBER_FOURTH_PIXEL_CLOUD_ASSET_LABEL,
+            rows: 8,
+            bytes_per_row: 4,
+        },
+    },
+    PixelCloudAsset {
+        sprite_frame_label: POD_SPRITE_FRAME_LABEL,
+        image: SpriteAssetImageSpec {
+            asset_label: POD_PIXEL_CLOUD_ASSET_LABEL,
+            rows: 8,
+            bytes_per_row: 4,
+        },
+    },
+    PixelCloudAsset {
+        sprite_frame_label: BAITER_FIRST_SPRITE_FRAME_LABEL,
+        image: SpriteAssetImageSpec {
+            asset_label: BAITER_FIRST_PIXEL_CLOUD_ASSET_LABEL,
+            rows: 4,
+            bytes_per_row: 6,
+        },
+    },
+    PixelCloudAsset {
+        sprite_frame_label: BAITER_SECOND_SPRITE_FRAME_LABEL,
+        image: SpriteAssetImageSpec {
+            asset_label: BAITER_SECOND_PIXEL_CLOUD_ASSET_LABEL,
+            rows: 4,
+            bytes_per_row: 6,
+        },
+    },
+    PixelCloudAsset {
+        sprite_frame_label: BAITER_THIRD_SPRITE_FRAME_LABEL,
+        image: SpriteAssetImageSpec {
+            asset_label: BAITER_THIRD_PIXEL_CLOUD_ASSET_LABEL,
+            rows: 4,
+            bytes_per_row: 6,
+        },
+    },
+    PixelCloudAsset {
+        sprite_frame_label: SWARMER_SPRITE_FRAME_LABEL,
+        image: SpriteAssetImageSpec {
+            asset_label: SWARMER_PIXEL_CLOUD_ASSET_LABEL,
+            rows: 4,
+            bytes_per_row: 3,
+        },
+    },
+    PixelCloudAsset {
+        sprite_frame_label: SWARMER_EXPLOSION_SPRITE_FRAME_LABEL,
+        image: SpriteAssetImageSpec {
+            asset_label: SWARMER_EXPLOSION_PIXEL_CLOUD_ASSET_LABEL,
+            rows: 8,
+            bytes_per_row: 4,
+        },
+    },
+    PixelCloudAsset {
+        sprite_frame_label: TERRAIN_EXPLOSION_SPRITE_FRAME_LABEL,
+        image: SpriteAssetImageSpec {
+            asset_label: TERRAIN_EXPLOSION_PIXEL_CLOUD_ASSET_LABEL,
+            rows: 6,
+            bytes_per_row: 8,
+        },
+    },
+];
+
+fn pixel_cloud_sprite_asset(detail: &ExpandedObjectDetailSnapshot) -> Option<SpriteAssetImageSpec> {
+    let sprite_frame_label = detail.sprite_frame_label?;
+    PIXEL_CLOUD_SPRITE_ASSETS
+        .iter()
+        .find(|asset| asset.sprite_frame_label == sprite_frame_label)
+        .map(|asset| asset.image)
+}
+
+fn push_expanded_object_pixel_cloud(
     scene: &mut RenderScene,
-    spec: SourceObjectImageSpec,
+    spec: SpriteAssetImageSpec,
     top_left: ScreenPosition,
     center: ScreenPosition,
     scale: u8,
     tick: u32,
     layer: RenderLayer,
 ) {
-    let pixels = source_object_image_pixels(spec);
+    let pixels = sprite_asset_pixels(spec);
     if pixels.is_empty() {
         return;
     }
@@ -895,19 +982,19 @@ fn push_source_expanded_object_picture_pixels(
             layer,
             position: [target_x as f32, target_y as f32],
             size: [1.0, 1.0],
-            tint: source_expanded_object_pixel_tint(pixel.tint, tick, index),
+            tint: pixel_cloud_tint(pixel.tint, tick, index),
         });
     }
 }
 
-fn source_expanded_object_pixel_tint(source_tint: Color, tick: u32, index: usize) -> Color {
+fn pixel_cloud_tint(source_tint: Color, tick: u32, index: usize) -> Color {
     if tick < 2 && index.is_multiple_of(3) {
-        return source_laser_tint(index);
+        return cycling_palette_tint(index);
     }
     source_tint
 }
 
-fn source_laser_tint(phase: usize) -> Color {
+fn cycling_palette_tint(phase: usize) -> Color {
     source_pseudo_color_tint(COLTAB_COLOR_BYTES[phase % COLTAB_ACTIVE_BYTES])
 }
 

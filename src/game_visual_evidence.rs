@@ -123,7 +123,7 @@ impl ExplosionSnapshot {
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::Explosion,
             size: display_size,
-            picture_label: Some(self.picture_label),
+            sprite_frame_label: Some(self.picture_label),
             picture_size: Some((width, height)),
             mapped_sprite: Some(self.mapped_sprite),
             center: Some(self.source_center.unwrap_or(ScreenPosition::new(

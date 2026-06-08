@@ -723,7 +723,7 @@ pub struct ExpandedObjectDetailSnapshot {
     pub slot_address: Option<u16>,
     pub size: u16,
     pub descriptor_address: Option<u16>,
-    pub picture_label: Option<&'static str>,
+    pub sprite_frame_label: Option<&'static str>,
     pub picture_size: Option<(u8, u8)>,
     pub mapped_sprite: Option<SpriteId>,
     pub erase_address: Option<u16>,
@@ -742,7 +742,7 @@ impl ExpandedObjectDetailSnapshot {
         slot_address: None,
         size: 0,
         descriptor_address: None,
-        picture_label: None,
+        sprite_frame_label: None,
         picture_size: None,
         mapped_sprite: None,
         erase_address: None,
@@ -814,7 +814,7 @@ impl ScorePopupSnapshot {
     fn expanded_object_detail(self) -> ExpandedObjectDetailSnapshot {
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::ScorePopup,
-            picture_label: Some(self.kind.picture_label()),
+            sprite_frame_label: Some(self.kind.picture_label()),
             picture_size: Some((6, 6)),
             mapped_sprite: Some(self.kind.sprite()),
             top_left: Some(self.position),
@@ -829,7 +829,7 @@ impl ScorePopupSnapshot {
 pub struct EnemyAppearanceSnapshot {
     pub position: ScreenPosition,
     pub source_size: u16,
-    pub picture_label: &'static str,
+    pub sprite_frame_label: &'static str,
     pub picture_size: (u8, u8),
     pub mapped_sprite: SpriteId,
 }
@@ -845,7 +845,7 @@ impl EnemyAppearanceSnapshot {
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::Appearance,
             size: self.source_size,
-            picture_label: Some(self.picture_label),
+            sprite_frame_label: Some(self.sprite_frame_label),
             picture_size: Some((width, height)),
             mapped_sprite: Some(self.mapped_sprite),
             center: Some(source_appearance_center(self.position, self.picture_size)),

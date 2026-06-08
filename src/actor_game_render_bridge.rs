@@ -213,7 +213,7 @@ impl ActorRenderSceneBridge {
         };
         let source_size = actor_source_explosion_size_for_kind(kind, age);
         if let Some(source_position) = try_screen_position(position)
-            && push_source_explosion_cloud_pixels(
+            && push_explosion_cloud_pixels(
                 scene,
                 clean_explosion_kind(kind),
                 source_position,
@@ -1265,7 +1265,7 @@ fn push_actor_attract_scoring_score_500_pixels(
     position: [f32; 2],
     display_step: u16,
 ) {
-    let bytes = actor_source_object_image_bytes("C5D10");
+    let bytes = actor_sprite_asset_image_bytes(SCORE_POPUP_500_PIXEL_ASSET_LABEL);
     let rows = 6_usize;
     let bytes_per_row = 6_usize;
     if bytes.len() != rows * bytes_per_row {
@@ -1278,14 +1278,14 @@ fn push_actor_attract_scoring_score_500_pixels(
         for row in 0..rows {
             let byte = bytes[column_start + row];
             if let Some(tint) = actor_score_500_nibble_tint(byte >> 4, phase) {
-                push_actor_source_fragment_pixel(
+                push_actor_fragment_pixel(
                     scene,
                     [position[0] + (column * 2) as f32, position[1] + row as f32],
                     tint,
                 );
             }
             if let Some(tint) = actor_score_500_nibble_tint(byte & 0x0F, phase) {
-                push_actor_source_fragment_pixel(
+                push_actor_fragment_pixel(
                     scene,
                     [
                         position[0] + (column * 2 + 1) as f32,
@@ -1298,13 +1298,15 @@ fn push_actor_attract_scoring_score_500_pixels(
     }
 }
 
+const SCORE_POPUP_500_PIXEL_ASSET_LABEL: &str = "C5D10"; // original: C5D10
+
 fn actor_score_500_nibble_tint(nibble: u8, phase: usize) -> Option<Color> {
     match nibble {
         0x0 => None,
         0xD => Some(SCORE_POPUP_500_COLOR_CYCLE[phase % SCORE_POPUP_500_COLOR_CYCLE.len()]),
         0xE => Some(SCORE_POPUP_500_COLOR_CYCLE[(phase + 1) % SCORE_POPUP_500_COLOR_CYCLE.len()]),
         0xF => Some(SCORE_POPUP_500_COLOR_CYCLE[(phase + 2) % SCORE_POPUP_500_COLOR_CYCLE.len()]),
-        _ => actor_source_picture_nibble_tint(nibble),
+        _ => actor_sprite_asset_nibble_tint(nibble),
     }
 }
 
@@ -1446,13 +1448,13 @@ fn push_actor_attract_scoring_materialize_pixels(
     let Some(position) = try_screen_position_from_scene_position(position) else {
         return;
     };
-    let descriptor = actor_attract_scoring_enemy_source_picture_descriptor(enemy);
+    let descriptor = actor_attract_scoring_enemy_sprite_frame_descriptor(enemy);
     let appearance_age = actor_attract_scoring_materialize_age(visual_step);
     let source_size = source_appearance_size_for_age(appearance_age);
-    let _ = push_source_appearance_cloud_pixels(
+    let _ = push_appearance_cloud_pixels(
         scene,
         position,
-        descriptor.picture_label,
+        descriptor.frame_label,
         descriptor.picture_size,
         descriptor.sprite,
         source_size,
@@ -1469,7 +1471,7 @@ fn push_actor_attract_scoring_explosion_pixels(
         return;
     };
     let source_size = source_explosion_size_for_age(visual_step.saturating_add(2));
-    let _ = push_source_explosion_cloud_pixels(
+    let _ = push_explosion_cloud_pixels(
         scene,
         clean_explosion_kind(actor_attract_scoring_enemy_explosion_kind(enemy)),
         position,
@@ -1478,7 +1480,7 @@ fn push_actor_attract_scoring_explosion_pixels(
     );
 }
 
-fn push_actor_source_fragment_pixel(scene: &mut RenderScene, position: [f32; 2], tint: Color) {
+fn push_actor_fragment_pixel(scene: &mut RenderScene, position: [f32; 2], tint: Color) {
     if position[0] < 0.0
         || position[1] < 0.0
         || position[0] >= scene.surface.width as f32
@@ -1496,43 +1498,50 @@ fn push_actor_source_fragment_pixel(scene: &mut RenderScene, position: [f32; 2],
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct ActorAttractScoringSourcePictureDescriptor {
-    picture_label: &'static str,
+struct ActorAttractScoringSpriteFrameDescriptor {
+    frame_label: &'static str,
     picture_size: (u8, u8),
     sprite: SpriteId,
 }
 
-fn actor_attract_scoring_enemy_source_picture_descriptor(
+const ATTRACT_LANDER_SPRITE_FRAME_LABEL: &str = "LNDP1"; // original: LNDP1
+const ATTRACT_MUTANT_SPRITE_FRAME_LABEL: &str = "SCZP1"; // original: SCZP1
+const ATTRACT_BAITER_SPRITE_FRAME_LABEL: &str = "UFOP1"; // original: UFOP1
+const ATTRACT_BOMBER_SPRITE_FRAME_LABEL: &str = "TIEP1"; // original: TIEP1
+const ATTRACT_POD_SPRITE_FRAME_LABEL: &str = "PRBP1"; // original: PRBP1
+const ATTRACT_SWARMER_SPRITE_FRAME_LABEL: &str = "SWPIC1"; // original: SWPIC1
+
+fn actor_attract_scoring_enemy_sprite_frame_descriptor(
     enemy: ActorAttractScoringEnemyKind,
-) -> ActorAttractScoringSourcePictureDescriptor {
+) -> ActorAttractScoringSpriteFrameDescriptor {
     match enemy {
-        ActorAttractScoringEnemyKind::Lander => ActorAttractScoringSourcePictureDescriptor {
-            picture_label: "LNDP1",
+        ActorAttractScoringEnemyKind::Lander => ActorAttractScoringSpriteFrameDescriptor {
+            frame_label: ATTRACT_LANDER_SPRITE_FRAME_LABEL,
             picture_size: (5, 8),
             sprite: SpriteId::ENEMY_LANDER,
         },
-        ActorAttractScoringEnemyKind::Mutant => ActorAttractScoringSourcePictureDescriptor {
-            picture_label: "SCZP1",
+        ActorAttractScoringEnemyKind::Mutant => ActorAttractScoringSpriteFrameDescriptor {
+            frame_label: ATTRACT_MUTANT_SPRITE_FRAME_LABEL,
             picture_size: (5, 8),
             sprite: SpriteId::ENEMY_MUTANT,
         },
-        ActorAttractScoringEnemyKind::Baiter => ActorAttractScoringSourcePictureDescriptor {
-            picture_label: "UFOP1",
+        ActorAttractScoringEnemyKind::Baiter => ActorAttractScoringSpriteFrameDescriptor {
+            frame_label: ATTRACT_BAITER_SPRITE_FRAME_LABEL,
             picture_size: (6, 4),
             sprite: SpriteId::ENEMY_BAITER,
         },
-        ActorAttractScoringEnemyKind::Bomber => ActorAttractScoringSourcePictureDescriptor {
-            picture_label: "TIEP1",
+        ActorAttractScoringEnemyKind::Bomber => ActorAttractScoringSpriteFrameDescriptor {
+            frame_label: ATTRACT_BOMBER_SPRITE_FRAME_LABEL,
             picture_size: (4, 8),
             sprite: SpriteId::ENEMY_BOMBER,
         },
-        ActorAttractScoringEnemyKind::Pod => ActorAttractScoringSourcePictureDescriptor {
-            picture_label: "PRBP1",
+        ActorAttractScoringEnemyKind::Pod => ActorAttractScoringSpriteFrameDescriptor {
+            frame_label: ATTRACT_POD_SPRITE_FRAME_LABEL,
             picture_size: (4, 8),
             sprite: SpriteId::ENEMY_POD,
         },
-        ActorAttractScoringEnemyKind::Swarmer => ActorAttractScoringSourcePictureDescriptor {
-            picture_label: "SWPIC1",
+        ActorAttractScoringEnemyKind::Swarmer => ActorAttractScoringSpriteFrameDescriptor {
+            frame_label: ATTRACT_SWARMER_SPRITE_FRAME_LABEL,
             picture_size: (3, 4),
             sprite: SpriteId::ENEMY_SWARMER,
         },
@@ -1575,7 +1584,7 @@ fn try_screen_position_from_scene_position(position: [f32; 2]) -> Option<ScreenP
     Some(ScreenPosition::new(x as u8, y as u8))
 }
 
-fn actor_source_object_image_bytes(label: &'static str) -> Vec<u8> {
+fn actor_sprite_asset_image_bytes(asset_label: &'static str) -> Vec<u8> {
     for line in OBJECT_IMAGES_TSV.lines().skip(1) {
         let mut fields = line.split('\t');
         let Some(row_label) = fields.next() else {
@@ -1585,29 +1594,29 @@ fn actor_source_object_image_bytes(label: &'static str) -> Vec<u8> {
         let Some(hex_bytes) = fields.next() else {
             continue;
         };
-        if row_label == label {
-            return actor_decode_source_hex_bytes(label, hex_bytes);
+        if row_label == asset_label {
+            return actor_decode_sprite_asset_hex_bytes(asset_label, hex_bytes);
         }
     }
     Vec::new()
 }
 
-fn actor_decode_source_hex_bytes(label: &'static str, hex_bytes: &str) -> Vec<u8> {
+fn actor_decode_sprite_asset_hex_bytes(asset_label: &'static str, hex_bytes: &str) -> Vec<u8> {
     assert!(
         hex_bytes.len().is_multiple_of(2),
-        "source object image {label} hex payload must have whole bytes"
+        "sprite asset image {asset_label} hex payload must have whole bytes"
     );
     (0..hex_bytes.len())
         .step_by(2)
         .map(|start| {
             u8::from_str_radix(&hex_bytes[start..start + 2], 16).unwrap_or_else(|error| {
-                panic!("source object image {label} byte must be hexadecimal: {error}")
+                panic!("sprite asset image {asset_label} byte must be hexadecimal: {error}")
             })
         })
         .collect()
 }
 
-fn actor_source_picture_nibble_tint(nibble: u8) -> Option<Color> {
+fn actor_sprite_asset_nibble_tint(nibble: u8) -> Option<Color> {
     match nibble {
         0x0 => None,
         0x1 | 0xA | 0xC | 0xD | 0xE | 0xF => Some(Color::WHITE),
