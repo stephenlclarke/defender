@@ -1255,35 +1255,18 @@ fn source_hall_score_entries(
 }
 
 fn source_high_score_seed_entry(index: usize) -> HighScoreTableEntrySnapshot {
-    let line = ACTOR_HIGH_SCORES_TSV
-        .lines()
-        .skip(1)
-        .nth(index)
-        .unwrap_or_else(|| panic!("missing red-label high-score seed row {index}"));
-    let mut fields = line.split('\t');
-    let initials = fields
-        .next()
-        .unwrap_or_else(|| panic!("missing red-label high-score initials row {index}"));
-    let score = fields
-        .next()
-        .unwrap_or_else(|| panic!("missing red-label high-score value row {index}"))
-        .parse::<u32>()
-        .unwrap_or_else(|error| panic!("red-label high-score row {index} score: {error}"));
+    let seed = crate::arcade_assets::HIGH_SCORE_SEEDS
+        .get(index)
+        .unwrap_or_else(|| panic!("missing embedded high-score seed row {index}"));
     HighScoreTableEntrySnapshot {
-        rank: u8::try_from(index + 1).expect("red-label high-score rank fits u8"),
-        score,
-        initials: high_score_initials_from_seed(initials),
+        rank: u8::try_from(index + 1).expect("embedded high-score rank fits u8"),
+        score: seed.score,
+        initials: [
+            Some(seed.initials[0]),
+            Some(seed.initials[1]),
+            Some(seed.initials[2]),
+        ],
     }
-}
-
-fn high_score_initials_from_seed(initials: &str) -> [Option<char>; 3] {
-    let mut result = [None; 3];
-    for (index, character) in initials.chars().take(result.len()).enumerate() {
-        if character.is_ascii_alphabetic() {
-            result[index] = Some(character.to_ascii_uppercase());
-        }
-    }
-    result
 }
 
 fn hall_score_table_draws(

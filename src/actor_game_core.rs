@@ -265,7 +265,6 @@ const ATTRACT_SCORING_HUMAN_SCANNER_COLOR_WORD: u16 = 0x6666;
 const ATTRACT_SCORING_LANDER_SCANNER_COLOR_WORD: u16 = 0x4433;
 const ATTRACT_SCORING_LEGEND_ORIGIN_X16: i32 = 0x1F00; // original: ATTRACT_SCORING_LEGEND_SOURCE_X16
 const ATTRACT_SCORING_LEGEND_ORIGIN_START_Y16: i32 = 0xA000; // original: ATTRACT_SCORING_LEGEND_SOURCE_START_Y16
-const OBJECT_IMAGES_TSV: &str = include_str!("../assets/red-label/object-images.tsv"); // original: SOURCE_OBJECT_IMAGES_TSV
 const NORMAL_PALETTE_BYTES: [u8; 16] = [
     // original: SOURCE_NORMAL_PALETTE_BYTES
     0x00, 0x00, 0x07, 0x28, 0x2F, 0x81, 0xA4, 0x15, 0xC7, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -279,9 +278,6 @@ const LASER_TIP_TINT: Color = Color::from_rgba(0x8F, 0xE8, 0xFF, 0xFF); // origi
 const LASER_FIZZLE_TINT: Color = Color::from_rgba(0x00, 0x78, 0xD8, 0xFF); // original: SOURCE_LASER_FIZZLE_TINT
 const WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255]; // original: SOURCE_WILLIAMS_RED_GREEN_LEVELS
 const WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255]; // original: SOURCE_WILLIAMS_BLUE_LEVELS
-const TERRAIN_DATA_TSV: &str = include_str!("../assets/red-label/terrain-data.tsv"); // original: SOURCE_TERRAIN_DATA_TSV
-const MAIN_TERRAIN_RECORD_LABEL: &str = "MTERR"; // original: SOURCE_TERRAIN_MTERR_LABEL
-const MAIN_TERRAIN_RECORD_ADDRESS: u16 = 0xCD67; // original: SOURCE_TERRAIN_MTERR_ADDRESS
 const MAIN_TERRAIN_RECORD_BYTE_COUNT: usize = 0x180; // original: SOURCE_TERRAIN_MTERR_BYTES
 const SCANNER_TERRAIN_RECORDS: usize = 0x40; // original: SOURCE_SCANNER_TERRAIN_RECORDS
 const SCANNER_MINI_TERRAIN_RECORDS: usize = MAIN_TERRAIN_RECORD_BYTE_COUNT / 3; // original: SOURCE_SCANNER_MINI_TERRAIN_RECORDS
@@ -434,10 +430,6 @@ const HUMAN_SAFE_LANDING_SCORE: u32 = 250;
 const ACTOR_ATTRACT_SCRIPT: &str = include_str!("../assets/red-label/actor-attract.script"); // original: ACTOR_RED_LABEL_ATTRACT_SCRIPT
 const ACTOR_BEHAVIOR_SCRIPT: &str = include_str!("../assets/red-label/actor-behavior.script"); // original: ACTOR_RED_LABEL_BEHAVIOR_SCRIPT
 const ACTOR_WAVE_SCRIPT: &str = include_str!("../assets/red-label/actor-waves.script"); // original: ACTOR_RED_LABEL_WAVE_SCRIPT
-const ACTOR_WAVE_TABLE_TSV: &str = include_str!("../assets/red-label/wave-table.tsv"); // original: ACTOR_SOURCE_WAVE_TABLE_TSV
-const ACTOR_HIGH_SCORES_TSV: &str = include_str!("../assets/red-label/high-scores.tsv"); // original: ACTOR_SOURCE_HIGH_SCORES_TSV
-const ACTOR_WAVE_TABLE_HEADER: &str =
-    "key\tceiling\tfloor\tintra_delta\tinter_delta\twave1\twave2\twave3\twave4"; // original: ACTOR_SOURCE_WAVE_TABLE_HEADER
 const ACTOR_DEFAULT_DIFFICULTY_INITIAL: u8 = 5; // original: ACTOR_SOURCE_DEFAULT_DIFFICULTY_INITIAL
 const ACTOR_DEFAULT_DIFFICULTY_CEILING: u8 = 15; // original: ACTOR_SOURCE_DEFAULT_DIFFICULTY_CEILING
 const ACTOR_DATA_BACKED_WAVES: u16 = 16; // original: ACTOR_SOURCE_BACKED_WAVES

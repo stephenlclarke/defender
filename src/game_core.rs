@@ -1,6 +1,7 @@
 use std::sync::OnceLock;
 
 use crate::{
+    arcade_assets::ObjectBitmapId,
     renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, source_screen_position},
     systems::{HighScoreInitialsState, ScreenPosition, ScreenVelocity},
 };
@@ -75,13 +76,8 @@ const WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255]; // original: SOURCE_WIL
 const NORMAL_PALETTE_BYTES: [u8; 16] = [
     0x00, 0x00, 0x07, 0x28, 0x2F, 0x81, 0xA4, 0x15, 0xC7, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
-const TERRAIN_DATA_TSV: &str = include_str!("../assets/red-label/terrain-data.tsv"); // original: SOURCE_TERRAIN_DATA_TSV
-const OBJECT_IMAGES_TSV: &str = include_str!("../assets/red-label/object-images.tsv"); // original: SOURCE_OBJECT_IMAGES_TSV
-const TERRAIN_TDATA_LABEL: &str = "TDATA"; // original: SOURCE_TERRAIN_TDATA_LABEL
-const MAIN_TERRAIN_RECORD_LABEL: &str = "MTERR"; // original: SOURCE_TERRAIN_MTERR_LABEL
-const TERRAIN_TDATA_ADDRESS: u16 = 0xC350; // original: SOURCE_TERRAIN_TDATA_ADDRESS
 const TERRAIN_TDATA_BYTES: usize = 0x100; // original: SOURCE_TERRAIN_TDATA_BYTES
-const MAIN_TERRAIN_RECORD_ADDRESS: u16 = 0xCD67; // original: SOURCE_TERRAIN_MTERR_ADDRESS
+const TERRAIN_PATTERN_STREAM_BASE: u16 = 0xC350; // original: TDATA
 const MAIN_TERRAIN_RECORD_BYTE_COUNT: usize = 0x180; // original: SOURCE_TERRAIN_MTERR_BYTES
 const TERRAIN_FLAVOR_RECORDS: usize = 0x98; // original: SOURCE_TERRAIN_FLAVOR_RECORDS
 const TERRAIN_SCREEN_WORDS: usize = 0x98; // original: SOURCE_TERRAIN_SCREEN_WORDS
@@ -479,95 +475,60 @@ pub struct WaveProfileSnapshot {
 impl WaveProfileSnapshot {
     pub fn for_wave(wave: u8) -> Self {
         Self {
-            landers: wave_table_u8("landers", wave),
-            bombers: wave_table_u8("bombers", wave),
-            pods: wave_table_u8("pods", wave),
-            mutants: wave_table_u8("mutants", wave),
-            swarmers: wave_table_u8("swarmers", wave),
-            lander_x_velocity: wave_table_u8("lander_x_velocity", wave),
-            lander_y_velocity_msb: wave_table_u8("lander_y_velocity_msb", wave),
-            lander_y_velocity_lsb: wave_table_u8("lander_y_velocity_lsb", wave),
-            mutant_random_y: wave_table_u8("mutant_random_y", wave),
-            mutant_y_velocity_msb: wave_table_u8("mutant_y_velocity_msb", wave),
-            mutant_y_velocity_lsb: wave_table_u8("mutant_y_velocity_lsb", wave),
-            mutant_x_velocity: wave_table_u8("mutant_x_velocity", wave),
-            swarmer_x_velocity: wave_table_u8("swarmer_x_velocity", wave),
-            wave_time: wave_table_u32("wave_time", wave),
-            wave_size: wave_table_u8("wave_size", wave),
-            lander_shot_time: wave_table_u32("lander_shot_time", wave),
-            bomber_x_velocity: wave_table_u8("bomber_x_velocity", wave),
-            mutant_shot_time: wave_table_u32("mutant_shot_time", wave),
-            swarmer_shot_time: wave_table_u32("swarmer_shot_time", wave),
-            swarmer_acceleration_mask: wave_table_u8("swarmer_acceleration_mask", wave),
-            baiter_delay: wave_table_u32("baiter_time", wave),
-            baiter_shot_time: wave_table_u32("baiter_shot_time", wave),
-            baiter_seek_probability: wave_table_u8("baiter_seek_probability", wave),
+            landers: wave_table_u8(crate::arcade_assets::WaveMetric::Landers, wave),
+            bombers: wave_table_u8(crate::arcade_assets::WaveMetric::Bombers, wave),
+            pods: wave_table_u8(crate::arcade_assets::WaveMetric::Pods, wave),
+            mutants: wave_table_u8(crate::arcade_assets::WaveMetric::Mutants, wave),
+            swarmers: wave_table_u8(crate::arcade_assets::WaveMetric::Swarmers, wave),
+            lander_x_velocity: wave_table_u8(crate::arcade_assets::WaveMetric::LanderXVelocity, wave),
+            lander_y_velocity_msb: wave_table_u8(crate::arcade_assets::WaveMetric::LanderYVelocityHigh, wave),
+            lander_y_velocity_lsb: wave_table_u8(crate::arcade_assets::WaveMetric::LanderYVelocityLow, wave),
+            mutant_random_y: wave_table_u8(crate::arcade_assets::WaveMetric::MutantRandomY, wave),
+            mutant_y_velocity_msb: wave_table_u8(crate::arcade_assets::WaveMetric::MutantYVelocityHigh, wave),
+            mutant_y_velocity_lsb: wave_table_u8(crate::arcade_assets::WaveMetric::MutantYVelocityLow, wave),
+            mutant_x_velocity: wave_table_u8(crate::arcade_assets::WaveMetric::MutantXVelocity, wave),
+            swarmer_x_velocity: wave_table_u8(crate::arcade_assets::WaveMetric::SwarmerXVelocity, wave),
+            wave_time: wave_table_u32(crate::arcade_assets::WaveMetric::WaveTime, wave),
+            wave_size: wave_table_u8(crate::arcade_assets::WaveMetric::WaveSize, wave),
+            lander_shot_time: wave_table_u32(crate::arcade_assets::WaveMetric::LanderShotTime, wave),
+            bomber_x_velocity: wave_table_u8(crate::arcade_assets::WaveMetric::BomberXVelocity, wave),
+            mutant_shot_time: wave_table_u32(crate::arcade_assets::WaveMetric::MutantShotTime, wave),
+            swarmer_shot_time: wave_table_u32(crate::arcade_assets::WaveMetric::SwarmerShotTime, wave),
+            swarmer_acceleration_mask: wave_table_u8(
+                crate::arcade_assets::WaveMetric::SwarmerAccelerationMask,
+                wave,
+            ),
+            baiter_delay: wave_table_u32(crate::arcade_assets::WaveMetric::BaiterDelay, wave),
+            baiter_shot_time: wave_table_u32(crate::arcade_assets::WaveMetric::BaiterShotTime, wave),
+            baiter_seek_probability: wave_table_u8(
+                crate::arcade_assets::WaveMetric::BaiterSeekProbability,
+                wave,
+            ),
         }
     }
 }
 
-const WAVE_TABLE_TSV: &str = include_str!("../assets/red-label/wave-table.tsv"); // original: SOURCE_WAVE_TABLE_TSV
-const WAVE_TABLE_HEADER: &str = // original: SOURCE_WAVE_TABLE_HEADER
-    "key\tceiling\tfloor\tintra_delta\tinter_delta\twave1\twave2\twave3\twave4";
 const DEFAULT_DIFFICULTY_INITIAL: u8 = 5; // original: SOURCE_DEFAULT_DIFFICULTY_INITIAL
 const DEFAULT_DIFFICULTY_CEILING: u8 = 15; // original: SOURCE_DEFAULT_DIFFICULTY_CEILING
 
-fn wave_table_u8(key: &str, wave: u8) -> u8 {
-    u8::try_from(wave_table_value(key, wave)).expect("red-label wave profile value should fit u8")
+fn wave_table_u8(metric: crate::arcade_assets::WaveMetric, wave: u8) -> u8 {
+    u8::try_from(wave_table_value(metric, wave)).expect("wave profile value should fit u8")
 }
 
-fn wave_table_u32(key: &str, wave: u8) -> u32 {
-    u32::try_from(wave_table_value(key, wave))
-        .expect("red-label wave profile value should be non-negative")
+fn wave_table_u32(metric: crate::arcade_assets::WaveMetric, wave: u8) -> u32 {
+    u32::try_from(wave_table_value(metric, wave)).expect("wave profile value should be non-negative")
 }
 
-fn wave_table_value(key: &str, wave: u8) -> i32 {
-    let mut lines = WAVE_TABLE_TSV.lines();
-    let header = lines
-        .next()
-        .expect("red-label wave table should have header");
-    assert_eq!(header, WAVE_TABLE_HEADER);
-
-    for line in lines.map(str::trim).filter(|line| !line.is_empty()) {
-        let fields = line.split('\t').collect::<Vec<_>>();
-        assert_eq!(fields.len(), 9, "red-label wave table row width changed");
-        if fields[0] != key {
-            continue;
-        }
-
-        let ceiling = parse_wave_table_i32(fields[1], key, "ceiling");
-        let floor = parse_wave_table_i32(fields[2], key, "floor");
-        let inter_delta = parse_wave_table_i32(fields[4], key, "inter_delta");
-        let wave = wave.max(1);
-        let wave_index = usize::from(wave.min(4));
-        let mut value = parse_wave_table_i32(fields[4 + wave_index], key, "wave");
-        for _ in 0..source_getwv_inter_wall_delta_iterations(wave) {
-            value = apply_wave_table_delta(value, inter_delta, floor, ceiling);
-        }
-        return value;
-    }
-
-    panic!("missing red-label wave table key {key}");
+fn wave_table_value(metric: crate::arcade_assets::WaveMetric, wave: u8) -> i32 {
+    crate::arcade_assets::wave_metric_value(
+        metric,
+        wave,
+        source_getwv_inter_wall_delta_iterations(wave.max(1)),
+    )
 }
 
 fn source_getwv_inter_wall_delta_iterations(wave: u8) -> u16 {
     let wave_delta = wave.saturating_sub(4);
     let pre_ceiling = DEFAULT_DIFFICULTY_INITIAL.saturating_add(wave_delta);
     u16::from(pre_ceiling.min(DEFAULT_DIFFICULTY_CEILING))
-}
-
-fn parse_wave_table_i32(value: &str, key: &str, field: &str) -> i32 {
-    value
-        .parse()
-        .unwrap_or_else(|_| panic!("red-label wave table {key}.{field} is not an integer"))
-}
-
-fn apply_wave_table_delta(value: i32, delta: i32, floor: i32, ceiling: i32) -> i32 {
-    if delta > 0 {
-        (value + delta).min(ceiling)
-    } else if delta < 0 {
-        (value + delta).max(floor)
-    } else {
-        value
-    }
 }

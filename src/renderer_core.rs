@@ -781,20 +781,7 @@ impl RenderScene {
 }
 
 pub fn source_message_text(label: &str) -> Option<&'static str> {
-    MESSAGE_TEXT_TABLE_TSV.lines().skip(1).find_map(|line| {
-        if line.trim().is_empty() {
-            return None;
-        }
-        let mut fields = line.split('\t');
-        let row_label = fields.next()?;
-        let _vector_address = fields.next()?;
-        let words = fields.next()?;
-        if row_label == label {
-            Some(words)
-        } else {
-            None
-        }
-    })
+    crate::arcade_assets::message_id_from_legacy_label(label).map(crate::arcade_assets::message_text)
 }
 
 pub fn source_screen_position(screen_address: u16) -> [f32; 2] {

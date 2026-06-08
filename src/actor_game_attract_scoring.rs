@@ -836,7 +836,7 @@ fn push_actor_attract_scoring_score_500_pixels(
     position: [f32; 2],
     display_step: u16,
 ) {
-    let bytes = actor_sprite_asset_image_bytes(SCORE_POPUP_500_PIXEL_ASSET_LABEL);
+    let bytes = crate::arcade_assets::object_bitmap_bytes(SCORE_POPUP_500_PIXEL_BITMAP);
     let rows = 6_usize;
     let bytes_per_row = 6_usize;
     if bytes.len() != rows * bytes_per_row {
@@ -869,7 +869,8 @@ fn push_actor_attract_scoring_score_500_pixels(
     }
 }
 
-const SCORE_POPUP_500_PIXEL_ASSET_LABEL: &str = "C5D10"; // original: C5D10
+const SCORE_POPUP_500_PIXEL_BITMAP: crate::arcade_assets::ObjectBitmapId =
+    crate::arcade_assets::ObjectBitmapId::Score500Primary; // original: C5D10
 
 fn actor_score_500_nibble_tint(nibble: u8, phase: usize) -> Option<Color> {
     match nibble {
@@ -1153,38 +1154,6 @@ fn try_screen_position_from_scene_position(position: [f32; 2]) -> Option<ScreenP
         return None;
     }
     Some(ScreenPosition::new(x as u8, y as u8))
-}
-
-fn actor_sprite_asset_image_bytes(asset_label: &'static str) -> Vec<u8> {
-    for line in OBJECT_IMAGES_TSV.lines().skip(1) {
-        let mut fields = line.split('\t');
-        let Some(row_label) = fields.next() else {
-            continue;
-        };
-        let _source_address = fields.next();
-        let Some(hex_bytes) = fields.next() else {
-            continue;
-        };
-        if row_label == asset_label {
-            return actor_decode_sprite_asset_hex_bytes(asset_label, hex_bytes);
-        }
-    }
-    Vec::new()
-}
-
-fn actor_decode_sprite_asset_hex_bytes(asset_label: &'static str, hex_bytes: &str) -> Vec<u8> {
-    assert!(
-        hex_bytes.len().is_multiple_of(2),
-        "sprite asset image {asset_label} hex payload must have whole bytes"
-    );
-    (0..hex_bytes.len())
-        .step_by(2)
-        .map(|start| {
-            u8::from_str_radix(&hex_bytes[start..start + 2], 16).unwrap_or_else(|error| {
-                panic!("sprite asset image {asset_label} byte must be hexadecimal: {error}")
-            })
-        })
-        .collect()
 }
 
 fn actor_sprite_asset_nibble_tint(nibble: u8) -> Option<Color> {

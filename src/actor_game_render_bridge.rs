@@ -479,43 +479,7 @@ fn source_generate_scanner_mini_terrain_records(
 }
 
 fn source_mterr_bytes() -> &'static [u8; MAIN_TERRAIN_RECORD_BYTE_COUNT] {
-    static MTERR: OnceLock<[u8; MAIN_TERRAIN_RECORD_BYTE_COUNT]> = OnceLock::new();
-    MTERR.get_or_init(parse_source_mterr_bytes)
-}
-
-fn parse_source_mterr_bytes() -> [u8; MAIN_TERRAIN_RECORD_BYTE_COUNT] {
-    let mut output = [0; MAIN_TERRAIN_RECORD_BYTE_COUNT];
-    for (line_index, line) in TERRAIN_DATA_TSV.lines().enumerate().skip(1) {
-        let mut fields = line.split('\t');
-        let label = fields.next().unwrap_or_default();
-        let address = fields.next().unwrap_or_default();
-        let bytes = fields.next().unwrap_or_default();
-        if label != MAIN_TERRAIN_RECORD_LABEL {
-            continue;
-        }
-        let expected_address = format!("0x{MAIN_TERRAIN_RECORD_ADDRESS:04X}");
-        assert_eq!(
-            address,
-            expected_address.as_str(),
-            "terrain-data line {} must preserve MTERR source address",
-            line_index + 1
-        );
-        assert_eq!(
-            bytes.len(),
-            MAIN_TERRAIN_RECORD_BYTE_COUNT * 2,
-            "MTERR hex payload must contain exactly 0x180 bytes"
-        );
-        for index in 0..MAIN_TERRAIN_RECORD_BYTE_COUNT {
-            output[index] = parse_source_hex_byte(&bytes[index * 2..index * 2 + 2]);
-        }
-        return output;
-    }
-
-    panic!("terrain-data.tsv must contain the MTERR record")
-}
-
-fn parse_source_hex_byte(value: &str) -> u8 {
-    u8::from_str_radix(value, 16).expect("source terrain byte must be hexadecimal")
+    crate::arcade_assets::MAIN_TERRAIN_BYTES
 }
 
 fn offset_new_sprites(scene: &mut RenderScene, first_sprite: usize, offset: [f32; 2]) {

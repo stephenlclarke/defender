@@ -213,7 +213,7 @@ fn source_initialize_terrain_flavor_tables(
     let mut generation_left = terrain_left.wrapping_add(0x2610);
     let mut left = SourceTerrainBitState {
         data_index: data.len() - 1,
-        data_pointer: TERRAIN_TDATA_ADDRESS.wrapping_sub(1),
+        data_pointer: TERRAIN_PATTERN_STREAM_BASE.wrapping_sub(1),
         data_byte: 0,
         bit_counter: 0,
     };
@@ -308,7 +308,7 @@ fn source_alinit_final_terrain_state(
 ) -> (SourceTerrainBitState, u8) {
     let mut state = SourceTerrainBitState {
         data_index: 0,
-        data_pointer: TERRAIN_TDATA_ADDRESS,
+        data_pointer: TERRAIN_PATTERN_STREAM_BASE,
         data_byte: data[0],
         bit_counter: 7,
     };
@@ -336,7 +336,7 @@ fn source_advance_terrain_right_state(
 ) {
     if state.bit_counter == 0 {
         state.data_index = (state.data_index + 1) % data.len();
-        state.data_pointer = TERRAIN_TDATA_ADDRESS
+        state.data_pointer = TERRAIN_PATTERN_STREAM_BASE
             .wrapping_add(u16::try_from(state.data_index).expect("TDATA index fits in u16"));
         state.bit_counter = 7;
         state.data_byte = data[state.data_index];
@@ -357,7 +357,7 @@ fn source_advance_terrain_left_state(
         } else {
             state.data_index - 1
         };
-        state.data_pointer = TERRAIN_TDATA_ADDRESS
+        state.data_pointer = TERRAIN_PATTERN_STREAM_BASE
             .wrapping_add(u16::try_from(state.data_index).expect("TDATA index fits in u16"));
         state.bit_counter = 0;
         state.data_byte = source_rotate_terrain_right_byte(data[state.data_index]);
@@ -372,78 +372,11 @@ fn source_rotate_terrain_right_byte(data_byte: u8) -> u8 {
 }
 
 fn source_tdata_bytes() -> &'static [u8; TERRAIN_TDATA_BYTES] {
-    static TDATA: OnceLock<[u8; TERRAIN_TDATA_BYTES]> = OnceLock::new();
-    TDATA.get_or_init(parse_source_tdata_bytes)
+    crate::arcade_assets::TERRAIN_PATTERN_BYTES
 }
 
 fn source_mterr_bytes() -> &'static [u8; MAIN_TERRAIN_RECORD_BYTE_COUNT] {
-    static MTERR: OnceLock<[u8; MAIN_TERRAIN_RECORD_BYTE_COUNT]> = OnceLock::new();
-    MTERR.get_or_init(parse_source_mterr_bytes)
-}
-
-fn parse_source_tdata_bytes() -> [u8; TERRAIN_TDATA_BYTES] {
-    let mut output = [0; TERRAIN_TDATA_BYTES];
-    for (line_index, line) in TERRAIN_DATA_TSV.lines().enumerate().skip(1) {
-        let mut fields = line.split('\t');
-        let label = fields.next().unwrap_or_default();
-        let address = fields.next().unwrap_or_default();
-        let bytes = fields.next().unwrap_or_default();
-        if label != TERRAIN_TDATA_LABEL {
-            continue;
-        }
-        assert_eq!(
-            address,
-            "0xC350",
-            "terrain-data line {} must preserve TDATA source address",
-            line_index + 1
-        );
-        assert_eq!(
-            bytes.len(),
-            TERRAIN_TDATA_BYTES * 2,
-            "TDATA hex payload must contain exactly 0x100 bytes"
-        );
-        for index in 0..TERRAIN_TDATA_BYTES {
-            output[index] = parse_source_hex_byte(&bytes[index * 2..index * 2 + 2]);
-        }
-        return output;
-    }
-
-    panic!("terrain-data.tsv must contain the TDATA record")
-}
-
-fn parse_source_mterr_bytes() -> [u8; MAIN_TERRAIN_RECORD_BYTE_COUNT] {
-    let mut output = [0; MAIN_TERRAIN_RECORD_BYTE_COUNT];
-    for (line_index, line) in TERRAIN_DATA_TSV.lines().enumerate().skip(1) {
-        let mut fields = line.split('\t');
-        let label = fields.next().unwrap_or_default();
-        let address = fields.next().unwrap_or_default();
-        let bytes = fields.next().unwrap_or_default();
-        if label != MAIN_TERRAIN_RECORD_LABEL {
-            continue;
-        }
-        let expected_address = format!("0x{MAIN_TERRAIN_RECORD_ADDRESS:04X}");
-        assert_eq!(
-            address,
-            expected_address.as_str(),
-            "terrain-data line {} must preserve MTERR source address",
-            line_index + 1
-        );
-        assert_eq!(
-            bytes.len(),
-            MAIN_TERRAIN_RECORD_BYTE_COUNT * 2,
-            "MTERR hex payload must contain exactly 0x180 bytes"
-        );
-        for index in 0..MAIN_TERRAIN_RECORD_BYTE_COUNT {
-            output[index] = parse_source_hex_byte(&bytes[index * 2..index * 2 + 2]);
-        }
-        return output;
-    }
-
-    panic!("terrain-data.tsv must contain the MTERR record")
-}
-
-fn parse_source_hex_byte(value: &str) -> u8 {
-    u8::from_str_radix(value, 16).expect("source terrain byte must be hexadecimal")
+    crate::arcade_assets::MAIN_TERRAIN_BYTES
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -455,13 +388,13 @@ struct SpriteAssetPixel {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct SpriteAssetImageSpec {
-    asset_label: &'static str,
+    bitmap: crate::arcade_assets::ObjectBitmapId,
     rows: u8,
     bytes_per_row: u8,
 }
 
 fn sprite_asset_pixels(spec: SpriteAssetImageSpec) -> Vec<SpriteAssetPixel> {
-    let bytes = sprite_asset_image_bytes(spec.asset_label);
+    let bytes = crate::arcade_assets::object_bitmap_bytes(spec.bitmap);
     let expected_byte_count = usize::from(spec.rows) * usize::from(spec.bytes_per_row);
     if bytes.len() != expected_byte_count {
         return Vec::new();
@@ -488,38 +421,6 @@ fn sprite_asset_pixels(spec: SpriteAssetImageSpec) -> Vec<SpriteAssetPixel> {
         }
     }
     pixels
-}
-
-fn sprite_asset_image_bytes(asset_label: &'static str) -> Vec<u8> {
-    for line in OBJECT_IMAGES_TSV.lines().skip(1) {
-        let mut columns = line.split('\t');
-        let Some(image_label) = columns.next() else {
-            continue;
-        };
-        let _address = columns.next();
-        let Some(hex_bytes) = columns.next() else {
-            continue;
-        };
-        if image_label == asset_label {
-            return decode_sprite_asset_hex_bytes(asset_label, hex_bytes);
-        }
-    }
-    Vec::new()
-}
-
-fn decode_sprite_asset_hex_bytes(asset_label: &'static str, hex_bytes: &str) -> Vec<u8> {
-    assert!(
-        hex_bytes.len().is_multiple_of(2),
-        "sprite asset image {asset_label} hex byte string must be even length"
-    );
-    (0..hex_bytes.len())
-        .step_by(2)
-        .map(|start| {
-            u8::from_str_radix(&hex_bytes[start..start + 2], 16).unwrap_or_else(|error| {
-                panic!("sprite asset image {asset_label} hex must parse: {error}")
-            })
-        })
-        .collect()
 }
 
 fn sprite_asset_nibble_tint(index: u8) -> Option<Color> {
@@ -794,27 +695,11 @@ const SWARMER_SPRITE_FRAME_LABEL: &str = "SWPIC1"; // original: SWPIC1
 const SWARMER_EXPLOSION_SPRITE_FRAME_LABEL: &str = "SWXP1"; // original: SWXP1
 const TERRAIN_EXPLOSION_SPRITE_FRAME_LABEL: &str = "TEREX"; // original: TEREX
 
-const LANDER_FIRST_PIXEL_CLOUD_ASSET_LABEL: &str = "LND10"; // original: LND10
-const LANDER_SECOND_PIXEL_CLOUD_ASSET_LABEL: &str = "LND20"; // original: LND20
-const LANDER_THIRD_PIXEL_CLOUD_ASSET_LABEL: &str = "LND30"; // original: LND30
-const MUTANT_PIXEL_CLOUD_ASSET_LABEL: &str = "SCZD10"; // original: SCZD10
-const BOMBER_FIRST_PIXEL_CLOUD_ASSET_LABEL: &str = "TIED10"; // original: TIED10
-const BOMBER_SECOND_PIXEL_CLOUD_ASSET_LABEL: &str = "TIED20"; // original: TIED20
-const BOMBER_THIRD_PIXEL_CLOUD_ASSET_LABEL: &str = "TIED30"; // original: TIED30
-const BOMBER_FOURTH_PIXEL_CLOUD_ASSET_LABEL: &str = "TIED40"; // original: TIED40
-const POD_PIXEL_CLOUD_ASSET_LABEL: &str = "PRBD10"; // original: PRBD10
-const BAITER_FIRST_PIXEL_CLOUD_ASSET_LABEL: &str = "UFOD10"; // original: UFOD10
-const BAITER_SECOND_PIXEL_CLOUD_ASSET_LABEL: &str = "UFOD20"; // original: UFOD20
-const BAITER_THIRD_PIXEL_CLOUD_ASSET_LABEL: &str = "UFOD30"; // original: UFOD30
-const SWARMER_PIXEL_CLOUD_ASSET_LABEL: &str = "SWMD10"; // original: SWMD10
-const SWARMER_EXPLOSION_PIXEL_CLOUD_ASSET_LABEL: &str = "SWXD10"; // original: SWXD10
-const TERRAIN_EXPLOSION_PIXEL_CLOUD_ASSET_LABEL: &str = "TERX0"; // original: TERX0
-
 const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
     PixelCloudAsset {
         sprite_frame_label: LANDER_FIRST_SPRITE_FRAME_LABEL,
         image: SpriteAssetImageSpec {
-            asset_label: LANDER_FIRST_PIXEL_CLOUD_ASSET_LABEL,
+            bitmap: ObjectBitmapId::LanderFrame1Primary,
             rows: 8,
             bytes_per_row: 5,
         },
@@ -822,7 +707,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
     PixelCloudAsset {
         sprite_frame_label: LANDER_SECOND_SPRITE_FRAME_LABEL,
         image: SpriteAssetImageSpec {
-            asset_label: LANDER_SECOND_PIXEL_CLOUD_ASSET_LABEL,
+            bitmap: ObjectBitmapId::LanderFrame2Primary,
             rows: 8,
             bytes_per_row: 5,
         },
@@ -830,7 +715,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
     PixelCloudAsset {
         sprite_frame_label: LANDER_THIRD_SPRITE_FRAME_LABEL,
         image: SpriteAssetImageSpec {
-            asset_label: LANDER_THIRD_PIXEL_CLOUD_ASSET_LABEL,
+            bitmap: ObjectBitmapId::LanderFrame3Primary,
             rows: 8,
             bytes_per_row: 5,
         },
@@ -838,7 +723,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
     PixelCloudAsset {
         sprite_frame_label: MUTANT_SPRITE_FRAME_LABEL,
         image: SpriteAssetImageSpec {
-            asset_label: MUTANT_PIXEL_CLOUD_ASSET_LABEL,
+            bitmap: ObjectBitmapId::MutantPrimary,
             rows: 8,
             bytes_per_row: 5,
         },
@@ -846,7 +731,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
     PixelCloudAsset {
         sprite_frame_label: BOMBER_FIRST_SPRITE_FRAME_LABEL,
         image: SpriteAssetImageSpec {
-            asset_label: BOMBER_FIRST_PIXEL_CLOUD_ASSET_LABEL,
+            bitmap: ObjectBitmapId::BomberFrame1Primary,
             rows: 8,
             bytes_per_row: 4,
         },
@@ -854,7 +739,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
     PixelCloudAsset {
         sprite_frame_label: BOMBER_SECOND_SPRITE_FRAME_LABEL,
         image: SpriteAssetImageSpec {
-            asset_label: BOMBER_SECOND_PIXEL_CLOUD_ASSET_LABEL,
+            bitmap: ObjectBitmapId::BomberFrame2Primary,
             rows: 8,
             bytes_per_row: 4,
         },
@@ -862,7 +747,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
     PixelCloudAsset {
         sprite_frame_label: BOMBER_THIRD_SPRITE_FRAME_LABEL,
         image: SpriteAssetImageSpec {
-            asset_label: BOMBER_THIRD_PIXEL_CLOUD_ASSET_LABEL,
+            bitmap: ObjectBitmapId::BomberFrame3Primary,
             rows: 8,
             bytes_per_row: 4,
         },
@@ -870,7 +755,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
     PixelCloudAsset {
         sprite_frame_label: BOMBER_FOURTH_SPRITE_FRAME_LABEL,
         image: SpriteAssetImageSpec {
-            asset_label: BOMBER_FOURTH_PIXEL_CLOUD_ASSET_LABEL,
+            bitmap: ObjectBitmapId::BomberFrame4Primary,
             rows: 8,
             bytes_per_row: 4,
         },
@@ -878,7 +763,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
     PixelCloudAsset {
         sprite_frame_label: POD_SPRITE_FRAME_LABEL,
         image: SpriteAssetImageSpec {
-            asset_label: POD_PIXEL_CLOUD_ASSET_LABEL,
+            bitmap: ObjectBitmapId::PodPrimary,
             rows: 8,
             bytes_per_row: 4,
         },
@@ -886,7 +771,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
     PixelCloudAsset {
         sprite_frame_label: BAITER_FIRST_SPRITE_FRAME_LABEL,
         image: SpriteAssetImageSpec {
-            asset_label: BAITER_FIRST_PIXEL_CLOUD_ASSET_LABEL,
+            bitmap: ObjectBitmapId::BaiterFrame1Primary,
             rows: 4,
             bytes_per_row: 6,
         },
@@ -894,7 +779,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
     PixelCloudAsset {
         sprite_frame_label: BAITER_SECOND_SPRITE_FRAME_LABEL,
         image: SpriteAssetImageSpec {
-            asset_label: BAITER_SECOND_PIXEL_CLOUD_ASSET_LABEL,
+            bitmap: ObjectBitmapId::BaiterFrame2Primary,
             rows: 4,
             bytes_per_row: 6,
         },
@@ -902,7 +787,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
     PixelCloudAsset {
         sprite_frame_label: BAITER_THIRD_SPRITE_FRAME_LABEL,
         image: SpriteAssetImageSpec {
-            asset_label: BAITER_THIRD_PIXEL_CLOUD_ASSET_LABEL,
+            bitmap: ObjectBitmapId::BaiterFrame3Primary,
             rows: 4,
             bytes_per_row: 6,
         },
@@ -910,7 +795,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
     PixelCloudAsset {
         sprite_frame_label: SWARMER_SPRITE_FRAME_LABEL,
         image: SpriteAssetImageSpec {
-            asset_label: SWARMER_PIXEL_CLOUD_ASSET_LABEL,
+            bitmap: ObjectBitmapId::SwarmerPrimary,
             rows: 4,
             bytes_per_row: 3,
         },
@@ -918,7 +803,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
     PixelCloudAsset {
         sprite_frame_label: SWARMER_EXPLOSION_SPRITE_FRAME_LABEL,
         image: SpriteAssetImageSpec {
-            asset_label: SWARMER_EXPLOSION_PIXEL_CLOUD_ASSET_LABEL,
+            bitmap: ObjectBitmapId::SwarmerExplosion,
             rows: 8,
             bytes_per_row: 4,
         },
@@ -926,7 +811,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
     PixelCloudAsset {
         sprite_frame_label: TERRAIN_EXPLOSION_SPRITE_FRAME_LABEL,
         image: SpriteAssetImageSpec {
-            asset_label: TERRAIN_EXPLOSION_PIXEL_CLOUD_ASSET_LABEL,
+            bitmap: ObjectBitmapId::TerrainExplosion,
             rows: 6,
             bytes_per_row: 8,
         },

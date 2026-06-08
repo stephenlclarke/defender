@@ -957,28 +957,76 @@ impl ActorSourceWaveProfile {
     pub fn for_wave(wave: u16) -> Self {
         let wave = u8::try_from(wave.min(u16::from(u8::MAX))).unwrap_or(u8::MAX);
         Self {
-            landers: actor_source_wave_u8("landers", wave),
-            bombers: actor_source_wave_u8("bombers", wave),
-            pods: actor_source_wave_u8("pods", wave),
-            mutants: actor_source_wave_u8("mutants", wave),
-            swarmers: actor_source_wave_u8("swarmers", wave),
-            wave_size: actor_source_wave_u8("wave_size", wave),
-            lander_x_velocity: actor_source_wave_u8("lander_x_velocity", wave),
-            lander_y_velocity_msb: actor_source_wave_u8("lander_y_velocity_msb", wave),
-            lander_y_velocity_lsb: actor_source_wave_u8("lander_y_velocity_lsb", wave),
-            bomber_x_velocity: actor_source_wave_u8("bomber_x_velocity", wave),
-            swarmer_x_velocity: actor_source_wave_u8("swarmer_x_velocity", wave),
-            swarmer_shot_time: actor_source_wave_u32("swarmer_shot_time", wave),
-            swarmer_acceleration_mask: actor_source_wave_u8("swarmer_acceleration_mask", wave),
-            baiter_delay: actor_source_wave_u32("baiter_time", wave),
-            baiter_shot_time: actor_source_wave_u32("baiter_shot_time", wave),
-            baiter_seek_probability: actor_source_wave_u8("baiter_seek_probability", wave),
-            lander_shot_time: actor_source_wave_u32("lander_shot_time", wave),
-            mutant_random_y: actor_source_wave_u8("mutant_random_y", wave),
-            mutant_y_velocity_msb: actor_source_wave_u8("mutant_y_velocity_msb", wave),
-            mutant_y_velocity_lsb: actor_source_wave_u8("mutant_y_velocity_lsb", wave),
-            mutant_x_velocity: actor_source_wave_u8("mutant_x_velocity", wave),
-            mutant_shot_time: actor_source_wave_u32("mutant_shot_time", wave),
+            landers: actor_source_wave_u8(crate::arcade_assets::WaveMetric::Landers, wave),
+            bombers: actor_source_wave_u8(crate::arcade_assets::WaveMetric::Bombers, wave),
+            pods: actor_source_wave_u8(crate::arcade_assets::WaveMetric::Pods, wave),
+            mutants: actor_source_wave_u8(crate::arcade_assets::WaveMetric::Mutants, wave),
+            swarmers: actor_source_wave_u8(crate::arcade_assets::WaveMetric::Swarmers, wave),
+            wave_size: actor_source_wave_u8(crate::arcade_assets::WaveMetric::WaveSize, wave),
+            lander_x_velocity: actor_source_wave_u8(
+                crate::arcade_assets::WaveMetric::LanderXVelocity,
+                wave,
+            ),
+            lander_y_velocity_msb: actor_source_wave_u8(
+                crate::arcade_assets::WaveMetric::LanderYVelocityHigh,
+                wave,
+            ),
+            lander_y_velocity_lsb: actor_source_wave_u8(
+                crate::arcade_assets::WaveMetric::LanderYVelocityLow,
+                wave,
+            ),
+            bomber_x_velocity: actor_source_wave_u8(
+                crate::arcade_assets::WaveMetric::BomberXVelocity,
+                wave,
+            ),
+            swarmer_x_velocity: actor_source_wave_u8(
+                crate::arcade_assets::WaveMetric::SwarmerXVelocity,
+                wave,
+            ),
+            swarmer_shot_time: actor_source_wave_u32(
+                crate::arcade_assets::WaveMetric::SwarmerShotTime,
+                wave,
+            ),
+            swarmer_acceleration_mask: actor_source_wave_u8(
+                crate::arcade_assets::WaveMetric::SwarmerAccelerationMask,
+                wave,
+            ),
+            baiter_delay: actor_source_wave_u32(
+                crate::arcade_assets::WaveMetric::BaiterDelay,
+                wave,
+            ),
+            baiter_shot_time: actor_source_wave_u32(
+                crate::arcade_assets::WaveMetric::BaiterShotTime,
+                wave,
+            ),
+            baiter_seek_probability: actor_source_wave_u8(
+                crate::arcade_assets::WaveMetric::BaiterSeekProbability,
+                wave,
+            ),
+            lander_shot_time: actor_source_wave_u32(
+                crate::arcade_assets::WaveMetric::LanderShotTime,
+                wave,
+            ),
+            mutant_random_y: actor_source_wave_u8(
+                crate::arcade_assets::WaveMetric::MutantRandomY,
+                wave,
+            ),
+            mutant_y_velocity_msb: actor_source_wave_u8(
+                crate::arcade_assets::WaveMetric::MutantYVelocityHigh,
+                wave,
+            ),
+            mutant_y_velocity_lsb: actor_source_wave_u8(
+                crate::arcade_assets::WaveMetric::MutantYVelocityLow,
+                wave,
+            ),
+            mutant_x_velocity: actor_source_wave_u8(
+                crate::arcade_assets::WaveMetric::MutantXVelocity,
+                wave,
+            ),
+            mutant_shot_time: actor_source_wave_u32(
+                crate::arcade_assets::WaveMetric::MutantShotTime,
+                wave,
+            ),
         }
     }
 
@@ -1295,63 +1343,26 @@ const fn actor_sign_extend_u8_to_u16(value: u8) -> u16 {
     u16::from_be_bytes([sign, value])
 }
 
-fn actor_source_wave_u8(key: &str, wave: u8) -> u8 {
-    u8::try_from(actor_source_wave_value(key, wave))
-        .unwrap_or_else(|_| panic!("actor source wave table {key} should fit u8"))
+fn actor_source_wave_u8(metric: crate::arcade_assets::WaveMetric, wave: u8) -> u8 {
+    u8::try_from(actor_source_wave_value(metric, wave))
+        .unwrap_or_else(|_| panic!("actor wave metric should fit u8"))
 }
 
-fn actor_source_wave_u32(key: &str, wave: u8) -> u32 {
-    u32::try_from(actor_source_wave_value(key, wave))
-        .unwrap_or_else(|_| panic!("actor source wave table {key} should be non-negative"))
+fn actor_source_wave_u32(metric: crate::arcade_assets::WaveMetric, wave: u8) -> u32 {
+    u32::try_from(actor_source_wave_value(metric, wave))
+        .unwrap_or_else(|_| panic!("actor wave metric should be non-negative"))
 }
 
-fn actor_source_wave_value(key: &str, wave: u8) -> i32 {
-    let mut lines = ACTOR_WAVE_TABLE_TSV.lines();
-    let header = lines
-        .next()
-        .expect("actor source wave table should have a header");
-    assert_eq!(header, ACTOR_WAVE_TABLE_HEADER);
-
-    for row in lines.map(str::trim).filter(|row| !row.is_empty()) {
-        let fields = row.split('\t').collect::<Vec<_>>();
-        assert_eq!(fields.len(), 9, "actor source wave table row width changed");
-        if fields[0] != key {
-            continue;
-        }
-
-        let ceiling = parse_actor_wave_i32(fields[1], key, "ceiling");
-        let floor = parse_actor_wave_i32(fields[2], key, "floor");
-        let inter_delta = parse_actor_wave_i32(fields[4], key, "inter_delta");
-        let wave = wave.max(1);
-        let wave_index = usize::from(wave.min(4));
-        let mut value = parse_actor_wave_i32(fields[4 + wave_index], key, "wave");
-        for _ in 0..actor_wave_inter_delta_iterations(wave) {
-            value = apply_actor_wave_delta(value, inter_delta, floor, ceiling);
-        }
-        return value;
-    }
-
-    panic!("missing actor source wave table key {key}");
+fn actor_source_wave_value(metric: crate::arcade_assets::WaveMetric, wave: u8) -> i32 {
+    crate::arcade_assets::wave_metric_value(
+        metric,
+        wave,
+        actor_wave_inter_delta_iterations(wave.max(1)),
+    )
 }
 
 fn actor_wave_inter_delta_iterations(wave: u8) -> u16 {
     let wave_delta = wave.saturating_sub(4);
     let pre_ceiling = ACTOR_DEFAULT_DIFFICULTY_INITIAL.saturating_add(wave_delta);
     u16::from(pre_ceiling.min(ACTOR_DEFAULT_DIFFICULTY_CEILING))
-}
-
-fn parse_actor_wave_i32(value: &str, key: &str, field: &str) -> i32 {
-    value
-        .parse()
-        .unwrap_or_else(|_| panic!("actor source wave table {key}.{field} is not an integer"))
-}
-
-fn apply_actor_wave_delta(value: i32, delta: i32, floor: i32, ceiling: i32) -> i32 {
-    if delta > 0 {
-        (value + delta).min(ceiling)
-    } else if delta < 0 {
-        (value + delta).max(floor)
-    } else {
-        value
-    }
 }

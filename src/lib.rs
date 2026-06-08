@@ -6,6 +6,7 @@
 
 pub mod actor_game;
 mod actor_smoke;
+mod arcade_assets;
 pub mod audio;
 mod game;
 mod live_wgpu;

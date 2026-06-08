@@ -457,13 +457,31 @@
     }
 
     #[test]
-    fn source_object_images_decode_arcade_bytes_and_palettes() {
-        let ship = decode_object_picture_asset_rgba("PLD10", 6, 8, ObjectPicturePalette::ship());
-        let ship_left =
-            decode_object_picture_asset_rgba("PLD20", 6, 8, ObjectPicturePalette::ship());
-        let shot =
-            decode_object_picture_asset_rgba("LASD10", 1, 8, ObjectPicturePalette::player_shot());
-        let human = decode_object_picture_asset_rgba("ASTD10", 8, 2, ObjectPicturePalette::white());
+    fn object_bitmaps_decode_arcade_bytes_and_palettes() {
+        let ship = decode_object_picture_asset_rgba(
+            ObjectBitmapId::PlayerShipRightPrimary,
+            6,
+            8,
+            ObjectPicturePalette::ship(),
+        );
+        let ship_left = decode_object_picture_asset_rgba(
+            ObjectBitmapId::PlayerShipLeftPrimary,
+            6,
+            8,
+            ObjectPicturePalette::ship(),
+        );
+        let shot = decode_object_picture_asset_rgba(
+            ObjectBitmapId::PlayerLaser,
+            1,
+            8,
+            ObjectPicturePalette::player_shot(),
+        );
+        let human = decode_object_picture_asset_rgba(
+            ObjectBitmapId::HumanStandingPrimary,
+            8,
+            2,
+            ObjectPicturePalette::white(),
+        );
 
         assert_eq!(ship.surface, SurfaceSize::new(16, 6));
         assert_eq!(

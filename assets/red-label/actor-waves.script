@@ -1,5 +1,5 @@
 # Actor runtime red-label source wave progression.
-# `source_waves` expands through assets/red-label/wave-table.tsv at startup.
+# `source_waves` expands from the embedded arcade wave table.
 
 name actor-source-wave-table
 source_waves 1 16

@@ -1,3 +1,7 @@
+use crate::arcade_assets::{
+    MESSAGE_GLYPH_ASSETS, ObjectBitmapId, SCORE_DIGIT_ASSETS, object_bitmap_bytes,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NativeRenderPipeline {
     TemporaryRaster,
@@ -180,10 +184,6 @@ const OBJECT_COLOR_SEQUENCE: [u8; 37] = [
 const WILLIAMS_RED_GREEN_DAC_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255]; // original: SOURCE_WILLIAMS_RED_GREEN_LEVELS
 const WILLIAMS_BLUE_DAC_LEVELS: [u8; 4] = [0, 95, 160, 255]; // original: SOURCE_WILLIAMS_BLUE_LEVELS
 const FONT_SHEET_PNG: &[u8] = include_bytes!("../assets/sprites/font-sheet.png");
-const ARCADE_SCORE_DIGITS_TSV: &str = include_str!("../assets/red-label/score-digits.tsv");
-const MESSAGE_GLYPH_TABLE_TSV: &str = include_str!("../assets/red-label/message-glyphs.tsv"); // original: SOURCE_MESSAGE_GLYPHS_TSV
-const MESSAGE_TEXT_TABLE_TSV: &str = include_str!("../assets/red-label/messages.tsv"); // original: SOURCE_MESSAGES_TSV
-const OBJECT_IMAGE_TABLE_TSV: &str = include_str!("../assets/red-label/object-images.tsv"); // original: SOURCE_OBJECT_IMAGES_TSV
 const SCORE_DIGIT_PIXEL_SIZE: [u32; 2] = [6, 8]; // original: SOURCE_SCORE_DIGIT_SIZE
 const MESSAGE_GLYPH_ATLAS_START: [u32; 2] = [0, 104];
 const MESSAGE_GLYPH_ATLAS_ROW_STEP: u32 = 16;
@@ -633,42 +633,113 @@ fn attract_defender_wordmark_block_regions() -> Vec<AtlasRegion> {
 fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) -> Vec<u8> {
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
 
-    let player_ship = decode_object_picture_asset_rgba("PLD10", 6, 8, ObjectPicturePalette::ship());
-    let player_ship_left =
-        decode_object_picture_asset_rgba("PLD20", 6, 8, ObjectPicturePalette::ship());
-    let player_projectile =
-        decode_object_picture_asset_rgba("LASD10", 1, 8, ObjectPicturePalette::player_shot());
-    let enemy_lander =
-        decode_object_picture_asset_rgba("LND10", 8, 5, ObjectPicturePalette::white());
-    let human = decode_object_picture_asset_rgba("ASTD10", 8, 2, ObjectPicturePalette::white());
-    let enemy_mutant =
-        decode_object_picture_asset_rgba("SCZD10", 8, 5, ObjectPicturePalette::white());
-    let enemy_baiter =
-        decode_object_picture_asset_rgba("UFOD10", 4, 6, ObjectPicturePalette::white());
-    let enemy_bomber =
-        decode_object_picture_asset_rgba("TIED10", 8, 4, ObjectPicturePalette::tie(0));
-    let enemy_pod = decode_object_picture_asset_rgba("PRBD10", 8, 4, ObjectPicturePalette::white());
-    let enemy_swarmer =
-        decode_object_picture_asset_rgba("SWMD10", 4, 3, ObjectPicturePalette::white());
-    let enemy_bomb = decode_object_picture_asset_rgba("BMBD10", 3, 2, ObjectPicturePalette::bomb(0));
-    let bomb_explosion =
-        decode_object_picture_asset_rgba("BXD10", 8, 4, ObjectPicturePalette::burst());
-    let swarmer_explosion =
-        decode_object_picture_asset_rgba("SWXD10", 8, 4, ObjectPicturePalette::burst());
-    let score_popup_250 =
-        decode_object_picture_asset_rgba("C25D10", 6, 6, ObjectPicturePalette::score_250(0));
-    let score_popup_500 =
-        decode_object_picture_asset_rgba("C5D10", 6, 6, ObjectPicturePalette::score_500(0));
-    let player_life_stock =
-        decode_object_picture_asset_rgba("PLAM0", 4, 5, ObjectPicturePalette::ship());
-    let smart_bomb_stock =
-        decode_object_picture_asset_rgba("SBD10", 3, 3, ObjectPicturePalette::white());
+    let player_ship = decode_object_picture_asset_rgba(
+        ObjectBitmapId::PlayerShipRightPrimary,
+        6,
+        8,
+        ObjectPicturePalette::ship(),
+    );
+    let player_ship_left = decode_object_picture_asset_rgba(
+        ObjectBitmapId::PlayerShipLeftPrimary,
+        6,
+        8,
+        ObjectPicturePalette::ship(),
+    );
+    let player_projectile = decode_object_picture_asset_rgba(
+        ObjectBitmapId::PlayerLaser,
+        1,
+        8,
+        ObjectPicturePalette::player_shot(),
+    );
+    let enemy_lander = decode_object_picture_asset_rgba(
+        ObjectBitmapId::LanderFrame1Primary,
+        8,
+        5,
+        ObjectPicturePalette::white(),
+    );
+    let human = decode_object_picture_asset_rgba(
+        ObjectBitmapId::HumanStandingPrimary,
+        8,
+        2,
+        ObjectPicturePalette::white(),
+    );
+    let enemy_mutant = decode_object_picture_asset_rgba(
+        ObjectBitmapId::MutantPrimary,
+        8,
+        5,
+        ObjectPicturePalette::white(),
+    );
+    let enemy_baiter = decode_object_picture_asset_rgba(
+        ObjectBitmapId::BaiterFrame1Primary,
+        4,
+        6,
+        ObjectPicturePalette::white(),
+    );
+    let enemy_bomber = decode_object_picture_asset_rgba(
+        ObjectBitmapId::BomberFrame1Primary,
+        8,
+        4,
+        ObjectPicturePalette::tie(0),
+    );
+    let enemy_pod = decode_object_picture_asset_rgba(
+        ObjectBitmapId::PodPrimary,
+        8,
+        4,
+        ObjectPicturePalette::white(),
+    );
+    let enemy_swarmer = decode_object_picture_asset_rgba(
+        ObjectBitmapId::SwarmerPrimary,
+        4,
+        3,
+        ObjectPicturePalette::white(),
+    );
+    let enemy_bomb = decode_object_picture_asset_rgba(
+        ObjectBitmapId::EnemyBombFrame1Primary,
+        3,
+        2,
+        ObjectPicturePalette::bomb(0),
+    );
+    let bomb_explosion = decode_object_picture_asset_rgba(
+        ObjectBitmapId::BombExplosion,
+        8,
+        4,
+        ObjectPicturePalette::burst(),
+    );
+    let swarmer_explosion = decode_object_picture_asset_rgba(
+        ObjectBitmapId::SwarmerExplosion,
+        8,
+        4,
+        ObjectPicturePalette::burst(),
+    );
+    let score_popup_250 = decode_object_picture_asset_rgba(
+        ObjectBitmapId::Score250Primary,
+        6,
+        6,
+        ObjectPicturePalette::score_250(0),
+    );
+    let score_popup_500 = decode_object_picture_asset_rgba(
+        ObjectBitmapId::Score500Primary,
+        6,
+        6,
+        ObjectPicturePalette::score_500(0),
+    );
+    let player_life_stock = decode_object_picture_asset_rgba(
+        ObjectBitmapId::PlayerLifeStock,
+        4,
+        5,
+        ObjectPicturePalette::ship(),
+    );
+    let smart_bomb_stock = decode_object_picture_asset_rgba(
+        ObjectBitmapId::SmartBombStock,
+        3,
+        3,
+        ObjectPicturePalette::white(),
+    );
     let astronaut_explosion = decode_picture_grid_rgba("ASXP1", ASTRONAUT_EXPLOSION_GRID);
     let null_object = decode_picture_grid_rgba("NULOB", NULL_OBJECT_GRID);
     let terrain_explosion = decode_picture_grid_rgba("TEREX", TERRAIN_EXPLOSION_GRID);
-    let score_digits = decode_score_digit_sprites("score-digits.tsv", ARCADE_SCORE_DIGITS_TSV);
-    let message_glyphs =
-        decode_message_glyph_sprites("message-glyphs.tsv", MESSAGE_GLYPH_TABLE_TSV);
+    let score_digits = decode_score_digit_sprites();
+    let message_glyphs = decode_message_glyph_sprites();
     let hall_of_fame_logo = decode_source_defender_logo_rgba();
     let attract_copyright_strip = decode_source_attract_copyright_strip_rgba();
     let attract_williams_logo = decode_source_attract_williams_logo_rgba();
@@ -996,13 +1067,13 @@ fn decode_picture_grid_rgba(name: &'static str, grid: ObjectPictureGrid) -> Embe
 }
 
 fn decode_object_picture_asset_rgba(
-    label: &'static str,
+    bitmap: ObjectBitmapId,
     rows: u8,
     bytes_per_row: u8,
     palette: ObjectPicturePalette,
 ) -> EmbeddedSprite {
-    let bytes = object_picture_asset_bytes(label);
-    decode_picture_bytes_rgba(label, rows, bytes_per_row, &bytes, palette)
+    let bytes = object_bitmap_bytes(bitmap);
+    decode_picture_bytes_rgba("object bitmap", rows, bytes_per_row, bytes, palette)
 }
 
 fn decode_picture_bytes_rgba(
@@ -1036,104 +1107,32 @@ fn decode_picture_bytes_rgba(
     EmbeddedSprite { surface, pixels }
 }
 
-fn object_picture_asset_bytes(label: &'static str) -> Vec<u8> {
-    for line in OBJECT_IMAGE_TABLE_TSV.lines().skip(1) {
-        let mut columns = line.split('\t');
-        let Some(image_label) = columns.next() else {
-            continue;
-        };
-        let _address = columns.next();
-        let Some(hex_bytes) = columns.next() else {
-            continue;
-        };
-        if image_label == label {
-            return decode_hex_bytes(label, hex_bytes);
-        }
-    }
-
-    panic!("source object image {label} must exist in object-images.tsv");
-}
-
-fn decode_hex_bytes(label: &'static str, hex_bytes: &str) -> Vec<u8> {
-    assert!(
-        hex_bytes.len().is_multiple_of(2),
-        "source object image {label} hex byte string must be even length"
-    );
-
-    (0..hex_bytes.len())
-        .step_by(2)
-        .map(|start| {
-            u8::from_str_radix(&hex_bytes[start..start + 2], 16).unwrap_or_else(|error| {
-                panic!("source object image {label} hex must parse: {error}")
-            })
+fn decode_score_digit_sprites() -> Vec<EmbeddedSprite> {
+    let mut rows = SCORE_DIGIT_ASSETS
+        .iter()
+        .map(|asset| {
+            (
+                asset.digit,
+                decode_score_digit_rgba(
+                    "score digit",
+                    asset.digit,
+                    asset.columns,
+                    asset.rows,
+                    asset.bytes,
+                ),
+            )
         })
-        .collect()
-}
-
-fn decode_score_digit_sprites(name: &'static str, tsv: &str) -> Vec<EmbeddedSprite> {
-    let mut rows = Vec::new();
-    for (line_index, line) in tsv.lines().enumerate().skip(1) {
-        if line.trim().is_empty() {
-            continue;
-        }
-        rows.push(decode_score_digit_sprite_row(name, line_index + 1, line));
-    }
+        .collect::<Vec<_>>();
     rows.sort_by_key(|(digit, _)| *digit);
-    assert_eq!(rows.len(), 10, "{name} must define ten score digit sprites");
+    assert_eq!(rows.len(), 10, "embedded score digits must define ten sprites");
     for (expected, (digit, _)) in rows.iter().enumerate() {
         assert_eq!(
             usize::from(*digit),
             expected,
-            "{name} score digit rows must cover 0 through 9 once"
+            "embedded score digit rows must cover 0 through 9 once"
         );
     }
     rows.into_iter().map(|(_, sprite)| sprite).collect()
-}
-
-fn decode_score_digit_sprite_row(
-    name: &'static str,
-    line_index: usize,
-    line: &str,
-) -> (u8, EmbeddedSprite) {
-    let fields = line.split('\t').collect::<Vec<_>>();
-    assert_eq!(
-        fields.len(),
-        7,
-        "{name}:{line_index} score digit row must have seven TSV fields"
-    );
-    let digit = fields[1]
-        .parse::<u8>()
-        .unwrap_or_else(|error| panic!("{name}:{line_index} digit must parse: {error}"));
-    assert!(
-        digit < 10,
-        "{name}:{line_index} digit must be in the range 0..=9"
-    );
-    let columns = fields[3]
-        .parse::<u8>()
-        .unwrap_or_else(|error| panic!("{name}:{line_index} width must parse: {error}"));
-    let rows = fields[4]
-        .parse::<u8>()
-        .unwrap_or_else(|error| panic!("{name}:{line_index} height must parse: {error}"));
-    let hex = fields[5].trim();
-    let expected_hex_len = usize::from(columns) * usize::from(rows) * 2;
-    assert_eq!(
-        hex.len(),
-        expected_hex_len,
-        "{name}:{line_index} digit byte string must match the declared dimensions"
-    );
-    let mut bytes = Vec::with_capacity(expected_hex_len / 2);
-    for pair in hex.as_bytes().chunks_exact(2) {
-        let pair = std::str::from_utf8(pair)
-            .unwrap_or_else(|error| panic!("{name}:{line_index} hex pair must parse: {error}"));
-        bytes
-            .push(u8::from_str_radix(pair, 16).unwrap_or_else(|error| {
-                panic!("{name}:{line_index} hex byte must parse: {error}")
-            }));
-    }
-    (
-        digit,
-        decode_score_digit_rgba(name, digit, columns, rows, &bytes),
-    )
 }
 
 fn decode_score_digit_rgba(
@@ -1168,79 +1167,34 @@ fn decode_score_digit_rgba(
     EmbeddedSprite { surface, pixels }
 }
 
-fn decode_message_glyph_sprites(name: &'static str, tsv: &str) -> Vec<(char, EmbeddedSprite)> {
-    let mut rows = Vec::new();
-    for (line_index, line) in tsv.lines().enumerate().skip(1) {
-        if line.trim().is_empty() {
-            continue;
-        }
-        rows.push(decode_message_glyph_sprite_row(name, line_index + 1, line));
-    }
+fn decode_message_glyph_sprites() -> Vec<(char, EmbeddedSprite)> {
+    let rows = MESSAGE_GLYPH_ASSETS
+        .iter()
+        .map(|asset| {
+            (
+                asset.character,
+                decode_message_glyph_rgba(
+                    "message glyph",
+                    asset.character,
+                    asset.columns,
+                    asset.rows,
+                    asset.bytes,
+                ),
+            )
+        })
+        .collect::<Vec<_>>();
     assert_eq!(
         rows.len(),
         SpriteId::MESSAGE_GLYPHS.len(),
-        "{name} must define the clean renderer message glyph set"
+        "embedded message glyphs must define the clean renderer glyph set"
     );
     for (character, _) in &rows {
         assert!(
             SpriteId::message_glyph(*character).is_some(),
-            "{name} glyph `{character}` must have a clean sprite mapping"
+            "embedded message glyph `{character}` must have a clean sprite mapping"
         );
     }
     rows
-}
-
-fn decode_message_glyph_sprite_row(
-    name: &'static str,
-    line_index: usize,
-    line: &str,
-) -> (char, EmbeddedSprite) {
-    let fields = line.split('\t').collect::<Vec<_>>();
-    assert_eq!(
-        fields.len(),
-        7,
-        "{name}:{line_index} message glyph row must have seven TSV fields"
-    );
-    let character = match fields[1] {
-        "SPACE" => ' ',
-        value => {
-            let mut chars = value.chars();
-            let character = chars
-                .next()
-                .unwrap_or_else(|| panic!("{name}:{line_index} glyph character must not be empty"));
-            assert!(
-                chars.next().is_none(),
-                "{name}:{line_index} glyph character must be one character"
-            );
-            character
-        }
-    };
-    let width = fields[3]
-        .parse::<u8>()
-        .unwrap_or_else(|error| panic!("{name}:{line_index} glyph width must parse: {error}"));
-    let height = fields[4]
-        .parse::<u8>()
-        .unwrap_or_else(|error| panic!("{name}:{line_index} glyph height must parse: {error}"));
-    let hex = fields[5].trim();
-    let expected_hex_len = usize::from(width) * usize::from(height) * 2;
-    assert_eq!(
-        hex.len(),
-        expected_hex_len,
-        "{name}:{line_index} glyph byte string must match the declared dimensions"
-    );
-    let mut bytes = Vec::with_capacity(expected_hex_len / 2);
-    for pair in hex.as_bytes().chunks_exact(2) {
-        let pair = std::str::from_utf8(pair)
-            .unwrap_or_else(|error| panic!("{name}:{line_index} hex pair must parse: {error}"));
-        bytes
-            .push(u8::from_str_radix(pair, 16).unwrap_or_else(|error| {
-                panic!("{name}:{line_index} hex byte must parse: {error}")
-            }));
-    }
-    (
-        character,
-        decode_message_glyph_rgba(name, character, width, height, &bytes),
-    )
 }
 
 fn decode_message_glyph_rgba(
