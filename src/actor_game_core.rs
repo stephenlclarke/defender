@@ -1,4 +1,5 @@
 use crate::{
+    MessageId,
     game::{
         ATTRACT_SCORING_SEQUENCE_START_FRAME, AttractPresentationSnapshot,
         Direction as CleanDirection, EnemyKind as CleanEnemyKind,
@@ -27,7 +28,7 @@ use crate::{
         push_source_controlled_message_sprites, push_source_text_bytes_sprites,
         source_attract_defender_appearance_pixels,
         source_attract_williams_logo_operation_pixel_counts,
-        source_attract_williams_logo_pixel_path, source_message_text, source_screen_position,
+        source_attract_williams_logo_pixel_path, source_screen_position,
         source_screen_position_with_offset,
     },
     systems::{
@@ -35,6 +36,9 @@ use crate::{
         ScreenVelocity,
     },
 };
+
+#[cfg(test)]
+use crate::renderer::source_message_text;
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
@@ -149,9 +153,13 @@ const ATTRACT_WILLIAMS_LOGO_DURATION_STEPS: u64 = ATTRACT_HALL_OF_FAME_START_STE
 const ATTRACT_PRESENTS_DURATION_STEPS: u64 =
     ATTRACT_HALL_OF_FAME_START_STEP - ATTRACT_PRESENTS_START_STEP; // original: SOURCE_ATTRACT_PRESENTS_DURATION_STEPS
 const REPLAY_BONUS_SCORE: u32 = 10_000; // original: SOURCE_REPLAY_SCORE
-const WAVE_COMPLETION_STATUS_LINES: &[(&str, u16)] =
+const WAVE_COMPLETION_STATUS_LINES: &[(MessageId, u16)] =
     // original: SOURCE_WAVE_COMPLETION_STATUS_LINES
-    &[("ATWV", 0x3850), ("COMPV", 0x3D60), ("BONSX", 0x3C90)];
+    &[
+        (MessageId::WaveCompletePrefix, 0x3850), // original: ATWV
+        (MessageId::Completed, 0x3D60),          // original: COMPV
+        (MessageId::BonusSurvivors, 0x3C90),     // original: BONSX
+    ];
 const WAVE_COMPLETION_WAVE_NUMBER_SCREEN: u16 = 0x6550; // original: SOURCE_WAVE_COMPLETION_WAVE_NUMBER_SCREEN
 const WAVE_COMPLETION_MULTIPLIER_NUMBER_SCREEN: u16 = 0x5890; // original: SOURCE_WAVE_COMPLETION_MULTIPLIER_NUMBER_SCREEN
 const SURVIVOR_BONUS_FIRST_HUMAN_SCREEN: u16 = 0x3CA0; // original: SOURCE_SURVIVOR_BONUS_FIRST_HUMAN_SCREEN
@@ -170,10 +178,10 @@ const ATTRACT_WILLIAMS_LOGO_POSITION: Point = Point::new(108, 60); // original: 
 const ATTRACT_DEFENDER_WORDMARK_POSITION: Point = Point::new(96, 144); // original: SOURCE_ATTRACT_DEFENDER_WORDMARK_POSITION
 const ATTRACT_CREDIT_LABEL_POSITION: Point = Point::new(176, 226); // original: SOURCE_ATTRACT_CREDIT_LABEL_POSITION
 const ATTRACT_CREDIT_COUNT_POSITION: Point = Point::new(248, 226); // original: SOURCE_ATTRACT_CREDIT_COUNT_POSITION
-const ATTRACT_HALL_TITLE_LABEL: &str = "HALLD_TITLE"; // original: SOURCE_ATTRACT_HALL_TITLE_LABEL
-const ATTRACT_HALL_TODAYS_LABEL: &str = "HALLD_TODAYS"; // original: SOURCE_ATTRACT_HALL_TODAYS_LABEL
-const ATTRACT_HALL_ALL_TIME_LABEL: &str = "HALLD_ALL_TIME"; // original: SOURCE_ATTRACT_HALL_ALL_TIME_LABEL
-const ATTRACT_HALL_GREATEST_LABEL: &str = "HALLD_GREATEST"; // original: SOURCE_ATTRACT_HALL_GREATEST_LABEL
+const ATTRACT_HALL_TITLE_MESSAGE: MessageId = MessageId::HallTitle; // original: HALLD_TITLE
+const ATTRACT_HALL_TODAYS_MESSAGE: MessageId = MessageId::HallTodays; // original: HALLD_TODAYS
+const ATTRACT_HALL_ALL_TIME_MESSAGE: MessageId = MessageId::HallAllTime; // original: HALLD_ALL_TIME
+const ATTRACT_HALL_GREATEST_MESSAGE: MessageId = MessageId::HallGreatest; // original: HALLD_GREATEST
 const ATTRACT_HALL_DEFENDER_LOGO_POSITION: Point = Point::new(85, 50); // original: SOURCE_ATTRACT_HALL_DEFENDER_LOGO_POSITION
 const ATTRACT_HALL_TODAYS_TABLE_SCREEN: u16 = 0x1886; // original: SOURCE_ATTRACT_HALL_TODAYS_TABLE_SCREEN
 const ATTRACT_HALL_ALL_TIME_TABLE_SCREEN: u16 = 0x5986; // original: SOURCE_ATTRACT_HALL_ALL_TIME_TABLE_SCREEN
@@ -183,15 +191,15 @@ const ATTRACT_HALL_TABLE_SCORE_OFFSET: u8 = 0x13; // original: SOURCE_ATTRACT_HA
 const ATTRACT_HALL_TABLE_VISUAL_OFFSET: Point = Point::new(-11, -6); // original: SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET
 const ATTRACT_HALL_SCORE_TEXT_LEN: usize = 6; // original: SOURCE_ATTRACT_HALL_SCORE_TEXT_LEN
 const ATTRACT_SCORING_VISUAL_OFFSET: Point = Point::new(-11, -7); // original: SOURCE_ATTRACT_SCORING_VISUAL_OFFSET
-const ATTRACT_INSTRUCTION_TEXT_LINES: [(&str, u16); 7] = [
+const ATTRACT_INSTRUCTION_TEXT_LINES: [(MessageId, u16); 7] = [
     // original: SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES
-    ("SCANV", 0x4330),
-    ("LANDV", 0x1C70),
-    ("MUTV", 0x3C70),
-    ("BAITV", 0x5F70),
-    ("BOMBV", 0x1CA8),
-    ("SWRMPV", 0x40A8),
-    ("SWARMV", 0x5CA8),
+    (MessageId::ScannerInstruction, 0x4330),       // original: SCANV
+    (MessageId::LanderInstruction, 0x1C70),        // original: LANDV
+    (MessageId::MutantInstruction, 0x3C70),        // original: MUTV
+    (MessageId::BaiterInstruction, 0x5F70),        // original: BAITV
+    (MessageId::BomberInstruction, 0x1CA8),        // original: BOMBV
+    (MessageId::SwarmerInstructionPrefix, 0x40A8), // original: SWRMPV
+    (MessageId::SwarmerInstruction, 0x5CA8),       // original: SWARMV
 ];
 const FINAL_GAME_OVER_SCREEN_ADDRESS: u16 = 0x3E80; // original: SOURCE_FINAL_GAME_OVER_SCREEN
 const PLAYER_START_PROMPT_SCREEN_ADDRESS: u16 = 0x3C80; // original: SOURCE_PLAYER_START_PROMPT_SCREEN
@@ -355,8 +363,8 @@ const STATUS_HIGH_SCORE_POSITION: Point = Point::new(94, 6);
 const STATUS_PLAYER_TWO_SCORE_POSITION: Point = Point::new(208, 6);
 const STATUS_WAVE_POSITION: Point = Point::new(8, 32);
 const STATUS_CREDITS_POSITION: Point = Point::new(176, 226);
-const CREDITS_MESSAGE_LABEL: &str = "CREDV"; // original: SOURCE_CREDITS_MESSAGE_LABEL
-const PRESENTS_MESSAGE_LABEL: &str = "ELECV"; // original: SOURCE_PRESENTS_MESSAGE_LABEL
+const CREDITS_MESSAGE: MessageId = MessageId::CreditsLabel; // original: CREDV
+const PRESENTS_MESSAGE: MessageId = MessageId::WilliamsElectronics; // original: ELECV
 const ATTRACT_PRESENTS_ELECTRONICS_SCREEN: u16 = 0x3258; // original: SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN
 const ACTOR_HUD_SCORE_DIGIT_DISPLAY_COUNT: usize = 6;
 const ACTOR_HUD_SCORE_DISPLAY_MAX: u32 = 999_999;
@@ -391,6 +399,11 @@ const MUTANT_X_DISTANCE_OFFSET: u16 = 380; // original: SOURCE_MUTANT_X_DISTANCE
 const MUTANT_CLOSE_X_WINDOW: u16 = 0x0700; // original: SOURCE_MUTANT_CLOSE_X_WINDOW
 const MUTANT_VERTICAL_WINDOW: u8 = 8; // original: SOURCE_MUTANT_VERTICAL_WINDOW
 const FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y: i16 = 0xA0; // original: SOURCE_FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y
+
+#[cfg(test)]
+fn actor_message_text(message: MessageId) -> &'static str {
+    crate::arcade_assets::message_text(message)
+}
 const TARGET6_MUTANT_CONVERSION_X_CORRECTION: u16 = 0x0120; // original: SOURCE_TARGET6_MUTANT_CONVERSION_X_CORRECTION
 const TARGET6_MUTANT_DEFERRED_SHOT_TIMER: u8 = 5; // original: SOURCE_TARGET6_MUTANT_DEFERRED_SHOT_TIMER
 const TARGET6_MUTANT_POST_SHOT_TIMER: u8 = 0x2C; // original: SOURCE_TARGET6_MUTANT_POST_SHOT_TIMER

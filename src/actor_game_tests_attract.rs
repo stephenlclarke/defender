@@ -115,7 +115,7 @@
                 .all(|draw| draw.text.as_deref() != Some("00"))
         );
         let presents_text =
-            source_message_text(PRESENTS_MESSAGE_LABEL).expect("ELECV source message");
+            actor_message_text(PRESENTS_MESSAGE);
         assert!(
             !williams
                 .draws
@@ -216,7 +216,7 @@
                 .any(|draw| draw.text.as_deref() == Some("00"))
         );
         let hall_title_text =
-            source_message_text(ATTRACT_HALL_TITLE_LABEL).expect("Hall title source text");
+            actor_message_text(ATTRACT_HALL_TITLE_MESSAGE);
         assert!(hall.draws.iter().any(|draw| {
             draw.text.as_deref() == Some(hall_title_text)
                 && matches!(
@@ -228,7 +228,7 @@
                 )
         }));
         let hall_greatest_text =
-            source_message_text(ATTRACT_HALL_GREATEST_LABEL).expect("Hall greatest source text");
+            actor_message_text(ATTRACT_HALL_GREATEST_MESSAGE);
         assert_eq!(
             hall.draws
                 .iter()
@@ -301,7 +301,7 @@
                 .iter()
                 .all(|draw| draw.sprite != SpriteKey::DefenderLogo)
         );
-        let scan_text = source_message_text("SCANV").expect("scanner instruction source message");
+        let scan_text = actor_message_text(MessageId::ScannerInstruction);
         assert!(scoring.draws.iter().any(|draw| {
             draw.text.as_deref() == Some(scan_text)
                 && matches!(
@@ -312,14 +312,14 @@
                     }
                 )
         }));
-        for (label, _) in ATTRACT_INSTRUCTION_TEXT_LINES.iter().skip(1) {
-            let text = source_message_text(label).expect("instruction source message");
+        for (message, _) in ATTRACT_INSTRUCTION_TEXT_LINES.iter().skip(1) {
+            let text = actor_message_text(*message);
             assert!(
                 !scoring
                     .draws
                     .iter()
                     .any(|draw| draw.text.as_deref() == Some(text)),
-                "{label} should wait for the score-card reveal cadence"
+                "{message:?} should wait for the score-card reveal cadence"
             );
         }
         assert!(scoring.draws.iter().any(|draw| {
@@ -464,8 +464,8 @@
             lander_label = driver.step(GameInput::NONE);
         }
         assert_eq!(lander_label.step, lander_label_start);
-        let lander_text = source_message_text("LANDV").expect("lander instruction source message");
-        let mutant_text = source_message_text("MUTV").expect("mutant instruction source message");
+        let lander_text = actor_message_text(MessageId::LanderInstruction);
+        let mutant_text = actor_message_text(MessageId::MutantInstruction);
         assert!(lander_label.draws.iter().any(|draw| {
             draw.text.as_deref() == Some(lander_text)
                 && matches!(
@@ -498,8 +498,8 @@
             last_label = driver.step(GameInput::NONE);
         }
         assert_eq!(last_label.step, last_label_start);
-        for (label, screen_address) in ATTRACT_INSTRUCTION_TEXT_LINES {
-            let text = source_message_text(label).expect("instruction source message");
+        for (message, screen_address) in ATTRACT_INSTRUCTION_TEXT_LINES {
+            let text = actor_message_text(message);
             assert!(last_label.draws.iter().any(|draw| {
                 draw.text.as_deref() == Some(text)
                     && matches!(
@@ -769,10 +769,10 @@
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
             AttractScriptActionManifest::SourceMessage {
-                ref label,
+                ref message,
                 top_left_screen_address: ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
                 visual_offset: Point { x: 0, y: 0 },
-            } if label == PRESENTS_MESSAGE_LABEL
+            } if message == "WilliamsElectronics"
         ) && event.start_after_steps
             == ATTRACT_PRESENTS_START_STEP
             && event.duration_steps == Some(ATTRACT_PRESENTS_DURATION_STEPS)));
@@ -813,11 +813,11 @@
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
             AttractScriptActionManifest::SourceMessage {
-                ref label,
+                ref message,
                 top_left_screen_address: 0x3854,
                 visual_offset: ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             } if event.start_after_steps == ATTRACT_HALL_OF_FAME_START_STEP
-                && label == ATTRACT_HALL_TITLE_LABEL
+                && message == "HallTitle"
                 && event.duration_steps == Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS)
         )));
         assert_eq!(
@@ -828,11 +828,11 @@
                 .filter(|event| matches!(
                     event.action,
                     AttractScriptActionManifest::SourceMessage {
-                        ref label,
+                        ref message,
                         top_left_screen_address: 0x1E72 | 0x5F72,
                         visual_offset: ATTRACT_HALL_TABLE_VISUAL_OFFSET,
                     } if event.start_after_steps == ATTRACT_HALL_OF_FAME_START_STEP
-                        && label == ATTRACT_HALL_GREATEST_LABEL
+                        && message == "HallGreatest"
                         && event.duration_steps == Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS)
                 ))
                 .count(),
@@ -852,19 +852,19 @@
                 if event.start_after_steps == ATTRACT_SCORING_SEQUENCE_START_STEP
                     && event.duration_steps.is_none()
         )));
-        for (line_index, (label, screen_address)) in
+        for (line_index, (message, screen_address)) in
             ATTRACT_INSTRUCTION_TEXT_LINES.iter().copied().enumerate()
         {
             assert!(parsed.manifest().events.iter().any(|event| matches!(
                 event.action,
                 AttractScriptActionManifest::SourceMessage {
-                    label: ref event_label,
+                    message: ref event_message,
                     top_left_screen_address,
                     visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
                 } if event.start_after_steps
                     == actor_attract_scoring_instruction_text_start_step(line_index)
                     && event.duration_steps.is_none()
-                    && event_label == label
+                    && event_message == &format!("{message:?}")
                     && top_left_screen_address == screen_address
             )));
         }
@@ -883,13 +883,14 @@
 
         let parsed = AttractScript::parse_text(ACTOR_ATTRACT_SCRIPT)
             .expect("embedded actor attract script should parse");
-        for (line_index, (label, _)) in ATTRACT_INSTRUCTION_TEXT_LINES.iter().copied().enumerate() {
+        for (line_index, (message, _)) in ATTRACT_INSTRUCTION_TEXT_LINES.iter().copied().enumerate()
+        {
             assert!(parsed.manifest().events.iter().any(|event| matches!(
                 event.action,
                 AttractScriptActionManifest::SourceMessage {
-                    label: ref event_label,
+                    message: ref event_message,
                     ..
-                } if event_label == label
+                } if event_message == &format!("{message:?}")
                     && event.start_after_steps
                         == actor_attract_scoring_instruction_text_start_step(line_index)
                     && event.duration_steps.is_none()
@@ -932,7 +933,7 @@
                 .iter()
                 .any(|draw| { matches!(draw.effect, VisualEffect::AttractScoringSurface { .. }) })
         );
-        let scan_text = source_message_text("SCANV").expect("SCANV source message");
+        let scan_text = actor_message_text(MessageId::ScannerInstruction);
         assert!(
             !wrapped_draws
                 .iter()
@@ -1275,8 +1276,7 @@
             .parse::<AttractScript>()
             .expect("credit script action should parse");
         let mut driver = ActorGameDriver::with_attract_script(script);
-        let source_credits_label = source_message_text(CREDITS_MESSAGE_LABEL)
-            .expect("CREDV source message should be checked in");
+        let source_credits_label = actor_message_text(CREDITS_MESSAGE);
 
         let first = driver.step(GameInput::NONE);
         assert!(first.draws.iter().any(|draw| {
@@ -1305,13 +1305,13 @@
         assert_eq!(
             script.manifest().events[0].action,
             AttractScriptActionManifest::SourceMessage {
-                label: "ELECV".to_string(),
+                message: "WilliamsElectronics".to_string(),
                 top_left_screen_address: 0x3258,
                 visual_offset: Point::new(0, 0),
             }
         );
         let mut driver = ActorGameDriver::with_attract_script(script);
-        let source_text = source_message_text("ELECV").expect("ELECV source message");
+        let source_text = actor_message_text(PRESENTS_MESSAGE);
 
         let report = driver.step(GameInput::NONE);
         assert!(report.draws.iter().any(|draw| {
@@ -1347,13 +1347,13 @@
         assert_eq!(
             script.manifest().events[0].action,
             AttractScriptActionManifest::SourceMessage {
-                label: "ELECV".to_string(),
+                message: "WilliamsElectronics".to_string(),
                 top_left_screen_address: 0x3258,
                 visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
             }
         );
         let mut driver = ActorGameDriver::with_attract_script(script);
-        let source_text = source_message_text("ELECV").expect("ELECV source message");
+        let source_text = actor_message_text(PRESENTS_MESSAGE);
 
         let report = driver.step(GameInput::NONE);
         assert!(report.draws.iter().any(|draw| {
@@ -1388,9 +1388,9 @@
         assert!(error.to_string().contains("unknown sprite key"));
 
         let error = AttractScript::parse_text("message 1 forever NO_SUCH_MESSAGE 0x3258\n")
-            .expect_err("unknown source message label should fail");
+            .expect_err("unknown message key should fail");
         assert_eq!(error.line, 1);
-        assert!(error.to_string().contains("unknown source message label"));
+        assert!(error.to_string().contains("unknown message key"));
 
         let error =
             AttractScript::parse_text("cycle 0\n").expect_err("zero cycle length should fail");

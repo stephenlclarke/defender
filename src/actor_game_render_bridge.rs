@@ -262,15 +262,14 @@ fn push_actor_wave_completion_status_sprites(scene: &mut RenderScene, report: &S
         return;
     }
 
-    for (label, screen_address) in WAVE_COMPLETION_STATUS_LINES {
-        if let Some(text) = source_message_text(label) {
-            push_source_text_bytes_sprites(
-                scene,
-                text.as_bytes(),
-                source_screen_position(*screen_address),
-                RenderLayer::Overlay,
-            );
-        }
+    for (message, screen_address) in WAVE_COMPLETION_STATUS_LINES {
+        let text = crate::arcade_assets::message_text(*message);
+        push_source_text_bytes_sprites(
+            scene,
+            text.as_bytes(),
+            source_screen_position(*screen_address),
+            RenderLayer::Overlay,
+        );
     }
 
     let (wave_digits, wave_digit_count) = actor_visible_decimal_digits(clean_wave(report.wave));
@@ -329,15 +328,15 @@ fn push_actor_player_switch_prompt_sprites(scene: &mut RenderScene, report: &Ste
         return;
     };
 
-    push_actor_source_message_sprites(
+    push_actor_message_sprites(
         scene,
-        player_source_message_label(player_switch.from_player),
+        player_message(player_switch.from_player),
         PLAYER_SWITCH_LABEL_SCREEN_ADDRESS,
         RenderLayer::Overlay,
     );
-    push_actor_source_message_sprites(
+    push_actor_message_sprites(
         scene,
-        "GO",
+        MessageId::GameOver,
         PLAYER_SWITCH_GAME_OVER_SCREEN_ADDRESS,
         RenderLayer::Overlay,
     );
@@ -348,9 +347,9 @@ fn push_actor_final_game_over_prompt_sprites(scene: &mut RenderScene, report: &S
         return;
     }
 
-    push_actor_source_message_sprites(
+    push_actor_message_sprites(
         scene,
-        "GO",
+        MessageId::GameOver,
         FINAL_GAME_OVER_SCREEN_ADDRESS,
         RenderLayer::Overlay,
     );
@@ -364,23 +363,26 @@ fn push_actor_player_start_prompt_sprites(scene: &mut RenderScene, report: &Step
         return;
     }
 
-    push_actor_source_message_sprites(
+    push_actor_message_sprites(
         scene,
-        player_source_message_label(player_start.player),
+        player_message(player_start.player),
         PLAYER_START_PROMPT_SCREEN_ADDRESS,
         RenderLayer::Overlay,
     );
 }
 
-fn push_actor_source_message_sprites(
+fn push_actor_message_sprites(
     scene: &mut RenderScene,
-    label: &str,
+    message: MessageId,
     top_left_screen_address: u16,
     layer: RenderLayer,
 ) {
-    if let Some(text) = source_message_text(label) {
-        push_source_controlled_message_sprites(scene, text, top_left_screen_address, layer);
-    }
+    push_source_controlled_message_sprites(
+        scene,
+        crate::arcade_assets::message_text(message),
+        top_left_screen_address,
+        layer,
+    );
 }
 
 fn actor_visible_survivor_bonus_icon_count(report: &StepReport) -> usize {

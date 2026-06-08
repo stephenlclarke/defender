@@ -1,6 +1,6 @@
 # Actor runtime red-label attract title script.
 # Format: <action> <start-step> <duration|forever> <x> <y> [text]
-# message uses: <label> <top-left-screen-address> [offset-x offset-y]
+# message uses: <message-key> <top-left-screen-address> [offset-x offset-y]
 # high_scores adds: <row-height> <rows>
 # hall_scores uses: <todays-screen-address> <all-time-screen-address> <offset-x> <offset-y>
 # credits and credits_nonzero use: <label-x> <label-y> <count-x> <count-y>
@@ -8,22 +8,22 @@
 
 cycle 3479
 williams_logo 1 599 108 60
-message 236 364 ELECV 0x3258
+message 236 364 williams_electronics 0x3258
 defender_wordmark 365 235 96 144
 credits_nonzero 1 599 176 226 248 226
 credits 600 forever 176 226 248 226
-message 600 600 HALLD_TITLE 0x3854 -11 -6
-message 600 600 HALLD_TODAYS 0x2268 -11 -6
-message 600 600 HALLD_ALL_TIME 0x6068 -11 -6
-message 600 600 HALLD_GREATEST 0x1E72 -11 -6
-message 600 600 HALLD_GREATEST 0x5F72 -11 -6
+message 600 600 hall_title 0x3854 -11 -6
+message 600 600 hall_todays 0x2268 -11 -6
+message 600 600 hall_all_time 0x6068 -11 -6
+message 600 600 hall_greatest 0x1E72 -11 -6
+message 600 600 hall_greatest 0x5F72 -11 -6
 sprite 600 600 defender_logo 85 50
 hall_scores 600 600 0x1886 0x5986 -11 -6
 scoring_surface 1200 forever
-message 1200 forever SCANV 0x4330 -11 -7
-message 2028 forever LANDV 0x1C70 -11 -7
-message 2214 forever MUTV 0x3C70 -11 -7
-message 2394 forever BAITV 0x5F70 -11 -7
-message 2574 forever BOMBV 0x1CA8 -11 -7
-message 2760 forever SWRMPV 0x40A8 -11 -7
-message 2940 forever SWARMV 0x5CA8 -11 -7
+message 1200 forever scanner 0x4330 -11 -7
+message 2028 forever lander 0x1C70 -11 -7
+message 2214 forever mutant 0x3C70 -11 -7
+message 2394 forever baiter 0x5F70 -11 -7
+message 2574 forever bomber 0x1CA8 -11 -7
+message 2760 forever swarmer_pod 0x40A8 -11 -7
+message 2940 forever swarmer 0x5CA8 -11 -7

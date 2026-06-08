@@ -799,7 +799,7 @@ pub(crate) const MESSAGE_GLYPH_ASSETS: &[MessageGlyphAsset] = &[
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum MessageId {
+pub enum MessageId {
     OperatorWrom,
     OperatorWram,
     OperatorRomfl,
@@ -1050,6 +1050,32 @@ pub(crate) fn message_id_from_legacy_label(label: &str) -> Option<MessageId> {
         "HALLD_ALL_TIME" => MessageId::HallAllTime,
         "HALLD_GREATEST" => MessageId::HallGreatest,
         _ => return None,
+    })
+}
+
+pub(crate) fn message_id_from_script_key(key: &str) -> Option<MessageId> {
+    let normalized = key.trim().to_ascii_lowercase().replace(['-', ' '], "_");
+    Some(match normalized.as_str() {
+        "credits" | "credits_label" => MessageId::CreditsLabel,
+        "scanner" | "scanner_instruction" => MessageId::ScannerInstruction,
+        "williams_electronics" | "presents" => MessageId::WilliamsElectronics,
+        "lander" | "lander_instruction" => MessageId::LanderInstruction,
+        "mutant" | "mutant_instruction" => MessageId::MutantInstruction,
+        "swarmer_pod" | "swarmer_instruction_prefix" => MessageId::SwarmerInstructionPrefix,
+        "bomber" | "bomber_instruction" => MessageId::BomberInstruction,
+        "swarmer" | "swarmer_instruction" => MessageId::SwarmerInstruction,
+        "baiter" | "baiter_instruction" => MessageId::BaiterInstruction,
+        "hall_title" | "hall_of_fame_title" => MessageId::HallTitle,
+        "hall_todays" | "todays_greatest" => MessageId::HallTodays,
+        "hall_all_time" | "all_time_greatest" => MessageId::HallAllTime,
+        "hall_greatest" | "greatest" => MessageId::HallGreatest,
+        "player_one" => MessageId::PlayerOne,
+        "player_two" => MessageId::PlayerTwo,
+        "game_over" => MessageId::GameOver,
+        "wave_complete_prefix" | "attack_wave" => MessageId::WaveCompletePrefix,
+        "completed" => MessageId::Completed,
+        "bonus_survivors" | "bonus_x" => MessageId::BonusSurvivors,
+        _ => return message_id_from_legacy_label(key),
     })
 }
 

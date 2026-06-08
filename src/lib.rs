@@ -16,6 +16,7 @@ mod runtime;
 mod sound_board;
 pub mod systems;
 
+pub use arcade_assets::MessageId;
 pub use game::{
     AttractPresentationPage, AttractPresentationSnapshot, Direction, EnemyKind,
     EnemyReserveSnapshot, EnemySnapshot, GameEvent, GameEvents, GameFrame, GameInput,

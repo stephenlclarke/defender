@@ -242,7 +242,7 @@ impl AttractScript {
             AttractScriptEvent::source_message(
                 ATTRACT_PRESENTS_START_STEP,
                 Some(ATTRACT_PRESENTS_DURATION_STEPS),
-                PRESENTS_MESSAGE_LABEL,
+                PRESENTS_MESSAGE,
                 ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
             ),
             AttractScriptEvent::defender_wordmark(
@@ -265,35 +265,35 @@ impl AttractScript {
             AttractScriptEvent::source_message_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
-                ATTRACT_HALL_TITLE_LABEL,
+                ATTRACT_HALL_TITLE_MESSAGE,
                 0x3854,
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
             AttractScriptEvent::source_message_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
-                ATTRACT_HALL_TODAYS_LABEL,
+                ATTRACT_HALL_TODAYS_MESSAGE,
                 0x2268,
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
             AttractScriptEvent::source_message_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
-                ATTRACT_HALL_ALL_TIME_LABEL,
+                ATTRACT_HALL_ALL_TIME_MESSAGE,
                 0x6068,
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
             AttractScriptEvent::source_message_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
-                ATTRACT_HALL_GREATEST_LABEL,
+                ATTRACT_HALL_GREATEST_MESSAGE,
                 0x1E72,
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
             AttractScriptEvent::source_message_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
-                ATTRACT_HALL_GREATEST_LABEL,
+                ATTRACT_HALL_GREATEST_MESSAGE,
                 0x5F72,
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
@@ -315,13 +315,13 @@ impl AttractScript {
             ATTRACT_SCORING_SEQUENCE_START_STEP,
             None,
         ));
-        for (line_index, (label, screen_address)) in
+        for (line_index, (message, screen_address)) in
             ATTRACT_INSTRUCTION_TEXT_LINES.iter().copied().enumerate()
         {
             events.push(AttractScriptEvent::source_message_with_offset(
                 actor_attract_scoring_instruction_text_start_step(line_index),
                 None,
-                label,
+                message,
                 screen_address,
                 ATTRACT_SCORING_VISUAL_OFFSET,
             ));
@@ -476,14 +476,14 @@ fn parse_attract_script_event(
             ))
         }
         "message" | "source_message" => {
-            let label = parse_attract_source_message_label(line_number, parts.next())?;
+            let message = parse_attract_message_id(line_number, parts.next())?;
             let top_left_screen_address =
                 parse_attract_u16(line_number, parts.next(), "top-left screen address")?;
             let visual_offset = parse_optional_attract_point(line_number, &mut parts)?;
             Ok(AttractScriptEvent::source_message_with_offset(
                 start_after_steps,
                 duration_steps,
-                label,
+                message,
                 top_left_screen_address,
                 visual_offset,
             ))
@@ -690,21 +690,16 @@ fn parse_attract_u16(
     Ok(parsed)
 }
 
-fn parse_attract_source_message_label(
+fn parse_attract_message_id(
     line_number: usize,
     token: Option<&str>,
-) -> Result<String, AttractScriptParseError> {
+) -> Result<MessageId, AttractScriptParseError> {
     let token = token.ok_or_else(|| {
-        AttractScriptParseError::new(line_number, "message action needs a source label")
+        AttractScriptParseError::new(line_number, "message action needs a message key")
     })?;
-    let label = token.to_ascii_uppercase();
-    if source_message_text(&label).is_none() {
-        return Err(AttractScriptParseError::new(
-            line_number,
-            format!("unknown source message label `{token}`"),
-        ));
-    }
-    Ok(label)
+    crate::arcade_assets::message_id_from_script_key(token).ok_or_else(|| {
+        AttractScriptParseError::new(line_number, format!("unknown message key `{token}`"))
+    })
 }
 
 fn parse_attract_sprite_key(
@@ -792,13 +787,13 @@ impl AttractScriptEvent {
     pub fn source_message(
         start_after_steps: u64,
         duration_steps: Option<u64>,
-        label: impl Into<String>,
+        message: MessageId,
         top_left_screen_address: u16,
     ) -> Self {
         Self::source_message_with_offset(
             start_after_steps,
             duration_steps,
-            label,
+            message,
             top_left_screen_address,
             Point::new(0, 0),
         )
@@ -807,7 +802,7 @@ impl AttractScriptEvent {
     pub fn source_message_with_offset(
         start_after_steps: u64,
         duration_steps: Option<u64>,
-        label: impl Into<String>,
+        message: MessageId,
         top_left_screen_address: u16,
         visual_offset: Point,
     ) -> Self {
@@ -815,7 +810,7 @@ impl AttractScriptEvent {
             start_after_steps,
             duration_steps,
             action: AttractScriptAction::SourceMessage {
-                label: label.into(),
+                message,
                 top_left_screen_address,
                 visual_offset,
             },
@@ -987,7 +982,7 @@ pub enum AttractScriptAction {
         value: String,
     },
     SourceMessage {
-        label: String,
+        message: MessageId,
         top_left_screen_address: u16,
         visual_offset: Point,
     },
@@ -1036,17 +1031,15 @@ impl AttractScriptAction {
                 vec![DrawCommand::text(actor, *position, value.clone())]
             }
             Self::SourceMessage {
-                label,
+                message,
                 top_left_screen_address,
                 visual_offset,
-            } => source_message_text(label).map_or_else(Vec::new, |text| {
-                vec![DrawCommand::source_message_with_offset(
-                    actor,
-                    text,
-                    *top_left_screen_address,
-                    *visual_offset,
-                )]
-            }),
+            } => vec![DrawCommand::source_message_with_offset(
+                actor,
+                crate::arcade_assets::message_text(*message),
+                *top_left_screen_address,
+                *visual_offset,
+            )],
             Self::Sprite { sprite, position } => {
                 vec![DrawCommand::sprite(actor, *sprite, *position)]
             }
@@ -1171,11 +1164,11 @@ impl AttractScriptAction {
                 value: value.clone(),
             },
             Self::SourceMessage {
-                label,
+                message,
                 top_left_screen_address,
                 visual_offset,
             } => AttractScriptActionManifest::SourceMessage {
-                label: label.clone(),
+                message: format!("{message:?}"),
                 top_left_screen_address: *top_left_screen_address,
                 visual_offset: *visual_offset,
             },
@@ -1234,7 +1227,7 @@ impl AttractScriptAction {
 }
 
 fn source_credits_label_text() -> &'static str {
-    source_message_text(CREDITS_MESSAGE_LABEL).unwrap_or("CREDITS:")
+    crate::arcade_assets::message_text(CREDITS_MESSAGE)
 }
 
 fn source_hall_score_seed_entries() -> [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] {
@@ -1376,7 +1369,7 @@ pub enum AttractScriptActionManifest {
         value: String,
     },
     SourceMessage {
-        label: String,
+        message: String,
         top_left_screen_address: u16,
         visual_offset: Point,
     },

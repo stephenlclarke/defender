@@ -288,6 +288,15 @@ fn format_high_score_initials(state: HighScoreInitialsState) -> String {
         .collect()
 }
 
+fn player_message(player: u8) -> MessageId {
+    if player == 2 {
+        MessageId::PlayerTwo
+    } else {
+        MessageId::PlayerOne
+    }
+}
+
+#[cfg(test)]
 fn player_source_message_label(player: u8) -> &'static str {
     if player == 2 { "PLYR2" } else { "PLYR1" }
 }
