@@ -24,7 +24,8 @@ use crate::{
         SourceLanderSnapshot, SourceMutantSnapshot, SourcePodSnapshot, SourceRandSnapshot,
         SourceSwarmerSnapshot, TerrainBlowSnapshot, TerrainBlowStage, TerrainSegment,
         WaveProfileSnapshot, WorldSnapshot, WorldVector, push_scanner_radar_sprites,
-        push_source_bgout_terrain_sprites, push_source_explosion_cloud_pixels,
+        push_source_appearance_cloud_pixels, push_source_bgout_terrain_sprites,
+        push_source_explosion_cloud_pixels, source_appearance_size_for_age,
         source_explosion_render_scale, source_explosion_size_for_age,
         source_terrain_blow_flash_tint, source_terrain_explosion_size_for_age,
         source_wave_landscape_tint,
@@ -232,9 +233,7 @@ const ATTRACT_SCORING_RESCUE_SEQUENCE_STEPS: u16 = ATTRACT_SCORING_RESCUE_DESCEN
 const ATTRACT_SCORING_DEMO_TOTAL_STEPS: u16 = ATTRACT_SCORING_RESCUE_SEQUENCE_STEPS
     + ATTRACT_SCORING_LEGEND_ENTRY_STEPS * ATTRACT_SCORING_LEGEND_ENTRIES
     + ATTRACT_SCORING_LEGEND_HOLD_STEPS;
-const ATTRACT_SCORING_PROTECTED_DEMO_STEP_OFFSET: u16 = ATTRACT_SCORING_RESCUE_DESCENT_STEPS
-    + ATTRACT_SCORING_RESCUE_ASCENT_STEPS
-    + ATTRACT_SCORING_RESCUE_LASER_STEPS;
+const ATTRACT_SCORING_PROTECTED_DEMO_STEP_OFFSET: u16 = 0;
 const ATTRACT_SCORING_PLAYER_X16: i32 = 0x0800;
 const ATTRACT_SCORING_PLAYER_Y16: i32 = 0x5000;
 const ATTRACT_SCORING_HUMAN_X16: i32 = 0x1E00;
@@ -305,6 +304,11 @@ const ENEMY_BOMB_SCENE_SIZE: [f32; 2] = [4.0, 3.0];
 const EXPLOSION_SCENE_SIZE: [f32; 2] = [8.0, 8.0];
 const PLAYER_EXPLOSION_PIXEL_SCENE_SIZE: [f32; 2] = [1.0, 1.0];
 const SCORE_POPUP_SCENE_SIZE: [f32; 2] = [12.0, 6.0];
+const SCORE_POPUP_500_COLOR_CYCLE: [Color; 3] = [
+    Color::from_rgba(0xFF, 0x50, 0x50, 0xFF),
+    Color::from_rgba(0xFF, 0xBC, 0x00, 0xFF),
+    Color::from_rgba(0x28, 0x38, 0xDC, 0xFF),
+];
 const HUMAN_GROUND_Y: i16 = 214;
 const HUMAN_FALL_ACCELERATION: i16 = 1;
 const HUMAN_MAX_FALL_SPEED: i16 = 8;
@@ -4770,7 +4774,7 @@ pub enum VisualEffect {
     },
     WilliamsReveal {
         stroke_step: u16,
-        color_phase: u8,
+        color_frame: u16,
     },
     DefenderCoalescence {
         slot: u8,
@@ -5787,17 +5791,16 @@ impl AttractScriptAction {
             Self::WilliamsLogo {
                 position,
                 reveal_steps,
-                color_period,
+                color_period: _,
             } => {
-                let color_period = (*color_period).max(1);
-                let color_phase = ((age.saturating_sub(1) / u64::from(color_period)) % 4) as u8;
+                let color_frame = u16::try_from(age.saturating_sub(1)).unwrap_or(u16::MAX);
                 vec![DrawCommand::sprite_with_effect(
                     actor,
                     SpriteKey::WilliamsLogo,
                     *position,
                     VisualEffect::WilliamsReveal {
                         stroke_step: (age as u16).min(*reveal_steps),
-                        color_phase,
+                        color_frame,
                     },
                 )]
             }
@@ -5855,7 +5858,7 @@ impl AttractScriptAction {
                 all_time_top_left_screen_address,
                 visual_offset,
             } => {
-                let entries = source_hall_score_entries(high_scores);
+                let entries = source_hall_score_seed_entries();
                 let mut draws = hall_score_table_draws(
                     actor,
                     entries,
@@ -5970,6 +5973,10 @@ impl AttractScriptAction {
 
 fn source_credits_label_text() -> &'static str {
     source_message_text(SOURCE_CREDITS_MESSAGE_LABEL).unwrap_or("CREDITS:")
+}
+
+fn source_hall_score_seed_entries() -> [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] {
+    std::array::from_fn(source_high_score_seed_entry)
 }
 
 fn source_hall_score_entries(
@@ -7301,8 +7308,8 @@ impl ActorRenderSceneBridge {
         match draw.effect {
             VisualEffect::WilliamsReveal {
                 stroke_step,
-                color_phase,
-            } => self.push_williams_reveal(scene, draw.position, stroke_step, color_phase),
+                color_frame,
+            } => self.push_williams_reveal(scene, draw.position, stroke_step, color_frame),
             VisualEffect::DefenderCoalescence { slot, row_pair } => {
                 self.push_defender_coalescence(scene, slot, row_pair)
             }
@@ -7329,9 +7336,9 @@ impl ActorRenderSceneBridge {
         scene: &mut RenderScene,
         position: Point,
         stroke_step: u16,
-        color_phase: u8,
+        color_frame: u16,
     ) {
-        let tint = williams_logo_phase_tint(color_phase);
+        let tint = SOURCE_VISUAL_STATE.attract_williams_logo_tint_for_frame(color_frame);
         let pixel_path = source_attract_williams_logo_pixel_path();
         let visible_pixel_count =
             williams_reveal_visible_pixel_count(stroke_step, pixel_path.len());
@@ -7390,6 +7397,7 @@ impl ActorRenderSceneBridge {
     }
 
     fn push_attract_scoring_surface(&self, scene: &mut RenderScene, scoring_tick: u16) {
+        push_source_bgout_terrain_sprites(scene, 0, source_wave_landscape_tint(1));
         push_attract_scoring_top_display_border(scene);
         push_attract_scoring_scanner_terrain(scene);
         push_attract_scoring_demo_scene(scene, scoring_tick);
@@ -7708,13 +7716,7 @@ fn push_attract_scoring_demo_scene(scene: &mut RenderScene, scoring_tick: u16) {
     }
 
     if let Some(bonus) = frame.bonus {
-        scene.push_sprite(SceneSprite {
-            sprite: bonus.sprite,
-            layer: RenderLayer::Objects,
-            position: actor_attract_scoring_scene_position(bonus.x16, bonus.y16),
-            size: SCORE_POPUP_SCENE_SIZE,
-            tint: Color::WHITE,
-        });
+        push_actor_attract_scoring_bonus(scene, bonus, frame.display_step);
     }
 }
 
@@ -8450,7 +8452,75 @@ fn actor_attract_scoring_laser_enemy_anchor(
     position: [f32; 2],
 ) -> [f32; 2] {
     let size = actor_attract_scoring_enemy_size(enemy);
-    [position[0] + size[0], position[1] + size[1] / 2.0]
+    [position[0], position[1] + size[1] / 2.0]
+}
+
+fn push_actor_attract_scoring_bonus(
+    scene: &mut RenderScene,
+    bonus: ActorAttractScoringBonus,
+    display_step: u16,
+) {
+    let position = actor_attract_scoring_scene_position(bonus.x16, bonus.y16);
+    if bonus.sprite == SpriteId::SCORE_POPUP_500 {
+        push_actor_attract_scoring_score_500_pixels(scene, position, display_step);
+        return;
+    }
+
+    scene.push_sprite(SceneSprite {
+        sprite: bonus.sprite,
+        layer: RenderLayer::Objects,
+        position,
+        size: SCORE_POPUP_SCENE_SIZE,
+        tint: Color::WHITE,
+    });
+}
+
+fn push_actor_attract_scoring_score_500_pixels(
+    scene: &mut RenderScene,
+    position: [f32; 2],
+    display_step: u16,
+) {
+    let bytes = actor_source_object_image_bytes("C5D10");
+    let rows = 6_usize;
+    let bytes_per_row = 6_usize;
+    if bytes.len() != rows * bytes_per_row {
+        return;
+    }
+
+    let phase = usize::from((display_step / 5) % SCORE_POPUP_500_COLOR_CYCLE.len() as u16);
+    for column in 0..bytes_per_row {
+        let column_start = column * rows;
+        for row in 0..rows {
+            let byte = bytes[column_start + row];
+            if let Some(tint) = actor_score_500_nibble_tint(byte >> 4, phase) {
+                push_actor_source_fragment_pixel(
+                    scene,
+                    [position[0] + (column * 2) as f32, position[1] + row as f32],
+                    tint,
+                );
+            }
+            if let Some(tint) = actor_score_500_nibble_tint(byte & 0x0F, phase) {
+                push_actor_source_fragment_pixel(
+                    scene,
+                    [
+                        position[0] + (column * 2 + 1) as f32,
+                        position[1] + row as f32,
+                    ],
+                    tint,
+                );
+            }
+        }
+    }
+}
+
+fn actor_score_500_nibble_tint(nibble: u8, phase: usize) -> Option<Color> {
+    match nibble {
+        0x0 => None,
+        0xD => Some(SCORE_POPUP_500_COLOR_CYCLE[phase % SCORE_POPUP_500_COLOR_CYCLE.len()]),
+        0xE => Some(SCORE_POPUP_500_COLOR_CYCLE[(phase + 1) % SCORE_POPUP_500_COLOR_CYCLE.len()]),
+        0xF => Some(SCORE_POPUP_500_COLOR_CYCLE[(phase + 2) % SCORE_POPUP_500_COLOR_CYCLE.len()]),
+        _ => actor_source_picture_nibble_tint(nibble),
+    }
 }
 
 fn push_actor_scoring_sparse_laser(
@@ -8467,8 +8537,17 @@ fn push_actor_scoring_sparse_laser(
     }
 
     let direction = if end_x >= start_x { 1 } else { -1 };
+    let visible_left = if direction > 0 { left } else { left + 1 };
+    let visible_right = if direction > 0 { right - 1 } else { right };
+    if visible_right < visible_left {
+        return;
+    }
     let y = start_y.round() as i32;
-    let head_x = if direction > 0 { right - 1 } else { left };
+    let head_x = if direction > 0 {
+        visible_right
+    } else {
+        visible_left
+    };
     let mut x = left;
     let mut cell = 0_i32;
     while x <= right {
@@ -8496,23 +8575,44 @@ fn push_actor_scoring_sparse_laser(
             };
             (byte, SOURCE_LASER_FIZZLE_TINT)
         };
-        push_actor_scoring_laser_byte(scene, x, y, byte, tint);
+        push_actor_scoring_laser_byte(scene, x, y, byte, tint, visible_left, visible_right);
         x += SOURCE_LASER_BYTE_PIXELS;
         cell += 1;
     }
 }
 
-fn push_actor_scoring_laser_byte(scene: &mut RenderScene, x: i32, y: i32, byte: u8, tint: Color) {
+fn push_actor_scoring_laser_byte(
+    scene: &mut RenderScene,
+    x: i32,
+    y: i32,
+    byte: u8,
+    tint: Color,
+    visible_left: i32,
+    visible_right: i32,
+) {
     if byte & 0xF0 != 0 {
-        push_actor_scoring_laser_pixel(scene, x, y, tint);
+        push_actor_scoring_laser_pixel(scene, x, y, tint, visible_left, visible_right);
     }
     if byte & 0x0F != 0 {
-        push_actor_scoring_laser_pixel(scene, x + 1, y, tint);
+        push_actor_scoring_laser_pixel(scene, x + 1, y, tint, visible_left, visible_right);
     }
 }
 
-fn push_actor_scoring_laser_pixel(scene: &mut RenderScene, x: i32, y: i32, tint: Color) {
-    if x < 0 || y < 0 || x >= scene.surface.width as i32 || y >= scene.surface.height as i32 {
+fn push_actor_scoring_laser_pixel(
+    scene: &mut RenderScene,
+    x: i32,
+    y: i32,
+    tint: Color,
+    visible_left: i32,
+    visible_right: i32,
+) {
+    if x < visible_left
+        || x > visible_right
+        || x < 0
+        || y < 0
+        || x >= scene.surface.width as i32
+        || y >= scene.surface.height as i32
+    {
         return;
     }
     scene.push_sprite(SceneSprite {
@@ -8552,45 +8652,26 @@ fn push_actor_attract_scoring_fragment_pixels(
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct ActorSourceObjectImagePixel {
-    x: u8,
-    y: u8,
-    tint: Color,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct ActorSourceObjectImageSpec {
-    label: &'static str,
-    rows: u8,
-    bytes_per_row: u8,
-}
-
 fn push_actor_attract_scoring_materialize_pixels(
     scene: &mut RenderScene,
     enemy: ActorAttractScoringEnemyKind,
     position: [f32; 2],
     visual_step: u16,
 ) {
-    let pixels = actor_source_object_image_pixels(enemy);
-    if pixels.is_empty() {
+    let Some(position) = try_screen_position_from_scene_position(position) else {
         return;
-    }
-    let reveal_count = ((usize::from(visual_step) + 1) * pixels.len()
-        / usize::from(ATTRACT_SCORING_LEGEND_TRANSFER_STEPS))
-    .clamp(1, pixels.len());
-    for (index, pixel) in pixels.iter().copied().enumerate().take(reveal_count) {
-        let jitter_x = actor_source_fragment_jitter(index, visual_step, 0);
-        let jitter_y = actor_source_fragment_jitter(index, visual_step, 3);
-        push_actor_source_fragment_pixel(
-            scene,
-            [
-                position[0] + f32::from(pixel.x) + jitter_x,
-                position[1] + f32::from(pixel.y) + jitter_y,
-            ],
-            pixel.tint,
-        );
-    }
+    };
+    let descriptor = actor_attract_scoring_enemy_source_picture_descriptor(enemy);
+    let appearance_age = actor_attract_scoring_materialize_age(visual_step);
+    let source_size = source_appearance_size_for_age(appearance_age);
+    let _ = push_source_appearance_cloud_pixels(
+        scene,
+        position,
+        descriptor.picture_label,
+        descriptor.picture_size,
+        descriptor.sprite,
+        source_size,
+    );
 }
 
 fn push_actor_attract_scoring_explosion_pixels(
@@ -8599,30 +8680,17 @@ fn push_actor_attract_scoring_explosion_pixels(
     position: [f32; 2],
     visual_step: u16,
 ) {
-    let pixels = actor_source_object_image_pixels(enemy);
-    if pixels.is_empty() {
+    let Some(position) = try_screen_position_from_scene_position(position) else {
         return;
-    }
-    let size = actor_attract_scoring_enemy_size(enemy);
-    let center = [position[0] + size[0] / 2.0, position[1] + size[1] / 2.0];
-    let source_center = [size[0] / 2.0, size[1] / 2.0];
-    let spread = 1.0 + f32::from(visual_step.min(18)) / 4.0;
-
-    for (index, pixel) in pixels.iter().copied().enumerate() {
-        if (index + usize::from(visual_step)).is_multiple_of(5) {
-            continue;
-        }
-        let jitter_x = actor_source_fragment_jitter(index, visual_step, 5);
-        let jitter_y = actor_source_fragment_jitter(index, visual_step, 9);
-        push_actor_source_fragment_pixel(
-            scene,
-            [
-                center[0] + (f32::from(pixel.x) - source_center[0]) * spread + jitter_x,
-                center[1] + (f32::from(pixel.y) - source_center[1]) * spread + jitter_y,
-            ],
-            pixel.tint,
-        );
-    }
+    };
+    let source_size = source_explosion_size_for_age(visual_step.saturating_add(2));
+    let _ = push_source_explosion_cloud_pixels(
+        scene,
+        clean_explosion_kind(actor_attract_scoring_enemy_explosion_kind(enemy)),
+        position,
+        None,
+        source_size,
+    );
 }
 
 fn push_actor_source_fragment_pixel(scene: &mut RenderScene, position: [f32; 2], tint: Color) {
@@ -8642,85 +8710,84 @@ fn push_actor_source_fragment_pixel(scene: &mut RenderScene, position: [f32; 2],
     });
 }
 
-fn actor_source_fragment_jitter(index: usize, visual_step: u16, salt: usize) -> f32 {
-    match (index * 11 + usize::from(visual_step) * 3 + salt) % 7 {
-        0 => -2.0,
-        1 | 2 => -1.0,
-        3 => 0.0,
-        4 | 5 => 1.0,
-        _ => 2.0,
-    }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ActorAttractScoringSourcePictureDescriptor {
+    picture_label: &'static str,
+    picture_size: (u8, u8),
+    sprite: SpriteId,
 }
 
-fn actor_source_object_image_pixels(
+fn actor_attract_scoring_enemy_source_picture_descriptor(
     enemy: ActorAttractScoringEnemyKind,
-) -> Vec<ActorSourceObjectImagePixel> {
-    let spec = actor_source_object_image_spec(enemy);
-    let bytes = actor_source_object_image_bytes(spec.label);
-    let expected_bytes = usize::from(spec.rows) * usize::from(spec.bytes_per_row);
-    if bytes.len() != expected_bytes {
-        return Vec::new();
-    }
-
-    let mut pixels = Vec::new();
-    for column in 0..usize::from(spec.bytes_per_row) {
-        let column_start = column * usize::from(spec.rows);
-        for row in 0..usize::from(spec.rows) {
-            let byte = bytes[column_start + row];
-            if let Some(tint) = actor_source_picture_nibble_tint(byte >> 4) {
-                pixels.push(ActorSourceObjectImagePixel {
-                    x: (column * 2) as u8,
-                    y: row as u8,
-                    tint,
-                });
-            }
-            if let Some(tint) = actor_source_picture_nibble_tint(byte & 0x0F) {
-                pixels.push(ActorSourceObjectImagePixel {
-                    x: (column * 2 + 1) as u8,
-                    y: row as u8,
-                    tint,
-                });
-            }
-        }
-    }
-    pixels
-}
-
-fn actor_source_object_image_spec(
-    enemy: ActorAttractScoringEnemyKind,
-) -> ActorSourceObjectImageSpec {
+) -> ActorAttractScoringSourcePictureDescriptor {
     match enemy {
-        ActorAttractScoringEnemyKind::Lander => ActorSourceObjectImageSpec {
-            label: "LND10",
-            rows: 8,
-            bytes_per_row: 5,
+        ActorAttractScoringEnemyKind::Lander => ActorAttractScoringSourcePictureDescriptor {
+            picture_label: "LNDP1",
+            picture_size: (5, 8),
+            sprite: SpriteId::ENEMY_LANDER,
         },
-        ActorAttractScoringEnemyKind::Mutant => ActorSourceObjectImageSpec {
-            label: "SCZD10",
-            rows: 8,
-            bytes_per_row: 5,
+        ActorAttractScoringEnemyKind::Mutant => ActorAttractScoringSourcePictureDescriptor {
+            picture_label: "SCZP1",
+            picture_size: (5, 8),
+            sprite: SpriteId::ENEMY_MUTANT,
         },
-        ActorAttractScoringEnemyKind::Baiter => ActorSourceObjectImageSpec {
-            label: "UFOD10",
-            rows: 4,
-            bytes_per_row: 6,
+        ActorAttractScoringEnemyKind::Baiter => ActorAttractScoringSourcePictureDescriptor {
+            picture_label: "UFOP1",
+            picture_size: (6, 4),
+            sprite: SpriteId::ENEMY_BAITER,
         },
-        ActorAttractScoringEnemyKind::Bomber => ActorSourceObjectImageSpec {
-            label: "TIED10",
-            rows: 8,
-            bytes_per_row: 4,
+        ActorAttractScoringEnemyKind::Bomber => ActorAttractScoringSourcePictureDescriptor {
+            picture_label: "TIEP1",
+            picture_size: (4, 8),
+            sprite: SpriteId::ENEMY_BOMBER,
         },
-        ActorAttractScoringEnemyKind::Pod => ActorSourceObjectImageSpec {
-            label: "PRBD10",
-            rows: 8,
-            bytes_per_row: 4,
+        ActorAttractScoringEnemyKind::Pod => ActorAttractScoringSourcePictureDescriptor {
+            picture_label: "PRBP1",
+            picture_size: (4, 8),
+            sprite: SpriteId::ENEMY_POD,
         },
-        ActorAttractScoringEnemyKind::Swarmer => ActorSourceObjectImageSpec {
-            label: "SWMD10",
-            rows: 4,
-            bytes_per_row: 3,
+        ActorAttractScoringEnemyKind::Swarmer => ActorAttractScoringSourcePictureDescriptor {
+            picture_label: "SWPIC1",
+            picture_size: (3, 4),
+            sprite: SpriteId::ENEMY_SWARMER,
         },
     }
+}
+
+fn actor_attract_scoring_enemy_explosion_kind(
+    enemy: ActorAttractScoringEnemyKind,
+) -> ExplosionKind {
+    match enemy {
+        ActorAttractScoringEnemyKind::Lander => ExplosionKind::Lander,
+        ActorAttractScoringEnemyKind::Mutant => ExplosionKind::Mutant,
+        ActorAttractScoringEnemyKind::Baiter => ExplosionKind::Baiter,
+        ActorAttractScoringEnemyKind::Bomber => ExplosionKind::Bomber,
+        ActorAttractScoringEnemyKind::Pod => ExplosionKind::Pod,
+        ActorAttractScoringEnemyKind::Swarmer => ExplosionKind::Swarmer,
+    }
+}
+
+fn actor_attract_scoring_materialize_age(visual_step: u16) -> u16 {
+    let final_age = 0x2C_u32;
+    let step = u32::from(visual_step.min(ATTRACT_SCORING_LEGEND_TRANSFER_STEPS.saturating_sub(1)));
+    let denominator = u32::from(
+        ATTRACT_SCORING_LEGEND_TRANSFER_STEPS
+            .saturating_sub(1)
+            .max(1),
+    );
+    u16::try_from(step * final_age / denominator).expect("materialize age fits in u16")
+}
+
+fn try_screen_position_from_scene_position(position: [f32; 2]) -> Option<ScreenPosition> {
+    if !position[0].is_finite() || !position[1].is_finite() {
+        return None;
+    }
+    let x = position[0].round();
+    let y = position[1].round();
+    if x < 0.0 || y < 0.0 || x > f32::from(u8::MAX) || y > f32::from(u8::MAX) {
+        return None;
+    }
+    Some(ScreenPosition::new(x as u8, y as u8))
 }
 
 fn actor_source_object_image_bytes(label: &'static str) -> Vec<u8> {
@@ -9032,15 +9099,6 @@ fn williams_reveal_visible_pixel_count(stroke_step: u16, total_pixels: usize) ->
         .copied()
         .unwrap_or(total_pixels)
         .clamp(1, total_pixels)
-}
-
-fn williams_logo_phase_tint(color_phase: u8) -> Color {
-    match color_phase % 4 {
-        0 => Color::from_rgba(0xFF, 0xFF, 0xFF, 0xFF),
-        1 => Color::from_rgba(0xFF, 0xD8, 0x40, 0xFF),
-        2 => Color::from_rgba(0x80, 0xE8, 0xFF, 0xFF),
-        _ => Color::from_rgba(0xFF, 0x80, 0xE8, 0xFF),
-    }
 }
 
 fn push_actor_playing_hud_sprites(scene: &mut RenderScene, report: &StepReport) {
@@ -17983,9 +18041,14 @@ mod tests {
                     draw.effect,
                     VisualEffect::WilliamsReveal {
                         stroke_step: 1,
-                        color_phase: 0,
+                        color_frame: 0,
                     }
                 )
+        }));
+        let williams_scene = ActorRenderSceneBridge::new().render_scene_for_report(&williams);
+        assert!(williams_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL
+                && sprite.tint == SOURCE_VISUAL_STATE.attract_williams_logo_tint_for_frame(0)
         }));
         assert!(
             williams
@@ -18144,7 +18207,7 @@ mod tests {
             draw.position == Point::new(47, 128) && draw.text.as_deref() == Some("DRJ")
         }));
         assert!(hall.draws.iter().any(|draw| {
-            draw.position == Point::new(75, 128) && draw.text.as_deref() == Some(" 10000")
+            draw.position == Point::new(75, 128) && draw.text.as_deref() == Some(" 21270")
         }));
         assert!(hall.draws.iter().any(|draw| {
             draw.position == Point::new(167, 128) && draw.text.as_deref() == Some("1")
@@ -18167,7 +18230,7 @@ mod tests {
                 && sprite.layer == RenderLayer::Overlay
         }));
         assert!(hall_scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::SCORE_DIGIT_1
+            sprite.sprite == SpriteId::SCORE_DIGIT_2
                 && sprite.position == [79.0, 128.0]
                 && sprite.layer == RenderLayer::Overlay
         }));
@@ -18260,16 +18323,39 @@ mod tests {
                 && sprite.tint == ATTRACT_SCORING_SCANNER_TERRAIN_TINT
         }));
         assert!(scoring_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::TERRAIN_TILE
+                && sprite.layer == RenderLayer::Terrain
+                && sprite.tint == source_wave_landscape_tint(1)
+        }));
+        assert!(scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::PLAYER_SHIP
                 && sprite.layer == RenderLayer::Objects
-                && sprite.position == [49.0, 70.0]
+                && sprite.position
+                    == actor_attract_scoring_scene_position(
+                        ATTRACT_SCORING_PLAYER_X16,
+                        ATTRACT_SCORING_PLAYER_Y16,
+                    )
                 && sprite.size == PLAYER_SHIP_SCENE_SIZE
         }));
         assert!(scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::HUMAN
                 && sprite.layer == RenderLayer::Objects
-                && sprite.position == [225.0, 85.0]
+                && sprite.position
+                    == actor_attract_scoring_scene_position(
+                        ATTRACT_SCORING_HUMAN_X16,
+                        ATTRACT_SCORING_HUMAN_Y16,
+                    )
                 && sprite.size == HUMAN_SCENE_SIZE
+        }));
+        assert!(scoring_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_LANDER
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position
+                    == actor_attract_scoring_scene_position(
+                        ATTRACT_SCORING_LANDER_X16,
+                        ATTRACT_SCORING_LANDER_Y16,
+                    )
+                && sprite.size == LANDER_SCENE_SIZE
         }));
         assert!(scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::SCANNER_PLAYER_BLIP
@@ -18288,20 +18374,50 @@ mod tests {
             2
         );
         let mut rescue_score = scoring;
-        let rescue_score_tick = actor_attract_scoring_tick_for_display_step(
-            ATTRACT_SCORING_PROTECTED_DEMO_STEP_OFFSET + ATTRACT_SCORING_RESCUE_FALL_STEPS,
-        );
+        let rescue_score_display_step =
+            actor_attract_scoring_display_step_for_stage(ActorAttractScoringStage::RescueScore, 0);
+        let rescue_score_tick =
+            actor_attract_scoring_tick_for_display_step(rescue_score_display_step);
         for _ in 0..rescue_score_tick {
             rescue_score = driver.step(GameInput::NONE);
         }
         let rescue_score_scene =
             ActorRenderSceneBridge::new().render_scene_for_report(&rescue_score);
-        assert!(rescue_score_scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::SCORE_POPUP_500
-                && sprite.layer == RenderLayer::Objects
-                && sprite.position == [225.0, 134.0]
-                && sprite.size == SCORE_POPUP_SCENE_SIZE
+        let score_position = actor_attract_scoring_scene_position(
+            ATTRACT_SCORING_SCORE_500_X16,
+            ATTRACT_SCORING_SCORE_500_Y16,
+        );
+        assert!(!rescue_score_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_POPUP_500 && sprite.layer == RenderLayer::Objects
         }));
+        let score_pixels = score_popup_500_pixels(&rescue_score_scene, score_position);
+        assert!(
+            score_pixels.len() > 20,
+            "rescued-human 500 bonus should render from coloured source pixels"
+        );
+        for tint in SCORE_POPUP_500_COLOR_CYCLE {
+            assert!(
+                score_pixels.iter().any(|sprite| sprite.tint == tint),
+                "rescued-human 500 bonus should include {tint:?}"
+            );
+        }
+        let mut next_score_scene = RenderScene::empty(0, ACTOR_RENDER_SURFACE);
+        push_attract_scoring_demo_scene(
+            &mut next_score_scene,
+            actor_attract_scoring_tick_for_display_step(rescue_score_display_step + 5),
+        );
+        let next_score_pixels = score_popup_500_pixels(&next_score_scene, score_position);
+        assert_ne!(
+            score_pixels
+                .iter()
+                .map(|sprite| (sprite.position, sprite.tint))
+                .collect::<Vec<_>>(),
+            next_score_pixels
+                .iter()
+                .map(|sprite| (sprite.position, sprite.tint))
+                .collect::<Vec<_>>(),
+            "rescued-human 500 bonus should colour-cycle between attract steps"
+        );
         let lander_label_start = actor_attract_scoring_instruction_text_start_step(1);
         let mut lander_label = rescue_score;
         while lander_label.step < lander_label_start {
@@ -18365,7 +18481,23 @@ mod tests {
         }));
     }
 
-    fn assert_attract_scoring_laser_reaches_target_edge(
+    fn score_popup_500_pixels(scene: &RenderScene, position: [f32; 2]) -> Vec<&SceneSprite> {
+        scene
+            .sprites
+            .iter()
+            .filter(|sprite| {
+                sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
+                    && sprite.layer == RenderLayer::Objects
+                    && sprite.size == PLAYER_EXPLOSION_PIXEL_SCENE_SIZE
+                    && sprite.position[0] >= position[0]
+                    && sprite.position[0] < position[0] + SCORE_POPUP_SCENE_SIZE[0]
+                    && sprite.position[1] >= position[1]
+                    && sprite.position[1] < position[1] + SCORE_POPUP_SCENE_SIZE[1]
+            })
+            .collect()
+    }
+
+    fn assert_attract_scoring_laser_stops_at_target_front(
         scene: &RenderScene,
         enemy: ActorAttractScoringEnemyKind,
         target_position: [f32; 2],
@@ -18381,7 +18513,7 @@ mod tests {
             }),
             "scoring laser test must use the visible source target"
         );
-        let target_right_edge = target_position[0] + target_size[0] - 1.0;
+        let target_front_edge = target_position[0];
         let target_center_y =
             actor_attract_scoring_laser_enemy_anchor(enemy, target_position)[1].round();
         let projectiles = scene
@@ -18397,8 +18529,12 @@ mod tests {
             .map(|sprite| sprite.position[0] + sprite.size[0] - 1.0)
             .fold(f32::NEG_INFINITY, f32::max);
         assert!(
-            laser_right_edge >= target_right_edge,
-            "attract scoring laser should visibly reach the {enemy:?} edge before explosion: laser={laser_right_edge}, target={target_right_edge}"
+            laser_right_edge >= target_front_edge - SOURCE_LASER_BYTE_PIXELS as f32,
+            "attract scoring laser should visibly reach the {enemy:?} front edge before explosion: laser={laser_right_edge}, target={target_front_edge}"
+        );
+        assert!(
+            laser_right_edge <= target_front_edge,
+            "attract scoring laser should stop at the {enemy:?} front instead of penetrating through it: laser={laser_right_edge}, target={target_front_edge}"
         );
         let ship_position = scene
             .sprites
@@ -18467,7 +18603,7 @@ mod tests {
             .iter()
             .find(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
             .expect("rescue laser should still render the target lander");
-        assert_attract_scoring_laser_reaches_target_edge(
+        assert_attract_scoring_laser_stops_at_target_front(
             &laser_scene,
             ActorAttractScoringEnemyKind::Lander,
             laser_target.position,
@@ -18477,14 +18613,14 @@ mod tests {
                 ActorAttractScoringEnemyKind::Lander,
                 [20.0, 40.0]
             ),
-            [30.0, 44.0]
+            [20.0, 44.0]
         );
         assert_eq!(
             actor_attract_scoring_laser_enemy_anchor(
                 ActorAttractScoringEnemyKind::Swarmer,
                 [20.0, 40.0]
             ),
-            [26.0, 42.0]
+            [20.0, 42.0]
         );
 
         for (legend_index, entry) in ACTOR_ATTRACT_SCORING_LEGEND.iter().enumerate() {
@@ -18497,7 +18633,7 @@ mod tests {
                 &mut legend_laser_scene,
                 actor_attract_scoring_tick_for_display_step(legend_laser_step),
             );
-            assert_attract_scoring_laser_reaches_target_edge(
+            assert_attract_scoring_laser_stops_at_target_front(
                 &legend_laser_scene,
                 entry.enemy,
                 actor_attract_scoring_scene_position(
@@ -18707,7 +18843,7 @@ mod tests {
                 .enumerate()
                 .map(|(index, _)| actor_attract_scoring_instruction_text_start_step(index))
                 .collect::<Vec<_>>(),
-            vec![1088, 1505, 1691, 1871, 2051, 2237, 2417]
+            vec![1088, 1916, 2102, 2282, 2462, 2648, 2828]
         );
 
         let parsed = AttractScript::parse_text(ACTOR_RED_LABEL_ATTRACT_SCRIPT)

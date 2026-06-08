@@ -4059,7 +4059,7 @@ mod tests {
         assert_eq!(attract_cycle.attract_frames, 96);
         assert_eq!(attract_cycle.non_attract_frames, 0);
         assert_eq!(attract_cycle.draw_commands, 193);
-        assert_eq!(attract_cycle.scene_sprites, 19009);
+        assert_eq!(attract_cycle.scene_sprites, 22385);
         assert!(attract_cycle.saw_williams_reveal);
         assert!(attract_cycle.saw_defender_coalescence);
         assert!(attract_cycle.saw_hall_of_fame);
@@ -4217,7 +4217,7 @@ mod tests {
                 "  attract_cycle_sampled_steps: 96\n",
                 "  attract_cycle_frames: attract=96,non_attract=0\n",
                 "  attract_cycle_draws: 193\n",
-                "  attract_cycle_scene_sprites: 19009\n",
+                "  attract_cycle_scene_sprites: 22385\n",
                 "  attract_cycle_milestones: williams_reveal=true,defender_coalescence=true,hall_of_fame=true,scoring_surface=true,final_scoring_label=true,cycle_return=true\n",
                 "  behavior_kind_profiles: 2\n",
                 "  behavior_actor_profiles: 0\n",

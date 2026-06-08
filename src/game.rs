@@ -2706,6 +2706,15 @@ impl EnemyAppearanceSnapshot {
     }
 }
 
+pub(crate) fn source_appearance_size_for_age(age: u16) -> u16 {
+    let size_high = SOURCE_APPEARANCE_INITIAL_SIZE.to_be_bytes()[0]
+        .saturating_sub(u8::try_from(age).unwrap_or(u8::MAX));
+    if size_high <= SOURCE_APPEARANCE_FINAL_SIZE.to_be_bytes()[0] {
+        return SOURCE_APPEARANCE_FINAL_SIZE;
+    }
+    u16::from_be_bytes([size_high, 0])
+}
+
 fn source_appearance_center(top_left: ScreenPosition, picture_size: (u8, u8)) -> ScreenPosition {
     let (width, height) = picture_size;
     let first_product_high = ((u16::from(top_left.x) * 0x00DA) >> 8) as u8;
@@ -9645,12 +9654,12 @@ const DEFAULT_HIGH_SCORE_TABLE: [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_E
     HighScoreTableEntrySnapshot {
         rank: 4,
         score: 14_285,
-        initials: [Some('P'), Some('G'), Some('D')],
+        initials: [Some('P'), Some('G'), Some('O')],
     },
     HighScoreTableEntrySnapshot {
         rank: 5,
         score: 12_520,
-        initials: [Some('C'), Some('R'), Some('B')],
+        initials: [Some('C'), Some('R'), Some('A')],
     },
     HighScoreTableEntrySnapshot {
         rank: 6,
@@ -14716,11 +14725,8 @@ fn attract_scoring_laser_ship_anchor(position: [f32; 2]) -> [f32; 2] {
 }
 
 fn attract_scoring_laser_enemy_anchor(kind: EnemyKind, position: [f32; 2]) -> [f32; 2] {
-    let (width, height) = enemy_sprite_size(kind);
-    [
-        position[0] + f32::from(width),
-        position[1] + f32::from(height / 2),
-    ]
+    let (_, height) = enemy_sprite_size(kind);
+    [position[0], position[1] + f32::from(height / 2)]
 }
 
 fn push_attract_scoring_expanded_pixels(
@@ -15808,6 +15814,32 @@ pub(crate) fn push_source_explosion_cloud_pixels(
     }
 
     push_expanded_object_explosion_pixels(scene, &detail);
+    true
+}
+
+pub(crate) fn push_source_appearance_cloud_pixels(
+    scene: &mut RenderScene,
+    position: ScreenPosition,
+    picture_label: &'static str,
+    picture_size: (u8, u8),
+    mapped_sprite: SpriteId,
+    source_size: u16,
+) -> bool {
+    let detail = ExpandedObjectDetailSnapshot {
+        kind: ExpandedObjectKind::Appearance,
+        size: source_size,
+        picture_label: Some(picture_label),
+        picture_size: Some(picture_size),
+        mapped_sprite: Some(mapped_sprite),
+        center: Some(source_appearance_center(position, picture_size)),
+        top_left: Some(position),
+        ..ExpandedObjectDetailSnapshot::EMPTY
+    };
+    if !source_expanded_object_uses_pixel_cloud(&detail) {
+        return false;
+    }
+
+    push_expanded_object_appearance_pixels(scene, &detail);
     true
 }
 
@@ -18468,11 +18500,11 @@ mod tests {
         );
         assert_eq!(
             super::attract_scoring_laser_enemy_anchor(EnemyKind::Lander, [20.0, 40.0]),
-            [30.0, 44.0]
+            [20.0, 44.0]
         );
         assert_eq!(
             super::attract_scoring_laser_enemy_anchor(EnemyKind::Swarmer, [20.0, 40.0]),
-            [26.0, 42.0]
+            [20.0, 42.0]
         );
         assert_eq!(
             super::attract_scoring_object_sprite(

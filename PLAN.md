@@ -1,6 +1,6 @@
 # Defender Current Plan
 
-Last reviewed: `2026-06-07`
+Last reviewed: `2026-06-08`
 
 ## Goal
 
@@ -40,6 +40,32 @@ This slice is the final repository tidy-up after implementation acceptance.
 - [x] Regenerate `docs/start-sequence.gif`.
 - [x] Run formatting, tests, clippy, docs lint, and diff hygiene.
 - [x] Commit this cleanup slice with a Conventional Commit message.
+
+## Owner Feedback Fidelity Slice
+
+This slice addresses concrete attract-mode mismatches identified against the
+MAME red-label video reference.
+
+- [x] Correct the Hall of Fame seed initials and scores used by the attract
+  scoreboard.
+- [x] Start the scoring scene with the lander descending toward the human
+  instead of skipping directly to the rescue/fall phase.
+- [x] Render the full playfield terrain during the attract scoring scene.
+- [x] Stop the scoring-scene player laser at the front of the target alien
+  instead of penetrating to the far edge of the sprite.
+- [x] Render the rescued-human `500` score popup as source pixels with
+  independent red/yellow/blue digit cycling.
+- [x] Regenerate `docs/defender.png`.
+- [x] Regenerate `docs/start-sequence.gif`.
+- [x] Run formatting, tests, clippy, docs lint, and diff hygiene.
+
+- [x] Tune the Williams Electronics screen colour cadence against the first
+  16 seconds of the MAME red-label reference by routing actor tinting through
+  the source visual-state colour cadence.
+- [x] Tune the scoring-scene laser byte pattern, alien explosion, and
+  materialisation/coalescence cadence against the 26-36 second MAME reference
+  window by clipping laser bytes at the target front and using the
+  source-derived expanded-object appearance/explosion projection helpers.
 
 ## Validation
 
