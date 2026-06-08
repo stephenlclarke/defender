@@ -1,6 +1,6 @@
 # Defender Current Specification
 
-Last reviewed: `2026-06-07`
+Last reviewed: `2026-06-08`
 
 ## Purpose
 
@@ -87,6 +87,14 @@ Media generation is part of the maintained workflow:
 
 These targets render accepted actor runtime scenes through the source-derived
 sprite atlas and CPU raster path in `src/renderer.rs`.
+
+The gameplay screenshot generator chooses a rich accepted-runtime playfield
+frame with the player, lower playfield terrain, humans, and multiple hostile
+sprites visible. For README readability, only the still image's main playfield
+terrain tint is normalized to the bright Williams terrain colour; live gameplay
+and HUD/scanner sprites are not changed. The attract GIF holds the
+Williams/Defender presentation block for 10 seconds and the Hall of Fame/high
+score block for 10 seconds before entering the scoring demonstration.
 
 ## Validation
 

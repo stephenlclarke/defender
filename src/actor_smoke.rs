@@ -1210,8 +1210,8 @@ mod tests {
     fn attract_cycle_report_exercises_default_actor_attract_loop() {
         let report = default_attract_cycle_report().expect("actor attract cycle smoke report");
 
-        assert_eq!(report.frames, 3367);
-        assert_eq!(report.cycle_steps, 3367);
+        assert_eq!(report.frames, 3479);
+        assert_eq!(report.cycle_steps, 3479);
         assert_eq!(report.attract_frames, report.frames);
         assert_eq!(report.playing_frames, 0);
         assert_eq!(report.game_over_frames, 0);
@@ -1279,10 +1279,10 @@ mod tests {
     #[test]
     fn attract_cycle_report_validates_required_default_milestones() {
         let mut report = ActorAttractCycleSmokeReport {
-            frames: 3367,
-            cycle_steps: 3367,
+            frames: 3479,
+            cycle_steps: 3479,
             distinct_scene_signatures: 8,
-            attract_frames: 3367,
+            attract_frames: 3479,
             sprite_instances: 1,
             sprite_draw_commands: 1,
             wgpu_frame_commands: 1,
@@ -1515,10 +1515,10 @@ mod tests {
     #[test]
     fn attract_cycle_report_formats_current_cli_output() {
         let report = ActorAttractCycleSmokeReport {
-            frames: 3367,
-            cycle_steps: 3367,
+            frames: 3479,
+            cycle_steps: 3479,
             distinct_scene_signatures: 42,
-            attract_frames: 3367,
+            attract_frames: 3479,
             sprite_instances: 1200,
             sprite_draw_commands: 340,
             wgpu_frame_commands: 680,
@@ -1535,7 +1535,7 @@ mod tests {
         let text = report.to_text();
 
         assert!(text.starts_with("actor attract smoke passed\n"));
-        assert!(text.contains("cycle_steps: 3367"));
+        assert!(text.contains("cycle_steps: 3479"));
         assert!(text.contains("saw_scoring_surface: true"));
         assert!(text.contains("saw_cycle_return: true"));
     }

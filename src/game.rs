@@ -732,8 +732,8 @@ const SOURCE_PLAYER_ENEMY_HIT_SOUND_DELAY_FRAMES: u8 = 1;
 const SOURCE_PLAYER_ENEMY_DEATH_SOUND_DELAY_FRAMES: u8 = 2;
 const SOURCE_LANDER_HIT_PULL_SUPPRESSION_FRAMES: u8 = 2;
 const ATTRACT_PRESENTS_START_FRAME: u16 = 236;
-const ATTRACT_COPYRIGHT_START_FRAME: u16 = 488;
-const ATTRACT_HALL_OF_FAME_START_FRAME: u16 = 488;
+const ATTRACT_HALL_OF_FAME_START_FRAME: u16 = 600;
+const ATTRACT_COPYRIGHT_START_FRAME: u16 = ATTRACT_HALL_OF_FAME_START_FRAME;
 const ATTRACT_HALL_OF_FAME_STALL_TICK_FRAMES: u16 = 10;
 pub(crate) const ATTRACT_SCORING_SEQUENCE_START_FRAME: u16 = ATTRACT_HALL_OF_FAME_START_FRAME
     + (HALL_OF_FAME_STALL_FRAMES as u16 * ATTRACT_HALL_OF_FAME_STALL_TICK_FRAMES);
@@ -18038,7 +18038,8 @@ mod tests {
         assert!(title_hold.shows_defender_wordmark());
         assert!(!title_hold.shows_copyright());
 
-        let hall_of_fame = AttractPresentationSnapshot::for_page_frame(488);
+        let hall_of_fame =
+            AttractPresentationSnapshot::for_page_frame(ATTRACT_HALL_OF_FAME_START_FRAME);
         assert_eq!(hall_of_fame.page, AttractPresentationPage::HallOfFame);
         assert_eq!(hall_of_fame.source_sleep_ticks, None);
         assert_eq!(
@@ -18098,7 +18099,8 @@ mod tests {
                 .any(|sprite| sprite.sprite == SpriteId::ATTRACT_COPYRIGHT_STRIP)
         );
 
-        game.state.attract = AttractPresentationSnapshot::for_page_frame(488);
+        game.state.attract =
+            AttractPresentationSnapshot::for_page_frame(ATTRACT_HALL_OF_FAME_START_FRAME);
         let hall_scene = game.scene();
         assert!(hall_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO && sprite.position == [85.0, 50.0]

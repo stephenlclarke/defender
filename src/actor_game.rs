@@ -142,7 +142,7 @@ const EXPLOSION_LIFETIME: u16 = 20;
 const SCORE_POPUP_LIFETIME: u16 = 50;
 const SOURCE_ATTRACT_PRESENTS_START_STEP: u64 = 236;
 const SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP: u64 = 365;
-const SOURCE_ATTRACT_HALL_OF_FAME_START_STEP: u64 = 488;
+const SOURCE_ATTRACT_HALL_OF_FAME_START_STEP: u64 = 600;
 const SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP: u64 = ATTRACT_SCORING_SEQUENCE_START_FRAME as u64;
 const SOURCE_ATTRACT_CYCLE_STEPS: u64 =
     SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP + ATTRACT_SCORING_DEMO_TOTAL_STEPS as u64;
@@ -18843,7 +18843,7 @@ mod tests {
                 .enumerate()
                 .map(|(index, _)| actor_attract_scoring_instruction_text_start_step(index))
                 .collect::<Vec<_>>(),
-            vec![1088, 1916, 2102, 2282, 2462, 2648, 2828]
+            vec![1200, 2028, 2214, 2394, 2574, 2760, 2940]
         );
 
         let parsed = AttractScript::parse_text(ACTOR_RED_LABEL_ATTRACT_SCRIPT)
@@ -18875,7 +18875,7 @@ mod tests {
             script.manifest().cycle_steps,
             Some(SOURCE_ATTRACT_CYCLE_STEPS)
         );
-        assert_eq!(SOURCE_ATTRACT_CYCLE_STEPS, 3367);
+        assert_eq!(SOURCE_ATTRACT_CYCLE_STEPS, 3479);
 
         let final_scoring_draws = script.draws_for(
             ActorId::new(99),

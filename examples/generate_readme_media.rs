@@ -6,8 +6,8 @@ use std::{
 
 use anyhow::{Context, bail};
 use defender::{
-    GamePhase, SurfaceSize,
-    actor_game::{ActorRuntimeAdapter, GameInput},
+    Color, GamePhase, RenderLayer, RenderScene, SpriteId, SurfaceSize,
+    actor_game::{ActorFrame, ActorRuntimeAdapter, GameInput},
     render_scene_to_rgba,
     renderer::SceneRaster,
 };
@@ -15,7 +15,10 @@ use gif::{Encoder, Frame, Repeat};
 
 const GAMEPLAY_TARGET: SurfaceSize = SurfaceSize::new(3456, 1864);
 const ATTRACT_TARGET: SurfaceSize = SurfaceSize::new(768, 576);
-const ATTRACT_SEQUENCE_STEPS: u16 = 3367;
+const GAMEPLAY_SHOWCASE_SEARCH_STEPS: u16 = 2_400;
+const GAMEPLAY_SHOWCASE_MIN_PLAYING_STEPS: u16 = 180;
+const GAMEPLAY_SHOWCASE_TERRAIN_TINT: Color = Color::from_rgba(174, 81, 0, 255);
+const ATTRACT_SEQUENCE_STEPS: u16 = 3479;
 const ATTRACT_SAMPLE_INTERVAL_STEPS: u16 = 12;
 const ATTRACT_FRAME_DELAY_CENTISECONDS: u16 = 20;
 
@@ -114,20 +117,127 @@ fn write_gameplay_png(path: &Path) -> anyhow::Result<()> {
 fn gameplay_raster() -> anyhow::Result<SceneRaster> {
     let mut runtime = ActorRuntimeAdapter::new_with_free_play_admission();
     let mut playing_steps = 0_u16;
+    let mut best_scene: Option<(u32, RenderScene)> = None;
 
-    for step in 0..900_u16 {
+    for step in 0..GAMEPLAY_SHOWCASE_SEARCH_STEPS {
         let input = gameplay_input(step, playing_steps);
         let frame = runtime.step(input);
-        if frame.state.phase == GamePhase::Playing {
-            playing_steps += 1;
-            if playing_steps >= 180 {
-                return render_scene_to_rgba(&frame.scene, GAMEPLAY_TARGET)
-                    .context("rasterizing gameplay scene");
-            }
+        if frame.state.phase != GamePhase::Playing {
+            continue;
+        }
+
+        playing_steps += 1;
+        if playing_steps < GAMEPLAY_SHOWCASE_MIN_PLAYING_STEPS {
+            continue;
+        }
+
+        let Some(score) = gameplay_showcase_score(&frame) else {
+            continue;
+        };
+        let should_replace = match best_scene.as_ref() {
+            Some((best_score, _)) => score > *best_score,
+            None => true,
+        };
+        if should_replace {
+            best_scene = Some((score, frame.scene.clone()));
         }
     }
 
-    bail!("actor runtime did not reach a stable gameplay frame for README media")
+    let Some((_, scene)) = best_scene else {
+        bail!("actor runtime did not produce a gameplay showcase frame for README media")
+    };
+    let scene = gameplay_showcase_scene(scene);
+
+    render_scene_to_rgba(&scene, GAMEPLAY_TARGET).context("rasterizing gameplay scene")
+}
+
+fn gameplay_showcase_scene(mut scene: RenderScene) -> RenderScene {
+    for sprite in &mut scene.sprites {
+        if sprite.layer == RenderLayer::Terrain
+            && matches!(
+                sprite.sprite,
+                SpriteId::TERRAIN_TILE | SpriteId::TERRAIN_TILE_ALT
+            )
+        {
+            sprite.tint = GAMEPLAY_SHOWCASE_TERRAIN_TINT;
+        }
+    }
+
+    scene
+}
+
+fn gameplay_showcase_score(frame: &ActorFrame) -> Option<u32> {
+    if frame.state.phase != GamePhase::Playing {
+        return None;
+    }
+
+    let counts = ShowcaseSpriteCounts::from_scene(&frame.scene);
+    counts.score()
+}
+
+#[derive(Debug, Default)]
+struct ShowcaseSpriteCounts {
+    has_player: bool,
+    terrain_tiles: u32,
+    lower_playfield_terrain_tiles: u32,
+    humans: u32,
+    hostile_aliens: u32,
+    projectiles: u32,
+    explosions: u32,
+    score_popups: u32,
+}
+
+impl ShowcaseSpriteCounts {
+    fn from_scene(scene: &RenderScene) -> Self {
+        let mut counts = Self::default();
+        for sprite in &scene.sprites {
+            match sprite.sprite {
+                SpriteId::PLAYER_SHIP | SpriteId::PLAYER_SHIP_LEFT => counts.has_player = true,
+                SpriteId::TERRAIN_TILE | SpriteId::TERRAIN_TILE_ALT => {
+                    counts.terrain_tiles += 1;
+                    if sprite.layer == RenderLayer::Terrain && sprite.position[1] >= 170.0 {
+                        counts.lower_playfield_terrain_tiles += 1;
+                    }
+                }
+                SpriteId::HUMAN => counts.humans += 1,
+                SpriteId::ENEMY_LANDER
+                | SpriteId::ENEMY_MUTANT
+                | SpriteId::ENEMY_BAITER
+                | SpriteId::ENEMY_BOMBER
+                | SpriteId::ENEMY_POD
+                | SpriteId::ENEMY_SWARMER => counts.hostile_aliens += 1,
+                SpriteId::PLAYER_PROJECTILE | SpriteId::ENEMY_BOMB => counts.projectiles += 1,
+                SpriteId::BOMB_EXPLOSION
+                | SpriteId::SWARMER_EXPLOSION
+                | SpriteId::ASTRONAUT_EXPLOSION
+                | SpriteId::TERRAIN_EXPLOSION => counts.explosions += 1,
+                SpriteId::SCORE_POPUP_250 | SpriteId::SCORE_POPUP_500 => counts.score_popups += 1,
+                _ => {}
+            }
+        }
+
+        counts
+    }
+
+    fn score(&self) -> Option<u32> {
+        if !self.has_player
+            || self.terrain_tiles < 16
+            || self.lower_playfield_terrain_tiles < 8
+            || self.humans < 2
+            || self.hostile_aliens < 2
+        {
+            return None;
+        }
+
+        Some(
+            100 + self.terrain_tiles.min(120)
+                + self.humans * 40
+                + self.hostile_aliens * 90
+                + self.projectiles * 35
+                + self.explosions * 50
+                + self.score_popups * 25,
+        )
+    }
 }
 
 fn gameplay_input(step: u16, playing_steps: u16) -> GameInput {
@@ -140,7 +250,7 @@ fn gameplay_input(step: u16, playing_steps: u16) -> GameInput {
     if playing_steps > 20 {
         input.thrust = true;
     }
-    if (24..=220).contains(&playing_steps) && playing_steps.is_multiple_of(8) {
+    if (24..=520).contains(&playing_steps) && playing_steps.is_multiple_of(8) {
         input.fire = true;
     }
     if (36..=88).contains(&playing_steps) {
@@ -152,6 +262,15 @@ fn gameplay_input(step: u16, playing_steps: u16) -> GameInput {
     if (124..=168).contains(&playing_steps) {
         input.altitude_down = true;
         input.thrust = true;
+    }
+    if playing_steps == 360 {
+        input.reverse = true;
+    }
+    if (372..=430).contains(&playing_steps) {
+        input.altitude_up = true;
+    }
+    if (456..=520).contains(&playing_steps) {
+        input.altitude_down = true;
     }
 
     input
@@ -244,4 +363,81 @@ fn prepare_parent_dir(path: &Path) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use defender::SceneSprite;
+
+    #[test]
+    fn gameplay_showcase_score_requires_a_rich_gameplay_scene() {
+        let sparse = scene_with_sprites([
+            SpriteId::PLAYER_SHIP,
+            SpriteId::TERRAIN_TILE,
+            SpriteId::HUMAN,
+            SpriteId::ENEMY_LANDER,
+        ]);
+
+        assert_eq!(ShowcaseSpriteCounts::from_scene(&sparse).score(), None);
+
+        let mut rich = RenderScene::empty(0, SurfaceSize::new(292, 240));
+        rich.sprites.push(test_sprite(SpriteId::PLAYER_SHIP));
+        rich.sprites.push(test_sprite(SpriteId::HUMAN));
+        rich.sprites.push(test_sprite(SpriteId::HUMAN));
+        rich.sprites.push(test_sprite(SpriteId::ENEMY_LANDER));
+        rich.sprites.push(test_sprite(SpriteId::ENEMY_BOMBER));
+        rich.sprites.push(test_sprite(SpriteId::PLAYER_PROJECTILE));
+        for _ in 0..8 {
+            rich.sprites.push(test_terrain_sprite([24.0, 180.0]));
+            rich.sprites.push(test_terrain_sprite([32.0, 208.0]));
+        }
+
+        assert!(ShowcaseSpriteCounts::from_scene(&rich).score().is_some());
+    }
+
+    #[test]
+    fn gameplay_showcase_scene_tints_only_main_playfield_terrain() {
+        let mut scene = RenderScene::empty(0, SurfaceSize::new(292, 240));
+        scene.sprites.push(test_terrain_sprite([20.0, 210.0]));
+        scene
+            .sprites
+            .push(test_sprite(SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL));
+        scene.sprites.push(test_sprite(SpriteId::PLAYER_SHIP));
+
+        let scene = gameplay_showcase_scene(scene);
+
+        assert_eq!(scene.sprites[0].tint, GAMEPLAY_SHOWCASE_TERRAIN_TINT);
+        assert_eq!(scene.sprites[1].tint, Color::WHITE);
+        assert_eq!(scene.sprites[2].tint, Color::WHITE);
+    }
+
+    fn scene_with_sprites<const N: usize>(sprites: [SpriteId; N]) -> RenderScene {
+        let mut scene = RenderScene::empty(0, SurfaceSize::new(292, 240));
+        for sprite in sprites {
+            scene.sprites.push(test_sprite(sprite));
+        }
+
+        scene
+    }
+
+    fn test_sprite(sprite: SpriteId) -> SceneSprite {
+        SceneSprite {
+            sprite,
+            layer: RenderLayer::Objects,
+            position: [0.0, 0.0],
+            size: [1.0, 1.0],
+            tint: Color::WHITE,
+        }
+    }
+
+    fn test_terrain_sprite(position: [f32; 2]) -> SceneSprite {
+        SceneSprite {
+            sprite: SpriteId::TERRAIN_TILE,
+            layer: RenderLayer::Terrain,
+            position,
+            size: [4.0, 1.0],
+            tint: Color::WHITE,
+        }
+    }
 }

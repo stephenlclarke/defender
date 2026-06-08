@@ -67,6 +67,25 @@ MAME red-label video reference.
   window by clipping laser bytes at the target front and using the
   source-derived expanded-object appearance/explosion projection helpers.
 
+## README Media And Attract Timing Slice
+
+This slice addresses owner feedback on the committed README media and attract
+screen pacing.
+
+- [x] Generate `docs/defender.png` from a richer accepted-runtime gameplay
+  frame that includes lower playfield terrain, the player, humans, and
+  multiple hostile sprites.
+- [x] Normalize only the README still image's main playfield terrain tint so
+  the bottom terrain is readable without changing live gameplay or HUD/scanner
+  sprites.
+- [x] Hold the Williams/Defender attract presentation block for 10 seconds
+  total before moving to Hall of Fame.
+- [x] Hold the Hall of Fame/high-score attract block for 10 seconds before
+  moving to the scoring scene.
+- [x] Regenerate `docs/defender.png`.
+- [x] Regenerate `docs/start-sequence.gif`.
+- [x] Run formatting, tests, clippy, docs lint, and diff hygiene.
+
 ## Validation
 
 Run these before closing the slice:
