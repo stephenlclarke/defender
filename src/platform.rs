@@ -83,7 +83,6 @@ where
 fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Result<()> {
     match classification {
         CliClassification::Runtime(config) => crate::runtime::run(&config),
-        CliClassification::GameSmoke => crate::runtime::run_game_smoke(),
         CliClassification::ActorScriptCheck(request) => {
             crate::runtime::run_actor_script_check(request.path)
         }
@@ -99,7 +98,6 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum CliClassification {
     Runtime(RuntimeConfig),
-    GameSmoke,
     ActorScriptCheck(ActorScriptCheckRequest),
     ActorSmoke,
     ActorAttractSmoke,
@@ -129,7 +127,6 @@ impl RuntimeCliClassifier {
         while let Some(arg) = args.next() {
             match Self::apply_arg(&arg, &mut args, &mut config, live_option_seen) {
                 ArgClassification::Runtime => live_option_seen = true,
-                ArgClassification::GameSmoke => return CliClassification::GameSmoke,
                 ArgClassification::ActorScriptCheck(request) => {
                     return CliClassification::ActorScriptCheck(request);
                 }
@@ -171,13 +168,6 @@ impl RuntimeCliClassifier {
                 config.mode = RunMode::Interactive;
                 ArgClassification::Runtime
             }
-            "--game-smoke" => no_arg_command(
-                args,
-                live_option_seen,
-                "--game-smoke",
-                CleanCliError::TooManyGameSmokeArgs,
-                ArgClassification::GameSmoke,
-            ),
             "--actor-smoke" => no_arg_command(
                 args,
                 live_option_seen,
@@ -281,7 +271,6 @@ where
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ArgClassification {
-    GameSmoke,
     ActorScriptCheck(ActorScriptCheckRequest),
     ActorSmoke,
     ActorAttractSmoke,
@@ -302,7 +291,6 @@ enum CleanCliError {
     RemovedRendererSelection,
     UnknownArgument(String),
     LiveOptionsWithCommand(&'static str),
-    TooManyGameSmokeArgs,
     MissingActorScriptCheckPath,
     TooManyActorScriptCheckArgs,
     TooManyActorSmokeArgs,
@@ -335,12 +323,6 @@ impl fmt::Display for CleanCliError {
             Self::UnknownArgument(value) => write!(formatter, "unknown argument: {value}"),
             Self::LiveOptionsWithCommand(command) => {
                 write!(formatter, "live options cannot be combined with {command}")
-            }
-            Self::TooManyGameSmokeArgs => {
-                write!(
-                    formatter,
-                    "--game-smoke does not accept additional arguments"
-                )
             }
             Self::MissingActorScriptCheckPath => {
                 write!(formatter, "--actor-script-check requires a script path")
@@ -457,10 +439,6 @@ mod tests {
             CliClassification::Help
         );
         assert_eq!(
-            RuntimeCliClassifier::classify(args(&["--game-smoke"])),
-            CliClassification::GameSmoke
-        );
-        assert_eq!(
             RuntimeCliClassifier::classify(args(&["--actor-smoke"])),
             CliClassification::ActorSmoke
         );
@@ -475,6 +453,14 @@ mod tests {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--actor-wgpu-smoke"])),
             CliClassification::ActorWgpuSmoke
+        );
+    }
+
+    #[test]
+    fn clean_cli_rejects_retired_game_smoke_command() {
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&["--game-smoke"])),
+            CliClassification::Error(CleanCliError::UnknownArgument(String::from("--game-smoke")))
         );
     }
 

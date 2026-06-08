@@ -1,4 +1,4 @@
-.PHONY: fmt test clippy release-gate ci ci-smoke ci-doctor coverage-doctor smoke-doctor coverage sq sq-ci sonar run run-wgpu live live-wgpu smoke-wgpu game-smoke actor-smoke actor-attract-smoke actor-post-game-smoke actor-wgpu-smoke live-smoke readme-gameplay-image readme-attract-sequence readme-media docs-lint diff-check clean
+.PHONY: fmt test clippy release-gate ci ci-smoke ci-doctor coverage-doctor smoke-doctor coverage sq sq-ci sonar run run-wgpu live live-wgpu smoke-wgpu actor-smoke actor-attract-smoke actor-post-game-smoke actor-wgpu-smoke live-smoke readme-gameplay-image readme-attract-sequence readme-media docs-lint diff-check clean
 
 SONAR_SCANNER ?= sonar-scanner
 SONAR_ARGS ?= -Dsonar.qualitygate.wait=true
@@ -21,7 +21,6 @@ release-gate:
 	$(MAKE) fmt
 	$(MAKE) test
 	$(MAKE) clippy
-	$(MAKE) game-smoke
 	$(MAKE) actor-smoke
 	$(MAKE) actor-attract-smoke
 	$(MAKE) actor-post-game-smoke
@@ -93,9 +92,6 @@ live-wgpu: run-wgpu
 
 smoke-wgpu:
 	cargo run -- --live-smoke
-
-game-smoke:
-	cargo run -- --game-smoke
 
 actor-smoke:
 	cargo run -- --actor-smoke

@@ -30,10 +30,6 @@ impl<B: RuntimeBackend> RuntimeHost<B> {
         self.backend.run_command(RuntimeCommand::Help)
     }
 
-    pub(crate) fn run_game_smoke(&self) -> anyhow::Result<()> {
-        self.backend.run_command(RuntimeCommand::GameSmoke)
-    }
-
     pub(crate) fn run_actor_script_check(&self, path: PathBuf) -> anyhow::Result<()> {
         self.backend
             .run_command(RuntimeCommand::ActorScriptCheck { path })
@@ -68,7 +64,6 @@ pub(crate) trait RuntimeBackend {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RuntimeCommand {
     Help,
-    GameSmoke,
     ActorScriptCheck {
         path: PathBuf,
     },
@@ -131,7 +126,6 @@ impl RuntimeBackend for InstalledRuntimeBackend {
                 print!("{}", help_text());
                 Ok(())
             }
-            RuntimeCommand::GameSmoke => crate::game_smoke::run(),
             RuntimeCommand::ActorScriptCheck { path } => {
                 let report = crate::live_wgpu::run_actor_script_check(&path)?;
                 print!("{}", report.to_text());
@@ -172,10 +166,6 @@ pub(crate) fn run_help() -> anyhow::Result<()> {
     RuntimeHost::current().run_help()
 }
 
-pub(crate) fn run_game_smoke() -> anyhow::Result<()> {
-    RuntimeHost::current().run_game_smoke()
-}
-
 pub(crate) fn run_actor_script_check(path: PathBuf) -> anyhow::Result<()> {
     RuntimeHost::current().run_actor_script_check(path)
 }
@@ -207,7 +197,6 @@ pub(crate) fn help_text() -> &'static str {
         "  cargo run -- --actor-live\n",
         "  cargo run -- --actor-script /path/to/driver.script\n",
         "  cargo run -- --live-smoke\n",
-        "  cargo run -- --game-smoke\n",
         "  cargo run -- --actor-script-check /path/to/driver.script\n",
         "  cargo run -- --actor-smoke\n",
         "  cargo run -- --actor-attract-smoke\n",
@@ -284,7 +273,6 @@ mod tests {
         });
 
         host.run_help().expect("help command");
-        host.run_game_smoke().expect("game smoke command");
         host.run_actor_script_check(PathBuf::from("driver.script"))
             .expect("actor script check command");
         host.run_actor_smoke().expect("actor smoke command");
@@ -299,7 +287,6 @@ mod tests {
             calls.borrow().as_slice(),
             &[
                 RuntimeCommand::Help,
-                RuntimeCommand::GameSmoke,
                 RuntimeCommand::ActorScriptCheck {
                     path: PathBuf::from("driver.script"),
                 },
@@ -375,7 +362,7 @@ mod tests {
         assert!(text.contains("--input-profile planetoid"));
         assert!(text.contains("--input-profile cabinet"));
         assert!(text.contains("--live-smoke"));
-        assert!(text.contains("--game-smoke"));
+        assert!(!text.contains("--game-smoke"));
         assert!(text.contains("--actor-script-check /path/to/driver.script"));
         assert!(text.contains("--actor-smoke"));
         assert!(text.contains("--actor-attract-smoke"));

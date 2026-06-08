@@ -59,7 +59,6 @@ Supported commands:
 - `cargo run -- --actor-script /path/to/driver.script`
 - `cargo run -- --actor-script-check /path/to/driver.script`
 - `cargo run -- --live-smoke`
-- `cargo run -- --game-smoke`
 - `cargo run -- --actor-smoke`
 - `cargo run -- --actor-attract-smoke`
 - `cargo run -- --actor-post-game-smoke`

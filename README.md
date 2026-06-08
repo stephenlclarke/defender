@@ -81,7 +81,6 @@ Important Makefile targets:
 
 - `make run`: launch the playable `wgpu` game.
 - `make live-smoke`: run the headless live runtime smoke path.
-- `make game-smoke`: run the clean game smoke path.
 - `make actor-smoke`: run the accepted actor gameplay smoke path.
 - `make actor-attract-smoke`: run the accepted attract sequence smoke path.
 - `make actor-post-game-smoke`: run the game-over return smoke path.

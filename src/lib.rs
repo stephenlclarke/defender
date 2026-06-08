@@ -7,8 +7,7 @@
 pub mod actor_game;
 mod actor_smoke;
 pub mod audio;
-pub mod game;
-mod game_smoke;
+mod game;
 mod live_wgpu;
 pub mod platform;
 pub mod renderer;
@@ -18,10 +17,10 @@ pub mod systems;
 
 pub use game::{
     AttractPresentationPage, AttractPresentationSnapshot, Direction, EnemyKind,
-    EnemyReserveSnapshot, EnemySnapshot, Game, GameEvent, GameEvents, GameFrame, GameInput,
-    GameOverSnapshot, GamePhase, GameSnapshot, GameState, HighScoreEntrySnapshot,
-    HighScoreSubmissionSnapshot, HighScoreTableEntrySnapshot, HighScoreTablesSnapshot,
-    HumanSnapshot, PlayerExplosionCloudSnapshot, PlayerExplosionPieceSnapshot, PlayerSnapshot,
+    EnemyReserveSnapshot, EnemySnapshot, GameEvent, GameEvents, GameFrame, GameInput,
+    GameOverSnapshot, GamePhase, GameState, HighScoreEntrySnapshot, HighScoreSubmissionSnapshot,
+    HighScoreTableEntrySnapshot, HighScoreTablesSnapshot, HumanSnapshot,
+    PlayerExplosionCloudSnapshot, PlayerExplosionPieceSnapshot, PlayerSnapshot,
     PlayerStockSnapshot, ProjectileSnapshot, ScoreSnapshot, SoundEvent, TerrainBlowSnapshot,
     TerrainBlowStage, TerrainSegment, WaveProfileSnapshot, WorldSnapshot, WorldVector,
 };
@@ -45,26 +44,26 @@ pub use renderer::{
 };
 pub use systems::{
     CollisionBox, CollisionSystem, EnemyMotionFrame, EnemyMotionSystem, FixedStepAccumulator,
-    FrameRate, GameSimulation, HighScoreEntryFrame, HighScoreEntrySystem, HighScoreInitialsFrame,
+    FrameRate, HighScoreEntryFrame, HighScoreEntrySystem, HighScoreInitialsFrame,
     HighScoreInitialsState, OperatorActionTriggers, OperatorControlFrame, OperatorControlSystem,
     PlayerActionTriggers, PlayerControlFrame, PlayerControlIntent, PlayerControlSystem,
     PlayerDamageFrame, PlayerDamageSystem, PlayerEnemyHit, PlayerMotionFrame, PlayerMotionState,
     PlayerMotionSystem, PlayerStock, ProjectileEnemyHit, ProjectileLaunchOutcome,
     ProjectileMotionFrame, ProjectileMotionSystem, ProjectileState, ProjectileSystem, ScoreFrame,
     ScoreSystem, ScreenPosition, ScreenVelocity, SmartBombFrame, SmartBombSystem, VerticalControl,
-    WaveState, WaveStatus, WaveSystem, advance_one_frame,
+    WaveState, WaveStatus, WaveSystem,
 };
 
 #[cfg(test)]
 mod public_api_tests {
     #[test]
-    fn public_game_simulation_advances_from_attract() {
-        let mut game = crate::Game::new();
-        let frame = crate::advance_one_frame(&mut game, crate::GameInput::NONE);
+    fn public_actor_runtime_advances_from_attract() {
+        let mut game = crate::actor_game::ActorRuntimeAdapter::new();
+        let frame = game.step(crate::actor_game::GameInput::NONE);
 
         assert_eq!(frame.state.frame, 1);
         assert_eq!(frame.state.phase, crate::GamePhase::Attract);
-        assert_eq!(frame.scene.summary().layers.hud, 0);
+        assert!(frame.scene.summary().sprite_count > 0);
     }
 
     #[test]

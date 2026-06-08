@@ -1,16 +1,6 @@
 //! Deterministic fixed-step system utilities.
 
-use crate::game::{Direction, GameFrame, GameInput, GameState, ScoreSnapshot, WorldVector};
-
-pub trait GameSimulation {
-    fn state(&self) -> GameState;
-
-    fn step(&mut self, input: GameInput) -> GameFrame;
-}
-
-pub fn advance_one_frame(simulation: &mut impl GameSimulation, input: GameInput) -> GameFrame {
-    simulation.step(input)
-}
+use crate::game::{Direction, GameInput, ScoreSnapshot, WorldVector};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum VerticalControl {
@@ -1032,23 +1022,17 @@ impl FixedStepAccumulator {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        game::{
-            Direction, GameEvents, GameFrame, GameInput, GamePhase, GameState, PlayerSnapshot,
-            ScoreSnapshot, WorldSnapshot, WorldVector,
-        },
-        renderer::{RenderScene, SurfaceSize},
-    };
+    use crate::game::{Direction, GameInput, ScoreSnapshot, WorldVector};
 
     use super::{
         CollisionBox, CollisionSystem, EnemyMotionSystem, Fixed24, FixedStepAccumulator, FrameRate,
-        GameSimulation, HighScoreEntrySystem, HighScoreInitialsState, OperatorActionTriggers,
+        HighScoreEntrySystem, HighScoreInitialsState, OperatorActionTriggers,
         OperatorControlSystem, PlayerActionTriggers, PlayerControlIntent, PlayerControlSystem,
         PlayerDamageSystem, PlayerMotionState, PlayerMotionSystem, PlayerStock,
         ProjectileLaunchOutcome, ProjectileMotionSystem, ProjectileState, ProjectileSystem,
         ScoreSystem, ScreenPosition, ScreenVelocity, SmartBombSystem, VerticalControl, WaveState,
-        WaveStatus, WaveSystem, advance_one_frame, clamp_camera_velocity_word,
-        next_vertical_velocity, scroll_adjusted_x, thrust_acceleration,
+        WaveStatus, WaveSystem, clamp_camera_velocity_word, next_vertical_velocity,
+        scroll_adjusted_x, thrust_acceleration,
     };
 
     #[test]
@@ -1066,23 +1050,6 @@ mod tests {
         assert_eq!(accumulator.accumulated_micros(), 1_500_000);
         assert_eq!(accumulator.consume_due_steps(8), 1);
         assert_eq!(accumulator.accumulated_micros(), 500_000);
-    }
-
-    #[test]
-    fn simulation_trait_advances_clean_frames_without_legacy_state_contracts() {
-        let mut simulation = FakeSimulation::default();
-
-        let frame = advance_one_frame(
-            &mut simulation,
-            GameInput {
-                coin: true,
-                ..GameInput::NONE
-            },
-        );
-
-        assert_eq!(frame.state.frame, 1);
-        assert_eq!(frame.state.credits, 1);
-        assert_eq!(frame.scene.summary().frame, 1);
     }
 
     #[test]
@@ -1578,67 +1545,6 @@ mod tests {
         let already_empty = PlayerDamageSystem::apply_hit(PlayerStock::new(0, 2));
         assert_eq!(already_empty.stock, PlayerStock::new(0, 2));
         assert!(already_empty.game_over);
-    }
-
-    #[derive(Debug)]
-    struct FakeSimulation {
-        state: GameState,
-    }
-
-    impl Default for FakeSimulation {
-        fn default() -> Self {
-            Self {
-                state: GameState {
-                    frame: 0,
-                    phase: GamePhase::Attract,
-                    credits: 0,
-                    current_player: 1,
-                    player_count: 1,
-                    wave: 0,
-                    wave_profile: crate::game::WaveProfileSnapshot::for_wave(0),
-                    player: PlayerSnapshot {
-                        position: (WorldVector::default(), WorldVector::default()),
-                        velocity: (WorldVector::default(), WorldVector::default()),
-                        direction: Direction::Right,
-                        lives: 3,
-                        smart_bombs: 3,
-                    },
-                    player_stocks: [crate::game::PlayerStockSnapshot::new(3, 3); 2],
-                    scores: ScoreSnapshot {
-                        player_one: 0,
-                        player_two: 0,
-                        high_score: 100,
-                        next_bonus: 10_000,
-                    },
-                    attract: crate::game::AttractPresentationSnapshot::for_page_frame(0),
-                    post_game_playfield: None,
-                    high_score_initials: HighScoreInitialsState::EMPTY,
-                    high_score_entry: None,
-                    high_score_submission: None,
-                    high_score_tables: crate::game::HighScoreTablesSnapshot::DEFAULT,
-                    game_over: crate::game::GameOverSnapshot::NONE,
-                    world: WorldSnapshot::default(),
-                },
-            }
-        }
-    }
-
-    impl GameSimulation for FakeSimulation {
-        fn state(&self) -> GameState {
-            self.state.clone()
-        }
-
-        fn step(&mut self, input: GameInput) -> GameFrame {
-            self.state.frame += 1;
-            if input.coin {
-                self.state.credits += 1;
-            }
-            GameFrame {
-                state: self.state.clone(),
-                events: GameEvents::default(),
-                scene: RenderScene::empty(self.state.frame, SurfaceSize::new(292, 240)),
-            }
-        }
     }
 
     fn player_motion_state(
