@@ -1,0 +1,1045 @@
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CollisionBody {
+    pub owner: ActorId,
+    pub kind: ActorKind,
+    pub position: Point,
+    pub bounds: Rect,
+    pub source_mutant: Option<ActorSourceMutantMetadata>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorSnapshot {
+    pub id: ActorId,
+    pub kind: ActorKind,
+    pub position: Point,
+    pub velocity: Velocity,
+    pub direction: Option<Direction>,
+    pub bounds: Option<Rect>,
+    pub alive: bool,
+    pub source_lander: Option<ActorSourceLanderMetadata>,
+    pub source_bomber: Option<ActorSourceBomberMetadata>,
+    pub source_pod: Option<ActorSourcePodMetadata>,
+    pub source_swarmer: Option<ActorSourceSwarmerMetadata>,
+    pub source_baiter: Option<ActorSourceBaiterMetadata>,
+    pub source_mutant: Option<ActorSourceMutantMetadata>,
+    pub source_human: Option<ActorSourceHumanMetadata>,
+    pub source_enemy_projectile: Option<ActorSourceEnemyProjectileMetadata>,
+}
+
+impl ActorSnapshot {
+    fn collision_body(&self) -> Option<CollisionBody> {
+        Some(CollisionBody {
+            owner: self.id,
+            kind: self.kind,
+            position: self.position,
+            bounds: self.bounds?,
+            source_mutant: self.source_mutant,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HumanMode {
+    Grounded,
+    Falling { velocity: i16 },
+    CarriedBy(ActorId),
+}
+
+impl HumanMode {
+    const fn sprite(self) -> SpriteKey {
+        match self {
+            Self::Grounded => SpriteKey::Human,
+            Self::Falling { .. } => SpriteKey::HumanFalling,
+            Self::CarriedBy(_) => SpriteKey::HumanCarried,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DrawCommand {
+    pub actor: ActorId,
+    pub sprite: SpriteKey,
+    pub position: Point,
+    pub effect: VisualEffect,
+    pub text: Option<String>,
+}
+
+impl DrawCommand {
+    pub fn sprite(actor: ActorId, sprite: SpriteKey, position: Point) -> Self {
+        Self::sprite_with_effect(actor, sprite, position, VisualEffect::Static)
+    }
+
+    pub fn sprite_with_effect(
+        actor: ActorId,
+        sprite: SpriteKey,
+        position: Point,
+        effect: VisualEffect,
+    ) -> Self {
+        Self {
+            actor,
+            sprite,
+            position,
+            effect,
+            text: None,
+        }
+    }
+
+    pub fn text(actor: ActorId, position: Point, value: impl Into<String>) -> Self {
+        Self {
+            actor,
+            sprite: SpriteKey::Text,
+            position,
+            effect: VisualEffect::Static,
+            text: Some(value.into()),
+        }
+    }
+
+    pub fn source_message(
+        actor: ActorId,
+        value: impl Into<String>,
+        top_left_screen_address: u16,
+    ) -> Self {
+        Self::source_message_with_offset(actor, value, top_left_screen_address, Point::new(0, 0))
+    }
+
+    pub fn source_message_with_offset(
+        actor: ActorId,
+        value: impl Into<String>,
+        top_left_screen_address: u16,
+        visual_offset: Point,
+    ) -> Self {
+        Self {
+            actor,
+            sprite: SpriteKey::Text,
+            position: Point::new(0, 0),
+            effect: VisualEffect::SourceMessage {
+                top_left_screen_address,
+                visual_offset,
+            },
+            text: Some(value.into()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SpawnRequest {
+    Laser {
+        position: Point,
+        direction: Direction,
+        owner: ActorId,
+    },
+    EnemyLaser {
+        position: Point,
+        velocity: Velocity,
+        source: Option<ActorSourceEnemyProjectileMetadata>,
+    },
+    Lander {
+        position: Point,
+    },
+    Mutant {
+        position: Point,
+        source: Option<ActorSourceMutantMetadata>,
+    },
+    Bomber {
+        position: Point,
+    },
+    Bomb {
+        position: Point,
+        source: Option<ActorSourceEnemyProjectileMetadata>,
+    },
+    Pod {
+        position: Point,
+    },
+    Swarmer {
+        position: Point,
+        source: Option<ActorSourceSwarmerMetadata>,
+    },
+    Baiter {
+        position: Point,
+        source: Option<ActorSourceBaiterMetadata>,
+    },
+    Human {
+        position: Point,
+        mode: HumanMode,
+    },
+    Explosion {
+        position: Point,
+        kind: ExplosionKind,
+        source_center: Option<Point>,
+    },
+    ScorePopup {
+        position: Point,
+        points: u32,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GameCommand {
+    Credit,
+    StartOnePlayer,
+    StartTwoPlayer,
+    Spawn(SpawnRequest),
+    Destroy(ActorId),
+    SetSourceBackgroundLeft(u16),
+    AttachHuman {
+        lander: ActorId,
+        human: ActorId,
+        position: Point,
+    },
+    SmartBomb {
+        consume_stock: bool,
+    },
+    Hyperspace,
+    HumanLost(ActorId),
+    AddScore(u32),
+    PlaySound(SoundCue),
+    PlayerKilled,
+    WaveCleared {
+        next_wave: u16,
+    },
+    AdvanceWave {
+        wave: u16,
+    },
+    EnterGameOver,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StepPrompt {
+    pub step: u64,
+    pub phase: Phase,
+    pub input: GameInput,
+    pub wave: u16,
+    pub source_wave: ActorSourceWaveProfile,
+    pub current_player: u8,
+    pub player_count: u8,
+    pub score: u32,
+    pub player_scores: [u32; 2],
+    pub credits: u8,
+    pub lives: u8,
+    pub smart_bombs: u8,
+    pub smart_bomb_pending: bool,
+    pub player_stocks: [PlayerStockSnapshot; 2],
+    pub player_death_sleep_remaining: Option<u8>,
+    pub game_over_hall_of_fame_stall_remaining: Option<u8>,
+    pub player_switch: Option<PlayerSwitchReport>,
+    pub player_start: Option<PlayerStartReport>,
+    pub high_scores: [u32; 5],
+    pub high_score_initials: HighScoreInitialsState,
+    pub snapshots: Vec<ActorSnapshot>,
+    pub behavior_script: ActorBehaviorScript,
+    pub source_background_left: u16,
+    pub source_rng: Option<ActorSourceRngSnapshot>,
+    pub source_human_walk_target_slot: Option<usize>,
+    pub source_shell_scan_tick: bool,
+}
+
+impl StepPrompt {
+    pub fn behavior_for(&self, actor: ActorId, kind: ActorKind) -> ActorBehaviorProfile {
+        self.behavior_script.behavior_for(actor, kind)
+    }
+
+    pub fn player_position(&self) -> Option<Point> {
+        self.snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive)
+            .map(|snapshot| snapshot.position)
+    }
+
+    pub fn player_velocity(&self) -> Option<Velocity> {
+        self.snapshots
+            .iter()
+            .find(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive)
+            .map(|snapshot| snapshot.velocity)
+    }
+
+    fn snapshot(&self, id: ActorId) -> Option<&ActorSnapshot> {
+        self.snapshots
+            .iter()
+            .find(|snapshot| snapshot.id == id && snapshot.alive)
+    }
+
+    fn nearest_human(&self, position: Point) -> Option<&ActorSnapshot> {
+        self.snapshots
+            .iter()
+            .filter(|snapshot| snapshot.kind == ActorKind::Human && snapshot.alive)
+            .min_by_key(|snapshot| manhattan_distance(position, snapshot.position))
+    }
+
+    fn source_target_human(&self, target_slot_index: usize) -> Option<&ActorSnapshot> {
+        self.snapshots.iter().find(|snapshot| {
+            snapshot.kind == ActorKind::Human
+                && snapshot.alive
+                && snapshot.bounds.is_some()
+                && snapshot
+                    .source_human
+                    .is_some_and(|source| source.target_slot_index == target_slot_index)
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorReply {
+    pub id: ActorId,
+    pub snapshot: ActorSnapshot,
+    pub commands: Vec<GameCommand>,
+    pub draws: Vec<DrawCommand>,
+}
+
+trait AssetActor: Send + 'static {
+    fn id(&self) -> ActorId;
+
+    fn update(&mut self, prompt: &StepPrompt) -> ActorReply;
+
+    fn apply_driver_command(&mut self, _command: ActorDriverCommand) {}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ActorDriverCommand {
+    AdjustSourceLanderShotTimer {
+        target_human_index: usize,
+        x_velocity: u16,
+        delta: u8,
+    },
+}
+
+enum ActorRequest {
+    Prompt(Box<StepPrompt>),
+    DriverCommand(ActorDriverCommand),
+    Stop,
+}
+
+struct ThreadedAsset {
+    sender: Sender<ActorRequest>,
+    receiver: Receiver<ActorReply>,
+    handle: Option<JoinHandle<()>>,
+}
+
+impl ThreadedAsset {
+    fn spawn(actor: impl AssetActor) -> Self {
+        let (request_sender, request_receiver) = mpsc::channel();
+        let (reply_sender, reply_receiver) = mpsc::channel();
+        let handle = thread::spawn(move || run_actor_thread(actor, request_receiver, reply_sender));
+        Self {
+            sender: request_sender,
+            receiver: reply_receiver,
+            handle: Some(handle),
+        }
+    }
+
+    fn prompt(&self, prompt: StepPrompt) -> Option<ActorReply> {
+        self.sender
+            .send(ActorRequest::Prompt(Box::new(prompt)))
+            .ok()?;
+        self.receiver.recv().ok()
+    }
+
+    fn apply_driver_command(&self, command: ActorDriverCommand) {
+        let _ = self.sender.send(ActorRequest::DriverCommand(command));
+    }
+}
+
+impl Drop for ThreadedAsset {
+    fn drop(&mut self) {
+        let _ = self.sender.send(ActorRequest::Stop);
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
+fn run_actor_thread(
+    mut actor: impl AssetActor,
+    receiver: Receiver<ActorRequest>,
+    sender: Sender<ActorReply>,
+) {
+    while let Ok(request) = receiver.recv() {
+        match request {
+            ActorRequest::Prompt(prompt) => {
+                if sender.send(actor.update(prompt.as_ref())).is_err() {
+                    break;
+                }
+            }
+            ActorRequest::DriverCommand(command) => {
+                actor.apply_driver_command(command);
+            }
+            ActorRequest::Stop => break,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StepReport {
+    pub step: u64,
+    pub phase: Phase,
+    pub wave: u16,
+    pub current_player: u8,
+    pub player_count: u8,
+    pub score: u32,
+    pub player_scores: [u32; 2],
+    pub credits: u8,
+    pub lives: u8,
+    pub smart_bombs: u8,
+    pub smart_bomb_flash_steps_remaining: u8,
+    pub player_stocks: [PlayerStockSnapshot; 2],
+    pub next_bonus: u32,
+    pub player_death_sleep_remaining: Option<u8>,
+    pub game_over_hall_of_fame_stall_remaining: Option<u8>,
+    pub player_switch: Option<PlayerSwitchReport>,
+    pub player_start: Option<PlayerStartReport>,
+    pub high_scores: [u32; 5],
+    pub source_wave: ActorSourceWaveProfile,
+    pub high_score_initials: HighScoreInitialsState,
+    pub high_score_initial_accepted: bool,
+    pub high_score_submitted: bool,
+    pub bonus_awarded: bool,
+    pub survivor_bonus: Option<SurvivorBonusReport>,
+    pub behavior_script: ActorBehaviorScriptManifest,
+    pub enemy_reserve: EnemyReserveSnapshot,
+    pub source_background_left: u16,
+    pub source_rng: Option<ActorSourceRngSnapshot>,
+    pub terrain_blow: Option<TerrainBlowSnapshot>,
+    pub snapshots: Vec<ActorSnapshot>,
+    pub draws: Vec<DrawCommand>,
+    pub sounds: Vec<SoundCue>,
+    pub commands: Vec<GameCommand>,
+}
+
+impl StepReport {
+    pub fn sound_events(&self, bridge: &mut ActorSoundEventBridge) -> Vec<SoundEvent> {
+        bridge.sound_events_for_report(self)
+    }
+
+    pub fn render_scene(&self) -> RenderScene {
+        ActorRenderSceneBridge::new().render_scene_for_report(self)
+    }
+
+    pub fn render_scene_with(&self, bridge: &ActorRenderSceneBridge) -> RenderScene {
+        bridge.render_scene_for_report(self)
+    }
+
+    pub fn game_state(&self) -> GameState {
+        ActorStateBridge::new().state_for_report(self)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SurvivorBonusReport {
+    pub next_wave: u16,
+    pub multiplier: u8,
+    pub total_survivors: u8,
+    pub visible_icons: u8,
+    pub remaining_awards: u8,
+    pub awarded_points: Option<u32>,
+    pub astronaut_sleep_steps_remaining: u8,
+    pub wave_advance_sleep_steps_remaining: Option<u8>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlayerSwitchReport {
+    pub sleep_steps_remaining: u8,
+    pub from_player: u8,
+    pub to_player: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlayerStartReport {
+    pub delay_steps_remaining: u8,
+    pub player: u8,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ActorStateBridge;
+
+impl ActorStateBridge {
+    pub const fn new() -> Self {
+        Self
+    }
+
+    pub fn state_for_report(&self, report: &StepReport) -> GameState {
+        let phase = clean_phase(report.phase);
+        let wave = clean_wave(report.wave);
+        let high_score_tables = high_score_tables_for_report(report);
+        GameState {
+            frame: report.step,
+            phase,
+            credits: report.credits,
+            current_player: report.current_player,
+            player_count: report.player_count,
+            wave,
+            wave_profile: actor_wave_profile_for_report(report),
+            player: player_snapshot_for_report(report),
+            player_stocks: report.player_stocks,
+            scores: ScoreSnapshot {
+                player_one: report.player_scores[0],
+                player_two: report.player_scores[1],
+                high_score: report.high_scores[0]
+                    .max(report.player_scores[0])
+                    .max(report.player_scores[1]),
+                next_bonus: report.next_bonus,
+            },
+            attract: attract_snapshot_for_report(report),
+            post_game_playfield: None,
+            high_score_initials: report.high_score_initials,
+            high_score_entry: high_score_entry_for_report(report),
+            high_score_submission: None,
+            high_score_tables,
+            game_over: game_over_snapshot_for_report(report),
+            world: world_snapshot_for_report(report),
+        }
+    }
+}
+
+fn clean_phase(phase: Phase) -> GamePhase {
+    match phase {
+        Phase::Attract => GamePhase::Attract,
+        Phase::Playing => GamePhase::Playing,
+        Phase::GameOver => GamePhase::GameOver,
+        Phase::HighScoreEntry => GamePhase::HighScoreEntry,
+    }
+}
+
+fn clean_wave(wave: u16) -> u8 {
+    u8::try_from(wave.max(1)).unwrap_or(u8::MAX)
+}
+
+fn actor_wave_profile_for_report(report: &StepReport) -> WaveProfileSnapshot {
+    let mut profile = WaveProfileSnapshot::for_wave(clean_wave(report.wave));
+    let source = report.source_wave;
+    profile.landers = source.landers;
+    profile.bombers = source.bombers;
+    profile.pods = source.pods;
+    profile.mutants = source.mutants;
+    profile.swarmers = source.swarmers;
+    profile.lander_x_velocity = source.lander_x_velocity;
+    profile.lander_y_velocity_msb = source.lander_y_velocity_msb;
+    profile.lander_y_velocity_lsb = source.lander_y_velocity_lsb;
+    profile.mutant_random_y = source.mutant_random_y;
+    profile.mutant_y_velocity_msb = source.mutant_y_velocity_msb;
+    profile.mutant_y_velocity_lsb = source.mutant_y_velocity_lsb;
+    profile.mutant_x_velocity = source.mutant_x_velocity;
+    profile.swarmer_x_velocity = source.swarmer_x_velocity;
+    profile.wave_size = source.wave_size;
+    profile.lander_shot_time = source.lander_shot_time;
+    profile.bomber_x_velocity = source.bomber_x_velocity;
+    profile.mutant_shot_time = source.mutant_shot_time;
+    profile.swarmer_shot_time = source.swarmer_shot_time;
+    profile.swarmer_acceleration_mask = source.swarmer_acceleration_mask;
+    profile.baiter_delay = source.baiter_delay;
+    profile.baiter_shot_time = source.baiter_shot_time;
+    profile.baiter_seek_probability = source.baiter_seek_probability;
+    profile
+}
+
+fn attract_snapshot_for_report(report: &StepReport) -> AttractPresentationSnapshot {
+    if report.phase == Phase::Attract {
+        AttractPresentationSnapshot::for_page_frame(u16::try_from(report.step).unwrap_or(u16::MAX))
+    } else {
+        AttractPresentationSnapshot::INACTIVE
+    }
+}
+
+fn player_snapshot_for_report(report: &StepReport) -> PlayerSnapshot {
+    let snapshot = report
+        .snapshots
+        .iter()
+        .find(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive);
+    let position = snapshot
+        .map(|snapshot| snapshot.position)
+        .unwrap_or_default();
+    let velocity = snapshot
+        .map(|snapshot| snapshot.velocity)
+        .unwrap_or_default();
+    PlayerSnapshot {
+        position: (world_vector(position.x), world_vector(position.y)),
+        velocity: (world_vector(velocity.dx), world_vector(velocity.dy)),
+        direction: snapshot
+            .and_then(|snapshot| snapshot.direction)
+            .map(clean_direction)
+            .unwrap_or_else(|| player_direction_for_report(report)),
+        lives: report.lives,
+        smart_bombs: report.smart_bombs,
+    }
+}
+
+fn clean_direction(direction: Direction) -> CleanDirection {
+    match direction {
+        Direction::Left => CleanDirection::Left,
+        Direction::Right => CleanDirection::Right,
+    }
+}
+
+fn player_direction_for_report(report: &StepReport) -> CleanDirection {
+    report
+        .draws
+        .iter()
+        .rev()
+        .find_map(|draw| match draw.sprite {
+            SpriteKey::PlayerLeft => Some(CleanDirection::Left),
+            SpriteKey::PlayerRight => Some(CleanDirection::Right),
+            _ => None,
+        })
+        .unwrap_or(CleanDirection::Right)
+}
+
+fn high_score_tables_for_report(report: &StepReport) -> HighScoreTablesSnapshot {
+    let entries = source_hall_score_entries(&report.high_scores);
+    HighScoreTablesSnapshot {
+        all_time: entries,
+        todays_greatest: entries,
+    }
+}
+
+fn high_score_entry_for_report(report: &StepReport) -> Option<HighScoreEntrySnapshot> {
+    if report.phase != Phase::HighScoreEntry {
+        return None;
+    }
+
+    report
+        .high_scores
+        .iter()
+        .position(|score| *score == report.score)
+        .map(|index| HighScoreEntrySnapshot {
+            score: report.score,
+            rank: u8::try_from(index + 1).expect("actor high-score rank should fit u8"),
+        })
+}
+
+fn game_over_snapshot_for_report(report: &StepReport) -> GameOverSnapshot {
+    if let Some(remaining) = report.player_death_sleep_remaining {
+        return GameOverSnapshot {
+            player_death_sleep_remaining: Some(remaining),
+            ..GameOverSnapshot::NONE
+        };
+    }
+
+    if let Some(player_switch) = report.player_switch {
+        return GameOverSnapshot {
+            player_switch_sleep_remaining: Some(player_switch.sleep_steps_remaining),
+            player_switch_from: Some(player_switch.from_player),
+            player_switch_to: Some(player_switch.to_player),
+            ..GameOverSnapshot::NONE
+        };
+    }
+
+    let Some(remaining) = report.game_over_hall_of_fame_stall_remaining else {
+        return GameOverSnapshot::NONE;
+    };
+
+    GameOverSnapshot {
+        hall_of_fame_stall_remaining: Some(remaining),
+        ..GameOverSnapshot::NONE
+    }
+}
+
+fn world_snapshot_for_report(report: &StepReport) -> WorldSnapshot {
+    if report.player_start.is_some() {
+        return WorldSnapshot::default();
+    }
+
+    let phase = clean_phase(report.phase);
+    let player = player_snapshot_for_report(report);
+    let mut world = WorldSnapshot {
+        terrain: actor_playfield_terrain_segments(report),
+        terrain_blow: report.terrain_blow,
+        enemies: actor_enemies_for_report(report),
+        humans: actor_humans_for_report(report),
+        projectiles: actor_projectiles_for_report(report),
+        enemy_projectiles: actor_enemy_projectiles_for_report(report),
+        explosions: actor_explosions_for_report(report),
+        score_popups: actor_score_popups_for_report(report),
+        enemy_reserve: report.enemy_reserve,
+        source_rng: report.source_rng.map(clean_source_rng).unwrap_or_default(),
+        ..WorldSnapshot::default()
+    };
+    world.sync_actor_presentation(
+        phase,
+        report.step,
+        actor_world_word(report.source_background_left),
+        player.position,
+    );
+    world
+}
+
+fn actor_playfield_terrain_segments(report: &StepReport) -> Vec<TerrainSegment> {
+    if report.phase != Phase::Playing || report.terrain_blow.is_some() {
+        return Vec::new();
+    }
+
+    source_playfield_terrain_segments()
+}
+
+fn source_playfield_terrain_segments() -> Vec<TerrainSegment> {
+    vec![
+        TerrainSegment {
+            position: ScreenPosition::new(0, 224),
+            size: (64, 8),
+        },
+        TerrainSegment {
+            position: ScreenPosition::new(64, 222),
+            size: (64, 8),
+        },
+        TerrainSegment {
+            position: ScreenPosition::new(128, 226),
+            size: (64, 8),
+        },
+        TerrainSegment {
+            position: ScreenPosition::new(192, 220),
+            size: (56, 8),
+        },
+        TerrainSegment {
+            position: ScreenPosition::new(248, 224),
+            size: (44, 8),
+        },
+    ]
+}
+
+fn actor_source_human_target_y(position_x: i16, offset: u8) -> Option<i16> {
+    actor_source_terrain_altitude(position_x)
+        .map(|altitude| i16::from(altitude.wrapping_add(offset).min(HUMAN_MAX_TARGET_Y)))
+}
+
+fn actor_source_terrain_altitude(position_x: i16) -> Option<u8> {
+    let object_x = u16::from(u8::try_from(position_x).ok()?);
+    source_playfield_terrain_segments()
+        .into_iter()
+        .find(|segment| {
+            let start = u16::from(segment.position.x);
+            let end = start.saturating_add(u16::from(segment.size.0));
+            object_x >= start && object_x < end
+        })
+        .map(|segment| segment.position.y)
+}
+
+fn actor_source_step_human_y(position_y: i16, target_y: i16) -> i16 {
+    match position_y.cmp(&target_y) {
+        Ordering::Less => position_y + 1,
+        Ordering::Equal => position_y,
+        Ordering::Greater => position_y - 1,
+    }
+}
+
+fn actor_enemies_for_report(report: &StepReport) -> Vec<CleanEnemySnapshot> {
+    report
+        .snapshots
+        .iter()
+        .filter_map(clean_enemy_snapshot)
+        .collect()
+}
+
+fn clean_enemy_snapshot(snapshot: &ActorSnapshot) -> Option<CleanEnemySnapshot> {
+    if snapshot.kind == ActorKind::Lander && snapshot.bounds.is_none() {
+        return None;
+    }
+
+    let kind = match snapshot.kind {
+        ActorKind::Lander => CleanEnemyKind::Lander,
+        ActorKind::Mutant => CleanEnemyKind::Mutant,
+        ActorKind::Bomber => CleanEnemyKind::Bomber,
+        ActorKind::Pod => CleanEnemyKind::Pod,
+        ActorKind::Swarmer => CleanEnemyKind::Swarmer,
+        ActorKind::Baiter => CleanEnemyKind::Baiter,
+        _ => return None,
+    };
+    let mut enemy = CleanEnemySnapshot::new(
+        kind,
+        screen_position(snapshot.position),
+        screen_velocity(snapshot.velocity),
+    );
+    enemy.source_lander = snapshot.source_lander.map(clean_source_lander);
+    enemy.source_bomber = snapshot.source_bomber.map(clean_source_bomber);
+    enemy.source_pod = snapshot.source_pod.map(clean_source_pod);
+    enemy.source_swarmer = snapshot.source_swarmer.map(clean_source_swarmer);
+    enemy.source_baiter = snapshot.source_baiter.map(clean_source_baiter);
+    enemy.source_mutant = snapshot.source_mutant.map(clean_source_mutant);
+    Some(enemy)
+}
+
+fn clean_source_lander(source: ActorSourceLanderMetadata) -> SourceLanderSnapshot {
+    SourceLanderSnapshot {
+        x_fraction: source.x_fraction,
+        y_fraction: source.y_fraction,
+        x_velocity: source.x_velocity,
+        y_velocity: source.y_velocity,
+        shot_timer: source.shot_timer,
+        sleep_ticks: source.sleep_ticks,
+        picture_frame: source.picture_frame,
+        target_human_index: source.target_human_index,
+    }
+}
+
+fn clean_source_bomber(source: ActorSourceBomberMetadata) -> SourceBomberSnapshot {
+    SourceBomberSnapshot {
+        x_fraction: source.x_fraction,
+        y_fraction: source.y_fraction,
+        x_velocity: source.x_velocity,
+        y_velocity: source.y_velocity,
+        picture_frame: source.picture_frame,
+        cruise_altitude: screen_coordinate(source.cruise_altitude),
+        sleep_ticks: source.sleep_ticks,
+        source_slot: source.source_slot,
+    }
+}
+
+fn clean_source_pod(source: ActorSourcePodMetadata) -> SourcePodSnapshot {
+    SourcePodSnapshot {
+        x_fraction: source.x_fraction,
+        y_fraction: source.y_fraction,
+        x_velocity: source.x_velocity,
+        y_velocity: source.y_velocity,
+    }
+}
+
+fn clean_source_swarmer(source: ActorSourceSwarmerMetadata) -> SourceSwarmerSnapshot {
+    SourceSwarmerSnapshot {
+        x_fraction: source.x_fraction,
+        y_fraction: source.y_fraction,
+        x_velocity: source.x_velocity,
+        y_velocity: source.y_velocity,
+        acceleration: source.acceleration,
+        shot_timer: source.shot_timer,
+        sleep_ticks: source.sleep_ticks,
+        horizontal_seek_pending: source.horizontal_seek_pending,
+    }
+}
+
+fn clean_source_baiter(source: ActorSourceBaiterMetadata) -> SourceBaiterSnapshot {
+    SourceBaiterSnapshot {
+        x_fraction: source.x_fraction,
+        y_fraction: source.y_fraction,
+        x_velocity: source.x_velocity,
+        y_velocity: source.y_velocity,
+        shot_timer: source.shot_timer,
+        sleep_ticks: source.sleep_ticks,
+        picture_frame: source.picture_frame,
+    }
+}
+
+fn clean_source_mutant(source: ActorSourceMutantMetadata) -> SourceMutantSnapshot {
+    SourceMutantSnapshot {
+        x_fraction: source.x_fraction,
+        y_fraction: source.y_fraction,
+        x_velocity: source.x_velocity,
+        y_velocity: source.y_velocity,
+        shot_timer: source.shot_timer,
+        sleep_ticks: source.sleep_ticks,
+        hop_rng: clean_source_rng(source.hop_rng),
+        render_x_correction: source.render_x_correction,
+        target6_first_shot_deferred: source.target6_first_shot_deferred,
+    }
+}
+
+const fn clean_source_rng(source: ActorSourceRngSnapshot) -> SourceRandSnapshot {
+    SourceRandSnapshot {
+        seed: source.seed,
+        hseed: source.hseed,
+        lseed: source.lseed,
+    }
+}
+
+fn actor_humans_for_report(report: &StepReport) -> Vec<CleanHumanSnapshot> {
+    report
+        .snapshots
+        .iter()
+        .filter(|snapshot| snapshot.kind == ActorKind::Human && snapshot.alive)
+        .map(|snapshot| {
+            let mut human = CleanHumanSnapshot::new(screen_position(snapshot.position));
+            human.carried = report.draws.iter().any(|draw| {
+                draw.actor == snapshot.id && matches!(draw.sprite, SpriteKey::HumanCarried)
+            });
+            if let Some(source) = snapshot.source_human {
+                human.source_x_fraction = source.x_fraction;
+                human.source_picture_frame = source.picture_frame;
+            }
+            human
+        })
+        .collect()
+}
+
+fn actor_projectiles_for_report(report: &StepReport) -> Vec<CleanProjectileSnapshot> {
+    report
+        .snapshots
+        .iter()
+        .filter(|snapshot| snapshot.kind == ActorKind::Laser && snapshot.alive)
+        .map(|snapshot| CleanProjectileSnapshot {
+            position: screen_position(snapshot.position),
+            source_tail_position: screen_position(Point::new(
+                snapshot.position.x.saturating_sub(16),
+                snapshot.position.y,
+            )),
+            velocity: screen_velocity(snapshot.velocity),
+        })
+        .collect()
+}
+
+fn actor_enemy_projectiles_for_report(report: &StepReport) -> Vec<CleanEnemyProjectileSnapshot> {
+    report
+        .snapshots
+        .iter()
+        .filter(|snapshot| {
+            matches!(snapshot.kind, ActorKind::EnemyLaser | ActorKind::Bomb) && snapshot.alive
+        })
+        .map(|snapshot| CleanEnemyProjectileSnapshot {
+            position: screen_position(snapshot.position),
+            velocity: screen_velocity(snapshot.velocity),
+            source_kind: if snapshot.kind == ActorKind::Bomb {
+                EnemyProjectileSourceKind::BomberBombShell
+            } else {
+                EnemyProjectileSourceKind::Fireball
+            },
+            source_x_fraction: snapshot
+                .source_enemy_projectile
+                .map_or(0, |source| source.x_fraction),
+            source_y_fraction: snapshot
+                .source_enemy_projectile
+                .map_or(0, |source| source.y_fraction),
+            source_x_velocity: snapshot
+                .source_enemy_projectile
+                .map_or(0, |source| source.x_velocity),
+            source_y_velocity: snapshot
+                .source_enemy_projectile
+                .map_or(0, |source| source.y_velocity),
+            source_lifetime_ticks: snapshot
+                .source_enemy_projectile
+                .map_or(0, |source| source.lifetime_ticks),
+        })
+        .collect()
+}
+
+fn actor_explosions_for_report(report: &StepReport) -> Vec<CleanExplosionSnapshot> {
+    report
+        .draws
+        .iter()
+        .filter_map(|draw| match draw.effect {
+            VisualEffect::ExplosionCloud {
+                kind,
+                age,
+                source_center,
+            } => {
+                let mut explosion = CleanExplosionSnapshot::source_spawn(
+                    clean_explosion_kind(kind),
+                    screen_position(draw.position),
+                );
+                explosion.source_center = source_center.map(screen_position);
+                explosion.source_size = actor_source_explosion_size_for_kind(kind, age);
+                Some(explosion)
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+fn clean_explosion_kind(kind: ExplosionKind) -> CleanExplosionKind {
+    match kind {
+        ExplosionKind::Lander => CleanExplosionKind::Lander,
+        ExplosionKind::Mutant => CleanExplosionKind::Mutant,
+        ExplosionKind::Bomber => CleanExplosionKind::Bomber,
+        ExplosionKind::Pod => CleanExplosionKind::Pod,
+        ExplosionKind::Swarmer => CleanExplosionKind::Swarmer,
+        ExplosionKind::Baiter => CleanExplosionKind::Baiter,
+        ExplosionKind::Bomb => CleanExplosionKind::Bomb,
+        ExplosionKind::Player => CleanExplosionKind::PlayerShip,
+        ExplosionKind::Human => CleanExplosionKind::Astronaut,
+        ExplosionKind::Terrain => CleanExplosionKind::Terrain,
+    }
+}
+
+fn actor_score_popups_for_report(report: &StepReport) -> Vec<CleanScorePopupSnapshot> {
+    report
+        .draws
+        .iter()
+        .filter_map(|draw| {
+            let kind = match draw.sprite {
+                SpriteKey::Score250 => CleanScorePopupKind::Points250,
+                SpriteKey::Score500 => CleanScorePopupKind::Points500,
+                _ => return None,
+            };
+            Some(CleanScorePopupSnapshot::source_spawn(
+                kind,
+                screen_position(draw.position),
+            ))
+        })
+        .collect()
+}
+
+fn world_vector(value: i16) -> WorldVector {
+    WorldVector::from_subpixels(i32::from(value) * WorldVector::SUBPIXELS_PER_PIXEL)
+}
+
+fn actor_world_word(value: u16) -> WorldVector {
+    WorldVector::from_subpixels(i32::from(value) << 8)
+}
+
+fn scroll_background_right(background_left: u16, pixels: i16) -> u16 {
+    background_left.wrapping_add(source_background_pixel_delta(pixels))
+}
+
+fn scroll_background_left(background_left: u16, pixels: i16) -> u16 {
+    background_left.wrapping_sub(source_background_pixel_delta(pixels))
+}
+
+fn source_background_pixel_delta(pixels: i16) -> u16 {
+    u16::try_from(pixels.max(0))
+        .unwrap_or(u16::MAX)
+        .wrapping_mul(BACKGROUND_WORD_PER_PIXEL)
+}
+
+fn screen_position(point: Point) -> ScreenPosition {
+    ScreenPosition::new(screen_coordinate(point.x), screen_coordinate(point.y))
+}
+
+fn try_screen_position(point: Point) -> Option<ScreenPosition> {
+    Some(ScreenPosition::new(
+        u8::try_from(point.x).ok()?,
+        u8::try_from(point.y).ok()?,
+    ))
+}
+
+fn screen_velocity(velocity: Velocity) -> ScreenVelocity {
+    ScreenVelocity::new(
+        screen_velocity_component(velocity.dx),
+        screen_velocity_component(velocity.dy),
+    )
+}
+
+fn screen_velocity_component(value: i16) -> i8 {
+    i8::try_from(value.clamp(i16::from(i8::MIN), i16::from(i8::MAX)))
+        .expect("screen velocity should be clamped to i8")
+}
+
+fn screen_coordinate(value: i16) -> u8 {
+    u8::try_from(value.clamp(0, 255)).expect("screen coordinate should be clamped to u8")
+}
+
+fn actor_source_projectile_velocity_component(value: i16) -> u16 {
+    let clamped = value.clamp(i16::from(i8::MIN), i16::from(i8::MAX)) as i8;
+    ((i16::from(clamped)) << 8) as u16
+}
+
+fn actor_source_projectile_lifetime_ticks(remaining_steps: u16) -> u8 {
+    remaining_steps.min(u16::from(u8::MAX)) as u8
+}
+
+fn actor_source_enemy_shot_metadata(
+    x_fraction: u8,
+    y_fraction: u8,
+    velocity: Velocity,
+    lifetime_steps: u16,
+) -> ActorSourceEnemyProjectileMetadata {
+    ActorSourceEnemyProjectileMetadata {
+        x_fraction,
+        y_fraction,
+        x_velocity: actor_source_projectile_velocity_component(velocity.dx),
+        y_velocity: actor_source_projectile_velocity_component(velocity.dy),
+        lifetime_ticks: actor_source_projectile_lifetime_ticks(lifetime_steps),
+    }
+}
+
+fn actor_source_projectile_axis_step(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
+    let raw = i32::from(position) * 256 + i32::from(fraction) + i32::from(velocity as i16);
+    let next_position = raw.div_euclid(256);
+    let next_fraction = raw.rem_euclid(256);
+    (
+        next_position.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16,
+        next_fraction as u8,
+    )
+}

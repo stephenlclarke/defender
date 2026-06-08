@@ -1,0 +1,1357 @@
+fn parse_behavior_actor_kind(
+    line_number: usize,
+    token: &str,
+) -> Result<ActorKind, ActorBehaviorScriptParseError> {
+    match normalize_script_token(token).as_str() {
+        "attract_director" => Ok(ActorKind::AttractDirector),
+        "attract_script" => Ok(ActorKind::AttractScript),
+        "status_display" => Ok(ActorKind::StatusDisplay),
+        "williams_logo" => Ok(ActorKind::WilliamsLogo),
+        "defender_wordmark" => Ok(ActorKind::DefenderWordmark),
+        "player" => Ok(ActorKind::Player),
+        "lander" => Ok(ActorKind::Lander),
+        "mutant" => Ok(ActorKind::Mutant),
+        "bomber" => Ok(ActorKind::Bomber),
+        "bomb" => Ok(ActorKind::Bomb),
+        "pod" => Ok(ActorKind::Pod),
+        "swarmer" => Ok(ActorKind::Swarmer),
+        "baiter" => Ok(ActorKind::Baiter),
+        "human" => Ok(ActorKind::Human),
+        "laser" => Ok(ActorKind::Laser),
+        "enemy_laser" => Ok(ActorKind::EnemyLaser),
+        "explosion" => Ok(ActorKind::Explosion),
+        "score_popup" => Ok(ActorKind::ScorePopup),
+        "text" => Ok(ActorKind::Text),
+        _ => Err(ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("unknown actor kind `{token}`"),
+        )),
+    }
+}
+
+fn parse_behavior_i16_value(
+    line_number: usize,
+    values: &[&str],
+    field: &str,
+) -> Result<i16, ActorBehaviorScriptParseError> {
+    let value = parse_behavior_single_value(line_number, values, field)?;
+    i16::try_from(parse_behavior_i64(line_number, value, field)?).map_err(|error| {
+        ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is invalid: {error}"),
+        )
+    })
+}
+
+fn parse_behavior_u8_value(
+    line_number: usize,
+    values: &[&str],
+    field: &str,
+) -> Result<u8, ActorBehaviorScriptParseError> {
+    let value = parse_behavior_single_value(line_number, values, field)?;
+    u8::try_from(parse_behavior_u64(line_number, value, field)?).map_err(|error| {
+        ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is invalid: {error}"),
+        )
+    })
+}
+
+fn parse_behavior_u16_value(
+    line_number: usize,
+    values: &[&str],
+    field: &str,
+) -> Result<u16, ActorBehaviorScriptParseError> {
+    let value = parse_behavior_single_value(line_number, values, field)?;
+    u16::try_from(parse_behavior_u64(line_number, value, field)?).map_err(|error| {
+        ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is invalid: {error}"),
+        )
+    })
+}
+
+fn parse_behavior_u64_value(
+    line_number: usize,
+    values: &[&str],
+    field: &str,
+) -> Result<u64, ActorBehaviorScriptParseError> {
+    let value = parse_behavior_single_value(line_number, values, field)?;
+    parse_behavior_u64(line_number, value, field)
+}
+
+fn parse_behavior_bool_value(
+    line_number: usize,
+    values: &[&str],
+    field: &str,
+) -> Result<bool, ActorBehaviorScriptParseError> {
+    let value = parse_behavior_single_value(line_number, values, field)?;
+    match normalize_script_token(value).as_str() {
+        "true" | "yes" | "on" | "1" => Ok(true),
+        "false" | "no" | "off" | "0" => Ok(false),
+        _ => Err(ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is not a boolean"),
+        )),
+    }
+}
+
+fn parse_behavior_hyperspace_seed_value(
+    line_number: usize,
+    values: &[&str],
+    field: &str,
+) -> Result<Option<ActorHyperspaceSourceSeed>, ActorBehaviorScriptParseError> {
+    if values.len() == 1 && normalize_script_token(values[0]) == "none" {
+        return Ok(None);
+    }
+    if values.len() != 3 {
+        return Err(ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} needs `none` or three seed bytes"),
+        ));
+    }
+    Ok(Some(ActorHyperspaceSourceSeed {
+        seed: parse_behavior_u8_value(line_number, &values[0..1], "seed")?,
+        hseed: parse_behavior_u8_value(line_number, &values[1..2], "hseed")?,
+        lseed: parse_behavior_u8_value(line_number, &values[2..3], "lseed")?,
+    }))
+}
+
+fn parse_lander_behavior_mode_value(
+    line_number: usize,
+    values: &[&str],
+    field: &str,
+) -> Result<LanderBehaviorMode, ActorBehaviorScriptParseError> {
+    let value = parse_behavior_single_value(line_number, values, field)?;
+    match normalize_script_token(value).as_str() {
+        "seek_nearest_human" | "seek_human" | "human" => Ok(LanderBehaviorMode::SeekNearestHuman),
+        "chase_player" | "chase" | "player" => Ok(LanderBehaviorMode::ChasePlayer),
+        "drift" => Ok(LanderBehaviorMode::Drift),
+        _ => Err(ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is not a lander behavior mode"),
+        )),
+    }
+}
+
+fn parse_hostile_movement_mode_value(
+    line_number: usize,
+    values: &[&str],
+    field: &str,
+) -> Result<HostileMovementMode, ActorBehaviorScriptParseError> {
+    let value = parse_behavior_single_value(line_number, values, field)?;
+    match normalize_script_token(value).as_str() {
+        "drift" => Ok(HostileMovementMode::Drift),
+        "chase_player" | "chase" | "player" => Ok(HostileMovementMode::ChasePlayer),
+        _ => Err(ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is not a hostile movement mode"),
+        )),
+    }
+}
+
+fn parse_behavior_single_value<'a>(
+    line_number: usize,
+    values: &'a [&'a str],
+    field: &str,
+) -> Result<&'a str, ActorBehaviorScriptParseError> {
+    match values {
+        [value] => Ok(value),
+        [] => Err(ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} needs a value"),
+        )),
+        _ => Err(ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} accepts one value"),
+        )),
+    }
+}
+
+fn parse_behavior_u64(
+    line_number: usize,
+    value: &str,
+    field: &str,
+) -> Result<u64, ActorBehaviorScriptParseError> {
+    if let Some(hex) = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))
+    {
+        return u64::from_str_radix(hex, 16).map_err(|error| {
+            ActorBehaviorScriptParseError::new(
+                line_number,
+                format!("{field} `{value}` is invalid: {error}"),
+            )
+        });
+    }
+    value.parse::<u64>().map_err(|error| {
+        ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is invalid: {error}"),
+        )
+    })
+}
+
+fn parse_behavior_i64(
+    line_number: usize,
+    value: &str,
+    field: &str,
+) -> Result<i64, ActorBehaviorScriptParseError> {
+    if let Some(hex) = value
+        .strip_prefix("-0x")
+        .or_else(|| value.strip_prefix("-0X"))
+    {
+        return i64::from_str_radix(hex, 16)
+            .map(|value| -value)
+            .map_err(|error| {
+                ActorBehaviorScriptParseError::new(
+                    line_number,
+                    format!("{field} `{value}` is invalid: {error}"),
+                )
+            });
+    }
+    if let Some(hex) = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))
+    {
+        return i64::from_str_radix(hex, 16).map_err(|error| {
+            ActorBehaviorScriptParseError::new(
+                line_number,
+                format!("{field} `{value}` is invalid: {error}"),
+            )
+        });
+    }
+    value.parse::<i64>().map_err(|error| {
+        ActorBehaviorScriptParseError::new(
+            line_number,
+            format!("{field} `{value}` is invalid: {error}"),
+        )
+    })
+}
+
+impl Default for ActorBehaviorScript {
+    fn default() -> Self {
+        Self::red_label_default()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceWaveProfile {
+    pub landers: u8,
+    pub bombers: u8,
+    pub pods: u8,
+    pub mutants: u8,
+    pub swarmers: u8,
+    pub wave_size: u8,
+    pub lander_x_velocity: u8,
+    pub lander_y_velocity_msb: u8,
+    pub lander_y_velocity_lsb: u8,
+    pub bomber_x_velocity: u8,
+    pub swarmer_x_velocity: u8,
+    pub swarmer_shot_time: u32,
+    pub swarmer_acceleration_mask: u8,
+    pub baiter_delay: u32,
+    pub baiter_shot_time: u32,
+    pub baiter_seek_probability: u8,
+    pub lander_shot_time: u32,
+    pub mutant_random_y: u8,
+    pub mutant_y_velocity_msb: u8,
+    pub mutant_y_velocity_lsb: u8,
+    pub mutant_x_velocity: u8,
+    pub mutant_shot_time: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceLanderMetadata {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub shot_timer: u8,
+    pub sleep_ticks: u8,
+    pub picture_frame: u8,
+    pub target_human_index: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceBomberMetadata {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub picture_frame: u8,
+    pub cruise_altitude: i16,
+    pub sleep_ticks: u8,
+    pub source_slot: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourcePodMetadata {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceSwarmerMetadata {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub acceleration: u8,
+    pub sleep_ticks: u8,
+    pub shot_timer: u8,
+    pub horizontal_seek_pending: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceBaiterMetadata {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub shot_timer: u8,
+    pub sleep_ticks: u8,
+    pub picture_frame: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceMutantMetadata {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub shot_timer: u8,
+    pub sleep_ticks: u8,
+    pub hop_rng: ActorSourceRngSnapshot,
+    pub render_x_correction: u16,
+    pub target6_first_shot_deferred: bool,
+}
+
+impl ActorSourceMutantMetadata {
+    fn from_lander_conversion(
+        source_lander: ActorSourceLanderMetadata,
+        profile: ActorSourceWaveProfile,
+        hop_rng: ActorSourceRngSnapshot,
+    ) -> Self {
+        Self {
+            x_fraction: source_lander.x_fraction,
+            y_fraction: source_lander.y_fraction,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: profile.mutant_shot_time.min(u32::from(u8::MAX)) as u8,
+            sleep_ticks: 0,
+            hop_rng,
+            render_x_correction: actor_source_target6_mutant_conversion_x_correction(source_lander)
+                .unwrap_or(0),
+            target6_first_shot_deferred: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceEnemyProjectileMetadata {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub lifetime_ticks: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorLanderSpawn {
+    pub position: Point,
+    pub source: Option<ActorSourceLanderMetadata>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorBomberSpawn {
+    pub position: Point,
+    pub source: Option<ActorSourceBomberMetadata>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorPodSpawn {
+    pub position: Point,
+    pub source: Option<ActorSourcePodMetadata>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSwarmerSpawn {
+    pub position: Point,
+    pub source: Option<ActorSourceSwarmerMetadata>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorBaiterSpawn {
+    pub position: Point,
+    pub source: Option<ActorSourceBaiterMetadata>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorMutantSpawn {
+    pub position: Point,
+    pub source: Option<ActorSourceMutantMetadata>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceHumanMetadata {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub picture_frame: u8,
+    pub target_slot_index: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorHumanSpawn {
+    pub position: Point,
+    pub mode: HumanMode,
+    pub source: Option<ActorSourceHumanMetadata>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ActorSourceFirstWaveLanderStart {
+    x16: u16,
+    y16: u16,
+    x_velocity: u16,
+    y_velocity: u16,
+    shot_timer: u8,
+    sleep_ticks: u8,
+    picture_frame: u8,
+    target_human_index: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ActorSourceFirstWaveHumanStart {
+    x16: u16,
+    y16: u16,
+    picture_frame: u8,
+}
+
+impl ActorLanderSpawn {
+    pub const fn new(position: Point) -> Self {
+        Self {
+            position,
+            source: None,
+        }
+    }
+
+    const fn source_first_wave(start: ActorSourceFirstWaveLanderStart) -> Self {
+        Self {
+            position: Point::new((start.x16 >> 8) as i16, (start.y16 >> 8) as i16),
+            source: Some(ActorSourceLanderMetadata {
+                x_fraction: (start.x16 & 0x00FF) as u8,
+                y_fraction: (start.y16 & 0x00FF) as u8,
+                x_velocity: start.x_velocity,
+                y_velocity: start.y_velocity,
+                shot_timer: start.shot_timer,
+                sleep_ticks: start.sleep_ticks,
+                picture_frame: start.picture_frame,
+                target_human_index: start.target_human_index,
+            }),
+        }
+    }
+
+    fn source_restore(
+        source_rng: &mut ActorSourceRng,
+        profile: ActorSourceWaveProfile,
+        target_human_index: Option<usize>,
+    ) -> Self {
+        let placement_state = source_rng.advance();
+        let x = placement_state.hseed;
+        let x_fraction = placement_state.lseed;
+        let y = PLAYFIELD_TOP_EDGE_Y.wrapping_add(2);
+        let y_velocity =
+            u16::from_be_bytes([profile.lander_y_velocity_msb, profile.lander_y_velocity_lsb]);
+        let shot_timer =
+            source_rng.advance_rmax(profile.lander_shot_time.min(u32::from(u8::MAX)) as u8);
+        let x_velocity_byte = source_rng.advance_rmax(profile.lander_x_velocity);
+        let x_velocity = if x_velocity_byte & 1 == 0 {
+            u16::from(x_velocity_byte)
+        } else {
+            !u16::from(x_velocity_byte)
+        };
+
+        Self {
+            position: Point::new(i16::from(x), i16::from(y)),
+            source: Some(ActorSourceLanderMetadata {
+                x_fraction,
+                y_fraction: 0,
+                x_velocity,
+                y_velocity,
+                shot_timer,
+                sleep_ticks: 0,
+                picture_frame: 0,
+                target_human_index,
+            }),
+        }
+    }
+}
+
+impl ActorBomberSpawn {
+    pub const fn new(position: Point) -> Self {
+        Self {
+            position,
+            source: None,
+        }
+    }
+
+    const fn source_initial(position: Point, source_x_velocity: u8, spawn_index: usize) -> Self {
+        let velocity_low = if spawn_index < 2 {
+            0u8.wrapping_sub(source_x_velocity)
+        } else {
+            source_x_velocity
+        };
+        Self {
+            position,
+            source: Some(ActorSourceBomberMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: actor_sign_extend_u8_to_u16(velocity_low),
+                y_velocity: 0,
+                picture_frame: 0,
+                cruise_altitude: BOMBER_CRUISE_ALTITUDE,
+                sleep_ticks: 0,
+                source_slot: (spawn_index % 4) as u8,
+            }),
+        }
+    }
+
+    fn source_restore_batch(
+        profile: ActorSourceWaveProfile,
+        player_absolute_x: u16,
+        count: usize,
+    ) -> Vec<Self> {
+        let mut bombers = Vec::with_capacity(count);
+        let mut remaining = count;
+        let mut positive_x_velocity = true;
+
+        while remaining > 0 {
+            let squad_count = remaining.min(BOMBER_SQUAD_SIZE);
+            let velocity_low = if positive_x_velocity {
+                profile.bomber_x_velocity
+            } else {
+                0u8.wrapping_sub(profile.bomber_x_velocity)
+            };
+            positive_x_velocity = !positive_x_velocity;
+            let x_velocity = actor_sign_extend_u8_to_u16(velocity_low);
+
+            for squad_remaining in (1..=squad_count).rev() {
+                let x16 = player_absolute_x
+                    .wrapping_add((squad_remaining as u16).wrapping_mul(0x0180))
+                    .wrapping_add(0x8000);
+                let [x, x_fraction] = x16.to_be_bytes();
+                bombers.push(Self {
+                    position: Point::new(i16::from(x), BOMBER_CRUISE_ALTITUDE),
+                    source: Some(ActorSourceBomberMetadata {
+                        x_fraction,
+                        y_fraction: 0,
+                        x_velocity,
+                        y_velocity: 0,
+                        picture_frame: 0,
+                        cruise_altitude: BOMBER_CRUISE_ALTITUDE,
+                        sleep_ticks: 0,
+                        source_slot: (squad_remaining - 1) as u8,
+                    }),
+                });
+            }
+
+            remaining -= squad_count;
+        }
+
+        bombers
+    }
+}
+
+impl ActorPodSpawn {
+    pub const fn new(position: Point) -> Self {
+        Self {
+            position,
+            source: None,
+        }
+    }
+
+    const fn source_initial(position: Point, spawn_index: usize) -> Self {
+        let velocity_low = if spawn_index < 2 {
+            0u8.wrapping_sub(INITIAL_POD_X_SPEED)
+        } else {
+            INITIAL_POD_X_SPEED
+        };
+        Self {
+            position,
+            source: Some(ActorSourcePodMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: actor_sign_extend_u8_to_u16(velocity_low),
+                y_velocity: 0,
+            }),
+        }
+    }
+
+    fn source_restore(source_rng: &mut ActorSourceRng) -> Self {
+        let state = source_rng.advance();
+        let [x, x_fraction] =
+            u16::from_be_bytes([(state.hseed & 0x3F).wrapping_add(0x10), state.lseed])
+                .to_be_bytes();
+        let y = state
+            .lseed
+            .wrapping_shr(1)
+            .wrapping_add(PLAYFIELD_TOP_EDGE_Y);
+        let x_velocity = actor_sign_extend_u8_to_u16((state.seed & 0x3F).wrapping_sub(0x20));
+        let mut y_velocity_low = (state.lseed & 0x7F).wrapping_sub(0x40);
+        if y_velocity_low & 0x80 == 0 {
+            y_velocity_low |= 0x20;
+        } else {
+            y_velocity_low &= 0xDF;
+        }
+
+        Self {
+            position: Point::new(i16::from(x), i16::from(y)),
+            source: Some(ActorSourcePodMetadata {
+                x_fraction,
+                y_fraction: 0,
+                x_velocity,
+                y_velocity: actor_sign_extend_u8_to_u16(y_velocity_low),
+            }),
+        }
+    }
+}
+
+impl ActorSwarmerSpawn {
+    pub const fn new(position: Point) -> Self {
+        Self {
+            position,
+            source: None,
+        }
+    }
+
+    fn source_from_pod(
+        source_rng: &mut ActorSourceRng,
+        profile: ActorSourceWaveProfile,
+        position: Point,
+    ) -> Self {
+        let velocity_rand = source_rng.advance();
+        let y_velocity = actor_sign_extend_u8_to_u16(velocity_rand.seed).wrapping_shl(1);
+        let x_velocity =
+            actor_sign_extend_u8_to_u16((velocity_rand.lseed & 0x3F).wrapping_sub(0x20));
+        let acceleration = velocity_rand.lseed & profile.swarmer_acceleration_mask;
+        let sleep_ticks = velocity_rand.hseed & 0x1F;
+        let shot_timer =
+            source_rng.advance_rmax(profile.swarmer_shot_time.min(u32::from(u8::MAX)) as u8);
+
+        Self {
+            position,
+            source: Some(ActorSourceSwarmerMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity,
+                y_velocity,
+                acceleration,
+                sleep_ticks,
+                shot_timer,
+                horizontal_seek_pending: true,
+            }),
+        }
+    }
+
+    fn source_restore_batch(
+        source_rng: &mut ActorSourceRng,
+        profile: ActorSourceWaveProfile,
+        count: usize,
+    ) -> Vec<Self> {
+        if count == 0 {
+            return Vec::new();
+        }
+
+        let y16 = u16::from_be_bytes([
+            source_rng
+                .seed
+                .wrapping_shr(1)
+                .wrapping_add(PLAYFIELD_TOP_EDGE_Y),
+            0,
+        ]);
+        let placement_rand = source_rng.advance();
+        let x16 = u16::from_be_bytes([
+            (placement_rand.seed & 0x3F).wrapping_add(0x80),
+            MINI_SWARMER_RESTORE_X_LOW,
+        ]);
+        let [x, x_fraction] = x16.to_be_bytes();
+        let [y, y_fraction] = y16.to_be_bytes();
+        let position = Point::new(i16::from(x), i16::from(y));
+
+        (0..count)
+            .map(|_| {
+                let mut spawn = Self::source_from_pod(source_rng, profile, position);
+                if let Some(source) = &mut spawn.source {
+                    source.x_fraction = x_fraction;
+                    source.y_fraction = y_fraction;
+                }
+                spawn
+            })
+            .collect()
+    }
+}
+
+impl ActorBaiterSpawn {
+    pub const fn new(position: Point) -> Self {
+        Self {
+            position,
+            source: None,
+        }
+    }
+
+    fn source_from_player(
+        profile: ActorSourceWaveProfile,
+        player_position: Point,
+        active_baiters: usize,
+    ) -> Self {
+        let spawn_x = if (active_baiters + usize::from(player_position.x >= 128)).is_multiple_of(2)
+        {
+            228
+        } else {
+            28
+        };
+        let spawn_y = (player_position.y + 24
+            - (i16::try_from(active_baiters % 3).unwrap_or(0) * 24))
+            .clamp(PLAYER_BOUNDS.top + 8, HUMAN_GROUND_Y - 24);
+        let position = Point::new(spawn_x, spawn_y);
+        let mut source = ActorSourceBaiterMetadata {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: BAITER_INITIAL_SHOT_TIMER,
+            sleep_ticks: 0,
+            picture_frame: 0,
+        };
+        source_baiter_velocity_update(
+            &mut source,
+            position,
+            profile,
+            player_position,
+            Velocity::default(),
+            false,
+            u8::MAX,
+        );
+        Self {
+            position,
+            source: Some(source),
+        }
+    }
+}
+
+impl ActorMutantSpawn {
+    pub const fn new(position: Point) -> Self {
+        Self {
+            position,
+            source: None,
+        }
+    }
+
+    fn source_initial(
+        position: Point,
+        profile: ActorSourceWaveProfile,
+        spawn_index: usize,
+    ) -> Self {
+        let mut source_rng = DEFAULT_RNG;
+        for _ in 0..=spawn_index {
+            source_rng.advance();
+        }
+        let shot_timer =
+            source_rng.advance_rmax(profile.mutant_shot_time.min(u32::from(u8::MAX)) as u8);
+        Self {
+            position,
+            source: Some(ActorSourceMutantMetadata {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                shot_timer,
+                sleep_ticks: 0,
+                hop_rng: source_rng.snapshot(),
+                render_x_correction: 0,
+                target6_first_shot_deferred: false,
+            }),
+        }
+    }
+
+    fn source_restore(
+        source_rng: &mut ActorSourceRng,
+        profile: ActorSourceWaveProfile,
+        background_absolute_x: u16,
+    ) -> Self {
+        let placement_state = source_rng.advance();
+        let avoid_left = background_absolute_x.wrapping_sub(MUTANT_RESTORE_AVOID_HALF_WIDTH);
+        let mut relative = u16::from_be_bytes([placement_state.hseed, placement_state.lseed])
+            .wrapping_sub(avoid_left);
+        if relative < MUTANT_RESTORE_AVOID_WIDTH {
+            relative = relative.wrapping_add(0x8000);
+        }
+        let x16 = relative.wrapping_add(avoid_left);
+        let [x, x_fraction] = x16.to_be_bytes();
+        let y = placement_state
+            .seed
+            .wrapping_shr(1)
+            .wrapping_add(PLAYFIELD_TOP_EDGE_Y);
+        let shot_timer =
+            source_rng.advance_rmax(profile.mutant_shot_time.min(u32::from(u8::MAX)) as u8);
+
+        Self {
+            position: Point::new(i16::from(x), i16::from(y)),
+            source: Some(ActorSourceMutantMetadata {
+                x_fraction,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                shot_timer,
+                sleep_ticks: 0,
+                hop_rng: source_rng.snapshot(),
+                render_x_correction: 0,
+                target6_first_shot_deferred: false,
+            }),
+        }
+    }
+}
+
+fn actor_source_initial_target_list_humans() -> Vec<ActorHumanSpawn> {
+    let mut source_rng = DEFAULT_RNG;
+    actor_source_target_list_restore_humans(&mut source_rng, START_HUMAN_COUNT)
+}
+
+fn actor_source_target_list_restore_humans(
+    source_rng: &mut ActorSourceRng,
+    target_count: u8,
+) -> Vec<ActorHumanSpawn> {
+    let mut humans = Vec::with_capacity(usize::from(target_count));
+    let mut slot_index = 0usize;
+    let mut remainder = target_count;
+
+    if target_count > 7 {
+        let quadrant_count = target_count >> 2;
+        for x_bank in [0x00, 0x40, 0x80, 0xC0] {
+            slot_index = actor_source_target_list_restore_human_group(
+                &mut humans,
+                source_rng,
+                quadrant_count,
+                x_bank,
+                slot_index,
+            );
+        }
+        remainder = target_count.wrapping_sub(quadrant_count << 2);
+    }
+
+    for _ in 0..remainder {
+        let x_bank = source_rng.hseed;
+        slot_index = actor_source_target_list_restore_human_group(
+            &mut humans,
+            source_rng,
+            1,
+            x_bank,
+            slot_index,
+        );
+    }
+
+    humans
+}
+
+fn actor_source_target_list_restore_human_group(
+    humans: &mut Vec<ActorHumanSpawn>,
+    source_rng: &mut ActorSourceRng,
+    count: u8,
+    x_bank: u8,
+    mut slot_index: usize,
+) -> usize {
+    for _ in 0..count {
+        let state = source_rng.advance();
+        let source_x = (state.hseed & 0x1F).wrapping_add(x_bank);
+        let picture_frame = if state.lseed & 0x01 != 0 { 2 } else { 0 };
+        humans.push(ActorHumanSpawn {
+            position: Point::new(i16::from(source_x), i16::from(ASTRONAUT_RESTORE_Y)),
+            mode: HumanMode::Grounded,
+            source: Some(ActorSourceHumanMetadata {
+                x_fraction: state.lseed,
+                y_fraction: 0,
+                picture_frame,
+                target_slot_index: slot_index,
+            }),
+        });
+        slot_index += 1;
+    }
+    slot_index
+}
+
+fn actor_source_select_lander_target_index(
+    cursor: &mut Option<usize>,
+    humans: &[ActorHumanSpawn],
+) -> Option<usize> {
+    if !humans.iter().any(|human| human.source.is_some()) {
+        return None;
+    }
+
+    let original_cursor = cursor
+        .filter(|slot| *slot < TARGET_LIST_ENTRY_COUNT)
+        .unwrap_or(0);
+    let mut probe = original_cursor;
+    for _ in 0..TARGET_LIST_ENTRY_COUNT {
+        probe = actor_source_target_list_next_slot_index(probe);
+        if humans.iter().any(|human| {
+            human
+                .source
+                .is_some_and(|source| source.target_slot_index == probe)
+        }) {
+            *cursor = Some(probe);
+            return Some(probe);
+        }
+        if probe == original_cursor {
+            break;
+        }
+    }
+
+    None
+}
+
+const fn actor_source_target_list_next_slot_index(slot_index: usize) -> usize {
+    if slot_index + 1 < TARGET_LIST_ENTRY_COUNT {
+        slot_index + 1
+    } else {
+        0
+    }
+}
+
+const fn actor_source_astronaut_next_slot_index(slot_index: usize) -> usize {
+    if slot_index + 1 < ASTRONAUT_TARGET_CURSOR_ENTRY_COUNT {
+        slot_index + 1
+    } else {
+        0
+    }
+}
+
+impl ActorHumanSpawn {
+    pub const fn new(position: Point, mode: HumanMode) -> Self {
+        Self {
+            position,
+            mode,
+            source: None,
+        }
+    }
+
+    const fn source_first_wave(
+        target_slot_index: usize,
+        start: ActorSourceFirstWaveHumanStart,
+    ) -> Self {
+        Self {
+            position: Point::new((start.x16 >> 8) as i16, (start.y16 >> 8) as i16),
+            mode: HumanMode::Grounded,
+            source: Some(ActorSourceHumanMetadata {
+                x_fraction: (start.x16 & 0x00FF) as u8,
+                y_fraction: (start.y16 & 0x00FF) as u8,
+                picture_frame: start.picture_frame,
+                target_slot_index,
+            }),
+        }
+    }
+}
+
+impl ActorSourceWaveProfile {
+    pub fn for_wave(wave: u16) -> Self {
+        let wave = u8::try_from(wave.min(u16::from(u8::MAX))).unwrap_or(u8::MAX);
+        Self {
+            landers: actor_source_wave_u8("landers", wave),
+            bombers: actor_source_wave_u8("bombers", wave),
+            pods: actor_source_wave_u8("pods", wave),
+            mutants: actor_source_wave_u8("mutants", wave),
+            swarmers: actor_source_wave_u8("swarmers", wave),
+            wave_size: actor_source_wave_u8("wave_size", wave),
+            lander_x_velocity: actor_source_wave_u8("lander_x_velocity", wave),
+            lander_y_velocity_msb: actor_source_wave_u8("lander_y_velocity_msb", wave),
+            lander_y_velocity_lsb: actor_source_wave_u8("lander_y_velocity_lsb", wave),
+            bomber_x_velocity: actor_source_wave_u8("bomber_x_velocity", wave),
+            swarmer_x_velocity: actor_source_wave_u8("swarmer_x_velocity", wave),
+            swarmer_shot_time: actor_source_wave_u32("swarmer_shot_time", wave),
+            swarmer_acceleration_mask: actor_source_wave_u8("swarmer_acceleration_mask", wave),
+            baiter_delay: actor_source_wave_u32("baiter_time", wave),
+            baiter_shot_time: actor_source_wave_u32("baiter_shot_time", wave),
+            baiter_seek_probability: actor_source_wave_u8("baiter_seek_probability", wave),
+            lander_shot_time: actor_source_wave_u32("lander_shot_time", wave),
+            mutant_random_y: actor_source_wave_u8("mutant_random_y", wave),
+            mutant_y_velocity_msb: actor_source_wave_u8("mutant_y_velocity_msb", wave),
+            mutant_y_velocity_lsb: actor_source_wave_u8("mutant_y_velocity_lsb", wave),
+            mutant_x_velocity: actor_source_wave_u8("mutant_x_velocity", wave),
+            mutant_shot_time: actor_source_wave_u32("mutant_shot_time", wave),
+        }
+    }
+
+    fn lander_behavior(self) -> ActorBehaviorProfile {
+        ActorBehaviorProfile {
+            lander_seek_speed: actor_lander_speed_from_source(self.lander_x_velocity),
+            lander_drift_speed: actor_lander_speed_from_source(self.lander_x_velocity),
+            lander_fire_period_steps: u64::from(self.lander_shot_time.max(1)),
+            ..ActorBehaviorProfile::default()
+        }
+    }
+
+    fn lander_spawns(self, wave: u16, humans: &[ActorHumanSpawn]) -> Vec<ActorLanderSpawn> {
+        let mut source_lander_index = 0;
+        let mut source_rng = DEFAULT_RNG;
+        let mut target_cursor = Some(0usize);
+        self.active_family_slots()
+            .into_iter()
+            .filter_map(|slot| {
+                if slot.kind != ActorSourceEnemyKind::Lander {
+                    return None;
+                }
+                let spawn = if wave == 1 {
+                    ACTOR_FIRST_WAVE_LANDER_SPAWNS
+                        .get(source_lander_index)
+                        .copied()
+                        .unwrap_or_else(|| ActorLanderSpawn::new(slot.position))
+                } else {
+                    ActorLanderSpawn::source_restore(
+                        &mut source_rng,
+                        self,
+                        actor_source_select_lander_target_index(&mut target_cursor, humans),
+                    )
+                };
+                source_lander_index += 1;
+                Some(spawn)
+            })
+            .collect()
+    }
+
+    fn human_spawns(self, wave: u16) -> Vec<ActorHumanSpawn> {
+        if wave == 1 {
+            ACTOR_FIRST_WAVE_HUMAN_SPAWNS.to_vec()
+        } else {
+            actor_source_initial_target_list_humans()
+        }
+    }
+
+    fn bomber_spawns(self) -> Vec<ActorBomberSpawn> {
+        self.active_family_slots()
+            .into_iter()
+            .filter(|slot| slot.kind == ActorSourceEnemyKind::Bomber)
+            .map(|slot| {
+                ActorBomberSpawn::source_initial(slot.position, self.bomber_x_velocity, slot.index)
+            })
+            .collect()
+    }
+
+    fn pod_spawns(self) -> Vec<ActorPodSpawn> {
+        self.active_family_slots()
+            .into_iter()
+            .filter(|slot| slot.kind == ActorSourceEnemyKind::Pod)
+            .map(|slot| ActorPodSpawn::source_initial(slot.position, slot.index))
+            .collect()
+    }
+
+    fn mutant_spawns(self) -> Vec<ActorMutantSpawn> {
+        self.active_family_slots()
+            .into_iter()
+            .filter(|slot| slot.kind == ActorSourceEnemyKind::Mutant)
+            .map(|slot| ActorMutantSpawn::source_initial(slot.position, self, slot.index))
+            .collect()
+    }
+
+    fn swarmer_spawns(self) -> Vec<ActorSwarmerSpawn> {
+        let mut source_rng = DEFAULT_RNG;
+        self.active_family_slots()
+            .into_iter()
+            .filter(|slot| slot.kind == ActorSourceEnemyKind::Swarmer)
+            .map(|slot| ActorSwarmerSpawn::source_from_pod(&mut source_rng, self, slot.position))
+            .collect()
+    }
+
+    fn enemy_reserve_after_active_batch(self) -> EnemyReserveSnapshot {
+        let mut reserve = EnemyReserveSnapshot {
+            landers: self.landers,
+            bombers: self.bombers,
+            pods: self.pods,
+            mutants: self.mutants,
+            swarmers: self.swarmers,
+        };
+        for slot in self.active_family_slots() {
+            actor_enemy_reserve_take(&mut reserve, slot.kind);
+        }
+        reserve
+    }
+
+    fn active_family_slots(self) -> Vec<ActorSourceEnemySlot> {
+        let mut counts = ActorSourceEnemyCounts {
+            landers: self.landers,
+            bombers: self.bombers,
+            pods: self.pods,
+            mutants: self.mutants,
+            swarmers: self.swarmers,
+        };
+        let target = usize::from(self.wave_size)
+            .min(MAX_ACTIVE_WAVE_ENEMIES)
+            .min(usize::from(counts.total()));
+        let mut kinds = Vec::with_capacity(target);
+
+        for kind in [
+            ActorSourceEnemyKind::Lander,
+            ActorSourceEnemyKind::Bomber,
+            ActorSourceEnemyKind::Pod,
+            ActorSourceEnemyKind::Mutant,
+            ActorSourceEnemyKind::Swarmer,
+        ] {
+            push_actor_source_kind(&mut kinds, &mut counts, target, kind);
+        }
+        for kind in [
+            ActorSourceEnemyKind::Lander,
+            ActorSourceEnemyKind::Bomber,
+            ActorSourceEnemyKind::Pod,
+            ActorSourceEnemyKind::Mutant,
+            ActorSourceEnemyKind::Swarmer,
+        ] {
+            while kinds.len() < target && counts.take(kind) {
+                kinds.push(kind);
+            }
+        }
+
+        kinds
+            .into_iter()
+            .enumerate()
+            .map(|(index, kind)| ActorSourceEnemySlot {
+                kind,
+                index,
+                position: ACTOR_WAVE_ACTIVE_SPAWN_SLOTS[index],
+            })
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ActorSourceEnemySlot {
+    kind: ActorSourceEnemyKind,
+    index: usize,
+    position: Point,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ActorSourceEnemyKind {
+    Lander,
+    Bomber,
+    Pod,
+    Mutant,
+    Swarmer,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ActorSourceEnemyCounts {
+    landers: u8,
+    bombers: u8,
+    pods: u8,
+    mutants: u8,
+    swarmers: u8,
+}
+
+impl ActorSourceEnemyCounts {
+    const fn total(self) -> u8 {
+        self.landers
+            .saturating_add(self.bombers)
+            .saturating_add(self.pods)
+            .saturating_add(self.mutants)
+            .saturating_add(self.swarmers)
+    }
+
+    fn take(&mut self, kind: ActorSourceEnemyKind) -> bool {
+        let count = match kind {
+            ActorSourceEnemyKind::Lander => &mut self.landers,
+            ActorSourceEnemyKind::Bomber => &mut self.bombers,
+            ActorSourceEnemyKind::Pod => &mut self.pods,
+            ActorSourceEnemyKind::Mutant => &mut self.mutants,
+            ActorSourceEnemyKind::Swarmer => &mut self.swarmers,
+        };
+        if *count == 0 {
+            return false;
+        }
+        *count = count.saturating_sub(1);
+        true
+    }
+}
+
+fn push_actor_source_kind(
+    kinds: &mut Vec<ActorSourceEnemyKind>,
+    counts: &mut ActorSourceEnemyCounts,
+    target: usize,
+    kind: ActorSourceEnemyKind,
+) {
+    if kinds.len() < target && counts.take(kind) {
+        kinds.push(kind);
+    }
+}
+
+fn actor_enemy_reserve_total(reserve: EnemyReserveSnapshot) -> u8 {
+    reserve
+        .landers
+        .saturating_add(reserve.bombers)
+        .saturating_add(reserve.pods)
+        .saturating_add(reserve.mutants)
+        .saturating_add(reserve.swarmers)
+}
+
+fn actor_enemy_reserve_is_empty(reserve: EnemyReserveSnapshot) -> bool {
+    actor_enemy_reserve_total(reserve) == 0
+}
+
+fn actor_enemy_reserve_take(
+    reserve: &mut EnemyReserveSnapshot,
+    kind: ActorSourceEnemyKind,
+) -> bool {
+    let count = match kind {
+        ActorSourceEnemyKind::Lander => &mut reserve.landers,
+        ActorSourceEnemyKind::Bomber => &mut reserve.bombers,
+        ActorSourceEnemyKind::Pod => &mut reserve.pods,
+        ActorSourceEnemyKind::Mutant => &mut reserve.mutants,
+        ActorSourceEnemyKind::Swarmer => &mut reserve.swarmers,
+    };
+    if *count == 0 {
+        return false;
+    }
+    *count = count.saturating_sub(1);
+    true
+}
+
+fn actor_source_reserve_enemy_kinds(
+    reserve: &mut EnemyReserveSnapshot,
+    profile: ActorSourceWaveProfile,
+) -> Vec<ActorSourceEnemyKind> {
+    if reserve.landers > 0 {
+        let target = MAX_ACTIVE_WAVE_ENEMIES.min(usize::from(reserve.landers));
+        let mut kinds = Vec::with_capacity(target);
+        while kinds.len() < target
+            && actor_enemy_reserve_take(reserve, ActorSourceEnemyKind::Lander)
+        {
+            kinds.push(ActorSourceEnemyKind::Lander);
+        }
+        return kinds;
+    }
+
+    let target = usize::from(profile.wave_size)
+        .min(MAX_ACTIVE_WAVE_ENEMIES)
+        .min(usize::from(actor_enemy_reserve_total(*reserve)));
+    let mut kinds = Vec::with_capacity(target);
+
+    for kind in [
+        ActorSourceEnemyKind::Lander,
+        ActorSourceEnemyKind::Bomber,
+        ActorSourceEnemyKind::Pod,
+        ActorSourceEnemyKind::Mutant,
+        ActorSourceEnemyKind::Swarmer,
+    ] {
+        push_actor_reserve_kind(&mut kinds, reserve, target, kind);
+    }
+
+    for kind in [
+        ActorSourceEnemyKind::Lander,
+        ActorSourceEnemyKind::Bomber,
+        ActorSourceEnemyKind::Pod,
+        ActorSourceEnemyKind::Mutant,
+        ActorSourceEnemyKind::Swarmer,
+    ] {
+        while kinds.len() < target && actor_enemy_reserve_take(reserve, kind) {
+            kinds.push(kind);
+        }
+    }
+
+    kinds
+}
+
+fn push_actor_reserve_kind(
+    kinds: &mut Vec<ActorSourceEnemyKind>,
+    reserve: &mut EnemyReserveSnapshot,
+    target: usize,
+    kind: ActorSourceEnemyKind,
+) {
+    if kinds.len() < target && actor_enemy_reserve_take(reserve, kind) {
+        kinds.push(kind);
+    }
+}
+
+fn actor_lander_speed_from_source(velocity: u8) -> i16 {
+    i16::from((velocity / 16).max(1))
+}
+
+fn actor_velocity_pixels_from_source(velocity: u8) -> i16 {
+    i16::from((velocity / 32).max(1))
+}
+
+fn adc8(lhs: u8, rhs: u8, carry: bool) -> (u8, bool) {
+    let sum = u16::from(lhs) + u16::from(rhs) + u16::from(u8::from(carry));
+    ((sum & 0xFF) as u8, sum > 0xFF)
+}
+
+fn source_rmax(max: u8, mut seed: u8) -> u8 {
+    while seed > max {
+        seed >>= 1;
+    }
+    seed.wrapping_add(1)
+}
+
+const fn actor_sign_extend_u8_to_u16(value: u8) -> u16 {
+    let sign = if value & 0x80 == 0 { 0x00 } else { 0xFF };
+    u16::from_be_bytes([sign, value])
+}
+
+fn actor_source_wave_u8(key: &str, wave: u8) -> u8 {
+    u8::try_from(actor_source_wave_value(key, wave))
+        .unwrap_or_else(|_| panic!("actor source wave table {key} should fit u8"))
+}
+
+fn actor_source_wave_u32(key: &str, wave: u8) -> u32 {
+    u32::try_from(actor_source_wave_value(key, wave))
+        .unwrap_or_else(|_| panic!("actor source wave table {key} should be non-negative"))
+}
+
+fn actor_source_wave_value(key: &str, wave: u8) -> i32 {
+    let mut lines = ACTOR_WAVE_TABLE_TSV.lines();
+    let header = lines
+        .next()
+        .expect("actor source wave table should have a header");
+    assert_eq!(header, ACTOR_WAVE_TABLE_HEADER);
+
+    for row in lines.map(str::trim).filter(|row| !row.is_empty()) {
+        let fields = row.split('\t').collect::<Vec<_>>();
+        assert_eq!(fields.len(), 9, "actor source wave table row width changed");
+        if fields[0] != key {
+            continue;
+        }
+
+        let ceiling = parse_actor_wave_i32(fields[1], key, "ceiling");
+        let floor = parse_actor_wave_i32(fields[2], key, "floor");
+        let inter_delta = parse_actor_wave_i32(fields[4], key, "inter_delta");
+        let wave = wave.max(1);
+        let wave_index = usize::from(wave.min(4));
+        let mut value = parse_actor_wave_i32(fields[4 + wave_index], key, "wave");
+        for _ in 0..actor_wave_inter_delta_iterations(wave) {
+            value = apply_actor_wave_delta(value, inter_delta, floor, ceiling);
+        }
+        return value;
+    }
+
+    panic!("missing actor source wave table key {key}");
+}
+
+fn actor_wave_inter_delta_iterations(wave: u8) -> u16 {
+    let wave_delta = wave.saturating_sub(4);
+    let pre_ceiling = ACTOR_DEFAULT_DIFFICULTY_INITIAL.saturating_add(wave_delta);
+    u16::from(pre_ceiling.min(ACTOR_DEFAULT_DIFFICULTY_CEILING))
+}
+
+fn parse_actor_wave_i32(value: &str, key: &str, field: &str) -> i32 {
+    value
+        .parse()
+        .unwrap_or_else(|_| panic!("actor source wave table {key}.{field} is not an integer"))
+}
+
+fn apply_actor_wave_delta(value: i32, delta: i32, floor: i32, ceiling: i32) -> i32 {
+    if delta > 0 {
+        (value + delta).min(ceiling)
+    } else if delta < 0 {
+        (value + delta).max(floor)
+    } else {
+        value
+    }
+}
