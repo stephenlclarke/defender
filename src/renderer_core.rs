@@ -854,24 +854,24 @@ pub fn push_source_text_bytes_sprites(
     }
 }
 
-pub fn push_source_controlled_message_sprites(
+pub fn push_arcade_controlled_message_sprites(
     scene: &mut RenderScene,
     text: &str,
     top_left_screen_address: u16,
     layer: RenderLayer,
 ) {
-    let mut layout = SourceMessageTextLayout {
+    let mut layout = ArcadeMessageTextLayout {
         top_left: top_left_screen_address,
         cursor: top_left_screen_address,
         line_spacing: MESSAGE_LINE_SPACING_ROWS,
     };
 
     for word in text.split_whitespace() {
-        if let Some(control) = source_message_control(word) {
+        if let Some(control) = arcade_message_control(word) {
             layout.apply(control);
             continue;
         }
-        if source_message_control_body(word).is_some() {
+        if arcade_message_control_body(word).is_some() {
             continue;
         }
 
@@ -914,38 +914,38 @@ fn source_text_cursor_advance(cursor: u16, width_pixels: u32) -> u16 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SourceMessageTextLayout {
+struct ArcadeMessageTextLayout {
     top_left: u16,
     cursor: u16,
     line_spacing: u8,
 }
 
-impl SourceMessageTextLayout {
-    fn apply(&mut self, control: SourceMessageControl) {
+impl ArcadeMessageTextLayout {
+    fn apply(&mut self, control: ArcadeMessageControl) {
         match control {
-            SourceMessageControl::HorizontalFromTopLeft(delta) => {
+            ArcadeMessageControl::HorizontalFromTopLeft(delta) => {
                 let [top_x, cursor_y] =
                     [self.top_left.to_be_bytes()[0], self.cursor.to_be_bytes()[1]];
                 self.cursor = u16::from_be_bytes([top_x.wrapping_add(delta), cursor_y]);
             }
-            SourceMessageControl::HorizontalFromCursor(delta) => {
+            ArcadeMessageControl::HorizontalFromCursor(delta) => {
                 let [cursor_x, cursor_y] = self.cursor.to_be_bytes();
                 self.cursor = u16::from_be_bytes([cursor_x.wrapping_add(delta), cursor_y]);
             }
-            SourceMessageControl::VerticalFromTopLeft(delta) => {
+            ArcadeMessageControl::VerticalFromTopLeft(delta) => {
                 let [cursor_x, _cursor_y] = self.cursor.to_be_bytes();
                 let top_y = self.top_left.to_be_bytes()[1];
                 self.cursor = u16::from_be_bytes([cursor_x, top_y.wrapping_add(delta)]);
             }
-            SourceMessageControl::VerticalFromCursor(delta) => {
+            ArcadeMessageControl::VerticalFromCursor(delta) => {
                 let [cursor_x, cursor_y] = self.cursor.to_be_bytes();
                 self.cursor = u16::from_be_bytes([cursor_x, cursor_y.wrapping_add(delta)]);
             }
-            SourceMessageControl::ResetTopLeftAndCursor(address) => {
+            ArcadeMessageControl::ResetTopLeftAndCursor(address) => {
                 self.top_left = address;
                 self.cursor = address;
             }
-            SourceMessageControl::ReturnLineFeed => {
+            ArcadeMessageControl::ReturnLineFeed => {
                 let [top_x, _top_y] = self.top_left.to_be_bytes();
                 let cursor_y = self.cursor.to_be_bytes()[1];
                 self.cursor = u16::from_be_bytes([top_x, cursor_y.wrapping_add(self.line_spacing)]);
@@ -955,7 +955,7 @@ impl SourceMessageTextLayout {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SourceMessageControl {
+enum ArcadeMessageControl {
     HorizontalFromTopLeft(u8),
     HorizontalFromCursor(u8),
     VerticalFromTopLeft(u8),
@@ -964,42 +964,42 @@ enum SourceMessageControl {
     ReturnLineFeed,
 }
 
-fn source_message_control(word: &str) -> Option<SourceMessageControl> {
-    let body = source_message_control_body(word)?;
+fn arcade_message_control(word: &str) -> Option<ArcadeMessageControl> {
+    let body = arcade_message_control_body(word)?;
     let (name, arguments) = body.split_once(':').unwrap_or((body, ""));
     match name {
-        "HMT" => Some(SourceMessageControl::HorizontalFromTopLeft(
-            source_message_control_byte(arguments)?,
+        "HMT" => Some(ArcadeMessageControl::HorizontalFromTopLeft(
+            arcade_message_control_byte(arguments)?,
         )),
-        "HMC" => Some(SourceMessageControl::HorizontalFromCursor(
-            source_message_control_byte(arguments)?,
+        "HMC" => Some(ArcadeMessageControl::HorizontalFromCursor(
+            arcade_message_control_byte(arguments)?,
         )),
-        "VMT" => Some(SourceMessageControl::VerticalFromTopLeft(
-            source_message_control_byte(arguments)?,
+        "VMT" => Some(ArcadeMessageControl::VerticalFromTopLeft(
+            arcade_message_control_byte(arguments)?,
         )),
-        "VMC" => Some(SourceMessageControl::VerticalFromCursor(
-            source_message_control_byte(arguments)?,
+        "VMC" => Some(ArcadeMessageControl::VerticalFromCursor(
+            arcade_message_control_byte(arguments)?,
         )),
         "RTC" => {
             let (x, y) = arguments.split_once(',')?;
-            Some(SourceMessageControl::ResetTopLeftAndCursor(
+            Some(ArcadeMessageControl::ResetTopLeftAndCursor(
                 u16::from_be_bytes([
-                    source_message_control_byte(x)?,
-                    source_message_control_byte(y)?,
+                    arcade_message_control_byte(x)?,
+                    arcade_message_control_byte(y)?,
                 ]),
             ))
         }
-        "RLF" if arguments.is_empty() => Some(SourceMessageControl::ReturnLineFeed),
+        "RLF" if arguments.is_empty() => Some(ArcadeMessageControl::ReturnLineFeed),
         _ => None,
     }
 }
 
-fn source_message_control_body(word: &str) -> Option<&str> {
+fn arcade_message_control_body(word: &str) -> Option<&str> {
     word.strip_prefix('[')
         .and_then(|value| value.strip_suffix(']'))
 }
 
-fn source_message_control_byte(value: &str) -> Option<u8> {
+fn arcade_message_control_byte(value: &str) -> Option<u8> {
     let hex = value.strip_prefix("0x")?;
     u8::from_str_radix(hex, 16).ok()
 }

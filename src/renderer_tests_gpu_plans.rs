@@ -863,7 +863,7 @@
         let mut scene = RenderScene::empty(0, SurfaceSize::new(292, 240));
         let text = source_message_text("ELECV").expect("ELECV message text");
 
-        push_source_controlled_message_sprites(&mut scene, text, 0x3258, RenderLayer::Overlay);
+        push_arcade_controlled_message_sprites(&mut scene, text, 0x3258, RenderLayer::Overlay);
 
         assert_eq!(scene.sprites.len(), 23);
         assert!(scene.sprites.iter().all(|sprite| {

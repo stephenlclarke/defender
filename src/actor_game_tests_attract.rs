@@ -138,7 +138,7 @@
             draw.text.as_deref() == Some(presents_text)
                 && matches!(
                     draw.effect,
-                    VisualEffect::SourceMessage {
+                    VisualEffect::ArcadeMessage {
                         top_left_screen_address: ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
                         visual_offset: Point { x: 0, y: 0 },
                     }
@@ -221,7 +221,7 @@
             draw.text.as_deref() == Some(hall_title_text)
                 && matches!(
                     draw.effect,
-                    VisualEffect::SourceMessage {
+                    VisualEffect::ArcadeMessage {
                         top_left_screen_address: 0x3854,
                         visual_offset: ATTRACT_HALL_TABLE_VISUAL_OFFSET,
                     }
@@ -306,7 +306,7 @@
             draw.text.as_deref() == Some(scan_text)
                 && matches!(
                     draw.effect,
-                    VisualEffect::SourceMessage {
+                    VisualEffect::ArcadeMessage {
                         top_left_screen_address: 0x4330,
                         visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
                     }
@@ -470,7 +470,7 @@
             draw.text.as_deref() == Some(lander_text)
                 && matches!(
                     draw.effect,
-                    VisualEffect::SourceMessage {
+                    VisualEffect::ArcadeMessage {
                         top_left_screen_address: 0x1C70,
                         visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
                     }
@@ -504,7 +504,7 @@
                 draw.text.as_deref() == Some(text)
                     && matches!(
                         draw.effect,
-                        VisualEffect::SourceMessage {
+                        VisualEffect::ArcadeMessage {
                             top_left_screen_address,
                             visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
                         } if top_left_screen_address == screen_address
@@ -768,7 +768,7 @@
             && event.duration_steps == Some(ATTRACT_WILLIAMS_LOGO_DURATION_STEPS)));
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
-            AttractScriptActionManifest::SourceMessage {
+            AttractScriptActionManifest::ArcadeMessage {
                 ref message,
                 top_left_screen_address: ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
                 visual_offset: Point { x: 0, y: 0 },
@@ -812,7 +812,7 @@
         )));
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
-            AttractScriptActionManifest::SourceMessage {
+            AttractScriptActionManifest::ArcadeMessage {
                 ref message,
                 top_left_screen_address: 0x3854,
                 visual_offset: ATTRACT_HALL_TABLE_VISUAL_OFFSET,
@@ -827,7 +827,7 @@
                 .iter()
                 .filter(|event| matches!(
                     event.action,
-                    AttractScriptActionManifest::SourceMessage {
+                    AttractScriptActionManifest::ArcadeMessage {
                         ref message,
                         top_left_screen_address: 0x1E72 | 0x5F72,
                         visual_offset: ATTRACT_HALL_TABLE_VISUAL_OFFSET,
@@ -857,7 +857,7 @@
         {
             assert!(parsed.manifest().events.iter().any(|event| matches!(
                 event.action,
-                AttractScriptActionManifest::SourceMessage {
+                AttractScriptActionManifest::ArcadeMessage {
                     message: ref event_message,
                     top_left_screen_address,
                     visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
@@ -887,7 +887,7 @@
         {
             assert!(parsed.manifest().events.iter().any(|event| matches!(
                 event.action,
-                AttractScriptActionManifest::SourceMessage {
+                AttractScriptActionManifest::ArcadeMessage {
                     message: ref event_message,
                     ..
                 } if event_message == &format!("{message:?}")
@@ -1304,7 +1304,7 @@
             .expect("source message script action should parse");
         assert_eq!(
             script.manifest().events[0].action,
-            AttractScriptActionManifest::SourceMessage {
+            AttractScriptActionManifest::ArcadeMessage {
                 message: "WilliamsElectronics".to_string(),
                 top_left_screen_address: 0x3258,
                 visual_offset: Point::new(0, 0),
@@ -1318,7 +1318,7 @@
             draw.text.as_deref() == Some(source_text)
                 && matches!(
                     draw.effect,
-                    VisualEffect::SourceMessage {
+                    VisualEffect::ArcadeMessage {
                         top_left_screen_address: 0x3258,
                         visual_offset: Point { x: 0, y: 0 },
                     }
@@ -1346,7 +1346,7 @@
             .expect("source message script action should parse with offset");
         assert_eq!(
             script.manifest().events[0].action,
-            AttractScriptActionManifest::SourceMessage {
+            AttractScriptActionManifest::ArcadeMessage {
                 message: "WilliamsElectronics".to_string(),
                 top_left_screen_address: 0x3258,
                 visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
@@ -1360,7 +1360,7 @@
             draw.text.as_deref() == Some(source_text)
                 && matches!(
                     draw.effect,
-                    VisualEffect::SourceMessage {
+                    VisualEffect::ArcadeMessage {
                         top_left_screen_address: 0x3258,
                         visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
                     }

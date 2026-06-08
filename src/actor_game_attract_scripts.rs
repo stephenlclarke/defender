@@ -29,7 +29,7 @@ pub enum SpriteKey {
 pub enum VisualEffect {
     #[default]
     Static,
-    SourceMessage {
+    ArcadeMessage {
         top_left_screen_address: u16,
         visual_offset: Point,
     },
@@ -239,7 +239,7 @@ impl AttractScript {
                 Some(ATTRACT_WILLIAMS_LOGO_DURATION_STEPS),
                 ATTRACT_WILLIAMS_LOGO_POSITION,
             ),
-            AttractScriptEvent::source_message(
+            AttractScriptEvent::arcade_message(
                 ATTRACT_PRESENTS_START_STEP,
                 Some(ATTRACT_PRESENTS_DURATION_STEPS),
                 PRESENTS_MESSAGE,
@@ -262,35 +262,35 @@ impl AttractScript {
                 ATTRACT_CREDIT_LABEL_POSITION,
                 ATTRACT_CREDIT_COUNT_POSITION,
             ),
-            AttractScriptEvent::source_message_with_offset(
+            AttractScriptEvent::arcade_message_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 ATTRACT_HALL_TITLE_MESSAGE,
                 0x3854,
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
-            AttractScriptEvent::source_message_with_offset(
+            AttractScriptEvent::arcade_message_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 ATTRACT_HALL_TODAYS_MESSAGE,
                 0x2268,
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
-            AttractScriptEvent::source_message_with_offset(
+            AttractScriptEvent::arcade_message_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 ATTRACT_HALL_ALL_TIME_MESSAGE,
                 0x6068,
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
-            AttractScriptEvent::source_message_with_offset(
+            AttractScriptEvent::arcade_message_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 ATTRACT_HALL_GREATEST_MESSAGE,
                 0x1E72,
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
-            AttractScriptEvent::source_message_with_offset(
+            AttractScriptEvent::arcade_message_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 ATTRACT_HALL_GREATEST_MESSAGE,
@@ -318,7 +318,7 @@ impl AttractScript {
         for (line_index, (message, screen_address)) in
             ATTRACT_INSTRUCTION_TEXT_LINES.iter().copied().enumerate()
         {
-            events.push(AttractScriptEvent::source_message_with_offset(
+            events.push(AttractScriptEvent::arcade_message_with_offset(
                 actor_attract_scoring_instruction_text_start_step(line_index),
                 None,
                 message,
@@ -480,7 +480,7 @@ fn parse_attract_script_event(
             let top_left_screen_address =
                 parse_attract_u16(line_number, parts.next(), "top-left screen address")?;
             let visual_offset = parse_optional_attract_point(line_number, &mut parts)?;
-            Ok(AttractScriptEvent::source_message_with_offset(
+            Ok(AttractScriptEvent::arcade_message_with_offset(
                 start_after_steps,
                 duration_steps,
                 message,
@@ -784,13 +784,13 @@ impl AttractScriptEvent {
         }
     }
 
-    pub fn source_message(
+    pub fn arcade_message(
         start_after_steps: u64,
         duration_steps: Option<u64>,
         message: MessageId,
         top_left_screen_address: u16,
     ) -> Self {
-        Self::source_message_with_offset(
+        Self::arcade_message_with_offset(
             start_after_steps,
             duration_steps,
             message,
@@ -799,7 +799,7 @@ impl AttractScriptEvent {
         )
     }
 
-    pub fn source_message_with_offset(
+    pub fn arcade_message_with_offset(
         start_after_steps: u64,
         duration_steps: Option<u64>,
         message: MessageId,
@@ -809,7 +809,7 @@ impl AttractScriptEvent {
         Self {
             start_after_steps,
             duration_steps,
-            action: AttractScriptAction::SourceMessage {
+            action: AttractScriptAction::ArcadeMessage {
                 message,
                 top_left_screen_address,
                 visual_offset,
@@ -981,7 +981,7 @@ pub enum AttractScriptAction {
         position: Point,
         value: String,
     },
-    SourceMessage {
+    ArcadeMessage {
         message: MessageId,
         top_left_screen_address: u16,
         visual_offset: Point,
@@ -1030,11 +1030,11 @@ impl AttractScriptAction {
             Self::Text { position, value } => {
                 vec![DrawCommand::text(actor, *position, value.clone())]
             }
-            Self::SourceMessage {
+            Self::ArcadeMessage {
                 message,
                 top_left_screen_address,
                 visual_offset,
-            } => vec![DrawCommand::source_message_with_offset(
+            } => vec![DrawCommand::arcade_message_with_offset(
                 actor,
                 crate::arcade_assets::message_text(*message),
                 *top_left_screen_address,
@@ -1163,11 +1163,11 @@ impl AttractScriptAction {
                 position: *position,
                 value: value.clone(),
             },
-            Self::SourceMessage {
+            Self::ArcadeMessage {
                 message,
                 top_left_screen_address,
                 visual_offset,
-            } => AttractScriptActionManifest::SourceMessage {
+            } => AttractScriptActionManifest::ArcadeMessage {
                 message: format!("{message:?}"),
                 top_left_screen_address: *top_left_screen_address,
                 visual_offset: *visual_offset,
@@ -1368,7 +1368,7 @@ pub enum AttractScriptActionManifest {
         position: Point,
         value: String,
     },
-    SourceMessage {
+    ArcadeMessage {
         message: String,
         top_left_screen_address: u16,
         visual_offset: Point,

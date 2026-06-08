@@ -67,12 +67,12 @@ impl ActorRenderSceneBridge {
             } else {
                 RenderLayer::Hud
             };
-            if let VisualEffect::SourceMessage {
+            if let VisualEffect::ArcadeMessage {
                 top_left_screen_address,
                 visual_offset,
             } = draw.effect
             {
-                push_source_controlled_message_sprites_with_offset(
+                push_arcade_controlled_message_sprites_with_offset(
                     scene,
                     text,
                     top_left_screen_address,
@@ -107,7 +107,7 @@ impl ActorRenderSceneBridge {
                 source_center,
             } => self.push_explosion_sprite(scene, draw.position, kind, age, source_center),
             VisualEffect::Static
-            | VisualEffect::SourceMessage { .. }
+            | VisualEffect::ArcadeMessage { .. }
             | VisualEffect::SourceLanderFrame { .. }
             | VisualEffect::SourceBomberFrame { .. }
             | VisualEffect::SourcePod
@@ -377,7 +377,7 @@ fn push_actor_message_sprites(
     top_left_screen_address: u16,
     layer: RenderLayer,
 ) {
-    push_source_controlled_message_sprites(
+    push_arcade_controlled_message_sprites(
         scene,
         crate::arcade_assets::message_text(message),
         top_left_screen_address,
@@ -401,7 +401,7 @@ fn actor_visible_decimal_digits(value: u8) -> ([u8; 2], usize) {
     }
 }
 
-fn push_source_controlled_message_sprites_with_offset(
+fn push_arcade_controlled_message_sprites_with_offset(
     scene: &mut RenderScene,
     text: &str,
     top_left_screen_address: u16,
@@ -409,7 +409,7 @@ fn push_source_controlled_message_sprites_with_offset(
     visual_offset: Point,
 ) {
     let first_sprite = scene.sprites.len();
-    push_source_controlled_message_sprites(scene, text, top_left_screen_address, layer);
+    push_arcade_controlled_message_sprites(scene, text, top_left_screen_address, layer);
     offset_new_sprites(scene, first_sprite, point_position(visual_offset));
 }
 
