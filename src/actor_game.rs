@@ -11,6 +11,7 @@ include!("actor_game_wave_scripts.rs");
 include!("actor_game_attract_scripts.rs");
 include!("actor_game_protocol.rs");
 include!("actor_game_render_bridge.rs");
+include!("actor_game_attract_scoring.rs");
 include!("actor_game_runtime.rs");
 include!("actor_game_driver.rs");
 include!("actor_game_actor_helpers.rs");
