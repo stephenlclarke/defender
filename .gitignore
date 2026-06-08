@@ -4,6 +4,7 @@ SONAR_TOKEN
 .vscode/
 CODEX.md
 AGENTS.md
+PLAN.md
 assets/roms/
 cfg/
 nvram/
