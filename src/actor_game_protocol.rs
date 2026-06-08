@@ -4,7 +4,7 @@ pub struct CollisionBody {
     pub kind: ActorKind,
     pub position: Point,
     pub bounds: Rect,
-    pub source_mutant: Option<ActorSourceMutantMetadata>,
+    pub mutant_runtime: Option<ActorSourceMutantMetadata>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,14 +16,14 @@ pub struct ActorSnapshot {
     pub direction: Option<Direction>,
     pub bounds: Option<Rect>,
     pub alive: bool,
-    pub source_lander: Option<ActorSourceLanderMetadata>,
-    pub source_bomber: Option<ActorSourceBomberMetadata>,
-    pub source_pod: Option<ActorSourcePodMetadata>,
-    pub source_swarmer: Option<ActorSourceSwarmerMetadata>,
-    pub source_baiter: Option<ActorSourceBaiterMetadata>,
-    pub source_mutant: Option<ActorSourceMutantMetadata>,
-    pub source_human: Option<ActorSourceHumanMetadata>,
-    pub source_enemy_projectile: Option<ActorSourceEnemyProjectileMetadata>,
+    pub lander_runtime: Option<ActorSourceLanderMetadata>,
+    pub bomber_runtime: Option<ActorSourceBomberMetadata>,
+    pub pod_runtime: Option<ActorSourcePodMetadata>,
+    pub swarmer_runtime: Option<ActorSourceSwarmerMetadata>,
+    pub baiter_runtime: Option<ActorSourceBaiterMetadata>,
+    pub mutant_runtime: Option<ActorSourceMutantMetadata>,
+    pub human_runtime: Option<ActorSourceHumanMetadata>,
+    pub enemy_projectile_runtime: Option<ActorSourceEnemyProjectileMetadata>,
 }
 
 impl ActorSnapshot {
@@ -33,7 +33,7 @@ impl ActorSnapshot {
             kind: self.kind,
             position: self.position,
             bounds: self.bounds?,
-            source_mutant: self.source_mutant,
+            mutant_runtime: self.mutant_runtime,
         })
     }
 }
@@ -227,10 +227,10 @@ pub struct StepPrompt {
     pub high_score_initials: HighScoreInitialsState,
     pub snapshots: Vec<ActorSnapshot>,
     pub behavior_script: ActorBehaviorScript,
-    pub source_background_left: u16,
-    pub source_rng: Option<ActorSourceRngSnapshot>,
-    pub source_human_walk_target_slot: Option<usize>,
-    pub source_shell_scan_tick: bool,
+    pub background_left: u16,
+    pub arcade_rng: Option<ActorSourceRngSnapshot>,
+    pub human_walk_target_slot: Option<usize>,
+    pub projectile_scan_tick: bool,
 }
 
 impl StepPrompt {
@@ -265,13 +265,13 @@ impl StepPrompt {
             .min_by_key(|snapshot| manhattan_distance(position, snapshot.position))
     }
 
-    fn source_target_human(&self, target_slot_index: usize) -> Option<&ActorSnapshot> {
+    fn target_human(&self, target_slot_index: usize) -> Option<&ActorSnapshot> {
         self.snapshots.iter().find(|snapshot| {
             snapshot.kind == ActorKind::Human
                 && snapshot.alive
                 && snapshot.bounds.is_some()
                 && snapshot
-                    .source_human
+                    .human_runtime
                     .is_some_and(|source| source.target_slot_index == target_slot_index)
         })
     }
@@ -395,8 +395,8 @@ pub struct StepReport {
     pub survivor_bonus: Option<SurvivorBonusReport>,
     pub behavior_script: ActorBehaviorScriptManifest,
     pub enemy_reserve: EnemyReserveSnapshot,
-    pub source_background_left: u16,
-    pub source_rng: Option<ActorSourceRngSnapshot>,
+    pub background_left: u16,
+    pub arcade_rng: Option<ActorSourceRngSnapshot>,
     pub terrain_blow: Option<TerrainBlowSnapshot>,
     pub snapshots: Vec<ActorSnapshot>,
     pub draws: Vec<DrawCommand>,
@@ -648,13 +648,13 @@ fn world_snapshot_for_report(report: &StepReport) -> WorldSnapshot {
         explosions: actor_explosions_for_report(report),
         score_popups: actor_score_popups_for_report(report),
         enemy_reserve: report.enemy_reserve,
-        source_rng: report.source_rng.map(clean_source_rng).unwrap_or_default(),
+        arcade_rng: report.arcade_rng.map(clean_arcade_rng).unwrap_or_default(),
         ..WorldSnapshot::default()
     };
     world.sync_actor_presentation(
         phase,
         report.step,
-        actor_world_word(report.source_background_left),
+        actor_world_word(report.background_left),
         player.position,
     );
     world
@@ -665,10 +665,10 @@ fn actor_playfield_terrain_segments(report: &StepReport) -> Vec<TerrainSegment> 
         return Vec::new();
     }
 
-    source_playfield_terrain_segments()
+    playfield_terrain_segments()
 }
 
-fn source_playfield_terrain_segments() -> Vec<TerrainSegment> {
+fn playfield_terrain_segments() -> Vec<TerrainSegment> {
     vec![
         TerrainSegment {
             position: ScreenPosition::new(0, 224),
@@ -700,7 +700,7 @@ fn actor_source_human_target_y(position_x: i16, offset: u8) -> Option<i16> {
 
 fn actor_source_terrain_altitude(position_x: i16) -> Option<u8> {
     let object_x = u16::from(u8::try_from(position_x).ok()?);
-    source_playfield_terrain_segments()
+    playfield_terrain_segments()
         .into_iter()
         .find(|segment| {
             let start = u16::from(segment.position.x);
@@ -745,17 +745,17 @@ fn clean_enemy_snapshot(snapshot: &ActorSnapshot) -> Option<CleanEnemySnapshot> 
         screen_position(snapshot.position),
         screen_velocity(snapshot.velocity),
     );
-    enemy.source_lander = snapshot.source_lander.map(clean_source_lander);
-    enemy.source_bomber = snapshot.source_bomber.map(clean_source_bomber);
-    enemy.source_pod = snapshot.source_pod.map(clean_source_pod);
-    enemy.source_swarmer = snapshot.source_swarmer.map(clean_source_swarmer);
-    enemy.source_baiter = snapshot.source_baiter.map(clean_source_baiter);
-    enemy.source_mutant = snapshot.source_mutant.map(clean_source_mutant);
+    enemy.lander_runtime = snapshot.lander_runtime.map(clean_lander_runtime);
+    enemy.bomber_runtime = snapshot.bomber_runtime.map(clean_bomber_runtime);
+    enemy.pod_runtime = snapshot.pod_runtime.map(clean_pod_runtime);
+    enemy.swarmer_runtime = snapshot.swarmer_runtime.map(clean_swarmer_runtime);
+    enemy.baiter_runtime = snapshot.baiter_runtime.map(clean_baiter_runtime);
+    enemy.mutant_runtime = snapshot.mutant_runtime.map(clean_mutant_runtime);
     Some(enemy)
 }
 
-fn clean_source_lander(source: ActorSourceLanderMetadata) -> SourceLanderSnapshot {
-    SourceLanderSnapshot {
+fn clean_lander_runtime(source: ActorSourceLanderMetadata) -> LanderRuntimeSnapshot {
+    LanderRuntimeSnapshot {
         x_fraction: source.x_fraction,
         y_fraction: source.y_fraction,
         x_velocity: source.x_velocity,
@@ -767,8 +767,8 @@ fn clean_source_lander(source: ActorSourceLanderMetadata) -> SourceLanderSnapsho
     }
 }
 
-fn clean_source_bomber(source: ActorSourceBomberMetadata) -> SourceBomberSnapshot {
-    SourceBomberSnapshot {
+fn clean_bomber_runtime(source: ActorSourceBomberMetadata) -> BomberRuntimeSnapshot {
+    BomberRuntimeSnapshot {
         x_fraction: source.x_fraction,
         y_fraction: source.y_fraction,
         x_velocity: source.x_velocity,
@@ -776,12 +776,12 @@ fn clean_source_bomber(source: ActorSourceBomberMetadata) -> SourceBomberSnapsho
         picture_frame: source.picture_frame,
         cruise_altitude: screen_coordinate(source.cruise_altitude),
         sleep_ticks: source.sleep_ticks,
-        source_slot: source.source_slot,
+        slot: source.slot,
     }
 }
 
-fn clean_source_pod(source: ActorSourcePodMetadata) -> SourcePodSnapshot {
-    SourcePodSnapshot {
+fn clean_pod_runtime(source: ActorSourcePodMetadata) -> PodRuntimeSnapshot {
+    PodRuntimeSnapshot {
         x_fraction: source.x_fraction,
         y_fraction: source.y_fraction,
         x_velocity: source.x_velocity,
@@ -789,8 +789,8 @@ fn clean_source_pod(source: ActorSourcePodMetadata) -> SourcePodSnapshot {
     }
 }
 
-fn clean_source_swarmer(source: ActorSourceSwarmerMetadata) -> SourceSwarmerSnapshot {
-    SourceSwarmerSnapshot {
+fn clean_swarmer_runtime(source: ActorSourceSwarmerMetadata) -> SwarmerRuntimeSnapshot {
+    SwarmerRuntimeSnapshot {
         x_fraction: source.x_fraction,
         y_fraction: source.y_fraction,
         x_velocity: source.x_velocity,
@@ -802,8 +802,8 @@ fn clean_source_swarmer(source: ActorSourceSwarmerMetadata) -> SourceSwarmerSnap
     }
 }
 
-fn clean_source_baiter(source: ActorSourceBaiterMetadata) -> SourceBaiterSnapshot {
-    SourceBaiterSnapshot {
+fn clean_baiter_runtime(source: ActorSourceBaiterMetadata) -> BaiterRuntimeSnapshot {
+    BaiterRuntimeSnapshot {
         x_fraction: source.x_fraction,
         y_fraction: source.y_fraction,
         x_velocity: source.x_velocity,
@@ -814,22 +814,22 @@ fn clean_source_baiter(source: ActorSourceBaiterMetadata) -> SourceBaiterSnapsho
     }
 }
 
-fn clean_source_mutant(source: ActorSourceMutantMetadata) -> SourceMutantSnapshot {
-    SourceMutantSnapshot {
+fn clean_mutant_runtime(source: ActorSourceMutantMetadata) -> MutantRuntimeSnapshot {
+    MutantRuntimeSnapshot {
         x_fraction: source.x_fraction,
         y_fraction: source.y_fraction,
         x_velocity: source.x_velocity,
         y_velocity: source.y_velocity,
         shot_timer: source.shot_timer,
         sleep_ticks: source.sleep_ticks,
-        hop_rng: clean_source_rng(source.hop_rng),
+        hop_rng: clean_arcade_rng(source.hop_rng),
         render_x_correction: source.render_x_correction,
         target6_first_shot_deferred: source.target6_first_shot_deferred,
     }
 }
 
-const fn clean_source_rng(source: ActorSourceRngSnapshot) -> SourceRandSnapshot {
-    SourceRandSnapshot {
+const fn clean_arcade_rng(source: ActorSourceRngSnapshot) -> ArcadeRngSnapshot {
+    ArcadeRngSnapshot {
         seed: source.seed,
         hseed: source.hseed,
         lseed: source.lseed,
@@ -846,9 +846,9 @@ fn actor_humans_for_report(report: &StepReport) -> Vec<CleanHumanSnapshot> {
             human.carried = report.draws.iter().any(|draw| {
                 draw.actor == snapshot.id && matches!(draw.sprite, SpriteKey::HumanCarried)
             });
-            if let Some(source) = snapshot.source_human {
-                human.source_x_fraction = source.x_fraction;
-                human.source_picture_frame = source.picture_frame;
+            if let Some(source) = snapshot.human_runtime {
+                human.x_subpixel = source.x_fraction;
+                human.picture_frame = source.picture_frame;
             }
             human
         })
@@ -862,7 +862,7 @@ fn actor_projectiles_for_report(report: &StepReport) -> Vec<CleanProjectileSnaps
         .filter(|snapshot| snapshot.kind == ActorKind::Laser && snapshot.alive)
         .map(|snapshot| CleanProjectileSnapshot {
             position: screen_position(snapshot.position),
-            source_tail_position: screen_position(Point::new(
+            tail_position: screen_position(Point::new(
                 snapshot.position.x.saturating_sub(16),
                 snapshot.position.y,
             )),
@@ -881,25 +881,25 @@ fn actor_enemy_projectiles_for_report(report: &StepReport) -> Vec<CleanEnemyProj
         .map(|snapshot| CleanEnemyProjectileSnapshot {
             position: screen_position(snapshot.position),
             velocity: screen_velocity(snapshot.velocity),
-            source_kind: if snapshot.kind == ActorKind::Bomb {
-                EnemyProjectileSourceKind::BomberBombShell
+            kind: if snapshot.kind == ActorKind::Bomb {
+                EnemyProjectileKind::BomberBombShell
             } else {
-                EnemyProjectileSourceKind::Fireball
+                EnemyProjectileKind::Fireball
             },
-            source_x_fraction: snapshot
-                .source_enemy_projectile
+            x_subpixel: snapshot
+                .enemy_projectile_runtime
                 .map_or(0, |source| source.x_fraction),
-            source_y_fraction: snapshot
-                .source_enemy_projectile
+            y_subpixel: snapshot
+                .enemy_projectile_runtime
                 .map_or(0, |source| source.y_fraction),
-            source_x_velocity: snapshot
-                .source_enemy_projectile
+            x_velocity_word: snapshot
+                .enemy_projectile_runtime
                 .map_or(0, |source| source.x_velocity),
-            source_y_velocity: snapshot
-                .source_enemy_projectile
+            y_velocity_word: snapshot
+                .enemy_projectile_runtime
                 .map_or(0, |source| source.y_velocity),
-            source_lifetime_ticks: snapshot
-                .source_enemy_projectile
+            lifetime_ticks: snapshot
+                .enemy_projectile_runtime
                 .map_or(0, |source| source.lifetime_ticks),
         })
         .collect()
@@ -970,14 +970,14 @@ fn actor_world_word(value: u16) -> WorldVector {
 }
 
 fn scroll_background_right(background_left: u16, pixels: i16) -> u16 {
-    background_left.wrapping_add(source_background_pixel_delta(pixels))
+    background_left.wrapping_add(background_pixel_delta(pixels))
 }
 
 fn scroll_background_left(background_left: u16, pixels: i16) -> u16 {
-    background_left.wrapping_sub(source_background_pixel_delta(pixels))
+    background_left.wrapping_sub(background_pixel_delta(pixels))
 }
 
-fn source_background_pixel_delta(pixels: i16) -> u16 {
+fn background_pixel_delta(pixels: i16) -> u16 {
     u16::try_from(pixels.max(0))
         .unwrap_or(u16::MAX)
         .wrapping_mul(BACKGROUND_WORD_PER_PIXEL)

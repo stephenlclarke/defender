@@ -43,14 +43,14 @@ impl AssetActor for AttractDirector {
                 direction: None,
                 bounds: None,
                 alive: true,
-                source_lander: None,
-                source_bomber: None,
-                source_pod: None,
-                source_swarmer: None,
-                source_baiter: None,
-                source_mutant: None,
-                source_human: None,
-                source_enemy_projectile: None,
+                lander_runtime: None,
+                bomber_runtime: None,
+                pod_runtime: None,
+                swarmer_runtime: None,
+                baiter_runtime: None,
+                mutant_runtime: None,
+                human_runtime: None,
+                enemy_projectile_runtime: None,
             },
             commands,
             draws,
@@ -128,14 +128,14 @@ impl AssetActor for ScriptedAttractProgram {
                 direction: None,
                 bounds: None,
                 alive: true,
-                source_lander: None,
-                source_bomber: None,
-                source_pod: None,
-                source_swarmer: None,
-                source_baiter: None,
-                source_mutant: None,
-                source_human: None,
-                source_enemy_projectile: None,
+                lander_runtime: None,
+                bomber_runtime: None,
+                pod_runtime: None,
+                swarmer_runtime: None,
+                baiter_runtime: None,
+                mutant_runtime: None,
+                human_runtime: None,
+                enemy_projectile_runtime: None,
             },
             commands: Vec::new(),
             draws,
@@ -242,14 +242,14 @@ impl StatusDisplay {
             direction: None,
             bounds: None,
             alive: true,
-            source_lander: None,
-            source_bomber: None,
-            source_pod: None,
-            source_swarmer: None,
-            source_baiter: None,
-            source_mutant: None,
-            source_human: None,
-            source_enemy_projectile: None,
+            lander_runtime: None,
+            bomber_runtime: None,
+            pod_runtime: None,
+            swarmer_runtime: None,
+            baiter_runtime: None,
+            mutant_runtime: None,
+            human_runtime: None,
+            enemy_projectile_runtime: None,
         }
     }
 }
@@ -428,12 +428,12 @@ impl PlayerShip {
 
         self.hyperspace_steps_remaining = self.hyperspace_steps_remaining.saturating_sub(1);
         if self.hyperspace_steps_remaining == 0 {
-            let (position, direction, source_background_left) =
+            let (position, direction, background_left) =
                 self.hyperspace_rematerialization(behavior);
             self.position = PLAYER_BOUNDS.clamp_point(position);
             self.direction = direction;
-            if let Some(source_background_left) = source_background_left {
-                commands.push(GameCommand::SetSourceBackgroundLeft(source_background_left));
+            if let Some(background_left) = background_left {
+                commands.push(GameCommand::SetSourceBackgroundLeft(background_left));
             }
             let death_lseed = self
                 .hyperspace_entry_lseed
@@ -492,7 +492,7 @@ impl AssetActor for PlayerShip {
             let input_blocked = was_hidden || self.hyperspace_death_steps_remaining.is_some();
             if !death_due && !input_blocked {
                 let mut next_position = self.position;
-                let mut source_background_left = prompt.source_background_left;
+                let mut background_left = prompt.background_left;
                 if prompt.input.altitude_up {
                     next_position.y = next_position.y.saturating_sub(behavior.player_speed);
                 }
@@ -503,10 +503,10 @@ impl AssetActor for PlayerShip {
                     let (next_x, next_background_left) = Self::step_horizontal_motion(
                         next_position.x,
                         self.direction.sign() * behavior.player_speed,
-                        source_background_left,
+                        background_left,
                     );
                     next_position.x = next_x;
-                    source_background_left = next_background_left;
+                    background_left = next_background_left;
                     commands.push(GameCommand::PlaySound(SoundCue::Thrust));
                 }
                 if prompt.input.reverse && !self.reverse_held {
@@ -519,8 +519,8 @@ impl AssetActor for PlayerShip {
                     clamp_i16(next_position.y, PLAYER_BOUNDS.top, PLAYER_BOUNDS.bottom);
                 self.position.x =
                     clamp_i16(next_position.x, PLAYER_BOUNDS.left, PLAYER_BOUNDS.right);
-                if source_background_left != prompt.source_background_left {
-                    commands.push(GameCommand::SetSourceBackgroundLeft(source_background_left));
+                if background_left != prompt.background_left {
+                    commands.push(GameCommand::SetSourceBackgroundLeft(background_left));
                 }
                 self.laser_cooldown = self.laser_cooldown.saturating_sub(1);
                 if prompt.input.wants_fire() && self.laser_cooldown == 0 {
@@ -586,14 +586,14 @@ impl AssetActor for PlayerShip {
                     None
                 },
                 alive: prompt.phase == Phase::Playing,
-                source_lander: None,
-                source_bomber: None,
-                source_pod: None,
-                source_swarmer: None,
-                source_baiter: None,
-                source_mutant: None,
-                source_human: None,
-                source_enemy_projectile: None,
+                lander_runtime: None,
+                bomber_runtime: None,
+                pod_runtime: None,
+                swarmer_runtime: None,
+                baiter_runtime: None,
+                mutant_runtime: None,
+                human_runtime: None,
+                enemy_projectile_runtime: None,
             },
             commands,
             draws,

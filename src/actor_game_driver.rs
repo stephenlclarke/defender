@@ -22,18 +22,18 @@ pub struct ActorGameDriver {
     wave_script: ActorWaveScript,
     wave_spawn_allocations: BTreeMap<ActorKind, usize>,
     enemy_reserve: EnemyReserveSnapshot,
-    source_target_cursor: Option<usize>,
-    source_astronaut_cursor: Option<usize>,
-    source_astronaut_sleep_ticks: u8,
-    source_reserve_activation_ready: bool,
-    source_reserve_activation_cooldown_steps: u16,
-    source_first_wave_early_reserve_steps_remaining: Option<u16>,
-    source_first_wave_lander_refill_steps_remaining: Option<u8>,
-    source_background_left: u16,
+    target_human_cursor: Option<usize>,
+    human_walk_cursor: Option<usize>,
+    human_walk_sleep_ticks: u8,
+    reserve_activation_ready: bool,
+    reserve_activation_cooldown_steps: u16,
+    first_wave_early_reserve_steps_remaining: Option<u16>,
+    first_wave_lander_refill_steps_remaining: Option<u8>,
+    background_left: u16,
     baiter_timer_steps: Option<u32>,
     baiter_pacing_steps_remaining: u8,
-    source_rng: ActorSourceRng,
-    source_shell_scan_steps_remaining: u8,
+    arcade_rng: ActorSourceRng,
+    projectile_scan_steps_remaining: u8,
     pending_smart_bomb_detonation_steps: Option<u8>,
     smart_bomb_flash_steps_remaining: u8,
     pending_sound_commands: Vec<PendingActorSoundCommand>,
@@ -108,18 +108,18 @@ impl ActorGameDriver {
             wave_script,
             wave_spawn_allocations: BTreeMap::new(),
             enemy_reserve: EnemyReserveSnapshot::default(),
-            source_target_cursor: None,
-            source_astronaut_cursor: Some(0),
-            source_astronaut_sleep_ticks: 0,
-            source_reserve_activation_ready: false,
-            source_reserve_activation_cooldown_steps: 0,
-            source_first_wave_early_reserve_steps_remaining: None,
-            source_first_wave_lander_refill_steps_remaining: None,
-            source_background_left: 0,
+            target_human_cursor: None,
+            human_walk_cursor: Some(0),
+            human_walk_sleep_ticks: 0,
+            reserve_activation_ready: false,
+            reserve_activation_cooldown_steps: 0,
+            first_wave_early_reserve_steps_remaining: None,
+            first_wave_lander_refill_steps_remaining: None,
+            background_left: 0,
             baiter_timer_steps: None,
             baiter_pacing_steps_remaining: ACTOR_BAITER_TIMER_PACING_STEPS,
-            source_rng: PLAYFIELD_START_RNG,
-            source_shell_scan_steps_remaining: ENEMY_PROJECTILE_SCAN_INITIAL_DELAY_STEPS,
+            arcade_rng: PLAYFIELD_START_RNG,
+            projectile_scan_steps_remaining: ENEMY_PROJECTILE_SCAN_INITIAL_DELAY_STEPS,
             pending_smart_bomb_detonation_steps: None,
             smart_bomb_flash_steps_remaining: 0,
             pending_sound_commands: Vec::new(),
@@ -205,26 +205,26 @@ impl ActorGameDriver {
         let mut behavior_script = self
             .behavior_script
             .with_input_overrides(effective_input, self.snapshots.values().cloned());
-        let source_rng = if self.phase == Phase::Playing
+        let arcade_rng = if self.phase == Phase::Playing
             && !survivor_bonus_interstitial
             && !player_switch_interstitial
             && !player_start_interstitial
         {
-            Some(self.source_rng.advance().snapshot())
+            Some(self.arcade_rng.advance().snapshot())
         } else {
             None
         };
-        if let Some(source_rng) = source_rng {
+        if let Some(arcade_rng) = arcade_rng {
             behavior_script =
-                behavior_script.with_hyperspace_source_seed(source_rng.hyperspace_seed());
+                behavior_script.with_hyperspace_source_seed(arcade_rng.hyperspace_seed());
         }
-        let source_human_walk_target_slot = self.advance_source_astronaut_process(source_rng);
-        let source_shell_scan_tick = if self.phase == Phase::Playing
+        let human_walk_target_slot = self.advance_human_walk_process(arcade_rng);
+        let projectile_scan_tick = if self.phase == Phase::Playing
             && !survivor_bonus_interstitial
             && !player_switch_interstitial
             && !player_start_interstitial
         {
-            self.advance_source_shell_scan_tick()
+            self.advance_projectile_scan_tick()
         } else {
             false
         };
@@ -254,10 +254,10 @@ impl ActorGameDriver {
             high_score_initials: self.high_score_initials,
             snapshots: self.snapshots.values().cloned().collect(),
             behavior_script: behavior_script.clone(),
-            source_background_left: self.source_background_left,
-            source_rng,
-            source_human_walk_target_slot,
-            source_shell_scan_tick,
+            background_left: self.background_left,
+            arcade_rng,
+            human_walk_target_slot,
+            projectile_scan_tick,
         };
 
         let mut replies = Vec::new();
@@ -311,7 +311,7 @@ impl ActorGameDriver {
             && !player_switch_interstitial
             && !player_start_interstitial
         {
-            self.source_reserve_activation_ready = true;
+            self.reserve_activation_ready = true;
         }
 
         let report = StepReport {
@@ -341,8 +341,8 @@ impl ActorGameDriver {
             survivor_bonus,
             behavior_script: behavior_script.manifest(),
             enemy_reserve: self.enemy_reserve,
-            source_background_left: self.source_background_left,
-            source_rng,
+            background_left: self.background_left,
+            arcade_rng,
             terrain_blow: self.terrain_blow,
             snapshots: self.snapshots.values().cloned().collect(),
             draws,
@@ -618,7 +618,7 @@ impl ActorGameDriver {
             .snapshots
             .values()
             .filter_map(|snapshot| {
-                actor_collision_body_for_snapshot(snapshot, self.source_background_left)
+                actor_collision_body_for_snapshot(snapshot, self.background_left)
             })
             .collect::<Vec<_>>();
         let mut destroyed = BTreeSet::new();
@@ -668,7 +668,7 @@ impl ActorGameDriver {
             }
             if actor_source_target6_mutant_waits_for_fire2524_collision(
                 enemy.position,
-                enemy.source_mutant,
+                enemy.mutant_runtime,
             ) {
                 continue;
             }
@@ -813,7 +813,7 @@ impl ActorGameDriver {
                     }
                 }
                 GameCommand::SetSourceBackgroundLeft(background_left) => {
-                    self.source_background_left = background_left;
+                    self.background_left = background_left;
                 }
                 GameCommand::AttachHuman {
                     lander,
@@ -823,7 +823,7 @@ impl ActorGameDriver {
                     let source = self
                         .snapshots
                         .get(&human)
-                        .and_then(|snapshot| snapshot.source_human);
+                        .and_then(|snapshot| snapshot.human_runtime);
                     self.snapshots.remove(&human);
                     self.actors.remove(&human);
                     self.spawn_actor(Human::with_source(
@@ -994,11 +994,11 @@ impl ActorGameDriver {
         self.clear_pending_astronaut_rescue();
         self.clear_first_wave_lander_refill();
         self.enemy_reserve = EnemyReserveSnapshot::default();
-        self.source_target_cursor = None;
-        self.source_reserve_activation_ready = false;
-        self.source_reserve_activation_cooldown_steps = 0;
-        self.source_first_wave_early_reserve_steps_remaining = None;
-        self.source_background_left = 0;
+        self.target_human_cursor = None;
+        self.reserve_activation_ready = false;
+        self.reserve_activation_cooldown_steps = 0;
+        self.first_wave_early_reserve_steps_remaining = None;
+        self.background_left = 0;
         self.baiter_timer_steps = None;
         self.clear_turn_playfield_actors();
     }
@@ -1034,10 +1034,10 @@ impl ActorGameDriver {
         self.clear_terrain_blow();
         self.clear_pending_astronaut_rescue();
         self.clear_first_wave_lander_refill();
-        self.source_rng = PLAYFIELD_START_RNG;
-        self.source_background_left = 0;
-        self.source_reserve_activation_cooldown_steps = 0;
-        self.source_first_wave_early_reserve_steps_remaining = None;
+        self.arcade_rng = PLAYFIELD_START_RNG;
+        self.background_left = 0;
+        self.reserve_activation_cooldown_steps = 0;
+        self.first_wave_early_reserve_steps_remaining = None;
         self.reset_source_shell_scan();
         self.clear_turn_playfield_actors();
         self.apply_wave_profile();
@@ -1257,7 +1257,7 @@ impl ActorGameDriver {
     }
 
     fn clear_first_wave_lander_refill(&mut self) {
-        self.source_first_wave_lander_refill_steps_remaining = None;
+        self.first_wave_lander_refill_steps_remaining = None;
         self.pending_sound_commands
             .retain(|command| command.source != PendingActorSoundSource::FirstWaveLanderRefill);
     }
@@ -1277,8 +1277,8 @@ impl ActorGameDriver {
         }
 
         self.pending_smart_bomb_detonation_steps = Some(SMART_BOMB_DETONATION_DELAY_STEPS);
-        self.source_reserve_activation_cooldown_steps = SMART_BOMB_RESERVE_DELAY_STEPS;
-        self.source_first_wave_early_reserve_steps_remaining = None;
+        self.reserve_activation_cooldown_steps = SMART_BOMB_RESERVE_DELAY_STEPS;
+        self.first_wave_early_reserve_steps_remaining = None;
         self.clear_first_wave_lander_refill();
         self.queue_smart_bomb_sound_sequence();
         true
@@ -1329,8 +1329,8 @@ impl ActorGameDriver {
         let active_score = self.active_score();
         self.set_active_stock(PlayerStock::new(0, 0));
         self.wave = 0;
-        self.source_rng = PLAYFIELD_START_RNG;
-        self.source_background_left = 0;
+        self.arcade_rng = PLAYFIELD_START_RNG;
+        self.background_left = 0;
         self.reset_source_shell_scan();
         self.high_score_initials = HighScoreInitialsState::EMPTY;
         self.player_death_sleep_remaining = None;
@@ -1344,10 +1344,10 @@ impl ActorGameDriver {
         self.clear_pending_astronaut_rescue();
         self.clear_first_wave_lander_refill();
         self.enemy_reserve = EnemyReserveSnapshot::default();
-        self.source_target_cursor = None;
-        self.source_reserve_activation_ready = false;
-        self.source_reserve_activation_cooldown_steps = 0;
-        self.source_first_wave_early_reserve_steps_remaining = None;
+        self.target_human_cursor = None;
+        self.reserve_activation_ready = false;
+        self.reserve_activation_cooldown_steps = 0;
+        self.first_wave_early_reserve_steps_remaining = None;
         self.high_scores.record(active_score);
         self.phase = if self.high_scores.qualifies(active_score) {
             Phase::HighScoreEntry
@@ -1406,12 +1406,12 @@ impl ActorGameDriver {
         self.clear_pending_astronaut_rescue();
         self.clear_first_wave_lander_refill();
         self.enemy_reserve = EnemyReserveSnapshot::default();
-        self.source_target_cursor = None;
-        self.source_reserve_activation_ready = false;
-        self.source_reserve_activation_cooldown_steps = 0;
-        self.source_first_wave_early_reserve_steps_remaining = None;
-        self.source_rng = PLAYFIELD_START_RNG;
-        self.source_background_left = 0;
+        self.target_human_cursor = None;
+        self.reserve_activation_ready = false;
+        self.reserve_activation_cooldown_steps = 0;
+        self.first_wave_early_reserve_steps_remaining = None;
+        self.arcade_rng = PLAYFIELD_START_RNG;
+        self.background_left = 0;
         self.reset_source_shell_scan();
         self.clear_turn_playfield_actors();
         self.apply_wave_profile();
@@ -1431,7 +1431,7 @@ impl ActorGameDriver {
         self.clear_first_wave_lander_refill();
         self.clear_wave_playfield_actors();
         self.apply_wave_profile();
-        self.source_reserve_activation_cooldown_steps = 0;
+        self.reserve_activation_cooldown_steps = 0;
         self.spawn_wave_hostiles();
         self.spawn_initial_humans();
         self.arm_first_wave_early_lander_reserve_delay();
@@ -1488,37 +1488,37 @@ impl ActorGameDriver {
     }
 
     fn reset_source_shell_scan(&mut self) {
-        self.source_shell_scan_steps_remaining = ENEMY_PROJECTILE_SCAN_INITIAL_DELAY_STEPS;
+        self.projectile_scan_steps_remaining = ENEMY_PROJECTILE_SCAN_INITIAL_DELAY_STEPS;
     }
 
     fn reset_source_astronaut_process(&mut self) {
-        self.source_astronaut_cursor = Some(0);
-        self.source_astronaut_sleep_ticks = 0;
+        self.human_walk_cursor = Some(0);
+        self.human_walk_sleep_ticks = 0;
     }
 
-    fn advance_source_astronaut_process(
+    fn advance_human_walk_process(
         &mut self,
-        source_rng: Option<ActorSourceRngSnapshot>,
+        arcade_rng: Option<ActorSourceRngSnapshot>,
     ) -> Option<usize> {
-        if source_rng.is_none() || !self.has_source_human_snapshots() {
+        if arcade_rng.is_none() || !self.has_source_human_snapshots() {
             return None;
         }
-        if self.source_astronaut_sleep_ticks > 0 {
-            self.source_astronaut_sleep_ticks = self.source_astronaut_sleep_ticks.saturating_sub(1);
+        if self.human_walk_sleep_ticks > 0 {
+            self.human_walk_sleep_ticks = self.human_walk_sleep_ticks.saturating_sub(1);
             return None;
         }
 
         let current_cursor = self
-            .source_astronaut_cursor
+            .human_walk_cursor
             .filter(|slot| *slot < ASTRONAUT_TARGET_CURSOR_ENTRY_COUNT)
             .unwrap_or(0);
         let next_cursor = actor_source_astronaut_next_slot_index(current_cursor);
-        self.source_astronaut_cursor = Some(next_cursor);
-        self.source_astronaut_sleep_ticks = ASTRONAUT_PROCESS_SLEEP_TICKS;
+        self.human_walk_cursor = Some(next_cursor);
+        self.human_walk_sleep_ticks = ASTRONAUT_PROCESS_SLEEP_TICKS;
 
         let human_count = self.human_snapshot_count();
         self.snapshots.values().find_map(|snapshot| {
-            let source = snapshot.source_human?;
+            let source = snapshot.human_runtime?;
             (source.target_slot_index == next_cursor
                 && actor_source_astronaut_walk_targetable(human_count, snapshot))
             .then_some(next_cursor)
@@ -1526,8 +1526,8 @@ impl ActorGameDriver {
     }
 
     fn advance_source_reserve_activation_cooldown(&mut self) {
-        self.source_reserve_activation_cooldown_steps = self
-            .source_reserve_activation_cooldown_steps
+        self.reserve_activation_cooldown_steps = self
+            .reserve_activation_cooldown_steps
             .saturating_sub(1);
     }
 
@@ -1561,14 +1561,14 @@ impl ActorGameDriver {
         self.phase = Phase::Attract;
     }
 
-    fn advance_source_shell_scan_tick(&mut self) -> bool {
-        if self.source_shell_scan_steps_remaining > 0 {
-            self.source_shell_scan_steps_remaining =
-                self.source_shell_scan_steps_remaining.saturating_sub(1);
+    fn advance_projectile_scan_tick(&mut self) -> bool {
+        if self.projectile_scan_steps_remaining > 0 {
+            self.projectile_scan_steps_remaining =
+                self.projectile_scan_steps_remaining.saturating_sub(1);
             return false;
         }
 
-        self.source_shell_scan_steps_remaining = ENEMY_PROJECTILE_SCAN_CADENCE_STEPS - 1;
+        self.projectile_scan_steps_remaining = ENEMY_PROJECTILE_SCAN_CADENCE_STEPS - 1;
         true
     }
 
@@ -1577,11 +1577,11 @@ impl ActorGameDriver {
         self.behavior_script = wave_profile.behavior_script.clone();
         self.wave_spawn_allocations.clear();
         self.enemy_reserve = wave_profile.enemy_reserve;
-        self.source_target_cursor = Some(0);
+        self.target_human_cursor = Some(0);
         self.reset_source_astronaut_process();
-        self.source_reserve_activation_ready = false;
-        self.source_reserve_activation_cooldown_steps = 0;
-        self.source_first_wave_early_reserve_steps_remaining = None;
+        self.reserve_activation_ready = false;
+        self.reserve_activation_cooldown_steps = 0;
+        self.first_wave_early_reserve_steps_remaining = None;
         self.clear_first_wave_lander_refill();
         if self.phase == Phase::Playing {
             self.reset_baiter_timer();
@@ -1610,8 +1610,8 @@ impl ActorGameDriver {
             || self.pending_survivor_bonus.is_some()
             || self.pending_player_switch.is_some()
             || self.pending_player_start.is_some()
-            || !self.source_reserve_activation_ready
-            || self.source_reserve_activation_cooldown_steps > 0
+            || !self.reserve_activation_ready
+            || self.reserve_activation_cooldown_steps > 0
             || actor_enemy_reserve_is_empty(self.enemy_reserve)
         {
             return Vec::new();
@@ -1624,7 +1624,7 @@ impl ActorGameDriver {
             return Vec::new();
         }
 
-        self.source_first_wave_early_reserve_steps_remaining = None;
+        self.first_wave_early_reserve_steps_remaining = None;
         self.clear_first_wave_lander_refill();
         let source_profile = self.current_source_wave_profile();
         let reserve_kinds =
@@ -1636,7 +1636,7 @@ impl ActorGameDriver {
                     let target_index = self.select_next_source_lander_target_index();
                     if let Some(target_index) = target_index {
                         let spawn = ActorLanderSpawn::source_restore(
-                            &mut self.source_rng,
+                            &mut self.arcade_rng,
                             source_profile,
                             Some(target_index),
                         );
@@ -1653,9 +1653,9 @@ impl ActorGameDriver {
                             .count();
                         for _ in 0..lander_count {
                             let spawn = ActorMutantSpawn::source_restore(
-                                &mut self.source_rng,
+                                &mut self.arcade_rng,
                                 source_profile,
-                                self.source_background_left,
+                                self.background_left,
                             );
                             commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
                                 position: spawn.position,
@@ -1689,7 +1689,7 @@ impl ActorGameDriver {
                     index += bomber_count;
                 }
                 ActorSourceEnemyKind::Pod => {
-                    let spawn = ActorPodSpawn::source_restore(&mut self.source_rng);
+                    let spawn = ActorPodSpawn::source_restore(&mut self.arcade_rng);
                     commands.push(GameCommand::Spawn(SpawnRequest::Pod {
                         position: spawn.position,
                     }));
@@ -1699,9 +1699,9 @@ impl ActorGameDriver {
                 }
                 ActorSourceEnemyKind::Mutant => {
                     let spawn = ActorMutantSpawn::source_restore(
-                        &mut self.source_rng,
+                        &mut self.arcade_rng,
                         source_profile,
-                        self.source_background_left,
+                        self.background_left,
                     );
                     commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
                         position: spawn.position,
@@ -1717,7 +1717,7 @@ impl ActorGameDriver {
                         .take_while(|&&kind| kind == ActorSourceEnemyKind::Swarmer)
                         .count();
                     for spawn in ActorSwarmerSpawn::source_restore_batch(
-                        &mut self.source_rng,
+                        &mut self.arcade_rng,
                         source_profile,
                         swarmer_count,
                     ) {
@@ -1736,7 +1736,7 @@ impl ActorGameDriver {
     }
 
     fn advance_first_wave_lander_refill_if_ready(&mut self, commands: &mut Vec<GameCommand>) {
-        let Some(remaining) = self.source_first_wave_lander_refill_steps_remaining else {
+        let Some(remaining) = self.first_wave_lander_refill_steps_remaining else {
             return;
         };
         if self.phase != Phase::Playing
@@ -1751,23 +1751,23 @@ impl ActorGameDriver {
 
         let remaining = remaining.saturating_sub(1);
         if remaining > 0 {
-            self.source_first_wave_lander_refill_steps_remaining = Some(remaining);
+            self.first_wave_lander_refill_steps_remaining = Some(remaining);
             return;
         }
 
-        self.source_first_wave_lander_refill_steps_remaining = None;
+        self.first_wave_lander_refill_steps_remaining = None;
         self.activate_first_wave_lander_refill(commands);
     }
 
     fn arm_first_wave_early_lander_reserve_delay(&mut self) {
-        self.source_first_wave_early_reserve_steps_remaining = (self.wave == 1
+        self.first_wave_early_reserve_steps_remaining = (self.wave == 1
             && self.enemy_reserve.landers > 0)
             .then_some(FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS);
     }
 
     fn schedule_first_wave_lander_refill_if_needed(&mut self) {
         if self
-            .source_first_wave_lander_refill_steps_remaining
+            .first_wave_lander_refill_steps_remaining
             .is_some()
             || self.phase != Phase::Playing
             || self.wave != 1
@@ -1775,7 +1775,7 @@ impl ActorGameDriver {
             || self.pending_player_switch.is_some()
             || self.pending_player_start.is_some()
             || self.pending_smart_bomb_detonation_steps.is_some()
-            || self.source_reserve_activation_cooldown_steps > 0
+            || self.reserve_activation_cooldown_steps > 0
         {
             return;
         }
@@ -1789,7 +1789,7 @@ impl ActorGameDriver {
             return;
         }
 
-        self.source_first_wave_lander_refill_steps_remaining =
+        self.first_wave_lander_refill_steps_remaining =
             Some(FIRST_WAVE_LANDER_REFILL_DELAY_STEPS);
     }
 
@@ -1797,21 +1797,21 @@ impl ActorGameDriver {
         &mut self,
         commands: &mut Vec<GameCommand>,
     ) -> bool {
-        let Some(remaining) = self.source_first_wave_early_reserve_steps_remaining else {
+        let Some(remaining) = self.first_wave_early_reserve_steps_remaining else {
             return false;
         };
         if self.wave != 1 || self.enemy_reserve.landers == 0 {
-            self.source_first_wave_early_reserve_steps_remaining = None;
+            self.first_wave_early_reserve_steps_remaining = None;
             return false;
         }
 
         let remaining = remaining.saturating_sub(1);
         if remaining > 0 {
-            self.source_first_wave_early_reserve_steps_remaining = Some(remaining);
+            self.first_wave_early_reserve_steps_remaining = Some(remaining);
             return false;
         }
 
-        self.source_first_wave_early_reserve_steps_remaining = None;
+        self.first_wave_early_reserve_steps_remaining = None;
         if self.source_counted_hostile_snapshot_count() >= FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT {
             return false;
         }
@@ -1839,8 +1839,8 @@ impl ActorGameDriver {
             .enemy_reserve
             .landers
             .saturating_sub(u8::try_from(reserve_count).expect("early reserve count fits u8"));
-        self.source_rng = FIRST_WAVE_EARLY_RESERVE_RNG;
-        self.source_target_cursor = Some(FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT);
+        self.arcade_rng = FIRST_WAVE_EARLY_RESERVE_RNG;
+        self.target_human_cursor = Some(FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT);
         true
     }
 
@@ -1894,7 +1894,7 @@ impl ActorGameDriver {
         for spawn in wave_profile.lander_spawns.iter().copied() {
             let actor = self.spawn_lander_from_spawn(spawn);
             if let Some(target_index) = spawn.source.and_then(|source| source.target_human_index) {
-                self.source_target_cursor = Some(target_index);
+                self.target_human_cursor = Some(target_index);
             }
             self.apply_next_wave_spawn_behavior(ActorKind::Lander, actor);
         }
@@ -1929,7 +1929,7 @@ impl ActorGameDriver {
 
     fn has_source_human_snapshots(&self) -> bool {
         self.snapshots.values().any(|snapshot| {
-            snapshot.kind == ActorKind::Human && snapshot.alive && snapshot.source_human.is_some()
+            snapshot.kind == ActorKind::Human && snapshot.alive && snapshot.human_runtime.is_some()
         })
     }
 
@@ -1960,7 +1960,7 @@ impl ActorGameDriver {
         }
 
         let original_cursor = self
-            .source_target_cursor
+            .target_human_cursor
             .filter(|slot| *slot < TARGET_LIST_ENTRY_COUNT)
             .unwrap_or(0);
         let mut probe = original_cursor;
@@ -1970,10 +1970,10 @@ impl ActorGameDriver {
                 snapshot.kind == ActorKind::Human
                     && snapshot.alive
                     && snapshot
-                        .source_human
+                        .human_runtime
                         .is_some_and(|source| source.target_slot_index == probe)
             }) {
-                self.source_target_cursor = Some(probe);
+                self.target_human_cursor = Some(probe);
                 return Some(probe);
             }
             if probe == original_cursor {
@@ -2072,7 +2072,7 @@ impl ActorGameDriver {
         (0..spawn_count)
             .map(|_| {
                 let spawn = ActorSwarmerSpawn::source_from_pod(
-                    &mut self.source_rng,
+                    &mut self.arcade_rng,
                     source_profile,
                     position,
                 );

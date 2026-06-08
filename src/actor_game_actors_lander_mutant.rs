@@ -116,14 +116,14 @@ impl AssetActor for Lander {
                 )),
                 bounds: self.output_visible().then_some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                source_lander: self.source,
-                source_bomber: None,
-                source_pod: None,
-                source_swarmer: None,
-                source_baiter: None,
-                source_mutant: None,
-                source_human: None,
-                source_enemy_projectile: None,
+                lander_runtime: self.source,
+                bomber_runtime: None,
+                pod_runtime: None,
+                swarmer_runtime: None,
+                baiter_runtime: None,
+                mutant_runtime: None,
+                human_runtime: None,
+                enemy_projectile_runtime: None,
             },
             commands,
             draws,
@@ -168,7 +168,7 @@ impl Lander {
         commands: &mut Vec<GameCommand>,
     ) {
         let target = self
-            .source_target_human(prompt)
+            .target_human(prompt)
             .or_else(|| prompt.nearest_human(self.position));
 
         if let Some(target) = target {
@@ -200,10 +200,10 @@ impl Lander {
         }
     }
 
-    fn source_target_human<'a>(&self, prompt: &'a StepPrompt) -> Option<&'a ActorSnapshot> {
+    fn target_human<'a>(&self, prompt: &'a StepPrompt) -> Option<&'a ActorSnapshot> {
         self.source
             .and_then(|source| source.target_human_index)
-            .and_then(|target_slot_index| prompt.source_target_human(target_slot_index))
+            .and_then(|target_slot_index| prompt.target_human(target_slot_index))
     }
 
     fn drift(&mut self, behavior: ActorBehaviorProfile) {
@@ -266,7 +266,7 @@ impl Lander {
 
     fn source_mutant_conversion(&self, prompt: &StepPrompt) -> Option<ActorSourceMutantMetadata> {
         let source = self.source?;
-        let hop_rng = prompt.source_rng?;
+        let hop_rng = prompt.arcade_rng?;
         Some(ActorSourceMutantMetadata::from_lander_conversion(
             source,
             prompt.source_wave,
@@ -735,14 +735,14 @@ impl AssetActor for Mutant {
                 )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                source_lander: None,
-                source_bomber: None,
-                source_pod: None,
-                source_swarmer: None,
-                source_baiter: None,
-                source_mutant: self.source,
-                source_human: None,
-                source_enemy_projectile: None,
+                lander_runtime: None,
+                bomber_runtime: None,
+                pod_runtime: None,
+                swarmer_runtime: None,
+                baiter_runtime: None,
+                mutant_runtime: self.source,
+                human_runtime: None,
+                enemy_projectile_runtime: None,
             },
             commands,
             draws,
@@ -774,14 +774,14 @@ const fn actor_source_rng_from_snapshot(snapshot: ActorSourceRngSnapshot) -> Act
 }
 
 fn actor_source_mutant_x_velocity(
-    source_x_velocity: u8,
+    x_velocity_word: u8,
     player_absolute_x: u16,
     object_absolute_x: u16,
 ) -> u16 {
     let x_velocity_low = if (player_absolute_x as i16) >= (object_absolute_x as i16) {
-        source_x_velocity
+        x_velocity_word
     } else {
-        0u8.wrapping_sub(source_x_velocity)
+        0u8.wrapping_sub(x_velocity_word)
     };
     actor_sign_extend_u8_to_u16(x_velocity_low)
 }
@@ -853,15 +853,15 @@ fn actor_source_mutant_shot_rng(
     actor: ActorId,
     position: Point,
 ) -> ActorSourceRngSnapshot {
-    let mut source_rng = prompt
-        .source_rng
+    let mut arcade_rng = prompt
+        .arcade_rng
         .map(actor_source_rng_from_snapshot)
         .unwrap_or(ActorSourceRng {
             seed: actor_source_motion_seed(prompt.step, actor),
             hseed: position.x as u8,
             lseed: position.y as u8,
         });
-    source_rng.advance().snapshot()
+    arcade_rng.advance().snapshot()
 }
 
 fn actor_source_mutant_shot_reset(profile: ActorSourceWaveProfile, seed: u8) -> u8 {
@@ -872,9 +872,9 @@ fn actor_source_mutant_shot_reset(profile: ActorSourceWaveProfile, seed: u8) -> 
 }
 
 fn actor_source_target6_mutant_conversion_x_correction(
-    source_lander: ActorSourceLanderMetadata,
+    lander_runtime: ActorSourceLanderMetadata,
 ) -> Option<u16> {
-    (source_lander.target_human_index == Some(6) && source_lander.x_velocity == 0)
+    (lander_runtime.target_human_index == Some(6) && lander_runtime.x_velocity == 0)
         .then_some(TARGET6_MUTANT_CONVERSION_X_CORRECTION)
 }
 
@@ -1193,8 +1193,8 @@ fn actor_source_target6_mutant_visual_position(
     if (x16 as i16) < 0 {
         return None;
     }
-    let screen_x = x16 >> OBJECT_SCREEN_X_SHIFT;
-    if screen_x >= OBJECT_VISIBLE_WIDTH {
+    let screen_x = x16 >> OBJECT_WORLD_TO_SCREEN_SHIFT;
+    if screen_x >= OBJECT_VISIBLE_SCREEN_WIDTH {
         return None;
     }
     let screen_y = ACTOR_TARGET6_MUTANT_VISUAL_ROWS
@@ -1273,7 +1273,7 @@ fn actor_player_enemy_collision_explosion_placement(
 ) -> ActorExplosionPlacement {
     if actor_source_target6_mutant_uses_fire2524_collision_projection(
         enemy.position,
-        enemy.source_mutant,
+        enemy.mutant_runtime,
     ) {
         ActorExplosionPlacement {
             position: TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_TOP_LEFT,
@@ -1319,8 +1319,8 @@ fn actor_source_bomb_shell_count(prompt: &StepPrompt) -> usize {
         .count()
 }
 
-fn actor_source_bomber_bomb_lifetime_ticks(source_rng: ActorSourceRngSnapshot) -> u8 {
-    (source_rng.seed & 0x1F).wrapping_add(1)
+fn actor_source_bomber_bomb_lifetime_ticks(arcade_rng: ActorSourceRngSnapshot) -> u8 {
+    (arcade_rng.seed & 0x1F).wrapping_add(1)
 }
 
 fn actor_source_tie_selected_slot(seed: u8) -> u8 {

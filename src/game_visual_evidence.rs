@@ -190,9 +190,9 @@ fn source_enemy_explosion_center(enemy: EnemySnapshot) -> Option<ScreenPosition>
 
 fn source_enemy_explosion_picture_descriptor(
     enemy: EnemySnapshot,
-) -> SourceObjectPictureDescriptor {
+) -> ObjectPictureDescriptor {
     if enemy.kind == EnemyKind::Swarmer {
-        return SourceObjectPictureDescriptor {
+        return ObjectPictureDescriptor {
             label: ExplosionKind::Swarmer.picture_label(),
             address: 0xF8E2,
             size: ExplosionKind::Swarmer.picture_size(),
@@ -202,7 +202,7 @@ fn source_enemy_explosion_picture_descriptor(
         };
     }
 
-    enemy.source_picture_descriptor()
+    enemy.arcade_picture_descriptor()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -249,7 +249,7 @@ pub struct WorldSnapshot {
     pub humans: Vec<HumanSnapshot>,
     pub source_target_list_cursor_address: Option<u16>,
     pub source_astronaut_cursor_address: Option<u16>,
-    pub source_astronaut_sleep_ticks: u8,
+    pub human_walk_sleep_ticks: u8,
     pub source_velocity_frames_remaining: u8,
     pub source_shell_scan_frames_remaining: u8,
     pub projectiles: Vec<ProjectileSnapshot>,
@@ -257,7 +257,7 @@ pub struct WorldSnapshot {
     pub enemy_appearances: Vec<EnemyAppearanceSnapshot>,
     pub score_popups: Vec<ScorePopupSnapshot>,
     pub explosions: Vec<ExplosionSnapshot>,
-    pub source_rng: SourceRandSnapshot,
+    pub arcade_rng: ArcadeRngSnapshot,
     pub object_evidence: ObjectEvidenceSnapshot,
     pub expanded_objects: ExpandedObjectEvidenceSnapshot,
     pub player_explosion: Option<PlayerExplosionCloudSnapshot>,
@@ -373,7 +373,7 @@ impl WorldSnapshot {
         self.humans.clear();
         self.source_target_list_cursor_address = None;
         self.source_astronaut_cursor_address = None;
-        self.source_astronaut_sleep_ticks = 0;
+        self.human_walk_sleep_ticks = 0;
     }
 
     fn sync_clean_lifecycle_evidence(&mut self) {
@@ -485,8 +485,8 @@ impl ObjectEvidenceSnapshot {
         if index >= OBJECT_EVIDENCE_DETAIL_LIMIT {
             return;
         }
-        let descriptor = enemy.source_picture_descriptor();
-        let identity = source_object_table_identity(index);
+        let descriptor = enemy.arcade_picture_descriptor();
+        let identity = object_table_identity(index);
         let object_category = enemy.kind.object_category();
         self.details[index] = ObjectEvidenceDetailSnapshot {
             list: ObjectEvidenceList::Active,
@@ -494,8 +494,8 @@ impl ObjectEvidenceSnapshot {
             address: Some(identity.address),
             slot: Some(identity.slot),
             screen_position: Some(enemy.position),
-            world_position: Some(enemy.source_world_position()),
-            velocity: Some(enemy.source_velocity_words()),
+            world_position: Some(enemy.arcade_world_position()),
+            velocity: Some(enemy.arcade_velocity_words()),
             picture_address: Some(descriptor.address),
             picture_label: Some(descriptor.label),
             picture_size: Some(descriptor.size),
@@ -514,15 +514,15 @@ impl ObjectEvidenceSnapshot {
             return;
         }
         let descriptor = PLAYER_PROJECTILE_PICTURE_DESCRIPTOR;
-        let identity = source_object_table_identity(index);
+        let identity = object_table_identity(index);
         self.details[index] = ObjectEvidenceDetailSnapshot {
             list: ObjectEvidenceList::Projectile,
             object_category: Some(ObjectEvidenceCategory::PlayerProjectile),
             address: Some(identity.address),
             slot: Some(identity.slot),
             screen_position: Some(projectile.position),
-            world_position: Some(projectile.source_world_position()),
-            velocity: Some(projectile.source_velocity_words()),
+            world_position: Some(projectile.arcade_world_position()),
+            velocity: Some(projectile.arcade_velocity_words()),
             picture_address: Some(descriptor.address),
             picture_label: Some(descriptor.label),
             picture_size: Some(descriptor.size),
@@ -540,16 +540,16 @@ impl ObjectEvidenceSnapshot {
         if index >= OBJECT_EVIDENCE_DETAIL_LIMIT {
             return;
         }
-        let descriptor = source_human_picture_descriptor(human.source_picture_frame);
-        let identity = source_object_table_identity(index);
+        let descriptor = human_picture_descriptor(human.picture_frame);
+        let identity = object_table_identity(index);
         self.details[index] = ObjectEvidenceDetailSnapshot {
             list: ObjectEvidenceList::Active,
             object_category: Some(ObjectEvidenceCategory::Human),
             address: Some(identity.address),
             slot: Some(identity.slot),
             screen_position: Some(human.position),
-            world_position: Some(human.source_world_position()),
-            velocity: Some(human.source_velocity_words()),
+            world_position: Some(human.arcade_world_position()),
+            velocity: Some(human.arcade_velocity_words()),
             picture_address: Some(descriptor.address),
             picture_label: Some(descriptor.label),
             picture_size: Some(descriptor.size),
@@ -567,20 +567,20 @@ impl ObjectEvidenceSnapshot {
         if index >= OBJECT_EVIDENCE_DETAIL_LIMIT {
             return;
         }
-        let identity = source_object_table_identity(index);
+        let identity = object_table_identity(index);
         self.details[index] = ObjectEvidenceDetailSnapshot {
             list: ObjectEvidenceList::Projectile,
             object_category: Some(ObjectEvidenceCategory::EnemyBomb),
             address: Some(identity.address),
             slot: Some(identity.slot),
             screen_position: Some(projectile.position),
-            world_position: Some(projectile.source_world_position()),
-            velocity: Some(projectile.source_velocity_words()),
-            picture_address: Some(BOMB_SHELL_PICTURE_ADDRESS),
-            picture_label: Some(projectile.source_bomb_picture_label()),
-            picture_size: Some(BOMB_SHELL_PICTURE_SIZE),
-            primary_image_address: Some(BOMB_SHELL_PRIMARY_IMAGE_ADDRESS),
-            alternate_image_address: Some(BOMB_SHELL_ALTERNATE_IMAGE_ADDRESS),
+            world_position: Some(projectile.arcade_world_position()),
+            velocity: Some(projectile.arcade_velocity_words()),
+            picture_address: Some(ENEMY_BOMB_PICTURE_DESCRIPTOR_ADDRESS),
+            picture_label: Some(projectile.bomb_picture_label()),
+            picture_size: Some(ENEMY_BOMB_PICTURE_SIZE),
+            primary_image_address: Some(ENEMY_BOMB_PRIMARY_IMAGE_ADDRESS),
+            alternate_image_address: Some(ENEMY_BOMB_ALTERNATE_IMAGE_ADDRESS),
             mapped_sprite: Some(SpriteId::ENEMY_BOMB),
             object_type: Some(identity.object_type),
             scanner_color: None,
@@ -589,7 +589,7 @@ impl ObjectEvidenceSnapshot {
     }
 
     fn push_clean_reserve_details(&mut self, reserve: EnemyReserveSnapshot) {
-        for (kind, count) in reserve.source_family_counts() {
+        for (kind, count) in reserve.family_counts() {
             for _ in 0..count {
                 self.push_clean_reserve_detail(kind);
             }
@@ -601,8 +601,8 @@ impl ObjectEvidenceSnapshot {
         if index >= OBJECT_EVIDENCE_DETAIL_LIMIT {
             return;
         }
-        let descriptor = source_reserve_picture_descriptor(kind);
-        let identity = source_object_table_identity(index);
+        let descriptor = reserve_picture_descriptor(kind);
+        let identity = object_table_identity(index);
         let object_category = kind.object_category();
         self.details[index] = ObjectEvidenceDetailSnapshot {
             list: ObjectEvidenceList::Inactive,
@@ -671,7 +671,7 @@ fn source_word_from_world_vector(vector: WorldVector) -> u16 {
     (vector.subpixels() >> 8) as u16
 }
 
-fn source_world_position(position: ScreenPosition, x_fraction: u8, y_fraction: u8) -> (u16, u16) {
+fn arcade_world_position(position: ScreenPosition, x_fraction: u8, y_fraction: u8) -> (u16, u16) {
     (
         u16::from_be_bytes([position.x, x_fraction]),
         u16::from_be_bytes([position.y, y_fraction]),
@@ -683,17 +683,17 @@ fn source_active_object_screen_position(
     x_fraction: u8,
     background_left: u16,
 ) -> Option<ScreenPosition> {
-    let (x16, _) = source_world_position(position, x_fraction, 0);
-    let active_left = background_left.wrapping_sub(OBJECT_ACTIVE_LEFT_BUFFER);
-    if x16.wrapping_sub(active_left) >= OBJECT_ACTIVE_WINDOW {
+    let (x16, _) = arcade_world_position(position, x_fraction, 0);
+    let active_left = background_left.wrapping_sub(OBJECT_ACTIVE_LEFT_MARGIN);
+    if x16.wrapping_sub(active_left) >= OBJECT_ACTIVE_WORLD_WIDTH {
         return None;
     }
     let screen_word = x16.wrapping_sub(background_left);
     if screen_word & 0x8000 != 0 {
         return None;
     }
-    let screen_x = screen_word >> OBJECT_SCREEN_X_SHIFT;
-    if screen_x >= OBJECT_VISIBLE_WIDTH {
+    let screen_x = screen_word >> OBJECT_WORLD_TO_SCREEN_SHIFT;
+    if screen_x >= OBJECT_VISIBLE_SCREEN_WIDTH {
         return None;
     }
     let Ok(screen_x) = u8::try_from(screen_x) else {
@@ -706,9 +706,9 @@ fn source_enemy_screen_position(
     enemy: EnemySnapshot,
     background_left: u16,
 ) -> Option<ScreenPosition> {
-    if let Some(source_mutant) = enemy.source_mutant {
-        let x16 = u16::from_be_bytes([enemy.position.x, source_mutant.x_fraction])
-            .wrapping_add(source_mutant.render_x_correction);
+    if let Some(mutant_runtime) = enemy.mutant_runtime {
+        let x16 = u16::from_be_bytes([enemy.position.x, mutant_runtime.x_fraction])
+            .wrapping_add(mutant_runtime.render_x_correction);
         let [x, x_fraction] = x16.to_be_bytes();
         return source_active_object_screen_position(
             ScreenPosition::new(x, enemy.position.y),
@@ -729,15 +729,15 @@ fn source_enemy_screen_position(
 }
 
 fn source_first_wave_target6_mutant_uses_dive_projection(
-    source_mutant: SourceMutantSnapshot,
+    mutant_runtime: MutantRuntimeSnapshot,
 ) -> bool {
-    source_mutant.render_x_correction == FIRST_WAVE_TARGET6_MUTANT_CONVERSION_X_CORRECTION
-        && source_mutant.y_velocity == 0x0090
+    mutant_runtime.render_x_correction == FIRST_WAVE_TARGET6_MUTANT_CONVERSION_X_CORRECTION
+        && mutant_runtime.y_velocity == 0x0090
 }
 
 fn source_enemy_uses_target6_dive_projection(enemy: EnemySnapshot) -> bool {
     enemy
-        .source_mutant
+        .mutant_runtime
         .is_some_and(source_first_wave_target6_mutant_uses_dive_projection)
 }
 
@@ -747,16 +747,16 @@ fn source_enemy_appearance_position(enemy: EnemySnapshot) -> ScreenPosition {
 
 fn source_enemy_x_fraction(enemy: EnemySnapshot) -> Option<u8> {
     enemy
-        .source_lander
+        .lander_runtime
         .map(|source| source.x_fraction)
-        .or_else(|| enemy.source_mutant.map(|source| source.x_fraction))
-        .or_else(|| enemy.source_bomber.map(|source| source.x_fraction))
-        .or_else(|| enemy.source_swarmer.map(|source| source.x_fraction))
-        .or_else(|| enemy.source_baiter.map(|source| source.x_fraction))
-        .or_else(|| enemy.source_pod.map(|source| source.x_fraction))
+        .or_else(|| enemy.mutant_runtime.map(|source| source.x_fraction))
+        .or_else(|| enemy.bomber_runtime.map(|source| source.x_fraction))
+        .or_else(|| enemy.swarmer_runtime.map(|source| source.x_fraction))
+        .or_else(|| enemy.baiter_runtime.map(|source| source.x_fraction))
+        .or_else(|| enemy.pod_runtime.map(|source| source.x_fraction))
 }
 
-fn source_fixed_velocity_words(velocity: ScreenVelocity) -> (u16, u16) {
+fn fixed_point_velocity_words(velocity: ScreenVelocity) -> (u16, u16) {
     (
         source_fixed_velocity_word(velocity.dx),
         source_fixed_velocity_word(velocity.dy),
@@ -768,34 +768,34 @@ fn source_fixed_velocity_word(velocity: i8) -> u16 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SourceObjectTableIdentity {
+struct ObjectTableIdentity {
     address: u16,
     slot: u16,
     object_type: u8,
 }
 
-fn source_object_table_identity(detail_index: usize) -> SourceObjectTableIdentity {
+fn object_table_identity(detail_index: usize) -> ObjectTableIdentity {
     let slot = u16::try_from(detail_index)
         .expect("clean object evidence detail index should fit source object slot");
-    SourceObjectTableIdentity {
-        address: OBJECT_TABLE_BASE.wrapping_add(OBJECT_TABLE_STRIDE.wrapping_mul(slot)),
+    ObjectTableIdentity {
+        address: OBJECT_EVIDENCE_TABLE_BASE_ADDRESS.wrapping_add(OBJECT_EVIDENCE_SLOT_STRIDE.wrapping_mul(slot)),
         slot,
-        object_type: OBJECT_DEFAULT_TYPE,
+        object_type: OBJECT_EVIDENCE_DEFAULT_TYPE,
     }
 }
 
-fn source_reserve_picture_descriptor(kind: EnemyKind) -> SourceObjectPictureDescriptor {
+fn reserve_picture_descriptor(kind: EnemyKind) -> ObjectPictureDescriptor {
     match kind {
-        EnemyKind::Lander => source_lander_picture_descriptor(0),
+        EnemyKind::Lander => lander_picture_descriptor(0),
         EnemyKind::Mutant => MUTANT_PICTURE_DESCRIPTOR,
-        EnemyKind::Bomber => source_bomber_picture_descriptor(0),
+        EnemyKind::Bomber => bomber_picture_descriptor(0),
         EnemyKind::Pod => POD_PICTURE_DESCRIPTOR,
         EnemyKind::Swarmer => SWARMER_PICTURE_DESCRIPTOR,
-        EnemyKind::Baiter => source_baiter_picture_descriptor(0),
+        EnemyKind::Baiter => baiter_picture_descriptor(0),
     }
 }
 
-fn source_human_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor {
+fn human_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
     match frame % 4 {
         1 => HUMAN_ASTP2_PICTURE_DESCRIPTOR,
         2 => HUMAN_ASTP3_PICTURE_DESCRIPTOR,
@@ -822,7 +822,7 @@ fn saturating_u16_len(value: usize) -> u16 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SourceObjectPictureDescriptor {
+struct ObjectPictureDescriptor {
     label: &'static str,
     address: u16,
     size: (u8, u8),
@@ -831,8 +831,8 @@ struct SourceObjectPictureDescriptor {
     mapped_sprite: SpriteId,
 }
 
-const PLAYER_PROJECTILE_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
-    SourceObjectPictureDescriptor {
+const PLAYER_PROJECTILE_PICTURE_DESCRIPTOR: ObjectPictureDescriptor =
+    ObjectPictureDescriptor {
         label: "LASP1",
         address: 0xF96F,
         size: (8, 1),
@@ -840,8 +840,8 @@ const PLAYER_PROJECTILE_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
         alternate_image_address: None,
         mapped_sprite: SpriteId::PLAYER_PROJECTILE,
     };
-const HUMAN_ASTP1_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
-    SourceObjectPictureDescriptor {
+const HUMAN_ASTP1_PICTURE_DESCRIPTOR: ObjectPictureDescriptor =
+    ObjectPictureDescriptor {
         label: "ASTP1",
         address: 0xF901,
         size: (2, 8),
@@ -849,8 +849,8 @@ const HUMAN_ASTP1_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
         alternate_image_address: Some(0xFADB),
         mapped_sprite: SpriteId::HUMAN,
     };
-const HUMAN_ASTP2_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
-    SourceObjectPictureDescriptor {
+const HUMAN_ASTP2_PICTURE_DESCRIPTOR: ObjectPictureDescriptor =
+    ObjectPictureDescriptor {
         label: "ASTP2",
         address: 0xF90B,
         size: (2, 8),
@@ -858,8 +858,8 @@ const HUMAN_ASTP2_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
         alternate_image_address: Some(0xFAFB),
         mapped_sprite: SpriteId::HUMAN,
     };
-const HUMAN_ASTP3_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
-    SourceObjectPictureDescriptor {
+const HUMAN_ASTP3_PICTURE_DESCRIPTOR: ObjectPictureDescriptor =
+    ObjectPictureDescriptor {
         label: "ASTP3",
         address: 0xF915,
         size: (2, 8),
@@ -867,8 +867,8 @@ const HUMAN_ASTP3_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
         alternate_image_address: Some(0xFB1B),
         mapped_sprite: SpriteId::HUMAN,
     };
-const HUMAN_ASTP4_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
-    SourceObjectPictureDescriptor {
+const HUMAN_ASTP4_PICTURE_DESCRIPTOR: ObjectPictureDescriptor =
+    ObjectPictureDescriptor {
         label: "ASTP4",
         address: 0xF91F,
         size: (2, 8),
@@ -876,7 +876,7 @@ const HUMAN_ASTP4_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
         alternate_image_address: Some(0xFB3B),
         mapped_sprite: SpriteId::HUMAN,
     };
-const MUTANT_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor = SourceObjectPictureDescriptor {
+const MUTANT_PICTURE_DESCRIPTOR: ObjectPictureDescriptor = ObjectPictureDescriptor {
     label: "SCZP1",
     address: 0xF8CE,
     size: (5, 8),
@@ -884,7 +884,7 @@ const MUTANT_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor = SourceObjectPic
     alternate_image_address: Some(0xFA23),
     mapped_sprite: SpriteId::ENEMY_MUTANT,
 };
-const POD_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor = SourceObjectPictureDescriptor {
+const POD_PICTURE_DESCRIPTOR: ObjectPictureDescriptor = ObjectPictureDescriptor {
     label: "PRBP1",
     address: 0xF8F7,
     size: (4, 8),
@@ -892,7 +892,7 @@ const POD_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor = SourceObjectPictur
     alternate_image_address: Some(0xFAAB),
     mapped_sprite: SpriteId::ENEMY_POD,
 };
-const SWARMER_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor = SourceObjectPictureDescriptor {
+const SWARMER_PICTURE_DESCRIPTOR: ObjectPictureDescriptor = ObjectPictureDescriptor {
     label: "SWPIC1",
     address: 0xF97B,
     size: (3, 4),
@@ -901,9 +901,9 @@ const SWARMER_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor = SourceObjectPi
     mapped_sprite: SpriteId::ENEMY_SWARMER,
 };
 
-fn source_lander_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor {
+fn lander_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
     match frame % LANDER_PICTURE_FRAME_COUNT {
-        1 => SourceObjectPictureDescriptor {
+        1 => ObjectPictureDescriptor {
             label: "LNDP2",
             address: 0xF98F,
             size: (5, 8),
@@ -911,7 +911,7 @@ fn source_lander_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor 
             alternate_image_address: Some(0xCD58),
             mapped_sprite: SpriteId::ENEMY_LANDER,
         },
-        2 => SourceObjectPictureDescriptor {
+        2 => ObjectPictureDescriptor {
             label: "LNDP3",
             address: 0xF999,
             size: (5, 8),
@@ -919,7 +919,7 @@ fn source_lander_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor 
             alternate_image_address: Some(0xCDA8),
             mapped_sprite: SpriteId::ENEMY_LANDER,
         },
-        _ => SourceObjectPictureDescriptor {
+        _ => ObjectPictureDescriptor {
             label: "LNDP1",
             address: 0xF985,
             size: (5, 8),
@@ -930,9 +930,9 @@ fn source_lander_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor 
     }
 }
 
-fn source_bomber_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor {
+fn bomber_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
     match frame % BOMBER_PICTURE_FRAME_COUNT {
-        1 => SourceObjectPictureDescriptor {
+        1 => ObjectPictureDescriptor {
             label: "TIEP2",
             address: 0xF933,
             size: (4, 8),
@@ -940,7 +940,7 @@ fn source_bomber_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor 
             alternate_image_address: Some(0xFBAB),
             mapped_sprite: SpriteId::ENEMY_BOMBER,
         },
-        2 => SourceObjectPictureDescriptor {
+        2 => ObjectPictureDescriptor {
             label: "TIEP3",
             address: 0xF93D,
             size: (4, 8),
@@ -948,7 +948,7 @@ fn source_bomber_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor 
             alternate_image_address: Some(0xFBEB),
             mapped_sprite: SpriteId::ENEMY_BOMBER,
         },
-        3 => SourceObjectPictureDescriptor {
+        3 => ObjectPictureDescriptor {
             label: "TIEP4",
             address: 0xF947,
             size: (4, 8),
@@ -956,7 +956,7 @@ fn source_bomber_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor 
             alternate_image_address: Some(0xFC2B),
             mapped_sprite: SpriteId::ENEMY_BOMBER,
         },
-        _ => SourceObjectPictureDescriptor {
+        _ => ObjectPictureDescriptor {
             label: "TIEP1",
             address: 0xF929,
             size: (4, 8),
@@ -967,9 +967,9 @@ fn source_bomber_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor 
     }
 }
 
-fn source_baiter_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor {
+fn baiter_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
     match frame % BAITER_PICTURE_FRAME_COUNT {
-        1 => SourceObjectPictureDescriptor {
+        1 => ObjectPictureDescriptor {
             label: "UFOP2",
             address: 0xF9AD,
             size: (6, 4),
@@ -977,7 +977,7 @@ fn source_baiter_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor 
             alternate_image_address: Some(0xCE18),
             mapped_sprite: SpriteId::ENEMY_BAITER,
         },
-        2 => SourceObjectPictureDescriptor {
+        2 => ObjectPictureDescriptor {
             label: "UFOP3",
             address: 0xF9B7,
             size: (6, 4),
@@ -985,7 +985,7 @@ fn source_baiter_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor 
             alternate_image_address: Some(0xCE48),
             mapped_sprite: SpriteId::ENEMY_BAITER,
         },
-        _ => SourceObjectPictureDescriptor {
+        _ => ObjectPictureDescriptor {
             label: "UFOP1",
             address: 0xF9A3,
             size: (6, 4),

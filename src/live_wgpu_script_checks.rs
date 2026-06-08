@@ -63,7 +63,7 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         first_playing_reserve_pods: first_playing.reserve_pods,
         first_playing_reserve_mutants: first_playing.reserve_mutants,
         first_playing_reserve_swarmers: first_playing.reserve_swarmers,
-        first_playing_source_background_left: first_playing.source_background_left,
+        first_playing_source_background_left: first_playing.background_left,
         first_playing_source_rng_seed: first_playing.source_rng_seed,
         first_playing_source_rng_hseed: first_playing.source_rng_hseed,
         first_playing_source_rng_lseed: first_playing.source_rng_lseed,
@@ -611,7 +611,7 @@ fn actor_script_check_playing_summary(frame: &ActorFrame) -> ActorScriptCheckPla
     let profile = frame.report.source_wave;
     let reserve = frame.state.world.enemy_reserve;
     debug_assert_eq!(reserve, frame.report.enemy_reserve);
-    let source_rng = frame.report.source_rng;
+    let arcade_rng = frame.report.arcade_rng;
     let player_behavior = first_playing_behavior_for(frame, ActorKind::Player);
     let lander_behavior = first_playing_behavior_for(frame, ActorKind::Lander);
     let mutant_behavior = first_playing_behavior_for(frame, ActorKind::Mutant);
@@ -635,10 +635,10 @@ fn actor_script_check_playing_summary(frame: &ActorFrame) -> ActorScriptCheckPla
         reserve_pods: reserve.pods,
         reserve_mutants: reserve.mutants,
         reserve_swarmers: reserve.swarmers,
-        source_background_left: frame.report.source_background_left,
-        source_rng_seed: source_rng.map(|source_rng| source_rng.seed),
-        source_rng_hseed: source_rng.map(|source_rng| source_rng.hseed),
-        source_rng_lseed: source_rng.map(|source_rng| source_rng.lseed),
+        background_left: frame.report.background_left,
+        source_rng_seed: arcade_rng.map(|arcade_rng| arcade_rng.seed),
+        source_rng_hseed: arcade_rng.map(|arcade_rng| arcade_rng.hseed),
+        source_rng_lseed: arcade_rng.map(|arcade_rng| arcade_rng.lseed),
         player_takes_enemy_collision_damage: player_behavior.player_takes_enemy_collision_damage,
         player_laser_cooldown_steps: player_behavior.player_laser_cooldown_steps,
         lander_mode: lander_behavior_mode_label(lander_behavior.lander_mode).to_string(),
@@ -668,12 +668,12 @@ fn actor_script_check_source_actor_samples(
         .filter(|snapshot| snapshot.alive)
         .filter_map(|snapshot| {
             actor_script_check_source_actor_fraction(snapshot).map(
-                |(source_x_fraction, source_y_fraction)| ActorScriptCheckSourceActorSample {
+                |(x_subpixel, y_subpixel)| ActorScriptCheckSourceActorSample {
                     kind: actor_script_check_source_actor_kind_label(snapshot.kind).to_string(),
                     x: snapshot.position.x,
                     y: snapshot.position.y,
-                    source_x_fraction,
-                    source_y_fraction,
+                    x_subpixel,
+                    y_subpixel,
                 },
             )
         })
@@ -686,25 +686,25 @@ fn actor_script_check_source_actor_fraction(
 ) -> Option<(u8, u8)> {
     match snapshot.kind {
         ActorKind::Lander => snapshot
-            .source_lander
+            .lander_runtime
             .map(|source| (source.x_fraction, source.y_fraction)),
         ActorKind::Mutant => snapshot
-            .source_mutant
+            .mutant_runtime
             .map(|source| (source.x_fraction, source.y_fraction)),
         ActorKind::Bomber => snapshot
-            .source_bomber
+            .bomber_runtime
             .map(|source| (source.x_fraction, source.y_fraction)),
         ActorKind::Pod => snapshot
-            .source_pod
+            .pod_runtime
             .map(|source| (source.x_fraction, source.y_fraction)),
         ActorKind::Swarmer => snapshot
-            .source_swarmer
+            .swarmer_runtime
             .map(|source| (source.x_fraction, source.y_fraction)),
         ActorKind::Baiter => snapshot
-            .source_baiter
+            .baiter_runtime
             .map(|source| (source.x_fraction, source.y_fraction)),
         ActorKind::Human => snapshot
-            .source_human
+            .human_runtime
             .map(|source| (source.x_fraction, source.y_fraction)),
         _ => None,
     }
@@ -732,7 +732,7 @@ fn actor_script_check_source_projectile_samples(
         .iter()
         .filter(|snapshot| snapshot.alive)
         .filter_map(|snapshot| {
-            let source = snapshot.source_enemy_projectile?;
+            let source = snapshot.enemy_projectile_runtime?;
             let kind = match snapshot.kind {
                 ActorKind::EnemyLaser => "enemy_laser",
                 ActorKind::Bomb => "bomb",
@@ -742,10 +742,10 @@ fn actor_script_check_source_projectile_samples(
                 kind: kind.to_string(),
                 x: snapshot.position.x,
                 y: snapshot.position.y,
-                source_x_fraction: source.x_fraction,
-                source_y_fraction: source.y_fraction,
-                source_x_velocity: source.x_velocity,
-                source_y_velocity: source.y_velocity,
+                x_subpixel: source.x_fraction,
+                y_subpixel: source.y_fraction,
+                x_velocity_word: source.x_velocity,
+                y_velocity_word: source.y_velocity,
                 lifetime_ticks: source.lifetime_ticks,
             })
         })
@@ -782,10 +782,10 @@ fn actor_script_check_projectile_spawn_command_samples(
                 y: position.y,
                 velocity_dx: velocity.dx,
                 velocity_dy: velocity.dy,
-                source_x_fraction: source.map(|source| source.x_fraction),
-                source_y_fraction: source.map(|source| source.y_fraction),
-                source_x_velocity: source.map(|source| source.x_velocity),
-                source_y_velocity: source.map(|source| source.y_velocity),
+                x_subpixel: source.map(|source| source.x_fraction),
+                y_subpixel: source.map(|source| source.y_fraction),
+                x_velocity_word: source.map(|source| source.x_velocity),
+                y_velocity_word: source.map(|source| source.y_velocity),
                 lifetime_ticks: source.map(|source| source.lifetime_ticks),
             },
         )
@@ -916,7 +916,7 @@ fn explosion_kind_label(kind: ExplosionKind) -> &'static str {
     }
 }
 
-fn source_rng_summary(seed: Option<u8>, hseed: Option<u8>, lseed: Option<u8>) -> String {
+fn arcade_rng_summary(seed: Option<u8>, hseed: Option<u8>, lseed: Option<u8>) -> String {
     match (seed, hseed, lseed) {
         (Some(seed), Some(hseed), Some(lseed)) => {
             format!("seed=0x{seed:02x},hseed=0x{hseed:02x},lseed=0x{lseed:02x}")

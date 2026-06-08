@@ -40,7 +40,7 @@ impl ActorRenderSceneBridge {
         {
             push_source_bgout_terrain_sprites(
                 &mut scene,
-                report.source_background_left,
+                report.background_left,
                 source_wave_landscape_tint(report.wave),
             );
         }
@@ -1814,7 +1814,7 @@ fn actor_draw_screen_position(report: &StepReport, draw: &DrawCommand) -> Option
         return Some(draw.position);
     };
 
-    actor_project_source_backed_draw(snapshot, draw.position, report.source_background_left)
+    actor_project_source_backed_draw(snapshot, draw.position, report.background_left)
 }
 
 fn actor_project_source_backed_draw(
@@ -1833,17 +1833,17 @@ fn actor_project_source_backed_draw(
 
 fn actor_source_backed_x_fraction(snapshot: &ActorSnapshot) -> Option<u8> {
     snapshot
-        .source_lander
+        .lander_runtime
         .map(|source| source.x_fraction)
-        .or_else(|| snapshot.source_bomber.map(|source| source.x_fraction))
-        .or_else(|| snapshot.source_pod.map(|source| source.x_fraction))
-        .or_else(|| snapshot.source_swarmer.map(|source| source.x_fraction))
-        .or_else(|| snapshot.source_baiter.map(|source| source.x_fraction))
-        .or_else(|| snapshot.source_mutant.map(|source| source.x_fraction))
-        .or_else(|| snapshot.source_human.map(|source| source.x_fraction))
+        .or_else(|| snapshot.bomber_runtime.map(|source| source.x_fraction))
+        .or_else(|| snapshot.pod_runtime.map(|source| source.x_fraction))
+        .or_else(|| snapshot.swarmer_runtime.map(|source| source.x_fraction))
+        .or_else(|| snapshot.baiter_runtime.map(|source| source.x_fraction))
+        .or_else(|| snapshot.mutant_runtime.map(|source| source.x_fraction))
+        .or_else(|| snapshot.human_runtime.map(|source| source.x_fraction))
         .or_else(|| {
             snapshot
-                .source_enemy_projectile
+                .enemy_projectile_runtime
                 .map(|source| source.x_fraction)
         })
 }
@@ -1854,16 +1854,16 @@ fn actor_source_project_screen_position(
     background_left: u16,
 ) -> Option<Point> {
     let x16 = actor_source_absolute_x(position, x_fraction);
-    let active_left = background_left.wrapping_sub(OBJECT_ACTIVE_LEFT_BUFFER);
-    if x16.wrapping_sub(active_left) >= OBJECT_ACTIVE_WINDOW {
+    let active_left = background_left.wrapping_sub(OBJECT_ACTIVE_LEFT_MARGIN);
+    if x16.wrapping_sub(active_left) >= OBJECT_ACTIVE_WORLD_WIDTH {
         return None;
     }
     let screen_word = x16.wrapping_sub(background_left);
     if screen_word & 0x8000 != 0 {
         return None;
     }
-    let screen_x = screen_word >> OBJECT_SCREEN_X_SHIFT;
-    if screen_x >= OBJECT_VISIBLE_WIDTH {
+    let screen_x = screen_word >> OBJECT_WORLD_TO_SCREEN_SHIFT;
+    if screen_x >= OBJECT_VISIBLE_SCREEN_WIDTH {
         return None;
     }
     Some(Point::new(screen_x as i16, position.y))

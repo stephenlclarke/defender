@@ -26,12 +26,12 @@ pub struct EnemySnapshot {
     pub kind: EnemyKind,
     pub position: ScreenPosition,
     pub velocity: ScreenVelocity,
-    pub source_lander: Option<SourceLanderSnapshot>,
-    pub source_mutant: Option<SourceMutantSnapshot>,
-    pub source_bomber: Option<SourceBomberSnapshot>,
-    pub source_swarmer: Option<SourceSwarmerSnapshot>,
-    pub source_baiter: Option<SourceBaiterSnapshot>,
-    pub source_pod: Option<SourcePodSnapshot>,
+    pub lander_runtime: Option<LanderRuntimeSnapshot>,
+    pub mutant_runtime: Option<MutantRuntimeSnapshot>,
+    pub bomber_runtime: Option<BomberRuntimeSnapshot>,
+    pub swarmer_runtime: Option<SwarmerRuntimeSnapshot>,
+    pub baiter_runtime: Option<BaiterRuntimeSnapshot>,
+    pub pod_runtime: Option<PodRuntimeSnapshot>,
 }
 
 impl EnemySnapshot {
@@ -40,116 +40,116 @@ impl EnemySnapshot {
             kind,
             position,
             velocity,
-            source_lander: None,
-            source_mutant: None,
-            source_bomber: None,
-            source_swarmer: None,
-            source_baiter: None,
-            source_pod: None,
+            lander_runtime: None,
+            mutant_runtime: None,
+            bomber_runtime: None,
+            swarmer_runtime: None,
+            baiter_runtime: None,
+            pod_runtime: None,
         }
     }
 
-    fn source_picture_descriptor(self) -> SourceObjectPictureDescriptor {
+    fn arcade_picture_descriptor(self) -> ObjectPictureDescriptor {
         match self.kind {
-            EnemyKind::Lander => source_lander_picture_descriptor(
-                self.source_lander
+            EnemyKind::Lander => lander_picture_descriptor(
+                self.lander_runtime
                     .map(|source| source.picture_frame)
                     .unwrap_or_default(),
             ),
             EnemyKind::Mutant => MUTANT_PICTURE_DESCRIPTOR,
-            EnemyKind::Bomber => source_bomber_picture_descriptor(
-                self.source_bomber
+            EnemyKind::Bomber => bomber_picture_descriptor(
+                self.bomber_runtime
                     .map(|source| source.picture_frame)
                     .unwrap_or_default(),
             ),
             EnemyKind::Pod => POD_PICTURE_DESCRIPTOR,
             EnemyKind::Swarmer => SWARMER_PICTURE_DESCRIPTOR,
-            EnemyKind::Baiter => source_baiter_picture_descriptor(
-                self.source_baiter
+            EnemyKind::Baiter => baiter_picture_descriptor(
+                self.baiter_runtime
                     .map(|source| source.picture_frame)
                     .unwrap_or_default(),
             ),
         }
     }
 
-    fn source_world_position(self) -> (u16, u16) {
+    fn arcade_world_position(self) -> (u16, u16) {
         match self.kind {
             EnemyKind::Lander => self
-                .source_lander
+                .lander_runtime
                 .map(|source| {
-                    source_world_position(self.position, source.x_fraction, source.y_fraction)
+                    arcade_world_position(self.position, source.x_fraction, source.y_fraction)
                 })
-                .unwrap_or_else(|| source_world_position(self.position, 0, 0)),
+                .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
             EnemyKind::Mutant => self
-                .source_mutant
+                .mutant_runtime
                 .map(|source| {
-                    source_world_position(self.position, source.x_fraction, source.y_fraction)
+                    arcade_world_position(self.position, source.x_fraction, source.y_fraction)
                 })
-                .unwrap_or_else(|| source_world_position(self.position, 0, 0)),
+                .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
             EnemyKind::Bomber => self
-                .source_bomber
+                .bomber_runtime
                 .map(|source| {
-                    source_world_position(self.position, source.x_fraction, source.y_fraction)
+                    arcade_world_position(self.position, source.x_fraction, source.y_fraction)
                 })
-                .unwrap_or_else(|| source_world_position(self.position, 0, 0)),
+                .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
             EnemyKind::Pod => self
-                .source_pod
+                .pod_runtime
                 .map(|source| {
-                    source_world_position(self.position, source.x_fraction, source.y_fraction)
+                    arcade_world_position(self.position, source.x_fraction, source.y_fraction)
                 })
-                .unwrap_or_else(|| source_world_position(self.position, 0, 0)),
+                .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
             EnemyKind::Swarmer => self
-                .source_swarmer
+                .swarmer_runtime
                 .map(|source| {
-                    source_world_position(self.position, source.x_fraction, source.y_fraction)
+                    arcade_world_position(self.position, source.x_fraction, source.y_fraction)
                 })
-                .unwrap_or_else(|| source_world_position(self.position, 0, 0)),
+                .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
             EnemyKind::Baiter => self
-                .source_baiter
+                .baiter_runtime
                 .map(|source| {
-                    source_world_position(self.position, source.x_fraction, source.y_fraction)
+                    arcade_world_position(self.position, source.x_fraction, source.y_fraction)
                 })
-                .unwrap_or_else(|| source_world_position(self.position, 0, 0)),
+                .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
         }
     }
 
-    fn source_velocity_words(self) -> (u16, u16) {
+    fn arcade_velocity_words(self) -> (u16, u16) {
         match self.kind {
             EnemyKind::Lander => self
-                .source_lander
+                .lander_runtime
                 .map(|source| (source.x_velocity, source.y_velocity))
-                .unwrap_or_else(|| source_fixed_velocity_words(self.velocity)),
+                .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Mutant => self
-                .source_mutant
+                .mutant_runtime
                 .map(|source| (source.x_velocity, source.y_velocity))
-                .unwrap_or_else(|| source_fixed_velocity_words(self.velocity)),
+                .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Bomber => self
-                .source_bomber
+                .bomber_runtime
                 .map(|source| (source.x_velocity, source.y_velocity))
-                .unwrap_or_else(|| source_fixed_velocity_words(self.velocity)),
+                .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Pod => self
-                .source_pod
+                .pod_runtime
                 .map(|source| (source.x_velocity, source.y_velocity))
-                .unwrap_or_else(|| source_fixed_velocity_words(self.velocity)),
+                .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Swarmer => self
-                .source_swarmer
+                .swarmer_runtime
                 .map(|source| (source.x_velocity, source.y_velocity))
-                .unwrap_or_else(|| source_fixed_velocity_words(self.velocity)),
+                .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Baiter => self
-                .source_baiter
+                .baiter_runtime
                 .map(|source| {
                     (
-                        source_baiter_screen_x_velocity(source.x_velocity),
+                        baiter_screen_x_velocity(source.x_velocity),
                         source.y_velocity,
                     )
                 })
-                .unwrap_or_else(|| source_fixed_velocity_words(self.velocity)),
+                .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SourceLanderSnapshot {
+pub struct LanderRuntimeSnapshot {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -161,20 +161,20 @@ pub struct SourceLanderSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SourceMutantSnapshot {
+pub struct MutantRuntimeSnapshot {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
     pub y_velocity: u16,
     pub shot_timer: u8,
     pub sleep_ticks: u8,
-    pub hop_rng: SourceRandSnapshot,
+    pub hop_rng: ArcadeRngSnapshot,
     pub render_x_correction: u16,
     pub target6_first_shot_deferred: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SourceBomberSnapshot {
+pub struct BomberRuntimeSnapshot {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -182,11 +182,11 @@ pub struct SourceBomberSnapshot {
     pub picture_frame: u8,
     pub cruise_altitude: u8,
     pub sleep_ticks: u8,
-    pub source_slot: u8,
+    pub slot: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SourceSwarmerSnapshot {
+pub struct SwarmerRuntimeSnapshot {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -198,7 +198,7 @@ pub struct SourceSwarmerSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SourceBaiterSnapshot {
+pub struct BaiterRuntimeSnapshot {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -209,7 +209,7 @@ pub struct SourceBaiterSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SourcePodSnapshot {
+pub struct PodRuntimeSnapshot {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -217,13 +217,13 @@ pub struct SourcePodSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SourceRandSnapshot {
+pub struct ArcadeRngSnapshot {
     pub seed: u8,
     pub hseed: u8,
     pub lseed: u8,
 }
 
-impl Default for SourceRandSnapshot {
+impl Default for ArcadeRngSnapshot {
     fn default() -> Self {
         Self {
             seed: 0,
@@ -233,19 +233,19 @@ impl Default for SourceRandSnapshot {
     }
 }
 
-impl SourceRandSnapshot {}
+impl ArcadeRngSnapshot {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EnemyProjectileSourceKind {
+pub enum EnemyProjectileKind {
     Fireball,
     BomberBombShell,
 }
 
-impl EnemyProjectileSourceKind {
+impl EnemyProjectileKind {
     pub const fn output_routine_address(self) -> u16 {
         match self {
-            Self::Fireball => FIREBALL_OUTPUT_ROUTINE_ADDRESS,
-            Self::BomberBombShell => BOMB_SHELL_OUTPUT_ROUTINE_ADDRESS,
+            Self::Fireball => FIREBALL_ARCADE_ROUTINE_ADDRESS,
+            Self::BomberBombShell => ENEMY_BOMB_ARCADE_ROUTINE_ADDRESS,
         }
     }
 }
@@ -254,33 +254,33 @@ impl EnemyProjectileSourceKind {
 pub struct EnemyProjectileSnapshot {
     pub position: ScreenPosition,
     pub velocity: ScreenVelocity,
-    pub source_kind: EnemyProjectileSourceKind,
-    pub source_x_fraction: u8,
-    pub source_y_fraction: u8,
-    pub source_x_velocity: u16,
-    pub source_y_velocity: u16,
-    pub source_lifetime_ticks: u8,
+    pub kind: EnemyProjectileKind,
+    pub x_subpixel: u8,
+    pub y_subpixel: u8,
+    pub x_velocity_word: u16,
+    pub y_velocity_word: u16,
+    pub lifetime_ticks: u8,
 }
 
 impl EnemyProjectileSnapshot {
-    pub const fn source_output_routine_address(self) -> u16 {
-        self.source_kind.output_routine_address()
+    pub const fn output_routine_address(self) -> u16 {
+        self.kind.output_routine_address()
     }
 
-    const fn source_bomb_picture_label(self) -> &'static str {
-        BOMB_SHELL_PICTURE_LABEL
+    const fn bomb_picture_label(self) -> &'static str {
+        ENEMY_BOMB_PICTURE_LABEL
     }
 
-    fn source_world_position(self) -> (u16, u16) {
-        source_world_position(
+    fn arcade_world_position(self) -> (u16, u16) {
+        arcade_world_position(
             self.position,
-            self.source_x_fraction,
-            self.source_y_fraction,
+            self.x_subpixel,
+            self.y_subpixel,
         )
     }
 
-    const fn source_velocity_words(self) -> (u16, u16) {
-        (self.source_x_velocity, self.source_y_velocity)
+    const fn arcade_velocity_words(self) -> (u16, u16) {
+        (self.x_velocity_word, self.y_velocity_word)
     }
 }
 
@@ -302,7 +302,7 @@ impl EnemyReserveSnapshot {
             .saturating_add(self.swarmers)
     }
 
-    fn source_family_counts(self) -> [(EnemyKind, u8); 5] {
+    fn family_counts(self) -> [(EnemyKind, u8); 5] {
         [
             (EnemyKind::Lander, self.landers),
             (EnemyKind::Bomber, self.bombers),
@@ -318,11 +318,11 @@ pub struct HumanSnapshot {
     pub position: ScreenPosition,
     pub carried: bool,
     pub carried_by_player: bool,
-    pub source_x_fraction: u8,
-    pub source_picture_frame: u8,
-    pub source_fall_velocity: u16,
-    pub source_fall_y_fraction: u8,
-    pub source_target_slot_address: Option<u16>,
+    pub x_subpixel: u8,
+    pub picture_frame: u8,
+    pub fall_velocity: u16,
+    pub fall_y_subpixel: u8,
+    pub target_slot_address: Option<u16>,
 }
 
 impl HumanSnapshot {
@@ -331,41 +331,41 @@ impl HumanSnapshot {
             position,
             carried: false,
             carried_by_player: false,
-            source_x_fraction: 0,
-            source_picture_frame: 0,
-            source_fall_velocity: 0,
-            source_fall_y_fraction: 0,
-            source_target_slot_address: None,
+            x_subpixel: 0,
+            picture_frame: 0,
+            fall_velocity: 0,
+            fall_y_subpixel: 0,
+            target_slot_address: None,
         }
     }
 
-    fn source_world_position(self) -> (u16, u16) {
-        source_world_position(
+    fn arcade_world_position(self) -> (u16, u16) {
+        arcade_world_position(
             self.position,
-            self.source_x_fraction,
-            self.source_fall_y_fraction,
+            self.x_subpixel,
+            self.fall_y_subpixel,
         )
     }
 
-    fn source_velocity_words(self) -> (u16, u16) {
-        (0, self.source_fall_velocity)
+    fn arcade_velocity_words(self) -> (u16, u16) {
+        (0, self.fall_velocity)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ProjectileSnapshot {
     pub position: ScreenPosition,
-    pub source_tail_position: ScreenPosition,
+    pub tail_position: ScreenPosition,
     pub velocity: ScreenVelocity,
 }
 
 impl ProjectileSnapshot {
-    fn source_world_position(self) -> (u16, u16) {
-        source_world_position(self.position, 0, 0)
+    fn arcade_world_position(self) -> (u16, u16) {
+        arcade_world_position(self.position, 0, 0)
     }
 
-    fn source_velocity_words(self) -> (u16, u16) {
-        source_fixed_velocity_words(self.velocity)
+    fn arcade_velocity_words(self) -> (u16, u16) {
+        fixed_point_velocity_words(self.velocity)
     }
 }
 
@@ -546,7 +546,7 @@ pub enum ScannerRadarStage {
 }
 
 impl ScannerRadarStage {
-    const fn source_sleep_ticks(self) -> u8 {
+    const fn stage_sleep_ticks(self) -> u8 {
         match self {
             Self::InactiveObjectScan => SCANNER_PROCESS_SLEEP_TICKS[0],
             Self::ActiveAndShellScan => SCANNER_PROCESS_SLEEP_TICKS[1],
@@ -647,7 +647,7 @@ impl ScannerRadarSnapshot {
         let mut scanner = Self {
             enabled: true,
             stage,
-            stage_sleep_ticks: stage.source_sleep_ticks(),
+            stage_sleep_ticks: stage.stage_sleep_ticks(),
             source_process_sleep_ticks: SCANNER_PROCESS_SLEEP_TICKS,
             selected_map: SCANNER_SELECTED_MAP,
             scan_left: Some(scan_left),
@@ -798,7 +798,7 @@ pub struct ScorePopupSnapshot {
     pub kind: ScorePopupKind,
     pub position: ScreenPosition,
     pub frames_remaining: u8,
-    pub source_lifetime_ticks: u8,
+    pub lifetime_ticks: u8,
 }
 
 impl ScorePopupSnapshot {
@@ -807,7 +807,7 @@ impl ScorePopupSnapshot {
             kind,
             position,
             frames_remaining: SCORE_POPUP_LIFETIME_TICKS,
-            source_lifetime_ticks: SCORE_POPUP_LIFETIME_TICKS,
+            lifetime_ticks: SCORE_POPUP_LIFETIME_TICKS,
         }
     }
 
@@ -818,7 +818,7 @@ impl ScorePopupSnapshot {
             picture_size: Some((6, 6)),
             mapped_sprite: Some(self.kind.sprite()),
             top_left: Some(self.position),
-            score_popup_lifetime_ticks: Some(self.source_lifetime_ticks),
+            score_popup_lifetime_ticks: Some(self.lifetime_ticks),
             score_popup_value: Some(self.kind.value()),
             ..ExpandedObjectDetailSnapshot::EMPTY
         }
@@ -837,7 +837,7 @@ pub struct EnemyAppearanceSnapshot {
 impl EnemyAppearanceSnapshot {
     fn matches_enemy(self, enemy: EnemySnapshot) -> bool {
         self.position == source_enemy_appearance_position(enemy)
-            && self.mapped_sprite == enemy.source_picture_descriptor().mapped_sprite
+            && self.mapped_sprite == enemy.arcade_picture_descriptor().mapped_sprite
     }
 
     fn expanded_object_detail(self) -> ExpandedObjectDetailSnapshot {

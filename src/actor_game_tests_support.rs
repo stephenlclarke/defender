@@ -67,7 +67,7 @@
         let state = report.game_state();
         let scene = report.render_scene();
 
-        assert_eq!(state.world.terrain, source_playfield_terrain_segments());
+        assert_eq!(state.world.terrain, playfield_terrain_segments());
         assert!(state.world.terrain_blow.is_none());
         assert!(state.world.scanner.enabled);
         assert!(scene.sprites.iter().any(|sprite| {
@@ -210,7 +210,7 @@
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 1;
-        let source_lander = ActorSourceLanderMetadata {
+        let lander_runtime = ActorSourceLanderMetadata {
             x_fraction: 0x12,
             y_fraction: 0x34,
             x_velocity: 0,
@@ -222,13 +222,13 @@
         };
         driver.spawn_lander_from_spawn(ActorLanderSpawn {
             position: Point::new(100, HUMAN_GROUND_Y),
-            source: Some(source_lander),
+            source: Some(lander_runtime),
         });
         driver.spawn_human_for_test(Point::new(100, HUMAN_GROUND_Y));
         driver.step(GameInput::NONE);
         driver.step(GameInput::NONE);
 
-        let (converted, source_mutant) = (0..120)
+        let (converted, mutant_runtime) = (0..120)
             .filter_map(|_| {
                 let report = driver.step(GameInput::NONE);
                 report.commands.iter().find_map(|command| {
@@ -246,8 +246,8 @@
             .next()
             .expect("source lander should spawn a source mutant");
         let expected_source = ActorSourceMutantMetadata {
-            x_fraction: source_lander.x_fraction,
-            y_fraction: source_lander.y_fraction,
+            x_fraction: lander_runtime.x_fraction,
+            y_fraction: lander_runtime.y_fraction,
             x_velocity: 0,
             y_velocity: 0,
             shot_timer: ActorSourceWaveProfile::for_wave(converted.wave)
@@ -255,12 +255,12 @@
                 .min(u32::from(u8::MAX)) as u8,
             sleep_ticks: 0,
             hop_rng: converted
-                .source_rng
+                .arcade_rng
                 .expect("playing report should expose source rng"),
             render_x_correction: 0,
             target6_first_shot_deferred: false,
         };
-        assert_eq!(source_mutant, expected_source);
+        assert_eq!(mutant_runtime, expected_source);
 
         let settled = driver.step(GameInput::NONE);
         let mutant = settled
@@ -268,7 +268,7 @@
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::Mutant)
             .expect("source mutant should become a live actor");
-        assert_eq!(mutant.source_mutant, Some(expected_source));
+        assert_eq!(mutant.mutant_runtime, Some(expected_source));
 
         let clean_state = settled.game_state();
         let clean_mutant = clean_state
@@ -278,15 +278,15 @@
             .find(|enemy| enemy.kind == CleanEnemyKind::Mutant)
             .expect("actor bridge should expose a clean mutant");
         assert_eq!(
-            clean_mutant.source_mutant,
-            Some(SourceMutantSnapshot {
+            clean_mutant.mutant_runtime,
+            Some(MutantRuntimeSnapshot {
                 x_fraction: expected_source.x_fraction,
                 y_fraction: expected_source.y_fraction,
                 x_velocity: expected_source.x_velocity,
                 y_velocity: expected_source.y_velocity,
                 shot_timer: expected_source.shot_timer,
                 sleep_ticks: expected_source.sleep_ticks,
-                hop_rng: clean_source_rng(expected_source.hop_rng),
+                hop_rng: clean_arcade_rng(expected_source.hop_rng),
                 render_x_correction: expected_source.render_x_correction,
                 target6_first_shot_deferred: expected_source.target6_first_shot_deferred,
             })
@@ -326,7 +326,7 @@
             report.step,
             report.wave,
             report
-                .source_rng
+                .arcade_rng
                 .expect("playing report should carry source rng"),
             Point::new(42, 120),
             Velocity::default(),
@@ -338,7 +338,7 @@
         assert_eq!(shot, None);
         let snapshot = snapshot_for(&report, mutant);
         assert_eq!(snapshot.position, expected_position);
-        assert_eq!(snapshot.source_mutant, Some(expected_source));
+        assert_eq!(snapshot.mutant_runtime, Some(expected_source));
         assert_eq!(
             expected_source.x_velocity,
             actor_source_mutant_x_velocity(
@@ -412,7 +412,7 @@
         let reply = mutant.update(&prompt);
         let updated_source = reply
             .snapshot
-            .source_mutant
+            .mutant_runtime
             .expect("source mutant should keep source metadata");
 
         assert_ne!(updated_source.x_velocity, default_x_velocity);
@@ -428,7 +428,7 @@
             hseed: 0x44,
             lseed: 0x55,
         };
-        let source_lander = ActorSourceLanderMetadata {
+        let lander_runtime = ActorSourceLanderMetadata {
             x_fraction: 0x12,
             y_fraction: 0x34,
             x_velocity: 0,
@@ -439,19 +439,19 @@
             target_human_index: Some(6),
         };
 
-        let source_mutant =
-            ActorSourceMutantMetadata::from_lander_conversion(source_lander, profile, hop_rng);
+        let mutant_runtime =
+            ActorSourceMutantMetadata::from_lander_conversion(lander_runtime, profile, hop_rng);
 
         assert_eq!(
-            source_mutant.render_x_correction,
+            mutant_runtime.render_x_correction,
             TARGET6_MUTANT_CONVERSION_X_CORRECTION
         );
-        assert_eq!(source_mutant.x_fraction, source_lander.x_fraction);
-        assert_eq!(source_mutant.y_fraction, source_lander.y_fraction);
+        assert_eq!(mutant_runtime.x_fraction, lander_runtime.x_fraction);
+        assert_eq!(mutant_runtime.y_fraction, lander_runtime.y_fraction);
 
         let moving_lander = ActorSourceLanderMetadata {
             x_velocity: 0x0030,
-            ..source_lander
+            ..lander_runtime
         };
         assert_eq!(
             ActorSourceMutantMetadata::from_lander_conversion(moving_lander, profile, hop_rng)
@@ -493,7 +493,7 @@
         assert!(first_enemy_laser_command(&report).is_none());
         let snapshot = snapshot_for(&report, mutant);
         let source = snapshot
-            .source_mutant
+            .mutant_runtime
             .expect("target6 mutant should keep source metadata");
         assert!(source.target6_first_shot_deferred);
         assert_eq!(source.shot_timer, TARGET6_MUTANT_DEFERRED_SHOT_TIMER);
@@ -537,7 +537,7 @@
         assert_eq!(shot.2.y_fraction, source.y_fraction);
         let snapshot = snapshot_for(&report, mutant);
         let source = snapshot
-            .source_mutant
+            .mutant_runtime
             .expect("target6 mutant should keep source metadata");
         assert!(source.target6_first_shot_deferred);
         assert_eq!(source.shot_timer, TARGET6_MUTANT_DEFERRED_SHOT_TIMER);
@@ -590,7 +590,7 @@
         );
         let snapshot = snapshot_for(&report, mutant);
         let source = snapshot
-            .source_mutant
+            .mutant_runtime
             .expect("target6 mutant should keep source metadata");
         assert!(source.target6_first_shot_deferred);
         assert_eq!(
@@ -828,7 +828,7 @@
             report.step,
             report.wave,
             report
-                .source_rng
+                .arcade_rng
                 .expect("playing report should carry source rng"),
             Point::new(42, 120),
             Velocity::default(),
@@ -858,7 +858,7 @@
         );
         let snapshot = snapshot_for(&report, mutant);
         assert_eq!(snapshot.position, expected_position);
-        assert_eq!(snapshot.source_mutant, Some(expected_source));
+        assert_eq!(snapshot.mutant_runtime, Some(expected_source));
     }
 
     #[test]
@@ -949,7 +949,7 @@
             fire: true,
             ..GameInput::NONE
         });
-        let mut expected_rng = driver.source_rng;
+        let mut expected_rng = driver.arcade_rng;
         expected_rng.advance();
         let expected_first_swarmer = ActorSwarmerSpawn::source_from_pod(
             &mut expected_rng,
@@ -991,7 +991,7 @@
                 expected_first_swarmer.source
             )
         );
-        assert_eq!(driver.source_rng, expected_rng);
+        assert_eq!(driver.arcade_rng, expected_rng);
 
         let live = driver.step(GameInput::NONE);
         assert_eq!(
@@ -1169,7 +1169,7 @@
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = wave.max(1);
-        driver.source_rng = PLAYFIELD_START_RNG;
+        driver.arcade_rng = PLAYFIELD_START_RNG;
         driver.apply_wave_profile();
         driver.spawn_player();
         driver.spawn_wave_hostiles();
@@ -1555,25 +1555,25 @@
         mut source: ActorSourceBomberMetadata,
         _step: u64,
         _id: ActorId,
-        source_rng: Option<ActorSourceRngSnapshot>,
+        arcade_rng: Option<ActorSourceRngSnapshot>,
         player_position: Option<Point>,
     ) -> (Point, ActorSourceBomberMetadata) {
-        if let Some(source_rng) = source_rng
-            && source.source_slot == actor_source_tie_selected_slot(source_rng.seed)
+        if let Some(arcade_rng) = arcade_rng
+            && source.slot == actor_source_tie_selected_slot(arcade_rng.seed)
         {
             if source.sleep_ticks > 0 {
                 source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
             } else {
                 source.picture_frame =
-                    actor_source_bomber_picture_frame(source_rng.seed, source.picture_frame);
+                    actor_source_bomber_picture_frame(arcade_rng.seed, source.picture_frame);
                 source.y_velocity =
-                    actor_source_bomber_random_y_velocity(source.y_velocity, source_rng.seed);
+                    actor_source_bomber_random_y_velocity(source.y_velocity, arcade_rng.seed);
                 if position.y == 0 {
                     source.y_velocity = actor_source_bomber_cruise_y_velocity(
                         source.y_velocity,
                         &mut source.cruise_altitude,
                         position.y,
-                        source_rng.seed,
+                        arcade_rng.seed,
                     );
                 } else if let Some(player) = player_position
                     && let Some(delta) =
@@ -1617,14 +1617,14 @@
             direction: None,
             bounds: Some(bounds),
             alive: true,
-            source_lander: None,
-            source_bomber: None,
-            source_pod: None,
-            source_swarmer: None,
-            source_baiter: None,
-            source_mutant: None,
-            source_human: None,
-            source_enemy_projectile: None,
+            lander_runtime: None,
+            bomber_runtime: None,
+            pod_runtime: None,
+            swarmer_runtime: None,
+            baiter_runtime: None,
+            mutant_runtime: None,
+            human_runtime: None,
+            enemy_projectile_runtime: None,
         }
     }
 
@@ -1635,7 +1635,7 @@
         bounds: Rect,
     ) -> ActorSnapshot {
         let mut snapshot = actor_snapshot_with_bounds(id, ActorKind::Mutant, position, bounds);
-        snapshot.source_mutant = Some(source);
+        snapshot.mutant_runtime = Some(source);
         snapshot
     }
 
@@ -1650,12 +1650,12 @@
         snapshot
     }
 
-    fn actor_source_projection_report_for_test(source_background_left: u16) -> StepReport {
+    fn actor_source_projection_report_for_test(background_left: u16) -> StepReport {
         let mut player = actor_snapshot(1, ActorKind::Player, Point::new(128, 100));
         player.direction = Some(Direction::Right);
 
         let mut lander = actor_snapshot(2, ActorKind::Lander, Point::new(0x30, 80));
-        lander.source_lander = Some(ActorSourceLanderMetadata {
+        lander.lander_runtime = Some(ActorSourceLanderMetadata {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -1667,7 +1667,7 @@
         });
 
         let mut enemy_laser = actor_snapshot(3, ActorKind::EnemyLaser, Point::new(0x31, 96));
-        enemy_laser.source_enemy_projectile = Some(ActorSourceEnemyProjectileMetadata {
+        enemy_laser.enemy_projectile_runtime = Some(ActorSourceEnemyProjectileMetadata {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -1676,7 +1676,7 @@
         });
 
         let mut bomb = actor_snapshot(4, ActorKind::Bomb, Point::new(0x31, 104));
-        bomb.source_enemy_projectile = Some(ActorSourceEnemyProjectileMetadata {
+        bomb.enemy_projectile_runtime = Some(ActorSourceEnemyProjectileMetadata {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -1685,7 +1685,7 @@
         });
 
         let mut human = actor_snapshot(5, ActorKind::Human, Point::new(0x2E, 220));
-        human.source_human = Some(ActorSourceHumanMetadata {
+        human.human_runtime = Some(ActorSourceHumanMetadata {
             x_fraction: 0x80,
             y_fraction: 0,
             picture_frame: 2,
@@ -1719,8 +1719,8 @@
             survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
             enemy_reserve: EnemyReserveSnapshot::default(),
-            source_background_left,
-            source_rng: None,
+            background_left,
+            arcade_rng: None,
             terrain_blow: None,
             snapshots: vec![player, lander, enemy_laser, bomb, human],
             draws: vec![
@@ -1772,7 +1772,7 @@
     fn source_mutant_prompt_for_test(
         step: u64,
         wave: u16,
-        source_rng: ActorSourceRngSnapshot,
+        arcade_rng: ActorSourceRngSnapshot,
         player_position: Point,
         player_velocity: Velocity,
     ) -> StepPrompt {
@@ -1780,13 +1780,13 @@
             step,
             wave,
             ActorSourceWaveProfile::for_wave(wave),
-            source_rng,
+            arcade_rng,
             player_position,
             player_velocity,
         )
     }
 
-    fn playing_player_prompt_for_test(input: GameInput, source_background_left: u16) -> StepPrompt {
+    fn playing_player_prompt_for_test(input: GameInput, background_left: u16) -> StepPrompt {
         StepPrompt {
             step: 1,
             phase: Phase::Playing,
@@ -1810,10 +1810,10 @@
             high_score_initials: HighScoreInitialsState::EMPTY,
             snapshots: Vec::new(),
             behavior_script: ActorBehaviorScript::default(),
-            source_background_left,
-            source_rng: None,
-            source_human_walk_target_slot: None,
-            source_shell_scan_tick: false,
+            background_left,
+            arcade_rng: None,
+            human_walk_target_slot: None,
+            projectile_scan_tick: false,
         }
     }
 
@@ -1821,7 +1821,7 @@
         step: u64,
         wave: u16,
         source_wave: ActorSourceWaveProfile,
-        source_rng: ActorSourceRngSnapshot,
+        arcade_rng: ActorSourceRngSnapshot,
         player_position: Point,
         player_velocity: Velocity,
     ) -> StepPrompt {
@@ -1853,10 +1853,10 @@
                 player_velocity,
             )],
             behavior_script: ActorBehaviorScript::default(),
-            source_background_left: 0,
-            source_rng: Some(source_rng),
-            source_human_walk_target_slot: None,
-            source_shell_scan_tick: false,
+            background_left: 0,
+            arcade_rng: Some(arcade_rng),
+            human_walk_target_slot: None,
+            projectile_scan_tick: false,
         }
     }
 

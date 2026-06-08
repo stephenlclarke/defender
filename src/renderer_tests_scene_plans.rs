@@ -35,7 +35,7 @@
             &[],
             SpriteId::PLAYER_SHIP,
             &source,
-            super::SpriteAssetSource {
+            super::SpriteAtlasSourceRegion {
                 origin: [0, 0],
                 size: [1, 1],
             },
@@ -51,7 +51,7 @@
                 size: [0, 1],
             },
             &source,
-            super::SpriteAssetSource {
+            super::SpriteAtlasSourceRegion {
                 origin: [0, 0],
                 size: [1, 1],
             },

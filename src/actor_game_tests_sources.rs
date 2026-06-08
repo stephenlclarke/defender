@@ -72,7 +72,7 @@
                 .sounds
                 .contains(&SoundCue::HyperspaceMaterialize)
         );
-        assert_eq!(rematerialized.source_background_left, 0x1234);
+        assert_eq!(rematerialized.background_left, 0x1234);
         assert!(
             rematerialized
                 .commands
@@ -114,7 +114,7 @@
         let player_snapshot = snapshot_for(&rematerialized, player);
         assert_eq!(player_snapshot.position, expected_position);
         assert_eq!(
-            rematerialized.source_background_left,
+            rematerialized.background_left,
             u16::from_be_bytes([expected_source.seed, expected_source.hseed])
         );
         assert!(rematerialized.draws.iter().any(|draw| {
@@ -132,7 +132,7 @@
         let mut driver = ActorGameDriver::new();
 
         let attract = driver.step(GameInput::NONE);
-        assert_eq!(attract.source_rng, None);
+        assert_eq!(attract.arcade_rng, None);
 
         driver.phase = Phase::Playing;
         let mut expected_source = PLAYFIELD_START_RNG;
@@ -140,10 +140,10 @@
 
         let playing = driver.step(GameInput::NONE);
 
-        assert_eq!(playing.source_rng, Some(expected_snapshot));
+        assert_eq!(playing.arcade_rng, Some(expected_snapshot));
         assert_eq!(
-            playing.game_state().world.source_rng,
-            clean_source_rng(expected_snapshot)
+            playing.game_state().world.arcade_rng,
+            clean_arcade_rng(expected_snapshot)
         );
     }
 
@@ -189,7 +189,7 @@
             .expect("source first-wave human should publish its restore position");
 
         assert_eq!(
-            human.source_human,
+            human.human_runtime,
             Some(ActorSourceHumanMetadata {
                 x_fraction: 0x81,
                 y_fraction: 0x00,
@@ -211,7 +211,7 @@
         let human_id =
             driver.spawn_human_from_spawn(source_human_spawn_for_test(Point::new(64, 220), 1, 0));
         driver.step(GameInput::NONE);
-        driver.source_rng = ActorSourceRng {
+        driver.arcade_rng = ActorSourceRng {
             seed: 0,
             hseed: 0,
             lseed: 0,
@@ -221,13 +221,13 @@
         let human = snapshot_for(&walked, human_id);
 
         assert_eq!(
-            walked.source_rng.map(|source_rng| source_rng.seed),
+            walked.arcade_rng.map(|arcade_rng| arcade_rng.seed),
             Some(17)
         );
         assert_eq!(human.position, Point::new(63, 221));
         assert_eq!(
             human
-                .source_human
+                .human_runtime
                 .map(|source| (source.x_fraction, source.picture_frame)),
             Some((0xE0, 1))
         );
@@ -240,7 +240,7 @@
         let human_id =
             driver.spawn_human_from_spawn(source_human_spawn_for_test(Point::new(64, 220), 1, 0));
         driver.step(GameInput::NONE);
-        driver.source_rng = ActorSourceRng {
+        driver.arcade_rng = ActorSourceRng {
             seed: 0,
             hseed: 0,
             lseed: 222,
@@ -249,11 +249,11 @@
         let turned = driver.step(GameInput::NONE);
         let human = snapshot_for(&turned, human_id);
 
-        assert_eq!(turned.source_rng.map(|source_rng| source_rng.seed), Some(0));
+        assert_eq!(turned.arcade_rng.map(|arcade_rng| arcade_rng.seed), Some(0));
         assert_eq!(human.position, Point::new(64, 220));
         assert_eq!(
             human
-                .source_human
+                .human_runtime
                 .map(|source| (source.x_fraction, source.picture_frame)),
             Some((0x20, 2))
         );
@@ -271,16 +271,16 @@
             driver.spawn_human_from_spawn(source_human_spawn_for_test(Point::new(80, 220), 2, 0));
 
         driver.step(GameInput::NONE);
-        driver.source_rng = ActorSourceRng {
+        driver.arcade_rng = ActorSourceRng {
             seed: 0,
             hseed: 0,
             lseed: 0,
         };
         let walked = driver.step(GameInput::NONE);
 
-        assert_eq!(driver.source_astronaut_cursor, Some(1));
+        assert_eq!(driver.human_walk_cursor, Some(1));
         assert_eq!(
-            driver.source_astronaut_sleep_ticks,
+            driver.human_walk_sleep_ticks,
             ASTRONAUT_PROCESS_SLEEP_TICKS
         );
         assert_eq!(snapshot_for(&walked, slot0).position, Point::new(48, 220));
@@ -288,7 +288,7 @@
         assert_eq!(snapshot_for(&walked, slot2).position, Point::new(80, 220));
 
         let sleeping = driver.step(GameInput::NONE);
-        assert_eq!(driver.source_astronaut_sleep_ticks, 1);
+        assert_eq!(driver.human_walk_sleep_ticks, 1);
         assert_eq!(snapshot_for(&sleeping, slot1).position, Point::new(63, 221));
         assert_eq!(snapshot_for(&sleeping, slot2).position, Point::new(80, 220));
     }
@@ -307,7 +307,7 @@
         }
 
         driver.step(GameInput::NONE);
-        driver.source_rng = ActorSourceRng {
+        driver.arcade_rng = ActorSourceRng {
             seed: 0,
             hseed: 0,
             lseed: 0,
@@ -318,15 +318,15 @@
             Point::new(47, 221)
         );
 
-        driver.source_astronaut_sleep_ticks = 0;
-        driver.source_rng = ActorSourceRng {
+        driver.human_walk_sleep_ticks = 0;
+        driver.arcade_rng = ActorSourceRng {
             seed: 0,
             hseed: 0,
             lseed: 0,
         };
         let slot2_suppressed = driver.step(GameInput::NONE);
 
-        assert_eq!(driver.source_astronaut_cursor, Some(2));
+        assert_eq!(driver.human_walk_cursor, Some(2));
         assert_eq!(
             snapshot_for(&slot2_suppressed, human_ids[2]).position,
             Point::new(56, 220)
@@ -348,7 +348,7 @@
         driver.spawn_human_for_test(Point::new(128, 220));
 
         driver.step(GameInput::NONE);
-        driver.source_rng = ActorSourceRng {
+        driver.arcade_rng = ActorSourceRng {
             seed: 0,
             hseed: 0,
             lseed: 0,
@@ -359,15 +359,15 @@
             Point::new(47, 221)
         );
 
-        driver.source_astronaut_sleep_ticks = 0;
-        driver.source_rng = ActorSourceRng {
+        driver.human_walk_sleep_ticks = 0;
+        driver.arcade_rng = ActorSourceRng {
             seed: 0,
             hseed: 0,
             lseed: 0,
         };
         let slot2_suppressed = driver.step(GameInput::NONE);
 
-        assert_eq!(driver.source_astronaut_cursor, Some(2));
+        assert_eq!(driver.human_walk_cursor, Some(2));
         assert_eq!(
             snapshot_for(&slot2_suppressed, source_ids[2]).position,
             Point::new(56, 220)
@@ -552,7 +552,7 @@
             .find(|snapshot| snapshot.kind == ActorKind::Bomb)
             .expect("spawned bomb should publish an actor snapshot");
         let source_projectile = bomb
-            .source_enemy_projectile
+            .enemy_projectile_runtime
             .expect("bomb should publish source projectile metadata");
         assert_eq!(source_projectile.x_velocity, 0);
         assert_eq!(source_projectile.y_velocity, 0);
@@ -564,7 +564,7 @@
     fn source_bomber_bomb_spawn_carries_source_shell_fractions() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
-        driver.source_rng = ActorSourceRng {
+        driver.arcade_rng = ActorSourceRng {
             seed: 0,
             hseed: 0,
             lseed: 0,
@@ -592,7 +592,7 @@
             picture_frame: 0,
             cruise_altitude: BOMBER_CRUISE_ALTITUDE,
             sleep_ticks: 0,
-            source_slot: 0,
+            slot: 0,
         };
         let bomber = driver.spawn_bomber_from_spawn(ActorBomberSpawn {
             position: Point::new(100, 80),
@@ -605,16 +605,16 @@
             initial_source,
             report.step,
             bomber,
-            report.source_rng,
+            report.arcade_rng,
             None,
         );
         let expected_lifetime_ticks = report
-            .source_rng
+            .arcade_rng
             .map(actor_source_bomber_bomb_lifetime_ticks)
             .expect("playing report should carry source rng");
         let bomber_snapshot = snapshot_for(&report, bomber);
         assert_eq!(bomber_snapshot.position, expected_position);
-        assert_eq!(bomber_snapshot.source_bomber, Some(expected_source));
+        assert_eq!(bomber_snapshot.bomber_runtime, Some(expected_source));
 
         assert!(report.commands.iter().any(|command| {
             matches!(
@@ -640,7 +640,7 @@
             .snapshots
             .iter()
             .find(|snapshot| {
-                snapshot.source_enemy_projectile.is_some_and(|source| {
+                snapshot.enemy_projectile_runtime.is_some_and(|source| {
                     source.x_fraction == initial_source.x_fraction
                         && source.y_fraction == initial_source.y_fraction
                 })
@@ -648,7 +648,7 @@
             .expect("source-backed bomber bomb should publish source shell fractions");
 
         assert_eq!(
-            bomb.source_enemy_projectile,
+            bomb.enemy_projectile_runtime,
             Some(ActorSourceEnemyProjectileMetadata {
                 x_fraction: initial_source.x_fraction,
                 y_fraction: initial_source.y_fraction,
@@ -663,7 +663,7 @@
     fn source_bomber_bomb_spawn_uses_source_rng_gate() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
-        driver.source_rng = ActorSourceRng {
+        driver.arcade_rng = ActorSourceRng {
             seed: 0,
             hseed: 0,
             lseed: 14,
@@ -686,16 +686,16 @@
                 picture_frame: 0,
                 cruise_altitude: BOMBER_CRUISE_ALTITUDE,
                 sleep_ticks: 0,
-                source_slot: 0,
+                slot: 0,
             }),
         });
 
         let report = driver.step(GameInput::NONE);
-        let source_rng = report
-            .source_rng
+        let arcade_rng = report
+            .arcade_rng
             .expect("playing report should carry source rng");
 
-        assert_ne!(source_rng.lseed & 0x07, 0);
+        assert_ne!(arcade_rng.lseed & 0x07, 0);
         assert!(
             !report.commands.iter().any(|command| {
                 matches!(command, GameCommand::Spawn(SpawnRequest::Bomb { .. }))
@@ -707,7 +707,7 @@
     fn source_bomber_bomb_spawn_respects_getshl_bounds() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
-        driver.source_rng = ActorSourceRng {
+        driver.arcade_rng = ActorSourceRng {
             seed: 0,
             hseed: 0,
             lseed: 0,
@@ -730,7 +730,7 @@
                 picture_frame: 0,
                 cruise_altitude: BOMBER_CRUISE_ALTITUDE,
                 sleep_ticks: 0,
-                source_slot: 0,
+                slot: 0,
             }),
         });
         driver.spawn_bomber_from_spawn(ActorBomberSpawn {
@@ -746,7 +746,7 @@
                 picture_frame: 0,
                 cruise_altitude: BOMBER_CRUISE_ALTITUDE,
                 sleep_ticks: 0,
-                source_slot: 0,
+                slot: 0,
             }),
         });
 
@@ -780,7 +780,7 @@
             .find(|snapshot| snapshot.kind == ActorKind::Player)
             .map(|snapshot| snapshot.position)
             .expect("player should publish a prompt snapshot");
-        driver.source_rng = ActorSourceRng {
+        driver.arcade_rng = ActorSourceRng {
             seed: 0,
             hseed: 0,
             lseed: 10,
@@ -793,7 +793,7 @@
             picture_frame: 2,
             cruise_altitude: BOMBER_CRUISE_ALTITUDE,
             sleep_ticks: 0,
-            source_slot: 3,
+            slot: 3,
         };
         let bomber_position = Point::new(96, player_position.y - 8);
         let bomber = driver.spawn_bomber_from_spawn(ActorBomberSpawn {
@@ -807,13 +807,13 @@
             initial_source,
             report.step,
             bomber,
-            report.source_rng,
+            report.arcade_rng,
             Some(player_position),
         );
         let snapshot = snapshot_for(&report, bomber);
 
         assert_eq!(snapshot.position, expected_position);
-        assert_eq!(snapshot.source_bomber, Some(expected_source));
+        assert_eq!(snapshot.bomber_runtime, Some(expected_source));
         assert_ne!(expected_source.y_velocity, 0);
         assert!(report.draws.iter().any(|draw| {
             draw.actor == bomber
@@ -834,7 +834,7 @@
     fn source_bomber_offscreen_motion_adjusts_cruise_altitude() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
-        driver.source_rng = ActorSourceRng {
+        driver.arcade_rng = ActorSourceRng {
             seed: 0,
             hseed: 0,
             lseed: 13,
@@ -854,7 +854,7 @@
             picture_frame: 1,
             cruise_altitude: BOMBER_CRUISE_ALTITUDE,
             sleep_ticks: 0,
-            source_slot: 3,
+            slot: 3,
         };
         let bomber_position = Point::new(100, 0);
         let bomber = driver.spawn_bomber_from_spawn(ActorBomberSpawn {
@@ -868,13 +868,13 @@
             initial_source,
             report.step,
             bomber,
-            report.source_rng,
+            report.arcade_rng,
             None,
         );
         let snapshot = snapshot_for(&report, bomber);
 
         assert_eq!(snapshot.position, expected_position);
-        assert_eq!(snapshot.source_bomber, Some(expected_source));
+        assert_eq!(snapshot.bomber_runtime, Some(expected_source));
         assert_ne!(expected_source.cruise_altitude, BOMBER_CRUISE_ALTITUDE);
         assert_ne!(expected_source.y_velocity, 0);
     }
@@ -956,7 +956,7 @@
                     .snapshots
                     .iter()
                     .find(|snapshot| snapshot.kind == ActorKind::Bomb)
-                    .and_then(|snapshot| snapshot.source_enemy_projectile)
+                    .and_then(|snapshot| snapshot.enemy_projectile_runtime)
                     .expect("source-backed bomb should publish source projectile metadata")
                     .lifetime_ticks
             })
@@ -1035,7 +1035,7 @@
                     .snapshots
                     .iter()
                     .find(|snapshot| snapshot.kind == ActorKind::EnemyLaser)
-                    .and_then(|snapshot| snapshot.source_enemy_projectile)
+                    .and_then(|snapshot| snapshot.enemy_projectile_runtime)
                     .expect("scripted enemy laser should publish source metadata");
                 first_source.get_or_insert(source);
                 source.lifetime_ticks
@@ -1293,7 +1293,7 @@
         assert!(live.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Baiter
                 && snapshot.position == Point::new(227, 143)
-                && snapshot.source_baiter
+                && snapshot.baiter_runtime
                     == Some(ActorSourceBaiterMetadata {
                         x_fraction: 0,
                         y_fraction: 0x80,
@@ -1338,7 +1338,7 @@
 
         let report = driver.step(GameInput::NONE);
         let report_source_rng = report
-            .source_rng
+            .arcade_rng
             .expect("playing report should carry source rng");
         let prompt = source_mutant_prompt_for_test(
             report.step,
@@ -1396,7 +1396,7 @@
             )
         );
         assert_eq!(
-            snapshot_for(&report, swarmer).source_swarmer,
+            snapshot_for(&report, swarmer).swarmer_runtime,
             Some(expected_source)
         );
     }
@@ -1429,7 +1429,7 @@
 
         let report = driver.step(GameInput::NONE);
         let report_source_rng = report
-            .source_rng
+            .arcade_rng
             .expect("playing report should carry source rng");
         let mut expected_source = source;
         expected_source.y_velocity = source_mini_swarmer_y_velocity(
@@ -1469,7 +1469,7 @@
             Point::new(expected_x, expected_y)
         );
         assert_eq!(
-            snapshot_for(&report, swarmer).source_swarmer,
+            snapshot_for(&report, swarmer).swarmer_runtime,
             Some(expected_source)
         );
     }
@@ -1543,7 +1543,7 @@
 
         let report = driver.step(GameInput::NONE);
         let report_source_rng = report
-            .source_rng
+            .arcade_rng
             .expect("playing report should carry source rng");
         let prompt = source_mutant_prompt_for_test(
             report.step,
@@ -1610,7 +1610,7 @@
             Point::new(expected_x, expected_y)
         );
         assert_eq!(
-            snapshot_for(&report, baiter).source_baiter,
+            snapshot_for(&report, baiter).baiter_runtime,
             Some(expected_source)
         );
     }
@@ -1647,7 +1647,7 @@
 
         let report = driver.step(GameInput::NONE);
         let report_source_rng = report
-            .source_rng
+            .arcade_rng
             .expect("playing report should carry source rng");
 
         assert!(!report.sounds.contains(&SoundCue::BaiterShot));
@@ -1661,7 +1661,7 @@
             )
         }));
         assert_eq!(
-            snapshot_for(&report, baiter).source_baiter,
+            snapshot_for(&report, baiter).baiter_runtime,
             Some(ActorSourceBaiterMetadata {
                 x_fraction: 0,
                 y_fraction: 0,
@@ -1679,7 +1679,7 @@
 
     #[test]
     fn source_baiter_fireball_adds_player_velocity_when_seed_is_high() {
-        let source_rng = ActorSourceRngSnapshot {
+        let arcade_rng = ActorSourceRngSnapshot {
             seed: 0x90,
             hseed: 0,
             lseed: 0x44,
@@ -1687,7 +1687,7 @@
         let prompt = source_mutant_prompt_for_test(
             7,
             2,
-            source_rng,
+            arcade_rng,
             Point::new(80, 120),
             Velocity::new(5, -2),
         );
@@ -1702,11 +1702,11 @@
         };
 
         let (velocity, projectile) =
-            actor_source_baiter_fireball(Point::new(70, 100), &prompt, source, source_rng)
+            actor_source_baiter_fireball(Point::new(70, 100), &prompt, source, arcade_rng)
                 .expect("high-seed baiter shot should allocate");
 
         let expected_x_velocity = actor_sign_extend_u8_to_u16(
-            (source_rng.seed & 0x1F)
+            (arcade_rng.seed & 0x1F)
                 .wrapping_sub(0x10)
                 .wrapping_add(80)
                 .wrapping_sub(70),
@@ -1714,7 +1714,7 @@
         .wrapping_shl(2)
         .wrapping_add(actor_source_velocity_word(5).wrapping_shl(2));
         let expected_y_velocity = actor_sign_extend_u8_to_u16(
-            (source_rng.lseed & 0x1F)
+            (arcade_rng.lseed & 0x1F)
                 .wrapping_sub(0x10)
                 .wrapping_add(120)
                 .wrapping_sub(100),
@@ -1746,7 +1746,7 @@
             driver.spawn_player();
             driver.spawn_lander_for_test(Point::new(220, 80));
             driver.step(GameInput::NONE);
-            driver.source_rng = ActorSourceRng {
+            driver.arcade_rng = ActorSourceRng {
                 seed,
                 hseed: 0,
                 lseed: 0,
@@ -1768,13 +1768,13 @@
         }
 
         let (held, held_baiter) = step_baiter_after_source_seed(0);
-        assert_eq!(held.source_rng.map(|source_rng| source_rng.seed), Some(17));
+        assert_eq!(held.arcade_rng.map(|arcade_rng| arcade_rng.seed), Some(17));
         assert_eq!(
             snapshot_for(&held, held_baiter).position,
             Point::new(70, 120)
         );
         assert_eq!(
-            snapshot_for(&held, held_baiter).source_baiter,
+            snapshot_for(&held, held_baiter).baiter_runtime,
             Some(ActorSourceBaiterMetadata {
                 x_fraction: 0,
                 y_fraction: 0,
@@ -1788,7 +1788,7 @@
 
         let (retargeted, retargeted_baiter) = step_baiter_after_source_seed(70);
         assert_eq!(
-            retargeted.source_rng.map(|source_rng| source_rng.seed),
+            retargeted.arcade_rng.map(|arcade_rng| arcade_rng.seed),
             Some(227)
         );
         assert_eq!(
@@ -1796,7 +1796,7 @@
             Point::new(69, 120)
         );
         assert_eq!(
-            snapshot_for(&retargeted, retargeted_baiter).source_baiter,
+            snapshot_for(&retargeted, retargeted_baiter).baiter_runtime,
             Some(ActorSourceBaiterMetadata {
                 x_fraction: 0,
                 y_fraction: 0,
@@ -1814,7 +1814,7 @@
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 1;
-        driver.source_rng = ActorSourceRng {
+        driver.arcade_rng = ActorSourceRng {
             seed: 70,
             hseed: 0,
             lseed: 0,
@@ -1839,12 +1839,12 @@
         let report = driver.step(GameInput::NONE);
 
         assert_eq!(
-            report.source_rng.map(|source_rng| source_rng.seed),
+            report.arcade_rng.map(|arcade_rng| arcade_rng.seed),
             Some(227)
         );
         assert_eq!(snapshot_for(&report, baiter).position, Point::new(69, 139));
         assert_eq!(
-            snapshot_for(&report, baiter).source_baiter,
+            snapshot_for(&report, baiter).baiter_runtime,
             Some(ActorSourceBaiterMetadata {
                 x_fraction: 0x08,
                 y_fraction: 0x82,

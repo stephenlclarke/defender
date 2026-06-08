@@ -31,7 +31,7 @@ struct EmbeddedSprite {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SpriteAssetSource {
+struct SpriteAtlasSourceRegion {
     origin: [u32; 2],
     size: [u32; 2],
 }
@@ -101,7 +101,7 @@ impl ObjectPicturePalette {
     }
 
     fn bomb(phase: usize) -> Self {
-        let color = source_object_cycle_color(phase);
+        let color = object_cycle_palette_color(phase);
         Self {
             one: WHITE_RGBA,
             a: color,
@@ -633,36 +633,36 @@ fn attract_defender_wordmark_block_regions() -> Vec<AtlasRegion> {
 fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) -> Vec<u8> {
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
 
-    let player_ship = decode_source_object_image_rgba("PLD10", 6, 8, ObjectPicturePalette::ship());
+    let player_ship = decode_object_picture_asset_rgba("PLD10", 6, 8, ObjectPicturePalette::ship());
     let player_ship_left =
-        decode_source_object_image_rgba("PLD20", 6, 8, ObjectPicturePalette::ship());
+        decode_object_picture_asset_rgba("PLD20", 6, 8, ObjectPicturePalette::ship());
     let player_projectile =
-        decode_source_object_image_rgba("LASD10", 1, 8, ObjectPicturePalette::player_shot());
+        decode_object_picture_asset_rgba("LASD10", 1, 8, ObjectPicturePalette::player_shot());
     let enemy_lander =
-        decode_source_object_image_rgba("LND10", 8, 5, ObjectPicturePalette::white());
-    let human = decode_source_object_image_rgba("ASTD10", 8, 2, ObjectPicturePalette::white());
+        decode_object_picture_asset_rgba("LND10", 8, 5, ObjectPicturePalette::white());
+    let human = decode_object_picture_asset_rgba("ASTD10", 8, 2, ObjectPicturePalette::white());
     let enemy_mutant =
-        decode_source_object_image_rgba("SCZD10", 8, 5, ObjectPicturePalette::white());
+        decode_object_picture_asset_rgba("SCZD10", 8, 5, ObjectPicturePalette::white());
     let enemy_baiter =
-        decode_source_object_image_rgba("UFOD10", 4, 6, ObjectPicturePalette::white());
+        decode_object_picture_asset_rgba("UFOD10", 4, 6, ObjectPicturePalette::white());
     let enemy_bomber =
-        decode_source_object_image_rgba("TIED10", 8, 4, ObjectPicturePalette::tie(0));
-    let enemy_pod = decode_source_object_image_rgba("PRBD10", 8, 4, ObjectPicturePalette::white());
+        decode_object_picture_asset_rgba("TIED10", 8, 4, ObjectPicturePalette::tie(0));
+    let enemy_pod = decode_object_picture_asset_rgba("PRBD10", 8, 4, ObjectPicturePalette::white());
     let enemy_swarmer =
-        decode_source_object_image_rgba("SWMD10", 4, 3, ObjectPicturePalette::white());
-    let enemy_bomb = decode_source_object_image_rgba("BMBD10", 3, 2, ObjectPicturePalette::bomb(0));
+        decode_object_picture_asset_rgba("SWMD10", 4, 3, ObjectPicturePalette::white());
+    let enemy_bomb = decode_object_picture_asset_rgba("BMBD10", 3, 2, ObjectPicturePalette::bomb(0));
     let bomb_explosion =
-        decode_source_object_image_rgba("BXD10", 8, 4, ObjectPicturePalette::burst());
+        decode_object_picture_asset_rgba("BXD10", 8, 4, ObjectPicturePalette::burst());
     let swarmer_explosion =
-        decode_source_object_image_rgba("SWXD10", 8, 4, ObjectPicturePalette::burst());
+        decode_object_picture_asset_rgba("SWXD10", 8, 4, ObjectPicturePalette::burst());
     let score_popup_250 =
-        decode_source_object_image_rgba("C25D10", 6, 6, ObjectPicturePalette::score_250(0));
+        decode_object_picture_asset_rgba("C25D10", 6, 6, ObjectPicturePalette::score_250(0));
     let score_popup_500 =
-        decode_source_object_image_rgba("C5D10", 6, 6, ObjectPicturePalette::score_500(0));
+        decode_object_picture_asset_rgba("C5D10", 6, 6, ObjectPicturePalette::score_500(0));
     let player_life_stock =
-        decode_source_object_image_rgba("PLAM0", 4, 5, ObjectPicturePalette::ship());
+        decode_object_picture_asset_rgba("PLAM0", 4, 5, ObjectPicturePalette::ship());
     let smart_bomb_stock =
-        decode_source_object_image_rgba("SBD10", 3, 3, ObjectPicturePalette::white());
+        decode_object_picture_asset_rgba("SBD10", 3, 3, ObjectPicturePalette::white());
     let astronaut_explosion = decode_picture_grid_rgba("ASXP1", ASTRONAUT_EXPLOSION_GRID);
     let null_object = decode_picture_grid_rgba("NULOB", NULL_OBJECT_GRID);
     let terrain_explosion = decode_picture_grid_rgba("TEREX", TERRAIN_EXPLOSION_GRID);
@@ -901,7 +901,7 @@ fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) ->
         regions,
         SpriteId::SCORE_TEXT,
         &font_sheet,
-        SpriteAssetSource {
+        SpriteAtlasSourceRegion {
             origin: [0, 0],
             size: [64, 8],
         },
@@ -912,7 +912,7 @@ fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) ->
         regions,
         SpriteId::STATUS_TEXT,
         &font_sheet,
-        SpriteAssetSource {
+        SpriteAtlasSourceRegion {
             origin: [0, 8],
             size: [64, 8],
         },
@@ -995,13 +995,13 @@ fn decode_picture_grid_rgba(name: &'static str, grid: ObjectPictureGrid) -> Embe
     )
 }
 
-fn decode_source_object_image_rgba(
+fn decode_object_picture_asset_rgba(
     label: &'static str,
     rows: u8,
     bytes_per_row: u8,
     palette: ObjectPicturePalette,
 ) -> EmbeddedSprite {
-    let bytes = source_object_image_bytes(label);
+    let bytes = object_picture_asset_bytes(label);
     decode_picture_bytes_rgba(label, rows, bytes_per_row, &bytes, palette)
 }
 
@@ -1036,7 +1036,7 @@ fn decode_picture_bytes_rgba(
     EmbeddedSprite { surface, pixels }
 }
 
-fn source_object_image_bytes(label: &'static str) -> Vec<u8> {
+fn object_picture_asset_bytes(label: &'static str) -> Vec<u8> {
     for line in OBJECT_IMAGE_TABLE_TSV.lines().skip(1) {
         let mut columns = line.split('\t');
         let Some(image_label) = columns.next() else {
@@ -1047,14 +1047,14 @@ fn source_object_image_bytes(label: &'static str) -> Vec<u8> {
             continue;
         };
         if image_label == label {
-            return decode_source_hex_bytes(label, hex_bytes);
+            return decode_hex_bytes(label, hex_bytes);
         }
     }
 
     panic!("source object image {label} must exist in object-images.tsv");
 }
 
-fn decode_source_hex_bytes(label: &'static str, hex_bytes: &str) -> Vec<u8> {
+fn decode_hex_bytes(label: &'static str, hex_bytes: &str) -> Vec<u8> {
     assert!(
         hex_bytes.len().is_multiple_of(2),
         "source object image {label} hex byte string must be even length"
@@ -1730,7 +1730,7 @@ fn pseudo_color_rgba(value: u8) -> [u8; 4] {
     ]
 }
 
-fn source_object_cycle_color(phase: usize) -> [u8; 4] {
+fn object_cycle_palette_color(phase: usize) -> [u8; 4] {
     pseudo_color_rgba(OBJECT_COLOR_SEQUENCE[phase % (OBJECT_COLOR_SEQUENCE.len() - 1)])
 }
 
@@ -1747,7 +1747,7 @@ fn blit_default_region(
         regions,
         sprite,
         source,
-        SpriteAssetSource {
+        SpriteAtlasSourceRegion {
             origin: [0, 0],
             size: [source.surface.width, source.surface.height],
         },
@@ -1760,7 +1760,7 @@ fn blit_default_region_from_source(
     regions: &[AtlasRegion],
     sprite: SpriteId,
     source: &EmbeddedSprite,
-    source_region: SpriteAssetSource,
+    source_region: SpriteAtlasSourceRegion,
 ) {
     let Some(region) = regions
         .iter()
@@ -1807,7 +1807,7 @@ fn blit_scaled_region(
     atlas_surface: SurfaceSize,
     region: AtlasRegion,
     source: &EmbeddedSprite,
-    source_region: SpriteAssetSource,
+    source_region: SpriteAtlasSourceRegion,
 ) {
     if region.size[0] == 0
         || region.size[1] == 0

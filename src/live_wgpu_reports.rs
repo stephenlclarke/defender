@@ -102,8 +102,8 @@ pub(crate) struct ActorScriptCheckSourceActorSample {
     pub(crate) kind: String,
     pub(crate) x: i16,
     pub(crate) y: i16,
-    pub(crate) source_x_fraction: u8,
-    pub(crate) source_y_fraction: u8,
+    pub(crate) x_subpixel: u8,
+    pub(crate) y_subpixel: u8,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -111,10 +111,10 @@ pub(crate) struct ActorScriptCheckSourceProjectileSample {
     pub(crate) kind: String,
     pub(crate) x: i16,
     pub(crate) y: i16,
-    pub(crate) source_x_fraction: u8,
-    pub(crate) source_y_fraction: u8,
-    pub(crate) source_x_velocity: u16,
-    pub(crate) source_y_velocity: u16,
+    pub(crate) x_subpixel: u8,
+    pub(crate) y_subpixel: u8,
+    pub(crate) x_velocity_word: u16,
+    pub(crate) y_velocity_word: u16,
     pub(crate) lifetime_ticks: u8,
 }
 
@@ -125,10 +125,10 @@ pub(crate) struct ActorScriptCheckProjectileSpawnSample {
     pub(crate) y: i16,
     pub(crate) velocity_dx: i16,
     pub(crate) velocity_dy: i16,
-    pub(crate) source_x_fraction: Option<u8>,
-    pub(crate) source_y_fraction: Option<u8>,
-    pub(crate) source_x_velocity: Option<u16>,
-    pub(crate) source_y_velocity: Option<u16>,
+    pub(crate) x_subpixel: Option<u8>,
+    pub(crate) y_subpixel: Option<u8>,
+    pub(crate) x_velocity_word: Option<u16>,
+    pub(crate) y_velocity_word: Option<u16>,
     pub(crate) lifetime_ticks: Option<u8>,
 }
 
@@ -166,7 +166,7 @@ pub(crate) struct ActorScriptCheckPlayingSummary {
     pub(crate) reserve_pods: u8,
     pub(crate) reserve_mutants: u8,
     pub(crate) reserve_swarmers: u8,
-    pub(crate) source_background_left: u16,
+    pub(crate) background_left: u16,
     pub(crate) source_rng_seed: Option<u8>,
     pub(crate) source_rng_hseed: Option<u8>,
     pub(crate) source_rng_lseed: Option<u8>,
@@ -435,7 +435,7 @@ impl LiveSmokeReport {
 
 impl ActorScriptCheckReport {
     pub(crate) fn to_text(&self) -> String {
-        let source_rng = source_rng_summary(
+        let arcade_rng = arcade_rng_summary(
             self.first_playing_source_rng_seed,
             self.first_playing_source_rng_hseed,
             self.first_playing_source_rng_lseed,
@@ -667,7 +667,7 @@ impl ActorScriptCheckReport {
             self.first_playing_reserve_mutants,
             self.first_playing_reserve_swarmers,
             self.first_playing_source_background_left,
-            source_rng,
+            arcade_rng,
             source_actor_samples_summary(&self.first_playing_source_actor_samples),
             source_projectile_samples_summary(&self.first_playing_source_projectile_samples),
             sound_commands_summary(&self.first_playing_sound_commands),
@@ -733,7 +733,7 @@ fn optional_u8_summary(value: Option<u8>) -> String {
 }
 
 fn playing_summary_to_text(prefix: &str, summary: &ActorScriptCheckPlayingSummary) -> String {
-    let source_rng = source_rng_summary(
+    let arcade_rng = arcade_rng_summary(
         summary.source_rng_seed,
         summary.source_rng_hseed,
         summary.source_rng_lseed,
@@ -754,8 +754,8 @@ fn playing_summary_to_text(prefix: &str, summary: &ActorScriptCheckPlayingSummar
         summary.reserve_pods,
         summary.reserve_mutants,
         summary.reserve_swarmers,
-        summary.source_background_left,
-        source_rng,
+        summary.background_left,
+        arcade_rng,
         source_actor_samples_summary(&summary.source_actor_samples),
         source_projectile_samples_summary(&summary.source_projectile_samples),
         sound_commands_summary(&summary.sound_commands),
@@ -785,7 +785,7 @@ fn source_actor_samples_summary(samples: &[ActorScriptCheckSourceActorSample]) -
         .map(|sample| {
             format!(
                 "{}@{},{}[frac=0x{:02x}/0x{:02x}]",
-                sample.kind, sample.x, sample.y, sample.source_x_fraction, sample.source_y_fraction
+                sample.kind, sample.x, sample.y, sample.x_subpixel, sample.y_subpixel
             )
         })
         .collect::<Vec<_>>()
@@ -805,10 +805,10 @@ fn source_projectile_samples_summary(samples: &[ActorScriptCheckSourceProjectile
                 sample.kind,
                 sample.x,
                 sample.y,
-                sample.source_x_fraction,
-                sample.source_y_fraction,
-                sample.source_x_velocity,
-                sample.source_y_velocity,
+                sample.x_subpixel,
+                sample.y_subpixel,
+                sample.x_velocity_word,
+                sample.y_velocity_word,
                 sample.lifetime_ticks,
             )
         })
@@ -825,10 +825,10 @@ fn projectile_spawn_samples_summary(samples: &[ActorScriptCheckProjectileSpawnSa
         .iter()
         .map(|sample| {
             let source = match (
-                sample.source_x_fraction,
-                sample.source_y_fraction,
-                sample.source_x_velocity,
-                sample.source_y_velocity,
+                sample.x_subpixel,
+                sample.y_subpixel,
+                sample.x_velocity_word,
+                sample.y_velocity_word,
                 sample.lifetime_ticks,
             ) {
                 (Some(x_fraction), Some(y_fraction), Some(x_velocity), Some(y_velocity), Some(lifetime_ticks)) => format!(

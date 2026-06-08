@@ -2,7 +2,7 @@ use crate::{
     game::{
         ATTRACT_SCORING_SEQUENCE_START_FRAME, AttractPresentationSnapshot,
         Direction as CleanDirection, EnemyKind as CleanEnemyKind,
-        EnemyProjectileSnapshot as CleanEnemyProjectileSnapshot, EnemyProjectileSourceKind,
+        EnemyProjectileSnapshot as CleanEnemyProjectileSnapshot, EnemyProjectileKind,
         EnemyReserveSnapshot, EnemySnapshot as CleanEnemySnapshot,
         ExplosionKind as CleanExplosionKind, ExplosionSnapshot as CleanExplosionSnapshot,
         GameEvent, GameEvents, GameFrame, GameInput as CleanGameInput, GameOverSnapshot, GamePhase,
@@ -10,9 +10,9 @@ use crate::{
         HighScoreTablesSnapshot, HumanSnapshot as CleanHumanSnapshot, PlayerSnapshot,
         PlayerStockSnapshot, ProjectileSnapshot as CleanProjectileSnapshot,
         ScorePopupKind as CleanScorePopupKind, ScorePopupSnapshot as CleanScorePopupSnapshot,
-        ScoreSnapshot, SoundEvent, SourceBaiterSnapshot, SourceBomberSnapshot,
-        SourceLanderSnapshot, SourceMutantSnapshot, SourcePodSnapshot, SourceRandSnapshot,
-        SourceSwarmerSnapshot, TERRAIN_BLOW_COMPLETE_FRAME, TERRAIN_BLOW_FLASH_COLOR_BYTES,
+        ScoreSnapshot, SoundEvent, BaiterRuntimeSnapshot, BomberRuntimeSnapshot,
+        LanderRuntimeSnapshot, MutantRuntimeSnapshot, PodRuntimeSnapshot, ArcadeRngSnapshot,
+        SwarmerRuntimeSnapshot, TERRAIN_BLOW_COMPLETE_FRAME, TERRAIN_BLOW_FLASH_COLOR_BYTES,
         TERRAIN_BLOW_OVERLOAD_COUNTER, TERRAIN_BLOW_START_SOUND_FRAMES,
         TERRAIN_EXPLOSION_LIFETIME_FRAMES, TerrainBlowSnapshot, TerrainBlowStage, TerrainSegment,
         VISUAL_STATE, WaveProfileSnapshot, WorldSnapshot, WorldVector, push_appearance_cloud_pixels,
@@ -409,10 +409,10 @@ const TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MAX: u16 = 0xA600; // original: SO
 const TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_TOP_LEFT: Point = Point::new(0x20, 0xA2); // original: SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_TOP_LEFT
 const TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER: Point = Point::new(0x21, 0xA9); // original: SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER
 const TARGET6_MUTANT_VISUAL_X_CORRECTION: u16 = 0x0168; // original: SOURCE_TARGET6_MUTANT_VISUAL_X_CORRECTION
-const OBJECT_ACTIVE_LEFT_BUFFER: u16 = 100 * 32; // original: SOURCE_OBJECT_ACTIVE_LEFT_BUFFER
-const OBJECT_ACTIVE_WINDOW: u16 = 500 * 32; // original: SOURCE_OBJECT_ACTIVE_WINDOW
-const OBJECT_SCREEN_X_SHIFT: u8 = 6; // original: SOURCE_OBJECT_SCREEN_X_SHIFT
-const OBJECT_VISIBLE_WIDTH: u16 = 292; // original: SOURCE_OBJECT_VISIBLE_WIDTH
+const OBJECT_ACTIVE_LEFT_MARGIN: u16 = 100 * 32; // original: SOURCE_OBJECT_ACTIVE_LEFT_BUFFER
+const OBJECT_ACTIVE_WORLD_WIDTH: u16 = 500 * 32; // original: SOURCE_OBJECT_ACTIVE_WINDOW
+const OBJECT_WORLD_TO_SCREEN_SHIFT: u8 = 6; // original: SOURCE_OBJECT_SCREEN_X_SHIFT
+const OBJECT_VISIBLE_SCREEN_WIDTH: u16 = 292; // original: SOURCE_OBJECT_VISIBLE_WIDTH
 const BOMBER_DRIFT_SPEED: i16 = 1;
 const BOMBER_BOMB_PERIOD: u64 = 64;
 const POD_DRIFT_SPEED: i16 = 1;
@@ -443,92 +443,92 @@ const ACTOR_DEFAULT_DIFFICULTY_CEILING: u8 = 15; // original: ACTOR_SOURCE_DEFAU
 const ACTOR_DATA_BACKED_WAVES: u16 = 16; // original: ACTOR_SOURCE_BACKED_WAVES
 const ACTOR_FIRST_WAVE_HUMAN_SPAWNS: [ActorHumanSpawn; 10] = [
     // original: ACTOR_SOURCE_FIRST_WAVE_HUMAN_SPAWNS
-    ActorHumanSpawn::source_first_wave(
+    ActorHumanSpawn::from_first_wave_record(
         0,
-        ActorSourceFirstWaveHumanStart {
-            x16: 0x18C3,
-            y16: 0xE000,
+        FirstWaveHumanSpawnRecord {
+            world_x: 0x18C3,
+            world_y: 0xE000,
             picture_frame: 2,
         },
     ),
-    ActorHumanSpawn::source_first_wave(
+    ActorHumanSpawn::from_first_wave_record(
         1,
-        ActorSourceFirstWaveHumanStart {
-            x16: 0x1C81,
-            y16: 0xE100,
+        FirstWaveHumanSpawnRecord {
+            world_x: 0x1C81,
+            world_y: 0xE100,
             picture_frame: 3,
         },
     ),
-    ActorHumanSpawn::source_first_wave(
+    ActorHumanSpawn::from_first_wave_record(
         2,
-        ActorSourceFirstWaveHumanStart {
-            x16: 0x4E30,
-            y16: 0xE000,
+        FirstWaveHumanSpawnRecord {
+            world_x: 0x4E30,
+            world_y: 0xE000,
             picture_frame: 0,
         },
     ),
-    ActorHumanSpawn::source_first_wave(
+    ActorHumanSpawn::from_first_wave_record(
         3,
-        ActorSourceFirstWaveHumanStart {
-            x16: 0x5718,
-            y16: 0xE000,
+        FirstWaveHumanSpawnRecord {
+            world_x: 0x5718,
+            world_y: 0xE000,
             picture_frame: 0,
         },
     ),
-    ActorHumanSpawn::source_first_wave(
+    ActorHumanSpawn::from_first_wave_record(
         4,
-        ActorSourceFirstWaveHumanStart {
-            x16: 0x9B8C,
-            y16: 0xE000,
+        FirstWaveHumanSpawnRecord {
+            world_x: 0x9B8C,
+            world_y: 0xE000,
             picture_frame: 0,
         },
     ),
-    ActorHumanSpawn::source_first_wave(
+    ActorHumanSpawn::from_first_wave_record(
         5,
-        ActorSourceFirstWaveHumanStart {
-            x16: 0x9DC6,
-            y16: 0xE000,
+        FirstWaveHumanSpawnRecord {
+            world_x: 0x9DC6,
+            world_y: 0xE000,
             picture_frame: 0,
         },
     ),
-    ActorHumanSpawn::source_first_wave(
+    ActorHumanSpawn::from_first_wave_record(
         6,
-        ActorSourceFirstWaveHumanStart {
-            x16: 0xCEE3,
-            y16: 0xE000,
+        FirstWaveHumanSpawnRecord {
+            world_x: 0xCEE3,
+            world_y: 0xE000,
             picture_frame: 2,
         },
     ),
-    ActorHumanSpawn::source_first_wave(
+    ActorHumanSpawn::from_first_wave_record(
         7,
-        ActorSourceFirstWaveHumanStart {
-            x16: 0xD771,
-            y16: 0xE000,
+        FirstWaveHumanSpawnRecord {
+            world_x: 0xD771,
+            world_y: 0xE000,
             picture_frame: 2,
         },
     ),
-    ActorHumanSpawn::source_first_wave(
+    ActorHumanSpawn::from_first_wave_record(
         8,
-        ActorSourceFirstWaveHumanStart {
-            x16: 0xD2B8,
-            y16: 0xE000,
+        FirstWaveHumanSpawnRecord {
+            world_x: 0xD2B8,
+            world_y: 0xE000,
             picture_frame: 0,
         },
     ),
-    ActorHumanSpawn::source_first_wave(
+    ActorHumanSpawn::from_first_wave_record(
         9,
-        ActorSourceFirstWaveHumanStart {
-            x16: 0xE8DC,
-            y16: 0xE000,
+        FirstWaveHumanSpawnRecord {
+            world_x: 0xE8DC,
+            world_y: 0xE000,
             picture_frame: 0,
         },
     ),
 ];
 const ACTOR_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
     // original: ACTOR_SOURCE_FIRST_WAVE_LANDER_SPAWNS
-    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
-        x16: 0xFB33,
-        y16: 0x2CE0,
+    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
+        world_x: 0xFB33,
+        world_y: 0x2CE0,
         x_velocity: 0xFFDE,
         y_velocity: 0x0070,
         shot_timer: 0x27,
@@ -536,9 +536,9 @@ const ACTOR_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         picture_frame: 1,
         target_human_index: Some(1),
     }),
-    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
-        x16: 0x3F4A,
-        y16: 0x2CE0,
+    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
+        world_x: 0x3F4A,
+        world_y: 0x2CE0,
         x_velocity: 0xFFEE,
         y_velocity: 0x0070,
         shot_timer: 0x3B,
@@ -546,9 +546,9 @@ const ACTOR_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         picture_frame: 1,
         target_human_index: Some(2),
     }),
-    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
-        x16: 0x67FF,
-        y16: 0x2C70,
+    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
+        world_x: 0x67FF,
+        world_y: 0x2C70,
         x_velocity: 0x0012,
         y_velocity: 0x0070,
         shot_timer: 0x23,
@@ -556,9 +556,9 @@ const ACTOR_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         picture_frame: 1,
         target_human_index: Some(3),
     }),
-    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
-        x16: 0x0D11,
-        y16: 0x2C70,
+    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
+        world_x: 0x0D11,
+        world_y: 0x2C70,
         x_velocity: 0x0014,
         y_velocity: 0x0070,
         shot_timer: 0x3C,
@@ -566,9 +566,9 @@ const ACTOR_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         picture_frame: 0,
         target_human_index: Some(4),
     }),
-    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
-        x16: 0x41B9,
-        y16: 0x2C70,
+    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
+        world_x: 0x41B9,
+        world_y: 0x2C70,
         x_velocity: 0x001A,
         y_velocity: 0x0070,
         shot_timer: 0x25,
@@ -579,9 +579,9 @@ const ACTOR_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
 ];
 const ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
     // original: ACTOR_SOURCE_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS
-    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
-        x16: 0x689A,
-        y16: 0x2C70,
+    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
+        world_x: 0x689A,
+        world_y: 0x2C70,
         x_velocity: 0x001E,
         y_velocity: 0x0070,
         shot_timer: 0x10,
@@ -589,9 +589,9 @@ const ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         picture_frame: 1,
         target_human_index: Some(7),
     }),
-    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
-        x16: 0x43D3,
-        y16: 0x2C70,
+    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
+        world_x: 0x43D3,
+        world_y: 0x2C70,
         x_velocity: 0xFFEC,
         y_velocity: 0x0070,
         shot_timer: 0x3A,
@@ -599,9 +599,9 @@ const ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         picture_frame: 1,
         target_human_index: Some(9),
     }),
-    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
-        x16: 0x1F51,
-        y16: 0x2C70,
+    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
+        world_x: 0x1F51,
+        world_y: 0x2C70,
         x_velocity: 0x0014,
         y_velocity: 0x0070,
         shot_timer: 0x13,
@@ -609,9 +609,9 @@ const ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         picture_frame: 0,
         target_human_index: Some(8),
     }),
-    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
-        x16: 0xFA03,
-        y16: 0x2C70,
+    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
+        world_x: 0xFA03,
+        world_y: 0x2C70,
         x_velocity: 0x0016,
         y_velocity: 0x0070,
         shot_timer: 0x26,
@@ -619,9 +619,9 @@ const ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         picture_frame: 1,
         target_human_index: Some(7),
     }),
-    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
-        x16: 0xCF34,
-        y16: 0x2CE0,
+    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
+        world_x: 0xCF34,
+        world_y: 0x2CE0,
         x_velocity: 0,
         y_velocity: 0,
         shot_timer: 0x34,
@@ -632,9 +632,9 @@ const ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
 ];
 const ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
     // original: ACTOR_SOURCE_FIRST_WAVE_REFILL_LANDER_SPAWNS
-    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
-        x16: 0xBC29,
-        y16: 0x2CFD,
+    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
+        world_x: 0xBC29,
+        world_y: 0x2CFD,
         x_velocity: 0x001C,
         y_velocity: 0x0090,
         shot_timer: 0x36,
@@ -642,9 +642,9 @@ const ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         picture_frame: 1,
         target_human_index: Some(7),
     }),
-    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
-        x16: 0xE14C,
-        y16: 0x2CAE,
+    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
+        world_x: 0xE14C,
+        world_y: 0x2CAE,
         x_velocity: 0x000E,
         y_velocity: 0x0090,
         shot_timer: 0x2F,
@@ -652,9 +652,9 @@ const ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         picture_frame: 0,
         target_human_index: Some(4),
     }),
-    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
-        x16: 0x0A63,
-        y16: 0x2CF0,
+    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
+        world_x: 0x0A63,
+        world_y: 0x2CF0,
         x_velocity: 0xFFF4,
         y_velocity: 0x0090,
         shot_timer: 0x23,
@@ -662,9 +662,9 @@ const ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         picture_frame: 0,
         target_human_index: Some(3),
     }),
-    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
-        x16: 0x531B,
-        y16: 0x2CC0,
+    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
+        world_x: 0x531B,
+        world_y: 0x2CC0,
         x_velocity: 0xFFF6,
         y_velocity: 0x0090,
         shot_timer: 0x30,
@@ -672,9 +672,9 @@ const ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         picture_frame: 0,
         target_human_index: Some(2),
     }),
-    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
-        x16: 0x98D9,
-        y16: 0x2CB8,
+    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
+        world_x: 0x98D9,
+        world_y: 0x2CB8,
         x_velocity: 0x001A,
         y_velocity: 0x0090,
         shot_timer: 0x1F,

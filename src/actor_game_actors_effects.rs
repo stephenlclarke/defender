@@ -51,7 +51,7 @@ impl Human {
 
     fn update_grounded(
         &mut self,
-        source_rng: Option<ActorSourceRngSnapshot>,
+        arcade_rng: Option<ActorSourceRngSnapshot>,
         source_walk_target_slot: Option<usize>,
     ) {
         let Some(source) = self.source else {
@@ -61,8 +61,8 @@ impl Human {
             return;
         }
 
-        if let Some(source_rng) = source_rng {
-            self.advance_source_walk(source_rng.seed);
+        if let Some(arcade_rng) = arcade_rng {
+            self.advance_source_walk(arcade_rng.seed);
         }
     }
 
@@ -111,7 +111,7 @@ impl Human {
         self.position = self.position.offset(Velocity::new(0, next_velocity));
 
         if self
-            .screen_bounds(prompt.source_background_left)
+            .screen_bounds(prompt.background_left)
             .is_some_and(|bounds| {
                 prompt.snapshots.iter().any(|snapshot| {
                     snapshot.kind == ActorKind::Player && intersects_snapshot(snapshot, bounds)
@@ -192,7 +192,7 @@ impl AssetActor for Human {
             let behavior = prompt.behavior_for(self.id, ActorKind::Human);
             commands.extend(match self.mode {
                 HumanMode::Grounded => {
-                    self.update_grounded(prompt.source_rng, prompt.source_human_walk_target_slot);
+                    self.update_grounded(prompt.arcade_rng, prompt.human_walk_target_slot);
                     Vec::new()
                 }
                 HumanMode::Falling { velocity } => self.update_falling(velocity, prompt, behavior),
@@ -217,14 +217,14 @@ impl AssetActor for Human {
                 direction: None,
                 bounds: human_collision_bounds(self.mode, self.position),
                 alive: prompt.phase == Phase::Playing,
-                source_lander: None,
-                source_bomber: None,
-                source_pod: None,
-                source_swarmer: None,
-                source_baiter: None,
-                source_mutant: None,
-                source_human: self.source,
-                source_enemy_projectile: None,
+                lander_runtime: None,
+                bomber_runtime: None,
+                pod_runtime: None,
+                swarmer_runtime: None,
+                baiter_runtime: None,
+                mutant_runtime: None,
+                human_runtime: self.source,
+                enemy_projectile_runtime: None,
             },
             commands,
             draws,
@@ -259,7 +259,7 @@ fn actor_source_astronaut_walk_targetable(human_count: usize, snapshot: &ActorSn
     snapshot.kind == ActorKind::Human
         && snapshot.alive
         && snapshot.bounds.is_some()
-        && snapshot.source_human.is_some_and(|source| {
+        && snapshot.human_runtime.is_some_and(|source| {
             human_count != usize::from(START_HUMAN_COUNT) || source.target_slot_index < 2
         })
 }
@@ -315,14 +315,14 @@ impl AssetActor for ScorePopup {
                 direction: None,
                 bounds: None,
                 alive: self.age < behavior.score_popup_lifetime_steps,
-                source_lander: None,
-                source_bomber: None,
-                source_pod: None,
-                source_swarmer: None,
-                source_baiter: None,
-                source_mutant: None,
-                source_human: None,
-                source_enemy_projectile: None,
+                lander_runtime: None,
+                bomber_runtime: None,
+                pod_runtime: None,
+                swarmer_runtime: None,
+                baiter_runtime: None,
+                mutant_runtime: None,
+                human_runtime: None,
+                enemy_projectile_runtime: None,
             },
             commands,
             draws,
@@ -387,14 +387,14 @@ impl AssetActor for LaserShot {
                 direction: Some(self.direction),
                 bounds: Some(self.bounds()),
                 alive: self.age < behavior.laser_lifetime_steps,
-                source_lander: None,
-                source_bomber: None,
-                source_pod: None,
-                source_swarmer: None,
-                source_baiter: None,
-                source_mutant: None,
-                source_human: None,
-                source_enemy_projectile: None,
+                lander_runtime: None,
+                bomber_runtime: None,
+                pod_runtime: None,
+                swarmer_runtime: None,
+                baiter_runtime: None,
+                mutant_runtime: None,
+                human_runtime: None,
+                enemy_projectile_runtime: None,
             },
             commands,
             draws,
@@ -486,7 +486,7 @@ impl AssetActor for EnemyLaserShot {
         let behavior = prompt.behavior_for(self.id, ActorKind::EnemyLaser);
         self.initialize_lifetime(behavior);
         if prompt.phase == Phase::Playing && self.lifetime_steps.is_some_and(|steps| steps > 0) {
-            if prompt.source_shell_scan_tick
+            if prompt.projectile_scan_tick
                 && let Some(lifetime_steps) = &mut self.lifetime_steps
             {
                 *lifetime_steps = lifetime_steps.saturating_sub(1);
@@ -517,14 +517,14 @@ impl AssetActor for EnemyLaserShot {
                 direction: Some(direction_for_velocity(movement_velocity, Direction::Right)),
                 bounds: Some(self.bounds()),
                 alive,
-                source_lander: None,
-                source_bomber: None,
-                source_pod: None,
-                source_swarmer: None,
-                source_baiter: None,
-                source_mutant: None,
-                source_human: None,
-                source_enemy_projectile: Some(self.source),
+                lander_runtime: None,
+                bomber_runtime: None,
+                pod_runtime: None,
+                swarmer_runtime: None,
+                baiter_runtime: None,
+                mutant_runtime: None,
+                human_runtime: None,
+                enemy_projectile_runtime: Some(self.source),
             },
             commands,
             draws,
@@ -594,14 +594,14 @@ impl AssetActor for Explosion {
                 direction: None,
                 bounds: None,
                 alive: self.age < lifetime_steps,
-                source_lander: None,
-                source_bomber: None,
-                source_pod: None,
-                source_swarmer: None,
-                source_baiter: None,
-                source_mutant: None,
-                source_human: None,
-                source_enemy_projectile: None,
+                lander_runtime: None,
+                bomber_runtime: None,
+                pod_runtime: None,
+                swarmer_runtime: None,
+                baiter_runtime: None,
+                mutant_runtime: None,
+                human_runtime: None,
+                enemy_projectile_runtime: None,
             },
             commands,
             draws,

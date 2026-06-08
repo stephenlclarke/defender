@@ -231,7 +231,7 @@
                 picture_frame: 0,
                 cruise_altitude: BOMBER_CRUISE_ALTITUDE,
                 sleep_ticks: 0,
-                source_slot: 1,
+                slot: 1,
             })
         );
         assert_eq!(second.pod_spawns.len(), 1);
@@ -415,17 +415,17 @@
                     picture_frame: 0,
                     cruise_altitude: BOMBER_CRUISE_ALTITUDE,
                     sleep_ticks: 0,
-                    source_slot: 1,
+                    slot: 1,
                 },
                 live.step,
                 bomber_snapshot.id,
-                live.source_rng,
+                live.arcade_rng,
                 None,
             );
         assert!(live.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Lander
                 && snapshot.position == Point::new(0xD2, 0x2C)
-                && snapshot.source_lander
+                && snapshot.lander_runtime
                     == Some(ActorSourceLanderMetadata {
                         x_fraction: 0xCB,
                         y_fraction: 0xB0,
@@ -438,10 +438,10 @@
                     })
         }));
         assert_eq!(bomber_snapshot.position, expected_bomber_position);
-        assert_eq!(bomber_snapshot.source_bomber, Some(expected_bomber_source));
+        assert_eq!(bomber_snapshot.bomber_runtime, Some(expected_bomber_source));
         assert!(live.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Pod
-                && snapshot.source_pod
+                && snapshot.pod_runtime
                     == Some(ActorSourcePodMetadata {
                         x_fraction: 0x20,
                         y_fraction: 0,
@@ -520,11 +520,11 @@
         assert!(
             source_landers
                 .iter()
-                .all(|snapshot| snapshot.source_lander.is_some())
+                .all(|snapshot| snapshot.lander_runtime.is_some())
         );
         assert!(source_landers.iter().any(|snapshot| {
             snapshot
-                .source_lander
+                .lander_runtime
                 .is_some_and(|source| source.target_human_index == Some(4))
         }));
     }
@@ -548,7 +548,7 @@
             }
         );
         assert_eq!(
-            driver.source_first_wave_early_reserve_steps_remaining,
+            driver.first_wave_early_reserve_steps_remaining,
             Some(FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS)
         );
 
@@ -575,9 +575,9 @@
             panic!(
                 "first-wave early lander reserve should materialize on source cadence; \
                  ready={} cooldown={} early={:?} reserve={:?} hostiles={} phase={:?}",
-                driver.source_reserve_activation_ready,
-                driver.source_reserve_activation_cooldown_steps,
-                driver.source_first_wave_early_reserve_steps_remaining,
+                driver.reserve_activation_ready,
+                driver.reserve_activation_cooldown_steps,
+                driver.first_wave_early_reserve_steps_remaining,
                 driver.enemy_reserve,
                 driver.source_counted_hostile_snapshot_count(),
                 driver.phase
@@ -622,7 +622,7 @@
         );
         assert!(report.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Lander
-                && snapshot.source_lander.is_some_and(|source| {
+                && snapshot.lander_runtime.is_some_and(|source| {
                     source.target_human_index == Some(FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT)
                         && source.x_velocity == 0
                         && source.y_velocity == 0
@@ -683,7 +683,7 @@
             7
         );
         assert_eq!(
-            driver.source_first_wave_lander_refill_steps_remaining,
+            driver.first_wave_lander_refill_steps_remaining,
             Some(FIRST_WAVE_LANDER_REFILL_DELAY_STEPS)
         );
 
@@ -727,7 +727,7 @@
             .filter(|snapshot| {
                 snapshot.kind == ActorKind::Lander
                     && snapshot
-                        .source_lander
+                        .lander_runtime
                         .is_some_and(|source| source.y_velocity == 0x0090)
             })
             .collect::<Vec<_>>();
@@ -744,7 +744,7 @@
             .find(|snapshot| snapshot.bounds.is_some())
             .expect("target-3 refill lane should be visible");
         assert_eq!(
-            visible_refill.source_lander,
+            visible_refill.lander_runtime,
             Some(ActorSourceLanderMetadata {
                 x_fraction: 0x63,
                 y_fraction: 0xF0,
@@ -765,7 +765,7 @@
                 .filter(|enemy| {
                     matches!(enemy.kind, CleanEnemyKind::Lander)
                         && enemy
-                            .source_lander
+                            .lander_runtime
                             .is_some_and(|source| source.y_velocity == 0x0090)
                 })
                 .count(),
@@ -864,7 +864,7 @@
         assert!(cleared.game_state().world.enemies.iter().all(|enemy| {
             !matches!(enemy.kind, CleanEnemyKind::Lander)
                 || enemy
-                    .source_lander
+                    .lander_runtime
                     .is_none_or(|source| source.y_velocity != 0x0090)
         }));
 
@@ -907,22 +907,22 @@
             landers: 2,
             ..EnemyReserveSnapshot::default()
         };
-        driver.source_rng = ActorSourceRng {
+        driver.arcade_rng = ActorSourceRng {
             seed: 0x20,
             hseed: 0x66,
             lseed: 0x99,
         };
-        driver.source_background_left = 0x3400;
-        let mut expected_rng = driver.source_rng;
+        driver.background_left = 0x3400;
+        let mut expected_rng = driver.arcade_rng;
         let first_spawn = ActorMutantSpawn::source_restore(
             &mut expected_rng,
             ActorSourceWaveProfile::for_wave(2),
-            driver.source_background_left,
+            driver.background_left,
         );
         let second_spawn = ActorMutantSpawn::source_restore(
             &mut expected_rng,
             ActorSourceWaveProfile::for_wave(2),
-            driver.source_background_left,
+            driver.background_left,
         );
 
         let restored = driver.step(GameInput::NONE);
@@ -934,7 +934,7 @@
                 ..EnemyReserveSnapshot::default()
             }
         );
-        assert_eq!(restored.source_background_left, 0x3400);
+        assert_eq!(restored.background_left, 0x3400);
         assert_eq!(
             restored
                 .commands
@@ -959,7 +959,7 @@
         );
         assert_eq!(
             restored
-                .source_rng
+                .arcade_rng
                 .expect("playing report should carry source rng"),
             expected_rng.advance().snapshot()
         );
@@ -968,7 +968,7 @@
             restored.step,
             restored.wave,
             restored
-                .source_rng
+                .arcade_rng
                 .expect("playing report should carry source rng"),
             player_position,
             Velocity::default(),
@@ -989,8 +989,8 @@
                 behavior,
             );
             assert_eq!(snapshot.position, expected_position);
-            assert_eq!(snapshot.source_mutant, Some(expected_source));
-            assert!(snapshot.source_lander.is_none());
+            assert_eq!(snapshot.mutant_runtime, Some(expected_source));
+            assert!(snapshot.lander_runtime.is_none());
         }
 
         let followup = driver.step(GameInput::NONE);
@@ -1015,7 +1015,7 @@
                 .snapshots
                 .iter()
                 .filter(|snapshot| snapshot.kind == ActorKind::Mutant)
-                .all(|snapshot| snapshot.source_mutant.is_some())
+                .all(|snapshot| snapshot.mutant_runtime.is_some())
         );
     }
 
@@ -1033,29 +1033,29 @@
             mutants: 2,
             ..EnemyReserveSnapshot::default()
         };
-        driver.source_rng = ActorSourceRng {
+        driver.arcade_rng = ActorSourceRng {
             seed: 0x37,
             hseed: 0x5A,
             lseed: 0x91,
         };
-        driver.source_background_left = 0x5420;
+        driver.background_left = 0x5420;
         let profile = ActorSourceWaveProfile::for_wave(2);
-        let mut expected_rng = driver.source_rng;
+        let mut expected_rng = driver.arcade_rng;
         let first_spawn = ActorMutantSpawn::source_restore(
             &mut expected_rng,
             profile,
-            driver.source_background_left,
+            driver.background_left,
         );
         let second_spawn = ActorMutantSpawn::source_restore(
             &mut expected_rng,
             profile,
-            driver.source_background_left,
+            driver.background_left,
         );
 
         let restored = driver.step(GameInput::NONE);
 
         assert_eq!(restored.enemy_reserve, EnemyReserveSnapshot::default());
-        assert_eq!(restored.source_background_left, 0x5420);
+        assert_eq!(restored.background_left, 0x5420);
         assert_eq!(
             restored
                 .commands
@@ -1080,7 +1080,7 @@
         );
         assert_eq!(
             restored
-                .source_rng
+                .arcade_rng
                 .expect("playing report should carry source rng"),
             expected_rng.advance().snapshot()
         );
@@ -1089,7 +1089,7 @@
             restored.step,
             restored.wave,
             restored
-                .source_rng
+                .arcade_rng
                 .expect("playing report should carry source rng"),
             player_position,
             Velocity::default(),
@@ -1111,8 +1111,8 @@
                 behavior,
             );
             assert_eq!(snapshot.position, expected_position);
-            assert_eq!(snapshot.source_mutant, Some(expected_source));
-            assert!(snapshot.source_lander.is_none());
+            assert_eq!(snapshot.mutant_runtime, Some(expected_source));
+            assert!(snapshot.lander_runtime.is_none());
         }
     }
 
@@ -1131,12 +1131,12 @@
             pods: 2,
             ..EnemyReserveSnapshot::default()
         };
-        driver.source_rng = ActorSourceRng {
+        driver.arcade_rng = ActorSourceRng {
             seed: 0x12,
             hseed: 0x6D,
             lseed: 0x80,
         };
-        let mut expected_rng = driver.source_rng;
+        let mut expected_rng = driver.arcade_rng;
         let mut expected_pod = ActorPodSpawn::source_restore(&mut expected_rng);
         if let Some(source) = &mut expected_pod.source {
             let (x, x_fraction) = actor_source_axis_step(
@@ -1192,26 +1192,26 @@
         assert!(
             bombers
                 .iter()
-                .all(|snapshot| snapshot.source_bomber.is_some())
+                .all(|snapshot| snapshot.bomber_runtime.is_some())
         );
         assert!(bombers.iter().any(|snapshot| {
-            let source = snapshot.source_bomber.expect("source bomber");
+            let source = snapshot.bomber_runtime.expect("source bomber");
             source.x_velocity
                 == actor_sign_extend_u8_to_u16(
                     ActorSourceWaveProfile::for_wave(2).bomber_x_velocity,
                 )
-                && source.source_slot == 0
+                && source.slot == 0
         }));
         assert!(restored.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Pod
                 && snapshot.position == expected_pod.position
-                && snapshot.source_pod == expected_pod.source
+                && snapshot.pod_runtime == expected_pod.source
         }));
         assert!(
             restored
                 .snapshots
                 .iter()
-                .filter_map(|snapshot| snapshot.source_bomber)
+                .filter_map(|snapshot| snapshot.bomber_runtime)
                 .any(|source| {
                     let expected_spawn = ActorBomberSpawn::source_restore_batch(
                         ActorSourceWaveProfile::for_wave(2),
@@ -1237,13 +1237,13 @@
             swarmers: 4,
             ..EnemyReserveSnapshot::default()
         };
-        driver.source_rng = ActorSourceRng {
+        driver.arcade_rng = ActorSourceRng {
             seed: 0x20,
             hseed: 0x41,
             lseed: 0xC0,
         };
         let profile = ActorSourceWaveProfile::for_wave(2);
-        let mut expected_rng = driver.source_rng;
+        let mut expected_rng = driver.arcade_rng;
         let expected_spawns =
             ActorSwarmerSpawn::source_restore_batch(&mut expected_rng, profile, 4);
 
@@ -1263,7 +1263,7 @@
         );
         assert_eq!(
             restored
-                .source_rng
+                .arcade_rng
                 .expect("playing report should carry source rng"),
             expected_rng.advance().snapshot()
         );
@@ -1279,10 +1279,10 @@
             let mut expected_source = spawn.source.expect("source swarmer restore metadata");
             expected_source.sleep_ticks = expected_source.sleep_ticks.saturating_sub(1);
             assert_eq!(snapshot.position, spawn.position);
-            assert_eq!(snapshot.source_swarmer, Some(expected_source));
+            assert_eq!(snapshot.swarmer_runtime, Some(expected_source));
         }
         assert!(source_swarmers.iter().all(|snapshot| {
-            let source = snapshot.source_swarmer.expect("source swarmer");
+            let source = snapshot.swarmer_runtime.expect("source swarmer");
             snapshot.position == source_swarmers[0].position
                 && source.x_fraction == MINI_SWARMER_RESTORE_X_LOW
                 && source.y_fraction == 0
@@ -1319,7 +1319,7 @@
             Point::new(0xD0, i16::from(PLAYFIELD_BOTTOM_EDGE_Y))
         );
         assert_eq!(
-            snapshot_for(&report, top).source_pod,
+            snapshot_for(&report, top).pod_runtime,
             Some(ActorSourcePodMetadata {
                 x_fraction: 0,
                 y_fraction: 0xFF,
@@ -1332,7 +1332,7 @@
             Point::new(0xE0, i16::from(PLAYFIELD_TOP_EDGE_Y))
         );
         assert_eq!(
-            snapshot_for(&report, bottom).source_pod,
+            snapshot_for(&report, bottom).pod_runtime,
             Some(ActorSourcePodMetadata {
                 x_fraction: 0,
                 y_fraction: 0,
@@ -1397,7 +1397,7 @@
             Point::new(0x70, i16::from(PLAYFIELD_BOTTOM_EDGE_Y))
         );
         assert_eq!(
-            snapshot_for(&report, lander).source_lander,
+            snapshot_for(&report, lander).lander_runtime,
             Some(ActorSourceLanderMetadata {
                 x_fraction: 0,
                 y_fraction: 0xFF,
@@ -1414,7 +1414,7 @@
             Point::new(0x7F, i16::from(PLAYFIELD_TOP_EDGE_Y))
         );
         assert_eq!(
-            snapshot_for(&report, swarmer).source_swarmer,
+            snapshot_for(&report, swarmer).swarmer_runtime,
             Some(ActorSourceSwarmerMetadata {
                 x_fraction: 0xE0,
                 y_fraction: 0,
@@ -1431,7 +1431,7 @@
             Point::new(0x90, i16::from(PLAYFIELD_BOTTOM_EDGE_Y))
         );
         assert_eq!(
-            snapshot_for(&report, baiter).source_baiter,
+            snapshot_for(&report, baiter).baiter_runtime,
             Some(ActorSourceBaiterMetadata {
                 x_fraction: 0,
                 y_fraction: 0xFF,
@@ -1466,7 +1466,7 @@
             .expect("source first-wave lander should publish its restore position");
 
         assert_eq!(
-            lander.source_lander,
+            lander.lander_runtime,
             Some(ActorSourceLanderMetadata {
                 x_fraction: 0x33,
                 y_fraction: 0xE0,
@@ -1518,7 +1518,7 @@
             lander_id = Some(lander.id);
             assert_eq!(lander.position, initial);
             assert_eq!(
-                lander.source_lander.map(|source| source.sleep_ticks),
+                lander.lander_runtime.map(|source| source.sleep_ticks),
                 Some(expected_sleep)
             );
         }
@@ -1528,12 +1528,12 @@
         assert_eq!(lander.position, Point::new(0xFB, 0x2D));
         assert_eq!(
             lander
-                .source_lander
+                .lander_runtime
                 .map(|source| (source.x_fraction, source.y_fraction)),
             Some((0x11, 0x50))
         );
         assert_eq!(
-            lander.source_lander.map(|source| source.sleep_ticks),
+            lander.lander_runtime.map(|source| source.sleep_ticks),
             Some(0)
         );
     }
@@ -1631,7 +1631,7 @@
             .find(|snapshot| {
                 snapshot.kind == ActorKind::Lander && snapshot.position == shot_position
             })
-            .and_then(|snapshot| snapshot.source_lander)
+            .and_then(|snapshot| snapshot.lander_runtime)
             .expect("source lander snapshot should own shot fractions");
         assert_eq!(
             shot_source,
@@ -1657,7 +1657,7 @@
             .find(|snapshot| snapshot.kind == ActorKind::EnemyLaser)
             .expect("spawned hostile shot should publish an actor snapshot");
         let source_projectile = enemy_laser
-            .source_enemy_projectile
+            .enemy_projectile_runtime
             .expect("hostile shot should publish source projectile metadata");
         assert_eq!(
             source_projectile.x_velocity,
@@ -1706,10 +1706,10 @@
             snapshots: Vec::new(),
             behavior_script: ActorBehaviorScript::default()
                 .with_kind_behavior(ActorKind::EnemyLaser, behavior),
-            source_background_left: 0,
-            source_rng: None,
-            source_human_walk_target_slot: None,
-            source_shell_scan_tick: false,
+            background_left: 0,
+            arcade_rng: None,
+            human_walk_target_slot: None,
+            projectile_scan_tick: false,
         };
         let mut shot = EnemyLaserShot::new(
             ActorId::new(101),
@@ -1725,7 +1725,7 @@
         assert_eq!(first.snapshot.position, Point::new(11, 79));
         assert_eq!(first.snapshot.velocity, Velocity::new(1, -1));
         assert_eq!(
-            first.snapshot.source_enemy_projectile,
+            first.snapshot.enemy_projectile_runtime,
             Some(ActorSourceEnemyProjectileMetadata {
                 x_fraction: 0x80,
                 y_fraction: 0x80,
@@ -1736,13 +1736,13 @@
         );
 
         let mut tick_prompt = prompt;
-        tick_prompt.source_shell_scan_tick = true;
+        tick_prompt.projectile_scan_tick = true;
         let second = shot.update(&tick_prompt);
 
         assert_eq!(second.snapshot.position, Point::new(13, 79));
         assert_eq!(second.snapshot.velocity, Velocity::new(2, 0));
         assert_eq!(
-            second.snapshot.source_enemy_projectile,
+            second.snapshot.enemy_projectile_runtime,
             Some(ActorSourceEnemyProjectileMetadata {
                 x_fraction: 0,
                 y_fraction: 0,
@@ -1771,7 +1771,7 @@
             .map(|_| {
                 let report = driver.step(GameInput::NONE);
                 snapshot_for(&report, shot)
-                    .source_enemy_projectile
+                    .enemy_projectile_runtime
                     .expect("enemy laser should publish source projectile metadata")
                     .lifetime_ticks
             })

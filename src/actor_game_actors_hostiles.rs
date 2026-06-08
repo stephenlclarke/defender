@@ -46,11 +46,11 @@ impl Bomber {
         true
     }
 
-    fn advance_source_tie_step(&mut self, prompt: &StepPrompt, source_rng: ActorSourceRngSnapshot) {
+    fn advance_source_tie_step(&mut self, prompt: &StepPrompt, arcade_rng: ActorSourceRngSnapshot) {
         let Some(source) = &mut self.source else {
             return;
         };
-        if source.source_slot != actor_source_tie_selected_slot(source_rng.seed) {
+        if source.slot != actor_source_tie_selected_slot(arcade_rng.seed) {
             return;
         }
         if source.sleep_ticks > 0 {
@@ -59,15 +59,15 @@ impl Bomber {
         }
 
         source.picture_frame =
-            actor_source_bomber_picture_frame(source_rng.seed, source.picture_frame);
+            actor_source_bomber_picture_frame(arcade_rng.seed, source.picture_frame);
         source.y_velocity =
-            actor_source_bomber_random_y_velocity(source.y_velocity, source_rng.seed);
+            actor_source_bomber_random_y_velocity(source.y_velocity, arcade_rng.seed);
         if self.position.y == 0 {
             source.y_velocity = actor_source_bomber_cruise_y_velocity(
                 source.y_velocity,
                 &mut source.cruise_altitude,
                 self.position.y,
-                source_rng.seed,
+                arcade_rng.seed,
             );
         } else if let Some(player) = prompt.player_position()
             && let Some(delta) =
@@ -94,13 +94,13 @@ impl Bomber {
         commands: &mut Vec<GameCommand>,
     ) {
         if let Some(source) = self.source {
-            let Some(source_rng) = prompt.source_rng else {
+            let Some(arcade_rng) = prompt.arcade_rng else {
                 return;
             };
-            if source.source_slot != actor_source_tie_selected_slot(source_rng.seed)
+            if source.slot != actor_source_tie_selected_slot(arcade_rng.seed)
                 || source.sleep_ticks > 0
                 || self.position.y == 0
-                || source_rng.lseed & 0x07 != 0
+                || arcade_rng.lseed & 0x07 != 0
                 || actor_source_bomb_shell_count(prompt) >= ACTIVE_BOMBER_BOMB_LIMIT
                 || actor_source_shell_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
                 || !source_shell_spawn_in_bounds(self.position)
@@ -115,7 +115,7 @@ impl Bomber {
                     y_fraction: source.y_fraction,
                     x_velocity: 0,
                     y_velocity: 0,
-                    lifetime_ticks: actor_source_bomber_bomb_lifetime_ticks(source_rng),
+                    lifetime_ticks: actor_source_bomber_bomb_lifetime_ticks(arcade_rng),
                 }),
             }));
             return;
@@ -212,8 +212,8 @@ impl AssetActor for Bomber {
             let behavior = prompt.behavior_for(self.id, ActorKind::Bomber);
             if self.source.is_some() {
                 self.maybe_spawn_bomb(prompt, behavior, &mut commands);
-                if let Some(source_rng) = prompt.source_rng {
-                    self.advance_source_tie_step(prompt, source_rng);
+                if let Some(arcade_rng) = prompt.arcade_rng {
+                    self.advance_source_tie_step(prompt, arcade_rng);
                 }
                 self.advance_source_motion();
             } else if let Some(position) = move_by_hostile_mode(
@@ -248,14 +248,14 @@ impl AssetActor for Bomber {
                 )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                source_lander: None,
-                source_bomber: self.source,
-                source_pod: None,
-                source_swarmer: None,
-                source_baiter: None,
-                source_mutant: None,
-                source_human: None,
-                source_enemy_projectile: None,
+                lander_runtime: None,
+                bomber_runtime: self.source,
+                pod_runtime: None,
+                swarmer_runtime: None,
+                baiter_runtime: None,
+                mutant_runtime: None,
+                human_runtime: None,
+                enemy_projectile_runtime: None,
             },
             commands,
             draws,
@@ -312,7 +312,7 @@ impl AssetActor for Bomb {
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply {
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing && self.lifetime_steps > 0 {
-            if prompt.source_shell_scan_tick {
+            if prompt.projectile_scan_tick {
                 self.lifetime_steps = self.lifetime_steps.saturating_sub(1);
                 self.source.lifetime_ticks =
                     actor_source_projectile_lifetime_ticks(self.lifetime_steps);
@@ -332,14 +332,14 @@ impl AssetActor for Bomb {
                 direction: None,
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing && self.lifetime_steps > 0,
-                source_lander: None,
-                source_bomber: None,
-                source_pod: None,
-                source_swarmer: None,
-                source_baiter: None,
-                source_mutant: None,
-                source_human: None,
-                source_enemy_projectile: Some(self.source),
+                lander_runtime: None,
+                bomber_runtime: None,
+                pod_runtime: None,
+                swarmer_runtime: None,
+                baiter_runtime: None,
+                mutant_runtime: None,
+                human_runtime: None,
+                enemy_projectile_runtime: Some(self.source),
             },
             commands: Vec::new(),
             draws,
@@ -438,14 +438,14 @@ impl AssetActor for Pod {
                 )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                source_lander: None,
-                source_bomber: None,
-                source_pod: self.source,
-                source_swarmer: None,
-                source_baiter: None,
-                source_mutant: None,
-                source_human: None,
-                source_enemy_projectile: None,
+                lander_runtime: None,
+                bomber_runtime: None,
+                pod_runtime: self.source,
+                swarmer_runtime: None,
+                baiter_runtime: None,
+                mutant_runtime: None,
+                human_runtime: None,
+                enemy_projectile_runtime: None,
             },
             commands: Vec::new(),
             draws,
@@ -517,7 +517,7 @@ impl Swarmer {
                 source.acceleration,
                 player.y,
                 self.position.y,
-                prompt.source_rng.map(|rng| rng.seed).unwrap_or(0),
+                prompt.arcade_rng.map(|rng| rng.seed).unwrap_or(0),
             );
             let player_absolute_x = actor_source_absolute_x(player, 0);
             let object_absolute_x = actor_source_absolute_x(self.position, source.x_fraction);
@@ -549,7 +549,7 @@ impl Swarmer {
             source.shot_timer = source.shot_timer.wrapping_sub(1);
             if source.shot_timer == 0 {
                 source.shot_timer = prompt
-                    .source_rng
+                    .arcade_rng
                     .map(|rng| source_rmax(clamped_source_swarmer_shot_reset(profile), rng.seed))
                     .unwrap_or_else(|| clamped_source_swarmer_shot_reset(profile));
                 push_swarmer_shot(self.position, prompt, behavior, Some(*source), commands);
@@ -609,14 +609,14 @@ impl AssetActor for Swarmer {
                 )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                source_lander: None,
-                source_bomber: None,
-                source_pod: None,
-                source_swarmer: self.source,
-                source_baiter: None,
-                source_mutant: None,
-                source_human: None,
-                source_enemy_projectile: None,
+                lander_runtime: None,
+                bomber_runtime: None,
+                pod_runtime: None,
+                swarmer_runtime: self.source,
+                baiter_runtime: None,
+                mutant_runtime: None,
+                human_runtime: None,
+                enemy_projectile_runtime: None,
             },
             commands,
             draws,
@@ -752,8 +752,8 @@ impl Baiter {
             {
                 let profile = prompt.source_wave;
                 let seed = prompt
-                    .source_rng
-                    .map(|source_rng| source_rng.seed)
+                    .arcade_rng
+                    .map(|arcade_rng| arcade_rng.seed)
                     .unwrap_or_else(|| actor_source_motion_seed(prompt.step, self.id));
                 source_baiter_velocity_update(
                     source,
@@ -833,7 +833,7 @@ fn actor_source_baiter_shot_rng(
     actor: ActorId,
     position: Point,
 ) -> ActorSourceRngSnapshot {
-    prompt.source_rng.unwrap_or(ActorSourceRngSnapshot {
+    prompt.arcade_rng.unwrap_or(ActorSourceRngSnapshot {
         seed: actor_source_motion_seed(prompt.step, actor),
         hseed: position.x as u8,
         lseed: position.y as u8,
@@ -938,14 +938,14 @@ impl AssetActor for Baiter {
                 )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                source_lander: None,
-                source_bomber: None,
-                source_pod: None,
-                source_swarmer: None,
-                source_baiter: self.source,
-                source_mutant: None,
-                source_human: None,
-                source_enemy_projectile: None,
+                lander_runtime: None,
+                bomber_runtime: None,
+                pod_runtime: None,
+                swarmer_runtime: None,
+                baiter_runtime: self.source,
+                mutant_runtime: None,
+                human_runtime: None,
+                enemy_projectile_runtime: None,
             },
             commands,
             draws,
@@ -957,8 +957,8 @@ fn clamped_source_baiter_shot_reset(profile: ActorSourceWaveProfile) -> u8 {
     profile.baiter_shot_time.max(1).min(u32::from(u8::MAX)) as u8
 }
 
-fn actor_source_baiter_screen_x_velocity(source_x_velocity: u16) -> u16 {
-    source_x_velocity.wrapping_shl(2)
+fn actor_source_baiter_screen_x_velocity(x_velocity_word: u16) -> u16 {
+    x_velocity_word.wrapping_shl(2)
 }
 
 fn source_baiter_velocity_update(
@@ -1016,11 +1016,11 @@ fn actor_source_motion_seed(step: u64, id: ActorId) -> u8 {
     (step as u8).wrapping_mul(17).wrapping_add(id.value() as u8)
 }
 
-fn source_mini_swarmer_seek_velocity(source_x_velocity: u8, player_x: i16, swarmer_x: i16) -> u16 {
+fn source_mini_swarmer_seek_velocity(x_velocity_word: u8, player_x: i16, swarmer_x: i16) -> u16 {
     if player_x >= swarmer_x {
-        actor_sign_extend_u8_to_u16(source_x_velocity)
+        actor_sign_extend_u8_to_u16(x_velocity_word)
     } else {
-        actor_sign_extend_u8_to_u16(0u8.wrapping_sub(source_x_velocity))
+        actor_sign_extend_u8_to_u16(0u8.wrapping_sub(x_velocity_word))
     }
 }
 

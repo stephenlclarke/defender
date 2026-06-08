@@ -213,7 +213,7 @@ pub enum AttractPresentationPage {
 pub struct AttractPresentationSnapshot {
     pub page_frame: u16,
     pub page: AttractPresentationPage,
-    pub source_sleep_ticks: Option<u8>,
+    pub stage_sleep_ticks: Option<u8>,
     pub source_stall_ticks: Option<u8>,
 }
 
@@ -221,7 +221,7 @@ impl AttractPresentationSnapshot {
     pub const INACTIVE: Self = Self {
         page_frame: 0,
         page: AttractPresentationPage::Inactive,
-        source_sleep_ticks: None,
+        stage_sleep_ticks: None,
         source_stall_ticks: None,
     };
 
@@ -231,7 +231,7 @@ impl AttractPresentationSnapshot {
         } else {
             page_frame % ATTRACT_CYCLE_FRAME_COUNT
         };
-        let (page, source_sleep_ticks, source_stall_ticks) =
+        let (page, stage_sleep_ticks, source_stall_ticks) =
             if page_frame >= ATTRACT_SCORING_SEQUENCE_START_FRAME {
                 (
                     AttractPresentationPage::ScoringSequence,
@@ -273,7 +273,7 @@ impl AttractPresentationSnapshot {
         Self {
             page_frame,
             page,
-            source_sleep_ticks,
+            stage_sleep_ticks,
             source_stall_ticks,
         }
     }

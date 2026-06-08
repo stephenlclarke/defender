@@ -299,12 +299,12 @@
                     .player_takes_enemy_collision_damage
             );
         }
-        let source_lander = manifest.waves[0]
+        let lander_runtime = manifest.waves[0]
             .behavior_script
             .kind_profile(ActorKind::Lander)
             .expect("source wave should keep source lander behavior");
         assert_eq!(
-            source_lander.lander_fire_period_steps,
+            lander_runtime.lander_fire_period_steps,
             ActorSourceWaveProfile::for_wave(1)
                 .lander_behavior()
                 .lander_fire_period_steps
@@ -510,7 +510,7 @@
         assert!(settled.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Human
                 && snapshot.position == Point::new(32, HUMAN_GROUND_Y)
-                && snapshot.source_human.is_none()
+                && snapshot.human_runtime.is_none()
         }));
     }
 
@@ -788,10 +788,10 @@
         assert_eq!(driver.snapshot_count(ActorKind::Mutant), 1);
         assert_eq!(driver.snapshot_count(ActorKind::Swarmer), 1);
         assert!(report.snapshots.iter().any(|snapshot| {
-            snapshot.kind == ActorKind::Mutant && snapshot.source_mutant.is_some()
+            snapshot.kind == ActorKind::Mutant && snapshot.mutant_runtime.is_some()
         }));
         assert!(report.snapshots.iter().any(|snapshot| {
-            snapshot.kind == ActorKind::Swarmer && snapshot.source_swarmer.is_some()
+            snapshot.kind == ActorKind::Swarmer && snapshot.swarmer_runtime.is_some()
         }));
         assert_eq!(report.source_wave.wave_size, 5);
         assert_eq!(report.source_wave.mutant_x_velocity, 48);
@@ -945,7 +945,7 @@
             vec![1, 2, 3]
         );
         for profile in manifest.waves.iter().take(2) {
-            let source_lander = ActorSourceWaveProfile::for_wave(profile.wave).lander_behavior();
+            let lander_runtime = ActorSourceWaveProfile::for_wave(profile.wave).lander_behavior();
             let lander_behavior = profile
                 .behavior_script
                 .kind_profile(ActorKind::Lander)
@@ -954,7 +954,7 @@
             assert_eq!(lander_behavior.lander_seek_speed, 7);
             assert_eq!(
                 lander_behavior.lander_fire_period_steps,
-                source_lander.lander_fire_period_steps
+                lander_runtime.lander_fire_period_steps
             );
         }
         let clean_wave_lander = manifest.waves[2]
@@ -1079,7 +1079,7 @@
             vec![1, 2, 3]
         );
         for profile in manifest.waves.iter().take(2) {
-            let source_lander = ActorSourceWaveProfile::for_wave(profile.wave).lander_behavior();
+            let lander_runtime = ActorSourceWaveProfile::for_wave(profile.wave).lander_behavior();
             assert_eq!(profile.spawn_behavior_profiles.len(), 1);
             assert_eq!(profile.spawn_behavior_profiles[0].kind, ActorKind::Lander);
             assert_eq!(profile.spawn_behavior_profiles[0].spawn_index, 0);
@@ -1088,7 +1088,7 @@
             assert_eq!(spawn_profile.lander_seek_speed, 9);
             assert_eq!(
                 spawn_profile.lander_fire_period_steps,
-                source_lander.lander_fire_period_steps
+                lander_runtime.lander_fire_period_steps
             );
         }
 
@@ -1229,7 +1229,7 @@
         let mut driver = ActorGameDriver::with_wave_script(wave_script);
         driver.phase = Phase::Playing;
         driver.wave = 2;
-        driver.source_rng = PLAYFIELD_START_RNG;
+        driver.arcade_rng = PLAYFIELD_START_RNG;
         driver.apply_wave_profile();
         driver.spawn_player();
         driver.spawn_wave_hostiles();

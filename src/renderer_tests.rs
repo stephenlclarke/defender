@@ -16,7 +16,7 @@ mod tests {
         SpriteSamplerBindingPlan, SpriteShaderPlan, SpriteTextureBindingPlan,
         SpriteVertexBufferBinding, SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas,
         ViewportLayout, WgpuFrameCommand, WgpuFramePlan, WgpuPassPlan, WgpuViewportCommand,
-        decode_source_object_image_rgba, pseudo_color_rgba, push_source_controlled_message_sprites,
+        decode_object_picture_asset_rgba, pseudo_color_rgba, push_source_controlled_message_sprites,
         push_source_text_bytes_sprites, render_scene_with_atlas_to_rgba, source_message_text,
         source_screen_position, source_screen_position_with_offset,
     };

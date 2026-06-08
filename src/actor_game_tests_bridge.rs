@@ -3,7 +3,7 @@
         background_left: u16,
     ) -> (Point, ActorSourceEnemyProjectileMetadata) {
         let screen_x = u16::try_from(position.x).expect("test screen x should be non-negative");
-        let absolute_x = background_left.wrapping_add(screen_x << OBJECT_SCREEN_X_SHIFT);
+        let absolute_x = background_left.wrapping_add(screen_x << OBJECT_WORLD_TO_SCREEN_SHIFT);
         let [x, x_fraction] = absolute_x.to_be_bytes();
         (
             Point::new(i16::from(x), position.y),
@@ -19,13 +19,13 @@
 
     fn spawn_enemy_laser_at_screen(driver: &mut ActorGameDriver, position: Point) -> ActorId {
         let (source_position, source) =
-            source_projectile_at_screen(position, driver.source_background_left);
+            source_projectile_at_screen(position, driver.background_left);
         driver.spawn_enemy_laser_from_spawn(source_position, Velocity::new(0, 0), Some(source))
     }
 
     fn spawn_bomb_at_screen(driver: &mut ActorGameDriver, position: Point) -> ActorId {
         let (source_position, source) =
-            source_projectile_at_screen(position, driver.source_background_left);
+            source_projectile_at_screen(position, driver.background_left);
         driver.spawn_bomb(source_position, Some(source))
     }
 
@@ -656,8 +656,8 @@
             survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
             enemy_reserve: EnemyReserveSnapshot::default(),
-            source_background_left: 0,
-            source_rng: None,
+            background_left: 0,
+            arcade_rng: None,
             terrain_blow: None,
             snapshots: Vec::new(),
             draws: vec![
@@ -864,8 +864,8 @@
             scrolled_state.world.humans[0].position,
             ScreenPosition::new(0x2E, 220)
         );
-        assert_eq!(still_state.world.humans[0].source_x_fraction, 0x80);
-        assert_eq!(scrolled_state.world.humans[0].source_x_fraction, 0x80);
+        assert_eq!(still_state.world.humans[0].x_subpixel, 0x80);
+        assert_eq!(scrolled_state.world.humans[0].x_subpixel, 0x80);
 
         let still = still_report.render_scene();
         let scrolled = scrolled_report.render_scene();
@@ -878,12 +878,12 @@
             Some([182.0, 220.0])
         );
 
-        let source_human = still_report
+        let human_runtime = still_report
             .snapshots
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::Human)
             .expect("source-backed human snapshot should be present");
-        let projected = actor_collision_body_for_snapshot(source_human, 0)
+        let projected = actor_collision_body_for_snapshot(human_runtime, 0)
             .expect("source-backed human should be projected while visible");
         assert_eq!(projected.position, Point::new(186, 220));
     }
@@ -892,7 +892,7 @@
     fn actor_collisions_project_source_world_hostiles_against_background() {
         let mut lander = actor_snapshot(2, ActorKind::Lander, Point::new(0x30, 80));
         lander.bounds = Some(Rect::from_center(lander.position, 8, 8));
-        lander.source_lander = Some(ActorSourceLanderMetadata {
+        lander.lander_runtime = Some(ActorSourceLanderMetadata {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -939,7 +939,7 @@
 
         assert_eq!(reply.snapshot.position, Point::new(0x40, 101));
         assert_eq!(
-            reply.snapshot.source_human.map(|source| source.x_fraction),
+            reply.snapshot.human_runtime.map(|source| source.x_fraction),
             Some(0)
         );
         assert!(
@@ -1010,8 +1010,8 @@
             survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
             enemy_reserve: EnemyReserveSnapshot::default(),
-            source_background_left: 0,
-            source_rng: None,
+            background_left: 0,
+            arcade_rng: None,
             terrain_blow: None,
             snapshots: Vec::new(),
             draws: vec![DrawCommand::sprite_with_effect(
@@ -1070,7 +1070,7 @@
         player.direction = Some(Direction::Right);
         let mut lander = actor_snapshot(12, ActorKind::Lander, Point::new(0x3F, 0x2C));
         lander.velocity = Velocity::new(-2, 1);
-        lander.source_lander = Some(ActorSourceLanderMetadata {
+        lander.lander_runtime = Some(ActorSourceLanderMetadata {
             x_fraction: 0x4A,
             y_fraction: 0xE0,
             x_velocity: 0xFFEE,
@@ -1081,7 +1081,7 @@
             target_human_index: Some(2),
         });
         let mut human = actor_snapshot(13, ActorKind::Human, Point::new(0x1C, 0xE1));
-        human.source_human = Some(ActorSourceHumanMetadata {
+        human.human_runtime = Some(ActorSourceHumanMetadata {
             x_fraction: 0x81,
             y_fraction: 0,
             picture_frame: 3,
@@ -1092,7 +1092,7 @@
         laser.direction = Some(Direction::Right);
         let mut enemy_laser = actor_snapshot(15, ActorKind::EnemyLaser, Point::new(90, 80));
         enemy_laser.velocity = Velocity::new(-3, 2);
-        enemy_laser.source_enemy_projectile = Some(ActorSourceEnemyProjectileMetadata {
+        enemy_laser.enemy_projectile_runtime = Some(ActorSourceEnemyProjectileMetadata {
             x_fraction: 0x22,
             y_fraction: 0x77,
             x_velocity: 0xFD00,
@@ -1100,7 +1100,7 @@
             lifetime_ticks: 17,
         });
         let mut bomb = actor_snapshot(16, ActorKind::Bomb, Point::new(100, 84));
-        bomb.source_enemy_projectile = Some(ActorSourceEnemyProjectileMetadata {
+        bomb.enemy_projectile_runtime = Some(ActorSourceEnemyProjectileMetadata {
             x_fraction: 0x44,
             y_fraction: 0x55,
             x_velocity: 0,
@@ -1141,8 +1141,8 @@
             survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
             enemy_reserve: EnemyReserveSnapshot::default(),
-            source_background_left: 0,
-            source_rng: None,
+            background_left: 0,
+            arcade_rng: None,
             terrain_blow: None,
             snapshots: vec![player, lander, human, laser, enemy_laser, bomb],
             draws: vec![
@@ -1191,8 +1191,8 @@
         assert_eq!(state.world.enemies[0].kind, CleanEnemyKind::Lander);
         assert_eq!(state.world.enemies[0].velocity, ScreenVelocity::new(-2, 1));
         assert_eq!(
-            state.world.enemies[0].source_lander,
-            Some(SourceLanderSnapshot {
+            state.world.enemies[0].lander_runtime,
+            Some(LanderRuntimeSnapshot {
                 x_fraction: 0x4A,
                 y_fraction: 0xE0,
                 x_velocity: 0xFFEE,
@@ -1205,7 +1205,7 @@
         );
         assert_eq!(state.world.humans.len(), 1);
         assert!(state.world.humans[0].carried);
-        assert_eq!(state.world.humans[0].source_picture_frame, 3);
+        assert_eq!(state.world.humans[0].picture_frame, 3);
         assert_eq!(state.world.projectiles.len(), 1);
         assert_eq!(
             state.world.projectiles[0].velocity,
@@ -1216,25 +1216,25 @@
             .world
             .enemy_projectiles
             .iter()
-            .find(|projectile| projectile.source_kind == EnemyProjectileSourceKind::Fireball)
+            .find(|projectile| projectile.kind == EnemyProjectileKind::Fireball)
             .expect("actor enemy laser should bridge as a source fireball");
         assert_eq!(fireball.velocity, ScreenVelocity::new(-3, 2));
-        assert_eq!(fireball.source_x_fraction, 0x22);
-        assert_eq!(fireball.source_y_fraction, 0x77);
-        assert_eq!(fireball.source_x_velocity, 0xFD00);
-        assert_eq!(fireball.source_y_velocity, 0x0200);
-        assert_eq!(fireball.source_lifetime_ticks, 17);
+        assert_eq!(fireball.x_subpixel, 0x22);
+        assert_eq!(fireball.y_subpixel, 0x77);
+        assert_eq!(fireball.x_velocity_word, 0xFD00);
+        assert_eq!(fireball.y_velocity_word, 0x0200);
+        assert_eq!(fireball.lifetime_ticks, 17);
         let bomb_shell = state
             .world
             .enemy_projectiles
             .iter()
-            .find(|projectile| projectile.source_kind == EnemyProjectileSourceKind::BomberBombShell)
+            .find(|projectile| projectile.kind == EnemyProjectileKind::BomberBombShell)
             .expect("actor bomb should bridge as a source bomb shell");
-        assert_eq!(bomb_shell.source_x_fraction, 0x44);
-        assert_eq!(bomb_shell.source_y_fraction, 0x55);
-        assert_eq!(bomb_shell.source_x_velocity, 0);
-        assert_eq!(bomb_shell.source_y_velocity, 0);
-        assert_eq!(bomb_shell.source_lifetime_ticks, 9);
+        assert_eq!(bomb_shell.x_subpixel, 0x44);
+        assert_eq!(bomb_shell.y_subpixel, 0x55);
+        assert_eq!(bomb_shell.x_velocity_word, 0);
+        assert_eq!(bomb_shell.y_velocity_word, 0);
+        assert_eq!(bomb_shell.lifetime_ticks, 9);
         assert!(
             state
                 .world
@@ -1243,7 +1243,7 @@
                 .any(|projectile| projectile.velocity == ScreenVelocity::new(-3, 2))
         );
         assert!(state.world.enemy_projectiles.iter().any(|projectile| {
-            projectile.source_kind == EnemyProjectileSourceKind::BomberBombShell
+            projectile.kind == EnemyProjectileKind::BomberBombShell
         }));
         assert_eq!(state.world.explosions.len(), 1);
         assert_eq!(state.world.explosions[0].kind, CleanExplosionKind::Lander);
@@ -1307,8 +1307,8 @@
             survivor_bonus: None,
             behavior_script: ActorBehaviorScript::default().manifest(),
             enemy_reserve: EnemyReserveSnapshot::default(),
-            source_background_left: 0,
-            source_rng: None,
+            background_left: 0,
+            arcade_rng: None,
             terrain_blow: None,
             snapshots: Vec::new(),
             draws,
