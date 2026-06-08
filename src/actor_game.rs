@@ -8397,13 +8397,13 @@ fn push_actor_attract_scoring_laser_beam(
         player_ship.y16,
     ));
     let target_position = actor_attract_scoring_scene_position(target.x16, target.y16);
-    let end_x = match target.kind {
+    let end = match target.kind {
         ActorAttractScoringObjectKind::Enemy(enemy) => {
-            actor_attract_scoring_laser_enemy_anchor(enemy, target_position)[0]
+            actor_attract_scoring_laser_enemy_anchor(enemy, target_position)
         }
-        _ => target_position[0],
+        _ => target_position,
     };
-    push_actor_scoring_sparse_laser(scene, start[0], start[1], end_x, display_step);
+    push_actor_scoring_sparse_laser(scene, start[0], end[1], end[0], display_step);
 }
 
 fn actor_attract_scoring_laser_ship_anchor(position: [f32; 2]) -> [f32; 2] {
@@ -18349,6 +18349,8 @@ mod tests {
             "scoring laser test must use the visible source target"
         );
         let target_right_edge = target_position[0] + target_size[0] - 1.0;
+        let target_center_y =
+            actor_attract_scoring_laser_enemy_anchor(enemy, target_position)[1].round();
         let laser_right_edge = scene
             .sprites
             .iter()
@@ -18361,6 +18363,22 @@ mod tests {
         assert!(
             laser_right_edge >= target_right_edge,
             "attract scoring laser should visibly reach the {enemy:?} edge before explosion: laser={laser_right_edge}, target={target_right_edge}"
+        );
+        assert!(
+            scene.sprites.iter().any(|sprite| {
+                sprite.sprite == SpriteId::PLAYER_PROJECTILE
+                    && sprite.layer == RenderLayer::Projectiles
+                    && (sprite.position[1] - target_center_y).abs() < f32::EPSILON
+            }),
+            "attract scoring laser should run through the {enemy:?} vertical center"
+        );
+        assert!(
+            scene.sprites.iter().all(|sprite| {
+                sprite.sprite != SpriteId::PLAYER_PROJECTILE
+                    || sprite.layer != RenderLayer::Projectiles
+                    || (sprite.position[1] - target_center_y).abs() < f32::EPSILON
+            }),
+            "attract scoring laser should not stay on the ship row above the {enemy:?}"
         );
     }
 

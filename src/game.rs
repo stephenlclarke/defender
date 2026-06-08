@@ -14660,18 +14660,18 @@ fn push_attract_scoring_laser_beam(
         player_ship.y16,
     ));
     let target_position = attract_scoring_scene_position(target.x16, target.y16);
-    let end_x = match target.kind {
+    let end = match target.kind {
         AttractScoringObjectKind::Enemy(kind) => {
-            attract_scoring_laser_enemy_anchor(kind, target_position)[0]
+            attract_scoring_laser_enemy_anchor(kind, target_position)
         }
-        _ => target_position[0],
+        _ => target_position,
     };
     push_arcade_laser_path(
         scene,
         start[0],
-        start[1],
-        end_x,
-        start[1],
+        end[1],
+        end[0],
+        end[1],
         u32::from(demo_tick),
         RenderLayer::Projectiles,
     );
@@ -18291,8 +18291,16 @@ mod tests {
         }));
         assert!(
             (projectile_y_range.1 - projectile_y_range.0).abs() < f32::EPSILON,
-            "MAME scoring-demo laser stays horizontal on the ship row"
+            "MAME scoring-demo laser stays horizontal through the target center"
         );
+        let laser_target = laser_scene
+            .sprites
+            .iter()
+            .find(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
+            .expect("attract scoring laser should render the target lander");
+        let target_center_y =
+            super::attract_scoring_laser_enemy_anchor(EnemyKind::Lander, laser_target.position)[1];
+        assert_eq!(projectile_y_range, (target_center_y, target_center_y));
 
         let transfer_display_tick = super::attract_scoring_demo_tick_for_stage(
             super::AttractScoringDemoStage::LegendTransfer(0),
@@ -18388,6 +18396,15 @@ mod tests {
             .map(|sprite| sprite.position[1] as i32)
             .collect::<std::collections::BTreeSet<_>>();
         assert_eq!(projectile_rows.len(), 1);
+        assert_eq!(
+            projectile_rows.into_iter().next(),
+            Some(
+                super::attract_scoring_laser_enemy_anchor(
+                    EnemyKind::Lander,
+                    super::attract_scoring_scene_position(alien_target.x16, alien_target.y16)
+                )[1] as i32
+            )
+        );
         assert_eq!(
             super::attract_scoring_laser_ship_anchor([20.0, 40.0]),
             [36.0, 44.0]
