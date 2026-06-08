@@ -1,7 +1,7 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorWaveProfile {
     pub wave: u16,
-    pub source_wave: Option<ActorSourceWaveProfile>,
+    pub source_wave: Option<ArcadeWaveProfile>,
     pub behavior_script: ActorBehaviorScript,
     pub lander_spawns: Vec<ActorLanderSpawn>,
     pub bomber_spawns: Vec<ActorBomberSpawn>,
@@ -84,12 +84,12 @@ impl ActorWaveProfile {
         self
     }
 
-    pub fn with_source_wave(mut self, source_wave: ActorSourceWaveProfile) -> Self {
+    pub fn with_source_wave(mut self, source_wave: ArcadeWaveProfile) -> Self {
         self.source_wave = Some(source_wave);
         self
     }
 
-    fn with_optional_source_wave(mut self, source_wave: Option<ActorSourceWaveProfile>) -> Self {
+    fn with_optional_source_wave(mut self, source_wave: Option<ArcadeWaveProfile>) -> Self {
         self.source_wave = source_wave;
         self
     }
@@ -202,7 +202,7 @@ pub struct ActorWaveSpawnBehaviorProfile {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorWaveProfileManifest {
     pub wave: u16,
-    pub source_wave: Option<ActorSourceWaveProfile>,
+    pub source_wave: Option<ArcadeWaveProfile>,
     pub behavior_script: ActorBehaviorScriptManifest,
     pub lander_spawns: Vec<ActorLanderSpawn>,
     pub bomber_spawns: Vec<ActorBomberSpawn>,
@@ -270,13 +270,13 @@ impl ActorWaveScript {
     }
 
     fn source_backed_profile(wave: u16) -> ActorWaveProfile {
-        let source = ActorSourceWaveProfile::for_wave(wave);
+        let source = ArcadeWaveProfile::for_wave(wave);
         Self::source_backed_profile_from_source(wave, source)
     }
 
     fn source_backed_profile_from_source(
         wave: u16,
-        source: ActorSourceWaveProfile,
+        source: ArcadeWaveProfile,
     ) -> ActorWaveProfile {
         Self::source_backed_profile_from_source_with_behavior(
             wave,
@@ -287,7 +287,7 @@ impl ActorWaveScript {
 
     fn source_backed_profile_from_source_with_behavior(
         wave: u16,
-        source: ActorSourceWaveProfile,
+        source: ArcadeWaveProfile,
         base_behavior: &ActorBehaviorScript,
     ) -> ActorWaveProfile {
         let human_spawns = source.human_spawns(wave);
@@ -469,7 +469,7 @@ impl ParsedActorWaveScript {
             }
             "source_wave" | "source_backed_wave" => {
                 let wave = parse_wave_u16(line_number, parts.next(), "wave")?;
-                let mut source = ActorSourceWaveProfile::for_wave(wave);
+                let mut source = ArcadeWaveProfile::for_wave(wave);
                 parse_source_wave_profile_updates(line_number, &mut source, parts)?;
                 self.push_profile(
                     line_number,
@@ -491,7 +491,7 @@ impl ParsedActorWaveScript {
                     ));
                 }
                 for wave in first..=last {
-                    let mut source = ActorSourceWaveProfile::for_wave(wave);
+                    let mut source = ArcadeWaveProfile::for_wave(wave);
                     parse_source_wave_profile_updates(
                         line_number,
                         &mut source,
@@ -1009,7 +1009,7 @@ struct ParsedWaveSpawnBehaviorUpdate<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ParsedActorWaveProfile {
     wave: u16,
-    source_wave: Option<ActorSourceWaveProfile>,
+    source_wave: Option<ArcadeWaveProfile>,
     behavior_script: ActorBehaviorScript,
     lander_spawns: Vec<ActorLanderSpawn>,
     bomber_spawns: Vec<ActorBomberSpawn>,
@@ -1042,7 +1042,7 @@ impl ParsedActorWaveProfile {
 
     fn source_backed_from_source_with_behavior(
         wave: u16,
-        source: ActorSourceWaveProfile,
+        source: ArcadeWaveProfile,
         base_behavior: &ActorBehaviorScript,
     ) -> Self {
         let profile = ActorWaveScript::source_backed_profile_from_source_with_behavior(
@@ -1188,7 +1188,7 @@ fn parse_wave_behavior_preset_name(
 
 fn parse_source_wave_profile_updates<'a>(
     line_number: usize,
-    source: &mut ActorSourceWaveProfile,
+    source: &mut ArcadeWaveProfile,
     mut parts: impl Iterator<Item = &'a str>,
 ) -> Result<(), ActorWaveScriptParseError> {
     while let Some(field) = parts.next() {
@@ -1205,7 +1205,7 @@ fn parse_source_wave_profile_updates<'a>(
 
 fn apply_source_wave_profile_field(
     line_number: usize,
-    source: &mut ActorSourceWaveProfile,
+    source: &mut ArcadeWaveProfile,
     field: &str,
     value: &str,
 ) -> Result<(), ActorWaveScriptParseError> {

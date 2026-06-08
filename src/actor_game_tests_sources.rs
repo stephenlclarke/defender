@@ -190,7 +190,7 @@
 
         assert_eq!(
             human.human_runtime,
-            Some(ActorSourceHumanMetadata {
+            Some(HumanArcadeState {
                 x_fraction: 0x81,
                 y_fraction: 0x00,
                 picture_frame: 3,
@@ -211,7 +211,7 @@
         let human_id =
             driver.spawn_human_from_spawn(source_human_spawn_for_test(Point::new(64, 220), 1, 0));
         driver.step(GameInput::NONE);
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 0,
             hseed: 0,
             lseed: 0,
@@ -240,7 +240,7 @@
         let human_id =
             driver.spawn_human_from_spawn(source_human_spawn_for_test(Point::new(64, 220), 1, 0));
         driver.step(GameInput::NONE);
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 0,
             hseed: 0,
             lseed: 222,
@@ -271,7 +271,7 @@
             driver.spawn_human_from_spawn(source_human_spawn_for_test(Point::new(80, 220), 2, 0));
 
         driver.step(GameInput::NONE);
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 0,
             hseed: 0,
             lseed: 0,
@@ -307,7 +307,7 @@
         }
 
         driver.step(GameInput::NONE);
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 0,
             hseed: 0,
             lseed: 0,
@@ -319,7 +319,7 @@
         );
 
         driver.human_walk_sleep_ticks = 0;
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 0,
             hseed: 0,
             lseed: 0,
@@ -348,7 +348,7 @@
         driver.spawn_human_for_test(Point::new(128, 220));
 
         driver.step(GameInput::NONE);
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 0,
             hseed: 0,
             lseed: 0,
@@ -360,7 +360,7 @@
         );
 
         driver.human_walk_sleep_ticks = 0;
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 0,
             hseed: 0,
             lseed: 0,
@@ -388,7 +388,7 @@
         );
         let lander_id = driver.spawn_lander_from_spawn(ActorLanderSpawn {
             position: Point::new(100, 100),
-            source: Some(ActorSourceLanderMetadata {
+            source: Some(LanderArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -403,7 +403,7 @@
         driver.spawn_human_from_spawn(ActorHumanSpawn {
             position: Point::new(160, 100),
             mode: HumanMode::Grounded,
-            source: Some(ActorSourceHumanMetadata {
+            source: Some(HumanArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 picture_frame: 0,
@@ -564,7 +564,7 @@
     fn source_bomber_bomb_spawn_carries_source_shell_fractions() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 0,
             hseed: 0,
             lseed: 0,
@@ -584,7 +584,7 @@
                 ..ActorBehaviorProfile::default()
             },
         );
-        let initial_source = ActorSourceBomberMetadata {
+        let initial_source = BomberArcadeState {
             x_fraction: 0x6D,
             y_fraction: 0x7B,
             x_velocity: 0,
@@ -621,7 +621,7 @@
                 command,
                 GameCommand::Spawn(SpawnRequest::Bomb {
                     position,
-                    source: Some(ActorSourceEnemyProjectileMetadata {
+                    source: Some(EnemyProjectileArcadeState {
                         x_fraction,
                         y_fraction,
                         x_velocity: 0,
@@ -649,7 +649,7 @@
 
         assert_eq!(
             bomb.enemy_projectile_runtime,
-            Some(ActorSourceEnemyProjectileMetadata {
+            Some(EnemyProjectileArcadeState {
                 x_fraction: initial_source.x_fraction,
                 y_fraction: initial_source.y_fraction,
                 x_velocity: 0,
@@ -663,7 +663,7 @@
     fn source_bomber_bomb_spawn_uses_source_rng_gate() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 0,
             hseed: 0,
             lseed: 14,
@@ -678,7 +678,7 @@
         );
         driver.spawn_bomber_from_spawn(ActorBomberSpawn {
             position: Point::new(100, 80),
-            source: Some(ActorSourceBomberMetadata {
+            source: Some(BomberArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -707,7 +707,7 @@
     fn source_bomber_bomb_spawn_respects_getshl_bounds() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 0,
             hseed: 0,
             lseed: 0,
@@ -722,7 +722,7 @@
         );
         driver.spawn_bomber_from_spawn(ActorBomberSpawn {
             position: Point::new(ENEMY_PROJECTILE_MAX_SCREEN_X, 80),
-            source: Some(ActorSourceBomberMetadata {
+            source: Some(BomberArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -738,7 +738,7 @@
                 ENEMY_PROJECTILE_MAX_SCREEN_X - 1,
                 i16::from(PLAYFIELD_TOP_EDGE_Y),
             ),
-            source: Some(ActorSourceBomberMetadata {
+            source: Some(BomberArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -780,12 +780,12 @@
             .find(|snapshot| snapshot.kind == ActorKind::Player)
             .map(|snapshot| snapshot.position)
             .expect("player should publish a prompt snapshot");
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 0,
             hseed: 0,
             lseed: 10,
         };
-        let initial_source = ActorSourceBomberMetadata {
+        let initial_source = BomberArcadeState {
             x_fraction: 0x10,
             y_fraction: 0x20,
             x_velocity: 0x0100,
@@ -834,7 +834,7 @@
     fn source_bomber_offscreen_motion_adjusts_cruise_altitude() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 0,
             hseed: 0,
             lseed: 13,
@@ -846,7 +846,7 @@
                 ..ActorBehaviorProfile::default()
             },
         );
-        let initial_source = ActorSourceBomberMetadata {
+        let initial_source = BomberArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -887,7 +887,7 @@
         driver.apply_commands(&[
             GameCommand::Spawn(SpawnRequest::Bomb {
                 position: Point::new(ENEMY_PROJECTILE_MAX_SCREEN_X, 100),
-                source: Some(ActorSourceEnemyProjectileMetadata {
+                source: Some(EnemyProjectileArcadeState {
                     x_fraction: 0,
                     y_fraction: 0,
                     x_velocity: 0,
@@ -900,7 +900,7 @@
                     ENEMY_PROJECTILE_MAX_SCREEN_X - 1,
                     i16::from(PLAYFIELD_TOP_EDGE_Y),
                 ),
-                source: Some(ActorSourceEnemyProjectileMetadata {
+                source: Some(EnemyProjectileArcadeState {
                     x_fraction: 0,
                     y_fraction: 0,
                     x_velocity: 0,
@@ -940,7 +940,7 @@
         );
         driver.apply_commands(&[GameCommand::Spawn(SpawnRequest::Bomb {
             position: Point::new(80, 100),
-            source: Some(ActorSourceEnemyProjectileMetadata {
+            source: Some(EnemyProjectileArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1018,7 +1018,7 @@
         driver.apply_commands(&[GameCommand::Spawn(SpawnRequest::EnemyLaser {
             position: Point::new(80, 100),
             velocity: Velocity::new(0, 0),
-            source: Some(ActorSourceEnemyProjectileMetadata {
+            source: Some(EnemyProjectileArcadeState {
                 x_fraction: 0x55,
                 y_fraction: 0x66,
                 x_velocity: 0,
@@ -1044,7 +1044,7 @@
 
         assert_eq!(
             first_source,
-            Some(ActorSourceEnemyProjectileMetadata {
+            Some(EnemyProjectileArcadeState {
                 x_fraction: 0x55,
                 y_fraction: 0x66,
                 x_velocity: 0,
@@ -1276,7 +1276,7 @@
             baiter_spawn,
             (
                 Point::new(228, 144),
-                Some(ActorSourceBaiterMetadata {
+                Some(BaiterArcadeState {
                     x_fraction: 0,
                     y_fraction: 0,
                     x_velocity: 0xFFC0,
@@ -1294,7 +1294,7 @@
             snapshot.kind == ActorKind::Baiter
                 && snapshot.position == Point::new(227, 143)
                 && snapshot.baiter_runtime
-                    == Some(ActorSourceBaiterMetadata {
+                    == Some(BaiterArcadeState {
                         x_fraction: 0,
                         y_fraction: 0x80,
                         x_velocity: 0xFFC0,
@@ -1321,7 +1321,7 @@
             actor_snapshot(player.value(), ActorKind::Player, Point::new(42, 120)),
         );
         let start = Point::new(25, 100);
-        let source = ActorSourceSwarmerMetadata {
+        let source = SwarmerArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0x0020,
@@ -1366,7 +1366,7 @@
         expected_source.x_fraction = expected_x_fraction;
         expected_source.y_fraction = expected_y_fraction;
         expected_source.shot_timer = source_rmax(
-            clamped_source_swarmer_shot_reset(ActorSourceWaveProfile::for_wave(report.wave)),
+            clamped_source_swarmer_shot_reset(ArcadeWaveProfile::for_wave(report.wave)),
             report_source_rng.seed,
         );
         expected_source.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
@@ -1412,7 +1412,7 @@
             actor_snapshot(player.value(), ActorKind::Player, Point::new(42, 120)),
         );
         let start = Point::new(48, 100);
-        let source = ActorSourceSwarmerMetadata {
+        let source = SwarmerArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0x0020,
@@ -1449,7 +1449,7 @@
         expected_source.x_fraction = expected_x_fraction;
         expected_source.y_fraction = expected_y_fraction;
         expected_source.shot_timer = source_rmax(
-            clamped_source_swarmer_shot_reset(ActorSourceWaveProfile::for_wave(report.wave)),
+            clamped_source_swarmer_shot_reset(ArcadeWaveProfile::for_wave(report.wave)),
             report_source_rng.seed,
         );
         expected_source.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
@@ -1493,7 +1493,7 @@
         }
         driver.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
             position: Point::new(25, 100),
-            source: Some(ActorSourceSwarmerMetadata {
+            source: Some(SwarmerArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0x0020,
@@ -1530,7 +1530,7 @@
         driver.wave = 1;
         let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
             position: Point::new(70, 120),
-            source: Some(ActorSourceBaiterMetadata {
+            source: Some(BaiterArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1552,13 +1552,13 @@
             Point::new(42, 120),
             Velocity::default(),
         );
-        let mut expected_source = ActorSourceBaiterMetadata {
+        let mut expected_source = BaiterArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
             y_velocity: 0,
             shot_timer: actor_source_baiter_shot_reset(
-                ActorSourceWaveProfile::for_wave(report.wave),
+                ArcadeWaveProfile::for_wave(report.wave),
                 report_source_rng.seed,
             ),
             sleep_ticks: BAITER_LOOP_SLEEP_TICKS,
@@ -1634,7 +1634,7 @@
         }
         let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
             position: Point::new(70, 120),
-            source: Some(ActorSourceBaiterMetadata {
+            source: Some(BaiterArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1662,13 +1662,13 @@
         }));
         assert_eq!(
             snapshot_for(&report, baiter).baiter_runtime,
-            Some(ActorSourceBaiterMetadata {
+            Some(BaiterArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
                 y_velocity: 0,
                 shot_timer: actor_source_baiter_shot_reset(
-                    ActorSourceWaveProfile::for_wave(report.wave),
+                    ArcadeWaveProfile::for_wave(report.wave),
                     report_source_rng.seed,
                 ),
                 sleep_ticks: BAITER_LOOP_SLEEP_TICKS,
@@ -1679,7 +1679,7 @@
 
     #[test]
     fn source_baiter_fireball_adds_player_velocity_when_seed_is_high() {
-        let arcade_rng = ActorSourceRngSnapshot {
+        let arcade_rng = ActorArcadeRngSnapshot {
             seed: 0x90,
             hseed: 0,
             lseed: 0x44,
@@ -1691,7 +1691,7 @@
             Point::new(80, 120),
             Velocity::new(5, -2),
         );
-        let source = ActorSourceBaiterMetadata {
+        let source = BaiterArcadeState {
             x_fraction: 0x12,
             y_fraction: 0x34,
             x_velocity: 0,
@@ -1723,7 +1723,7 @@
 
         assert_eq!(
             projectile,
-            ActorSourceEnemyProjectileMetadata {
+            EnemyProjectileArcadeState {
                 x_fraction: source.x_fraction,
                 y_fraction: source.y_fraction,
                 x_velocity: expected_x_velocity,
@@ -1746,14 +1746,14 @@
             driver.spawn_player();
             driver.spawn_lander_for_test(Point::new(220, 80));
             driver.step(GameInput::NONE);
-            driver.arcade_rng = ActorSourceRng {
+            driver.arcade_rng = ActorArcadeRng {
                 seed,
                 hseed: 0,
                 lseed: 0,
             };
             let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
                 position: Point::new(70, 120),
-                source: Some(ActorSourceBaiterMetadata {
+                source: Some(BaiterArcadeState {
                     x_fraction: 0,
                     y_fraction: 0,
                     x_velocity: 0,
@@ -1775,7 +1775,7 @@
         );
         assert_eq!(
             snapshot_for(&held, held_baiter).baiter_runtime,
-            Some(ActorSourceBaiterMetadata {
+            Some(BaiterArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1797,7 +1797,7 @@
         );
         assert_eq!(
             snapshot_for(&retargeted, retargeted_baiter).baiter_runtime,
-            Some(ActorSourceBaiterMetadata {
+            Some(BaiterArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0xFFC0,
@@ -1814,7 +1814,7 @@
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 1;
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 70,
             hseed: 0,
             lseed: 0,
@@ -1825,7 +1825,7 @@
         driver.snapshots.insert(player_id, player);
         let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
             position: Point::new(70, 140),
-            source: Some(ActorSourceBaiterMetadata {
+            source: Some(BaiterArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1845,7 +1845,7 @@
         assert_eq!(snapshot_for(&report, baiter).position, Point::new(69, 139));
         assert_eq!(
             snapshot_for(&report, baiter).baiter_runtime,
-            Some(ActorSourceBaiterMetadata {
+            Some(BaiterArcadeState {
                 x_fraction: 0x08,
                 y_fraction: 0x82,
                 x_velocity: 0xFFC2,

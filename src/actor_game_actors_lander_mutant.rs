@@ -4,7 +4,7 @@ struct Lander {
     position: Point,
     drift: i16,
     mode: LanderMode,
-    source: Option<ActorSourceLanderMetadata>,
+    source: Option<LanderArcadeState>,
     source_output: SourceLanderOutput,
 }
 
@@ -264,10 +264,10 @@ impl Lander {
         }
     }
 
-    fn source_mutant_conversion(&self, prompt: &StepPrompt) -> Option<ActorSourceMutantMetadata> {
+    fn source_mutant_conversion(&self, prompt: &StepPrompt) -> Option<MutantArcadeState> {
         let source = self.source?;
         let hop_rng = prompt.arcade_rng?;
-        Some(ActorSourceMutantMetadata::from_lander_conversion(
+        Some(MutantArcadeState::from_lander_conversion(
             source,
             prompt.source_wave,
             hop_rng,
@@ -366,20 +366,20 @@ const fn source_lander_drift_from_velocity(x_velocity: u16) -> i16 {
     actor_source_drift_from_velocity(x_velocity)
 }
 
-fn source_lander_output(source: Option<ActorSourceLanderMetadata>) -> SourceLanderOutput {
+fn source_lander_output(source: Option<LanderArcadeState>) -> SourceLanderOutput {
     let Some(source) = source else {
         return SourceLanderOutput::Normal;
     };
     source_first_wave_refill_lander_output(source).unwrap_or(SourceLanderOutput::Normal)
 }
 
-fn source_lander_output_visible(source: ActorSourceLanderMetadata) -> bool {
+fn source_lander_output_visible(source: LanderArcadeState) -> bool {
     source_first_wave_refill_lander_output(source)
         == Some(SourceLanderOutput::VisibleFirstWaveRefill)
 }
 
 fn source_first_wave_refill_lander_output(
-    source: ActorSourceLanderMetadata,
+    source: LanderArcadeState,
 ) -> Option<SourceLanderOutput> {
     ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS
         .iter()
@@ -398,8 +398,8 @@ fn source_first_wave_refill_lander_output(
 }
 
 fn source_lander_metadata_matches_refill_row(
-    source: ActorSourceLanderMetadata,
-    refill_source: ActorSourceLanderMetadata,
+    source: LanderArcadeState,
+    refill_source: LanderArcadeState,
 ) -> bool {
     source.x_fraction == refill_source.x_fraction
         && source.y_fraction == refill_source.y_fraction
@@ -513,7 +513,7 @@ struct Mutant {
     id: ActorId,
     position: Point,
     drift: i16,
-    source: Option<ActorSourceMutantMetadata>,
+    source: Option<MutantArcadeState>,
 }
 
 impl Mutant {
@@ -765,8 +765,8 @@ fn actor_source_world_position(position: Point, x_fraction: u8, y_fraction: u8) 
     )
 }
 
-const fn actor_source_rng_from_snapshot(snapshot: ActorSourceRngSnapshot) -> ActorSourceRng {
-    ActorSourceRng {
+const fn actor_source_rng_from_snapshot(snapshot: ActorArcadeRngSnapshot) -> ActorArcadeRng {
+    ActorArcadeRng {
         seed: snapshot.seed,
         hseed: snapshot.hseed,
         lseed: snapshot.lseed,
@@ -787,7 +787,7 @@ fn actor_source_mutant_x_velocity(
 }
 
 fn actor_source_mutant_y_velocity(
-    profile: ActorSourceWaveProfile,
+    profile: ArcadeWaveProfile,
     player_y: i16,
     player_absolute_x: u16,
     object_absolute_x: u16,
@@ -852,11 +852,11 @@ fn actor_source_mutant_shot_rng(
     prompt: &StepPrompt,
     actor: ActorId,
     position: Point,
-) -> ActorSourceRngSnapshot {
+) -> ActorArcadeRngSnapshot {
     let mut arcade_rng = prompt
         .arcade_rng
         .map(actor_source_rng_from_snapshot)
-        .unwrap_or(ActorSourceRng {
+        .unwrap_or(ActorArcadeRng {
             seed: actor_source_motion_seed(prompt.step, actor),
             hseed: position.x as u8,
             lseed: position.y as u8,
@@ -864,7 +864,7 @@ fn actor_source_mutant_shot_rng(
     arcade_rng.advance().snapshot()
 }
 
-fn actor_source_mutant_shot_reset(profile: ActorSourceWaveProfile, seed: u8) -> u8 {
+fn actor_source_mutant_shot_reset(profile: ArcadeWaveProfile, seed: u8) -> u8 {
     source_rmax(
         profile.mutant_shot_time.max(1).min(u32::from(u8::MAX)) as u8,
         seed,
@@ -872,25 +872,25 @@ fn actor_source_mutant_shot_reset(profile: ActorSourceWaveProfile, seed: u8) -> 
 }
 
 fn actor_source_target6_mutant_conversion_x_correction(
-    lander_runtime: ActorSourceLanderMetadata,
+    lander_runtime: LanderArcadeState,
 ) -> Option<u16> {
     (lander_runtime.target_human_index == Some(6) && lander_runtime.x_velocity == 0)
         .then_some(TARGET6_MUTANT_CONVERSION_X_CORRECTION)
 }
 
 fn actor_source_target6_mutant_has_conversion_correction(
-    source: ActorSourceMutantMetadata,
+    source: MutantArcadeState,
 ) -> bool {
     source.render_x_correction == TARGET6_MUTANT_CONVERSION_X_CORRECTION
 }
 
-fn actor_source_target6_mutant_uses_dive_projection(source: ActorSourceMutantMetadata) -> bool {
+fn actor_source_target6_mutant_uses_dive_projection(source: MutantArcadeState) -> bool {
     actor_source_target6_mutant_has_conversion_correction(source) && source.y_velocity == 0x0090
 }
 
 fn actor_source_target6_mutant_defers_first_shot(
     position: Point,
-    source: ActorSourceMutantMetadata,
+    source: MutantArcadeState,
 ) -> bool {
     actor_source_target6_mutant_has_conversion_correction(source)
         && !source.target6_first_shot_deferred
@@ -900,7 +900,7 @@ fn actor_source_target6_mutant_defers_first_shot(
 
 fn actor_source_target6_mutant_fires_visible_entry_shot(
     position: Point,
-    source: ActorSourceMutantMetadata,
+    source: MutantArcadeState,
     player_position: Point,
 ) -> bool {
     actor_source_target6_mutant_has_conversion_correction(source)
@@ -914,7 +914,7 @@ fn actor_source_target6_mutant_fires_visible_entry_shot(
 
 fn actor_source_target6_mutant_suppresses_fire2524_regular_shot(
     position: Point,
-    source: ActorSourceMutantMetadata,
+    source: MutantArcadeState,
 ) -> bool {
     if !actor_source_target6_mutant_uses_dive_projection(source) {
         return false;
@@ -926,7 +926,7 @@ fn actor_source_target6_mutant_suppresses_fire2524_regular_shot(
 
 fn actor_source_target6_mutant_fires_dive_shot(
     position: Point,
-    source: ActorSourceMutantMetadata,
+    source: MutantArcadeState,
 ) -> bool {
     if !actor_source_target6_mutant_uses_dive_projection(source)
         || !source.target6_first_shot_deferred
@@ -942,7 +942,7 @@ fn actor_source_target6_mutant_fires_dive_shot(
 }
 
 fn actor_source_target6_mutant_post_shot_timer(
-    source: ActorSourceMutantMetadata,
+    source: MutantArcadeState,
     fired: bool,
 ) -> Option<u8> {
     (fired && actor_source_target6_mutant_has_conversion_correction(source))
@@ -950,115 +950,115 @@ fn actor_source_target6_mutant_post_shot_timer(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ActorSourceTarget6ProjectionAnchor {
+struct Target6MutantProjectionAnchor {
     raw_x16: u16,
     raw_y16: u16,
     screen: Point,
 }
 
-const ACTOR_TARGET6_MUTANT_DIVE_PROJECTIONS: &[ActorSourceTarget6ProjectionAnchor] = &[
+const ACTOR_TARGET6_MUTANT_DIVE_PROJECTIONS: &[Target6MutantProjectionAnchor] = &[
     // original: ACTOR_SOURCE_TARGET6_MUTANT_DIVE_PROJECTIONS
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x031C,
         raw_y16: 0x3360,
         screen: Point::new(0x12, 0x43),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x037C,
         raw_y16: 0x3380,
         screen: Point::new(0x13, 0x46),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x034C,
         raw_y16: 0x33F0,
         screen: Point::new(0x12, 0x43),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x03AC,
         raw_y16: 0x3410,
         screen: Point::new(0x14, 0x46),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x037C,
         raw_y16: 0x3480,
         screen: Point::new(0x13, 0x44),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x085C,
         raw_y16: 0x47A0,
         screen: Point::new(0x1F, 0x5B),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x085C,
         raw_y16: 0x6120,
         screen: Point::new(0x1F, 0x71),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x088C,
         raw_y16: 0x61B0,
         screen: Point::new(0x1E, 0x71),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x085C,
         raw_y16: 0x6140,
         screen: Point::new(0x1F, 0x71),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x082C,
         raw_y16: 0x7770,
         screen: Point::new(0x20, 0x87),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x07FC,
         raw_y16: 0x7800,
         screen: Point::new(0x21, 0x88),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x082C,
         raw_y16: 0x7990,
         screen: Point::new(0x20, 0x87),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x082C,
         raw_y16: 0x81E0,
         screen: Point::new(0x20, 0x90),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x082C,
         raw_y16: 0x9730,
         screen: Point::new(0x21, 0x9F),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x07FC,
         raw_y16: 0x97A0,
         screen: Point::new(0x20, 0x9E),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x085C,
         raw_y16: 0x97C0,
         screen: Point::new(0x20, 0xA0),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x088C,
         raw_y16: 0x9850,
         screen: Point::new(0x1F, 0xA0),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x085C,
         raw_y16: 0x99E0,
         screen: Point::new(0x1E, 0xA2),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x082C,
         raw_y16: 0x9A70,
         screen: Point::new(0x20, 0xA3),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x088C,
         raw_y16: 0xA200,
         screen: Point::new(0x20, 0xA2),
     },
-    ActorSourceTarget6ProjectionAnchor {
+    Target6MutantProjectionAnchor {
         raw_x16: 0x08EC,
         raw_y16: 0xA320,
         screen: Point::new(0x20, 0xA2),
@@ -1111,7 +1111,7 @@ const ACTOR_TARGET6_MUTANT_VISUAL_ROWS: &[(u16, i16)] = &[
 
 fn actor_source_target6_mutant_dive_position(
     position: Point,
-    source: ActorSourceMutantMetadata,
+    source: MutantArcadeState,
 ) -> Option<Point> {
     if !actor_source_target6_mutant_uses_dive_projection(source) {
         return None;
@@ -1181,7 +1181,7 @@ fn actor_source_lerp_i16(
 
 fn actor_source_target6_mutant_visual_position(
     position: Point,
-    source: ActorSourceMutantMetadata,
+    source: MutantArcadeState,
 ) -> Option<Point> {
     if !actor_source_target6_mutant_has_conversion_correction(source) || source.x_velocity != 0x0030
     {
@@ -1205,7 +1205,7 @@ fn actor_source_target6_mutant_visual_position(
 
 fn actor_source_target6_mutant_scene_position(
     position: Point,
-    source: Option<ActorSourceMutantMetadata>,
+    source: Option<MutantArcadeState>,
 ) -> Point {
     let Some(source) = source else {
         return position;
@@ -1217,7 +1217,7 @@ fn actor_source_target6_mutant_scene_position(
 
 fn actor_source_target6_mutant_collision_position(
     position: Point,
-    source: Option<ActorSourceMutantMetadata>,
+    source: Option<MutantArcadeState>,
 ) -> Point {
     let Some(source) = source else {
         return position;
@@ -1230,7 +1230,7 @@ fn actor_source_target6_mutant_collision_position(
 
 fn actor_source_target6_mutant_waits_for_fire2524_collision(
     position: Point,
-    source: Option<ActorSourceMutantMetadata>,
+    source: Option<MutantArcadeState>,
 ) -> bool {
     let Some(source) = source else {
         return false;
@@ -1246,7 +1246,7 @@ fn actor_source_target6_mutant_waits_for_fire2524_collision(
 
 fn actor_source_target6_mutant_uses_fire2524_collision_projection(
     position: Point,
-    source: Option<ActorSourceMutantMetadata>,
+    source: Option<MutantArcadeState>,
 ) -> bool {
     let Some(source) = source else {
         return false;
@@ -1289,7 +1289,7 @@ fn actor_player_enemy_collision_explosion_placement(
 
 fn actor_source_target6_mutant_shot_position(
     position: Point,
-    source: ActorSourceMutantMetadata,
+    source: MutantArcadeState,
 ) -> Point {
     if !actor_source_target6_mutant_uses_dive_projection(source) {
         return position;
@@ -1319,7 +1319,7 @@ fn actor_source_bomb_shell_count(prompt: &StepPrompt) -> usize {
         .count()
 }
 
-fn actor_source_bomber_bomb_lifetime_ticks(arcade_rng: ActorSourceRngSnapshot) -> u8 {
+fn actor_source_bomber_bomb_lifetime_ticks(arcade_rng: ActorArcadeRngSnapshot) -> u8 {
     (arcade_rng.seed & 0x1F).wrapping_add(1)
 }
 
@@ -1329,10 +1329,10 @@ fn actor_source_tie_selected_slot(seed: u8) -> u8 {
 
 fn actor_source_target6_mutant_fire2524_forced_shot(
     position: Point,
-    source: ActorSourceMutantMetadata,
+    source: MutantArcadeState,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
-) -> Option<(Point, Velocity, ActorSourceEnemyProjectileMetadata)> {
+) -> Option<(Point, Velocity, EnemyProjectileArcadeState)> {
     if !actor_source_target6_mutant_uses_dive_projection(source)
         || actor_source_shell_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
     {
@@ -1373,11 +1373,11 @@ fn actor_source_target6_mutant_exact_projectile(
     x_velocity: u16,
     y_velocity: u16,
     behavior: ActorBehaviorProfile,
-) -> (Point, Velocity, ActorSourceEnemyProjectileMetadata) {
+) -> (Point, Velocity, EnemyProjectileArcadeState) {
     (
         position,
         actor_source_screen_velocity(x_velocity, y_velocity),
-        ActorSourceEnemyProjectileMetadata {
+        EnemyProjectileArcadeState {
             x_fraction,
             y_fraction,
             x_velocity,
@@ -1392,7 +1392,7 @@ fn actor_source_target6_mutant_exact_projectile(
 fn push_source_enemy_projectile_command(
     position: Point,
     velocity: Velocity,
-    source: ActorSourceEnemyProjectileMetadata,
+    source: EnemyProjectileArcadeState,
     sound: SoundCue,
     commands: &mut Vec<GameCommand>,
 ) {
@@ -1408,8 +1408,8 @@ fn push_source_mutant_shot(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
-    source: ActorSourceMutantMetadata,
-    shot_rng: ActorSourceRngSnapshot,
+    source: MutantArcadeState,
+    shot_rng: ActorArcadeRngSnapshot,
     commands: &mut Vec<GameCommand>,
 ) -> bool {
     let Some((velocity, source)) =
@@ -1431,9 +1431,9 @@ fn actor_source_mutant_fireball(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
-    source: ActorSourceMutantMetadata,
-    shot_rng: ActorSourceRngSnapshot,
-) -> Option<(Velocity, ActorSourceEnemyProjectileMetadata)> {
+    source: MutantArcadeState,
+    shot_rng: ActorArcadeRngSnapshot,
+) -> Option<(Velocity, EnemyProjectileArcadeState)> {
     let lifetime_ticks =
         actor_source_projectile_lifetime_ticks(behavior.mutant_shot_lifetime_steps);
     actor_source_enemy_fireball(
@@ -1451,9 +1451,9 @@ fn actor_source_enemy_fireball(
     x_fraction: u8,
     y_fraction: u8,
     prompt: &StepPrompt,
-    shot_rng: ActorSourceRngSnapshot,
+    shot_rng: ActorArcadeRngSnapshot,
     lifetime_ticks: u8,
-) -> Option<(Velocity, ActorSourceEnemyProjectileMetadata)> {
+) -> Option<(Velocity, EnemyProjectileArcadeState)> {
     if !source_shell_spawn_in_bounds(position)
         || actor_source_shell_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
     {
@@ -1478,7 +1478,7 @@ fn actor_source_enemy_fireball(
     let velocity = actor_source_screen_velocity(x_velocity, y_velocity);
     Some((
         velocity,
-        ActorSourceEnemyProjectileMetadata {
+        EnemyProjectileArcadeState {
             x_fraction,
             y_fraction,
             x_velocity,

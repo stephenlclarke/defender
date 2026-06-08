@@ -78,7 +78,7 @@
     fn default_wave_script_uses_source_wave_table_values() {
         let script = ActorWaveScript::default_progression();
         assert_eq!(script.name(), "actor-source-wave-table");
-        let first_source = ActorSourceWaveProfile::for_wave(1);
+        let first_source = ArcadeWaveProfile::for_wave(1);
         assert_eq!(first_source.baiter_delay, 192);
         assert_eq!(first_source.baiter_shot_time, 10);
         assert_eq!(first_source.baiter_seek_probability, 200);
@@ -124,7 +124,7 @@
         );
         assert_eq!(
             first.human_spawns[1].source,
-            Some(ActorSourceHumanMetadata {
+            Some(HumanArcadeState {
                 x_fraction: 0x81,
                 y_fraction: 0x00,
                 picture_frame: 3,
@@ -133,7 +133,7 @@
         );
         assert_eq!(
             first.lander_spawns[0].source,
-            Some(ActorSourceLanderMetadata {
+            Some(LanderArcadeState {
                 x_fraction: 0x33,
                 y_fraction: 0xE0,
                 x_velocity: 0xFFDE,
@@ -146,7 +146,7 @@
         );
         assert_eq!(
             first.lander_spawns[3].source,
-            Some(ActorSourceLanderMetadata {
+            Some(LanderArcadeState {
                 x_fraction: 0x11,
                 y_fraction: 0x70,
                 x_velocity: 0x0014,
@@ -163,7 +163,7 @@
         let second = script.profile_for_wave(2);
         assert_eq!(
             second.source_wave,
-            Some(ActorSourceWaveProfile::for_wave(2))
+            Some(ArcadeWaveProfile::for_wave(2))
         );
         let second_lander = second
             .behavior_script
@@ -182,7 +182,7 @@
         );
         assert_eq!(
             second.lander_spawns[0].source,
-            Some(ActorSourceLanderMetadata {
+            Some(LanderArcadeState {
                 x_fraction: 0xAD,
                 y_fraction: 0,
                 x_velocity: 0x001E,
@@ -195,7 +195,7 @@
         );
         assert_eq!(
             second.lander_spawns[1].source,
-            Some(ActorSourceLanderMetadata {
+            Some(LanderArcadeState {
                 x_fraction: 0x55,
                 y_fraction: 0,
                 x_velocity: 0xFFDE,
@@ -208,7 +208,7 @@
         );
         assert_eq!(
             second.lander_spawns[2].source,
-            Some(ActorSourceLanderMetadata {
+            Some(LanderArcadeState {
                 x_fraction: 0x4A,
                 y_fraction: 0,
                 x_velocity: 0x0020,
@@ -223,7 +223,7 @@
         assert_eq!(second.bomber_spawn_points(), vec![Point::new(228, 104)]);
         assert_eq!(
             second.bomber_spawns[0].source,
-            Some(ActorSourceBomberMetadata {
+            Some(BomberArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0xFFD8,
@@ -238,7 +238,7 @@
         assert_eq!(second.pod_spawn_points(), vec![Point::new(184, 72)]);
         assert_eq!(
             second.pod_spawns[0].source,
-            Some(ActorSourcePodMetadata {
+            Some(PodArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0x0020,
@@ -262,7 +262,7 @@
         );
         assert_eq!(
             second.human_spawns[0].source,
-            Some(ActorSourceHumanMetadata {
+            Some(HumanArcadeState {
                 x_fraction: 0xAD,
                 y_fraction: 0,
                 picture_frame: 2,
@@ -271,7 +271,7 @@
         );
         assert_eq!(
             second.human_spawns[9].source,
-            Some(ActorSourceHumanMetadata {
+            Some(HumanArcadeState {
                 x_fraction: 0x69,
                 y_fraction: 0,
                 picture_frame: 2,
@@ -292,7 +292,7 @@
         assert_eq!(second_bomber.bomber_drift_speed, 1);
 
         let fifth = script.profile_for_wave(5);
-        assert_eq!(fifth.source_wave, Some(ActorSourceWaveProfile::for_wave(5)));
+        assert_eq!(fifth.source_wave, Some(ArcadeWaveProfile::for_wave(5)));
         let fifth_lander = fifth
             .behavior_script
             .behavior_for(ActorId::new(1), ActorKind::Lander);
@@ -363,11 +363,11 @@
         );
         assert_eq!(
             parsed.manifest().waves[0].source_wave,
-            Some(ActorSourceWaveProfile::for_wave(1))
+            Some(ArcadeWaveProfile::for_wave(1))
         );
         assert_eq!(
             parsed.manifest().waves[4].source_wave,
-            Some(ActorSourceWaveProfile::for_wave(5))
+            Some(ArcadeWaveProfile::for_wave(5))
         );
         assert_eq!(parsed.profile_for_wave(1).lander_spawns.len(), 5);
         assert_eq!(
@@ -407,7 +407,7 @@
         let (expected_bomber_position, expected_bomber_source) =
             expected_source_bomber_after_motion(
                 Point::new(228, 104),
-                ActorSourceBomberMetadata {
+                BomberArcadeState {
                     x_fraction: 0,
                     y_fraction: 0,
                     x_velocity: 0xFFD8,
@@ -426,7 +426,7 @@
             snapshot.kind == ActorKind::Lander
                 && snapshot.position == Point::new(0xD2, 0x2C)
                 && snapshot.lander_runtime
-                    == Some(ActorSourceLanderMetadata {
+                    == Some(LanderArcadeState {
                         x_fraction: 0xCB,
                         y_fraction: 0xB0,
                         x_velocity: 0x001E,
@@ -442,7 +442,7 @@
         assert!(live.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Pod
                 && snapshot.pod_runtime
-                    == Some(ActorSourcePodMetadata {
+                    == Some(PodArcadeState {
                         x_fraction: 0x20,
                         y_fraction: 0,
                         x_velocity: 0x0020,
@@ -745,7 +745,7 @@
             .expect("target-3 refill lane should be visible");
         assert_eq!(
             visible_refill.lander_runtime,
-            Some(ActorSourceLanderMetadata {
+            Some(LanderArcadeState {
                 x_fraction: 0x63,
                 y_fraction: 0xF0,
                 x_velocity: 0xFFF4,
@@ -907,7 +907,7 @@
             landers: 2,
             ..EnemyReserveSnapshot::default()
         };
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 0x20,
             hseed: 0x66,
             lseed: 0x99,
@@ -916,12 +916,12 @@
         let mut expected_rng = driver.arcade_rng;
         let first_spawn = ActorMutantSpawn::source_restore(
             &mut expected_rng,
-            ActorSourceWaveProfile::for_wave(2),
+            ArcadeWaveProfile::for_wave(2),
             driver.background_left,
         );
         let second_spawn = ActorMutantSpawn::source_restore(
             &mut expected_rng,
-            ActorSourceWaveProfile::for_wave(2),
+            ArcadeWaveProfile::for_wave(2),
             driver.background_left,
         );
 
@@ -1033,13 +1033,13 @@
             mutants: 2,
             ..EnemyReserveSnapshot::default()
         };
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 0x37,
             hseed: 0x5A,
             lseed: 0x91,
         };
         driver.background_left = 0x5420;
-        let profile = ActorSourceWaveProfile::for_wave(2);
+        let profile = ArcadeWaveProfile::for_wave(2);
         let mut expected_rng = driver.arcade_rng;
         let first_spawn = ActorMutantSpawn::source_restore(
             &mut expected_rng,
@@ -1131,7 +1131,7 @@
             pods: 2,
             ..EnemyReserveSnapshot::default()
         };
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 0x12,
             hseed: 0x6D,
             lseed: 0x80,
@@ -1198,7 +1198,7 @@
             let source = snapshot.bomber_runtime.expect("source bomber");
             source.x_velocity
                 == actor_sign_extend_u8_to_u16(
-                    ActorSourceWaveProfile::for_wave(2).bomber_x_velocity,
+                    ArcadeWaveProfile::for_wave(2).bomber_x_velocity,
                 )
                 && source.slot == 0
         }));
@@ -1214,7 +1214,7 @@
                 .filter_map(|snapshot| snapshot.bomber_runtime)
                 .any(|source| {
                     let expected_spawn = ActorBomberSpawn::source_restore_batch(
-                        ActorSourceWaveProfile::for_wave(2),
+                        ArcadeWaveProfile::for_wave(2),
                         actor_source_absolute_x(player_position, 0),
                         1,
                     )[0];
@@ -1237,12 +1237,12 @@
             swarmers: 4,
             ..EnemyReserveSnapshot::default()
         };
-        driver.arcade_rng = ActorSourceRng {
+        driver.arcade_rng = ActorArcadeRng {
             seed: 0x20,
             hseed: 0x41,
             lseed: 0xC0,
         };
-        let profile = ActorSourceWaveProfile::for_wave(2);
+        let profile = ArcadeWaveProfile::for_wave(2);
         let mut expected_rng = driver.arcade_rng;
         let expected_spawns =
             ActorSwarmerSpawn::source_restore_batch(&mut expected_rng, profile, 4);
@@ -1295,7 +1295,7 @@
         driver.phase = Phase::Playing;
         let top = driver.spawn_pod_from_spawn(ActorPodSpawn {
             position: Point::new(0xD0, i16::from(PLAYFIELD_TOP_EDGE_Y)),
-            source: Some(ActorSourcePodMetadata {
+            source: Some(PodArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1304,7 +1304,7 @@
         });
         let bottom = driver.spawn_pod_from_spawn(ActorPodSpawn {
             position: Point::new(0xE0, i16::from(PLAYFIELD_BOTTOM_EDGE_Y)),
-            source: Some(ActorSourcePodMetadata {
+            source: Some(PodArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1320,7 +1320,7 @@
         );
         assert_eq!(
             snapshot_for(&report, top).pod_runtime,
-            Some(ActorSourcePodMetadata {
+            Some(PodArcadeState {
                 x_fraction: 0,
                 y_fraction: 0xFF,
                 x_velocity: 0,
@@ -1333,7 +1333,7 @@
         );
         assert_eq!(
             snapshot_for(&report, bottom).pod_runtime,
-            Some(ActorSourcePodMetadata {
+            Some(PodArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1353,7 +1353,7 @@
         );
         let lander = driver.spawn_lander_from_spawn(ActorLanderSpawn {
             position: Point::new(0x70, i16::from(PLAYFIELD_TOP_EDGE_Y)),
-            source: Some(ActorSourceLanderMetadata {
+            source: Some(LanderArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1366,7 +1366,7 @@
         });
         let swarmer = driver.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
             position: Point::new(0x80, i16::from(PLAYFIELD_BOTTOM_EDGE_Y)),
-            source: Some(ActorSourceSwarmerMetadata {
+            source: Some(SwarmerArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1379,7 +1379,7 @@
         });
         let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
             position: Point::new(0x90, i16::from(PLAYFIELD_TOP_EDGE_Y)),
-            source: Some(ActorSourceBaiterMetadata {
+            source: Some(BaiterArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1398,7 +1398,7 @@
         );
         assert_eq!(
             snapshot_for(&report, lander).lander_runtime,
-            Some(ActorSourceLanderMetadata {
+            Some(LanderArcadeState {
                 x_fraction: 0,
                 y_fraction: 0xFF,
                 x_velocity: 0,
@@ -1415,7 +1415,7 @@
         );
         assert_eq!(
             snapshot_for(&report, swarmer).swarmer_runtime,
-            Some(ActorSourceSwarmerMetadata {
+            Some(SwarmerArcadeState {
                 x_fraction: 0xE0,
                 y_fraction: 0,
                 x_velocity: 0xFFE0,
@@ -1432,7 +1432,7 @@
         );
         assert_eq!(
             snapshot_for(&report, baiter).baiter_runtime,
-            Some(ActorSourceBaiterMetadata {
+            Some(BaiterArcadeState {
                 x_fraction: 0,
                 y_fraction: 0xFF,
                 x_velocity: 0,
@@ -1467,7 +1467,7 @@
 
         assert_eq!(
             lander.lander_runtime,
-            Some(ActorSourceLanderMetadata {
+            Some(LanderArcadeState {
                 x_fraction: 0x33,
                 y_fraction: 0xE0,
                 x_velocity: 0xFFDE,
@@ -1635,7 +1635,7 @@
             .expect("source lander snapshot should own shot fractions");
         assert_eq!(
             shot_source,
-            Some(ActorSourceEnemyProjectileMetadata {
+            Some(EnemyProjectileArcadeState {
                 x_fraction: lander_source.x_fraction,
                 y_fraction: lander_source.y_fraction,
                 x_velocity: actor_source_projectile_velocity_component(shot_velocity.dx),
@@ -1687,7 +1687,7 @@
             phase: Phase::Playing,
             input: GameInput::NONE,
             wave: 1,
-            source_wave: ActorSourceWaveProfile::for_wave(1),
+            source_wave: ArcadeWaveProfile::for_wave(1),
             current_player: 1,
             player_count: 1,
             score: 0,
@@ -1726,7 +1726,7 @@
         assert_eq!(first.snapshot.velocity, Velocity::new(1, -1));
         assert_eq!(
             first.snapshot.enemy_projectile_runtime,
-            Some(ActorSourceEnemyProjectileMetadata {
+            Some(EnemyProjectileArcadeState {
                 x_fraction: 0x80,
                 y_fraction: 0x80,
                 x_velocity: 0x0180,
@@ -1743,7 +1743,7 @@
         assert_eq!(second.snapshot.velocity, Velocity::new(2, 0));
         assert_eq!(
             second.snapshot.enemy_projectile_runtime,
-            Some(ActorSourceEnemyProjectileMetadata {
+            Some(EnemyProjectileArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0x0180,

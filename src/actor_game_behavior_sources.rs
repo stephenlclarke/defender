@@ -236,7 +236,7 @@ impl Default for ActorBehaviorScript {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ActorSourceWaveProfile {
+pub struct ArcadeWaveProfile {
     pub landers: u8,
     pub bombers: u8,
     pub pods: u8,
@@ -262,7 +262,7 @@ pub struct ActorSourceWaveProfile {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ActorSourceLanderMetadata {
+pub struct LanderArcadeState {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -274,7 +274,7 @@ pub struct ActorSourceLanderMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ActorSourceBomberMetadata {
+pub struct BomberArcadeState {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -286,7 +286,7 @@ pub struct ActorSourceBomberMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ActorSourcePodMetadata {
+pub struct PodArcadeState {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -294,7 +294,7 @@ pub struct ActorSourcePodMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ActorSourceSwarmerMetadata {
+pub struct SwarmerArcadeState {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -306,7 +306,7 @@ pub struct ActorSourceSwarmerMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ActorSourceBaiterMetadata {
+pub struct BaiterArcadeState {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -317,23 +317,23 @@ pub struct ActorSourceBaiterMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ActorSourceMutantMetadata {
+pub struct MutantArcadeState {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
     pub y_velocity: u16,
     pub shot_timer: u8,
     pub sleep_ticks: u8,
-    pub hop_rng: ActorSourceRngSnapshot,
+    pub hop_rng: ActorArcadeRngSnapshot,
     pub render_x_correction: u16,
     pub target6_first_shot_deferred: bool,
 }
 
-impl ActorSourceMutantMetadata {
+impl MutantArcadeState {
     fn from_lander_conversion(
-        lander_runtime: ActorSourceLanderMetadata,
-        profile: ActorSourceWaveProfile,
-        hop_rng: ActorSourceRngSnapshot,
+        lander_runtime: LanderArcadeState,
+        profile: ArcadeWaveProfile,
+        hop_rng: ActorArcadeRngSnapshot,
     ) -> Self {
         Self {
             x_fraction: lander_runtime.x_fraction,
@@ -351,7 +351,7 @@ impl ActorSourceMutantMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ActorSourceEnemyProjectileMetadata {
+pub struct EnemyProjectileArcadeState {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -362,41 +362,41 @@ pub struct ActorSourceEnemyProjectileMetadata {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorLanderSpawn {
     pub position: Point,
-    pub source: Option<ActorSourceLanderMetadata>,
+    pub source: Option<LanderArcadeState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorBomberSpawn {
     pub position: Point,
-    pub source: Option<ActorSourceBomberMetadata>,
+    pub source: Option<BomberArcadeState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorPodSpawn {
     pub position: Point,
-    pub source: Option<ActorSourcePodMetadata>,
+    pub source: Option<PodArcadeState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorSwarmerSpawn {
     pub position: Point,
-    pub source: Option<ActorSourceSwarmerMetadata>,
+    pub source: Option<SwarmerArcadeState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorBaiterSpawn {
     pub position: Point,
-    pub source: Option<ActorSourceBaiterMetadata>,
+    pub source: Option<BaiterArcadeState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorMutantSpawn {
     pub position: Point,
-    pub source: Option<ActorSourceMutantMetadata>,
+    pub source: Option<MutantArcadeState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ActorSourceHumanMetadata {
+pub struct HumanArcadeState {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub picture_frame: u8,
@@ -407,7 +407,7 @@ pub struct ActorSourceHumanMetadata {
 pub struct ActorHumanSpawn {
     pub position: Point,
     pub mode: HumanMode,
-    pub source: Option<ActorSourceHumanMetadata>,
+    pub source: Option<HumanArcadeState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -440,7 +440,7 @@ impl ActorLanderSpawn {
     const fn from_first_wave_record(start: FirstWaveLanderSpawnRecord) -> Self {
         Self {
             position: Point::new((start.world_x >> 8) as i16, (start.world_y >> 8) as i16),
-            source: Some(ActorSourceLanderMetadata {
+            source: Some(LanderArcadeState {
                 x_fraction: (start.world_x & 0x00FF) as u8,
                 y_fraction: (start.world_y & 0x00FF) as u8,
                 x_velocity: start.x_velocity,
@@ -454,8 +454,8 @@ impl ActorLanderSpawn {
     }
 
     fn source_restore(
-        arcade_rng: &mut ActorSourceRng,
-        profile: ActorSourceWaveProfile,
+        arcade_rng: &mut ActorArcadeRng,
+        profile: ArcadeWaveProfile,
         target_human_index: Option<usize>,
     ) -> Self {
         let placement_state = arcade_rng.advance();
@@ -475,7 +475,7 @@ impl ActorLanderSpawn {
 
         Self {
             position: Point::new(i16::from(x), i16::from(y)),
-            source: Some(ActorSourceLanderMetadata {
+            source: Some(LanderArcadeState {
                 x_fraction,
                 y_fraction: 0,
                 x_velocity,
@@ -505,7 +505,7 @@ impl ActorBomberSpawn {
         };
         Self {
             position,
-            source: Some(ActorSourceBomberMetadata {
+            source: Some(BomberArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: actor_sign_extend_u8_to_u16(velocity_low),
@@ -519,7 +519,7 @@ impl ActorBomberSpawn {
     }
 
     fn source_restore_batch(
-        profile: ActorSourceWaveProfile,
+        profile: ArcadeWaveProfile,
         player_absolute_x: u16,
         count: usize,
     ) -> Vec<Self> {
@@ -544,7 +544,7 @@ impl ActorBomberSpawn {
                 let [x, x_fraction] = x16.to_be_bytes();
                 bombers.push(Self {
                     position: Point::new(i16::from(x), BOMBER_CRUISE_ALTITUDE),
-                    source: Some(ActorSourceBomberMetadata {
+                    source: Some(BomberArcadeState {
                         x_fraction,
                         y_fraction: 0,
                         x_velocity,
@@ -580,7 +580,7 @@ impl ActorPodSpawn {
         };
         Self {
             position,
-            source: Some(ActorSourcePodMetadata {
+            source: Some(PodArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: actor_sign_extend_u8_to_u16(velocity_low),
@@ -589,7 +589,7 @@ impl ActorPodSpawn {
         }
     }
 
-    fn source_restore(arcade_rng: &mut ActorSourceRng) -> Self {
+    fn source_restore(arcade_rng: &mut ActorArcadeRng) -> Self {
         let state = arcade_rng.advance();
         let [x, x_fraction] =
             u16::from_be_bytes([(state.hseed & 0x3F).wrapping_add(0x10), state.lseed])
@@ -608,7 +608,7 @@ impl ActorPodSpawn {
 
         Self {
             position: Point::new(i16::from(x), i16::from(y)),
-            source: Some(ActorSourcePodMetadata {
+            source: Some(PodArcadeState {
                 x_fraction,
                 y_fraction: 0,
                 x_velocity,
@@ -627,8 +627,8 @@ impl ActorSwarmerSpawn {
     }
 
     fn source_from_pod(
-        arcade_rng: &mut ActorSourceRng,
-        profile: ActorSourceWaveProfile,
+        arcade_rng: &mut ActorArcadeRng,
+        profile: ArcadeWaveProfile,
         position: Point,
     ) -> Self {
         let velocity_rand = arcade_rng.advance();
@@ -642,7 +642,7 @@ impl ActorSwarmerSpawn {
 
         Self {
             position,
-            source: Some(ActorSourceSwarmerMetadata {
+            source: Some(SwarmerArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity,
@@ -656,8 +656,8 @@ impl ActorSwarmerSpawn {
     }
 
     fn source_restore_batch(
-        arcade_rng: &mut ActorSourceRng,
-        profile: ActorSourceWaveProfile,
+        arcade_rng: &mut ActorArcadeRng,
+        profile: ArcadeWaveProfile,
         count: usize,
     ) -> Vec<Self> {
         if count == 0 {
@@ -702,7 +702,7 @@ impl ActorBaiterSpawn {
     }
 
     fn source_from_player(
-        profile: ActorSourceWaveProfile,
+        profile: ArcadeWaveProfile,
         player_position: Point,
         active_baiters: usize,
     ) -> Self {
@@ -716,7 +716,7 @@ impl ActorBaiterSpawn {
             - (i16::try_from(active_baiters % 3).unwrap_or(0) * 24))
             .clamp(PLAYER_BOUNDS.top + 8, HUMAN_GROUND_Y - 24);
         let position = Point::new(spawn_x, spawn_y);
-        let mut source = ActorSourceBaiterMetadata {
+        let mut source = BaiterArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -751,7 +751,7 @@ impl ActorMutantSpawn {
 
     fn source_initial(
         position: Point,
-        profile: ActorSourceWaveProfile,
+        profile: ArcadeWaveProfile,
         spawn_index: usize,
     ) -> Self {
         let mut arcade_rng = DEFAULT_RNG;
@@ -762,7 +762,7 @@ impl ActorMutantSpawn {
             arcade_rng.advance_rmax(profile.mutant_shot_time.min(u32::from(u8::MAX)) as u8);
         Self {
             position,
-            source: Some(ActorSourceMutantMetadata {
+            source: Some(MutantArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -777,8 +777,8 @@ impl ActorMutantSpawn {
     }
 
     fn source_restore(
-        arcade_rng: &mut ActorSourceRng,
-        profile: ActorSourceWaveProfile,
+        arcade_rng: &mut ActorArcadeRng,
+        profile: ArcadeWaveProfile,
         background_absolute_x: u16,
     ) -> Self {
         let placement_state = arcade_rng.advance();
@@ -799,7 +799,7 @@ impl ActorMutantSpawn {
 
         Self {
             position: Point::new(i16::from(x), i16::from(y)),
-            source: Some(ActorSourceMutantMetadata {
+            source: Some(MutantArcadeState {
                 x_fraction,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -820,7 +820,7 @@ fn actor_source_initial_target_list_humans() -> Vec<ActorHumanSpawn> {
 }
 
 fn actor_source_target_list_restore_humans(
-    arcade_rng: &mut ActorSourceRng,
+    arcade_rng: &mut ActorArcadeRng,
     target_count: u8,
 ) -> Vec<ActorHumanSpawn> {
     let mut humans = Vec::with_capacity(usize::from(target_count));
@@ -857,7 +857,7 @@ fn actor_source_target_list_restore_humans(
 
 fn actor_source_target_list_restore_human_group(
     humans: &mut Vec<ActorHumanSpawn>,
-    arcade_rng: &mut ActorSourceRng,
+    arcade_rng: &mut ActorArcadeRng,
     count: u8,
     x_bank: u8,
     mut slot_index: usize,
@@ -869,7 +869,7 @@ fn actor_source_target_list_restore_human_group(
         humans.push(ActorHumanSpawn {
             position: Point::new(i16::from(source_x), i16::from(ASTRONAUT_RESTORE_Y)),
             mode: HumanMode::Grounded,
-            source: Some(ActorSourceHumanMetadata {
+            source: Some(HumanArcadeState {
                 x_fraction: state.lseed,
                 y_fraction: 0,
                 picture_frame,
@@ -943,7 +943,7 @@ impl ActorHumanSpawn {
         Self {
             position: Point::new((start.world_x >> 8) as i16, (start.world_y >> 8) as i16),
             mode: HumanMode::Grounded,
-            source: Some(ActorSourceHumanMetadata {
+            source: Some(HumanArcadeState {
                 x_fraction: (start.world_x & 0x00FF) as u8,
                 y_fraction: (start.world_y & 0x00FF) as u8,
                 picture_frame: start.picture_frame,
@@ -953,7 +953,7 @@ impl ActorHumanSpawn {
     }
 }
 
-impl ActorSourceWaveProfile {
+impl ArcadeWaveProfile {
     pub fn for_wave(wave: u16) -> Self {
         let wave = u8::try_from(wave.min(u16::from(u8::MAX))).unwrap_or(u8::MAX);
         Self {
@@ -1264,7 +1264,7 @@ fn actor_enemy_reserve_take(
 
 fn actor_source_reserve_enemy_kinds(
     reserve: &mut EnemyReserveSnapshot,
-    profile: ActorSourceWaveProfile,
+    profile: ArcadeWaveProfile,
 ) -> Vec<ActorSourceEnemyKind> {
     if reserve.landers > 0 {
         let target = MAX_ACTIVE_WAVE_ENEMIES.min(usize::from(reserve.landers));

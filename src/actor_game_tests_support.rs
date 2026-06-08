@@ -210,7 +210,7 @@
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 1;
-        let lander_runtime = ActorSourceLanderMetadata {
+        let lander_runtime = LanderArcadeState {
             x_fraction: 0x12,
             y_fraction: 0x34,
             x_velocity: 0,
@@ -245,12 +245,12 @@
             })
             .next()
             .expect("source lander should spawn a source mutant");
-        let expected_source = ActorSourceMutantMetadata {
+        let expected_source = MutantArcadeState {
             x_fraction: lander_runtime.x_fraction,
             y_fraction: lander_runtime.y_fraction,
             x_velocity: 0,
             y_velocity: 0,
-            shot_timer: ActorSourceWaveProfile::for_wave(converted.wave)
+            shot_timer: ArcadeWaveProfile::for_wave(converted.wave)
                 .mutant_shot_time
                 .min(u32::from(u8::MAX)) as u8,
             sleep_ticks: 0,
@@ -300,14 +300,14 @@
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let source = ActorSourceMutantMetadata {
+        let source = MutantArcadeState {
             x_fraction: 0x20,
             y_fraction: 0x40,
             x_velocity: 0,
             y_velocity: 0,
             shot_timer: 9,
             sleep_ticks: 0,
-            hop_rng: ActorSourceRngSnapshot {
+            hop_rng: ActorArcadeRngSnapshot {
                 seed: 0x81,
                 hseed: 0x22,
                 lseed: 0x44,
@@ -342,7 +342,7 @@
         assert_eq!(
             expected_source.x_velocity,
             actor_source_mutant_x_velocity(
-                ActorSourceWaveProfile::for_wave(1).mutant_x_velocity,
+                ArcadeWaveProfile::for_wave(1).mutant_x_velocity,
                 actor_source_absolute_x(Point::new(42, 120), 0),
                 actor_source_absolute_x(start, source.x_fraction),
             )
@@ -353,7 +353,7 @@
     #[test]
     fn source_mutant_actor_uses_prompt_source_wave_profile() {
         let actor = ActorId::new(1001);
-        let default_profile = ActorSourceWaveProfile::for_wave(1);
+        let default_profile = ArcadeWaveProfile::for_wave(1);
         let mut source_profile = default_profile;
         source_profile.mutant_x_velocity = 0x48;
         source_profile.mutant_y_velocity_msb = 0x00;
@@ -365,14 +365,14 @@
             default_profile.mutant_x_velocity
         );
 
-        let source = ActorSourceMutantMetadata {
+        let source = MutantArcadeState {
             x_fraction: 0x20,
             y_fraction: 0x40,
             x_velocity: 0,
             y_velocity: 0,
             shot_timer: 9,
             sleep_ticks: 0,
-            hop_rng: ActorSourceRngSnapshot {
+            hop_rng: ActorArcadeRngSnapshot {
                 seed: 0x81,
                 hseed: 0x22,
                 lseed: 0x44,
@@ -385,7 +385,7 @@
             12,
             1,
             source_profile,
-            ActorSourceRngSnapshot {
+            ActorArcadeRngSnapshot {
                 seed: 0x52,
                 hseed: 0x34,
                 lseed: 0x12,
@@ -422,13 +422,13 @@
 
     #[test]
     fn target6_source_lander_conversion_sets_mutant_render_correction() {
-        let profile = ActorSourceWaveProfile::for_wave(1);
-        let hop_rng = ActorSourceRngSnapshot {
+        let profile = ArcadeWaveProfile::for_wave(1);
+        let hop_rng = ActorArcadeRngSnapshot {
             seed: 0x33,
             hseed: 0x44,
             lseed: 0x55,
         };
-        let lander_runtime = ActorSourceLanderMetadata {
+        let lander_runtime = LanderArcadeState {
             x_fraction: 0x12,
             y_fraction: 0x34,
             x_velocity: 0,
@@ -440,7 +440,7 @@
         };
 
         let mutant_runtime =
-            ActorSourceMutantMetadata::from_lander_conversion(lander_runtime, profile, hop_rng);
+            MutantArcadeState::from_lander_conversion(lander_runtime, profile, hop_rng);
 
         assert_eq!(
             mutant_runtime.render_x_correction,
@@ -449,12 +449,12 @@
         assert_eq!(mutant_runtime.x_fraction, lander_runtime.x_fraction);
         assert_eq!(mutant_runtime.y_fraction, lander_runtime.y_fraction);
 
-        let moving_lander = ActorSourceLanderMetadata {
+        let moving_lander = LanderArcadeState {
             x_velocity: 0x0030,
             ..lander_runtime
         };
         assert_eq!(
-            ActorSourceMutantMetadata::from_lander_conversion(moving_lander, profile, hop_rng)
+            MutantArcadeState::from_lander_conversion(moving_lander, profile, hop_rng)
                 .render_x_correction,
             0
         );
@@ -467,14 +467,14 @@
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let source = ActorSourceMutantMetadata {
+        let source = MutantArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
             y_velocity: 0,
             shot_timer: 1,
             sleep_ticks: 0,
-            hop_rng: ActorSourceRngSnapshot {
+            hop_rng: ActorArcadeRngSnapshot {
                 seed: 0x81,
                 hseed: 0x22,
                 lseed: 0x44,
@@ -507,14 +507,14 @@
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let source = ActorSourceMutantMetadata {
+        let source = MutantArcadeState {
             x_fraction: 0x7C,
             y_fraction: 0x80,
             x_velocity: 0x0030,
             y_velocity: 0x0090,
             shot_timer: TARGET6_MUTANT_DEFERRED_SHOT_TIMER,
             sleep_ticks: MUTANT_LOOP_SLEEP_TICKS,
-            hop_rng: ActorSourceRngSnapshot {
+            hop_rng: ActorArcadeRngSnapshot {
                 seed: 0x44,
                 hseed: 0x55,
                 lseed: 0x66,
@@ -551,14 +551,14 @@
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let source = ActorSourceMutantMetadata {
+        let source = MutantArcadeState {
             x_fraction: 0x2C,
             y_fraction: 0x60,
             x_velocity: 0x0030,
             y_velocity: 0x0090,
             shot_timer: 0x80,
             sleep_ticks: MUTANT_LOOP_SLEEP_TICKS,
-            hop_rng: ActorSourceRngSnapshot {
+            hop_rng: ActorArcadeRngSnapshot {
                 seed: 0x11,
                 hseed: 0x22,
                 lseed: 0x33,
@@ -580,7 +580,7 @@
         assert_eq!(shot.1, actor_source_screen_velocity(0xFFE0, 0x0138));
         assert_eq!(
             shot.2,
-            ActorSourceEnemyProjectileMetadata {
+            EnemyProjectileArcadeState {
                 x_fraction: 0x33,
                 y_fraction: 0x56,
                 x_velocity: 0xFFE0,
@@ -602,14 +602,14 @@
 
     #[test]
     fn target6_source_mutant_shot_position_uses_dive_anchor_overrides() {
-        let source = ActorSourceMutantMetadata {
+        let source = MutantArcadeState {
             x_fraction: 0x8C,
             y_fraction: 0xB0,
             x_velocity: 0,
             y_velocity: 0x0090,
             shot_timer: 0,
             sleep_ticks: 0,
-            hop_rng: ActorSourceRngSnapshot {
+            hop_rng: ActorArcadeRngSnapshot {
                 seed: 0,
                 hseed: 0,
                 lseed: 0,
@@ -625,7 +625,7 @@
         assert_eq!(
             actor_source_target6_mutant_shot_position(
                 Point::new(0x07, 0x78),
-                ActorSourceMutantMetadata {
+                MutantArcadeState {
                     x_fraction: 0xFC,
                     y_fraction: 0x00,
                     ..source
@@ -636,7 +636,7 @@
         assert_eq!(
             actor_source_target6_mutant_shot_position(
                 Point::new(0x03, 0x33),
-                ActorSourceMutantMetadata {
+                MutantArcadeState {
                     x_fraction: 0x7C,
                     y_fraction: 0x80,
                     ..source
@@ -648,14 +648,14 @@
 
     #[test]
     fn target6_source_mutant_collision_position_offsets_dive_projection() {
-        let source = ActorSourceMutantMetadata {
+        let source = MutantArcadeState {
             x_fraction: 0x8C,
             y_fraction: 0xB0,
             x_velocity: 0,
             y_velocity: 0x0090,
             shot_timer: 0,
             sleep_ticks: 0,
-            hop_rng: ActorSourceRngSnapshot {
+            hop_rng: ActorArcadeRngSnapshot {
                 seed: 0,
                 hseed: 0,
                 lseed: 0,
@@ -681,14 +681,14 @@
         let player_id = ActorId::new(100);
         let mutant_id = ActorId::new(101);
         let raw_position = Point::new(0x08, 0x99);
-        let source = ActorSourceMutantMetadata {
+        let source = MutantArcadeState {
             x_fraction: 0x5C,
             y_fraction: 0xE0,
             x_velocity: 0x0030,
             y_velocity: 0x0090,
             shot_timer: 0x80,
             sleep_ticks: 0,
-            hop_rng: ActorSourceRngSnapshot {
+            hop_rng: ActorArcadeRngSnapshot {
                 seed: 0,
                 hseed: 0,
                 lseed: 0,
@@ -734,14 +734,14 @@
         let mutant_id = ActorId::new(101);
         let raw_position = Point::new(0x08, 0xA5);
         let player_position = TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER;
-        let source = ActorSourceMutantMetadata {
+        let source = MutantArcadeState {
             x_fraction: 0x00,
             y_fraction: 0x00,
             x_velocity: 0x0030,
             y_velocity: 0x0090,
             shot_timer: 0x80,
             sleep_ticks: 0,
-            hop_rng: ActorSourceRngSnapshot {
+            hop_rng: ActorArcadeRngSnapshot {
                 seed: 0,
                 hseed: 0,
                 lseed: 0,
@@ -802,14 +802,14 @@
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let source = ActorSourceMutantMetadata {
+        let source = MutantArcadeState {
             x_fraction: 0x12,
             y_fraction: 0x34,
             x_velocity: 0,
             y_velocity: 0,
             shot_timer: 1,
             sleep_ticks: 0,
-            hop_rng: ActorSourceRngSnapshot {
+            hop_rng: ActorArcadeRngSnapshot {
                 seed: 0x71,
                 hseed: 0x44,
                 lseed: 0x88,
@@ -953,13 +953,13 @@
         expected_rng.advance();
         let expected_first_swarmer = ActorSwarmerSpawn::source_from_pod(
             &mut expected_rng,
-            ActorSourceWaveProfile::for_wave(2),
+            ArcadeWaveProfile::for_wave(2),
             Point::new(64, 120),
         );
         for _ in 1..POD_SWARMER_REQUEST_LIMIT {
             ActorSwarmerSpawn::source_from_pod(
                 &mut expected_rng,
-                ActorSourceWaveProfile::for_wave(2),
+                ArcadeWaveProfile::for_wave(2),
                 Point::new(64, 120),
             );
         }
@@ -1541,7 +1541,7 @@
         ActorHumanSpawn {
             position,
             mode: HumanMode::Grounded,
-            source: Some(ActorSourceHumanMetadata {
+            source: Some(HumanArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 picture_frame,
@@ -1552,12 +1552,12 @@
 
     fn expected_source_bomber_after_motion(
         position: Point,
-        mut source: ActorSourceBomberMetadata,
+        mut source: BomberArcadeState,
         _step: u64,
         _id: ActorId,
-        arcade_rng: Option<ActorSourceRngSnapshot>,
+        arcade_rng: Option<ActorArcadeRngSnapshot>,
         player_position: Option<Point>,
-    ) -> (Point, ActorSourceBomberMetadata) {
+    ) -> (Point, BomberArcadeState) {
         if let Some(arcade_rng) = arcade_rng
             && source.slot == actor_source_tie_selected_slot(arcade_rng.seed)
         {
@@ -1631,7 +1631,7 @@
     fn source_mutant_snapshot_with_bounds(
         id: ActorId,
         position: Point,
-        source: ActorSourceMutantMetadata,
+        source: MutantArcadeState,
         bounds: Rect,
     ) -> ActorSnapshot {
         let mut snapshot = actor_snapshot_with_bounds(id, ActorKind::Mutant, position, bounds);
@@ -1655,7 +1655,7 @@
         player.direction = Some(Direction::Right);
 
         let mut lander = actor_snapshot(2, ActorKind::Lander, Point::new(0x30, 80));
-        lander.lander_runtime = Some(ActorSourceLanderMetadata {
+        lander.lander_runtime = Some(LanderArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -1667,7 +1667,7 @@
         });
 
         let mut enemy_laser = actor_snapshot(3, ActorKind::EnemyLaser, Point::new(0x31, 96));
-        enemy_laser.enemy_projectile_runtime = Some(ActorSourceEnemyProjectileMetadata {
+        enemy_laser.enemy_projectile_runtime = Some(EnemyProjectileArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -1676,7 +1676,7 @@
         });
 
         let mut bomb = actor_snapshot(4, ActorKind::Bomb, Point::new(0x31, 104));
-        bomb.enemy_projectile_runtime = Some(ActorSourceEnemyProjectileMetadata {
+        bomb.enemy_projectile_runtime = Some(EnemyProjectileArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -1685,7 +1685,7 @@
         });
 
         let mut human = actor_snapshot(5, ActorKind::Human, Point::new(0x2E, 220));
-        human.human_runtime = Some(ActorSourceHumanMetadata {
+        human.human_runtime = Some(HumanArcadeState {
             x_fraction: 0x80,
             y_fraction: 0,
             picture_frame: 2,
@@ -1711,7 +1711,7 @@
             player_switch: None,
             player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
-            source_wave: ActorSourceWaveProfile::for_wave(1),
+            source_wave: ArcadeWaveProfile::for_wave(1),
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,
@@ -1772,14 +1772,14 @@
     fn source_mutant_prompt_for_test(
         step: u64,
         wave: u16,
-        arcade_rng: ActorSourceRngSnapshot,
+        arcade_rng: ActorArcadeRngSnapshot,
         player_position: Point,
         player_velocity: Velocity,
     ) -> StepPrompt {
         source_mutant_prompt_with_source_wave_for_test(
             step,
             wave,
-            ActorSourceWaveProfile::for_wave(wave),
+            ArcadeWaveProfile::for_wave(wave),
             arcade_rng,
             player_position,
             player_velocity,
@@ -1792,7 +1792,7 @@
             phase: Phase::Playing,
             input,
             wave: 1,
-            source_wave: ActorSourceWaveProfile::for_wave(1),
+            source_wave: ArcadeWaveProfile::for_wave(1),
             current_player: 1,
             player_count: 1,
             score: 0,
@@ -1820,8 +1820,8 @@
     fn source_mutant_prompt_with_source_wave_for_test(
         step: u64,
         wave: u16,
-        source_wave: ActorSourceWaveProfile,
-        arcade_rng: ActorSourceRngSnapshot,
+        source_wave: ArcadeWaveProfile,
+        arcade_rng: ActorArcadeRngSnapshot,
         player_position: Point,
         player_velocity: Velocity,
     ) -> StepPrompt {
@@ -1862,14 +1862,14 @@
 
     fn expected_source_mutant_after_motion(
         mut position: Point,
-        mut source: ActorSourceMutantMetadata,
+        mut source: MutantArcadeState,
         actor: ActorId,
         prompt: &StepPrompt,
         behavior: ActorBehaviorProfile,
     ) -> (
         Point,
-        ActorSourceMutantMetadata,
-        Option<(Point, Velocity, ActorSourceEnemyProjectileMetadata)>,
+        MutantArcadeState,
+        Option<(Point, Velocity, EnemyProjectileArcadeState)>,
     ) {
         if source.sleep_ticks > 0 {
             source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
@@ -1940,7 +1940,7 @@
 
     fn first_enemy_laser_command(
         report: &StepReport,
-    ) -> Option<(Point, Velocity, ActorSourceEnemyProjectileMetadata)> {
+    ) -> Option<(Point, Velocity, EnemyProjectileArcadeState)> {
         report.commands.iter().find_map(|command| match command {
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position,

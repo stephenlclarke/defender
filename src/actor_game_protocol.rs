@@ -4,7 +4,7 @@ pub struct CollisionBody {
     pub kind: ActorKind,
     pub position: Point,
     pub bounds: Rect,
-    pub mutant_runtime: Option<ActorSourceMutantMetadata>,
+    pub mutant_runtime: Option<MutantArcadeState>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,14 +16,14 @@ pub struct ActorSnapshot {
     pub direction: Option<Direction>,
     pub bounds: Option<Rect>,
     pub alive: bool,
-    pub lander_runtime: Option<ActorSourceLanderMetadata>,
-    pub bomber_runtime: Option<ActorSourceBomberMetadata>,
-    pub pod_runtime: Option<ActorSourcePodMetadata>,
-    pub swarmer_runtime: Option<ActorSourceSwarmerMetadata>,
-    pub baiter_runtime: Option<ActorSourceBaiterMetadata>,
-    pub mutant_runtime: Option<ActorSourceMutantMetadata>,
-    pub human_runtime: Option<ActorSourceHumanMetadata>,
-    pub enemy_projectile_runtime: Option<ActorSourceEnemyProjectileMetadata>,
+    pub lander_runtime: Option<LanderArcadeState>,
+    pub bomber_runtime: Option<BomberArcadeState>,
+    pub pod_runtime: Option<PodArcadeState>,
+    pub swarmer_runtime: Option<SwarmerArcadeState>,
+    pub baiter_runtime: Option<BaiterArcadeState>,
+    pub mutant_runtime: Option<MutantArcadeState>,
+    pub human_runtime: Option<HumanArcadeState>,
+    pub enemy_projectile_runtime: Option<EnemyProjectileArcadeState>,
 }
 
 impl ActorSnapshot {
@@ -131,32 +131,32 @@ pub enum SpawnRequest {
     EnemyLaser {
         position: Point,
         velocity: Velocity,
-        source: Option<ActorSourceEnemyProjectileMetadata>,
+        source: Option<EnemyProjectileArcadeState>,
     },
     Lander {
         position: Point,
     },
     Mutant {
         position: Point,
-        source: Option<ActorSourceMutantMetadata>,
+        source: Option<MutantArcadeState>,
     },
     Bomber {
         position: Point,
     },
     Bomb {
         position: Point,
-        source: Option<ActorSourceEnemyProjectileMetadata>,
+        source: Option<EnemyProjectileArcadeState>,
     },
     Pod {
         position: Point,
     },
     Swarmer {
         position: Point,
-        source: Option<ActorSourceSwarmerMetadata>,
+        source: Option<SwarmerArcadeState>,
     },
     Baiter {
         position: Point,
-        source: Option<ActorSourceBaiterMetadata>,
+        source: Option<BaiterArcadeState>,
     },
     Human {
         position: Point,
@@ -209,7 +209,7 @@ pub struct StepPrompt {
     pub phase: Phase,
     pub input: GameInput,
     pub wave: u16,
-    pub source_wave: ActorSourceWaveProfile,
+    pub source_wave: ArcadeWaveProfile,
     pub current_player: u8,
     pub player_count: u8,
     pub score: u32,
@@ -228,7 +228,7 @@ pub struct StepPrompt {
     pub snapshots: Vec<ActorSnapshot>,
     pub behavior_script: ActorBehaviorScript,
     pub background_left: u16,
-    pub arcade_rng: Option<ActorSourceRngSnapshot>,
+    pub arcade_rng: Option<ActorArcadeRngSnapshot>,
     pub human_walk_target_slot: Option<usize>,
     pub projectile_scan_tick: bool,
 }
@@ -387,7 +387,7 @@ pub struct StepReport {
     pub player_switch: Option<PlayerSwitchReport>,
     pub player_start: Option<PlayerStartReport>,
     pub high_scores: [u32; 5],
-    pub source_wave: ActorSourceWaveProfile,
+    pub source_wave: ArcadeWaveProfile,
     pub high_score_initials: HighScoreInitialsState,
     pub high_score_initial_accepted: bool,
     pub high_score_submitted: bool,
@@ -396,7 +396,7 @@ pub struct StepReport {
     pub behavior_script: ActorBehaviorScriptManifest,
     pub enemy_reserve: EnemyReserveSnapshot,
     pub background_left: u16,
-    pub arcade_rng: Option<ActorSourceRngSnapshot>,
+    pub arcade_rng: Option<ActorArcadeRngSnapshot>,
     pub terrain_blow: Option<TerrainBlowSnapshot>,
     pub snapshots: Vec<ActorSnapshot>,
     pub draws: Vec<DrawCommand>,
@@ -754,7 +754,7 @@ fn clean_enemy_snapshot(snapshot: &ActorSnapshot) -> Option<CleanEnemySnapshot> 
     Some(enemy)
 }
 
-fn clean_lander_runtime(source: ActorSourceLanderMetadata) -> LanderRuntimeSnapshot {
+fn clean_lander_runtime(source: LanderArcadeState) -> LanderRuntimeSnapshot {
     LanderRuntimeSnapshot {
         x_fraction: source.x_fraction,
         y_fraction: source.y_fraction,
@@ -767,7 +767,7 @@ fn clean_lander_runtime(source: ActorSourceLanderMetadata) -> LanderRuntimeSnaps
     }
 }
 
-fn clean_bomber_runtime(source: ActorSourceBomberMetadata) -> BomberRuntimeSnapshot {
+fn clean_bomber_runtime(source: BomberArcadeState) -> BomberRuntimeSnapshot {
     BomberRuntimeSnapshot {
         x_fraction: source.x_fraction,
         y_fraction: source.y_fraction,
@@ -780,7 +780,7 @@ fn clean_bomber_runtime(source: ActorSourceBomberMetadata) -> BomberRuntimeSnaps
     }
 }
 
-fn clean_pod_runtime(source: ActorSourcePodMetadata) -> PodRuntimeSnapshot {
+fn clean_pod_runtime(source: PodArcadeState) -> PodRuntimeSnapshot {
     PodRuntimeSnapshot {
         x_fraction: source.x_fraction,
         y_fraction: source.y_fraction,
@@ -789,7 +789,7 @@ fn clean_pod_runtime(source: ActorSourcePodMetadata) -> PodRuntimeSnapshot {
     }
 }
 
-fn clean_swarmer_runtime(source: ActorSourceSwarmerMetadata) -> SwarmerRuntimeSnapshot {
+fn clean_swarmer_runtime(source: SwarmerArcadeState) -> SwarmerRuntimeSnapshot {
     SwarmerRuntimeSnapshot {
         x_fraction: source.x_fraction,
         y_fraction: source.y_fraction,
@@ -802,7 +802,7 @@ fn clean_swarmer_runtime(source: ActorSourceSwarmerMetadata) -> SwarmerRuntimeSn
     }
 }
 
-fn clean_baiter_runtime(source: ActorSourceBaiterMetadata) -> BaiterRuntimeSnapshot {
+fn clean_baiter_runtime(source: BaiterArcadeState) -> BaiterRuntimeSnapshot {
     BaiterRuntimeSnapshot {
         x_fraction: source.x_fraction,
         y_fraction: source.y_fraction,
@@ -814,7 +814,7 @@ fn clean_baiter_runtime(source: ActorSourceBaiterMetadata) -> BaiterRuntimeSnaps
     }
 }
 
-fn clean_mutant_runtime(source: ActorSourceMutantMetadata) -> MutantRuntimeSnapshot {
+fn clean_mutant_runtime(source: MutantArcadeState) -> MutantRuntimeSnapshot {
     MutantRuntimeSnapshot {
         x_fraction: source.x_fraction,
         y_fraction: source.y_fraction,
@@ -828,7 +828,7 @@ fn clean_mutant_runtime(source: ActorSourceMutantMetadata) -> MutantRuntimeSnaps
     }
 }
 
-const fn clean_arcade_rng(source: ActorSourceRngSnapshot) -> ArcadeRngSnapshot {
+const fn clean_arcade_rng(source: ActorArcadeRngSnapshot) -> ArcadeRngSnapshot {
     ArcadeRngSnapshot {
         seed: source.seed,
         hseed: source.hseed,
@@ -1024,8 +1024,8 @@ fn actor_source_enemy_shot_metadata(
     y_fraction: u8,
     velocity: Velocity,
     lifetime_steps: u16,
-) -> ActorSourceEnemyProjectileMetadata {
-    ActorSourceEnemyProjectileMetadata {
+) -> EnemyProjectileArcadeState {
+    EnemyProjectileArcadeState {
         x_fraction,
         y_fraction,
         x_velocity: actor_source_projectile_velocity_component(velocity.dx),

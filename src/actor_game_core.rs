@@ -106,13 +106,13 @@ const FINAL_GAME_OVER_DELAY_STEPS: u8 = 40; // original: SOURCE_FINAL_GAME_OVER_
 const PLAYER_START_SOUND_DELAY_STEPS: u8 = 1; // original: SOURCE_START_SOUND_DELAY_STEPS
 const PLAYER_START_PLAYFIELD_DELAY_STEPS: u8 = 138; // original: SOURCE_START_PLAYFIELD_DELAY_STEPS
 const ENEMY_PROJECTILE_MAX_SCREEN_X: i16 = 0x98; // original: SOURCE_SHELL_X_MAX
-const PLAYFIELD_START_RNG: ActorSourceRng = ActorSourceRng {
+const PLAYFIELD_START_RNG: ActorArcadeRng = ActorArcadeRng {
     // original: SOURCE_PLAYFIELD_START_RNG
     seed: 0x52,
     hseed: 0x62,
     lseed: 0x0C,
 };
-const DEFAULT_RNG: ActorSourceRng = ActorSourceRng {
+const DEFAULT_RNG: ActorArcadeRng = ActorArcadeRng {
     // original: SOURCE_DEFAULT_RNG
     seed: 0,
     hseed: 0xA5,
@@ -122,7 +122,7 @@ const FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS: u16 = 449; // original: SOURCE_FIRST
 const FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT: usize = 10; // original: SOURCE_FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT
 const FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT: usize = 6; // original: SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT
 const FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY: u8 = 2; // original: SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY
-const FIRST_WAVE_EARLY_RESERVE_RNG: ActorSourceRng = ActorSourceRng {
+const FIRST_WAVE_EARLY_RESERVE_RNG: ActorArcadeRng = ActorArcadeRng {
     // original: SOURCE_FIRST_WAVE_EARLY_RESERVE_RNG
     seed: 0x3A,
     hseed: 0xDA,
@@ -1283,13 +1283,13 @@ pub struct ActorHyperspaceSourceSeed {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ActorSourceRngSnapshot {
+pub struct ActorArcadeRngSnapshot {
     pub seed: u8,
     pub hseed: u8,
     pub lseed: u8,
 }
 
-impl ActorSourceRngSnapshot {
+impl ActorArcadeRngSnapshot {
     const fn hyperspace_seed(self) -> ActorHyperspaceSourceSeed {
         ActorHyperspaceSourceSeed {
             seed: self.seed,
@@ -1300,13 +1300,13 @@ impl ActorSourceRngSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ActorSourceRng {
+struct ActorArcadeRng {
     seed: u8,
     hseed: u8,
     lseed: u8,
 }
 
-impl ActorSourceRng {
+impl ActorArcadeRng {
     fn advance(&mut self) -> Self {
         let product_low = self.seed.wrapping_mul(3).wrapping_add(17);
         let mut a = self.lseed >> 3;
@@ -1327,8 +1327,8 @@ impl ActorSourceRng {
         source_rmax(max, state.seed)
     }
 
-    const fn snapshot(self) -> ActorSourceRngSnapshot {
-        ActorSourceRngSnapshot {
+    const fn snapshot(self) -> ActorArcadeRngSnapshot {
+        ActorArcadeRngSnapshot {
             seed: self.seed,
             hseed: self.hseed,
             lseed: self.lseed,

@@ -4,7 +4,7 @@ struct Human {
     position: Point,
     mode: HumanMode,
     safe_landing_awarded: bool,
-    source: Option<ActorSourceHumanMetadata>,
+    source: Option<HumanArcadeState>,
 }
 
 impl Human {
@@ -20,7 +20,7 @@ impl Human {
         id: ActorId,
         position: Point,
         mode: HumanMode,
-        source: Option<ActorSourceHumanMetadata>,
+        source: Option<HumanArcadeState>,
     ) -> Self {
         Self {
             id,
@@ -51,7 +51,7 @@ impl Human {
 
     fn update_grounded(
         &mut self,
-        arcade_rng: Option<ActorSourceRngSnapshot>,
+        arcade_rng: Option<ActorArcadeRngSnapshot>,
         source_walk_target_slot: Option<usize>,
     ) {
         let Some(source) = self.source else {
@@ -406,7 +406,7 @@ impl AssetActor for LaserShot {
 struct EnemyLaserShot {
     id: ActorId,
     position: Point,
-    source: ActorSourceEnemyProjectileMetadata,
+    source: EnemyProjectileArcadeState,
     lifetime_steps: Option<u16>,
 }
 
@@ -415,9 +415,9 @@ impl EnemyLaserShot {
         id: ActorId,
         position: Point,
         velocity: Velocity,
-        source: Option<ActorSourceEnemyProjectileMetadata>,
+        source: Option<EnemyProjectileArcadeState>,
     ) -> Self {
-        let source = source.unwrap_or(ActorSourceEnemyProjectileMetadata {
+        let source = source.unwrap_or(EnemyProjectileArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: actor_source_projectile_velocity_component(velocity.dx),

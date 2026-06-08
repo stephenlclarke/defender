@@ -32,7 +32,7 @@ pub struct ActorGameDriver {
     background_left: u16,
     baiter_timer_steps: Option<u32>,
     baiter_pacing_steps_remaining: u8,
-    arcade_rng: ActorSourceRng,
+    arcade_rng: ActorArcadeRng,
     projectile_scan_steps_remaining: u8,
     pending_smart_bomb_detonation_steps: Option<u8>,
     smart_bomb_flash_steps_remaining: u8,
@@ -508,7 +508,7 @@ impl ActorGameDriver {
     fn spawn_bomb(
         &mut self,
         position: Point,
-        source: Option<ActorSourceEnemyProjectileMetadata>,
+        source: Option<EnemyProjectileArcadeState>,
     ) -> ActorId {
         let id = self.allocate_actor_id();
         let lifetime = self
@@ -577,7 +577,7 @@ impl ActorGameDriver {
         &mut self,
         position: Point,
         velocity: Velocity,
-        source: Option<ActorSourceEnemyProjectileMetadata>,
+        source: Option<EnemyProjectileArcadeState>,
     ) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(EnemyLaserShot::new(id, position, velocity, source));
@@ -1498,7 +1498,7 @@ impl ActorGameDriver {
 
     fn advance_human_walk_process(
         &mut self,
-        arcade_rng: Option<ActorSourceRngSnapshot>,
+        arcade_rng: Option<ActorArcadeRngSnapshot>,
     ) -> Option<usize> {
         if arcade_rng.is_none() || !self.has_source_human_snapshots() {
             return None;
@@ -1588,11 +1588,11 @@ impl ActorGameDriver {
         }
     }
 
-    fn current_source_wave_profile(&self) -> ActorSourceWaveProfile {
+    fn current_source_wave_profile(&self) -> ArcadeWaveProfile {
         self.wave_script
             .profile_for_wave(self.wave)
             .source_wave
-            .unwrap_or_else(|| ActorSourceWaveProfile::for_wave(self.wave.max(1)))
+            .unwrap_or_else(|| ArcadeWaveProfile::for_wave(self.wave.max(1)))
     }
 
     fn reset_baiter_timer(&mut self) {

@@ -305,7 +305,7 @@
             .expect("source wave should keep source lander behavior");
         assert_eq!(
             lander_runtime.lander_fire_period_steps,
-            ActorSourceWaveProfile::for_wave(1)
+            ArcadeWaveProfile::for_wave(1)
                 .lander_behavior()
                 .lander_fire_period_steps
         );
@@ -945,7 +945,7 @@
             vec![1, 2, 3]
         );
         for profile in manifest.waves.iter().take(2) {
-            let lander_runtime = ActorSourceWaveProfile::for_wave(profile.wave).lander_behavior();
+            let lander_runtime = ArcadeWaveProfile::for_wave(profile.wave).lander_behavior();
             let lander_behavior = profile
                 .behavior_script
                 .kind_profile(ActorKind::Lander)
@@ -1079,7 +1079,7 @@
             vec![1, 2, 3]
         );
         for profile in manifest.waves.iter().take(2) {
-            let lander_runtime = ActorSourceWaveProfile::for_wave(profile.wave).lander_behavior();
+            let lander_runtime = ArcadeWaveProfile::for_wave(profile.wave).lander_behavior();
             assert_eq!(profile.spawn_behavior_profiles.len(), 1);
             assert_eq!(profile.spawn_behavior_profiles[0].kind, ActorKind::Lander);
             assert_eq!(profile.spawn_behavior_profiles[0].spawn_index, 0);

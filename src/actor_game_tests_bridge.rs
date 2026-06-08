@@ -1,13 +1,13 @@
     fn source_projectile_at_screen(
         position: Point,
         background_left: u16,
-    ) -> (Point, ActorSourceEnemyProjectileMetadata) {
+    ) -> (Point, EnemyProjectileArcadeState) {
         let screen_x = u16::try_from(position.x).expect("test screen x should be non-negative");
         let absolute_x = background_left.wrapping_add(screen_x << OBJECT_WORLD_TO_SCREEN_SHIFT);
         let [x, x_fraction] = absolute_x.to_be_bytes();
         (
             Point::new(i16::from(x), position.y),
-            ActorSourceEnemyProjectileMetadata {
+            EnemyProjectileArcadeState {
                 x_fraction,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -648,7 +648,7 @@
             player_switch: None,
             player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
-            source_wave: ActorSourceWaveProfile::for_wave(1),
+            source_wave: ArcadeWaveProfile::for_wave(1),
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,
@@ -892,7 +892,7 @@
     fn actor_collisions_project_source_world_hostiles_against_background() {
         let mut lander = actor_snapshot(2, ActorKind::Lander, Point::new(0x30, 80));
         lander.bounds = Some(Rect::from_center(lander.position, 8, 8));
-        lander.lander_runtime = Some(ActorSourceLanderMetadata {
+        lander.lander_runtime = Some(LanderArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -923,7 +923,7 @@
             ActorId::new(7),
             Point::new(0x40, 100),
             HumanMode::Falling { velocity: 0 },
-            Some(ActorSourceHumanMetadata {
+            Some(HumanArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 picture_frame: 0,
@@ -1002,7 +1002,7 @@
             player_switch: None,
             player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
-            source_wave: ActorSourceWaveProfile::for_wave(1),
+            source_wave: ArcadeWaveProfile::for_wave(1),
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,
@@ -1070,7 +1070,7 @@
         player.direction = Some(Direction::Right);
         let mut lander = actor_snapshot(12, ActorKind::Lander, Point::new(0x3F, 0x2C));
         lander.velocity = Velocity::new(-2, 1);
-        lander.lander_runtime = Some(ActorSourceLanderMetadata {
+        lander.lander_runtime = Some(LanderArcadeState {
             x_fraction: 0x4A,
             y_fraction: 0xE0,
             x_velocity: 0xFFEE,
@@ -1081,7 +1081,7 @@
             target_human_index: Some(2),
         });
         let mut human = actor_snapshot(13, ActorKind::Human, Point::new(0x1C, 0xE1));
-        human.human_runtime = Some(ActorSourceHumanMetadata {
+        human.human_runtime = Some(HumanArcadeState {
             x_fraction: 0x81,
             y_fraction: 0,
             picture_frame: 3,
@@ -1092,7 +1092,7 @@
         laser.direction = Some(Direction::Right);
         let mut enemy_laser = actor_snapshot(15, ActorKind::EnemyLaser, Point::new(90, 80));
         enemy_laser.velocity = Velocity::new(-3, 2);
-        enemy_laser.enemy_projectile_runtime = Some(ActorSourceEnemyProjectileMetadata {
+        enemy_laser.enemy_projectile_runtime = Some(EnemyProjectileArcadeState {
             x_fraction: 0x22,
             y_fraction: 0x77,
             x_velocity: 0xFD00,
@@ -1100,7 +1100,7 @@
             lifetime_ticks: 17,
         });
         let mut bomb = actor_snapshot(16, ActorKind::Bomb, Point::new(100, 84));
-        bomb.enemy_projectile_runtime = Some(ActorSourceEnemyProjectileMetadata {
+        bomb.enemy_projectile_runtime = Some(EnemyProjectileArcadeState {
             x_fraction: 0x44,
             y_fraction: 0x55,
             x_velocity: 0,
@@ -1130,7 +1130,7 @@
             player_switch: None,
             player_start: None,
             high_scores: [12_000, 10_000, 7_500, 5_000, 2_500],
-            source_wave: ActorSourceWaveProfile::for_wave(2),
+            source_wave: ArcadeWaveProfile::for_wave(2),
             high_score_initials: HighScoreInitialsState {
                 initials: [Some('R'), None, None],
                 cursor: 1,
@@ -1299,7 +1299,7 @@
             player_switch: None,
             player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
-            source_wave: ActorSourceWaveProfile::for_wave(3),
+            source_wave: ArcadeWaveProfile::for_wave(3),
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,

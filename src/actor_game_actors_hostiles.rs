@@ -3,7 +3,7 @@ struct Bomber {
     id: ActorId,
     position: Point,
     drift: i16,
-    source: Option<ActorSourceBomberMetadata>,
+    source: Option<BomberArcadeState>,
 }
 
 impl Bomber {
@@ -46,7 +46,7 @@ impl Bomber {
         true
     }
 
-    fn advance_source_tie_step(&mut self, prompt: &StepPrompt, arcade_rng: ActorSourceRngSnapshot) {
+    fn advance_source_tie_step(&mut self, prompt: &StepPrompt, arcade_rng: ActorArcadeRngSnapshot) {
         let Some(source) = &mut self.source else {
             return;
         };
@@ -110,7 +110,7 @@ impl Bomber {
 
             commands.push(GameCommand::Spawn(SpawnRequest::Bomb {
                 position: self.position,
-                source: Some(ActorSourceEnemyProjectileMetadata {
+                source: Some(EnemyProjectileArcadeState {
                     x_fraction: source.x_fraction,
                     y_fraction: source.y_fraction,
                     x_velocity: 0,
@@ -268,7 +268,7 @@ struct Bomb {
     id: ActorId,
     position: Point,
     lifetime_steps: u16,
-    source: ActorSourceEnemyProjectileMetadata,
+    source: EnemyProjectileArcadeState,
 }
 
 impl Bomb {
@@ -276,9 +276,9 @@ impl Bomb {
         id: ActorId,
         position: Point,
         lifetime_steps: u16,
-        source: Option<ActorSourceEnemyProjectileMetadata>,
+        source: Option<EnemyProjectileArcadeState>,
     ) -> Self {
-        let mut source = source.unwrap_or(ActorSourceEnemyProjectileMetadata {
+        let mut source = source.unwrap_or(EnemyProjectileArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -352,7 +352,7 @@ struct Pod {
     id: ActorId,
     position: Point,
     drift: i16,
-    source: Option<ActorSourcePodMetadata>,
+    source: Option<PodArcadeState>,
 }
 
 impl Pod {
@@ -458,7 +458,7 @@ struct Swarmer {
     id: ActorId,
     position: Point,
     drift: i16,
-    source: Option<ActorSourceSwarmerMetadata>,
+    source: Option<SwarmerArcadeState>,
 }
 
 impl Swarmer {
@@ -628,7 +628,7 @@ fn push_swarmer_shot(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
-    source: Option<ActorSourceSwarmerMetadata>,
+    source: Option<SwarmerArcadeState>,
     commands: &mut Vec<GameCommand>,
 ) {
     if let Some(source) = source {
@@ -658,8 +658,8 @@ fn push_swarmer_shot(
 fn actor_source_mini_swarmer_fireball(
     position: Point,
     prompt: &StepPrompt,
-    source: ActorSourceSwarmerMetadata,
-) -> Option<(Velocity, ActorSourceEnemyProjectileMetadata)> {
+    source: SwarmerArcadeState,
+) -> Option<(Velocity, EnemyProjectileArcadeState)> {
     let player = prompt.player_position()?;
     let player_delta = actor_source_absolute_x(player, 0)
         .wrapping_sub(actor_source_absolute_x(position, source.x_fraction));
@@ -677,7 +677,7 @@ fn actor_source_mini_swarmer_fireball(
     let velocity = actor_source_screen_velocity(x_velocity, y_velocity);
     Some((
         velocity,
-        ActorSourceEnemyProjectileMetadata {
+        EnemyProjectileArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity,
@@ -687,7 +687,7 @@ fn actor_source_mini_swarmer_fireball(
     ))
 }
 
-fn clamped_source_swarmer_shot_reset(profile: ActorSourceWaveProfile) -> u8 {
+fn clamped_source_swarmer_shot_reset(profile: ArcadeWaveProfile) -> u8 {
     profile.swarmer_shot_time.max(1).min(u32::from(u8::MAX)) as u8
 }
 
@@ -696,7 +696,7 @@ struct Baiter {
     id: ActorId,
     position: Point,
     drift: i16,
-    source: Option<ActorSourceBaiterMetadata>,
+    source: Option<BaiterArcadeState>,
 }
 
 impl Baiter {
@@ -798,8 +798,8 @@ fn push_baiter_shot(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
-    source: Option<ActorSourceBaiterMetadata>,
-    shot_rng: Option<ActorSourceRngSnapshot>,
+    source: Option<BaiterArcadeState>,
+    shot_rng: Option<ActorArcadeRngSnapshot>,
     commands: &mut Vec<GameCommand>,
 ) {
     if let Some(source) = source {
@@ -832,24 +832,24 @@ fn actor_source_baiter_shot_rng(
     prompt: &StepPrompt,
     actor: ActorId,
     position: Point,
-) -> ActorSourceRngSnapshot {
-    prompt.arcade_rng.unwrap_or(ActorSourceRngSnapshot {
+) -> ActorArcadeRngSnapshot {
+    prompt.arcade_rng.unwrap_or(ActorArcadeRngSnapshot {
         seed: actor_source_motion_seed(prompt.step, actor),
         hseed: position.x as u8,
         lseed: position.y as u8,
     })
 }
 
-fn actor_source_baiter_shot_reset(profile: ActorSourceWaveProfile, seed: u8) -> u8 {
+fn actor_source_baiter_shot_reset(profile: ArcadeWaveProfile, seed: u8) -> u8 {
     source_rmax(clamped_source_baiter_shot_reset(profile), seed)
 }
 
 fn actor_source_baiter_fireball(
     position: Point,
     prompt: &StepPrompt,
-    source: ActorSourceBaiterMetadata,
-    shot_rng: ActorSourceRngSnapshot,
-) -> Option<(Velocity, ActorSourceEnemyProjectileMetadata)> {
+    source: BaiterArcadeState,
+    shot_rng: ActorArcadeRngSnapshot,
+) -> Option<(Velocity, EnemyProjectileArcadeState)> {
     actor_source_enemy_fireball(
         position,
         source.x_fraction,
@@ -953,7 +953,7 @@ impl AssetActor for Baiter {
     }
 }
 
-fn clamped_source_baiter_shot_reset(profile: ActorSourceWaveProfile) -> u8 {
+fn clamped_source_baiter_shot_reset(profile: ArcadeWaveProfile) -> u8 {
     profile.baiter_shot_time.max(1).min(u32::from(u8::MAX)) as u8
 }
 
@@ -962,9 +962,9 @@ fn actor_source_baiter_screen_x_velocity(x_velocity_word: u16) -> u16 {
 }
 
 fn source_baiter_velocity_update(
-    source: &mut ActorSourceBaiterMetadata,
+    source: &mut BaiterArcadeState,
     position: Point,
-    profile: ActorSourceWaveProfile,
+    profile: ArcadeWaveProfile,
     player_position: Point,
     player_velocity: Velocity,
     honor_seek_probability: bool,

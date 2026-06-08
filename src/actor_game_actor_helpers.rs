@@ -87,7 +87,7 @@ fn source_shell_spawn_in_bounds(position: Point) -> bool {
 
 fn bomb_shell_spawn_in_source_bounds(
     position: Point,
-    source: Option<ActorSourceEnemyProjectileMetadata>,
+    source: Option<EnemyProjectileArcadeState>,
 ) -> bool {
     source.is_none() || source_shell_spawn_in_bounds(position)
 }
@@ -241,7 +241,7 @@ fn player_hazard_explosion_kind(kind: ActorKind) -> ExplosionKind {
 
 fn source_baiter_accelerated_timer_steps(
     current_steps: u32,
-    profile: ActorSourceWaveProfile,
+    profile: ArcadeWaveProfile,
     enemy_total: usize,
 ) -> u32 {
     if enemy_total > 8 {
@@ -256,7 +256,7 @@ fn source_baiter_accelerated_timer_steps(
     current_steps.min(target_steps)
 }
 
-fn source_baiter_reset_timer_steps(profile: ActorSourceWaveProfile, enemy_total: usize) -> u32 {
+fn source_baiter_reset_timer_steps(profile: ArcadeWaveProfile, enemy_total: usize) -> u32 {
     if enemy_total < 4 {
         (profile.baiter_delay / 4).max(1)
     } else {
