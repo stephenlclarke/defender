@@ -236,7 +236,7 @@ impl ActorGameDriver {
             phase: self.phase,
             input: effective_input,
             wave: self.wave,
-            source_wave: self.current_source_wave_profile(),
+            arcade_wave: self.current_arcade_wave_profile(),
             current_player: self.current_player,
             player_count: self.player_count,
             score: self.active_score(),
@@ -333,7 +333,7 @@ impl ActorGameDriver {
             player_switch,
             player_start,
             high_scores: self.high_scores.entries(),
-            source_wave: self.current_source_wave_profile(),
+            arcade_wave: self.current_arcade_wave_profile(),
             high_score_initials: self.high_score_initials,
             high_score_initial_accepted: high_score_entry_step.accepted,
             high_score_submitted: high_score_entry_step.submitted,
@@ -1588,15 +1588,15 @@ impl ActorGameDriver {
         }
     }
 
-    fn current_source_wave_profile(&self) -> ArcadeWaveProfile {
+    fn current_arcade_wave_profile(&self) -> ArcadeWaveProfile {
         self.wave_script
             .profile_for_wave(self.wave)
-            .source_wave
+            .arcade_wave
             .unwrap_or_else(|| ArcadeWaveProfile::for_wave(self.wave.max(1)))
     }
 
     fn reset_baiter_timer(&mut self) {
-        let source_profile = self.current_source_wave_profile();
+        let source_profile = self.current_arcade_wave_profile();
         self.baiter_timer_steps = Some(source_profile.baiter_delay.max(1));
         self.baiter_pacing_steps_remaining = ACTOR_BAITER_TIMER_PACING_STEPS;
     }
@@ -1626,7 +1626,7 @@ impl ActorGameDriver {
 
         self.first_wave_early_reserve_steps_remaining = None;
         self.clear_first_wave_lander_refill();
-        let source_profile = self.current_source_wave_profile();
+        let source_profile = self.current_arcade_wave_profile();
         let reserve_kinds =
             actor_source_reserve_enemy_kinds(&mut self.enemy_reserve, source_profile);
         let mut index = 0;
@@ -2067,7 +2067,7 @@ impl ActorGameDriver {
             .count();
         let spawn_count =
             POD_SWARMER_REQUEST_LIMIT.min(ACTIVE_SWARMER_LIMIT.saturating_sub(active_swarmers));
-        let source_profile = self.current_source_wave_profile();
+        let source_profile = self.current_arcade_wave_profile();
 
         (0..spawn_count)
             .map(|_| {
@@ -2088,7 +2088,7 @@ impl ActorGameDriver {
         if self.phase != Phase::Playing || self.wave == 0 {
             return;
         }
-        let enemy_total = self.source_wave_enemy_total();
+        let enemy_total = self.arcade_wave_enemy_total();
         if enemy_total == 0 {
             return;
         }
@@ -2103,7 +2103,7 @@ impl ActorGameDriver {
         }
         self.baiter_pacing_steps_remaining = ACTOR_BAITER_TIMER_PACING_STEPS;
 
-        let profile = self.current_source_wave_profile();
+        let profile = self.current_arcade_wave_profile();
         let timer_steps = source_baiter_accelerated_timer_steps(timer_steps, profile, enemy_total);
         let decremented_steps = timer_steps.saturating_sub(1);
         if decremented_steps > 0 {
@@ -2131,7 +2131,7 @@ impl ActorGameDriver {
         }));
     }
 
-    fn source_wave_enemy_total(&self) -> usize {
+    fn arcade_wave_enemy_total(&self) -> usize {
         self.snapshots
             .values()
             .filter(|snapshot| snapshot_blocks_wave_clear(snapshot))

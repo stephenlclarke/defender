@@ -351,7 +351,7 @@
     }
 
     #[test]
-    fn source_mutant_actor_uses_prompt_source_wave_profile() {
+    fn source_mutant_actor_uses_prompt_arcade_wave_profile() {
         let actor = ActorId::new(1001);
         let default_profile = ArcadeWaveProfile::for_wave(1);
         let mut source_profile = default_profile;
@@ -381,7 +381,7 @@
             target6_first_shot_deferred: false,
         };
         let start = Point::new(100, 80);
-        let prompt = source_mutant_prompt_with_source_wave_for_test(
+        let prompt = source_mutant_prompt_with_arcade_wave_for_test(
             12,
             1,
             source_profile,
@@ -1165,7 +1165,7 @@
         driver
     }
 
-    fn started_source_wave_driver(wave: u16) -> (ActorGameDriver, StepReport) {
+    fn started_arcade_wave_driver(wave: u16) -> (ActorGameDriver, StepReport) {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = wave.max(1);
@@ -1711,7 +1711,7 @@
             player_switch: None,
             player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
-            source_wave: ArcadeWaveProfile::for_wave(1),
+            arcade_wave: ArcadeWaveProfile::for_wave(1),
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,
@@ -1776,7 +1776,7 @@
         player_position: Point,
         player_velocity: Velocity,
     ) -> StepPrompt {
-        source_mutant_prompt_with_source_wave_for_test(
+        source_mutant_prompt_with_arcade_wave_for_test(
             step,
             wave,
             ArcadeWaveProfile::for_wave(wave),
@@ -1792,7 +1792,7 @@
             phase: Phase::Playing,
             input,
             wave: 1,
-            source_wave: ArcadeWaveProfile::for_wave(1),
+            arcade_wave: ArcadeWaveProfile::for_wave(1),
             current_player: 1,
             player_count: 1,
             score: 0,
@@ -1817,10 +1817,10 @@
         }
     }
 
-    fn source_mutant_prompt_with_source_wave_for_test(
+    fn source_mutant_prompt_with_arcade_wave_for_test(
         step: u64,
         wave: u16,
-        source_wave: ArcadeWaveProfile,
+        arcade_wave: ArcadeWaveProfile,
         arcade_rng: ActorArcadeRngSnapshot,
         player_position: Point,
         player_velocity: Velocity,
@@ -1830,7 +1830,7 @@
             phase: Phase::Playing,
             input: GameInput::NONE,
             wave,
-            source_wave,
+            arcade_wave,
             current_player: 1,
             player_count: 1,
             score: 0,
@@ -1879,7 +1879,7 @@
         let player_position = prompt
             .player_position()
             .expect("source mutant expected helper needs a player");
-        let profile = prompt.source_wave;
+        let profile = prompt.arcade_wave;
         let player_absolute_x = actor_source_absolute_x(player_position, 0);
         let object_absolute_x = actor_source_absolute_x(position, source.x_fraction);
         source.x_velocity = actor_source_mutant_x_velocity(

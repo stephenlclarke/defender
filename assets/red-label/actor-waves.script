@@ -1,5 +1,5 @@
-# Actor runtime red-label source wave progression.
-# `source_waves` expands from the embedded arcade wave table.
+# Actor runtime arcade wave progression.
+# `arcade_waves` expands from the embedded arcade wave table.
 
-name actor-source-wave-table
-source_waves 1 16
+name actor-arcade-wave-table
+arcade_waves 1 16

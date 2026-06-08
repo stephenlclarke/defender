@@ -365,7 +365,7 @@
         assert!(scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::TERRAIN_TILE
                 && sprite.layer == RenderLayer::Terrain
-                && sprite.tint == source_wave_landscape_tint(1)
+                && sprite.tint == arcade_wave_landscape_tint(1)
         }));
         assert!(scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::PLAYER_SHIP

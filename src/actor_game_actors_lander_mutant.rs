@@ -269,7 +269,7 @@ impl Lander {
         let hop_rng = prompt.arcade_rng?;
         Some(MutantArcadeState::from_lander_conversion(
             source,
-            prompt.source_wave,
+            prompt.arcade_wave,
             hop_rng,
         ))
     }
@@ -596,7 +596,7 @@ impl Mutant {
         let Some(player_position) = prompt.player_position() else {
             return false;
         };
-        let profile = prompt.source_wave;
+        let profile = prompt.arcade_wave;
         let player_absolute_x = actor_source_absolute_x(player_position, 0);
         let object_absolute_x = actor_source_absolute_x(self.position, source.x_fraction);
         source.x_velocity = actor_source_mutant_x_velocity(

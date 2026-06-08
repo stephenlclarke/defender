@@ -75,9 +75,9 @@
     }
 
     #[test]
-    fn default_wave_script_uses_source_wave_table_values() {
+    fn default_wave_script_uses_arcade_wave_table_values() {
         let script = ActorWaveScript::default_progression();
-        assert_eq!(script.name(), "actor-source-wave-table");
+        assert_eq!(script.name(), "actor-arcade-wave-table");
         let first_source = ArcadeWaveProfile::for_wave(1);
         assert_eq!(first_source.baiter_delay, 192);
         assert_eq!(first_source.baiter_shot_time, 10);
@@ -89,7 +89,7 @@
         assert_eq!(first_source.mutant_shot_time, 32);
 
         let first = script.profile_for_wave(1);
-        assert_eq!(first.source_wave, Some(first_source));
+        assert_eq!(first.arcade_wave, Some(first_source));
         let first_lander = first
             .behavior_script
             .behavior_for(ActorId::new(1), ActorKind::Lander);
@@ -162,7 +162,7 @@
 
         let second = script.profile_for_wave(2);
         assert_eq!(
-            second.source_wave,
+            second.arcade_wave,
             Some(ArcadeWaveProfile::for_wave(2))
         );
         let second_lander = second
@@ -292,7 +292,7 @@
         assert_eq!(second_bomber.bomber_drift_speed, 1);
 
         let fifth = script.profile_for_wave(5);
-        assert_eq!(fifth.source_wave, Some(ArcadeWaveProfile::for_wave(5)));
+        assert_eq!(fifth.arcade_wave, Some(ArcadeWaveProfile::for_wave(5)));
         let fifth_lander = fifth
             .behavior_script
             .behavior_for(ActorId::new(1), ActorKind::Lander);
@@ -344,7 +344,7 @@
     }
 
     #[test]
-    fn embedded_actor_wave_script_expands_source_wave_range() {
+    fn embedded_actor_wave_script_expands_arcade_wave_range() {
         let parsed = ActorWaveScript::parse_text(ACTOR_WAVE_SCRIPT)
             .expect("embedded actor wave script should parse");
 
@@ -353,20 +353,20 @@
             parsed.manifest()
         );
         assert_eq!(
-            ActorWaveScript::source_table_progression().manifest(),
+            ActorWaveScript::arcade_table_progression().manifest(),
             parsed.manifest()
         );
-        assert_eq!(parsed.name(), "actor-source-wave-table");
+        assert_eq!(parsed.name(), "actor-arcade-wave-table");
         assert_eq!(
             parsed.manifest().waves.len(),
             usize::from(ACTOR_DATA_BACKED_WAVES)
         );
         assert_eq!(
-            parsed.manifest().waves[0].source_wave,
+            parsed.manifest().waves[0].arcade_wave,
             Some(ArcadeWaveProfile::for_wave(1))
         );
         assert_eq!(
-            parsed.manifest().waves[4].source_wave,
+            parsed.manifest().waves[4].arcade_wave,
             Some(ArcadeWaveProfile::for_wave(5))
         );
         assert_eq!(parsed.profile_for_wave(1).lander_spawns.len(), 5);
@@ -382,8 +382,8 @@
     }
 
     #[test]
-    fn second_source_wave_spawns_bomber_and_pod_actor_families() {
-        let (driver, live) = started_source_wave_driver(2);
+    fn second_arcade_wave_spawns_bomber_and_pod_actor_families() {
+        let (driver, live) = started_arcade_wave_driver(2);
         assert_eq!(live.wave, 2);
 
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 3);
@@ -467,7 +467,7 @@
 
     #[test]
     fn actor_source_reserve_landers_activate_before_wave_clear() {
-        let (mut driver, live) = started_source_wave_driver(2);
+        let (mut driver, live) = started_arcade_wave_driver(2);
         assert_eq!(
             live.enemy_reserve,
             EnemyReserveSnapshot {
@@ -877,19 +877,19 @@
         );
         let next_scene = next_wave.render_scene();
         assert!(next_scene.sprites.iter().any(|sprite| {
-            sprite.layer == RenderLayer::Terrain && sprite.tint == source_wave_landscape_tint(2)
+            sprite.layer == RenderLayer::Terrain && sprite.tint == arcade_wave_landscape_tint(2)
         }));
         assert!(next_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::TOP_DISPLAY_BORDER_WORD
                 && sprite.position != source_screen_position(0x4C07)
                 && sprite.position != source_screen_position(0x4C28)
-                && sprite.tint == source_wave_landscape_tint(2)
+                && sprite.tint == arcade_wave_landscape_tint(2)
         }));
     }
 
     #[test]
     fn actor_source_reserve_landers_without_humans_restore_source_mutants() {
-        let (mut driver, live) = started_source_wave_driver(2);
+        let (mut driver, live) = started_arcade_wave_driver(2);
         let player_position = live
             .snapshots
             .iter()
@@ -1021,7 +1021,7 @@
 
     #[test]
     fn actor_source_mutant_reserves_use_restore_state() {
-        let (mut driver, seeded) = started_source_wave_driver(2);
+        let (mut driver, seeded) = started_arcade_wave_driver(2);
         let player_position = seeded
             .snapshots
             .iter()
@@ -1118,7 +1118,7 @@
 
     #[test]
     fn actor_source_bomber_and_pod_reserves_use_restore_state() {
-        let (mut driver, seeded) = started_source_wave_driver(2);
+        let (mut driver, seeded) = started_arcade_wave_driver(2);
         let player_position = seeded
             .snapshots
             .iter()
@@ -1231,7 +1231,7 @@
 
     #[test]
     fn actor_source_swarmer_reserves_use_plres_restore_state() {
-        let (mut driver, seeded) = started_source_wave_driver(2);
+        let (mut driver, seeded) = started_arcade_wave_driver(2);
         destroy_source_counted_hostiles(&mut driver, &seeded);
         driver.enemy_reserve = EnemyReserveSnapshot {
             swarmers: 4,
@@ -1687,7 +1687,7 @@
             phase: Phase::Playing,
             input: GameInput::NONE,
             wave: 1,
-            source_wave: ArcadeWaveProfile::for_wave(1),
+            arcade_wave: ArcadeWaveProfile::for_wave(1),
             current_player: 1,
             player_count: 1,
             score: 0,

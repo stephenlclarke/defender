@@ -564,7 +564,7 @@
     }
 
     #[test]
-    fn actor_survivor_bonus_uses_source_wave_multiplier_and_replay_stock() {
+    fn actor_survivor_bonus_uses_arcade_wave_multiplier_and_replay_stock() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 3;
@@ -648,7 +648,7 @@
             player_switch: None,
             player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
-            source_wave: ArcadeWaveProfile::for_wave(1),
+            arcade_wave: ArcadeWaveProfile::for_wave(1),
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,
@@ -1002,7 +1002,7 @@
             player_switch: None,
             player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
-            source_wave: ArcadeWaveProfile::for_wave(1),
+            arcade_wave: ArcadeWaveProfile::for_wave(1),
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,
@@ -1130,7 +1130,7 @@
             player_switch: None,
             player_start: None,
             high_scores: [12_000, 10_000, 7_500, 5_000, 2_500],
-            source_wave: ArcadeWaveProfile::for_wave(2),
+            arcade_wave: ArcadeWaveProfile::for_wave(2),
             high_score_initials: HighScoreInitialsState {
                 initials: [Some('R'), None, None],
                 cursor: 1,
@@ -1299,7 +1299,7 @@
             player_switch: None,
             player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
-            source_wave: ArcadeWaveProfile::for_wave(3),
+            arcade_wave: ArcadeWaveProfile::for_wave(3),
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,

@@ -15,7 +15,7 @@ fn source_pseudo_color_tint(value: u8) -> Color {
     )
 }
 
-pub(crate) fn source_wave_landscape_tint(wave: u16) -> Color {
+pub(crate) fn arcade_wave_landscape_tint(wave: u16) -> Color {
     let wave = wave.max(1);
     let index = usize::from((wave - 1) % WAVE_LANDSCAPE_COLOR_BYTES.len() as u16);
     source_pseudo_color_tint(WAVE_LANDSCAPE_COLOR_BYTES[index])

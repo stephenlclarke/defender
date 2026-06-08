@@ -282,7 +282,7 @@
         let wave_script = ActorWaveScript::parse_text_with_base_behavior(
             "\
             name inherited wave behavior\n\
-            source_wave 1 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n\
+            arcade_wave 1 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n\
             wave 2\n\
             lander 80 214\n",
             &behavior_script,
@@ -302,7 +302,7 @@
         let lander_runtime = manifest.waves[0]
             .behavior_script
             .kind_profile(ActorKind::Lander)
-            .expect("source wave should keep source lander behavior");
+            .expect("arcade wave should keep arcade lander behavior");
         assert_eq!(
             lander_runtime.lander_fire_period_steps,
             ArcadeWaveProfile::for_wave(1)
@@ -366,7 +366,7 @@
                 .spawn_behavior_presets
                 .is_empty()
         );
-        assert_eq!(attract_manifest.current_wave_profile.source_wave, None);
+        assert_eq!(attract_manifest.current_wave_profile.arcade_wave, None);
         assert_eq!(
             attract_manifest.current_wave_profile.lander_spawns[0].position,
             Point::new(80, 96)
@@ -735,20 +735,20 @@
     }
 
     #[test]
-    fn parsed_source_wave_overrides_drive_source_shaped_custom_wave() {
+    fn parsed_arcade_wave_overrides_drive_source_shaped_custom_wave() {
         let wave_script = concat!(
             "name custom source shape\n",
-            "source_wave 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
+            "arcade_wave 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
             "swarmer_x_velocity 64 swarmer_shot_time 11 baiter_time 24 ",
             "mutant_x_velocity 48 mutant_random_y 2 mutant_shot_time 12\n",
         )
         .parse::<ActorWaveScript>()
-        .expect("source wave overrides should parse");
+        .expect("arcade wave overrides should parse");
         let manifest = wave_script.manifest();
         let profile = &manifest.waves[0];
         let source = profile
-            .source_wave
-            .expect("source_wave override should preserve source metadata");
+            .arcade_wave
+            .expect("arcade_wave override should preserve source metadata");
 
         assert_eq!(source.wave_size, 5);
         assert_eq!(source.landers, 1);
@@ -793,9 +793,9 @@
         assert!(report.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Swarmer && snapshot.swarmer_runtime.is_some()
         }));
-        assert_eq!(report.source_wave.wave_size, 5);
-        assert_eq!(report.source_wave.mutant_x_velocity, 48);
-        assert_eq!(report.source_wave.swarmer_shot_time, 11);
+        assert_eq!(report.arcade_wave.wave_size, 5);
+        assert_eq!(report.arcade_wave.mutant_x_velocity, 48);
+        assert_eq!(report.arcade_wave.swarmer_shot_time, 11);
         let state_profile = report.game_state().wave_profile;
         assert_eq!(state_profile.wave_size, 5);
         assert_eq!(state_profile.landers, 1);
@@ -817,7 +817,7 @@
             driver
                 .script_manifest()
                 .current_wave_profile
-                .source_wave
+                .arcade_wave
                 .expect("current wave manifest should expose source override")
                 .mutants,
             1
@@ -825,15 +825,15 @@
     }
 
     #[test]
-    fn parsed_source_wave_range_overrides_apply_to_each_expanded_profile() {
+    fn parsed_arcade_wave_range_overrides_apply_to_each_expanded_profile() {
         let wave_script = concat!(
             "name ranged source shape\n",
-            "source_waves 1 2 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
+            "arcade_waves 1 2 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
             "swarmer_x_velocity 64 swarmer_shot_time 11 baiter_time 24 ",
             "mutant_x_velocity 48 mutant_random_y 2 mutant_shot_time 12\n",
         )
         .parse::<ActorWaveScript>()
-        .expect("source wave range overrides should parse");
+        .expect("arcade wave range overrides should parse");
         let manifest = wave_script.manifest();
 
         assert_eq!(
@@ -846,7 +846,7 @@
         );
         for profile in &manifest.waves {
             let source = profile
-                .source_wave
+                .arcade_wave
                 .expect("range override should preserve source metadata");
             assert_eq!(source.wave_size, 5);
             assert_eq!(source.landers, 1);
@@ -873,7 +873,7 @@
         let second = wave_script.profile_for_wave(2);
         assert_eq!(
             second
-                .source_wave
+                .arcade_wave
                 .expect("wave 2 should use the effective range override")
                 .mutants,
             1
@@ -886,7 +886,7 @@
     fn parsed_wave_script_applies_behavior_ranges_to_existing_profiles() {
         let wave_script = concat!(
             "name ranged behavior\n",
-            "source_waves 1 2 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
+            "arcade_waves 1 2 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
             "behavior_waves 1 2 kind lander lander_mode chase_player\n",
             "behavior_waves 1 2 kind lander lander_seek_speed 7\n",
             "spawn_behavior_waves 1 2 lander 0 lander_seek_speed 9\n",
@@ -926,7 +926,7 @@
             "name preset behavior\n",
             "behavior_preset hard_lander kind lander lander_mode chase_player\n",
             "behavior_preset hard_lander kind lander lander_seek_speed 7\n",
-            "source_waves 1 2 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
+            "arcade_waves 1 2 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
             "use_behavior_waves 1 2 hard_lander\n",
             "wave 3\n",
             "use_behavior hard_lander\n",
@@ -966,7 +966,7 @@
             LanderBehaviorMode::ChasePlayer
         );
         assert_eq!(clean_wave_lander.lander_seek_speed, 7);
-        assert_eq!(manifest.waves[2].source_wave, None);
+        assert_eq!(manifest.waves[2].arcade_wave, None);
     }
 
     #[test]
@@ -977,7 +977,7 @@
             "behavior_preset Hard-Lander kind lander lander_seek_speed 7\n",
             "spawn_behavior_preset Fast-Slot lander_mode chase_player\n",
             "spawn_behavior_preset Fast-Slot lander_seek_speed 9\n",
-            "source_wave 1 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
+            "arcade_wave 1 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
             "use_behavior hard_lander\n",
             "use_spawn_behavior lander 0 fast_slot\n",
         )
@@ -1029,7 +1029,7 @@
     fn parsed_wave_script_reports_missing_behavior_range_profiles() {
         let error = "\
             name missing behavior range\n\
-            source_wave 1\n\
+            arcade_wave 1\n\
             behavior_waves 1 2 kind lander lander_seek_speed 7\n"
             .parse::<ActorWaveScript>()
             .expect_err("range behavior should require existing profiles");
@@ -1042,7 +1042,7 @@
     fn parsed_wave_script_reports_unknown_behavior_presets() {
         let error = "\
             name missing preset\n\
-            source_wave 1\n\
+            arcade_wave 1\n\
             use_behavior missing\n"
             .parse::<ActorWaveScript>()
             .expect_err("preset use should require a definition");
@@ -1057,7 +1057,7 @@
             "name spawn preset behavior\n",
             "spawn_behavior_preset fast_slot lander_mode chase_player\n",
             "spawn_behavior_preset fast_slot lander_seek_speed 9\n",
-            "source_waves 1 2 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
+            "arcade_waves 1 2 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
             "use_spawn_behavior_waves 1 2 lander 0 fast_slot\n",
             "wave 3\n",
             "behavior kind lander lander_mode drift\n",
@@ -1158,7 +1158,7 @@
     fn parsed_wave_script_reports_unknown_spawn_behavior_presets() {
         let error = "\
             name missing spawn preset\n\
-            source_wave 1\n\
+            arcade_wave 1\n\
             use_spawn_behavior lander 0 missing\n"
             .parse::<ActorWaveScript>()
             .expect_err("spawn preset use should require a definition");
@@ -1221,7 +1221,7 @@
     fn parsed_wave_script_applies_spawn_index_behavior_to_reserve_allocations() {
         let wave_script = "\
             name reserve spawn behavior\n\
-            source_wave 2\n\
+            arcade_wave 2\n\
             spawn_behavior lander 3 lander_mode chase_player\n\
             spawn_behavior lander 3 lander_seek_speed 5\n"
             .parse::<ActorWaveScript>()

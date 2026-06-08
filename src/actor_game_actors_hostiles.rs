@@ -496,7 +496,7 @@ impl Swarmer {
         let Some(player) = prompt.player_position() else {
             return false;
         };
-        let profile = prompt.source_wave;
+        let profile = prompt.arcade_wave;
         let mut horizontal_seek_only = false;
         if source.horizontal_seek_pending {
             source.x_velocity = source_mini_swarmer_seek_velocity(
@@ -732,7 +732,7 @@ impl Baiter {
         } else {
             source.shot_timer = source.shot_timer.wrapping_sub(1);
             if source.shot_timer == 0 {
-                let profile = prompt.source_wave;
+                let profile = prompt.arcade_wave;
                 let shot_rng = actor_source_baiter_shot_rng(prompt, self.id, self.position);
                 source.shot_timer = actor_source_baiter_shot_reset(profile, shot_rng.seed);
                 push_baiter_shot(
@@ -750,7 +750,7 @@ impl Baiter {
             if source.picture_frame == 0
                 && let Some(player) = prompt.player_position()
             {
-                let profile = prompt.source_wave;
+                let profile = prompt.arcade_wave;
                 let seed = prompt
                     .arcade_rng
                     .map(|arcade_rng| arcade_rng.seed)

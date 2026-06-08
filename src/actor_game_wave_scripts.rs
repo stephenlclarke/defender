@@ -1,7 +1,7 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorWaveProfile {
     pub wave: u16,
-    pub source_wave: Option<ArcadeWaveProfile>,
+    pub arcade_wave: Option<ArcadeWaveProfile>,
     pub behavior_script: ActorBehaviorScript,
     pub lander_spawns: Vec<ActorLanderSpawn>,
     pub bomber_spawns: Vec<ActorBomberSpawn>,
@@ -65,7 +65,7 @@ impl ActorWaveProfile {
     ) -> Self {
         Self {
             wave: wave.max(1),
-            source_wave: None,
+            arcade_wave: None,
             behavior_script,
             lander_spawns,
             bomber_spawns,
@@ -84,13 +84,13 @@ impl ActorWaveProfile {
         self
     }
 
-    pub fn with_source_wave(mut self, source_wave: ArcadeWaveProfile) -> Self {
-        self.source_wave = Some(source_wave);
+    pub fn with_arcade_wave(mut self, arcade_wave: ArcadeWaveProfile) -> Self {
+        self.arcade_wave = Some(arcade_wave);
         self
     }
 
-    fn with_optional_source_wave(mut self, source_wave: Option<ArcadeWaveProfile>) -> Self {
-        self.source_wave = source_wave;
+    fn with_optional_arcade_wave(mut self, arcade_wave: Option<ArcadeWaveProfile>) -> Self {
+        self.arcade_wave = arcade_wave;
         self
     }
 
@@ -177,7 +177,7 @@ impl ActorWaveProfile {
     pub fn manifest(&self) -> ActorWaveProfileManifest {
         ActorWaveProfileManifest {
             wave: self.wave,
-            source_wave: self.source_wave,
+            arcade_wave: self.arcade_wave,
             behavior_script: self.behavior_script.manifest(),
             lander_spawns: self.lander_spawns.clone(),
             bomber_spawns: self.bomber_spawns.clone(),
@@ -202,7 +202,7 @@ pub struct ActorWaveSpawnBehaviorProfile {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorWaveProfileManifest {
     pub wave: u16,
-    pub source_wave: Option<ArcadeWaveProfile>,
+    pub arcade_wave: Option<ArcadeWaveProfile>,
     pub behavior_script: ActorBehaviorScriptManifest,
     pub lander_spawns: Vec<ActorLanderSpawn>,
     pub bomber_spawns: Vec<ActorBomberSpawn>,
@@ -235,7 +235,7 @@ impl ActorWaveScript {
         spawn_behavior_presets: Vec<ActorWaveSpawnBehaviorPresetManifest>,
     ) -> Self {
         if waves.is_empty() {
-            waves.push(Self::source_backed_profile(1));
+            waves.push(Self::arcade_backed_profile(1));
         }
         waves.sort_by_key(|profile| profile.wave);
         Self {
@@ -262,30 +262,30 @@ impl ActorWaveScript {
             .unwrap_or_else(|error| panic!("embedded actor wave script is invalid: {error}"))
     }
 
-    pub fn source_table_progression() -> Self {
+    pub fn arcade_table_progression() -> Self {
         let waves = (1..=ACTOR_DATA_BACKED_WAVES)
-            .map(Self::source_backed_profile)
+            .map(Self::arcade_backed_profile)
             .collect::<Vec<_>>();
-        Self::new("actor-source-wave-table", waves)
+        Self::new("actor-arcade-wave-table", waves)
     }
 
-    fn source_backed_profile(wave: u16) -> ActorWaveProfile {
+    fn arcade_backed_profile(wave: u16) -> ActorWaveProfile {
         let source = ArcadeWaveProfile::for_wave(wave);
-        Self::source_backed_profile_from_source(wave, source)
+        Self::arcade_backed_profile_from_profile(wave, source)
     }
 
-    fn source_backed_profile_from_source(
+    fn arcade_backed_profile_from_profile(
         wave: u16,
         source: ArcadeWaveProfile,
     ) -> ActorWaveProfile {
-        Self::source_backed_profile_from_source_with_behavior(
+        Self::arcade_backed_profile_from_profile_with_behavior(
             wave,
             source,
             &ActorBehaviorScript::from_arcade_profile(),
         )
     }
 
-    fn source_backed_profile_from_source_with_behavior(
+    fn arcade_backed_profile_from_profile_with_behavior(
         wave: u16,
         source: ArcadeWaveProfile,
         base_behavior: &ActorBehaviorScript,
@@ -310,7 +310,7 @@ impl ActorWaveScript {
             source.pod_spawns(),
             human_spawns,
         )
-        .with_source_wave(source)
+        .with_arcade_wave(source)
         .with_mutant_spawns(source.mutant_spawns())
         .with_swarmer_spawns(source.swarmer_spawns())
         .with_enemy_reserve(source.enemy_reserve_after_active_batch())
@@ -467,39 +467,39 @@ impl ParsedActorWaveScript {
                     ParsedActorWaveProfile::new_with_behavior(wave, self.base_behavior.clone()),
                 )
             }
-            "source_wave" | "source_backed_wave" => {
+            "arcade_wave" | "source_wave" | "source_backed_wave" => {
                 let wave = parse_wave_u16(line_number, parts.next(), "wave")?;
                 let mut source = ArcadeWaveProfile::for_wave(wave);
-                parse_source_wave_profile_updates(line_number, &mut source, parts)?;
+                parse_arcade_wave_profile_updates(line_number, &mut source, parts)?;
                 self.push_profile(
                     line_number,
-                    ParsedActorWaveProfile::source_backed_from_source_with_behavior(
+                    ParsedActorWaveProfile::arcade_backed_from_profile_with_behavior(
                         wave,
                         source,
                         &self.base_behavior,
                     ),
                 )
             }
-            "source_waves" | "source_backed_waves" => {
+            "arcade_waves" | "source_waves" | "source_backed_waves" => {
                 let first = parse_wave_u16(line_number, parts.next(), "first wave")?.max(1);
                 let last = parse_wave_u16(line_number, parts.next(), "last wave")?.max(1);
                 let source_update_tokens = parts.collect::<Vec<_>>();
                 if last < first {
                     return Err(ActorWaveScriptParseError::new(
                         line_number,
-                        format!("source wave range `{first}..{last}` is invalid"),
+                        format!("arcade wave range `{first}..{last}` is invalid"),
                     ));
                 }
                 for wave in first..=last {
                     let mut source = ArcadeWaveProfile::for_wave(wave);
-                    parse_source_wave_profile_updates(
+                    parse_arcade_wave_profile_updates(
                         line_number,
                         &mut source,
                         source_update_tokens.iter().copied(),
                     )?;
                     self.push_profile(
                         line_number,
-                        ParsedActorWaveProfile::source_backed_from_source_with_behavior(
+                        ParsedActorWaveProfile::arcade_backed_from_profile_with_behavior(
                             wave,
                             source,
                             &self.base_behavior,
@@ -1009,7 +1009,7 @@ struct ParsedWaveSpawnBehaviorUpdate<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ParsedActorWaveProfile {
     wave: u16,
-    source_wave: Option<ArcadeWaveProfile>,
+    arcade_wave: Option<ArcadeWaveProfile>,
     behavior_script: ActorBehaviorScript,
     lander_spawns: Vec<ActorLanderSpawn>,
     bomber_spawns: Vec<ActorBomberSpawn>,
@@ -1026,7 +1026,7 @@ impl ParsedActorWaveProfile {
     fn new_with_behavior(wave: u16, behavior_script: ActorBehaviorScript) -> Self {
         Self {
             wave: wave.max(1),
-            source_wave: None,
+            arcade_wave: None,
             behavior_script,
             lander_spawns: Vec::new(),
             bomber_spawns: Vec::new(),
@@ -1040,19 +1040,19 @@ impl ParsedActorWaveProfile {
         }
     }
 
-    fn source_backed_from_source_with_behavior(
+    fn arcade_backed_from_profile_with_behavior(
         wave: u16,
         source: ArcadeWaveProfile,
         base_behavior: &ActorBehaviorScript,
     ) -> Self {
-        let profile = ActorWaveScript::source_backed_profile_from_source_with_behavior(
+        let profile = ActorWaveScript::arcade_backed_profile_from_profile_with_behavior(
             wave,
             source,
             base_behavior,
         );
         Self {
             wave: profile.wave,
-            source_wave: profile.source_wave,
+            arcade_wave: profile.arcade_wave,
             behavior_script: profile.behavior_script,
             lander_spawns: profile.lander_spawns,
             bomber_spawns: profile.bomber_spawns,
@@ -1099,7 +1099,7 @@ impl ParsedActorWaveProfile {
             self.pod_spawns,
             self.human_spawns,
         )
-        .with_optional_source_wave(self.source_wave)
+        .with_optional_arcade_wave(self.arcade_wave)
         .with_mutant_spawns(self.mutant_spawns)
         .with_swarmer_spawns(self.swarmer_spawns)
         .with_baiter_spawns(self.baiter_spawns)
@@ -1186,7 +1186,7 @@ fn parse_wave_behavior_preset_name(
     Ok(name)
 }
 
-fn parse_source_wave_profile_updates<'a>(
+fn parse_arcade_wave_profile_updates<'a>(
     line_number: usize,
     source: &mut ArcadeWaveProfile,
     mut parts: impl Iterator<Item = &'a str>,
@@ -1195,15 +1195,15 @@ fn parse_source_wave_profile_updates<'a>(
         let value = parts.next().ok_or_else(|| {
             ActorWaveScriptParseError::new(
                 line_number,
-                format!("source wave field `{field}` needs a value"),
+                format!("arcade wave field `{field}` needs a value"),
             )
         })?;
-        apply_source_wave_profile_field(line_number, source, field, value)?;
+        apply_arcade_wave_profile_field(line_number, source, field, value)?;
     }
     Ok(())
 }
 
-fn apply_source_wave_profile_field(
+fn apply_arcade_wave_profile_field(
     line_number: usize,
     source: &mut ArcadeWaveProfile,
     field: &str,
@@ -1267,7 +1267,7 @@ fn apply_source_wave_profile_field(
         _ => {
             return Err(ActorWaveScriptParseError::new(
                 line_number,
-                format!("unknown source wave field `{field}`"),
+                format!("unknown arcade wave field `{field}`"),
             ));
         }
     }

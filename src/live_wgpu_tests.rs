@@ -810,7 +810,7 @@ mod tests {
                 "kind lander lander_mode drift\n",
                 "[wave]\n",
                 "name projectile check waves\n",
-                "source_wave 1 wave_size 1 landers 0 bombers 0 pods 0 mutants 1 swarmers 0 ",
+                "arcade_wave 1 wave_size 1 landers 0 bombers 0 pods 0 mutants 1 swarmers 0 ",
                 "mutant_shot_time 1 mutant_x_velocity 48 mutant_random_y 2\n",
                 "behavior kind mutant mutant_mode drift\n",
             ),
@@ -851,7 +851,7 @@ mod tests {
     }
 
     #[test]
-    fn actor_script_check_reports_source_wave_overrides_at_play_start() {
+    fn actor_script_check_reports_arcade_wave_overrides_at_play_start() {
         let path = write_actor_script_file(
             "actor-script-source-wave-check",
             concat!(
@@ -861,13 +861,13 @@ mod tests {
                 "kind lander lander_mode drift\n",
                 "[wave]\n",
                 "name source check waves\n",
-                "source_wave 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
+                "arcade_wave 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
                 "swarmer_x_velocity 64 swarmer_shot_time 11 baiter_time 24 ",
                 "mutant_x_velocity 48 mutant_random_y 2 mutant_shot_time 12\n",
             ),
         );
 
-        let report = run_actor_script_check(&path).expect("source wave script should check");
+        let report = run_actor_script_check(&path).expect("arcade wave script should check");
 
         assert_eq!(report.first_playing_wave, 1);
         assert_eq!(report.first_playing_wave_size, 5);
@@ -968,7 +968,7 @@ mod tests {
                 "kind lander lander_mode drift\n",
                 "[wave]\n",
                 "name reserve check waves\n",
-                "source_wave 1 wave_size 2 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
+                "arcade_wave 1 wave_size 2 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
                 "reserve_full 3 2 1 1 1\n",
             ),
         );
@@ -1005,10 +1005,10 @@ mod tests {
                 "kind lander lander_mode drift\n",
                 "[wave]\n",
                 "name next wave check waves\n",
-                "source_wave 1 wave_size 1 landers 1 bombers 0 pods 0 mutants 0 swarmers 0\n",
+                "arcade_wave 1 wave_size 1 landers 1 bombers 0 pods 0 mutants 0 swarmers 0\n",
                 "behavior kind lander lander_mode drift\n",
                 "behavior kind lander lander_drift_speed 2\n",
-                "source_wave 2 wave_size 3 landers 1 bombers 1 pods 1 mutants 0 swarmers 0\n",
+                "arcade_wave 2 wave_size 3 landers 1 bombers 1 pods 1 mutants 0 swarmers 0\n",
                 "reserve_full 2 1 1 1 1\n",
                 "behavior kind lander lander_mode chase_player\n",
                 "behavior kind lander lander_seek_speed 7\n",
@@ -1029,7 +1029,7 @@ mod tests {
         let wave_sleep = report
             .wave_clear_advance_sleep
             .as_ref()
-            .expect("checker should report the source wave advance sleep");
+            .expect("checker should report the arcade wave advance sleep");
         let post_reserve_wave_clear = report
             .post_reserve_wave_clear
             .as_ref()
@@ -1340,7 +1340,7 @@ mod tests {
                 "kind player player_laser_cooldown_steps 5\n",
                 "[wave]\n",
                 "name behavior check waves\n",
-                "source_wave 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1\n",
+                "arcade_wave 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1\n",
                 "behavior kind lander lander_mode chase_player\n",
                 "behavior kind lander lander_seek_speed 4\n",
                 "behavior kind mutant mutant_mode drift\n",

@@ -41,7 +41,7 @@ impl ActorRenderSceneBridge {
             push_source_bgout_terrain_sprites(
                 &mut scene,
                 report.background_left,
-                source_wave_landscape_tint(report.wave),
+                arcade_wave_landscape_tint(report.wave),
             );
         }
         if let Some(state) = &state {
@@ -182,7 +182,7 @@ impl ActorRenderSceneBridge {
     }
 
     fn push_attract_scoring_surface(&self, scene: &mut RenderScene, scoring_tick: u16) {
-        push_source_bgout_terrain_sprites(scene, 0, source_wave_landscape_tint(1));
+        push_source_bgout_terrain_sprites(scene, 0, arcade_wave_landscape_tint(1));
         push_attract_scoring_top_display_border(scene);
         push_attract_scoring_scanner_terrain(scene);
         push_attract_scoring_demo_scene(scene, scoring_tick);
@@ -423,7 +423,7 @@ fn push_actor_playing_top_display_border(scene: &mut RenderScene, wave: u16) {
             tint: if matches!(screen_address, 0x4C07 | 0x4C28) {
                 VISUAL_STATE.top_display_scanner_marker_tint()
             } else {
-                source_wave_landscape_tint(wave)
+                arcade_wave_landscape_tint(wave)
             },
         });
     }

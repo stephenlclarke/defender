@@ -209,7 +209,7 @@ pub struct StepPrompt {
     pub phase: Phase,
     pub input: GameInput,
     pub wave: u16,
-    pub source_wave: ArcadeWaveProfile,
+    pub arcade_wave: ArcadeWaveProfile,
     pub current_player: u8,
     pub player_count: u8,
     pub score: u32,
@@ -387,7 +387,7 @@ pub struct StepReport {
     pub player_switch: Option<PlayerSwitchReport>,
     pub player_start: Option<PlayerStartReport>,
     pub high_scores: [u32; 5],
-    pub source_wave: ArcadeWaveProfile,
+    pub arcade_wave: ArcadeWaveProfile,
     pub high_score_initials: HighScoreInitialsState,
     pub high_score_initial_accepted: bool,
     pub high_score_submitted: bool,
@@ -504,7 +504,7 @@ fn clean_wave(wave: u16) -> u8 {
 
 fn actor_wave_profile_for_report(report: &StepReport) -> WaveProfileSnapshot {
     let mut profile = WaveProfileSnapshot::for_wave(clean_wave(report.wave));
-    let source = report.source_wave;
+    let source = report.arcade_wave;
     profile.landers = source.landers;
     profile.bombers = source.bombers;
     profile.pods = source.pods;

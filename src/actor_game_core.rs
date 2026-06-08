@@ -21,7 +21,7 @@ use crate::{
         source_appearance_size_for_age,
         source_explosion_render_scale, source_explosion_size_for_age,
         source_terrain_blow_flash_tint, source_terrain_explosion_size_for_age,
-        source_wave_landscape_tint,
+        arcade_wave_landscape_tint,
     },
     renderer::{
         Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,

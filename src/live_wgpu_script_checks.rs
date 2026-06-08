@@ -358,22 +358,22 @@ fn actor_script_check_hostile_projectile_matrix_input(kind: ActorKind) -> ActorG
 }
 
 fn actor_script_check_hostile_projectile_matrix_script(kind: ActorKind) -> String {
-    let source_wave = match kind {
+    let arcade_wave = match kind {
         ActorKind::Lander => {
-            "source_wave 2 wave_size 1 landers 1 bombers 0 pods 0 mutants 0 swarmers 0 lander_shot_time 1\n"
+            "arcade_wave 2 wave_size 1 landers 1 bombers 0 pods 0 mutants 0 swarmers 0 lander_shot_time 1\n"
         }
         ActorKind::Mutant => {
-            "source_wave 1 wave_size 1 landers 0 bombers 0 pods 0 mutants 1 swarmers 0 mutant_shot_time 1 mutant_x_velocity 48 mutant_random_y 2\n"
+            "arcade_wave 1 wave_size 1 landers 0 bombers 0 pods 0 mutants 1 swarmers 0 mutant_shot_time 1 mutant_x_velocity 48 mutant_random_y 2\n"
         }
         ActorKind::Swarmer => {
             concat!(
-                "source_wave 1 wave_size 0 landers 0 bombers 0 pods 0 mutants 0 swarmers 0\n",
+                "arcade_wave 1 wave_size 0 landers 0 bombers 0 pods 0 mutants 0 swarmers 0\n",
                 "swarmer 62 120\n",
             )
         }
         ActorKind::Baiter => {
             concat!(
-                "source_wave 1 wave_size 0 landers 0 bombers 0 pods 0 mutants 0 swarmers 0 ",
+                "arcade_wave 1 wave_size 0 landers 0 bombers 0 pods 0 mutants 0 swarmers 0 ",
                 "baiter_time 1 baiter_shot_time 1 lander_shot_time 255\n",
                 "lander 220 120\n",
             )
@@ -395,11 +395,11 @@ fn actor_script_check_hostile_projectile_matrix_script(kind: ActorKind) -> Strin
             "kind swarmer swarmer_fire_period_steps 1\n",
             "[wave]\n",
             "name hostile projectile matrix {kind_label}\n",
-            "{source_wave}",
+            "{arcade_wave}",
             "human 100 214\n",
         ),
         kind_label = actor_script_check_source_actor_kind_label(kind),
-        source_wave = source_wave
+        arcade_wave = arcade_wave
     )
 }
 
@@ -608,7 +608,7 @@ fn actor_script_check_hostile_laser_hit_matrix_script(kind: ActorKind) -> String
 }
 
 fn actor_script_check_playing_summary(frame: &ActorFrame) -> ActorScriptCheckPlayingSummary {
-    let profile = frame.report.source_wave;
+    let profile = frame.report.arcade_wave;
     let reserve = frame.state.world.enemy_reserve;
     debug_assert_eq!(reserve, frame.report.enemy_reserve);
     let arcade_rng = frame.report.arcade_rng;
