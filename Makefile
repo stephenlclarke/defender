@@ -4,7 +4,7 @@ SONAR_SCANNER ?= sonar-scanner
 SONAR_ARGS ?= -Dsonar.qualitygate.wait=true
 XVFB_RUN ?= xvfb-run
 VULKANINFO ?= vulkaninfo
-DOCS_MARKDOWN := README.md SPEC.md
+DOCS_MARKDOWN := README.md
 README_GAMEPLAY_IMAGE ?= docs/defender.png
 README_ATTRACT_SEQUENCE ?= docs/start-sequence.gif
 
