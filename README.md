@@ -79,7 +79,12 @@ make release-gate
 
 Important Makefile targets:
 
+- `make` or `make help`: print the supported target list.
 - `make run`: launch the playable `wgpu` game.
+- `make fmt`: check Rust formatting.
+- `make test`: run all Rust tests.
+- `make clippy`: run clippy with warnings denied.
+- `make smoke`: run the local actor and `wgpu` smoke suite.
 - `make live-smoke`: run the headless live runtime smoke path.
 - `make actor-smoke`: run the accepted actor gameplay smoke path.
 - `make actor-attract-smoke`: run the accepted attract sequence smoke path.
@@ -88,10 +93,15 @@ Important Makefile targets:
 - `make readme-gameplay-image`: regenerate `docs/defender.png`.
 - `make readme-attract-sequence`: regenerate `docs/start-sequence.gif`.
 - `make readme-media`: regenerate both committed README media files.
+- `make readme-media-check`: verify committed README media is current.
+- `make ci`: run non-graphical CI checks and coverage.
+- `make ci-smoke`: run CI smoke checks; Linux CI wraps this with `xvfb-run`.
+- `make ci-doctor`: check CI coverage and smoke prerequisites.
+- `make coverage`: generate lcov and Cobertura coverage reports.
 - `make docs-lint`: lint `README.md`.
 - `make diff-check`: run whitespace hygiene over the working tree diff.
 - `make clean`: remove Cargo build outputs and local scanner artifacts.
-- `make release-gate`: run the local release checks and README media refresh.
+- `make release-gate`: run the local release checks and verify README media.
 
 The README media targets render the accepted actor runtime through the same
 sprite atlas path used by the native renderer. They do not depend on the
@@ -185,8 +195,11 @@ rules.
   workflow in CI.
 - `make sq` runs the same coverage step locally and then invokes
   `sonar-scanner`.
-- Local SonarQube scans require `cargo-llvm-cov`, `sonar-scanner`, and a
-  `SONAR_TOKEN` environment variable.
+- Coverage runs under the `stable` Rust toolchain by default; override with
+  `COVERAGE_TOOLCHAIN=<toolchain>` when needed.
+- Local SonarQube scans require `cargo-llvm-cov`, `llvm-tools-preview` for the
+  coverage toolchain, `sonar-scanner`, and a `SONAR_TOKEN` environment
+  variable.
 
 ## Platform Support
 
