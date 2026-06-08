@@ -91,6 +91,7 @@ Important Makefile targets:
 - `make readme-media`: regenerate both committed README media files.
 - `make docs-lint`: lint `README.md`, `SPEC.md`, and `PLAN.md`.
 - `make diff-check`: run whitespace hygiene over the working tree diff.
+- `make clean`: remove Cargo build outputs and local scanner artifacts.
 - `make release-gate`: run the local release checks and README media refresh.
 
 The README media targets render the accepted actor runtime through the same

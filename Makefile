@@ -1,4 +1,4 @@
-.PHONY: fmt test clippy release-gate ci ci-smoke ci-doctor coverage-doctor smoke-doctor coverage sq sq-ci sonar run run-wgpu live live-wgpu smoke-wgpu game-smoke actor-smoke actor-attract-smoke actor-post-game-smoke actor-wgpu-smoke live-smoke readme-gameplay-image readme-attract-sequence readme-media docs-lint diff-check
+.PHONY: fmt test clippy release-gate ci ci-smoke ci-doctor coverage-doctor smoke-doctor coverage sq sq-ci sonar run run-wgpu live live-wgpu smoke-wgpu game-smoke actor-smoke actor-attract-smoke actor-post-game-smoke actor-wgpu-smoke live-smoke readme-gameplay-image readme-attract-sequence readme-media docs-lint diff-check clean
 
 SONAR_SCANNER ?= sonar-scanner
 SONAR_ARGS ?= -Dsonar.qualitygate.wait=true
@@ -125,3 +125,7 @@ docs-lint:
 
 diff-check:
 	git diff --check
+
+clean:
+	cargo clean
+	rm -rf .scannerwork
