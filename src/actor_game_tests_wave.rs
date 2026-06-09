@@ -455,13 +455,13 @@
                 .any(|draw| draw.sprite == SpriteKey::Bomber
                     && matches!(
                         draw.effect,
-                        VisualEffect::SourceBomberFrame { frame }
+                        VisualEffect::BomberSpriteFrame { frame }
                             if frame == expected_bomber_source.picture_frame
                     ))
         );
         assert!(
             live.draws.iter().any(|draw| draw.sprite == SpriteKey::Pod
-                && matches!(draw.effect, VisualEffect::SourcePod))
+                && matches!(draw.effect, VisualEffect::PodSprite))
         );
     }
 
@@ -1481,7 +1481,7 @@
         assert!(live.draws.iter().any(|draw| {
             draw.actor == lander.id
                 && draw.sprite == SpriteKey::Lander
-                && matches!(draw.effect, VisualEffect::SourceLanderFrame { frame: 1 })
+                && matches!(draw.effect, VisualEffect::LanderSpriteFrame { frame: 1 })
         }));
     }
 

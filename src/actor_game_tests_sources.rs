@@ -200,7 +200,7 @@
         assert!(live.draws.iter().any(|draw| {
             draw.actor == human.id
                 && draw.sprite == SpriteKey::Human
-                && matches!(draw.effect, VisualEffect::SourceHumanFrame { frame: 3 })
+                && matches!(draw.effect, VisualEffect::HumanSpriteFrame { frame: 3 })
         }));
     }
 
@@ -819,7 +819,7 @@
             draw.actor == bomber
                 && matches!(
                     draw.effect,
-                    VisualEffect::SourceBomberFrame { frame }
+                    VisualEffect::BomberSpriteFrame { frame }
                         if frame == expected_source.picture_frame
                 )
         }));
@@ -1306,7 +1306,7 @@
         }));
         assert!(live.draws.iter().any(|draw| {
             draw.sprite == SpriteKey::Baiter
-                && matches!(draw.effect, VisualEffect::SourceBaiterFrame { frame: 1 })
+                && matches!(draw.effect, VisualEffect::BaiterSpriteFrame { frame: 1 })
         }));
     }
 

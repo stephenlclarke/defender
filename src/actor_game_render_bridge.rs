@@ -108,11 +108,11 @@ impl ActorRenderSceneBridge {
             } => self.push_explosion_sprite(scene, draw.position, kind, age, source_center),
             VisualEffect::Static
             | VisualEffect::ArcadeMessage { .. }
-            | VisualEffect::SourceLanderFrame { .. }
-            | VisualEffect::SourceBomberFrame { .. }
-            | VisualEffect::SourcePod
-            | VisualEffect::SourceBaiterFrame { .. }
-            | VisualEffect::SourceHumanFrame { .. } => self.push_static_sprite(scene, report, draw),
+            | VisualEffect::LanderSpriteFrame { .. }
+            | VisualEffect::BomberSpriteFrame { .. }
+            | VisualEffect::PodSprite
+            | VisualEffect::BaiterSpriteFrame { .. }
+            | VisualEffect::HumanSpriteFrame { .. } => self.push_static_sprite(scene, report, draw),
         }
     }
 

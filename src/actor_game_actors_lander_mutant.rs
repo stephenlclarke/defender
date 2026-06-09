@@ -355,7 +355,7 @@ impl Lander {
 
     fn draw_effect(&self) -> VisualEffect {
         self.source
-            .map(|source| VisualEffect::SourceLanderFrame {
+            .map(|source| VisualEffect::LanderSpriteFrame {
                 frame: source.picture_frame,
             })
             .unwrap_or(VisualEffect::Static)

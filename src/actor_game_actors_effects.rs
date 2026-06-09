@@ -235,7 +235,7 @@ impl AssetActor for Human {
 impl Human {
     fn draw_effect(&self) -> VisualEffect {
         self.source
-            .map(|source| VisualEffect::SourceHumanFrame {
+            .map(|source| VisualEffect::HumanSpriteFrame {
                 frame: source.picture_frame,
             })
             .unwrap_or(VisualEffect::Static)

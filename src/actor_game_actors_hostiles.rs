@@ -81,7 +81,7 @@ impl Bomber {
 
     fn draw_effect(&self) -> VisualEffect {
         self.source
-            .map(|source| VisualEffect::SourceBomberFrame {
+            .map(|source| VisualEffect::BomberSpriteFrame {
                 frame: source.picture_frame,
             })
             .unwrap_or(VisualEffect::Static)
@@ -420,7 +420,7 @@ impl AssetActor for Pod {
                 self.id,
                 SpriteKey::Pod,
                 self.position,
-                VisualEffect::SourcePod,
+                VisualEffect::PodSprite,
             ));
         }
         let movement_velocity = observed_velocity(previous_position, self.position);
@@ -786,7 +786,7 @@ impl Baiter {
 
     fn draw_effect(&self) -> VisualEffect {
         self.source
-            .map(|source| VisualEffect::SourceBaiterFrame {
+            .map(|source| VisualEffect::BaiterSpriteFrame {
                 frame: source.picture_frame,
             })
             .unwrap_or(VisualEffect::Static)

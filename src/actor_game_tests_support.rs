@@ -1736,7 +1736,7 @@
                     ActorId::new(5),
                     SpriteKey::Human,
                     Point::new(0x2E, 220),
-                    VisualEffect::SourceHumanFrame { frame: 2 },
+                    VisualEffect::HumanSpriteFrame { frame: 2 },
                 ),
             ],
             sounds: Vec::new(),

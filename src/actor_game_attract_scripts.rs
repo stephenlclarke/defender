@@ -44,17 +44,17 @@ pub enum VisualEffect {
         slot: u8,
         row_pair: u8,
     },
-    SourceLanderFrame {
+    LanderSpriteFrame {
         frame: u8,
     },
-    SourceBomberFrame {
+    BomberSpriteFrame {
         frame: u8,
     },
-    SourcePod,
-    SourceBaiterFrame {
+    PodSprite,
+    BaiterSpriteFrame {
         frame: u8,
     },
-    SourceHumanFrame {
+    HumanSpriteFrame {
         frame: u8,
     },
     ExplosionCloud {
