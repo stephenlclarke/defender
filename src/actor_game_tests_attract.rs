@@ -433,7 +433,7 @@
         let score_pixels = score_popup_500_pixels(&rescue_score_scene, score_position);
         assert!(
             score_pixels.len() > 20,
-            "rescued-human 500 bonus should render from coloured source pixels"
+            "rescued-human 500 bonus should render from coloured arcade pixels"
         );
         for tint in SCORE_POPUP_500_COLOR_CYCLE {
             assert!(
@@ -551,7 +551,7 @@
                     && sprite.position == target_position
                     && sprite.size == target_size
             }),
-            "scoring laser test must use the visible source target"
+            "scoring laser test must use the visible arcade target"
         );
         let target_front_edge = target_position[0];
         let target_center_y =

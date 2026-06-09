@@ -434,7 +434,7 @@ impl ActorPostGameSmokeReport {
             bail!("actor post-game smoke did not render pod sprites");
         }
         if !self.saw_explosion_pixels {
-            bail!("actor post-game smoke did not render source explosion pixels");
+            bail!("actor post-game smoke did not render arcade explosion pixels");
         }
         if !self.saw_hall_of_fame {
             bail!("actor post-game smoke did not render Hall of Fame after submission");

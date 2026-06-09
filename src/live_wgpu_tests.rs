@@ -802,7 +802,7 @@ mod tests {
     #[test]
     fn actor_script_check_reports_enemy_projectile_and_sound_samples() {
         let path = write_actor_script_file(
-            "actor-script-source-projectile-check",
+            "actor-script-arcade-projectile-check",
             concat!(
                 "[attract]\n",
                 "text 1 forever 12 20 PROJECTILE CHECK\n",
@@ -853,14 +853,14 @@ mod tests {
     #[test]
     fn actor_script_check_reports_arcade_wave_overrides_at_play_start() {
         let path = write_actor_script_file(
-            "actor-script-source-wave-check",
+            "actor-script-arcade-wave-check",
             concat!(
                 "[attract]\n",
-                "text 1 forever 12 20 SOURCE CHECK\n",
+                "text 1 forever 12 20 ARCADE CHECK\n",
                 "[behavior]\n",
                 "kind lander lander_mode drift\n",
                 "[wave]\n",
-                "name source check waves\n",
+                "name arcade check waves\n",
                 "arcade_wave 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
                 "swarmer_x_velocity 64 swarmer_shot_time 11 baiter_time 24 ",
                 "mutant_x_velocity 48 mutant_random_y 2 mutant_shot_time 12\n",
