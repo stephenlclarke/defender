@@ -52,12 +52,12 @@ impl Human {
     fn update_grounded(
         &mut self,
         arcade_rng: Option<ActorArcadeRngSnapshot>,
-        source_walk_target_slot: Option<usize>,
+        human_walk_target_slot: Option<usize>,
     ) {
         let Some(source) = self.source else {
             return;
         };
-        if source_walk_target_slot != Some(source.target_slot_index) {
+        if human_walk_target_slot != Some(source.target_slot_index) {
             return;
         }
 
