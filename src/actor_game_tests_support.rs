@@ -1533,7 +1533,7 @@
             .expect("actor snapshot should be present")
     }
 
-    fn source_human_spawn_for_test(
+    fn arcade_human_spawn_for_test(
         position: Point,
         target_slot_index: usize,
         picture_frame: u8,

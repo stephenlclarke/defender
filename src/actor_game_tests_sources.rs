@@ -169,7 +169,7 @@
     }
 
     #[test]
-    fn first_wave_humans_publish_source_metadata_and_picture_frames() {
+    fn first_wave_humans_publish_arcade_state_and_picture_frames() {
         let mut driver = ActorGameDriver::new();
         driver.step(GameInput {
             coin: true,
@@ -187,7 +187,7 @@
             .find(|snapshot| {
                 snapshot.kind == ActorKind::Human && snapshot.position == Point::new(0x1C, 0xE1)
             })
-            .expect("source first-wave human should publish its restore position");
+            .expect("arcade-state first-wave human should publish its restore position");
 
         assert_eq!(
             human.human_runtime,
@@ -206,11 +206,11 @@
     }
 
     #[test]
-    fn source_human_walk_uses_seeded_left_branch_and_terrain_y_target() {
+    fn human_walk_uses_arcade_seeded_left_branch_and_terrain_y_target() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         let human_id =
-            driver.spawn_human_from_spawn(source_human_spawn_for_test(Point::new(64, 220), 1, 0));
+            driver.spawn_human_from_spawn(arcade_human_spawn_for_test(Point::new(64, 220), 1, 0));
         driver.step(GameInput::NONE);
         driver.arcade_rng = ActorArcadeRng {
             seed: 0,
@@ -229,17 +229,17 @@
         assert_eq!(
             human
                 .human_runtime
-                .map(|source| (source.x_fraction, source.picture_frame)),
+                .map(|arcade_state| (arcade_state.x_fraction, arcade_state.picture_frame)),
             Some((0xE0, 1))
         );
     }
 
     #[test]
-    fn source_human_walk_turns_on_low_source_seed_without_y_step() {
+    fn human_walk_turns_on_low_arcade_seed_without_y_step() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         let human_id =
-            driver.spawn_human_from_spawn(source_human_spawn_for_test(Point::new(64, 220), 1, 0));
+            driver.spawn_human_from_spawn(arcade_human_spawn_for_test(Point::new(64, 220), 1, 0));
         driver.step(GameInput::NONE);
         driver.arcade_rng = ActorArcadeRng {
             seed: 0,
@@ -255,21 +255,21 @@
         assert_eq!(
             human
                 .human_runtime
-                .map(|source| (source.x_fraction, source.picture_frame)),
+                .map(|arcade_state| (arcade_state.x_fraction, arcade_state.picture_frame)),
             Some((0x20, 2))
         );
     }
 
     #[test]
-    fn source_human_walk_process_moves_only_selected_target_slot() {
+    fn human_walk_process_moves_only_selected_target_slot() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         let slot0 =
-            driver.spawn_human_from_spawn(source_human_spawn_for_test(Point::new(48, 220), 0, 0));
+            driver.spawn_human_from_spawn(arcade_human_spawn_for_test(Point::new(48, 220), 0, 0));
         let slot1 =
-            driver.spawn_human_from_spawn(source_human_spawn_for_test(Point::new(64, 220), 1, 0));
+            driver.spawn_human_from_spawn(arcade_human_spawn_for_test(Point::new(64, 220), 1, 0));
         let slot2 =
-            driver.spawn_human_from_spawn(source_human_spawn_for_test(Point::new(80, 220), 2, 0));
+            driver.spawn_human_from_spawn(arcade_human_spawn_for_test(Point::new(80, 220), 2, 0));
 
         driver.step(GameInput::NONE);
         driver.arcade_rng = ActorArcadeRng {
@@ -295,12 +295,12 @@
     }
 
     #[test]
-    fn source_human_walk_process_suppresses_inactive_first_wave_slots() {
+    fn human_walk_process_suppresses_inactive_first_wave_slots() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         let mut human_ids = Vec::new();
         for slot in 0..usize::from(START_HUMAN_COUNT) {
-            human_ids.push(driver.spawn_human_from_spawn(source_human_spawn_for_test(
+            human_ids.push(driver.spawn_human_from_spawn(arcade_human_spawn_for_test(
                 Point::new(40 + i16::try_from(slot).expect("slot fits i16") * 8, 220),
                 slot,
                 0,
@@ -335,12 +335,12 @@
     }
 
     #[test]
-    fn source_human_walk_process_suppression_counts_plain_humans() {
+    fn human_walk_process_suppression_counts_plain_humans() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
-        let mut source_ids = Vec::new();
+        let mut arcade_state_ids = Vec::new();
         for slot in 0..9usize {
-            source_ids.push(driver.spawn_human_from_spawn(source_human_spawn_for_test(
+            arcade_state_ids.push(driver.spawn_human_from_spawn(arcade_human_spawn_for_test(
                 Point::new(40 + i16::try_from(slot).expect("slot fits i16") * 8, 220),
                 slot,
                 0,
@@ -356,7 +356,7 @@
         };
         let slot1_walked = driver.step(GameInput::NONE);
         assert_eq!(
-            snapshot_for(&slot1_walked, source_ids[1]).position,
+            snapshot_for(&slot1_walked, arcade_state_ids[1]).position,
             Point::new(47, 221)
         );
 
@@ -370,7 +370,7 @@
 
         assert_eq!(driver.human_walk_cursor, Some(2));
         assert_eq!(
-            snapshot_for(&slot2_suppressed, source_ids[2]).position,
+            snapshot_for(&slot2_suppressed, arcade_state_ids[2]).position,
             Point::new(56, 220)
         );
     }
