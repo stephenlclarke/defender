@@ -881,7 +881,7 @@
     }
 
     #[test]
-    fn source_bomb_spawn_commands_respect_getshl_bounds() {
+    fn bomb_spawn_commands_respect_enemy_projectile_bounds() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
 
@@ -929,7 +929,7 @@
     }
 
     #[test]
-    fn source_bomb_spawn_preserves_scripted_lifetime_ticks() {
+    fn bomb_spawn_preserves_arcade_lifetime_ticks() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.set_kind_behavior(
@@ -958,7 +958,7 @@
                     .iter()
                     .find(|snapshot| snapshot.kind == ActorKind::Bomb)
                     .and_then(|snapshot| snapshot.enemy_projectile_runtime)
-                    .expect("source-backed bomb should publish source projectile metadata")
+                    .expect("bomb should publish enemy projectile arcade state")
                     .lifetime_ticks
             })
             .collect::<Vec<_>>();
@@ -967,7 +967,7 @@
     }
 
     #[test]
-    fn source_enemy_laser_spawn_commands_respect_getshl_bounds() {
+    fn enemy_laser_spawn_commands_respect_enemy_projectile_bounds() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
 
@@ -1006,7 +1006,7 @@
     }
 
     #[test]
-    fn source_enemy_laser_spawn_preserves_scripted_projectile_metadata() {
+    fn enemy_laser_spawn_preserves_arcade_projectile_state() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.set_kind_behavior(
@@ -1028,23 +1028,23 @@
             }),
         })]);
 
-        let mut first_source = None;
+        let mut first_arcade_state = None;
         let lifetimes = (0..=ENEMY_PROJECTILE_SCAN_INITIAL_DELAY_STEPS)
             .map(|_| {
                 let report = driver.step(GameInput::NONE);
-                let source = report
+                let arcade_state = report
                     .snapshots
                     .iter()
                     .find(|snapshot| snapshot.kind == ActorKind::EnemyLaser)
                     .and_then(|snapshot| snapshot.enemy_projectile_runtime)
-                    .expect("scripted enemy laser should publish source metadata");
-                first_source.get_or_insert(source);
-                source.lifetime_ticks
+                    .expect("scripted enemy laser should publish arcade projectile state");
+                first_arcade_state.get_or_insert(arcade_state);
+                arcade_state.lifetime_ticks
             })
             .collect::<Vec<_>>();
 
         assert_eq!(
-            first_source,
+            first_arcade_state,
             Some(EnemyProjectileArcadeState {
                 x_fraction: 0x55,
                 y_fraction: 0x66,

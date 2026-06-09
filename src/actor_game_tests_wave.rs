@@ -1782,7 +1782,7 @@
                 let report = driver.step(GameInput::NONE);
                 snapshot_for(&report, shot)
                     .enemy_projectile_runtime
-                    .expect("enemy laser should publish source projectile metadata")
+                    .expect("enemy laser should publish arcade projectile state")
                     .lifetime_ticks
             })
             .collect::<Vec<_>>();
