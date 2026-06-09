@@ -372,8 +372,8 @@
                 && sprite.layer == RenderLayer::Objects
                 && sprite.position
                     == actor_attract_scoring_scene_position(
-                        ATTRACT_SCORING_PLAYER_X16,
-                        ATTRACT_SCORING_PLAYER_Y16,
+                        ATTRACT_SCORING_PLAYER_WORLD_X,
+                        ATTRACT_SCORING_PLAYER_WORLD_Y,
                     )
                 && sprite.size == PLAYER_SHIP_SCENE_SIZE
         }));
@@ -382,8 +382,8 @@
                 && sprite.layer == RenderLayer::Objects
                 && sprite.position
                     == actor_attract_scoring_scene_position(
-                        ATTRACT_SCORING_HUMAN_X16,
-                        ATTRACT_SCORING_HUMAN_Y16,
+                        ATTRACT_SCORING_HUMAN_WORLD_X,
+                        ATTRACT_SCORING_HUMAN_WORLD_Y,
                     )
                 && sprite.size == HUMAN_SCENE_SIZE
         }));
@@ -392,8 +392,8 @@
                 && sprite.layer == RenderLayer::Objects
                 && sprite.position
                     == actor_attract_scoring_scene_position(
-                        ATTRACT_SCORING_LANDER_X16,
-                        ATTRACT_SCORING_LANDER_Y16,
+                        ATTRACT_SCORING_LANDER_WORLD_X,
+                        ATTRACT_SCORING_LANDER_WORLD_Y,
                     )
                 && sprite.size == LANDER_SCENE_SIZE
         }));
@@ -424,8 +424,8 @@
         let rescue_score_scene =
             ActorRenderSceneBridge::new().render_scene_for_report(&rescue_score);
         let score_position = actor_attract_scoring_scene_position(
-            ATTRACT_SCORING_SCORE_500_X16,
-            ATTRACT_SCORING_SCORE_500_Y16,
+            ATTRACT_SCORING_SCORE_500_WORLD_X,
+            ATTRACT_SCORING_SCORE_500_WORLD_Y,
         );
         assert!(!rescue_score_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::SCORE_POPUP_500 && sprite.layer == RenderLayer::Objects
@@ -677,8 +677,8 @@
                 &legend_laser_scene,
                 entry.enemy,
                 actor_attract_scoring_scene_position(
-                    ATTRACT_SCORING_LEGEND_ORIGIN_X16,
-                    actor_attract_scoring_legend_enemy_y16(
+                    ATTRACT_SCORING_LEGEND_ORIGIN_WORLD_X,
+                    actor_attract_scoring_legend_enemy_world_y(
                         entry.enemy,
                         actor_attract_scoring_legend_player_position().1,
                     ),

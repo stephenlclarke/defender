@@ -87,8 +87,8 @@ struct ActorAttractScoringFrame {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ActorAttractScoringLegendEntry {
     enemy: ActorAttractScoringEnemyKind,
-    table_x16: i32,
-    table_y16: i32,
+    table_world_x: i32,
+    table_world_y: i32,
     scanner_color_word: u16,
 }
 
@@ -96,38 +96,38 @@ const ACTOR_ATTRACT_SCORING_LEGEND: [ActorAttractScoringLegendEntry;
     ATTRACT_SCORING_LEGEND_ENTRIES as usize] = [
     ActorAttractScoringLegendEntry {
         enemy: ActorAttractScoringEnemyKind::Lander,
-        table_x16: 0x07A0,
-        table_y16: 0x5900,
+        table_world_x: 0x07A0,
+        table_world_y: 0x5900,
         scanner_color_word: 0x4433,
     },
     ActorAttractScoringLegendEntry {
         enemy: ActorAttractScoringEnemyKind::Mutant,
-        table_x16: 0x0FA0,
-        table_y16: 0x5900,
+        table_world_x: 0x0FA0,
+        table_world_y: 0x5900,
         scanner_color_word: 0xCC33,
     },
     ActorAttractScoringLegendEntry {
         enemy: ActorAttractScoringEnemyKind::Baiter,
-        table_x16: 0x1820,
-        table_y16: 0x5B00,
+        table_world_x: 0x1820,
+        table_world_y: 0x5B00,
         scanner_color_word: 0x3333,
     },
     ActorAttractScoringLegendEntry {
         enemy: ActorAttractScoringEnemyKind::Bomber,
-        table_x16: 0x0800,
-        table_y16: 0x9100,
+        table_world_x: 0x0800,
+        table_world_y: 0x9100,
         scanner_color_word: 0x8888,
     },
     ActorAttractScoringLegendEntry {
         enemy: ActorAttractScoringEnemyKind::Pod,
-        table_x16: 0x1000,
-        table_y16: 0x9100,
+        table_world_x: 0x1000,
+        table_world_y: 0x9100,
         scanner_color_word: 0xCCCC,
     },
     ActorAttractScoringLegendEntry {
         enemy: ActorAttractScoringEnemyKind::Swarmer,
-        table_x16: 0x1880,
-        table_y16: 0x9300,
+        table_world_x: 0x1880,
+        table_world_y: 0x9300,
         scanner_color_word: 0x2424,
     },
 ];
@@ -135,15 +135,15 @@ const ACTOR_ATTRACT_SCORING_LEGEND: [ActorAttractScoringLegendEntry;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ActorAttractScoringBonus {
     sprite: SpriteId,
-    x16: i32,
-    y16: i32,
+    world_x: i32,
+    world_y: i32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ActorAttractScoringObject {
     kind: ActorAttractScoringObjectKind,
-    x16: i32,
-    y16: i32,
+    world_x: i32,
+    world_y: i32,
     visual: ActorAttractScoringVisual,
     visual_step: u16,
 }
@@ -341,18 +341,18 @@ fn actor_attract_scoring_objects_for_stage(
         ActorAttractScoringStage::RescueDescend => {
             objects.push(actor_attract_scoring_enemy_object(
                 ActorAttractScoringEnemyKind::Lander,
-                ATTRACT_SCORING_LANDER_X16,
-                ATTRACT_SCORING_LANDER_Y16 + i32::from(local_step) * 0x00A0,
+                ATTRACT_SCORING_LANDER_WORLD_X,
+                ATTRACT_SCORING_LANDER_WORLD_Y + i32::from(local_step) * 0x00A0,
             ));
             objects.push(actor_attract_scoring_object(
                 ActorAttractScoringObjectKind::Human,
-                ATTRACT_SCORING_HUMAN_X16,
-                ATTRACT_SCORING_HUMAN_Y16,
+                ATTRACT_SCORING_HUMAN_WORLD_X,
+                ATTRACT_SCORING_HUMAN_WORLD_Y,
             ));
             objects.push(actor_attract_scoring_object(
                 ActorAttractScoringObjectKind::PlayerShip,
-                ATTRACT_SCORING_PLAYER_X16,
-                ATTRACT_SCORING_PLAYER_Y16,
+                ATTRACT_SCORING_PLAYER_WORLD_X,
+                ATTRACT_SCORING_PLAYER_WORLD_Y,
             ));
         }
         ActorAttractScoringStage::RescueAscend | ActorAttractScoringStage::RescueLaser => {
@@ -362,35 +362,35 @@ fn actor_attract_scoring_objects_for_stage(
                 ATTRACT_SCORING_RESCUE_ASCENT_STEPS + local_step
             };
             let lander_y = if stage == ActorAttractScoringStage::RescueLaser {
-                actor_attract_scoring_laser_aligned_enemy_y16(
+                actor_attract_scoring_laser_aligned_enemy_world_y(
                     ActorAttractScoringEnemyKind::Lander,
-                    ATTRACT_SCORING_PLAYER_Y16,
+                    ATTRACT_SCORING_PLAYER_WORLD_Y,
                 )
             } else {
-                ATTRACT_SCORING_LANDER_Y16
+                ATTRACT_SCORING_LANDER_WORLD_Y
                     + i32::from(ATTRACT_SCORING_RESCUE_DESCENT_STEPS) * 0x00A0
                     - i32::from(rise_step) * 0x00B0
             };
-            let human_y = ATTRACT_SCORING_HUMAN_Y16 - i32::from(rise_step) * 0x00B0;
+            let human_y = ATTRACT_SCORING_HUMAN_WORLD_Y - i32::from(rise_step) * 0x00B0;
             objects.push(actor_attract_scoring_enemy_object(
                 ActorAttractScoringEnemyKind::Lander,
-                ATTRACT_SCORING_LANDER_X16,
+                ATTRACT_SCORING_LANDER_WORLD_X,
                 lander_y,
             ));
             objects.push(actor_attract_scoring_object(
                 ActorAttractScoringObjectKind::Human,
-                ATTRACT_SCORING_HUMAN_X16,
+                ATTRACT_SCORING_HUMAN_WORLD_X,
                 human_y,
             ));
             objects.push(actor_attract_scoring_object(
                 ActorAttractScoringObjectKind::PlayerShip,
-                ATTRACT_SCORING_PLAYER_X16,
-                ATTRACT_SCORING_PLAYER_Y16,
+                ATTRACT_SCORING_PLAYER_WORLD_X,
+                ATTRACT_SCORING_PLAYER_WORLD_Y,
             ));
             if stage == ActorAttractScoringStage::RescueLaser {
                 objects.push(actor_attract_scoring_object(
                     ActorAttractScoringObjectKind::PlayerShot,
-                    ATTRACT_SCORING_LANDER_X16,
+                    ATTRACT_SCORING_LANDER_WORLD_X,
                     lander_y,
                 ));
             }
@@ -403,13 +403,13 @@ fn actor_attract_scoring_objects_for_stage(
                 ship_y,
             ));
             if local_step < 12 {
-                let lander_y = actor_attract_scoring_laser_aligned_enemy_y16(
+                let lander_y = actor_attract_scoring_laser_aligned_enemy_world_y(
                     ActorAttractScoringEnemyKind::Lander,
-                    ATTRACT_SCORING_PLAYER_Y16,
+                    ATTRACT_SCORING_PLAYER_WORLD_Y,
                 );
                 objects.push(actor_attract_scoring_visual_enemy_object(
                     ActorAttractScoringEnemyKind::Lander,
-                    ATTRACT_SCORING_LANDER_X16,
+                    ATTRACT_SCORING_LANDER_WORLD_X,
                     lander_y,
                     ActorAttractScoringVisual::Explosion,
                     local_step,
@@ -417,7 +417,7 @@ fn actor_attract_scoring_objects_for_stage(
             }
             objects.push(actor_attract_scoring_object(
                 ActorAttractScoringObjectKind::Human,
-                ATTRACT_SCORING_HUMAN_X16,
+                ATTRACT_SCORING_HUMAN_WORLD_X,
                 human_y,
             ));
         }
@@ -430,7 +430,7 @@ fn actor_attract_scoring_objects_for_stage(
             ));
             objects.push(actor_attract_scoring_object(
                 ActorAttractScoringObjectKind::Human,
-                ATTRACT_SCORING_CAUGHT_HUMAN_X16,
+                ATTRACT_SCORING_CAUGHT_HUMAN_WORLD_X,
                 human_y,
             ));
         }
@@ -439,13 +439,13 @@ fn actor_attract_scoring_objects_for_stage(
                 actor_attract_scoring_drop_state(ATTRACT_SCORING_RESCUE_SCORE_STEPS);
             objects.push(actor_attract_scoring_object(
                 ActorAttractScoringObjectKind::PlayerShip,
-                ship_x + i32::from(local_step) * ATTRACT_SCORING_RESCUE_RETURN_XV16,
-                ship_y + i32::from(local_step) * ATTRACT_SCORING_RESCUE_RETURN_YV16,
+                ship_x + i32::from(local_step) * ATTRACT_SCORING_RESCUE_RETURN_WORLD_X_VELOCITY,
+                ship_y + i32::from(local_step) * ATTRACT_SCORING_RESCUE_RETURN_WORLD_Y_VELOCITY,
             ));
             objects.push(actor_attract_scoring_object(
                 ActorAttractScoringObjectKind::Human,
-                ATTRACT_SCORING_CAUGHT_HUMAN_X16,
-                ATTRACT_SCORING_GROUNDED_HUMAN_Y16,
+                ATTRACT_SCORING_CAUGHT_HUMAN_WORLD_X,
+                ATTRACT_SCORING_GROUNDED_HUMAN_WORLD_Y,
             ));
         }
         ActorAttractScoringStage::LegendApproach(_)
@@ -461,8 +461,8 @@ fn actor_attract_scoring_objects_for_stage(
             ));
             objects.push(actor_attract_scoring_object(
                 ActorAttractScoringObjectKind::Human,
-                ATTRACT_SCORING_CAUGHT_HUMAN_X16,
-                ATTRACT_SCORING_GROUNDED_HUMAN_Y16,
+                ATTRACT_SCORING_CAUGHT_HUMAN_WORLD_X,
+                ATTRACT_SCORING_GROUNDED_HUMAN_WORLD_Y,
             ));
             append_actor_attract_scoring_legend_objects(
                 &mut objects,
@@ -477,21 +477,21 @@ fn actor_attract_scoring_objects_for_stage(
 }
 
 fn actor_attract_scoring_intercept_state(fall_step: u16) -> (i32, i32, i32) {
-    let mut ship_x = ATTRACT_SCORING_PLAYER_X16;
-    let mut ship_y = ATTRACT_SCORING_PLAYER_Y16;
-    let mut human_y = ATTRACT_SCORING_HUMAN_Y16
+    let mut ship_x = ATTRACT_SCORING_PLAYER_WORLD_X;
+    let mut ship_y = ATTRACT_SCORING_PLAYER_WORLD_Y;
+    let mut human_y = ATTRACT_SCORING_HUMAN_WORLD_Y
         - i32::from(ATTRACT_SCORING_RESCUE_ASCENT_STEPS + ATTRACT_SCORING_RESCUE_LASER_STEPS)
             * 0x00B0;
     let mut elapsed = 0;
     let mut human_velocity = 0;
     for _ in 0..(ATTRACT_SCORING_RESCUE_FALL_STEPS / 2) {
-        human_velocity += ATTRACT_SCORING_RESCUE_HUMAN_ACCEL16;
+        human_velocity += ATTRACT_SCORING_RESCUE_HUMAN_WORLD_ACCELERATION;
         for _ in 0..2 {
             if elapsed >= fall_step {
                 return (ship_x, ship_y, human_y);
             }
-            ship_x += ATTRACT_SCORING_RESCUE_SHIP_XV16;
-            ship_y += ATTRACT_SCORING_RESCUE_SHIP_YV16;
+            ship_x += ATTRACT_SCORING_RESCUE_SHIP_WORLD_X_VELOCITY;
+            ship_y += ATTRACT_SCORING_RESCUE_SHIP_WORLD_Y_VELOCITY;
             human_y += human_velocity;
             elapsed += 1;
         }
@@ -504,8 +504,8 @@ fn actor_attract_scoring_drop_state(score_step: u16) -> (i32, i32, i32) {
         actor_attract_scoring_intercept_state(ATTRACT_SCORING_RESCUE_FALL_STEPS);
     (
         ship_x,
-        ship_y + i32::from(score_step) * ATTRACT_SCORING_RESCUE_DROP_YV16,
-        ATTRACT_SCORING_CAUGHT_HUMAN_Y16 + i32::from(score_step) * ATTRACT_SCORING_RESCUE_DROP_YV16,
+        ship_y + i32::from(score_step) * ATTRACT_SCORING_RESCUE_DROP_WORLD_Y_VELOCITY,
+        ATTRACT_SCORING_CAUGHT_HUMAN_WORLD_Y + i32::from(score_step) * ATTRACT_SCORING_RESCUE_DROP_WORLD_Y_VELOCITY,
     )
 }
 
@@ -513,9 +513,9 @@ fn actor_attract_scoring_legend_player_position() -> (i32, i32) {
     let (ship_x, ship_y, _) = actor_attract_scoring_drop_state(ATTRACT_SCORING_RESCUE_SCORE_STEPS);
     (
         ship_x
-            + i32::from(ATTRACT_SCORING_RESCUE_RETURN_STEPS) * ATTRACT_SCORING_RESCUE_RETURN_XV16,
+            + i32::from(ATTRACT_SCORING_RESCUE_RETURN_STEPS) * ATTRACT_SCORING_RESCUE_RETURN_WORLD_X_VELOCITY,
         ship_y
-            + i32::from(ATTRACT_SCORING_RESCUE_RETURN_STEPS) * ATTRACT_SCORING_RESCUE_RETURN_YV16,
+            + i32::from(ATTRACT_SCORING_RESCUE_RETURN_STEPS) * ATTRACT_SCORING_RESCUE_RETURN_WORLD_Y_VELOCITY,
     )
 }
 
@@ -523,8 +523,8 @@ fn append_actor_attract_scoring_legend_objects(
     objects: &mut Vec<ActorAttractScoringObject>,
     stage: ActorAttractScoringStage,
     local_step: u16,
-    player_x16: i32,
-    player_y16: i32,
+    player_world_x: i32,
+    player_world_y: i32,
 ) {
     for entry in ACTOR_ATTRACT_SCORING_LEGEND
         .iter()
@@ -532,8 +532,8 @@ fn append_actor_attract_scoring_legend_objects(
     {
         objects.push(actor_attract_scoring_enemy_object(
             entry.enemy,
-            entry.table_x16,
-            entry.table_y16,
+            entry.table_world_x,
+            entry.table_world_y,
         ));
     }
 
@@ -550,45 +550,45 @@ fn append_actor_attract_scoring_legend_objects(
     };
 
     let entry = ACTOR_ATTRACT_SCORING_LEGEND[index];
-    let legend_enemy_y16 = actor_attract_scoring_legend_enemy_y16(entry.enemy, player_y16);
+    let legend_enemy_world_y = actor_attract_scoring_legend_enemy_world_y(entry.enemy, player_world_y);
     match stage {
         ActorAttractScoringStage::LegendApproach(_) => {
-            let enemy_y = actor_attract_scoring_lerp_y16(
-                ATTRACT_SCORING_LEGEND_ORIGIN_START_Y16,
-                legend_enemy_y16,
+            let enemy_y = actor_attract_scoring_lerp_world_y(
+                ATTRACT_SCORING_LEGEND_ORIGIN_START_WORLD_Y,
+                legend_enemy_world_y,
                 local_step,
                 ATTRACT_SCORING_LEGEND_APPROACH_STEPS,
             );
             objects.push(actor_attract_scoring_enemy_object(
                 entry.enemy,
-                ATTRACT_SCORING_LEGEND_ORIGIN_X16,
+                ATTRACT_SCORING_LEGEND_ORIGIN_WORLD_X,
                 enemy_y,
             ));
         }
         ActorAttractScoringStage::LegendLaser(_) => {
             objects.push(actor_attract_scoring_enemy_object(
                 entry.enemy,
-                ATTRACT_SCORING_LEGEND_ORIGIN_X16,
-                legend_enemy_y16,
+                ATTRACT_SCORING_LEGEND_ORIGIN_WORLD_X,
+                legend_enemy_world_y,
             ));
             objects.push(actor_attract_scoring_object(
                 ActorAttractScoringObjectKind::PlayerShot,
-                player_x16,
-                player_y16,
+                player_world_x,
+                player_world_y,
             ));
         }
         ActorAttractScoringStage::LegendTransfer(_) => {
             objects.push(actor_attract_scoring_visual_enemy_object(
                 entry.enemy,
-                ATTRACT_SCORING_LEGEND_ORIGIN_X16,
-                legend_enemy_y16,
+                ATTRACT_SCORING_LEGEND_ORIGIN_WORLD_X,
+                legend_enemy_world_y,
                 ActorAttractScoringVisual::Explosion,
                 local_step,
             ));
             objects.push(actor_attract_scoring_visual_enemy_object(
                 entry.enemy,
-                entry.table_x16,
-                entry.table_y16,
+                entry.table_world_x,
+                entry.table_world_y,
                 ActorAttractScoringVisual::Materialize,
                 local_step,
             ));
@@ -596,8 +596,8 @@ fn append_actor_attract_scoring_legend_objects(
         ActorAttractScoringStage::LegendReveal(_) => {
             objects.push(actor_attract_scoring_enemy_object(
                 entry.enemy,
-                entry.table_x16,
-                entry.table_y16,
+                entry.table_world_x,
+                entry.table_world_y,
             ));
         }
         ActorAttractScoringStage::LegendHold => {}
@@ -616,51 +616,51 @@ fn actor_attract_scoring_revealed_legend_entries(stage: ActorAttractScoringStage
     }
 }
 
-fn actor_attract_scoring_legend_enemy_y16(
+fn actor_attract_scoring_legend_enemy_world_y(
     enemy: ActorAttractScoringEnemyKind,
-    player_y16: i32,
+    player_world_y: i32,
 ) -> i32 {
-    actor_attract_scoring_laser_aligned_enemy_y16(enemy, player_y16)
+    actor_attract_scoring_laser_aligned_enemy_world_y(enemy, player_world_y)
 }
 
-fn actor_attract_scoring_laser_aligned_enemy_y16(
+fn actor_attract_scoring_laser_aligned_enemy_world_y(
     enemy: ActorAttractScoringEnemyKind,
-    player_y16: i32,
+    player_world_y: i32,
 ) -> i32 {
-    let player_top_y = actor_attract_scoring_scene_position(0, player_y16)[1];
+    let player_top_y = actor_attract_scoring_scene_position(0, player_world_y)[1];
     let ship_anchor_y = player_top_y + PLAYER_SHIP_SCENE_SIZE[1] / 2.0 + 1.0;
     let target_top_y = ship_anchor_y - actor_attract_scoring_enemy_size(enemy)[1] / 2.0;
     let native_y = target_top_y - ATTRACT_SCORING_OBJECT_REFERENCE_OFFSET[1];
     (native_y.round() as i32) << 8
 }
 
-fn actor_attract_scoring_lerp_y16(start_y16: i32, end_y16: i32, step: u16, steps: u16) -> i32 {
+fn actor_attract_scoring_lerp_world_y(start_world_y: i32, end_world_y: i32, step: u16, steps: u16) -> i32 {
     let denominator = i64::from(steps.saturating_sub(1).max(1));
     let numerator = i64::from(step.min(steps.saturating_sub(1)));
-    let start = i64::from(start_y16);
-    let delta = i64::from(end_y16 - start_y16);
+    let start = i64::from(start_world_y);
+    let delta = i64::from(end_world_y - start_world_y);
     (start + delta * numerator / denominator) as i32
 }
 
 fn actor_attract_scoring_enemy_object(
     enemy: ActorAttractScoringEnemyKind,
-    x16: i32,
-    y16: i32,
+    world_x: i32,
+    world_y: i32,
 ) -> ActorAttractScoringObject {
-    actor_attract_scoring_object(ActorAttractScoringObjectKind::Enemy(enemy), x16, y16)
+    actor_attract_scoring_object(ActorAttractScoringObjectKind::Enemy(enemy), world_x, world_y)
 }
 
 fn actor_attract_scoring_visual_enemy_object(
     enemy: ActorAttractScoringEnemyKind,
-    x16: i32,
-    y16: i32,
+    world_x: i32,
+    world_y: i32,
     visual: ActorAttractScoringVisual,
     visual_step: u16,
 ) -> ActorAttractScoringObject {
     ActorAttractScoringObject {
         kind: ActorAttractScoringObjectKind::Enemy(enemy),
-        x16,
-        y16,
+        world_x,
+        world_y,
         visual,
         visual_step,
     }
@@ -668,13 +668,13 @@ fn actor_attract_scoring_visual_enemy_object(
 
 fn actor_attract_scoring_object(
     kind: ActorAttractScoringObjectKind,
-    x16: i32,
-    y16: i32,
+    world_x: i32,
+    world_y: i32,
 ) -> ActorAttractScoringObject {
     ActorAttractScoringObject {
         kind,
-        x16,
-        y16,
+        world_x,
+        world_y,
         visual: ActorAttractScoringVisual::Sprite,
         visual_step: 0,
     }
@@ -687,20 +687,20 @@ fn actor_attract_scoring_bonus(
     match stage {
         ActorAttractScoringStage::RescueScore => Some(ActorAttractScoringBonus {
             sprite: SpriteId::SCORE_POPUP_500,
-            x16: ATTRACT_SCORING_SCORE_500_X16,
-            y16: ATTRACT_SCORING_SCORE_500_Y16,
+            world_x: ATTRACT_SCORING_SCORE_500_WORLD_X,
+            world_y: ATTRACT_SCORING_SCORE_500_WORLD_Y,
         }),
         ActorAttractScoringStage::RescueReturn => Some(ActorAttractScoringBonus {
             sprite: SpriteId::SCORE_POPUP_500,
-            x16: ATTRACT_SCORING_SCORE_500_DROP_X16,
-            y16: ATTRACT_SCORING_SCORE_500_DROP_Y16 + i32::from(local_step / 2) * 0x0010,
+            world_x: ATTRACT_SCORING_SCORE_500_DROP_WORLD_X,
+            world_y: ATTRACT_SCORING_SCORE_500_DROP_WORLD_Y + i32::from(local_step / 2) * 0x0010,
         }),
         ActorAttractScoringStage::LegendTransfer(index) if local_step == 0 => {
             let entry = ACTOR_ATTRACT_SCORING_LEGEND[index];
             Some(ActorAttractScoringBonus {
                 sprite: SpriteId::SCORE_POPUP_250,
-                x16: entry.table_x16,
-                y16: entry.table_y16,
+                world_x: entry.table_world_x,
+                world_y: entry.table_world_y,
             })
         }
         _ => None,
@@ -734,7 +734,7 @@ fn push_attract_scoring_scene_object(scene: &mut RenderScene, object: ActorAttra
     scene.push_sprite(SceneSprite {
         sprite,
         layer: RenderLayer::Objects,
-        position: actor_attract_scoring_scene_position(object.x16, object.y16),
+        position: actor_attract_scoring_scene_position(object.world_x, object.world_y),
         size,
         tint: Color::WHITE,
     });
@@ -783,10 +783,10 @@ fn push_actor_attract_scoring_laser_beam(
     display_step: u16,
 ) {
     let start = actor_attract_scoring_laser_ship_anchor(actor_attract_scoring_scene_position(
-        player_ship.x16,
-        player_ship.y16,
+        player_ship.world_x,
+        player_ship.world_y,
     ));
-    let target_position = actor_attract_scoring_scene_position(target.x16, target.y16);
+    let target_position = actor_attract_scoring_scene_position(target.world_x, target.world_y);
     let end = match target.kind {
         ActorAttractScoringObjectKind::Enemy(enemy) => {
             actor_attract_scoring_laser_enemy_anchor(enemy, target_position)
@@ -816,7 +816,7 @@ fn push_actor_attract_scoring_bonus(
     bonus: ActorAttractScoringBonus,
     display_step: u16,
 ) {
-    let position = actor_attract_scoring_scene_position(bonus.x16, bonus.y16);
+    let position = actor_attract_scoring_scene_position(bonus.world_x, bonus.world_y);
     if bonus.sprite == SpriteId::SCORE_POPUP_500 {
         push_actor_attract_scoring_score_500_pixels(scene, position, display_step);
         return;
@@ -994,7 +994,7 @@ fn push_actor_attract_scoring_fragment_pixels(
     let ActorAttractScoringObjectKind::Enemy(enemy) = object.kind else {
         return;
     };
-    let position = actor_attract_scoring_scene_position(object.x16, object.y16);
+    let position = actor_attract_scoring_scene_position(object.world_x, object.world_y);
     match object.visual {
         ActorAttractScoringVisual::Materialize => {
             push_actor_attract_scoring_materialize_pixels(
@@ -1190,15 +1190,15 @@ fn actor_attract_scoring_enemy_size(enemy: ActorAttractScoringEnemyKind) -> [f32
     }
 }
 
-fn actor_attract_scoring_scene_position(x16: i32, y16: i32) -> [f32; 2] {
+fn actor_attract_scoring_scene_position(world_x: i32, world_y: i32) -> [f32; 2] {
     offset_f32_position(
-        actor_attract_scoring_native_position(x16, y16),
+        actor_attract_scoring_native_position(world_x, world_y),
         ATTRACT_SCORING_OBJECT_REFERENCE_OFFSET,
     )
 }
 
 fn actor_attract_scoring_scanner_position(object: ActorAttractScoringObject) -> [f32; 2] {
-    let [native_x, native_y] = actor_attract_scoring_native_position(object.x16, object.y16);
+    let [native_x, native_y] = actor_attract_scoring_native_position(object.world_x, object.world_y);
     offset_f32_position(
         [
             ATTRACT_SCORING_SCANNER_ORIGIN[0]
@@ -1210,9 +1210,9 @@ fn actor_attract_scoring_scanner_position(object: ActorAttractScoringObject) -> 
     )
 }
 
-fn actor_attract_scoring_native_position(x16: i32, y16: i32) -> [f32; 2] {
+fn actor_attract_scoring_native_position(world_x: i32, world_y: i32) -> [f32; 2] {
     [
-        ((x16 + 0x10) >> 5).clamp(0, 319) as f32,
-        ((y16 + 0x80) >> 8).clamp(0, 255) as f32,
+        ((world_x + 0x10) >> 5).clamp(0, 319) as f32,
+        ((world_y + 0x80) >> 8).clamp(0, 255) as f32,
     ]
 }
