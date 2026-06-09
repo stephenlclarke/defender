@@ -414,13 +414,14 @@ fn push_arcade_controlled_message_sprites_with_offset(
 }
 
 fn push_actor_playing_top_display_border(scene: &mut RenderScene, wave: u16) {
-    for (screen_address, size) in TOP_DISPLAY_BORDER_SEGMENTS {
+    for (screen_address_word, size) in TOP_DISPLAY_BORDER_SEGMENTS {
+        let screen_cell = crate::ScreenAddress::new(screen_address_word);
         scene.push_sprite(SceneSprite {
             sprite: SpriteId::TOP_DISPLAY_BORDER_WORD,
             layer: RenderLayer::Hud,
-            position: screen_position_from_address(screen_address),
+            position: screen_position_from_address(screen_cell.word()),
             size,
-            tint: if matches!(screen_address, 0x4C07 | 0x4C28) {
+            tint: if matches!(screen_cell.word(), 0x4C07 | 0x4C28) {
                 VISUAL_STATE.top_display_scanner_marker_tint()
             } else {
                 arcade_wave_landscape_tint(wave)
@@ -451,7 +452,7 @@ fn scanner_mini_terrain_records() -> &'static [ScannerMiniTerrainRecord; SCANNER
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 struct ScannerMiniTerrainRecord {
-    screen_address: u16,
+    screen_cell: crate::ScreenAddress,
     word: u16,
 }
 
@@ -470,7 +471,7 @@ fn generate_scanner_mini_terrain_records(
     for (index, record) in records.iter_mut().enumerate() {
         let record_byte_index = (first_record + index) * 3;
         *record = ScannerMiniTerrainRecord {
-            screen_address: u16::from_be_bytes([screen_column, bytes[record_byte_index]]),
+            screen_cell: crate::ScreenAddress::from_bytes(screen_column, bytes[record_byte_index]),
             word: u16::from_be_bytes([bytes[record_byte_index + 1], bytes[record_byte_index + 2]]),
         };
         screen_column = screen_column.wrapping_add(1);

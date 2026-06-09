@@ -49,26 +49,26 @@ impl TerrainFlavorRecord {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct TerrainDrawRecord {
-    screen_address: u16,
+    screen_cell: crate::ScreenAddress,
     word: u16,
 }
 
 impl TerrainDrawRecord {
     const EMPTY: Self = Self {
-        screen_address: 0,
+        screen_cell: crate::ScreenAddress::new(0),
         word: 0,
     };
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ScannerMiniTerrainRecord {
-    screen_address: u16,
+    screen_cell: crate::ScreenAddress,
     word: u16,
 }
 
 impl ScannerMiniTerrainRecord {
     const EMPTY: Self = Self {
-        screen_address: 0,
+        screen_cell: crate::ScreenAddress::new(0),
         word: 0,
     };
 }
@@ -102,7 +102,7 @@ pub(crate) fn push_background_terrain_sprites(
         scene.push_sprite(SceneSprite {
             sprite: terrain_word_sprite(record.word),
             layer: RenderLayer::Terrain,
-            position: screen_position_from_address(record.screen_address),
+            position: screen_position_from_address(record.screen_cell.word()),
             size: TERRAIN_WORD_SIZE,
             tint,
         });
@@ -156,13 +156,13 @@ fn generate_background_terrain_records(terrain_left: u16) -> [TerrainDrawRecord;
         let terrain_record =
             selected_flavor[(selected_pointer + entry_index) % selected_flavor.len()];
         *record = TerrainDrawRecord {
-            screen_address: u16::from_be_bytes([
+            screen_cell: crate::ScreenAddress::from_bytes(
                 0x98u8.wrapping_sub(
                     u8::try_from(entry_index)
                         .expect("background terrain entry index fits in u8"),
                 ),
                 terrain_record.offset,
-            ]),
+            ),
             word: terrain_record.word,
         };
     }
@@ -188,7 +188,7 @@ fn generate_scanner_mini_terrain_records(
     for (index, record) in records.iter_mut().enumerate() {
         let record_byte_index = (first_record + index) * 3;
         *record = ScannerMiniTerrainRecord {
-            screen_address: u16::from_be_bytes([screen_column, bytes[record_byte_index]]),
+            screen_cell: crate::ScreenAddress::from_bytes(screen_column, bytes[record_byte_index]),
             word: u16::from_be_bytes([bytes[record_byte_index + 1], bytes[record_byte_index + 2]]),
         };
         screen_column = screen_column.wrapping_add(1);
@@ -484,7 +484,7 @@ pub(crate) fn push_scanner_radar_sprites(scene: &mut RenderScene, scanner: &Scan
 
 fn push_scanner_terrain_sprites(scene: &mut RenderScene, scan_left: u16) {
     for record in scanner_mini_terrain_records_for_scan_left(scan_left) {
-        let origin = screen_position_from_address(record.screen_address);
+        let origin = screen_position_from_address(record.screen_cell.word());
         for (row, byte) in record.word.to_be_bytes().into_iter().enumerate() {
             for column in 0..2 {
                 let nibble = if column == 0 { byte >> 4 } else { byte & 0x0F };

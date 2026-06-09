@@ -950,35 +950,35 @@
             &records[..8],
             &[
                 ScannerMiniTerrainRecord {
-                    screen_address: 0x3025,
+                    screen_cell: crate::ScreenAddress::new(0x3025),
                     word: 0x7700,
                 },
                 ScannerMiniTerrainRecord {
-                    screen_address: 0x3124,
+                    screen_cell: crate::ScreenAddress::new(0x3124),
                     word: 0x7700,
                 },
                 ScannerMiniTerrainRecord {
-                    screen_address: 0x3222,
+                    screen_cell: crate::ScreenAddress::new(0x3222),
                     word: 0x0770,
                 },
                 ScannerMiniTerrainRecord {
-                    screen_address: 0x3320,
+                    screen_cell: crate::ScreenAddress::new(0x3320),
                     word: 0x0770,
                 },
                 ScannerMiniTerrainRecord {
-                    screen_address: 0x341E,
+                    screen_cell: crate::ScreenAddress::new(0x341E),
                     word: 0x0770,
                 },
                 ScannerMiniTerrainRecord {
-                    screen_address: 0x351C,
+                    screen_cell: crate::ScreenAddress::new(0x351C),
                     word: 0x0770,
                 },
                 ScannerMiniTerrainRecord {
-                    screen_address: 0x361D,
+                    screen_cell: crate::ScreenAddress::new(0x361D),
                     word: 0x7007,
                 },
                 ScannerMiniTerrainRecord {
-                    screen_address: 0x371F,
+                    screen_cell: crate::ScreenAddress::new(0x371F),
                     word: 0x7007,
                 },
             ]
