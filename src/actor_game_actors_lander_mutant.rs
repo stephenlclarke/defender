@@ -363,7 +363,7 @@ impl Lander {
 }
 
 const fn lander_drift_from_arcade_velocity(x_velocity: u16) -> i16 {
-    actor_source_drift_from_velocity(x_velocity)
+    arcade_drift_from_velocity(x_velocity)
 }
 
 fn lander_spawn_visibility(source: Option<LanderArcadeState>) -> LanderSpawnVisibility {
@@ -411,7 +411,7 @@ fn lander_arcade_state_matches_refill_row(
         && source.target_human_index == refill_source.target_human_index
 }
 
-const fn actor_source_drift_from_velocity(x_velocity: u16) -> i16 {
+const fn arcade_drift_from_velocity(x_velocity: u16) -> i16 {
     if x_velocity & 0x8000 != 0 {
         -1
     } else if x_velocity == 0 {
@@ -523,7 +523,7 @@ impl Mutant {
             position: spawn.position,
             drift: spawn
                 .source
-                .map(|source| actor_source_drift_from_velocity(source.x_velocity))
+                .map(|source| arcade_drift_from_velocity(source.x_velocity))
                 .unwrap_or(-1),
             source: spawn.source,
         }
@@ -687,7 +687,7 @@ impl Mutant {
         source.x_fraction = x_fraction;
         source.y_fraction = y_fraction;
         source.sleep_ticks = next_sleep_ticks;
-        self.drift = actor_source_drift_from_velocity(source.x_velocity);
+        self.drift = arcade_drift_from_velocity(source.x_velocity);
         true
     }
 }

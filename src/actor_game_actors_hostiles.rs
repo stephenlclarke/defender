@@ -17,7 +17,7 @@ impl Bomber {
             position: spawn.position,
             drift: spawn
                 .source
-                .map(|source| actor_source_drift_from_velocity(source.x_velocity))
+                .map(|source| arcade_drift_from_velocity(source.x_velocity))
                 .unwrap_or(-1),
             source: spawn.source,
         }
@@ -42,7 +42,7 @@ impl Bomber {
         self.position = Point::new(x, y);
         arcade_state.x_fraction = x_fraction;
         arcade_state.y_fraction = y_fraction;
-        self.drift = actor_source_drift_from_velocity(arcade_state.x_velocity);
+        self.drift = arcade_drift_from_velocity(arcade_state.x_velocity);
         true
     }
 
@@ -366,7 +366,7 @@ impl Pod {
             position: spawn.position,
             drift: spawn
                 .source
-                .map(|arcade_state| actor_source_drift_from_velocity(arcade_state.x_velocity))
+                .map(|arcade_state| arcade_drift_from_velocity(arcade_state.x_velocity))
                 .unwrap_or(1),
             source: spawn.source,
         }
@@ -390,7 +390,7 @@ impl Pod {
         self.position = Point::new(x, y);
         arcade_state.x_fraction = x_fraction;
         arcade_state.y_fraction = y_fraction;
-        self.drift = actor_source_drift_from_velocity(arcade_state.x_velocity);
+        self.drift = arcade_drift_from_velocity(arcade_state.x_velocity);
         true
     }
 }
