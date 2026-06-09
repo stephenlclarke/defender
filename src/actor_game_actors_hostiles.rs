@@ -983,7 +983,7 @@ fn update_baiter_arcade_velocity(
             BAITER_X_SEEK_SPEED
         };
         let player_x_velocity =
-            actor_arithmetic_shift_right_word(actor_source_velocity_word(player_velocity.dx), 2);
+            actor_arithmetic_shift_right_word(arcade_velocity_word(player_velocity.dx), 2);
         arcade_state.x_velocity =
             actor_sign_extend_u8_to_u16(x_seek_byte).wrapping_add(player_x_velocity);
     }
@@ -997,7 +997,7 @@ fn update_baiter_arcade_velocity(
         };
         arcade_state.y_velocity = actor_arithmetic_shift_right_word(
             u16::from_be_bytes([y_seek_byte, 0])
-                .wrapping_add(actor_source_velocity_word(player_velocity.dy)),
+                .wrapping_add(arcade_velocity_word(player_velocity.dy)),
             1,
         );
     }
@@ -1009,7 +1009,7 @@ fn actor_arithmetic_shift_right_word(value: u16, shift: u8) -> u16 {
     ((value as i16) >> shift.min(15)) as u16
 }
 
-fn actor_source_velocity_word(value: i16) -> u16 {
+fn arcade_velocity_word(value: i16) -> u16 {
     value as u16
 }
 

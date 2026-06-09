@@ -1719,7 +1719,7 @@
                 .wrapping_sub(70),
         )
         .wrapping_shl(2)
-        .wrapping_add(actor_source_velocity_word(5).wrapping_shl(2));
+        .wrapping_add(arcade_velocity_word(5).wrapping_shl(2));
         let expected_y_velocity = actor_sign_extend_u8_to_u16(
             (arcade_rng.lseed & 0x1F)
                 .wrapping_sub(0x10)

@@ -1468,7 +1468,7 @@ fn actor_source_enemy_fireball(
     let mut x_velocity = actor_sign_extend_u8_to_u16(x_delta).wrapping_shl(2);
     if shot_rng.seed > 120 {
         x_velocity =
-            x_velocity.wrapping_add(actor_source_velocity_word(player_velocity.dx).wrapping_shl(2));
+            x_velocity.wrapping_add(arcade_velocity_word(player_velocity.dx).wrapping_shl(2));
     }
     let y_delta = (shot_rng.lseed & 0x1F)
         .wrapping_sub(0x10)
