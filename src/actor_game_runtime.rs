@@ -232,11 +232,11 @@ impl PendingPlayerStart {
 struct PendingActorSoundCommand {
     steps_remaining: u8,
     command: u8,
-    source: PendingActorSoundSource,
+    trigger: PendingActorSoundTrigger,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PendingActorSoundSource {
+enum PendingActorSoundTrigger {
     SmartBomb,
     TerrainBlow,
     AstronautRescue,

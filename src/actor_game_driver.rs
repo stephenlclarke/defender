@@ -1082,7 +1082,7 @@ impl ActorGameDriver {
                     .map(|(steps_remaining, command)| PendingActorSoundCommand {
                         steps_remaining,
                         command,
-                        source: PendingActorSoundSource::SmartBomb,
+                        trigger: PendingActorSoundTrigger::SmartBomb,
                     }),
             );
     }
@@ -1093,7 +1093,7 @@ impl ActorGameDriver {
                 |(steps_remaining, command)| PendingActorSoundCommand {
                     steps_remaining,
                     command,
-                    source: PendingActorSoundSource::TerrainBlow,
+                    trigger: PendingActorSoundTrigger::TerrainBlow,
                 },
             ));
     }
@@ -1104,7 +1104,7 @@ impl ActorGameDriver {
                 |(steps_remaining, command)| PendingActorSoundCommand {
                     steps_remaining,
                     command,
-                    source: PendingActorSoundSource::AstronautRescue,
+                    trigger: PendingActorSoundTrigger::AstronautRescue,
                 },
             ),
         );
@@ -1114,7 +1114,7 @@ impl ActorGameDriver {
         self.pending_sound_commands.push(PendingActorSoundCommand {
             steps_remaining: FIRST_WAVE_LANDER_REFILL_APPEAR_SOUND_DELAY_STEPS,
             command: APPEARANCE_SOUND_COMMAND,
-            source: PendingActorSoundSource::FirstWaveLanderRefill,
+            trigger: PendingActorSoundTrigger::FirstWaveLanderRefill,
         });
     }
 
@@ -1242,24 +1242,24 @@ impl ActorGameDriver {
         self.pending_smart_bomb_detonation_steps = None;
         self.smart_bomb_flash_steps_remaining = 0;
         self.pending_sound_commands
-            .retain(|command| command.source != PendingActorSoundSource::SmartBomb);
+            .retain(|command| command.trigger != PendingActorSoundTrigger::SmartBomb);
     }
 
     fn clear_terrain_blow(&mut self) {
         self.terrain_blow = None;
         self.pending_sound_commands
-            .retain(|command| command.source != PendingActorSoundSource::TerrainBlow);
+            .retain(|command| command.trigger != PendingActorSoundTrigger::TerrainBlow);
     }
 
     fn clear_pending_astronaut_rescue(&mut self) {
         self.pending_sound_commands
-            .retain(|command| command.source != PendingActorSoundSource::AstronautRescue);
+            .retain(|command| command.trigger != PendingActorSoundTrigger::AstronautRescue);
     }
 
     fn clear_first_wave_lander_refill(&mut self) {
         self.first_wave_lander_refill_steps_remaining = None;
         self.pending_sound_commands
-            .retain(|command| command.source != PendingActorSoundSource::FirstWaveLanderRefill);
+            .retain(|command| command.trigger != PendingActorSoundTrigger::FirstWaveLanderRefill);
     }
 
     fn start_smart_bomb(&mut self, consume_stock: bool) -> bool {
