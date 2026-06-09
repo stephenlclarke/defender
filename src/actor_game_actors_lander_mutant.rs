@@ -613,7 +613,7 @@ impl Mutant {
         );
 
         let mut next_sleep_ticks = MUTANT_LOOP_SLEEP_TICKS;
-        if actor_source_mutant_should_hop_and_shoot(
+        if mutant_arcade_should_hop_and_shoot(
             player_absolute_x,
             object_absolute_x,
             self.position,
@@ -625,7 +625,7 @@ impl Mutant {
             let hop_state = hop_rng.advance();
             source.hop_rng = hop_state.snapshot();
             self.position.y =
-                actor_source_mutant_hop_y(self.position.y, profile.mutant_random_y, hop_state.seed);
+                mutant_arcade_hop_y(self.position.y, profile.mutant_random_y, hop_state.seed);
 
             if target6_forced_dive_shot {
                 let shot_rng = actor_source_mutant_shot_rng(prompt, self.id, self.position);
@@ -822,7 +822,7 @@ fn mutant_arcade_y_velocity(
     }
 }
 
-fn actor_source_mutant_should_hop_and_shoot(
+fn mutant_arcade_should_hop_and_shoot(
     player_absolute_x: u16,
     object_absolute_x: u16,
     position: Point,
@@ -835,7 +835,7 @@ fn actor_source_mutant_should_hop_and_shoot(
             && position.y <= i16::from(PLAYFIELD_BOTTOM_EDGE_Y))
 }
 
-fn actor_source_mutant_hop_y(position_y: i16, random_y: u8, seed: u8) -> i16 {
+fn mutant_arcade_hop_y(position_y: i16, random_y: u8, seed: u8) -> i16 {
     let step = if seed & 0x80 == 0 {
         0u8.wrapping_sub(random_y)
     } else {

@@ -1896,13 +1896,11 @@
         );
 
         let mut shot = None;
-        if actor_source_mutant_should_hop_and_shoot(player_absolute_x, object_absolute_x, position)
-        {
+        if mutant_arcade_should_hop_and_shoot(player_absolute_x, object_absolute_x, position) {
             let mut hop_rng = arcade_rng_from_snapshot(source.hop_rng);
             let hop_state = hop_rng.advance();
             source.hop_rng = hop_state.snapshot();
-            position.y =
-                actor_source_mutant_hop_y(position.y, profile.mutant_random_y, hop_state.seed);
+            position.y = mutant_arcade_hop_y(position.y, profile.mutant_random_y, hop_state.seed);
             source.shot_timer = source.shot_timer.wrapping_sub(1);
             if source.shot_timer == 0 {
                 let shot_rng = actor_source_mutant_shot_rng(prompt, actor, position);
