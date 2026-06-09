@@ -343,7 +343,7 @@ impl MutantArcadeState {
             shot_timer: profile.mutant_shot_time.min(u32::from(u8::MAX)) as u8,
             sleep_ticks: 0,
             hop_rng,
-            render_x_correction: actor_source_target6_mutant_conversion_x_correction(lander_runtime)
+            render_x_correction: target6_mutant_arcade_conversion_x_correction(lander_runtime)
                 .unwrap_or(0),
             target6_first_shot_deferred: false,
         }

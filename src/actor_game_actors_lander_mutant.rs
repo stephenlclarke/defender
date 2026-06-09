@@ -570,7 +570,7 @@ impl Mutant {
                 );
             }
             if let Some(player_position) = prompt.player_position()
-                && actor_source_target6_mutant_fires_visible_entry_shot(
+                && target6_mutant_arcade_fires_visible_entry_shot(
                     self.position,
                     *source,
                     player_position,
@@ -619,7 +619,7 @@ impl Mutant {
             self.position,
         ) {
             let target6_forced_dive_shot =
-                actor_source_target6_mutant_fires_dive_shot(self.position, *source);
+                target6_mutant_arcade_fires_dive_shot(self.position, *source);
             let target6_forced_dive_shot_position = self.position;
             let mut hop_rng = arcade_rng_from_snapshot(source.hop_rng);
             let hop_state = hop_rng.advance();
@@ -645,12 +645,12 @@ impl Mutant {
             } else {
                 source.shot_timer = source.shot_timer.wrapping_sub(1);
                 if source.shot_timer == 0 {
-                    if actor_source_target6_mutant_suppresses_fire2524_regular_shot(
+                    if target6_mutant_arcade_suppresses_fire2524_regular_shot(
                         self.position,
                         *source,
                     ) {
                         source.shot_timer = TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER;
-                    } else if actor_source_target6_mutant_defers_first_shot(self.position, *source)
+                    } else if target6_mutant_arcade_defers_first_shot(self.position, *source)
                     {
                         source.target6_first_shot_deferred = true;
                         source.shot_timer = TARGET6_MUTANT_DEFERRED_SHOT_TIMER;
@@ -669,7 +669,7 @@ impl Mutant {
                             commands,
                         );
                         source.shot_timer =
-                            actor_source_target6_mutant_post_shot_timer(*source, fired)
+                            target6_mutant_arcade_post_shot_timer(*source, fired)
                                 .unwrap_or(default_reset);
                     }
                 }
@@ -871,39 +871,39 @@ fn mutant_arcade_shot_reset(profile: ArcadeWaveProfile, seed: u8) -> u8 {
     )
 }
 
-fn actor_source_target6_mutant_conversion_x_correction(
+fn target6_mutant_arcade_conversion_x_correction(
     lander_runtime: LanderArcadeState,
 ) -> Option<u16> {
     (lander_runtime.target_human_index == Some(6) && lander_runtime.x_velocity == 0)
         .then_some(TARGET6_MUTANT_CONVERSION_X_CORRECTION)
 }
 
-fn actor_source_target6_mutant_has_conversion_correction(
+fn target6_mutant_arcade_has_conversion_correction(
     source: MutantArcadeState,
 ) -> bool {
     source.render_x_correction == TARGET6_MUTANT_CONVERSION_X_CORRECTION
 }
 
-fn actor_source_target6_mutant_uses_dive_projection(source: MutantArcadeState) -> bool {
-    actor_source_target6_mutant_has_conversion_correction(source) && source.y_velocity == 0x0090
+fn target6_mutant_arcade_uses_dive_projection(source: MutantArcadeState) -> bool {
+    target6_mutant_arcade_has_conversion_correction(source) && source.y_velocity == 0x0090
 }
 
-fn actor_source_target6_mutant_defers_first_shot(
+fn target6_mutant_arcade_defers_first_shot(
     position: Point,
     source: MutantArcadeState,
 ) -> bool {
-    actor_source_target6_mutant_has_conversion_correction(source)
+    target6_mutant_arcade_has_conversion_correction(source)
         && !source.target6_first_shot_deferred
         && position.x <= 0x04
         && position.y <= 0x60
 }
 
-fn actor_source_target6_mutant_fires_visible_entry_shot(
+fn target6_mutant_arcade_fires_visible_entry_shot(
     position: Point,
     source: MutantArcadeState,
     player_position: Point,
 ) -> bool {
-    actor_source_target6_mutant_has_conversion_correction(source)
+    target6_mutant_arcade_has_conversion_correction(source)
         && !source.target6_first_shot_deferred
         && source.shot_timer == TARGET6_MUTANT_DEFERRED_SHOT_TIMER
         && source.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS
@@ -912,11 +912,11 @@ fn actor_source_target6_mutant_fires_visible_entry_shot(
         && player_position.y <= FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y
 }
 
-fn actor_source_target6_mutant_suppresses_fire2524_regular_shot(
+fn target6_mutant_arcade_suppresses_fire2524_regular_shot(
     position: Point,
     source: MutantArcadeState,
 ) -> bool {
-    if !actor_source_target6_mutant_uses_dive_projection(source) {
+    if !target6_mutant_arcade_uses_dive_projection(source) {
         return false;
     }
 
@@ -924,11 +924,11 @@ fn actor_source_target6_mutant_suppresses_fire2524_regular_shot(
     (0x4000..=0x4FFF).contains(&raw_y16) || (0x9000..=0x9FFF).contains(&raw_y16)
 }
 
-fn actor_source_target6_mutant_fires_dive_shot(
+fn target6_mutant_arcade_fires_dive_shot(
     position: Point,
     source: MutantArcadeState,
 ) -> bool {
-    if !actor_source_target6_mutant_uses_dive_projection(source)
+    if !target6_mutant_arcade_uses_dive_projection(source)
         || !source.target6_first_shot_deferred
         || source.sleep_ticks != 0
     {
@@ -941,11 +941,11 @@ fn actor_source_target6_mutant_fires_dive_shot(
     )
 }
 
-fn actor_source_target6_mutant_post_shot_timer(
+fn target6_mutant_arcade_post_shot_timer(
     source: MutantArcadeState,
     fired: bool,
 ) -> Option<u8> {
-    (fired && actor_source_target6_mutant_has_conversion_correction(source))
+    (fired && target6_mutant_arcade_has_conversion_correction(source))
         .then_some(TARGET6_MUTANT_POST_SHOT_TIMER)
 }
 
@@ -1113,7 +1113,7 @@ fn actor_source_target6_mutant_dive_position(
     position: Point,
     source: MutantArcadeState,
 ) -> Option<Point> {
-    if !actor_source_target6_mutant_uses_dive_projection(source) {
+    if !target6_mutant_arcade_uses_dive_projection(source) {
         return None;
     }
 
@@ -1183,7 +1183,7 @@ fn actor_source_target6_mutant_visual_position(
     position: Point,
     source: MutantArcadeState,
 ) -> Option<Point> {
-    if !actor_source_target6_mutant_has_conversion_correction(source) || source.x_velocity != 0x0030
+    if !target6_mutant_arcade_has_conversion_correction(source) || source.x_velocity != 0x0030
     {
         return None;
     }
@@ -1235,7 +1235,7 @@ fn actor_source_target6_mutant_waits_for_fire2524_collision(
     let Some(source) = source else {
         return false;
     };
-    if !actor_source_target6_mutant_uses_dive_projection(source) {
+    if !target6_mutant_arcade_uses_dive_projection(source) {
         return false;
     }
 
@@ -1251,7 +1251,7 @@ fn actor_source_target6_mutant_uses_fire2524_collision_projection(
     let Some(source) = source else {
         return false;
     };
-    if !actor_source_target6_mutant_uses_dive_projection(source) {
+    if !target6_mutant_arcade_uses_dive_projection(source) {
         return false;
     }
 
@@ -1291,7 +1291,7 @@ fn actor_source_target6_mutant_shot_position(
     position: Point,
     source: MutantArcadeState,
 ) -> Point {
-    if !actor_source_target6_mutant_uses_dive_projection(source) {
+    if !target6_mutant_arcade_uses_dive_projection(source) {
         return position;
     }
 
@@ -1333,7 +1333,7 @@ fn actor_source_target6_mutant_fire2524_forced_shot(
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
 ) -> Option<(Point, Velocity, EnemyProjectileArcadeState)> {
-    if !actor_source_target6_mutant_uses_dive_projection(source)
+    if !target6_mutant_arcade_uses_dive_projection(source)
         || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
     {
         return None;
