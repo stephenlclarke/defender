@@ -18,6 +18,7 @@ include!("actor_game_attract_scoring.rs");
 include!("actor_game_runtime.rs");
 include!("actor_game_driver.rs");
 include!("actor_game_actor_helpers.rs");
+include!("actor_game_arcade_motion.rs");
 include!("actor_game_actors_hostile_motion.rs");
 include!("actor_game_actors_hostile_projectiles.rs");
 include!("actor_game_actors_player.rs");

@@ -78,24 +78,3 @@ fn arcade_enemy_fireball(
         },
     ))
 }
-
-fn arcade_screen_velocity(x_velocity: u16, y_velocity: u16) -> Velocity {
-    Velocity::new(
-        arcade_screen_velocity_component(x_velocity),
-        arcade_screen_velocity_component(y_velocity),
-    )
-}
-
-fn arcade_screen_velocity_component(velocity: u16) -> i16 {
-    let signed = velocity as i16;
-    if signed == 0 {
-        return 0;
-    }
-
-    let pixels = signed / 256;
-    if pixels == 0 {
-        if signed > 0 { 1 } else { -1 }
-    } else {
-        pixels
-    }
-}

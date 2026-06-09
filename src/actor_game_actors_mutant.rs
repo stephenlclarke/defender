@@ -243,19 +243,8 @@ impl AssetActor for Mutant {
     }
 }
 
-fn arcade_absolute_x(position: Point, x_fraction: u8) -> u16 {
-    u16::from_be_bytes([position.x as u8, x_fraction])
-}
-
 const fn arcade_hyperspace_background_left(arcade_seed: ActorHyperspaceArcadeSeed) -> u16 {
     u16::from_be_bytes([arcade_seed.seed, arcade_seed.hseed])
-}
-
-fn arcade_world_position(position: Point, x_fraction: u8, y_fraction: u8) -> (u16, u16) {
-    (
-        u16::from_be_bytes([position.x as u8, x_fraction]),
-        u16::from_be_bytes([position.y as u8, y_fraction]),
-    )
 }
 
 const fn arcade_rng_from_snapshot(snapshot: ActorArcadeRngSnapshot) -> ActorArcadeRng {
