@@ -258,7 +258,7 @@
                 .arcade_rng
                 .expect("playing report should expose arcade rng"),
             render_x_correction: 0,
-            target6_first_shot_deferred: false,
+            dive_entry_shot_deferred: false,
         };
         assert_eq!(mutant_runtime, expected_arcade);
 
@@ -288,7 +288,7 @@
                 sleep_ticks: expected_arcade.sleep_ticks,
                 hop_rng: clean_arcade_rng(expected_arcade.hop_rng),
                 render_x_correction: expected_arcade.render_x_correction,
-                target6_first_shot_deferred: expected_arcade.target6_first_shot_deferred,
+                dive_entry_shot_deferred: expected_arcade.dive_entry_shot_deferred,
             })
         );
     }
@@ -313,7 +313,7 @@
                 lseed: 0x44,
             },
             render_x_correction: 0,
-            target6_first_shot_deferred: false,
+            dive_entry_shot_deferred: false,
         };
         let start = Point::new(100, 80);
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
@@ -378,7 +378,7 @@
                 lseed: 0x44,
             },
             render_x_correction: 0,
-            target6_first_shot_deferred: false,
+            dive_entry_shot_deferred: false,
         };
         let start = Point::new(100, 80);
         let prompt = mutant_arcade_prompt_with_arcade_wave_for_test(
@@ -421,7 +421,7 @@
     }
 
     #[test]
-    fn target6_arcade_lander_conversion_sets_mutant_render_correction() {
+    fn mutant_dive_arcade_lander_conversion_sets_render_correction() {
         let profile = ArcadeWaveProfile::for_wave(1);
         let hop_rng = ActorArcadeRngSnapshot {
             seed: 0x33,
@@ -444,7 +444,7 @@
 
         assert_eq!(
             mutant_runtime.render_x_correction,
-            TARGET6_MUTANT_CONVERSION_X_CORRECTION
+            MUTANT_DIVE_CONVERSION_X_CORRECTION
         );
         assert_eq!(mutant_runtime.x_fraction, lander_runtime.x_fraction);
         assert_eq!(mutant_runtime.y_fraction, lander_runtime.y_fraction);
@@ -461,7 +461,7 @@
     }
 
     #[test]
-    fn target6_arcade_mutant_defers_first_entry_shot() {
+    fn mutant_dive_arcade_defers_first_entry_shot() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
@@ -479,8 +479,8 @@
                 hseed: 0x22,
                 lseed: 0x44,
             },
-            render_x_correction: TARGET6_MUTANT_CONVERSION_X_CORRECTION,
-            target6_first_shot_deferred: false,
+            render_x_correction: MUTANT_DIVE_CONVERSION_X_CORRECTION,
+            dive_entry_shot_deferred: false,
         };
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: Point::new(4, 0x50),
@@ -494,17 +494,17 @@
         let snapshot = snapshot_for(&report, mutant);
         let updated_arcade_state = snapshot
             .mutant_runtime
-            .expect("target6 mutant should keep arcade metadata");
-        assert!(updated_arcade_state.target6_first_shot_deferred);
+            .expect("mutant dive should keep arcade metadata");
+        assert!(updated_arcade_state.dive_entry_shot_deferred);
         assert_eq!(
             updated_arcade_state.shot_timer,
-            TARGET6_MUTANT_DEFERRED_SHOT_TIMER
+            MUTANT_DIVE_DEFERRED_SHOT_TIMER
         );
         assert_eq!(updated_arcade_state.sleep_ticks, 0);
     }
 
     #[test]
-    fn target6_arcade_mutant_visible_entry_shot_uses_projected_position() {
+    fn mutant_dive_arcade_visible_entry_shot_uses_projected_position() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
@@ -515,15 +515,15 @@
             y_fraction: 0x80,
             x_velocity: 0x0030,
             y_velocity: 0x0090,
-            shot_timer: TARGET6_MUTANT_DEFERRED_SHOT_TIMER,
+            shot_timer: MUTANT_DIVE_DEFERRED_SHOT_TIMER,
             sleep_ticks: MUTANT_LOOP_SLEEP_TICKS,
             hop_rng: ActorArcadeRngSnapshot {
                 seed: 0x44,
                 hseed: 0x55,
                 lseed: 0x66,
             },
-            render_x_correction: TARGET6_MUTANT_CONVERSION_X_CORRECTION,
-            target6_first_shot_deferred: false,
+            render_x_correction: MUTANT_DIVE_CONVERSION_X_CORRECTION,
+            dive_entry_shot_deferred: false,
         };
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: Point::new(0x03, 0x33),
@@ -532,7 +532,7 @@
 
         let report = driver.step(GameInput::NONE);
         let shot = first_enemy_laser_command(&report)
-            .expect("visible target6 entry should emit a mutant shot");
+            .expect("visible mutant dive entry should emit a mutant shot");
 
         assert!(report.sounds.contains(&SoundCue::MutantShot));
         assert_eq!(shot.0, Point::new(0x13, 0x46));
@@ -541,17 +541,17 @@
         let snapshot = snapshot_for(&report, mutant);
         let updated_arcade_state = snapshot
             .mutant_runtime
-            .expect("target6 mutant should keep arcade metadata");
-        assert!(updated_arcade_state.target6_first_shot_deferred);
+            .expect("mutant dive should keep arcade metadata");
+        assert!(updated_arcade_state.dive_entry_shot_deferred);
         assert_eq!(
             updated_arcade_state.shot_timer,
-            TARGET6_MUTANT_DEFERRED_SHOT_TIMER
+            MUTANT_DIVE_DEFERRED_SHOT_TIMER
         );
         assert_eq!(updated_arcade_state.sleep_ticks, MUTANT_LOOP_SLEEP_TICKS - 1);
     }
 
     #[test]
-    fn target6_arcade_mutant_fire2524_sleep_shot_uses_exact_projectile() {
+    fn mutant_dive_arcade_pending_sleep_shot_uses_exact_projectile() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
@@ -569,8 +569,8 @@
                 hseed: 0x22,
                 lseed: 0x33,
             },
-            render_x_correction: TARGET6_MUTANT_CONVERSION_X_CORRECTION,
-            target6_first_shot_deferred: true,
+            render_x_correction: MUTANT_DIVE_CONVERSION_X_CORRECTION,
+            dive_entry_shot_deferred: true,
         };
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: Point::new(0x08, 0x51),
@@ -579,7 +579,7 @@
 
         let report = driver.step(GameInput::NONE);
         let shot =
-            first_enemy_laser_command(&report).expect("fire2524 target6 row should force a shot");
+            first_enemy_laser_command(&report).expect("mutant dive forced-shot row should force a shot");
 
         assert!(report.sounds.contains(&SoundCue::MutantShot));
         assert_eq!(shot.0, Point::new(0x1E, 0x54));
@@ -597,17 +597,17 @@
         let snapshot = snapshot_for(&report, mutant);
         let updated_arcade_state = snapshot
             .mutant_runtime
-            .expect("target6 mutant should keep arcade metadata");
-        assert!(updated_arcade_state.target6_first_shot_deferred);
+            .expect("mutant dive should keep arcade metadata");
+        assert!(updated_arcade_state.dive_entry_shot_deferred);
         assert_eq!(
             updated_arcade_state.shot_timer,
-            TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER
+            MUTANT_DIVE_COLLISION_PENDING_SHOT_TIMER
         );
         assert_eq!(updated_arcade_state.sleep_ticks, MUTANT_LOOP_SLEEP_TICKS - 1);
     }
 
     #[test]
-    fn target6_arcade_mutant_shot_position_uses_dive_anchor_overrides() {
+    fn mutant_dive_arcade_shot_position_uses_path_anchor_overrides() {
         let arcade_state = MutantArcadeState {
             x_fraction: 0x8C,
             y_fraction: 0xB0,
@@ -620,16 +620,16 @@
                 hseed: 0,
                 lseed: 0,
             },
-            render_x_correction: TARGET6_MUTANT_CONVERSION_X_CORRECTION,
-            target6_first_shot_deferred: true,
+            render_x_correction: MUTANT_DIVE_CONVERSION_X_CORRECTION,
+            dive_entry_shot_deferred: true,
         };
 
         assert_eq!(
-            target6_mutant_arcade_shot_position(Point::new(0x08, 0x61), arcade_state),
+            mutant_dive_shot_position(Point::new(0x08, 0x61), arcade_state),
             Point::new(0x1E, 0x70)
         );
         assert_eq!(
-            target6_mutant_arcade_shot_position(
+            mutant_dive_shot_position(
                 Point::new(0x07, 0x78),
                 MutantArcadeState {
                     x_fraction: 0xFC,
@@ -640,7 +640,7 @@
             Point::new(0x21, 0x87)
         );
         assert_eq!(
-            target6_mutant_arcade_shot_position(
+            mutant_dive_shot_position(
                 Point::new(0x03, 0x33),
                 MutantArcadeState {
                     x_fraction: 0x7C,
@@ -653,7 +653,7 @@
     }
 
     #[test]
-    fn target6_arcade_mutant_collision_position_offsets_dive_projection() {
+    fn mutant_dive_arcade_collision_position_offsets_path_projection() {
         let arcade_state = MutantArcadeState {
             x_fraction: 0x8C,
             y_fraction: 0xB0,
@@ -666,27 +666,27 @@
                 hseed: 0,
                 lseed: 0,
             },
-            render_x_correction: TARGET6_MUTANT_CONVERSION_X_CORRECTION,
-            target6_first_shot_deferred: true,
+            render_x_correction: MUTANT_DIVE_CONVERSION_X_CORRECTION,
+            dive_entry_shot_deferred: true,
         };
 
         assert_eq!(
-            target6_mutant_arcade_scene_position(Point::new(0x08, 0x61), Some(arcade_state)),
+            mutant_dive_scene_position(Point::new(0x08, 0x61), Some(arcade_state)),
             Point::new(0x1E, 0x71)
         );
         assert_eq!(
-            target6_mutant_arcade_collision_position(Point::new(0x08, 0x61), Some(arcade_state)),
+            mutant_dive_collision_position(Point::new(0x08, 0x61), Some(arcade_state)),
             Point::new(0x1E, 0x72)
         );
     }
 
     #[test]
-    fn target6_arcade_mutant_waits_for_fire2524_collision_window() {
+    fn mutant_dive_arcade_waits_for_collision_window() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         let player_id = ActorId::new(100);
         let mutant_id = ActorId::new(101);
-        let raw_position = Point::new(0x08, 0x99);
+        let arcade_position = Point::new(0x08, 0x99);
         let arcade_state = MutantArcadeState {
             x_fraction: 0x5C,
             y_fraction: 0xE0,
@@ -699,11 +699,11 @@
                 hseed: 0,
                 lseed: 0,
             },
-            render_x_correction: TARGET6_MUTANT_CONVERSION_X_CORRECTION,
-            target6_first_shot_deferred: true,
+            render_x_correction: MUTANT_DIVE_CONVERSION_X_CORRECTION,
+            dive_entry_shot_deferred: true,
         };
         let collision_position =
-            target6_mutant_arcade_collision_position(raw_position, Some(arcade_state));
+            mutant_dive_collision_position(arcade_position, Some(arcade_state));
         driver.snapshots.insert(
             player_id,
             actor_snapshot_with_bounds(
@@ -717,7 +717,7 @@
             mutant_id,
             mutant_arcade_snapshot_with_bounds(
                 mutant_id,
-                raw_position,
+                arcade_position,
                 arcade_state,
                 Rect::from_center(collision_position, 14, 12),
             ),
@@ -728,18 +728,18 @@
 
         assert!(
             commands.is_empty(),
-            "pending fire2524 target6 mutant should not collide yet: {commands:?}"
+            "pending mutant dive collision window should not collide yet: {commands:?}"
         );
     }
 
     #[test]
-    fn target6_arcade_mutant_fire2524_collision_projects_enemy_explosion() {
+    fn mutant_dive_arcade_collision_projects_enemy_explosion() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         let player_id = ActorId::new(100);
         let mutant_id = ActorId::new(101);
-        let raw_position = Point::new(0x08, 0xA5);
-        let player_position = TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER;
+        let arcade_position = Point::new(0x08, 0xA5);
+        let player_position = MUTANT_DIVE_COLLISION_EXPLOSION_ANCHOR;
         let arcade_state = MutantArcadeState {
             x_fraction: 0x00,
             y_fraction: 0x00,
@@ -752,8 +752,8 @@
                 hseed: 0,
                 lseed: 0,
             },
-            render_x_correction: TARGET6_MUTANT_CONVERSION_X_CORRECTION,
-            target6_first_shot_deferred: true,
+            render_x_correction: MUTANT_DIVE_CONVERSION_X_CORRECTION,
+            dive_entry_shot_deferred: true,
         };
         driver.snapshots.insert(
             player_id,
@@ -768,7 +768,7 @@
             mutant_id,
             mutant_arcade_snapshot_with_bounds(
                 mutant_id,
-                raw_position,
+                arcade_position,
                 arcade_state,
                 Rect::from_center(player_position, 14, 12),
             ),
@@ -794,9 +794,9 @@
             })
             .collect::<Vec<_>>();
         assert!(explosions.contains(&(
-            TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_TOP_LEFT,
+            MUTANT_DIVE_COLLISION_EXPLOSION_TOP_LEFT,
             ExplosionKind::Mutant,
-            Some(TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER),
+            Some(MUTANT_DIVE_COLLISION_EXPLOSION_ANCHOR),
         )));
         assert!(explosions.contains(&(player_position, ExplosionKind::Player, None)));
     }
@@ -821,7 +821,7 @@
                 lseed: 0x88,
             },
             render_x_correction: 0,
-            target6_first_shot_deferred: false,
+            dive_entry_shot_deferred: false,
         };
         let start = Point::new(70, 120);
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
@@ -1193,11 +1193,11 @@
         let arcade_state = spawn
             .arcade_state
             .expect("arcade lander spawn should carry state");
-        let x16 = u16::from_be_bytes([spawn.position.x as u8, arcade_state.x_fraction]);
-        let y16 = u16::from_be_bytes([spawn.position.y as u8, arcade_state.y_fraction]);
+        let world_x_word = u16::from_be_bytes([spawn.position.x as u8, arcade_state.x_fraction]);
+        let world_y_word = u16::from_be_bytes([spawn.position.y as u8, arcade_state.y_fraction]);
         (
-            x16,
-            y16,
+            world_x_word,
+            world_y_word,
             arcade_state.x_velocity,
             arcade_state.y_velocity,
             arcade_state.shot_timer,

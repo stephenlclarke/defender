@@ -107,10 +107,10 @@ impl ActorBomberSpawn {
             let x_velocity = actor_sign_extend_u8_to_u16(velocity_low);
 
             for squad_remaining in (1..=squad_count).rev() {
-                let x16 = player_absolute_x
+                let world_x_word = player_absolute_x
                     .wrapping_add((squad_remaining as u16).wrapping_mul(0x0180))
                     .wrapping_add(0x8000);
-                let [x, x_fraction] = x16.to_be_bytes();
+                let [x, x_fraction] = world_x_word.to_be_bytes();
                 bombers.push(Self {
                     position: Point::new(i16::from(x), BOMBER_CRUISE_ALTITUDE),
                     arcade_state: Some(BomberArcadeState {
@@ -233,7 +233,7 @@ impl ActorSwarmerSpawn {
             return Vec::new();
         }
 
-        let y16 = u16::from_be_bytes([
+        let world_y_word = u16::from_be_bytes([
             arcade_rng
                 .seed
                 .wrapping_shr(1)
@@ -241,12 +241,12 @@ impl ActorSwarmerSpawn {
             0,
         ]);
         let placement_rand = arcade_rng.advance();
-        let x16 = u16::from_be_bytes([
+        let world_x_word = u16::from_be_bytes([
             (placement_rand.seed & 0x3F).wrapping_add(0x80),
             MINI_SWARMER_RESTORE_X_LOW,
         ]);
-        let [x, x_fraction] = x16.to_be_bytes();
-        let [y, y_fraction] = y16.to_be_bytes();
+        let [x, x_fraction] = world_x_word.to_be_bytes();
+        let [y, y_fraction] = world_y_word.to_be_bytes();
         let position = Point::new(i16::from(x), i16::from(y));
 
         (0..count)
@@ -340,7 +340,7 @@ impl ActorMutantSpawn {
                 sleep_ticks: 0,
                 hop_rng: arcade_rng.snapshot(),
                 render_x_correction: 0,
-                target6_first_shot_deferred: false,
+                dive_entry_shot_deferred: false,
             }),
         }
     }
@@ -357,8 +357,8 @@ impl ActorMutantSpawn {
         if relative < MUTANT_RESTORE_AVOID_WIDTH {
             relative = relative.wrapping_add(0x8000);
         }
-        let x16 = relative.wrapping_add(avoid_left);
-        let [x, x_fraction] = x16.to_be_bytes();
+        let world_x_word = relative.wrapping_add(avoid_left);
+        let [x, x_fraction] = world_x_word.to_be_bytes();
         let y = placement_state
             .seed
             .wrapping_shr(1)
@@ -377,7 +377,7 @@ impl ActorMutantSpawn {
                 sleep_ticks: 0,
                 hop_rng: arcade_rng.snapshot(),
                 render_x_correction: 0,
-                target6_first_shot_deferred: false,
+                dive_entry_shot_deferred: false,
             }),
         }
     }

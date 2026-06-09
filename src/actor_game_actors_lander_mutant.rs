@@ -540,11 +540,11 @@ impl Mutant {
     }
 
     fn scene_position(&self) -> Point {
-        target6_mutant_arcade_scene_position(self.position, self.arcade_state)
+        mutant_dive_scene_position(self.position, self.arcade_state)
     }
 
     fn collision_position(&self) -> Point {
-        target6_mutant_arcade_collision_position(self.position, self.arcade_state)
+        mutant_dive_collision_position(self.position, self.arcade_state)
     }
 
     fn advance_arcade_motion(
@@ -558,15 +558,15 @@ impl Mutant {
         };
         if arcade_state.sleep_ticks > 0 {
             if let Some((position, velocity, projectile_arcade_state)) =
-                target6_mutant_arcade_fire2524_forced_shot(
+                mutant_dive_forced_shot(
                     self.position,
                     *arcade_state,
                     prompt,
                     behavior,
                 )
             {
-                arcade_state.target6_first_shot_deferred = true;
-                arcade_state.shot_timer = TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER;
+                arcade_state.dive_entry_shot_deferred = true;
+                arcade_state.shot_timer = MUTANT_DIVE_COLLISION_PENDING_SHOT_TIMER;
                 push_arcade_enemy_projectile_command(
                     position,
                     velocity,
@@ -576,16 +576,16 @@ impl Mutant {
                 );
             }
             if let Some(player_position) = prompt.player_position()
-                && target6_mutant_arcade_fires_visible_entry_shot(
+                && mutant_dive_fires_visible_entry_shot(
                     self.position,
                     *arcade_state,
                     player_position,
                 )
             {
-                arcade_state.target6_first_shot_deferred = true;
+                arcade_state.dive_entry_shot_deferred = true;
                 let shot_rng = mutant_arcade_shot_rng(prompt, self.id, self.position);
                 let shot_position =
-                    target6_mutant_arcade_shot_position(self.position, *arcade_state);
+                    mutant_dive_shot_position(self.position, *arcade_state);
                 push_mutant_arcade_shot(
                     shot_position,
                     prompt,
@@ -624,19 +624,19 @@ impl Mutant {
             object_absolute_x,
             self.position,
         ) {
-            let target6_forced_dive_shot =
-                target6_mutant_arcade_fires_dive_shot(self.position, *arcade_state);
-            let target6_forced_dive_shot_position = self.position;
+            let forced_dive_shot =
+                mutant_dive_fires_path_shot(self.position, *arcade_state);
+            let forced_dive_shot_position = self.position;
             let mut hop_rng = arcade_rng_from_snapshot(arcade_state.hop_rng);
             let hop_state = hop_rng.advance();
             arcade_state.hop_rng = hop_state.snapshot();
             self.position.y =
                 mutant_arcade_hop_y(self.position.y, profile.mutant_random_y, hop_state.seed);
 
-            if target6_forced_dive_shot {
+            if forced_dive_shot {
                 let shot_rng = mutant_arcade_shot_rng(prompt, self.id, self.position);
-                let shot_position = target6_mutant_arcade_shot_position(
-                    target6_forced_dive_shot_position,
+                let shot_position = mutant_dive_shot_position(
+                    forced_dive_shot_position,
                     *arcade_state,
                 );
                 push_mutant_arcade_shot(
@@ -647,25 +647,25 @@ impl Mutant {
                     shot_rng,
                     commands,
                 );
-                arcade_state.shot_timer = TARGET6_MUTANT_POST_SHOT_TIMER;
+                arcade_state.shot_timer = MUTANT_DIVE_POST_SHOT_TIMER;
             } else {
                 arcade_state.shot_timer = arcade_state.shot_timer.wrapping_sub(1);
                 if arcade_state.shot_timer == 0 {
-                    if target6_mutant_arcade_suppresses_fire2524_regular_shot(
+                    if mutant_dive_suppresses_regular_shot(
                         self.position,
                         *arcade_state,
                     ) {
-                        arcade_state.shot_timer = TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER;
-                    } else if target6_mutant_arcade_defers_first_shot(self.position, *arcade_state)
+                        arcade_state.shot_timer = MUTANT_DIVE_COLLISION_PENDING_SHOT_TIMER;
+                    } else if mutant_dive_defers_first_shot(self.position, *arcade_state)
                     {
-                        arcade_state.target6_first_shot_deferred = true;
-                        arcade_state.shot_timer = TARGET6_MUTANT_DEFERRED_SHOT_TIMER;
+                        arcade_state.dive_entry_shot_deferred = true;
+                        arcade_state.shot_timer = MUTANT_DIVE_DEFERRED_SHOT_TIMER;
                         next_sleep_ticks = 0;
                     } else {
                         let shot_rng = mutant_arcade_shot_rng(prompt, self.id, self.position);
                         let default_reset = mutant_arcade_shot_reset(profile, shot_rng.seed);
                         let shot_position =
-                            target6_mutant_arcade_shot_position(self.position, *arcade_state);
+                            mutant_dive_shot_position(self.position, *arcade_state);
                         let fired = push_mutant_arcade_shot(
                             shot_position,
                             prompt,
@@ -675,7 +675,7 @@ impl Mutant {
                             commands,
                         );
                         arcade_state.shot_timer =
-                            target6_mutant_arcade_post_shot_timer(*arcade_state, fired)
+                            mutant_dive_post_shot_timer(*arcade_state, fired)
                                 .unwrap_or(default_reset);
                     }
                 }
@@ -880,67 +880,67 @@ fn mutant_arcade_shot_reset(profile: ArcadeWaveProfile, seed: u8) -> u8 {
     )
 }
 
-fn target6_mutant_arcade_conversion_x_correction(
+fn mutant_dive_arcade_conversion_x_correction(
     lander_runtime: LanderArcadeState,
 ) -> Option<u16> {
     (lander_runtime.target_human_index == Some(6) && lander_runtime.x_velocity == 0)
-        .then_some(TARGET6_MUTANT_CONVERSION_X_CORRECTION)
+        .then_some(MUTANT_DIVE_CONVERSION_X_CORRECTION)
 }
 
-fn target6_mutant_arcade_has_conversion_correction(
+fn mutant_dive_has_conversion_correction(
     arcade_state: MutantArcadeState,
 ) -> bool {
-    arcade_state.render_x_correction == TARGET6_MUTANT_CONVERSION_X_CORRECTION
+    arcade_state.render_x_correction == MUTANT_DIVE_CONVERSION_X_CORRECTION
 }
 
-fn target6_mutant_arcade_uses_dive_projection(arcade_state: MutantArcadeState) -> bool {
-    target6_mutant_arcade_has_conversion_correction(arcade_state)
+fn mutant_dive_uses_path_projection(arcade_state: MutantArcadeState) -> bool {
+    mutant_dive_has_conversion_correction(arcade_state)
         && arcade_state.y_velocity == 0x0090
 }
 
-fn target6_mutant_arcade_defers_first_shot(
+fn mutant_dive_defers_first_shot(
     position: Point,
     arcade_state: MutantArcadeState,
 ) -> bool {
-    target6_mutant_arcade_has_conversion_correction(arcade_state)
-        && !arcade_state.target6_first_shot_deferred
+    mutant_dive_has_conversion_correction(arcade_state)
+        && !arcade_state.dive_entry_shot_deferred
         && position.x <= 0x04
         && position.y <= 0x60
 }
 
-fn target6_mutant_arcade_fires_visible_entry_shot(
+fn mutant_dive_fires_visible_entry_shot(
     position: Point,
     arcade_state: MutantArcadeState,
     player_position: Point,
 ) -> bool {
-    target6_mutant_arcade_has_conversion_correction(arcade_state)
-        && !arcade_state.target6_first_shot_deferred
-        && arcade_state.shot_timer == TARGET6_MUTANT_DEFERRED_SHOT_TIMER
+    mutant_dive_has_conversion_correction(arcade_state)
+        && !arcade_state.dive_entry_shot_deferred
+        && arcade_state.shot_timer == MUTANT_DIVE_DEFERRED_SHOT_TIMER
         && arcade_state.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS
         && position.x <= 0x04
         && position.y <= 0x60
         && player_position.y <= FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y
 }
 
-fn target6_mutant_arcade_suppresses_fire2524_regular_shot(
+fn mutant_dive_suppresses_regular_shot(
     position: Point,
     arcade_state: MutantArcadeState,
 ) -> bool {
-    if !target6_mutant_arcade_uses_dive_projection(arcade_state) {
+    if !mutant_dive_uses_path_projection(arcade_state) {
         return false;
     }
 
-    let (_, raw_y16) =
+    let (_, world_y_word) =
         arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction);
-    (0x4000..=0x4FFF).contains(&raw_y16) || (0x9000..=0x9FFF).contains(&raw_y16)
+    (0x4000..=0x4FFF).contains(&world_y_word) || (0x9000..=0x9FFF).contains(&world_y_word)
 }
 
-fn target6_mutant_arcade_fires_dive_shot(
+fn mutant_dive_fires_path_shot(
     position: Point,
     arcade_state: MutantArcadeState,
 ) -> bool {
-    if !target6_mutant_arcade_uses_dive_projection(arcade_state)
-        || !arcade_state.target6_first_shot_deferred
+    if !mutant_dive_uses_path_projection(arcade_state)
+        || !arcade_state.dive_entry_shot_deferred
         || arcade_state.sleep_ticks != 0
     {
         return false;
@@ -948,135 +948,135 @@ fn target6_mutant_arcade_fires_dive_shot(
 
     matches!(
         arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction),
-        TARGET6_MUTANT_DIVE_FIRST_SHOT_RAW | TARGET6_MUTANT_DIVE_SECOND_SHOT_RAW
+        MUTANT_DIVE_FIRST_SHOT_WORLD_WORDS | MUTANT_DIVE_SECOND_SHOT_WORLD_WORDS
     )
 }
 
-fn target6_mutant_arcade_post_shot_timer(
+fn mutant_dive_post_shot_timer(
     arcade_state: MutantArcadeState,
     fired: bool,
 ) -> Option<u8> {
-    (fired && target6_mutant_arcade_has_conversion_correction(arcade_state))
-        .then_some(TARGET6_MUTANT_POST_SHOT_TIMER)
+    (fired && mutant_dive_has_conversion_correction(arcade_state))
+        .then_some(MUTANT_DIVE_POST_SHOT_TIMER)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Target6MutantProjectionAnchor {
-    raw_x16: u16,
-    raw_y16: u16,
+struct MutantDivePathAnchor {
+    world_x_word: u16,
+    world_y_word: u16,
     screen: Point,
 }
 
-const ACTOR_TARGET6_MUTANT_DIVE_PROJECTIONS: &[Target6MutantProjectionAnchor] = &[
+const MUTANT_DIVE_PATH_ANCHORS: &[MutantDivePathAnchor] = &[
     // original: ACTOR_SOURCE_TARGET6_MUTANT_DIVE_PROJECTIONS
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x031C,
-        raw_y16: 0x3360,
+    MutantDivePathAnchor {
+        world_x_word: 0x031C,
+        world_y_word: 0x3360,
         screen: Point::new(0x12, 0x43),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x037C,
-        raw_y16: 0x3380,
+    MutantDivePathAnchor {
+        world_x_word: 0x037C,
+        world_y_word: 0x3380,
         screen: Point::new(0x13, 0x46),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x034C,
-        raw_y16: 0x33F0,
+    MutantDivePathAnchor {
+        world_x_word: 0x034C,
+        world_y_word: 0x33F0,
         screen: Point::new(0x12, 0x43),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x03AC,
-        raw_y16: 0x3410,
+    MutantDivePathAnchor {
+        world_x_word: 0x03AC,
+        world_y_word: 0x3410,
         screen: Point::new(0x14, 0x46),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x037C,
-        raw_y16: 0x3480,
+    MutantDivePathAnchor {
+        world_x_word: 0x037C,
+        world_y_word: 0x3480,
         screen: Point::new(0x13, 0x44),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x085C,
-        raw_y16: 0x47A0,
+    MutantDivePathAnchor {
+        world_x_word: 0x085C,
+        world_y_word: 0x47A0,
         screen: Point::new(0x1F, 0x5B),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x085C,
-        raw_y16: 0x6120,
+    MutantDivePathAnchor {
+        world_x_word: 0x085C,
+        world_y_word: 0x6120,
         screen: Point::new(0x1F, 0x71),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x088C,
-        raw_y16: 0x61B0,
+    MutantDivePathAnchor {
+        world_x_word: 0x088C,
+        world_y_word: 0x61B0,
         screen: Point::new(0x1E, 0x71),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x085C,
-        raw_y16: 0x6140,
+    MutantDivePathAnchor {
+        world_x_word: 0x085C,
+        world_y_word: 0x6140,
         screen: Point::new(0x1F, 0x71),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x082C,
-        raw_y16: 0x7770,
+    MutantDivePathAnchor {
+        world_x_word: 0x082C,
+        world_y_word: 0x7770,
         screen: Point::new(0x20, 0x87),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x07FC,
-        raw_y16: 0x7800,
+    MutantDivePathAnchor {
+        world_x_word: 0x07FC,
+        world_y_word: 0x7800,
         screen: Point::new(0x21, 0x88),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x082C,
-        raw_y16: 0x7990,
+    MutantDivePathAnchor {
+        world_x_word: 0x082C,
+        world_y_word: 0x7990,
         screen: Point::new(0x20, 0x87),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x082C,
-        raw_y16: 0x81E0,
+    MutantDivePathAnchor {
+        world_x_word: 0x082C,
+        world_y_word: 0x81E0,
         screen: Point::new(0x20, 0x90),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x082C,
-        raw_y16: 0x9730,
+    MutantDivePathAnchor {
+        world_x_word: 0x082C,
+        world_y_word: 0x9730,
         screen: Point::new(0x21, 0x9F),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x07FC,
-        raw_y16: 0x97A0,
+    MutantDivePathAnchor {
+        world_x_word: 0x07FC,
+        world_y_word: 0x97A0,
         screen: Point::new(0x20, 0x9E),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x085C,
-        raw_y16: 0x97C0,
+    MutantDivePathAnchor {
+        world_x_word: 0x085C,
+        world_y_word: 0x97C0,
         screen: Point::new(0x20, 0xA0),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x088C,
-        raw_y16: 0x9850,
+    MutantDivePathAnchor {
+        world_x_word: 0x088C,
+        world_y_word: 0x9850,
         screen: Point::new(0x1F, 0xA0),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x085C,
-        raw_y16: 0x99E0,
+    MutantDivePathAnchor {
+        world_x_word: 0x085C,
+        world_y_word: 0x99E0,
         screen: Point::new(0x1E, 0xA2),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x082C,
-        raw_y16: 0x9A70,
+    MutantDivePathAnchor {
+        world_x_word: 0x082C,
+        world_y_word: 0x9A70,
         screen: Point::new(0x20, 0xA3),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x088C,
-        raw_y16: 0xA200,
+    MutantDivePathAnchor {
+        world_x_word: 0x088C,
+        world_y_word: 0xA200,
         screen: Point::new(0x20, 0xA2),
     },
-    Target6MutantProjectionAnchor {
-        raw_x16: 0x08EC,
-        raw_y16: 0xA320,
+    MutantDivePathAnchor {
+        world_x_word: 0x08EC,
+        world_y_word: 0xA320,
         screen: Point::new(0x20, 0xA2),
     },
 ];
 
-const ACTOR_TARGET6_MUTANT_VISUAL_ROWS: &[(u16, i16)] = &[
+const MUTANT_DIVE_VISUAL_ROWS: &[(u16, i16)] = &[
     // original: ACTOR_SOURCE_TARGET6_MUTANT_VISUAL_ROWS
     (0x0004, 0x36),
     (0x0034, 0x36),
@@ -1120,39 +1120,39 @@ const ACTOR_TARGET6_MUTANT_VISUAL_ROWS: &[(u16, i16)] = &[
     (0x0754, 0x2C),
 ];
 
-fn target6_mutant_arcade_dive_position(
+fn mutant_dive_path_position(
     position: Point,
     arcade_state: MutantArcadeState,
 ) -> Option<Point> {
-    if !target6_mutant_arcade_uses_dive_projection(arcade_state) {
+    if !mutant_dive_uses_path_projection(arcade_state) {
         return None;
     }
 
-    let (raw_x16, raw_y16) =
+    let (world_x_word, world_y_word) =
         arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction);
-    if let Some(anchor) = ACTOR_TARGET6_MUTANT_DIVE_PROJECTIONS
+    if let Some(anchor) = MUTANT_DIVE_PATH_ANCHORS
         .iter()
-        .find(|anchor| anchor.raw_x16 == raw_x16 && anchor.raw_y16 == raw_y16)
+        .find(|anchor| anchor.world_x_word == world_x_word && anchor.world_y_word == world_y_word)
     {
         return Some(anchor.screen);
     }
 
-    target6_mutant_arcade_interpolated_dive_position(raw_y16)
+    mutant_dive_interpolated_path_position(world_y_word)
 }
 
-fn target6_mutant_arcade_interpolated_dive_position(raw_y16: u16) -> Option<Point> {
-    let first = ACTOR_TARGET6_MUTANT_DIVE_PROJECTIONS.first()?;
-    let last = ACTOR_TARGET6_MUTANT_DIVE_PROJECTIONS.last()?;
-    if raw_y16 < first.raw_y16 || raw_y16 > last.raw_y16 {
+fn mutant_dive_interpolated_path_position(world_y_word: u16) -> Option<Point> {
+    let first = MUTANT_DIVE_PATH_ANCHORS.first()?;
+    let last = MUTANT_DIVE_PATH_ANCHORS.last()?;
+    if world_y_word < first.world_y_word || world_y_word > last.world_y_word {
         return None;
     }
 
-    ACTOR_TARGET6_MUTANT_DIVE_PROJECTIONS
+    MUTANT_DIVE_PATH_ANCHORS
         .windows(2)
         .find_map(|anchors| {
             let start = anchors[0];
             let end = anchors[1];
-            if raw_y16 < start.raw_y16 || raw_y16 > end.raw_y16 || start.raw_y16 >= end.raw_y16 {
+            if world_y_word < start.world_y_word || world_y_word > end.world_y_word || start.world_y_word >= end.world_y_word {
                 return None;
             }
 
@@ -1160,16 +1160,16 @@ fn target6_mutant_arcade_interpolated_dive_position(raw_y16: u16) -> Option<Poin
                 arcade_lerp_i16(
                     start.screen.x,
                     end.screen.x,
-                    raw_y16,
-                    start.raw_y16,
-                    end.raw_y16,
+                    world_y_word,
+                    start.world_y_word,
+                    end.world_y_word,
                 ),
                 arcade_lerp_i16(
                     start.screen.y,
                     end.screen.y,
-                    raw_y16,
-                    start.raw_y16,
-                    end.raw_y16,
+                    world_y_word,
+                    start.world_y_word,
+                    end.world_y_word,
                 ),
             ))
         })
@@ -1190,90 +1190,90 @@ fn arcade_lerp_i16(
     rounded.clamp(0, i32::from(u8::MAX)) as i16
 }
 
-fn target6_mutant_arcade_visual_position(
+fn mutant_dive_visual_position(
     position: Point,
     arcade_state: MutantArcadeState,
 ) -> Option<Point> {
-    if !target6_mutant_arcade_has_conversion_correction(arcade_state)
+    if !mutant_dive_has_conversion_correction(arcade_state)
         || arcade_state.x_velocity != 0x0030
     {
         return None;
     }
 
-    let x16 = arcade_absolute_x(position, arcade_state.x_fraction)
-        .wrapping_add(TARGET6_MUTANT_VISUAL_X_CORRECTION);
-    if (x16 as i16) < 0 {
+    let world_x_word = arcade_absolute_x(position, arcade_state.x_fraction)
+        .wrapping_add(MUTANT_DIVE_VISUAL_X_CORRECTION);
+    if (world_x_word as i16) < 0 {
         return None;
     }
-    let screen_x = x16 >> OBJECT_WORLD_TO_SCREEN_SHIFT;
+    let screen_x = world_x_word >> OBJECT_WORLD_TO_SCREEN_SHIFT;
     if screen_x >= OBJECT_VISIBLE_SCREEN_WIDTH {
         return None;
     }
-    let screen_y = ACTOR_TARGET6_MUTANT_VISUAL_ROWS
+    let screen_y = MUTANT_DIVE_VISUAL_ROWS
         .iter()
-        .find_map(|(row_x16, screen_y)| (*row_x16 == x16).then_some(*screen_y))?;
+        .find_map(|(row_world_x_word, screen_y)| (*row_world_x_word == world_x_word).then_some(*screen_y))?;
     Some(Point::new(screen_x as i16, screen_y))
 }
 
-fn target6_mutant_arcade_scene_position(
+fn mutant_dive_scene_position(
     position: Point,
     arcade_state: Option<MutantArcadeState>,
 ) -> Point {
     let Some(arcade_state) = arcade_state else {
         return position;
     };
-    target6_mutant_arcade_dive_position(position, arcade_state)
-        .or_else(|| target6_mutant_arcade_visual_position(position, arcade_state))
+    mutant_dive_path_position(position, arcade_state)
+        .or_else(|| mutant_dive_visual_position(position, arcade_state))
         .unwrap_or(position)
 }
 
-fn target6_mutant_arcade_collision_position(
+fn mutant_dive_collision_position(
     position: Point,
     arcade_state: Option<MutantArcadeState>,
 ) -> Point {
     let Some(arcade_state) = arcade_state else {
         return position;
     };
-    if let Some(position) = target6_mutant_arcade_dive_position(position, arcade_state) {
+    if let Some(position) = mutant_dive_path_position(position, arcade_state) {
         return position.offset(Velocity::new(0, 1));
     }
-    target6_mutant_arcade_visual_position(position, arcade_state).unwrap_or(position)
+    mutant_dive_visual_position(position, arcade_state).unwrap_or(position)
 }
 
-fn target6_mutant_arcade_waits_for_fire2524_collision(
+fn mutant_dive_collision_window_pending(
     position: Point,
     arcade_state: Option<MutantArcadeState>,
 ) -> bool {
     let Some(arcade_state) = arcade_state else {
         return false;
     };
-    if !target6_mutant_arcade_uses_dive_projection(arcade_state) {
+    if !mutant_dive_uses_path_projection(arcade_state) {
         return false;
     }
 
-    let (_, raw_y16) =
+    let (_, world_y_word) =
         arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction);
     arcade_state.shot_timer >= 0x80
-        && (0x9000..TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MIN).contains(&raw_y16)
+        && (0x9000..MUTANT_DIVE_COLLISION_WORLD_Y_MIN).contains(&world_y_word)
 }
 
-fn target6_mutant_arcade_uses_fire2524_collision_projection(
+fn mutant_dive_uses_collision_projection(
     position: Point,
     arcade_state: Option<MutantArcadeState>,
 ) -> bool {
     let Some(arcade_state) = arcade_state else {
         return false;
     };
-    if !target6_mutant_arcade_uses_dive_projection(arcade_state) {
+    if !mutant_dive_uses_path_projection(arcade_state) {
         return false;
     }
 
-    let (_, raw_y16) =
+    let (_, world_y_word) =
         arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction);
     arcade_state.shot_timer >= 0x80
-        && (TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MIN
-            ..TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MAX)
-            .contains(&raw_y16)
+        && (MUTANT_DIVE_COLLISION_WORLD_Y_MIN
+            ..MUTANT_DIVE_COLLISION_WORLD_Y_MAX)
+            .contains(&world_y_word)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1285,13 +1285,13 @@ struct ActorExplosionPlacement {
 fn actor_player_enemy_collision_explosion_placement(
     enemy: &CollisionBody,
 ) -> ActorExplosionPlacement {
-    if target6_mutant_arcade_uses_fire2524_collision_projection(
+    if mutant_dive_uses_collision_projection(
         enemy.position,
         enemy.mutant_runtime,
     ) {
         ActorExplosionPlacement {
-            position: TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_TOP_LEFT,
-            explosion_anchor: Some(TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER),
+            position: MUTANT_DIVE_COLLISION_EXPLOSION_TOP_LEFT,
+            explosion_anchor: Some(MUTANT_DIVE_COLLISION_EXPLOSION_ANCHOR),
         }
     } else {
         ActorExplosionPlacement {
@@ -1301,19 +1301,19 @@ fn actor_player_enemy_collision_explosion_placement(
     }
 }
 
-fn target6_mutant_arcade_shot_position(
+fn mutant_dive_shot_position(
     position: Point,
     arcade_state: MutantArcadeState,
 ) -> Point {
-    if !target6_mutant_arcade_uses_dive_projection(arcade_state) {
+    if !mutant_dive_uses_path_projection(arcade_state) {
         return position;
     }
 
     match arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction) {
-        TARGET6_MUTANT_DIVE_ENTRY_RAW => Point::new(0x13, 0x46),
-        TARGET6_MUTANT_DIVE_FIRST_SHOT_RAW => Point::new(0x1E, 0x70),
-        TARGET6_MUTANT_DIVE_SECOND_SHOT_RAW => Point::new(0x21, 0x87),
-        _ => target6_mutant_arcade_dive_position(position, arcade_state).unwrap_or(position),
+        MUTANT_DIVE_ENTRY_WORLD_WORDS => Point::new(0x13, 0x46),
+        MUTANT_DIVE_FIRST_SHOT_WORLD_WORDS => Point::new(0x1E, 0x70),
+        MUTANT_DIVE_SECOND_SHOT_WORLD_WORDS => Point::new(0x21, 0x87),
+        _ => mutant_dive_path_position(position, arcade_state).unwrap_or(position),
     }
 }
 
@@ -1341,23 +1341,23 @@ fn arcade_tie_selected_slot(seed: u8) -> u8 {
     (seed & 0x06) >> 1
 }
 
-fn target6_mutant_arcade_fire2524_forced_shot(
+fn mutant_dive_forced_shot(
     position: Point,
     arcade_state: MutantArcadeState,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
 ) -> Option<(Point, Velocity, EnemyProjectileArcadeState)> {
-    if !target6_mutant_arcade_uses_dive_projection(arcade_state)
+    if !mutant_dive_uses_path_projection(arcade_state)
         || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
     {
         return None;
     }
 
     match arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction) {
-        TARGET6_MUTANT_FIRE2524_FIRST_SHOT_RAW
+        MUTANT_DIVE_FORCED_FIRST_SHOT_WORLD_WORDS
             if arcade_state.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS =>
         {
-            Some(target6_mutant_arcade_exact_projectile(
+            Some(mutant_dive_exact_projectile(
                 Point::new(0x1E, 0x54),
                 0x33,
                 0x56,
@@ -1366,10 +1366,10 @@ fn target6_mutant_arcade_fire2524_forced_shot(
                 behavior,
             ))
         }
-        TARGET6_MUTANT_FIRE2524_SECOND_SHOT_RAW
+        MUTANT_DIVE_FORCED_SECOND_SHOT_WORLD_WORDS
             if arcade_state.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS =>
         {
-            Some(target6_mutant_arcade_exact_projectile(
+            Some(mutant_dive_exact_projectile(
                 Point::new(0x21, 0x7F),
                 0x6F,
                 0xE1,
@@ -1382,7 +1382,7 @@ fn target6_mutant_arcade_fire2524_forced_shot(
     }
 }
 
-fn target6_mutant_arcade_exact_projectile(
+fn mutant_dive_exact_projectile(
     position: Point,
     x_fraction: u8,
     y_fraction: u8,

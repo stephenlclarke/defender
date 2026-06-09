@@ -826,7 +826,7 @@ fn clean_mutant_runtime(arcade_state: MutantArcadeState) -> MutantRuntimeSnapsho
         sleep_ticks: arcade_state.sleep_ticks,
         hop_rng: clean_arcade_rng(arcade_state.hop_rng),
         render_x_correction: arcade_state.render_x_correction,
-        target6_first_shot_deferred: arcade_state.target6_first_shot_deferred,
+        dive_entry_shot_deferred: arcade_state.dive_entry_shot_deferred,
     }
 }
 

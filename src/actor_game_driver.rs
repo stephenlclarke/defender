@@ -666,7 +666,7 @@ impl ActorGameDriver {
             if hyperspace_clears_enemy_lasers && enemy.kind == ActorKind::EnemyLaser {
                 continue;
             }
-            if target6_mutant_arcade_waits_for_fire2524_collision(
+            if mutant_dive_collision_window_pending(
                 enemy.position,
                 enemy.mutant_runtime,
             ) {

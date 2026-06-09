@@ -194,7 +194,7 @@ pub struct MutantRuntimeSnapshot {
     pub sleep_ticks: u8,
     pub hop_rng: ArcadeRngSnapshot,
     pub render_x_correction: u16,
-    pub target6_first_shot_deferred: bool,
+    pub dive_entry_shot_deferred: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
