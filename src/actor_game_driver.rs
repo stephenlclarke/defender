@@ -1596,8 +1596,8 @@ impl ActorGameDriver {
     }
 
     fn reset_baiter_timer(&mut self) {
-        let source_profile = self.current_arcade_wave_profile();
-        self.baiter_timer_steps = Some(source_profile.baiter_delay.max(1));
+        let arcade_wave_profile = self.current_arcade_wave_profile();
+        self.baiter_timer_steps = Some(arcade_wave_profile.baiter_delay.max(1));
         self.baiter_pacing_steps_remaining = ACTOR_BAITER_TIMER_PACING_STEPS;
     }
 
@@ -1626,9 +1626,9 @@ impl ActorGameDriver {
 
         self.first_wave_early_reserve_steps_remaining = None;
         self.clear_first_wave_lander_refill();
-        let source_profile = self.current_arcade_wave_profile();
+        let arcade_wave_profile = self.current_arcade_wave_profile();
         let reserve_kinds =
-            actor_source_reserve_enemy_kinds(&mut self.enemy_reserve, source_profile);
+            actor_source_reserve_enemy_kinds(&mut self.enemy_reserve, arcade_wave_profile);
         let mut index = 0;
         while index < reserve_kinds.len() {
             match reserve_kinds[index] {
@@ -1637,7 +1637,7 @@ impl ActorGameDriver {
                     if let Some(target_index) = target_index {
                         let spawn = ActorLanderSpawn::source_restore(
                             &mut self.arcade_rng,
-                            source_profile,
+                            arcade_wave_profile,
                             Some(target_index),
                         );
                         commands.push(GameCommand::Spawn(SpawnRequest::Lander {
@@ -1654,7 +1654,7 @@ impl ActorGameDriver {
                         for _ in 0..lander_count {
                             let spawn = ActorMutantSpawn::source_restore(
                                 &mut self.arcade_rng,
-                                source_profile,
+                                arcade_wave_profile,
                                 self.background_left,
                             );
                             commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
@@ -1676,7 +1676,7 @@ impl ActorGameDriver {
                         .active_player_position()
                         .map_or(0, |position| actor_source_absolute_x(position, 0));
                     for spawn in ActorBomberSpawn::source_restore_batch(
-                        source_profile,
+                        arcade_wave_profile,
                         player_absolute_x,
                         bomber_count,
                     ) {
@@ -1700,7 +1700,7 @@ impl ActorGameDriver {
                 ActorSourceEnemyKind::Mutant => {
                     let spawn = ActorMutantSpawn::source_restore(
                         &mut self.arcade_rng,
-                        source_profile,
+                        arcade_wave_profile,
                         self.background_left,
                     );
                     commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
@@ -1718,7 +1718,7 @@ impl ActorGameDriver {
                         .count();
                     for spawn in ActorSwarmerSpawn::source_restore_batch(
                         &mut self.arcade_rng,
-                        source_profile,
+                        arcade_wave_profile,
                         swarmer_count,
                     ) {
                         commands.push(GameCommand::Spawn(SpawnRequest::Swarmer {
@@ -2067,13 +2067,13 @@ impl ActorGameDriver {
             .count();
         let spawn_count =
             POD_SWARMER_REQUEST_LIMIT.min(ACTIVE_SWARMER_LIMIT.saturating_sub(active_swarmers));
-        let source_profile = self.current_arcade_wave_profile();
+        let arcade_wave_profile = self.current_arcade_wave_profile();
 
         (0..spawn_count)
             .map(|_| {
                 let spawn = ActorSwarmerSpawn::source_from_pod(
                     &mut self.arcade_rng,
-                    source_profile,
+                    arcade_wave_profile,
                     position,
                 );
                 GameCommand::Spawn(SpawnRequest::Swarmer {
