@@ -748,17 +748,17 @@
     }
 
     #[test]
-    fn embedded_actor_attract_script_matches_red_label_constructor_fallback() {
+    fn embedded_actor_attract_script_matches_arcade_constructor_fallback() {
         let parsed = AttractScript::parse_text(ACTOR_ATTRACT_SCRIPT)
             .expect("embedded actor attract script should parse");
 
         assert_eq!(parsed.manifest().cycle_steps, Some(ATTRACT_CYCLE_STEPS));
         assert_eq!(
-            AttractScript::red_label_title().manifest(),
+            AttractScript::arcade_title().manifest(),
             parsed.manifest()
         );
         assert_eq!(
-            AttractScript::red_label_title_from_events().manifest(),
+            AttractScript::arcade_title_from_events().manifest(),
             parsed.manifest()
         );
         assert!(parsed.manifest().events.iter().any(|event| matches!(
@@ -900,7 +900,7 @@
 
     #[test]
     fn default_actor_attract_script_loops_after_source_scoring_cycle() {
-        let script = AttractScript::red_label_title();
+        let script = AttractScript::arcade_title();
         let high_scores = HighScoreTable::default().entries;
 
         assert_eq!(script.manifest().cycle_steps, Some(ATTRACT_CYCLE_STEPS));

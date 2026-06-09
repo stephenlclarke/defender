@@ -223,16 +223,12 @@ impl AttractScript {
         source.parse()
     }
 
-    pub fn red_label_title() -> Self {
+    pub fn arcade_title() -> Self {
         Self::parse_text(ACTOR_ATTRACT_SCRIPT)
             .unwrap_or_else(|error| panic!("embedded actor attract script is invalid: {error}"))
     }
 
-    pub fn arcade_title() -> Self {
-        Self::red_label_title()
-    }
-
-    pub fn red_label_title_from_events() -> Self {
+    pub fn arcade_title_from_events() -> Self {
         let mut events = vec![
             AttractScriptEvent::williams_logo(
                 1,
@@ -756,7 +752,7 @@ fn normalize_script_token(token: &str) -> String {
 
 impl Default for AttractScript {
     fn default() -> Self {
-        Self::red_label_title()
+        Self::arcade_title()
     }
 }
 

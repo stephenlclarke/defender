@@ -57,7 +57,7 @@ impl ActorGameDriver {
     }
 
     pub fn with_wave_script(wave_script: ActorWaveScript) -> Self {
-        Self::with_attract_and_wave_scripts(AttractScript::red_label_title(), wave_script)
+        Self::with_attract_and_wave_scripts(AttractScript::arcade_title(), wave_script)
     }
 
     pub fn with_attract_and_wave_scripts(

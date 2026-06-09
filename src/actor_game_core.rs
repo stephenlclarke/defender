@@ -1503,7 +1503,7 @@ impl ActorBehaviorScript {
         Self::new(ActorBehaviorProfile::DEFAULT)
     }
 
-    pub fn red_label_default() -> Self {
+    pub fn arcade_default() -> Self {
         Self::parse_text(ACTOR_BEHAVIOR_SCRIPT)
             .unwrap_or_else(|error| panic!("embedded actor behavior script is invalid: {error}"))
     }

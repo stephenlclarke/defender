@@ -231,7 +231,7 @@ fn parse_behavior_i64(
 
 impl Default for ActorBehaviorScript {
     fn default() -> Self {
-        Self::red_label_default()
+        Self::arcade_default()
     }
 }
 
