@@ -569,7 +569,7 @@ fn actor_source_project_screen_position(
     x_fraction: u8,
     background_left: u16,
 ) -> Option<Point> {
-    let x16 = actor_source_absolute_x(position, x_fraction);
+    let x16 = arcade_absolute_x(position, x_fraction);
     let active_left = background_left.wrapping_sub(OBJECT_ACTIVE_LEFT_MARGIN);
     if x16.wrapping_sub(active_left) >= OBJECT_ACTIVE_WORLD_WIDTH {
         return None;

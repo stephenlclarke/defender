@@ -343,8 +343,8 @@
             expected_source.x_velocity,
             actor_source_mutant_x_velocity(
                 ArcadeWaveProfile::for_wave(1).mutant_x_velocity,
-                actor_source_absolute_x(Point::new(42, 120), 0),
-                actor_source_absolute_x(start, source.x_fraction),
+                arcade_absolute_x(Point::new(42, 120), 0),
+                arcade_absolute_x(start, source.x_fraction),
             )
         );
         assert_ne!(expected_source.hop_rng, source.hop_rng);
@@ -398,8 +398,8 @@
             expected_source_mutant_after_motion(start, source, actor, &prompt, behavior);
         let default_x_velocity = actor_source_mutant_x_velocity(
             default_profile.mutant_x_velocity,
-            actor_source_absolute_x(Point::new(42, 120), 0),
-            actor_source_absolute_x(start, source.x_fraction),
+            arcade_absolute_x(Point::new(42, 120), 0),
+            arcade_absolute_x(start, source.x_fraction),
         );
 
         let mut mutant = Mutant::from_spawn(
@@ -1880,8 +1880,8 @@
             .player_position()
             .expect("source mutant expected helper needs a player");
         let profile = prompt.arcade_wave;
-        let player_absolute_x = actor_source_absolute_x(player_position, 0);
-        let object_absolute_x = actor_source_absolute_x(position, source.x_fraction);
+        let player_absolute_x = arcade_absolute_x(player_position, 0);
+        let object_absolute_x = arcade_absolute_x(position, source.x_fraction);
         source.x_velocity = actor_source_mutant_x_velocity(
             profile.mutant_x_velocity,
             player_absolute_x,

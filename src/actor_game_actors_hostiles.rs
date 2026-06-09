@@ -519,8 +519,8 @@ impl Swarmer {
                 self.position.y,
                 prompt.arcade_rng.map(|rng| rng.seed).unwrap_or(0),
             );
-            let player_absolute_x = actor_source_absolute_x(player, 0);
-            let object_absolute_x = actor_source_absolute_x(self.position, arcade_state.x_fraction);
+            let player_absolute_x = arcade_absolute_x(player, 0);
+            let object_absolute_x = arcade_absolute_x(self.position, arcade_state.x_fraction);
             let past_window = player_absolute_x
                 .wrapping_sub(object_absolute_x)
                 .wrapping_add(MINI_SWARMER_TURN_WINDOW_HALF);
@@ -661,8 +661,8 @@ fn mini_swarmer_fireball(
     arcade_state: SwarmerArcadeState,
 ) -> Option<(Velocity, EnemyProjectileArcadeState)> {
     let player = prompt.player_position()?;
-    let player_delta = actor_source_absolute_x(player, 0)
-        .wrapping_sub(actor_source_absolute_x(position, arcade_state.x_fraction));
+    let player_delta = arcade_absolute_x(player, 0)
+        .wrapping_sub(arcade_absolute_x(position, arcade_state.x_fraction));
     if (player_delta.to_be_bytes()[0] ^ arcade_state.x_velocity.to_be_bytes()[0]) & 0x80 != 0
         || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
     {

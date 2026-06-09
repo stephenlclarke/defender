@@ -1215,7 +1215,7 @@
                 .any(|arcade_state| {
                     let expected_spawn = ActorBomberSpawn::arcade_restore_batch(
                         ArcadeWaveProfile::for_wave(2),
-                        actor_source_absolute_x(player_position, 0),
+                        arcade_absolute_x(player_position, 0),
                         1,
                     )[0];
                     let expected_arcade_state =

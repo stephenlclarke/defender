@@ -597,8 +597,8 @@ impl Mutant {
             return false;
         };
         let profile = prompt.arcade_wave;
-        let player_absolute_x = actor_source_absolute_x(player_position, 0);
-        let object_absolute_x = actor_source_absolute_x(self.position, source.x_fraction);
+        let player_absolute_x = arcade_absolute_x(player_position, 0);
+        let object_absolute_x = arcade_absolute_x(self.position, source.x_fraction);
         source.x_velocity = actor_source_mutant_x_velocity(
             profile.mutant_x_velocity,
             player_absolute_x,
@@ -750,7 +750,7 @@ impl AssetActor for Mutant {
     }
 }
 
-fn actor_source_absolute_x(position: Point, x_fraction: u8) -> u16 {
+fn arcade_absolute_x(position: Point, x_fraction: u8) -> u16 {
     u16::from_be_bytes([position.x as u8, x_fraction])
 }
 
@@ -1188,7 +1188,7 @@ fn actor_source_target6_mutant_visual_position(
         return None;
     }
 
-    let x16 = actor_source_absolute_x(position, source.x_fraction)
+    let x16 = arcade_absolute_x(position, source.x_fraction)
         .wrapping_add(TARGET6_MUTANT_VISUAL_X_CORRECTION);
     if (x16 as i16) < 0 {
         return None;

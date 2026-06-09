@@ -1674,7 +1674,7 @@ impl ActorGameDriver {
                         .count();
                     let player_absolute_x = self
                         .active_player_position()
-                        .map_or(0, |position| actor_source_absolute_x(position, 0));
+                        .map_or(0, |position| arcade_absolute_x(position, 0));
                     for spawn in ActorBomberSpawn::arcade_restore_batch(
                         arcade_wave_profile,
                         player_absolute_x,
