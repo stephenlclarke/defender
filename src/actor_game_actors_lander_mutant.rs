@@ -74,7 +74,7 @@ impl AssetActor for Lander {
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Lander);
             if self.spawn_visibility != LanderSpawnVisibility::HiddenFirstWaveRefill
-                && !self.tick_source_sleep()
+                && !self.tick_arcade_sleep()
             {
                 match self.mode {
                     LanderMode::Seeking => self.update_seeking(prompt, behavior, &mut commands),
@@ -258,13 +258,13 @@ impl Lander {
             commands.push(GameCommand::Destroy(human_id));
             commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
                 position: self.position,
-                source: self.source_mutant_conversion(prompt),
+                source: self.mutant_arcade_conversion(prompt),
             }));
             commands.push(GameCommand::PlaySound(SoundCue::MutantSpawn));
         }
     }
 
-    fn source_mutant_conversion(&self, prompt: &StepPrompt) -> Option<MutantArcadeState> {
+    fn mutant_arcade_conversion(&self, prompt: &StepPrompt) -> Option<MutantArcadeState> {
         let source = self.source?;
         let hop_rng = prompt.arcade_rng?;
         Some(MutantArcadeState::from_lander_conversion(
@@ -274,7 +274,7 @@ impl Lander {
         ))
     }
 
-    fn tick_source_sleep(&mut self) -> bool {
+    fn tick_arcade_sleep(&mut self) -> bool {
         if let Some(source) = &mut self.source
             && source.sleep_ticks > 0
         {
@@ -290,17 +290,17 @@ impl Lander {
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) {
-        let mut source_fired = false;
+        let mut arcade_shot_fired = false;
         if let Some(source) = &mut self.source {
             if source.shot_timer > 0 {
                 source.shot_timer = source.shot_timer.saturating_sub(1);
             }
             if source.shot_timer == 0 {
                 source.shot_timer = clamped_lander_fire_timer_reset(behavior);
-                source_fired = true;
+                arcade_shot_fired = true;
             }
         }
-        if source_fired {
+        if arcade_shot_fired {
             self.fire_lander_shot(prompt, behavior, commands);
             return;
         }
@@ -541,7 +541,7 @@ impl Mutant {
         target6_mutant_arcade_collision_position(self.position, self.source)
     }
 
-    fn advance_source_motion(
+    fn advance_arcade_motion(
         &mut self,
         prompt: &StepPrompt,
         behavior: ActorBehaviorProfile,
@@ -703,7 +703,7 @@ impl AssetActor for Mutant {
         let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Mutant);
-            if !self.advance_source_motion(prompt, behavior, &mut commands)
+            if !self.advance_arcade_motion(prompt, behavior, &mut commands)
                 && let Some(position) = move_by_hostile_mode(
                     self.position,
                     behavior.mutant_mode,
