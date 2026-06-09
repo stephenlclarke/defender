@@ -38,22 +38,22 @@ fn video_word_tint(word: u16) -> Color {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SourceTerrainFlavorRecord {
+struct TerrainFlavorRecord {
     offset: u8,
     word: u16,
 }
 
-impl SourceTerrainFlavorRecord {
+impl TerrainFlavorRecord {
     const EMPTY: Self = Self { offset: 0, word: 0 };
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SourceTerrainDrawRecord {
+struct TerrainDrawRecord {
     screen_address: u16,
     word: u16,
 }
 
-impl SourceTerrainDrawRecord {
+impl TerrainDrawRecord {
     const EMPTY: Self = Self {
         screen_address: 0,
         word: 0,
@@ -74,7 +74,7 @@ impl SourceScannerTerrainRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SourceTerrainBitState {
+struct TerrainBitState {
     data_index: usize,
     data_pointer: u16,
     data_byte: u8,
@@ -82,9 +82,9 @@ struct SourceTerrainBitState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SourceTerrainGenerationState {
-    left: SourceTerrainBitState,
-    right: SourceTerrainBitState,
+struct TerrainGenerationState {
+    left: TerrainBitState,
+    right: TerrainBitState,
     left_offset: u8,
     right_offset: u8,
     background_left: u16,
@@ -93,14 +93,14 @@ struct SourceTerrainGenerationState {
     flavor_1_pointer: usize,
 }
 
-pub(crate) fn push_source_bgout_terrain_sprites(
+pub(crate) fn push_background_terrain_sprites(
     scene: &mut RenderScene,
     background_left: u16,
     tint: Color,
 ) {
-    for record in source_bgout_terrain_records(background_left) {
+    for record in background_terrain_records(background_left) {
         scene.push_sprite(SceneSprite {
-            sprite: source_terrain_word_sprite(record.word),
+            sprite: terrain_word_sprite(record.word),
             layer: RenderLayer::Terrain,
             position: source_screen_position(record.screen_address),
             size: TERRAIN_WORD_SIZE,
@@ -109,7 +109,7 @@ pub(crate) fn push_source_bgout_terrain_sprites(
     }
 }
 
-fn source_terrain_word_sprite(word: u16) -> SpriteId {
+fn terrain_word_sprite(word: u16) -> SpriteId {
     if word == TERRAIN_WORD_0770 {
         SpriteId::TERRAIN_TILE_ALT
     } else {
@@ -117,20 +117,17 @@ fn source_terrain_word_sprite(word: u16) -> SpriteId {
     }
 }
 
-fn source_bgout_default_terrain_records() -> &'static [SourceTerrainDrawRecord; TERRAIN_SCREEN_WORDS]
-{
-    static RECORDS: OnceLock<[SourceTerrainDrawRecord; TERRAIN_SCREEN_WORDS]> = OnceLock::new();
-    RECORDS.get_or_init(|| source_generate_bgout_terrain_records(0))
+fn default_background_terrain_records() -> &'static [TerrainDrawRecord; TERRAIN_SCREEN_WORDS] {
+    static RECORDS: OnceLock<[TerrainDrawRecord; TERRAIN_SCREEN_WORDS]> = OnceLock::new();
+    RECORDS.get_or_init(|| generate_background_terrain_records(0))
 }
 
-fn source_bgout_terrain_records(
-    background_left: u16,
-) -> [SourceTerrainDrawRecord; TERRAIN_SCREEN_WORDS] {
-    let terrain_left = source_bgout_terrain_left(background_left);
+fn background_terrain_records(background_left: u16) -> [TerrainDrawRecord; TERRAIN_SCREEN_WORDS] {
+    let terrain_left = background_terrain_left(background_left);
     if terrain_left == 0 {
-        return *source_bgout_default_terrain_records();
+        return *default_background_terrain_records();
     }
-    source_generate_bgout_terrain_records(terrain_left)
+    generate_background_terrain_records(terrain_left)
 }
 
 fn source_scanner_mini_terrain_records_for_scan_left(
@@ -139,12 +136,10 @@ fn source_scanner_mini_terrain_records_for_scan_left(
     source_generate_scanner_mini_terrain_records(scan_left)
 }
 
-fn source_generate_bgout_terrain_records(
-    terrain_left: u16,
-) -> [SourceTerrainDrawRecord; TERRAIN_SCREEN_WORDS] {
-    let data = source_tdata_bytes();
-    let terrain_left = source_bgout_terrain_left(terrain_left);
-    let (flavor_0, flavor_1, state) = source_initialize_terrain_flavor_tables(data, terrain_left);
+fn generate_background_terrain_records(terrain_left: u16) -> [TerrainDrawRecord; TERRAIN_SCREEN_WORDS] {
+    let data = terrain_pattern_bytes();
+    let terrain_left = background_terrain_left(terrain_left);
+    let (flavor_0, flavor_1, state) = initialize_terrain_flavor_tables(data, terrain_left);
     let selected_flavor = if state.terrain_left.to_be_bytes()[1] & 0x20 == 0 {
         &flavor_1
     } else {
@@ -156,24 +151,25 @@ fn source_generate_bgout_terrain_records(
         state.flavor_0_pointer
     };
 
-    let mut records = [SourceTerrainDrawRecord::EMPTY; TERRAIN_SCREEN_WORDS];
+    let mut records = [TerrainDrawRecord::EMPTY; TERRAIN_SCREEN_WORDS];
     for (entry_index, record) in records.iter_mut().enumerate() {
-        let source_record =
+        let terrain_record =
             selected_flavor[(selected_pointer + entry_index) % selected_flavor.len()];
-        *record = SourceTerrainDrawRecord {
+        *record = TerrainDrawRecord {
             screen_address: u16::from_be_bytes([
                 0x98u8.wrapping_sub(
-                    u8::try_from(entry_index).expect("BGOUT terrain entry index fits in u8"),
+                    u8::try_from(entry_index)
+                        .expect("background terrain entry index fits in u8"),
                 ),
-                source_record.offset,
+                terrain_record.offset,
             ]),
-            word: source_record.word,
+            word: terrain_record.word,
         };
     }
     records
 }
 
-const fn source_bgout_terrain_left(background_left: u16) -> u16 {
+const fn background_terrain_left(background_left: u16) -> u16 {
     background_left & 0xFFE0
 }
 
@@ -201,44 +197,44 @@ fn source_generate_scanner_mini_terrain_records(
     records
 }
 
-fn source_initialize_terrain_flavor_tables(
+fn initialize_terrain_flavor_tables(
     data: &[u8; TERRAIN_TDATA_BYTES],
     terrain_left: u16,
 ) -> (
-    [SourceTerrainFlavorRecord; TERRAIN_FLAVOR_RECORDS],
-    [SourceTerrainFlavorRecord; TERRAIN_FLAVOR_RECORDS],
-    SourceTerrainGenerationState,
+    [TerrainFlavorRecord; TERRAIN_FLAVOR_RECORDS],
+    [TerrainFlavorRecord; TERRAIN_FLAVOR_RECORDS],
+    TerrainGenerationState,
 ) {
-    let (right, right_offset) = source_alinit_final_terrain_state(data);
+    let (right, right_offset) = initialize_right_terrain_state(data);
     let mut generation_left = terrain_left.wrapping_add(0x2610);
-    let mut left = SourceTerrainBitState {
+    let mut left = TerrainBitState {
         data_index: data.len() - 1,
         data_pointer: TERRAIN_PATTERN_STREAM_BASE.wrapping_sub(1),
         data_byte: 0,
         bit_counter: 0,
     };
     let mut left_offset = 0xE0;
-    source_advance_terrain_right_state(&mut left, data);
+    advance_terrain_right_state(&mut left, data);
 
     let mut scan_x = 0x0010u16;
     for _ in 0..=0x0800 {
         if scan_x == generation_left {
             break;
         }
-        left_offset = source_terrain_altitude_step(left_offset, left.data_byte);
-        source_advance_terrain_right_state(&mut left, data);
+        left_offset = terrain_altitude_step(left_offset, left.data_byte);
+        advance_terrain_right_state(&mut left, data);
         scan_x = scan_x.wrapping_add(0x20);
     }
     assert_eq!(
         scan_x, generation_left,
-        "BGINIT terrain stream must align to BGLX 0x{generation_left:04X}"
+        "background terrain stream must align to 0x{generation_left:04X}"
     );
 
     let saved_right = left;
     let saved_right_offset = left_offset;
-    let mut flavor_0 = [SourceTerrainFlavorRecord::EMPTY; TERRAIN_FLAVOR_RECORDS];
-    let mut flavor_1 = [SourceTerrainFlavorRecord::EMPTY; TERRAIN_FLAVOR_RECORDS];
-    let mut state = SourceTerrainGenerationState {
+    let mut flavor_0 = [TerrainFlavorRecord::EMPTY; TERRAIN_FLAVOR_RECORDS];
+    let mut flavor_1 = [TerrainFlavorRecord::EMPTY; TERRAIN_FLAVOR_RECORDS];
+    let mut state = TerrainGenerationState {
         left,
         right,
         left_offset,
@@ -255,7 +251,7 @@ fn source_initialize_terrain_flavor_tables(
         if generation_left.wrapping_sub(state.terrain_left) & 0x8000 != 0 {
             break;
         }
-        source_add_left_terrain_pixel(&mut state, data, &mut flavor_0, &mut flavor_1);
+        add_left_terrain_pixel(&mut state, data, &mut flavor_0, &mut flavor_1);
     }
 
     state.right = saved_right;
@@ -263,13 +259,13 @@ fn source_initialize_terrain_flavor_tables(
     (flavor_0, flavor_1, state)
 }
 
-fn source_add_left_terrain_pixel(
-    state: &mut SourceTerrainGenerationState,
+fn add_left_terrain_pixel(
+    state: &mut TerrainGenerationState,
     data: &[u8; TERRAIN_TDATA_BYTES],
-    flavor_0: &mut [SourceTerrainFlavorRecord; TERRAIN_FLAVOR_RECORDS],
-    flavor_1: &mut [SourceTerrainFlavorRecord; TERRAIN_FLAVOR_RECORDS],
+    flavor_0: &mut [TerrainFlavorRecord; TERRAIN_FLAVOR_RECORDS],
+    flavor_1: &mut [TerrainFlavorRecord; TERRAIN_FLAVOR_RECORDS],
 ) {
-    source_advance_terrain_left_state(&mut state.right, data);
+    advance_terrain_left_state(&mut state.right, data);
     state.right_offset = if state.right.data_byte & 0x80 == 0 {
         state.right_offset.wrapping_sub(1)
     } else {
@@ -283,7 +279,7 @@ fn source_add_left_terrain_pixel(
         state.flavor_1_pointer
     };
 
-    source_advance_terrain_left_state(&mut state.left, data);
+    advance_terrain_left_state(&mut state.left, data);
     let (offset, word) = if state.left.data_byte & 0x80 == 0 {
         state.left_offset = state.left_offset.wrapping_sub(1);
         (state.left_offset, TERRAIN_WORD_7007)
@@ -293,7 +289,7 @@ fn source_add_left_terrain_pixel(
         (offset, TERRAIN_WORD_0770)
     };
 
-    let record = SourceTerrainFlavorRecord { offset, word };
+    let record = TerrainFlavorRecord { offset, word };
     if flavor_0_selected {
         flavor_0[record_index] = record;
         state.flavor_0_pointer = (record_index + 1) % TERRAIN_FLAVOR_RECORDS;
@@ -303,10 +299,8 @@ fn source_add_left_terrain_pixel(
     }
 }
 
-fn source_alinit_final_terrain_state(
-    data: &[u8; TERRAIN_TDATA_BYTES],
-) -> (SourceTerrainBitState, u8) {
-    let mut state = SourceTerrainBitState {
+fn initialize_right_terrain_state(data: &[u8; TERRAIN_TDATA_BYTES]) -> (TerrainBitState, u8) {
+    let mut state = TerrainBitState {
         data_index: 0,
         data_pointer: TERRAIN_PATTERN_STREAM_BASE,
         data_byte: data[0],
@@ -314,15 +308,15 @@ fn source_alinit_final_terrain_state(
     };
     let mut offset = 0xE0;
     for _ in 0..0x0400 {
-        offset = source_terrain_altitude_step(offset, state.data_byte);
-        source_advance_terrain_right_state(&mut state, data);
-        offset = source_terrain_altitude_step(offset, state.data_byte);
-        source_advance_terrain_right_state(&mut state, data);
+        offset = terrain_altitude_step(offset, state.data_byte);
+        advance_terrain_right_state(&mut state, data);
+        offset = terrain_altitude_step(offset, state.data_byte);
+        advance_terrain_right_state(&mut state, data);
     }
     (state, offset)
 }
 
-fn source_terrain_altitude_step(offset: u8, data_byte: u8) -> u8 {
+fn terrain_altitude_step(offset: u8, data_byte: u8) -> u8 {
     if data_byte & 0x80 != 0 {
         offset.wrapping_sub(1)
     } else {
@@ -330,8 +324,8 @@ fn source_terrain_altitude_step(offset: u8, data_byte: u8) -> u8 {
     }
 }
 
-fn source_advance_terrain_right_state(
-    state: &mut SourceTerrainBitState,
+fn advance_terrain_right_state(
+    state: &mut TerrainBitState,
     data: &[u8; TERRAIN_TDATA_BYTES],
 ) {
     if state.bit_counter == 0 {
@@ -347,8 +341,8 @@ fn source_advance_terrain_right_state(
     }
 }
 
-fn source_advance_terrain_left_state(
-    state: &mut SourceTerrainBitState,
+fn advance_terrain_left_state(
+    state: &mut TerrainBitState,
     data: &[u8; TERRAIN_TDATA_BYTES],
 ) {
     if state.bit_counter == 7 {
@@ -360,18 +354,18 @@ fn source_advance_terrain_left_state(
         state.data_pointer = TERRAIN_PATTERN_STREAM_BASE
             .wrapping_add(u16::try_from(state.data_index).expect("TDATA index fits in u16"));
         state.bit_counter = 0;
-        state.data_byte = source_rotate_terrain_right_byte(data[state.data_index]);
+        state.data_byte = rotate_terrain_right_byte(data[state.data_index]);
     } else {
         state.bit_counter += 1;
-        state.data_byte = source_rotate_terrain_right_byte(state.data_byte);
+        state.data_byte = rotate_terrain_right_byte(state.data_byte);
     }
 }
 
-fn source_rotate_terrain_right_byte(data_byte: u8) -> u8 {
+fn rotate_terrain_right_byte(data_byte: u8) -> u8 {
     (data_byte >> 1).wrapping_add(if data_byte & 1 == 0 { 0 } else { 0x80 })
 }
 
-fn source_tdata_bytes() -> &'static [u8; TERRAIN_TDATA_BYTES] {
+fn terrain_pattern_bytes() -> &'static [u8; TERRAIN_TDATA_BYTES] {
     crate::arcade_assets::TERRAIN_PATTERN_BYTES
 }
 

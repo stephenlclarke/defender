@@ -399,7 +399,7 @@
     }
 
     #[test]
-    fn default_sprite_atlas_decodes_source_terrain_word_patterns() {
+    fn default_sprite_atlas_decodes_arcade_terrain_word_patterns() {
         let atlas = TextureAtlas::default_sprites();
         let terrain_7007 = atlas_region_pixels(&atlas, SpriteId::TERRAIN_TILE);
         let terrain_0770 = atlas_region_pixels(&atlas, SpriteId::TERRAIN_TILE_ALT);

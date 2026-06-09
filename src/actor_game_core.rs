@@ -18,8 +18,8 @@ use crate::{
         TERRAIN_EXPLOSION_LIFETIME_FRAMES, TerrainBlowSnapshot, TerrainBlowStage, TerrainSegment,
         VISUAL_STATE, WaveProfileSnapshot, WorldSnapshot, WorldVector, arcade_wave_landscape_tint,
         appearance_growth_size_for_age, explosion_growth_size_for_age, explosion_render_scale,
-        push_appearance_cloud_pixels, push_explosion_cloud_pixels, push_scanner_radar_sprites,
-        push_source_bgout_terrain_sprites, terrain_blow_flash_tint,
+        push_appearance_cloud_pixels, push_background_terrain_sprites,
+        push_explosion_cloud_pixels, push_scanner_radar_sprites, terrain_blow_flash_tint,
         terrain_explosion_growth_size_for_age,
     },
     renderer::{

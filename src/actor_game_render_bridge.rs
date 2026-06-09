@@ -38,7 +38,7 @@ impl ActorRenderSceneBridge {
             && report.player_start.is_none()
             && report.terrain_blow.is_none()
         {
-            push_source_bgout_terrain_sprites(
+            push_background_terrain_sprites(
                 &mut scene,
                 report.background_left,
                 arcade_wave_landscape_tint(report.wave),
@@ -182,7 +182,7 @@ impl ActorRenderSceneBridge {
     }
 
     fn push_attract_scoring_surface(&self, scene: &mut RenderScene, scoring_tick: u16) {
-        push_source_bgout_terrain_sprites(scene, 0, arcade_wave_landscape_tint(1));
+        push_background_terrain_sprites(scene, 0, arcade_wave_landscape_tint(1));
         push_attract_scoring_top_display_border(scene);
         push_attract_scoring_scanner_terrain(scene);
         push_attract_scoring_demo_scene(scene, scoring_tick);
