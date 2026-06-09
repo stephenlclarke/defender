@@ -466,7 +466,7 @@
     }
 
     #[test]
-    fn actor_source_reserve_landers_activate_before_wave_clear() {
+    fn actor_arcade_reserve_landers_activate_before_wave_clear() {
         let (mut driver, live) = started_arcade_wave_driver(2);
         assert_eq!(
             live.enemy_reserve,
@@ -511,26 +511,26 @@
                 .count(),
             MAX_ACTIVE_WAVE_ENEMIES
         );
-        let source_landers = restored
+        let arcade_landers = restored
             .snapshots
             .iter()
             .filter(|snapshot| snapshot.kind == ActorKind::Lander)
             .collect::<Vec<_>>();
-        assert_eq!(source_landers.len(), MAX_ACTIVE_WAVE_ENEMIES);
+        assert_eq!(arcade_landers.len(), MAX_ACTIVE_WAVE_ENEMIES);
         assert!(
-            source_landers
+            arcade_landers
                 .iter()
                 .all(|snapshot| snapshot.lander_runtime.is_some())
         );
-        assert!(source_landers.iter().any(|snapshot| {
+        assert!(arcade_landers.iter().any(|snapshot| {
             snapshot
                 .lander_runtime
-                .is_some_and(|source| source.target_human_index == Some(4))
+                .is_some_and(|arcade| arcade.target_human_index == Some(4))
         }));
     }
 
     #[test]
-    fn actor_first_wave_early_lander_reserve_materializes_on_source_cadence() {
+    fn actor_first_wave_early_lander_reserve_materializes_on_arcade_cadence() {
         let mut driver = started_driver();
         driver.set_kind_behavior(
             ActorKind::Player,
@@ -573,7 +573,7 @@
 
         let (offset, report) = materialized.unwrap_or_else(|| {
             panic!(
-                "first-wave early lander reserve should materialize on source cadence; \
+                "first-wave early lander reserve should materialize on arcade cadence; \
                  ready={} cooldown={} early={:?} reserve={:?} hostiles={} phase={:?}",
                 driver.reserve_activation_ready,
                 driver.reserve_activation_cooldown_steps,
@@ -622,10 +622,10 @@
         );
         assert!(report.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Lander
-                && snapshot.lander_runtime.is_some_and(|source| {
-                    source.target_human_index == Some(FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT)
-                        && source.x_velocity == 0
-                        && source.y_velocity == 0
+                && snapshot.lander_runtime.is_some_and(|arcade| {
+                    arcade.target_human_index == Some(FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT)
+                        && arcade.x_velocity == 0
+                        && arcade.y_velocity == 0
                 })
         }));
     }
@@ -706,7 +706,7 @@
         }
 
         let (offset, report) =
-            materialized.expect("first-wave refill should materialize on source cadence");
+            materialized.expect("first-wave refill should materialize on arcade cadence");
         assert_eq!(offset, FIRST_WAVE_LANDER_REFILL_DELAY_STEPS);
         assert_eq!(
             report
@@ -1584,7 +1584,7 @@
     }
 
     #[test]
-    fn source_lander_shot_timer_spawns_hostile_projectile() {
+    fn arcade_lander_shot_timer_spawns_hostile_projectile() {
         let mut driver = ActorGameDriver::new();
         driver.step(GameInput {
             coin: true,
@@ -1620,7 +1620,7 @@
                 break;
             }
         }
-        let shot_report = shot_report.expect("source lander should spawn a hostile shot");
+        let shot_report = shot_report.expect("arcade lander should spawn a hostile shot");
 
         assert!(shot_report.sounds.contains(&SoundCue::LanderShot));
         let (shot_position, shot_velocity, shot_source) = shot_report
@@ -1634,20 +1634,20 @@
                 }) => Some((*position, *velocity, *source)),
                 _ => None,
             })
-            .expect("source lander should emit a hostile shot command");
-        let lander_source = shot_report
+            .expect("arcade lander should emit a hostile shot command");
+        let lander_arcade = shot_report
             .snapshots
             .iter()
             .find(|snapshot| {
                 snapshot.kind == ActorKind::Lander && snapshot.position == shot_position
             })
             .and_then(|snapshot| snapshot.lander_runtime)
-            .expect("source lander snapshot should own shot fractions");
+            .expect("arcade lander snapshot should own shot fractions");
         assert_eq!(
             shot_source,
             Some(EnemyProjectileArcadeState {
-                x_fraction: lander_source.x_fraction,
-                y_fraction: lander_source.y_fraction,
+                x_fraction: lander_arcade.x_fraction,
+                y_fraction: lander_arcade.y_fraction,
                 x_velocity: arcade_projectile_velocity_component(shot_velocity.dx),
                 y_velocity: arcade_projectile_velocity_component(shot_velocity.dy),
                 lifetime_ticks: arcade_projectile_lifetime_ticks(LANDER_SHOT_LIFETIME),
@@ -1666,18 +1666,18 @@
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::EnemyLaser)
             .expect("spawned hostile shot should publish an actor snapshot");
-        let source_projectile = enemy_laser
+        let arcade_projectile = enemy_laser
             .enemy_projectile_runtime
-            .expect("hostile shot should publish source projectile metadata");
+            .expect("hostile shot should publish arcade projectile metadata");
         assert_eq!(
-            source_projectile.x_velocity,
+            arcade_projectile.x_velocity,
             arcade_projectile_velocity_component(enemy_laser.velocity.dx)
         );
         assert_eq!(
-            source_projectile.y_velocity,
+            arcade_projectile.y_velocity,
             arcade_projectile_velocity_component(enemy_laser.velocity.dy)
         );
-        assert!(source_projectile.lifetime_ticks > 0);
+        assert!(arcade_projectile.lifetime_ticks > 0);
         assert!(
             settled
                 .draws

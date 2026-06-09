@@ -206,7 +206,7 @@
     }
 
     #[test]
-    fn source_lander_abduction_spawns_source_mutant_metadata() {
+    fn arcade_lander_abduction_spawns_mutant_arcade_state() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 1;
@@ -244,8 +244,8 @@
                 })
             })
             .next()
-            .expect("source lander should spawn a source mutant");
-        let expected_source = MutantArcadeState {
+            .expect("arcade lander should spawn a mutant with arcade state");
+        let expected_arcade = MutantArcadeState {
             x_fraction: lander_runtime.x_fraction,
             y_fraction: lander_runtime.y_fraction,
             x_velocity: 0,
@@ -256,19 +256,19 @@
             sleep_ticks: 0,
             hop_rng: converted
                 .arcade_rng
-                .expect("playing report should expose source rng"),
+                .expect("playing report should expose arcade rng"),
             render_x_correction: 0,
             target6_first_shot_deferred: false,
         };
-        assert_eq!(mutant_runtime, expected_source);
+        assert_eq!(mutant_runtime, expected_arcade);
 
         let settled = driver.step(GameInput::NONE);
         let mutant = settled
             .snapshots
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::Mutant)
-            .expect("source mutant should become a live actor");
-        assert_eq!(mutant.mutant_runtime, Some(expected_source));
+            .expect("mutant with arcade state should become a live actor");
+        assert_eq!(mutant.mutant_runtime, Some(expected_arcade));
 
         let clean_state = settled.game_state();
         let clean_mutant = clean_state
@@ -280,15 +280,15 @@
         assert_eq!(
             clean_mutant.mutant_runtime,
             Some(MutantRuntimeSnapshot {
-                x_fraction: expected_source.x_fraction,
-                y_fraction: expected_source.y_fraction,
-                x_velocity: expected_source.x_velocity,
-                y_velocity: expected_source.y_velocity,
-                shot_timer: expected_source.shot_timer,
-                sleep_ticks: expected_source.sleep_ticks,
-                hop_rng: clean_arcade_rng(expected_source.hop_rng),
-                render_x_correction: expected_source.render_x_correction,
-                target6_first_shot_deferred: expected_source.target6_first_shot_deferred,
+                x_fraction: expected_arcade.x_fraction,
+                y_fraction: expected_arcade.y_fraction,
+                x_velocity: expected_arcade.x_velocity,
+                y_velocity: expected_arcade.y_velocity,
+                shot_timer: expected_arcade.shot_timer,
+                sleep_ticks: expected_arcade.sleep_ticks,
+                hop_rng: clean_arcade_rng(expected_arcade.hop_rng),
+                render_x_correction: expected_arcade.render_x_correction,
+                target6_first_shot_deferred: expected_arcade.target6_first_shot_deferred,
             })
         );
     }
@@ -1522,7 +1522,7 @@
             }
         }
 
-        panic!("first-wave early reserve should materialize on source cadence");
+        panic!("first-wave early reserve should materialize on arcade cadence");
     }
 
     fn snapshot_for(report: &StepReport, id: ActorId) -> &ActorSnapshot {

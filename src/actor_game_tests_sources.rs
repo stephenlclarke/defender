@@ -376,7 +376,7 @@
     }
 
     #[test]
-    fn source_lander_prefers_configured_target_human_slot() {
+    fn arcade_lander_prefers_configured_target_human_slot() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.set_kind_behavior(
