@@ -647,7 +647,7 @@
     }
 
     #[test]
-    fn target6_source_mutant_collision_position_offsets_dive_projection() {
+    fn target6_arcade_mutant_collision_position_offsets_dive_projection() {
         let source = MutantArcadeState {
             x_fraction: 0x8C,
             y_fraction: 0xB0,
@@ -665,11 +665,11 @@
         };
 
         assert_eq!(
-            actor_source_target6_mutant_scene_position(Point::new(0x08, 0x61), Some(source)),
+            target6_mutant_arcade_scene_position(Point::new(0x08, 0x61), Some(source)),
             Point::new(0x1E, 0x71)
         );
         assert_eq!(
-            actor_source_target6_mutant_collision_position(Point::new(0x08, 0x61), Some(source)),
+            target6_mutant_arcade_collision_position(Point::new(0x08, 0x61), Some(source)),
             Point::new(0x1E, 0x72)
         );
     }
@@ -697,7 +697,7 @@
             target6_first_shot_deferred: true,
         };
         let collision_position =
-            actor_source_target6_mutant_collision_position(raw_position, Some(source));
+            target6_mutant_arcade_collision_position(raw_position, Some(source));
         driver.snapshots.insert(
             player_id,
             actor_snapshot_with_bounds(

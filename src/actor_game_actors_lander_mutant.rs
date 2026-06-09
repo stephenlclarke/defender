@@ -534,11 +534,11 @@ impl Mutant {
     }
 
     fn scene_position(&self) -> Point {
-        actor_source_target6_mutant_scene_position(self.position, self.source)
+        target6_mutant_arcade_scene_position(self.position, self.source)
     }
 
     fn collision_position(&self) -> Point {
-        actor_source_target6_mutant_collision_position(self.position, self.source)
+        target6_mutant_arcade_collision_position(self.position, self.source)
     }
 
     fn advance_source_motion(
@@ -1109,7 +1109,7 @@ const ACTOR_TARGET6_MUTANT_VISUAL_ROWS: &[(u16, i16)] = &[
     (0x0754, 0x2C),
 ];
 
-fn actor_source_target6_mutant_dive_position(
+fn target6_mutant_arcade_dive_position(
     position: Point,
     source: MutantArcadeState,
 ) -> Option<Point> {
@@ -1126,10 +1126,10 @@ fn actor_source_target6_mutant_dive_position(
         return Some(anchor.screen);
     }
 
-    actor_source_target6_mutant_interpolated_dive_position(raw_y16)
+    target6_mutant_arcade_interpolated_dive_position(raw_y16)
 }
 
-fn actor_source_target6_mutant_interpolated_dive_position(raw_y16: u16) -> Option<Point> {
+fn target6_mutant_arcade_interpolated_dive_position(raw_y16: u16) -> Option<Point> {
     let first = ACTOR_TARGET6_MUTANT_DIVE_PROJECTIONS.first()?;
     let last = ACTOR_TARGET6_MUTANT_DIVE_PROJECTIONS.last()?;
     if raw_y16 < first.raw_y16 || raw_y16 > last.raw_y16 {
@@ -1179,7 +1179,7 @@ fn arcade_lerp_i16(
     rounded.clamp(0, i32::from(u8::MAX)) as i16
 }
 
-fn actor_source_target6_mutant_visual_position(
+fn target6_mutant_arcade_visual_position(
     position: Point,
     source: MutantArcadeState,
 ) -> Option<Point> {
@@ -1203,29 +1203,29 @@ fn actor_source_target6_mutant_visual_position(
     Some(Point::new(screen_x as i16, screen_y))
 }
 
-fn actor_source_target6_mutant_scene_position(
+fn target6_mutant_arcade_scene_position(
     position: Point,
     source: Option<MutantArcadeState>,
 ) -> Point {
     let Some(source) = source else {
         return position;
     };
-    actor_source_target6_mutant_dive_position(position, source)
-        .or_else(|| actor_source_target6_mutant_visual_position(position, source))
+    target6_mutant_arcade_dive_position(position, source)
+        .or_else(|| target6_mutant_arcade_visual_position(position, source))
         .unwrap_or(position)
 }
 
-fn actor_source_target6_mutant_collision_position(
+fn target6_mutant_arcade_collision_position(
     position: Point,
     source: Option<MutantArcadeState>,
 ) -> Point {
     let Some(source) = source else {
         return position;
     };
-    if let Some(position) = actor_source_target6_mutant_dive_position(position, source) {
+    if let Some(position) = target6_mutant_arcade_dive_position(position, source) {
         return position.offset(Velocity::new(0, 1));
     }
-    actor_source_target6_mutant_visual_position(position, source).unwrap_or(position)
+    target6_mutant_arcade_visual_position(position, source).unwrap_or(position)
 }
 
 fn actor_source_target6_mutant_waits_for_fire2524_collision(
@@ -1299,7 +1299,7 @@ fn actor_source_target6_mutant_shot_position(
         TARGET6_MUTANT_DIVE_ENTRY_RAW => Point::new(0x13, 0x46),
         TARGET6_MUTANT_DIVE_FIRST_SHOT_RAW => Point::new(0x1E, 0x70),
         TARGET6_MUTANT_DIVE_SECOND_SHOT_RAW => Point::new(0x21, 0x87),
-        _ => actor_source_target6_mutant_dive_position(position, source).unwrap_or(position),
+        _ => target6_mutant_arcade_dive_position(position, source).unwrap_or(position),
     }
 }
 
