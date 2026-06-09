@@ -599,12 +599,12 @@ impl Mutant {
         let profile = prompt.arcade_wave;
         let player_absolute_x = arcade_absolute_x(player_position, 0);
         let object_absolute_x = arcade_absolute_x(self.position, source.x_fraction);
-        source.x_velocity = actor_source_mutant_x_velocity(
+        source.x_velocity = mutant_arcade_x_velocity(
             profile.mutant_x_velocity,
             player_absolute_x,
             object_absolute_x,
         );
-        source.y_velocity = actor_source_mutant_y_velocity(
+        source.y_velocity = mutant_arcade_y_velocity(
             profile,
             player_position.y,
             player_absolute_x,
@@ -773,7 +773,7 @@ const fn arcade_rng_from_snapshot(snapshot: ActorArcadeRngSnapshot) -> ActorArca
     }
 }
 
-fn actor_source_mutant_x_velocity(
+fn mutant_arcade_x_velocity(
     x_velocity_word: u8,
     player_absolute_x: u16,
     object_absolute_x: u16,
@@ -786,7 +786,7 @@ fn actor_source_mutant_x_velocity(
     actor_sign_extend_u8_to_u16(x_velocity_low)
 }
 
-fn actor_source_mutant_y_velocity(
+fn mutant_arcade_y_velocity(
     profile: ArcadeWaveProfile,
     player_y: i16,
     player_absolute_x: u16,

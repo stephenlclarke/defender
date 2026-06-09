@@ -341,7 +341,7 @@
         assert_eq!(snapshot.mutant_runtime, Some(expected_source));
         assert_eq!(
             expected_source.x_velocity,
-            actor_source_mutant_x_velocity(
+            mutant_arcade_x_velocity(
                 ArcadeWaveProfile::for_wave(1).mutant_x_velocity,
                 arcade_absolute_x(Point::new(42, 120), 0),
                 arcade_absolute_x(start, source.x_fraction),
@@ -396,7 +396,7 @@
         let behavior = ActorBehaviorProfile::default();
         let (expected_position, expected_source, _shot) =
             expected_source_mutant_after_motion(start, source, actor, &prompt, behavior);
-        let default_x_velocity = actor_source_mutant_x_velocity(
+        let default_x_velocity = mutant_arcade_x_velocity(
             default_profile.mutant_x_velocity,
             arcade_absolute_x(Point::new(42, 120), 0),
             arcade_absolute_x(start, source.x_fraction),
@@ -1882,12 +1882,12 @@
         let profile = prompt.arcade_wave;
         let player_absolute_x = arcade_absolute_x(player_position, 0);
         let object_absolute_x = arcade_absolute_x(position, source.x_fraction);
-        source.x_velocity = actor_source_mutant_x_velocity(
+        source.x_velocity = mutant_arcade_x_velocity(
             profile.mutant_x_velocity,
             player_absolute_x,
             object_absolute_x,
         );
-        source.y_velocity = actor_source_mutant_y_velocity(
+        source.y_velocity = mutant_arcade_y_velocity(
             profile,
             player_position.y,
             player_absolute_x,
