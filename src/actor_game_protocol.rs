@@ -775,7 +775,7 @@ fn clean_bomber_runtime(arcade_state: BomberArcadeState) -> BomberRuntimeSnapsho
         y_fraction: arcade_state.y_fraction,
         x_velocity: arcade_state.x_velocity,
         y_velocity: arcade_state.y_velocity,
-        picture_frame: arcade_state.picture_frame,
+        picture_frame: arcade_state.animation_frame.index(),
         cruise_altitude: screen_coordinate(arcade_state.cruise_altitude),
         sleep_ticks: arcade_state.sleep_ticks,
         slot: arcade_state.slot,

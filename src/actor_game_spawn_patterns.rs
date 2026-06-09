@@ -79,7 +79,7 @@ impl ActorBomberSpawn {
                 y_fraction: 0,
                 x_velocity: actor_sign_extend_u8_to_u16(velocity_low),
                 y_velocity: 0,
-                picture_frame: 0,
+                animation_frame: SpriteFrameIndex::new(0),
                 cruise_altitude: BOMBER_CRUISE_ALTITUDE,
                 sleep_ticks: 0,
                 slot: (spawn_index % 4) as u8,
@@ -118,7 +118,7 @@ impl ActorBomberSpawn {
                         y_fraction: 0,
                         x_velocity,
                         y_velocity: 0,
-                        picture_frame: 0,
+                        animation_frame: SpriteFrameIndex::new(0),
                         cruise_altitude: BOMBER_CRUISE_ALTITUDE,
                         sleep_ticks: 0,
                         slot: (squad_remaining - 1) as u8,
@@ -521,4 +521,3 @@ impl ActorHumanSpawn {
         }
     }
 }
-

@@ -42,7 +42,7 @@ pub struct BomberArcadeState {
     pub y_fraction: u8,
     pub x_velocity: u16,
     pub y_velocity: u16,
-    pub picture_frame: u8,
+    pub animation_frame: SpriteFrameIndex,
     pub cruise_altitude: i16,
     pub sleep_ticks: u8,
     pub slot: u8,

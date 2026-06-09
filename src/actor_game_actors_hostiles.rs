@@ -58,8 +58,10 @@ impl Bomber {
             return;
         }
 
-        arcade_state.picture_frame =
-            bomber_sprite_frame_after_arcade_seed(arcade_rng.seed, arcade_state.picture_frame);
+        arcade_state.animation_frame = SpriteFrameIndex::new(bomber_sprite_frame_after_arcade_seed(
+            arcade_rng.seed,
+            arcade_state.animation_frame.index(),
+        ));
         arcade_state.y_velocity =
             bomber_seeded_y_velocity(arcade_state.y_velocity, arcade_rng.seed);
         if self.position.y == 0 {
@@ -82,7 +84,7 @@ impl Bomber {
     fn draw_effect(&self) -> VisualEffect {
         self.arcade_state
             .map(|arcade_state| VisualEffect::BomberSpriteFrame {
-                animation_frame: SpriteFrameIndex::new(arcade_state.picture_frame),
+                animation_frame: arcade_state.animation_frame,
             })
             .unwrap_or(VisualEffect::Static)
     }

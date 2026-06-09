@@ -228,7 +228,7 @@
                 y_fraction: 0,
                 x_velocity: 0xFFD8,
                 y_velocity: 0,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
                 cruise_altitude: BOMBER_CRUISE_ALTITUDE,
                 sleep_ticks: 0,
                 slot: 1,
@@ -404,7 +404,7 @@
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::Bomber)
             .expect("second wave should publish bomber arcade snapshot");
-        let (expected_bomber_position, expected_bomber_source) =
+        let (expected_bomber_position, expected_bomber_arcade_state) =
             expected_bomber_after_arcade_motion(
                 Point::new(228, 104),
                 BomberArcadeState {
@@ -412,7 +412,7 @@
                     y_fraction: 0,
                     x_velocity: 0xFFD8,
                     y_velocity: 0,
-                    picture_frame: 0,
+                    animation_frame: crate::SpriteFrameIndex::new(0),
                     cruise_altitude: BOMBER_CRUISE_ALTITUDE,
                     sleep_ticks: 0,
                     slot: 1,
@@ -438,7 +438,10 @@
                     })
         }));
         assert_eq!(bomber_snapshot.position, expected_bomber_position);
-        assert_eq!(bomber_snapshot.bomber_runtime, Some(expected_bomber_source));
+        assert_eq!(
+            bomber_snapshot.bomber_runtime,
+            Some(expected_bomber_arcade_state)
+        );
         assert!(live.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Pod
                 && snapshot.pod_runtime
@@ -456,8 +459,7 @@
                     && matches!(
                         draw.effect,
                         VisualEffect::BomberSpriteFrame { animation_frame }
-                            if animation_frame
-                                == crate::SpriteFrameIndex::new(expected_bomber_source.picture_frame)
+                            if animation_frame == expected_bomber_arcade_state.animation_frame
                     ))
         );
         assert!(

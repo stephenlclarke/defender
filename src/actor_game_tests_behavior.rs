@@ -594,7 +594,7 @@
             y_fraction: 0x7B,
             x_velocity: 0,
             y_velocity: 0,
-            picture_frame: 0,
+            animation_frame: crate::SpriteFrameIndex::new(0),
             cruise_altitude: BOMBER_CRUISE_ALTITUDE,
             sleep_ticks: 0,
             slot: 0,
@@ -688,7 +688,7 @@
                 y_fraction: 0,
                 x_velocity: 0,
                 y_velocity: 0,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
                 cruise_altitude: BOMBER_CRUISE_ALTITUDE,
                 sleep_ticks: 0,
                 slot: 0,
@@ -732,7 +732,7 @@
                 y_fraction: 0,
                 x_velocity: 0,
                 y_velocity: 0,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
                 cruise_altitude: BOMBER_CRUISE_ALTITUDE,
                 sleep_ticks: 0,
                 slot: 0,
@@ -748,7 +748,7 @@
                 y_fraction: 0,
                 x_velocity: 0,
                 y_velocity: 0,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
                 cruise_altitude: BOMBER_CRUISE_ALTITUDE,
                 sleep_ticks: 0,
                 slot: 0,
@@ -795,7 +795,7 @@
             y_fraction: 0x20,
             x_velocity: 0x0100,
             y_velocity: 0,
-            picture_frame: 2,
+            animation_frame: crate::SpriteFrameIndex::new(2),
             cruise_altitude: BOMBER_CRUISE_ALTITUDE,
             sleep_ticks: 0,
             slot: 3,
@@ -825,8 +825,7 @@
                 && matches!(
                     draw.effect,
                     VisualEffect::BomberSpriteFrame { animation_frame }
-                        if animation_frame
-                            == crate::SpriteFrameIndex::new(expected_arcade_state.picture_frame)
+                        if animation_frame == expected_arcade_state.animation_frame
                 )
         }));
         assert!(
@@ -857,7 +856,7 @@
             y_fraction: 0,
             x_velocity: 0,
             y_velocity: 0,
-            picture_frame: 1,
+            animation_frame: crate::SpriteFrameIndex::new(1),
             cruise_altitude: BOMBER_CRUISE_ALTITUDE,
             sleep_ticks: 0,
             slot: 3,

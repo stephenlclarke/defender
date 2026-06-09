@@ -1574,8 +1574,12 @@
             if arcade_state.sleep_ticks > 0 {
                 arcade_state.sleep_ticks = arcade_state.sleep_ticks.saturating_sub(1);
             } else {
-                arcade_state.picture_frame =
-                    bomber_sprite_frame_after_arcade_seed(arcade_rng.seed, arcade_state.picture_frame);
+                arcade_state.animation_frame = crate::SpriteFrameIndex::new(
+                    bomber_sprite_frame_after_arcade_seed(
+                        arcade_rng.seed,
+                        arcade_state.animation_frame.index(),
+                    ),
+                );
                 arcade_state.y_velocity =
                     bomber_seeded_y_velocity(arcade_state.y_velocity, arcade_rng.seed);
                 if position.y == 0 {
