@@ -1146,14 +1146,14 @@ fn actor_source_target6_mutant_interpolated_dive_position(raw_y16: u16) -> Optio
             }
 
             Some(Point::new(
-                actor_source_lerp_i16(
+                arcade_lerp_i16(
                     start.screen.x,
                     end.screen.x,
                     raw_y16,
                     start.raw_y16,
                     end.raw_y16,
                 ),
-                actor_source_lerp_i16(
+                arcade_lerp_i16(
                     start.screen.y,
                     end.screen.y,
                     raw_y16,
@@ -1164,7 +1164,7 @@ fn actor_source_target6_mutant_interpolated_dive_position(raw_y16: u16) -> Optio
         })
 }
 
-fn actor_source_lerp_i16(
+fn arcade_lerp_i16(
     start: i16,
     end: i16,
     value: u16,
