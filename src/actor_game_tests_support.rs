@@ -217,7 +217,7 @@
             y_velocity: 0,
             shot_timer: u8::MAX,
             sleep_ticks: 0,
-            picture_frame: 3,
+            animation_frame: crate::SpriteFrameIndex::new(3),
             target_human_index: None,
         };
         driver.spawn_lander_from_spawn(ActorLanderSpawn {
@@ -435,7 +435,7 @@
             y_velocity: 0,
             shot_timer: 0,
             sleep_ticks: 0,
-            picture_frame: 0,
+            animation_frame: crate::SpriteFrameIndex::new(0),
             target_human_index: Some(6),
         };
 
@@ -1202,7 +1202,7 @@
             arcade_state.y_velocity,
             arcade_state.shot_timer,
             arcade_state.sleep_ticks,
-            arcade_state.picture_frame,
+            arcade_state.animation_frame.index(),
             arcade_state.target_human_index,
         )
     }
@@ -1676,7 +1676,7 @@
             y_velocity: 0,
             shot_timer: 0,
             sleep_ticks: 0,
-            picture_frame: 0,
+            animation_frame: crate::SpriteFrameIndex::new(0),
             target_human_index: None,
         });
 

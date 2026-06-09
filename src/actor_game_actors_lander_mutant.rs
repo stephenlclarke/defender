@@ -361,7 +361,7 @@ impl Lander {
     fn draw_effect(&self) -> VisualEffect {
         self.arcade_state
             .map(|arcade_state| VisualEffect::LanderSpriteFrame {
-                animation_frame: SpriteFrameIndex::new(arcade_state.picture_frame),
+                animation_frame: arcade_state.animation_frame,
             })
             .unwrap_or(VisualEffect::Static)
     }
@@ -413,7 +413,7 @@ fn lander_arcade_state_matches_refill_row(
         && arcade_state.y_velocity == refill_arcade_state.y_velocity
         && arcade_state.shot_timer == refill_arcade_state.shot_timer
         && arcade_state.sleep_ticks == refill_arcade_state.sleep_ticks
-        && arcade_state.picture_frame == refill_arcade_state.picture_frame
+        && arcade_state.animation_frame == refill_arcade_state.animation_frame
         && arcade_state.target_human_index == refill_arcade_state.target_human_index
 }
 

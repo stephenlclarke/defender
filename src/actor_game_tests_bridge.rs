@@ -913,7 +913,7 @@
             y_velocity: 0,
             shot_timer: 0,
             sleep_ticks: 0,
-            picture_frame: 0,
+            animation_frame: crate::SpriteFrameIndex::new(0),
             target_human_index: None,
         });
 
@@ -1094,7 +1094,7 @@
             y_velocity: 0x0070,
             shot_timer: 0x3B,
             sleep_ticks: 0x04,
-            picture_frame: 1,
+            animation_frame: crate::SpriteFrameIndex::new(1),
             target_human_index: Some(2),
         });
         let mut human = actor_snapshot(13, ActorKind::Human, Point::new(0x1C, 0xE1));

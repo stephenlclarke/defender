@@ -16,7 +16,7 @@ impl ActorLanderSpawn {
                 y_velocity: start.y_velocity,
                 shot_timer: start.shot_timer,
                 sleep_ticks: start.sleep_ticks,
-                picture_frame: start.picture_frame,
+                animation_frame: start.animation_frame,
                 target_human_index: start.target_human_index,
             }),
         }
@@ -51,7 +51,7 @@ impl ActorLanderSpawn {
                 y_velocity,
                 shot_timer,
                 sleep_ticks: 0,
-                picture_frame: 0,
+                animation_frame: SpriteFrameIndex::new(0),
                 target_human_index,
             }),
         }

@@ -400,7 +400,7 @@
                 y_velocity: 0,
                 shot_timer: u8::MAX,
                 sleep_ticks: 0,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
                 target_human_index: Some(7),
             }),
         });

@@ -140,7 +140,7 @@
                 y_velocity: 0x0070,
                 shot_timer: 0x27,
                 sleep_ticks: 0x04,
-                picture_frame: 1,
+                animation_frame: crate::SpriteFrameIndex::new(1),
                 target_human_index: Some(1),
             })
         );
@@ -153,7 +153,7 @@
                 y_velocity: 0x0070,
                 shot_timer: 0x3C,
                 sleep_ticks: 0x04,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
                 target_human_index: Some(4),
             })
         );
@@ -189,7 +189,7 @@
                 y_velocity: 0x00B0,
                 shot_timer: 0x21,
                 sleep_ticks: 0,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
                 target_human_index: Some(1),
             })
         );
@@ -202,7 +202,7 @@
                 y_velocity: 0x00B0,
                 shot_timer: 0x2F,
                 sleep_ticks: 0,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
                 target_human_index: Some(2),
             })
         );
@@ -215,7 +215,7 @@
                 y_velocity: 0x00B0,
                 shot_timer: 0x1D,
                 sleep_ticks: 0,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
                 target_human_index: Some(3),
             })
         );
@@ -433,7 +433,7 @@
                         y_velocity: 0x00B0,
                         shot_timer: 0x20,
                         sleep_ticks: 0,
-                        picture_frame: 0,
+                        animation_frame: crate::SpriteFrameIndex::new(0),
                         target_human_index: Some(1),
                     })
         }));
@@ -755,7 +755,7 @@
                 y_velocity: 0x0090,
                 shot_timer: 0x23,
                 sleep_ticks: 0,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
                 target_human_index: Some(3),
             })
         );
@@ -1368,7 +1368,7 @@
                 y_velocity: 0xFFFF,
                 shot_timer: 8,
                 sleep_ticks: 0,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
                 target_human_index: None,
             }),
         });
@@ -1413,7 +1413,7 @@
                 y_velocity: 0xFFFF,
                 shot_timer: 7,
                 sleep_ticks: 0,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
                 target_human_index: None,
             })
         );
@@ -1482,7 +1482,7 @@
                 y_velocity: 0x0070,
                 shot_timer: 0x27,
                 sleep_ticks: 0x03,
-                picture_frame: 1,
+                animation_frame: crate::SpriteFrameIndex::new(1),
                 target_human_index: Some(1),
             })
         );

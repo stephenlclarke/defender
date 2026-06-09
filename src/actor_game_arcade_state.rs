@@ -32,7 +32,7 @@ pub struct LanderArcadeState {
     pub y_velocity: u16,
     pub shot_timer: u8,
     pub sleep_ticks: u8,
-    pub picture_frame: u8,
+    pub animation_frame: SpriteFrameIndex,
     pub target_human_index: Option<usize>,
 }
 
@@ -181,7 +181,7 @@ struct FirstWaveLanderSpawnRecord {
     y_velocity: u16,
     shot_timer: u8,
     sleep_ticks: u8,
-    picture_frame: u8,
+    animation_frame: SpriteFrameIndex,
     target_human_index: Option<usize>,
 }
 

@@ -764,7 +764,7 @@ fn clean_lander_runtime(arcade_state: LanderArcadeState) -> LanderRuntimeSnapsho
         y_velocity: arcade_state.y_velocity,
         shot_timer: arcade_state.shot_timer,
         sleep_ticks: arcade_state.sleep_ticks,
-        picture_frame: arcade_state.picture_frame,
+        picture_frame: arcade_state.animation_frame.index(),
         target_human_index: arcade_state.target_human_index,
     }
 }

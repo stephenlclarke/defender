@@ -534,7 +534,7 @@ const ACTOR_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         y_velocity: 0x0070,
         shot_timer: 0x27,
         sleep_ticks: 0x04,
-        picture_frame: 1,
+        animation_frame: SpriteFrameIndex::new(1),
         target_human_index: Some(1),
     }),
     ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
@@ -544,7 +544,7 @@ const ACTOR_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         y_velocity: 0x0070,
         shot_timer: 0x3B,
         sleep_ticks: 0x04,
-        picture_frame: 1,
+        animation_frame: SpriteFrameIndex::new(1),
         target_human_index: Some(2),
     }),
     ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
@@ -554,7 +554,7 @@ const ACTOR_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         y_velocity: 0x0070,
         shot_timer: 0x23,
         sleep_ticks: 0x04,
-        picture_frame: 1,
+        animation_frame: SpriteFrameIndex::new(1),
         target_human_index: Some(3),
     }),
     ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
@@ -564,7 +564,7 @@ const ACTOR_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         y_velocity: 0x0070,
         shot_timer: 0x3C,
         sleep_ticks: 0x04,
-        picture_frame: 0,
+        animation_frame: SpriteFrameIndex::new(0),
         target_human_index: Some(4),
     }),
     ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
@@ -574,7 +574,7 @@ const ACTOR_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         y_velocity: 0x0070,
         shot_timer: 0x25,
         sleep_ticks: 0x04,
-        picture_frame: 1,
+        animation_frame: SpriteFrameIndex::new(1),
         target_human_index: Some(5),
     }),
 ];
@@ -587,7 +587,7 @@ const ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         y_velocity: 0x0070,
         shot_timer: 0x10,
         sleep_ticks: 0,
-        picture_frame: 1,
+        animation_frame: SpriteFrameIndex::new(1),
         target_human_index: Some(7),
     }),
     ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
@@ -597,7 +597,7 @@ const ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         y_velocity: 0x0070,
         shot_timer: 0x3A,
         sleep_ticks: 0,
-        picture_frame: 1,
+        animation_frame: SpriteFrameIndex::new(1),
         target_human_index: Some(9),
     }),
     ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
@@ -607,7 +607,7 @@ const ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         y_velocity: 0x0070,
         shot_timer: 0x13,
         sleep_ticks: 0,
-        picture_frame: 0,
+        animation_frame: SpriteFrameIndex::new(0),
         target_human_index: Some(8),
     }),
     ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
@@ -617,7 +617,7 @@ const ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         y_velocity: 0x0070,
         shot_timer: 0x26,
         sleep_ticks: 0,
-        picture_frame: 1,
+        animation_frame: SpriteFrameIndex::new(1),
         target_human_index: Some(7),
     }),
     ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
@@ -627,7 +627,7 @@ const ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         y_velocity: 0,
         shot_timer: 0x34,
         sleep_ticks: 1,
-        picture_frame: 0,
+        animation_frame: SpriteFrameIndex::new(0),
         target_human_index: Some(6),
     }),
 ];
@@ -640,7 +640,7 @@ const ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         y_velocity: 0x0090,
         shot_timer: 0x36,
         sleep_ticks: 6,
-        picture_frame: 1,
+        animation_frame: SpriteFrameIndex::new(1),
         target_human_index: Some(7),
     }),
     ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
@@ -650,7 +650,7 @@ const ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         y_velocity: 0x0090,
         shot_timer: 0x2F,
         sleep_ticks: 0,
-        picture_frame: 0,
+        animation_frame: SpriteFrameIndex::new(0),
         target_human_index: Some(4),
     }),
     ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
@@ -660,7 +660,7 @@ const ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         y_velocity: 0x0090,
         shot_timer: 0x23,
         sleep_ticks: 1,
-        picture_frame: 0,
+        animation_frame: SpriteFrameIndex::new(0),
         target_human_index: Some(3),
     }),
     ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
@@ -670,7 +670,7 @@ const ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         y_velocity: 0x0090,
         shot_timer: 0x30,
         sleep_ticks: 1,
-        picture_frame: 0,
+        animation_frame: SpriteFrameIndex::new(0),
         target_human_index: Some(2),
     }),
     ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
@@ -680,7 +680,7 @@ const ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
         y_velocity: 0x0090,
         shot_timer: 0x1F,
         sleep_ticks: 1,
-        picture_frame: 0,
+        animation_frame: SpriteFrameIndex::new(0),
         target_human_index: Some(1),
     }),
 ];
