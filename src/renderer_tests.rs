@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::arcade_assets::ObjectBitmapId;
+    use crate::arcade_assets::{MessageId, ObjectBitmapId, message_text};
     use super::{
         ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT, AtlasRegion, Color, GpuRendererSettings,
         NativeRenderPipeline, NativeRendererResources, NativeSceneRenderer, ObjectPicturePalette,
@@ -18,8 +18,8 @@ mod tests {
         SpriteVertexBufferBinding, SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas,
         ViewportLayout, WgpuFrameCommand, WgpuFramePlan, WgpuPassPlan, WgpuViewportCommand,
         decode_object_picture_asset_rgba, pseudo_color_rgba, push_arcade_controlled_message_sprites,
-        push_source_text_bytes_sprites, render_scene_with_atlas_to_rgba, source_message_text,
-        source_screen_position, source_screen_position_with_offset,
+        push_source_text_bytes_sprites, render_scene_with_atlas_to_rgba, source_screen_position,
+        source_screen_position_with_offset,
     };
     use crate::renderer::{
         EmbeddedSprite, WHITE_RGBA, decode_source_attract_williams_logo_rgba,

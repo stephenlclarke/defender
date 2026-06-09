@@ -780,10 +780,6 @@ impl RenderScene {
     }
 }
 
-pub fn source_message_text(label: &str) -> Option<&'static str> {
-    crate::arcade_assets::message_id_from_legacy_label(label).map(crate::arcade_assets::message_text)
-}
-
 pub fn source_screen_position(screen_address: u16) -> [f32; 2] {
     let [column, row] = screen_address.to_be_bytes();
     [

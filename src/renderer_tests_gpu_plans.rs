@@ -802,10 +802,9 @@
     fn default_sprite_atlas_uses_message_glyph_regions() {
         let atlas = TextureAtlas::default_sprites();
 
-        assert_eq!(source_message_text("PLYR1"), Some("PLAYER ONE"));
-        assert_eq!(source_message_text("PLYR2"), Some("PLAYER TWO"));
-        assert_eq!(source_message_text("GO"), Some("GAME OVER"));
-        assert_eq!(source_message_text("MISSING"), None);
+        assert_eq!(message_text(MessageId::PlayerOne), "PLAYER ONE");
+        assert_eq!(message_text(MessageId::PlayerTwo), "PLAYER TWO");
+        assert_eq!(message_text(MessageId::GameOver), "GAME OVER");
         assert_eq!(source_screen_position(0x3C78), [120.0, 120.0]);
         assert_eq!(
             source_screen_position_with_offset(0x1458, 0, 0x0A),
@@ -861,7 +860,7 @@
     #[test]
     fn source_controlled_message_sprites_apply_source_cursor_controls() {
         let mut scene = RenderScene::empty(0, SurfaceSize::new(292, 240));
-        let text = source_message_text("ELECV").expect("ELECV message text");
+        let text = message_text(MessageId::WilliamsElectronics);
 
         push_arcade_controlled_message_sprites(&mut scene, text, 0x3258, RenderLayer::Overlay);
 
