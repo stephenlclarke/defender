@@ -1032,8 +1032,8 @@ impl ArcadeWaveProfile {
 
     fn lander_behavior(self) -> ActorBehaviorProfile {
         ActorBehaviorProfile {
-            lander_seek_speed: actor_lander_speed_from_source(self.lander_x_velocity),
-            lander_drift_speed: actor_lander_speed_from_source(self.lander_x_velocity),
+            lander_seek_speed: lander_speed_from_arcade_velocity(self.lander_x_velocity),
+            lander_drift_speed: lander_speed_from_arcade_velocity(self.lander_x_velocity),
             lander_fire_period_steps: u64::from(self.lander_shot_time.max(1)),
             ..ActorBehaviorProfile::default()
         }
@@ -1318,11 +1318,11 @@ fn push_actor_reserve_kind(
     }
 }
 
-fn actor_lander_speed_from_source(velocity: u8) -> i16 {
+fn lander_speed_from_arcade_velocity(velocity: u8) -> i16 {
     i16::from((velocity / 16).max(1))
 }
 
-fn actor_velocity_pixels_from_source(velocity: u8) -> i16 {
+fn speed_pixels_from_arcade_velocity(velocity: u8) -> i16 {
     i16::from((velocity / 32).max(1))
 }
 

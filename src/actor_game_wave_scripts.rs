@@ -299,7 +299,7 @@ impl ActorWaveScript {
                 .with_kind_behavior(
                     ActorKind::Bomber,
                     ActorBehaviorProfile {
-                        bomber_drift_speed: actor_velocity_pixels_from_source(
+                        bomber_drift_speed: speed_pixels_from_arcade_velocity(
                             source.bomber_x_velocity,
                         ),
                         ..ActorBehaviorProfile::default()
