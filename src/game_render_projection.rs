@@ -61,12 +61,12 @@ impl TerrainDrawRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SourceScannerTerrainRecord {
+struct ScannerMiniTerrainRecord {
     screen_address: u16,
     word: u16,
 }
 
-impl SourceScannerTerrainRecord {
+impl ScannerMiniTerrainRecord {
     const EMPTY: Self = Self {
         screen_address: 0,
         word: 0,
@@ -130,10 +130,10 @@ fn background_terrain_records(background_left: u16) -> [TerrainDrawRecord; TERRA
     generate_background_terrain_records(terrain_left)
 }
 
-fn source_scanner_mini_terrain_records_for_scan_left(
+fn scanner_mini_terrain_records_for_scan_left(
     scan_left: u16,
-) -> [SourceScannerTerrainRecord; SCANNER_TERRAIN_RECORDS] {
-    source_generate_scanner_mini_terrain_records(scan_left)
+) -> [ScannerMiniTerrainRecord; SCANNER_TERRAIN_RECORDS] {
+    generate_scanner_mini_terrain_records(scan_left)
 }
 
 fn generate_background_terrain_records(terrain_left: u16) -> [TerrainDrawRecord; TERRAIN_SCREEN_WORDS] {
@@ -173,25 +173,25 @@ const fn background_terrain_left(background_left: u16) -> u16 {
     background_left & 0xFFE0
 }
 
-fn source_generate_scanner_mini_terrain_records(
+fn generate_scanner_mini_terrain_records(
     scan_left: u16,
-) -> [SourceScannerTerrainRecord; SCANNER_TERRAIN_RECORDS] {
-    let bytes = source_mterr_bytes();
+) -> [ScannerMiniTerrainRecord; SCANNER_TERRAIN_RECORDS] {
+    let bytes = main_terrain_record_bytes();
     let first_record = usize::from(scan_left.to_be_bytes()[0] >> 2);
     assert!(
         first_record + SCANNER_TERRAIN_RECORDS <= SCANNER_MINI_TERRAIN_RECORDS,
-        "MTERR slice must contain 64 source scanner terrain records"
+        "main terrain slice must contain 64 scanner terrain records"
     );
 
-    let mut records = [SourceScannerTerrainRecord::EMPTY; SCANNER_TERRAIN_RECORDS];
-    let mut source_column = SCANNER_OBJECT_BASE_SCREEN.to_be_bytes()[0];
+    let mut records = [ScannerMiniTerrainRecord::EMPTY; SCANNER_TERRAIN_RECORDS];
+    let mut screen_column = SCANNER_OBJECT_BASE_SCREEN.to_be_bytes()[0];
     for (index, record) in records.iter_mut().enumerate() {
-        let source_index = (first_record + index) * 3;
-        *record = SourceScannerTerrainRecord {
-            screen_address: u16::from_be_bytes([source_column, bytes[source_index]]),
-            word: u16::from_be_bytes([bytes[source_index + 1], bytes[source_index + 2]]),
+        let record_byte_index = (first_record + index) * 3;
+        *record = ScannerMiniTerrainRecord {
+            screen_address: u16::from_be_bytes([screen_column, bytes[record_byte_index]]),
+            word: u16::from_be_bytes([bytes[record_byte_index + 1], bytes[record_byte_index + 2]]),
         };
-        source_column = source_column.wrapping_add(1);
+        screen_column = screen_column.wrapping_add(1);
     }
 
     records
@@ -369,7 +369,7 @@ fn terrain_pattern_bytes() -> &'static [u8; TERRAIN_TDATA_BYTES] {
     crate::arcade_assets::TERRAIN_PATTERN_BYTES
 }
 
-fn source_mterr_bytes() -> &'static [u8; MAIN_TERRAIN_RECORD_BYTE_COUNT] {
+fn main_terrain_record_bytes() -> &'static [u8; MAIN_TERRAIN_RECORD_BYTE_COUNT] {
     crate::arcade_assets::MAIN_TERRAIN_BYTES
 }
 
@@ -483,7 +483,7 @@ pub(crate) fn push_scanner_radar_sprites(scene: &mut RenderScene, scanner: &Scan
 }
 
 fn push_scanner_terrain_sprites(scene: &mut RenderScene, scan_left: u16) {
-    for record in source_scanner_mini_terrain_records_for_scan_left(scan_left) {
+    for record in scanner_mini_terrain_records_for_scan_left(scan_left) {
         let origin = source_screen_position(record.screen_address);
         for (row, byte) in record.word.to_be_bytes().into_iter().enumerate() {
             for column in 0..2 {
