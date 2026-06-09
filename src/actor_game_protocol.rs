@@ -915,12 +915,12 @@ fn actor_explosions_for_report(report: &StepReport) -> Vec<CleanExplosionSnapsho
                 age,
                 explosion_anchor,
             } => {
-                let mut explosion = CleanExplosionSnapshot::source_spawn(
+                let mut explosion = CleanExplosionSnapshot::spawn(
                     clean_explosion_kind(kind),
                     screen_position(draw.position),
                 );
                 explosion.explosion_anchor = explosion_anchor.map(screen_position);
-                explosion.source_size = actor_source_explosion_size_for_kind(kind, age);
+                explosion.growth_size = actor_explosion_growth_size_for_kind(kind, age);
                 Some(explosion)
             }
             _ => None,
@@ -953,10 +953,7 @@ fn actor_score_popups_for_report(report: &StepReport) -> Vec<CleanScorePopupSnap
                 SpriteKey::Score500 => CleanScorePopupKind::Points500,
                 _ => return None,
             };
-            Some(CleanScorePopupSnapshot::source_spawn(
-                kind,
-                screen_position(draw.position),
-            ))
+            Some(CleanScorePopupSnapshot::spawn(kind, screen_position(draw.position)))
         })
         .collect()
 }

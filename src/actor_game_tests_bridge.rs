@@ -964,21 +964,21 @@
     }
 
     #[test]
-    fn actor_source_explosion_render_scale_uses_source_size_curve() {
+    fn actor_explosion_render_scale_uses_growth_size_curve() {
         assert_eq!(
-            actor_source_explosion_render_scale(source_explosion_size_for_age(0)),
+            actor_explosion_render_scale(explosion_growth_size_for_age(0)),
             1.0
         );
         assert_eq!(
-            actor_source_explosion_render_scale(source_explosion_size_for_age(1)),
+            actor_explosion_render_scale(explosion_growth_size_for_age(1)),
             1.0
         );
         assert_eq!(
-            actor_source_explosion_render_scale(source_explosion_size_for_age(2)),
+            actor_explosion_render_scale(explosion_growth_size_for_age(2)),
             2.0
         );
         assert_eq!(
-            actor_source_explosion_render_scale(source_explosion_size_for_age(18)),
+            actor_explosion_render_scale(explosion_growth_size_for_age(18)),
             3.0
         );
     }
@@ -1044,8 +1044,8 @@
             Some(ScreenPosition::new(0x21, 0xA9))
         );
         assert_eq!(
-            state.world.explosions[0].source_size,
-            source_explosion_size_for_age(2)
+            state.world.explosions[0].growth_size,
+            explosion_growth_size_for_age(2)
         );
 
         let scene = report.render_scene();
@@ -1055,7 +1055,7 @@
             CleanExplosionKind::Mutant,
             ScreenPosition::new(0x20, 0xA2),
             Some(ScreenPosition::new(0x21, 0xA9)),
-            source_explosion_size_for_age(2),
+            explosion_growth_size_for_age(2),
         ));
         let object_sprites = scene
             .sprites

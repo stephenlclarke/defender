@@ -211,20 +211,20 @@ impl ActorRenderSceneBridge {
                 PLAYER_EXPLOSION_PIXEL_SCENE_SIZE,
             ),
         };
-        let source_size = actor_source_explosion_size_for_kind(kind, age);
+        let growth_size = actor_explosion_growth_size_for_kind(kind, age);
         if let Some(source_position) = try_screen_position(position)
             && push_explosion_cloud_pixels(
                 scene,
                 clean_explosion_kind(kind),
                 source_position,
                 explosion_anchor.and_then(try_screen_position),
-                source_size,
+                growth_size,
             )
         {
             return;
         }
 
-        let scale = actor_source_explosion_render_scale(source_size);
+        let scale = actor_explosion_render_scale(growth_size);
         let size = [base_size[0] * scale, base_size[1] * scale];
         let origin = point_position(position);
         let centered_position = [
@@ -497,20 +497,20 @@ fn offset_f32_position(position: [f32; 2], offset: [f32; 2]) -> [f32; 2] {
     [position[0] + offset[0], position[1] + offset[1]]
 }
 
-fn actor_source_explosion_render_scale(source_size: u16) -> f32 {
-    source_explosion_render_scale(source_size)
+fn actor_explosion_render_scale(growth_size: u16) -> f32 {
+    explosion_render_scale(growth_size)
         .map(f32::from)
         .unwrap_or(1.0)
 }
 
-fn actor_source_explosion_size_for_kind(kind: ExplosionKind, age: u16) -> u16 {
+fn actor_explosion_growth_size_for_kind(kind: ExplosionKind, age: u16) -> u16 {
     if kind == ExplosionKind::Terrain {
-        return source_terrain_explosion_size_for_age(
+        return terrain_explosion_growth_size_for_age(
             u8::try_from(age).unwrap_or(TERRAIN_EXPLOSION_LIFETIME_FRAMES),
         );
     }
 
-    source_explosion_size_for_age(age)
+    explosion_growth_size_for_age(age)
 }
 
 fn point_position(point: Point) -> [f32; 2] {

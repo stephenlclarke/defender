@@ -802,7 +802,7 @@ pub struct ScorePopupSnapshot {
 }
 
 impl ScorePopupSnapshot {
-    pub fn source_spawn(kind: ScorePopupKind, position: ScreenPosition) -> Self {
+    pub fn spawn(kind: ScorePopupKind, position: ScreenPosition) -> Self {
         Self {
             kind,
             position,
@@ -828,7 +828,7 @@ impl ScorePopupSnapshot {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EnemyAppearanceSnapshot {
     pub position: ScreenPosition,
-    pub source_size: u16,
+    pub growth_size: u16,
     pub sprite_frame_label: &'static str,
     pub picture_size: (u8, u8),
     pub mapped_sprite: SpriteId,
@@ -844,7 +844,7 @@ impl EnemyAppearanceSnapshot {
         let (width, height) = self.picture_size;
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::Appearance,
-            size: self.source_size,
+            size: self.growth_size,
             sprite_frame_label: Some(self.sprite_frame_label),
             picture_size: Some((width, height)),
             mapped_sprite: Some(self.mapped_sprite),
@@ -855,7 +855,7 @@ impl EnemyAppearanceSnapshot {
     }
 }
 
-pub(crate) fn source_appearance_size_for_age(age: u16) -> u16 {
+pub(crate) fn appearance_growth_size_for_age(age: u16) -> u16 {
     let size_high = APPEARANCE_INITIAL_SIZE.to_be_bytes()[0]
         .saturating_sub(u8::try_from(age).unwrap_or(u8::MAX));
     if size_high <= APPEARANCE_FINAL_SIZE.to_be_bytes()[0] {

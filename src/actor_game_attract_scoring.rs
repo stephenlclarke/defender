@@ -1022,14 +1022,14 @@ fn push_actor_attract_scoring_materialize_pixels(
     };
     let descriptor = actor_attract_scoring_enemy_sprite_frame_descriptor(enemy);
     let appearance_age = actor_attract_scoring_materialize_age(visual_step);
-    let source_size = source_appearance_size_for_age(appearance_age);
+    let growth_size = appearance_growth_size_for_age(appearance_age);
     let _ = push_appearance_cloud_pixels(
         scene,
         position,
         descriptor.frame_label,
         descriptor.picture_size,
         descriptor.sprite,
-        source_size,
+        growth_size,
     );
 }
 
@@ -1042,13 +1042,13 @@ fn push_actor_attract_scoring_explosion_pixels(
     let Some(position) = try_screen_position_from_scene_position(position) else {
         return;
     };
-    let source_size = source_explosion_size_for_age(visual_step.saturating_add(2));
+    let growth_size = explosion_growth_size_for_age(visual_step.saturating_add(2));
     let _ = push_explosion_cloud_pixels(
         scene,
         clean_explosion_kind(actor_attract_scoring_enemy_explosion_kind(enemy)),
         position,
         None,
-        source_size,
+        growth_size,
     );
 }
 

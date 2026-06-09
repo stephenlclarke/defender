@@ -82,7 +82,7 @@ pub struct ExplosionSnapshot {
     pub kind: ExplosionKind,
     pub position: ScreenPosition,
     pub explosion_anchor: Option<ScreenPosition>,
-    pub source_size: u16,
+    pub growth_size: u16,
     pub frames_remaining: u8,
     pub picture_label: &'static str,
     pub picture_size: (u8, u8),
@@ -90,26 +90,26 @@ pub struct ExplosionSnapshot {
 }
 
 impl ExplosionSnapshot {
-    pub fn source_spawn(kind: ExplosionKind, position: ScreenPosition) -> Self {
+    pub fn spawn(kind: ExplosionKind, position: ScreenPosition) -> Self {
         Self {
             kind,
             position,
             explosion_anchor: None,
-            source_size: EXPLOSION_INITIAL_SIZE,
-            frames_remaining: source_explosion_lifetime_frames(kind),
+            growth_size: EXPLOSION_INITIAL_SIZE,
+            frames_remaining: explosion_lifetime_frames(kind),
             picture_label: kind.picture_label(),
             picture_size: kind.picture_size(),
             mapped_sprite: kind.sprite(),
         }
     }
 
-    fn source_spawn_from_enemy(enemy: EnemySnapshot) -> Self {
+    fn spawn_from_enemy(enemy: EnemySnapshot) -> Self {
         let descriptor = source_enemy_explosion_picture_descriptor(enemy);
         Self {
             kind: ExplosionKind::for_enemy(enemy.kind),
             position: enemy.position,
             explosion_anchor: source_enemy_explosion_center(enemy),
-            source_size: EXPLOSION_INITIAL_SIZE,
+            growth_size: EXPLOSION_INITIAL_SIZE,
             frames_remaining: EXPLOSION_LIFETIME_FRAMES,
             picture_label: descriptor.label,
             picture_size: descriptor.size,
@@ -119,7 +119,7 @@ impl ExplosionSnapshot {
 
     fn expanded_object_detail(self) -> ExpandedObjectDetailSnapshot {
         let (width, height) = self.picture_size;
-        let display_size = source_explosion_display_size(self);
+        let display_size = explosion_display_size(self);
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::Explosion,
             size: display_size,
@@ -131,14 +131,14 @@ impl ExplosionSnapshot {
                 self.position.y.wrapping_add(height / 2),
             ))),
             top_left: Some(self.position),
-            explosion_frame: source_explosion_frame_index(display_size),
+            explosion_frame: explosion_frame_index(display_size),
             explosion_lifetime_frames: Some(EXPLOSION_LIFETIME_FRAMES),
             ..ExpandedObjectDetailSnapshot::EMPTY
         }
     }
 }
 
-fn source_explosion_lifetime_frames(kind: ExplosionKind) -> u8 {
+fn explosion_lifetime_frames(kind: ExplosionKind) -> u8 {
     if kind == ExplosionKind::Terrain {
         TERRAIN_EXPLOSION_LIFETIME_FRAMES
     } else {
@@ -146,11 +146,11 @@ fn source_explosion_lifetime_frames(kind: ExplosionKind) -> u8 {
     }
 }
 
-pub(crate) fn source_explosion_size_for_age(age: u16) -> u16 {
+pub(crate) fn explosion_growth_size_for_age(age: u16) -> u16 {
     EXPLOSION_INITIAL_SIZE.wrapping_add(EXPLOSION_SIZE_DELTA.wrapping_mul(age))
 }
 
-pub(crate) fn source_terrain_explosion_size_for_age(age: u8) -> u16 {
+pub(crate) fn terrain_explosion_growth_size_for_age(age: u8) -> u16 {
     let step_index = usize::from(
         TERRAIN_EXPLOSION_GROWTH_STEPS
             .get(usize::from(age))
@@ -161,22 +161,22 @@ pub(crate) fn source_terrain_explosion_size_for_age(age: u8) -> u16 {
                     .expect("terrain explosion growth table is non-empty")
             }),
     );
-    source_explosion_size_for_age(step_index as u16)
+    explosion_growth_size_for_age(step_index as u16)
 }
 
-fn source_explosion_display_size(explosion: ExplosionSnapshot) -> u16 {
+fn explosion_display_size(explosion: ExplosionSnapshot) -> u16 {
     if explosion.kind == ExplosionKind::Mutant
         && matches!(
             explosion.position,
             ScreenPosition { x: 0x20, y: 0xA2 } | ScreenPosition { x: 0x20, y: 0xA3 }
         )
         && explosion.explosion_anchor == Some(ScreenPosition::new(0x21, 0xA9))
-        && explosion.source_size == EXPLOSION_INITIAL_SIZE
+        && explosion.growth_size == EXPLOSION_INITIAL_SIZE
     {
         return EXPLOSION_INITIAL_SIZE.wrapping_add(EXPLOSION_SIZE_DELTA);
     }
 
-    explosion.source_size
+    explosion.growth_size
 }
 
 fn source_enemy_explosion_center(enemy: EnemySnapshot) -> Option<ScreenPosition> {
@@ -317,7 +317,7 @@ impl WorldSnapshot {
             return;
         }
         self.score_popups
-            .push(ScorePopupSnapshot::source_spawn(kind, position));
+            .push(ScorePopupSnapshot::spawn(kind, position));
     }
 
     pub fn spawn_explosion(&mut self, kind: ExplosionKind, position: ScreenPosition) {
@@ -330,7 +330,7 @@ impl WorldSnapshot {
             return;
         }
         self.explosions
-            .push(ExplosionSnapshot::source_spawn(kind, position));
+            .push(ExplosionSnapshot::spawn(kind, position));
     }
 
     pub fn spawn_enemy_explosion(&mut self, enemy: EnemySnapshot) {
@@ -343,7 +343,7 @@ impl WorldSnapshot {
             return;
         }
         self.explosions
-            .push(ExplosionSnapshot::source_spawn_from_enemy(enemy));
+            .push(ExplosionSnapshot::spawn_from_enemy(enemy));
     }
 
     pub fn start_terrain_blow(&mut self) {

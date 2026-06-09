@@ -17,10 +17,10 @@ use crate::{
         TERRAIN_BLOW_OVERLOAD_COUNTER, TERRAIN_BLOW_START_SOUND_FRAMES,
         TERRAIN_EXPLOSION_LIFETIME_FRAMES, TerrainBlowSnapshot, TerrainBlowStage, TerrainSegment,
         VISUAL_STATE, WaveProfileSnapshot, WorldSnapshot, WorldVector, arcade_wave_landscape_tint,
+        appearance_growth_size_for_age, explosion_growth_size_for_age, explosion_render_scale,
         push_appearance_cloud_pixels, push_explosion_cloud_pixels, push_scanner_radar_sprites,
-        push_source_bgout_terrain_sprites, source_appearance_size_for_age,
-        source_explosion_render_scale, source_explosion_size_for_age,
-        source_terrain_explosion_size_for_age, terrain_blow_flash_tint,
+        push_source_bgout_terrain_sprites, terrain_blow_flash_tint,
+        terrain_explosion_growth_size_for_age,
     },
     renderer::{
         Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,

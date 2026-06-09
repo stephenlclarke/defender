@@ -545,8 +545,7 @@ fn push_scanner_byte_pixels(
 fn expanded_object_uses_pixel_cloud(detail: &ExpandedObjectDetailSnapshot) -> bool {
     match detail.kind {
         ExpandedObjectKind::Appearance => {
-            source_appearance_size_scale(detail.size).is_some()
-                && pixel_cloud_sprite_asset(detail).is_some()
+            appearance_growth_scale(detail.size).is_some() && pixel_cloud_sprite_asset(detail).is_some()
         }
         ExpandedObjectKind::Explosion => matches!(
             detail.mapped_sprite,
@@ -571,9 +570,9 @@ pub(crate) fn push_explosion_cloud_pixels(
     cloud_center: Option<ScreenPosition>,
     growth_size: u16,
 ) -> bool {
-    let mut explosion = ExplosionSnapshot::source_spawn(kind, position);
+    let mut explosion = ExplosionSnapshot::spawn(kind, position);
     explosion.explosion_anchor = cloud_center;
-    explosion.source_size = growth_size;
+    explosion.growth_size = growth_size;
     let detail = explosion.expanded_object_detail();
     if !expanded_object_uses_pixel_cloud(&detail) {
         return false;
@@ -622,7 +621,7 @@ fn push_expanded_object_explosion_pixels(
     let Some(spec) = pixel_cloud_sprite_asset(detail) else {
         return;
     };
-    let Some(scale) = source_explosion_size_scale(detail.size) else {
+    let Some(scale) = explosion_growth_scale(detail.size) else {
         return;
     };
     let Some(explosion_frame) = detail.explosion_frame else {
@@ -656,10 +655,10 @@ fn push_expanded_object_appearance_pixels(
     let Some(spec) = pixel_cloud_sprite_asset(detail) else {
         return;
     };
-    let Some(scale) = source_appearance_size_scale(detail.size) else {
+    let Some(scale) = appearance_growth_scale(detail.size) else {
         return;
     };
-    let tick = u32::from(source_appearance_tick(detail.size));
+    let tick = u32::from(appearance_growth_tick(detail.size));
     push_expanded_object_pixel_cloud(
         scene,
         spec,
@@ -885,11 +884,11 @@ fn cycling_palette_tint(phase: usize) -> Color {
 
 const EXPLOSION_RENDER_MAX_SCALE: u8 = 3; // original: SOURCE_EXPLOSION_RENDER_MAX_SCALE
 
-pub(crate) fn source_explosion_render_scale(size: u16) -> Option<u16> {
-    source_explosion_size_scale(size).map(|scale| u16::from(scale.min(EXPLOSION_RENDER_MAX_SCALE)))
+pub(crate) fn explosion_render_scale(size: u16) -> Option<u16> {
+    explosion_growth_scale(size).map(|scale| u16::from(scale.min(EXPLOSION_RENDER_MAX_SCALE)))
 }
 
-pub(crate) fn source_explosion_size_scale(size: u16) -> Option<u8> {
+pub(crate) fn explosion_growth_scale(size: u16) -> Option<u8> {
     let high = size.to_be_bytes()[0] & 0x7F;
     if high == 0 || high > EXPLOSION_KILL_SIZE_HIGH {
         return None;
@@ -897,7 +896,7 @@ pub(crate) fn source_explosion_size_scale(size: u16) -> Option<u8> {
     Some(high)
 }
 
-fn source_appearance_size_scale(size: u16) -> Option<u8> {
+fn appearance_growth_scale(size: u16) -> Option<u8> {
     if size & 0x8000 == 0 {
         return None;
     }
@@ -905,14 +904,14 @@ fn source_appearance_size_scale(size: u16) -> Option<u8> {
     (scale > 0).then_some(scale)
 }
 
-fn source_appearance_tick(size: u16) -> u8 {
+fn appearance_growth_tick(size: u16) -> u8 {
     let start = APPEARANCE_INITIAL_SIZE.to_be_bytes()[0];
     let current = size.to_be_bytes()[0];
     start.saturating_sub(current)
 }
 
-pub(crate) fn source_explosion_frame_index(size: u16) -> Option<u8> {
-    if source_explosion_size_scale(size).is_none() || size < EXPLOSION_INITIAL_SIZE {
+pub(crate) fn explosion_frame_index(size: u16) -> Option<u8> {
+    if explosion_growth_scale(size).is_none() || size < EXPLOSION_INITIAL_SIZE {
         return None;
     }
     let offset = size.wrapping_sub(EXPLOSION_INITIAL_SIZE);
