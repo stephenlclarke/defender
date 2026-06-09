@@ -16,7 +16,7 @@
 ---
 
 This repository is a native Rust reimplementation of Williams' `Defender`
-red-label arcade game.
+arcade game.
 
 The live game uses a clean actor runtime, `wgpu` rendering, `winit` windowing,
 and synthesized audio driven by Williams sound-command families. Runtime
@@ -26,7 +26,7 @@ asset directory.
 
 The goal is faithful original-arcade behaviour: visuals, audio, sprite
 behaviour, lasers, explosions, reverse direction, attract mode, side scrolling,
-waves, humans, and playability should match the MAME red-label game as closely
+waves, humans, and playability should match the MAME reference game as closely
 as practical while remaining a clean actor implementation.
 
 ![Defender gameplay frame](docs/defender.png)
@@ -62,7 +62,7 @@ Useful launch options:
 - `defender --input-profile cabinet`
 - `defender --input-profile planetoid`
 - `defender --mute`
-- `defender --cmos-path ~/.local/state/defender/red-label-cmos.bin`
+- `defender --cmos-path ~/.local/state/defender/arcade-cmos.bin`
 - `defender --actor-script /path/to/driver.script`
 
 ## Build
@@ -177,13 +177,12 @@ rules.
 ## Runtime Notes
 
 - Live CMOS persistence is opt-in. Without `--cmos-path`, each run starts from
-  embedded red-label CMOS defaults.
+  embedded arcade CMOS defaults.
 - Actor scripts can be supplied with
   `cargo run -- --actor-script /path/to/driver.script`.
 - The checked custom-driver starting point is
   `examples/actor-custom-attract.script`.
-- The retained source-derived actor scripts and tables live under
-  `assets/red-label/`.
+- The retained actor scripts and tables live under `assets/arcade-scripts/`.
 - The retained sprite source image is `assets/sprites/font-sheet.png`; object
   and terrain sprites are generated from the source-derived tables.
 - Committed README media lives at `docs/defender.png` and

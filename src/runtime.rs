@@ -205,7 +205,7 @@ pub(crate) fn help_text() -> &'static str {
         "  cargo run -- --mute\n",
         "  cargo run -- --input-profile planetoid\n",
         "  cargo run -- --input-profile cabinet\n",
-        "  cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin\n",
+        "  cargo run -- --cmos-path ~/.local/state/defender/arcade-cmos.bin\n",
         "\n",
         "Runtime assets are embedded in the binary for copy-only deployment.\n",
         "Live play uses the windowed wgpu backend.\n",

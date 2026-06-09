@@ -6,7 +6,7 @@ use crate::{
     systems::{HighScoreInitialsState, ScreenPosition, ScreenVelocity},
 };
 
-// Arcade-evidence-backed cabinet defaults from assets/red-label CMOS/high-score evidence.
+// Arcade-evidence-backed cabinet defaults from CMOS/high-score evidence.
 pub const HIGH_SCORE_TABLE_ENTRIES: usize = 8;
 const HALL_OF_FAME_STALL_FRAMES: u8 = 60;
 const FIRST_WAVE_MUTANT_DIVE_CONVERSION_X_CORRECTION: u16 = 0x0120; // original: SOURCE_FIRST_WAVE_TARGET6_MUTANT_CONVERSION_X_CORRECTION
