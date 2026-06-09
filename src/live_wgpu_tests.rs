@@ -289,11 +289,11 @@ mod tests {
         assert_eq!(report.first_frame_draws, 1);
         assert_eq!(report.first_playing_wave, 1);
         assert_eq!(report.first_playing_wave_size, 5);
-        assert_eq!(report.first_playing_source_landers, 15);
-        assert_eq!(report.first_playing_source_bombers, 0);
-        assert_eq!(report.first_playing_source_pods, 0);
-        assert_eq!(report.first_playing_source_mutants, 0);
-        assert_eq!(report.first_playing_source_swarmers, 0);
+        assert_eq!(report.first_playing_enemy_landers, 15);
+        assert_eq!(report.first_playing_enemy_bombers, 0);
+        assert_eq!(report.first_playing_enemy_pods, 0);
+        assert_eq!(report.first_playing_enemy_mutants, 0);
+        assert_eq!(report.first_playing_enemy_swarmers, 0);
         assert_eq!(report.first_playing_world_enemies, 2);
         assert_eq!(report.first_playing_world_humans, 2);
         assert_eq!(report.first_playing_reserve_landers, 0);
@@ -356,11 +356,11 @@ mod tests {
             .expect("example script should reach the second wave");
         assert_eq!(next_playing.wave, 2);
         assert_eq!(next_playing.wave_size, 5);
-        assert_eq!(next_playing.source_landers, 20);
-        assert_eq!(next_playing.source_bombers, 3);
-        assert_eq!(next_playing.source_pods, 1);
-        assert_eq!(next_playing.source_mutants, 0);
-        assert_eq!(next_playing.source_swarmers, 0);
+        assert_eq!(next_playing.enemy_landers, 20);
+        assert_eq!(next_playing.enemy_bombers, 3);
+        assert_eq!(next_playing.enemy_pods, 1);
+        assert_eq!(next_playing.enemy_mutants, 0);
+        assert_eq!(next_playing.enemy_swarmers, 0);
         assert_eq!(next_playing.world_enemies, 2);
         assert_eq!(next_playing.world_humans, 2);
         assert_eq!(next_playing.lander_mode, "drift");
@@ -441,7 +441,7 @@ mod tests {
                 "  first_frame_draws: 1\n",
                 "  first_playing_wave: 1\n",
                 "  first_playing_wave_size: 5\n",
-                "  first_playing_source_counts: landers=15,bombers=0,pods=0,mutants=0,swarmers=0\n",
+                "  first_playing_enemy_counts: landers=15,bombers=0,pods=0,mutants=0,swarmers=0\n",
                 "  first_playing_world_counts: enemies=2,humans=2\n",
                 "  first_playing_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0\n",
                 "  first_playing_source_state: background_left=0x0000,rng=seed=0xbe,hseed=0xb1,lseed=0x06\n",
@@ -484,7 +484,7 @@ mod tests {
                 "  next_playing_assist_steps: 140\n",
                 "  next_playing_wave: 2\n",
                 "  next_playing_wave_size: 5\n",
-                "  next_playing_source_counts: landers=20,bombers=3,pods=1,mutants=0,swarmers=0\n",
+                "  next_playing_enemy_counts: landers=20,bombers=3,pods=1,mutants=0,swarmers=0\n",
                 "  next_playing_world_counts: enemies=2,humans=2\n",
                 "  next_playing_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0\n",
                 "  next_playing_source_state: background_left=0x0000,rng=seed=0x82,hseed=0x35,lseed=0x88\n",
@@ -871,11 +871,11 @@ mod tests {
 
         assert_eq!(report.first_playing_wave, 1);
         assert_eq!(report.first_playing_wave_size, 5);
-        assert_eq!(report.first_playing_source_landers, 1);
-        assert_eq!(report.first_playing_source_bombers, 1);
-        assert_eq!(report.first_playing_source_pods, 1);
-        assert_eq!(report.first_playing_source_mutants, 1);
-        assert_eq!(report.first_playing_source_swarmers, 1);
+        assert_eq!(report.first_playing_enemy_landers, 1);
+        assert_eq!(report.first_playing_enemy_bombers, 1);
+        assert_eq!(report.first_playing_enemy_pods, 1);
+        assert_eq!(report.first_playing_enemy_mutants, 1);
+        assert_eq!(report.first_playing_enemy_swarmers, 1);
         assert_eq!(report.first_playing_world_enemies, 5);
         assert_eq!(report.first_playing_world_humans, 10);
         assert_eq!(report.first_playing_reserve_landers, 0);
@@ -945,7 +945,7 @@ mod tests {
             ]
         );
         assert!(report.to_text().contains(
-            "first_playing_source_counts: landers=1,bombers=1,pods=1,mutants=1,swarmers=1"
+            "first_playing_enemy_counts: landers=1,bombers=1,pods=1,mutants=1,swarmers=1"
         ));
         assert!(
             report
@@ -1075,11 +1075,11 @@ mod tests {
         assert!(report.wave_clear_advance_sleep_unavailable_reason.is_none());
         assert_eq!(next_playing.wave, 2);
         assert_eq!(next_playing.wave_size, 3);
-        assert_eq!(next_playing.source_landers, 1);
-        assert_eq!(next_playing.source_bombers, 1);
-        assert_eq!(next_playing.source_pods, 1);
-        assert_eq!(next_playing.source_mutants, 0);
-        assert_eq!(next_playing.source_swarmers, 0);
+        assert_eq!(next_playing.enemy_landers, 1);
+        assert_eq!(next_playing.enemy_bombers, 1);
+        assert_eq!(next_playing.enemy_pods, 1);
+        assert_eq!(next_playing.enemy_mutants, 0);
+        assert_eq!(next_playing.enemy_swarmers, 0);
         assert_eq!(next_playing.world_enemies, 3);
         assert_eq!(next_playing.world_humans, 10);
         assert_eq!(next_playing.reserve_landers, 2);
@@ -1225,11 +1225,11 @@ mod tests {
         assert_eq!(report.post_reserve_next_playing_assist_steps, Some(904));
         assert_eq!(post_reserve_next_playing.wave, 3);
         assert_eq!(post_reserve_next_playing.wave_size, 3);
-        assert_eq!(post_reserve_next_playing.source_landers, 1);
-        assert_eq!(post_reserve_next_playing.source_bombers, 1);
-        assert_eq!(post_reserve_next_playing.source_pods, 1);
-        assert_eq!(post_reserve_next_playing.source_mutants, 0);
-        assert_eq!(post_reserve_next_playing.source_swarmers, 0);
+        assert_eq!(post_reserve_next_playing.enemy_landers, 1);
+        assert_eq!(post_reserve_next_playing.enemy_bombers, 1);
+        assert_eq!(post_reserve_next_playing.enemy_pods, 1);
+        assert_eq!(post_reserve_next_playing.enemy_mutants, 0);
+        assert_eq!(post_reserve_next_playing.enemy_swarmers, 0);
         assert_eq!(post_reserve_next_playing.world_enemies, 3);
         assert_eq!(post_reserve_next_playing.world_humans, 10);
         assert_eq!(post_reserve_next_playing.reserve_landers, 2);
@@ -1247,7 +1247,7 @@ mod tests {
                 .is_none()
         );
         assert!(report.to_text().contains(
-            "next_playing_source_counts: landers=1,bombers=1,pods=1,mutants=0,swarmers=0"
+            "next_playing_enemy_counts: landers=1,bombers=1,pods=1,mutants=0,swarmers=0"
         ));
         assert!(report.to_text().contains(
             "wave_clear_survivor_bonus: total=10,visible_icons=1,remaining_awards=9,awarded_points=100"
@@ -1324,7 +1324,7 @@ mod tests {
                 .contains("post_reserve_next_playing_assist_steps: 904")
         );
         assert!(report.to_text().contains(
-            "post_reserve_next_playing_source_counts: landers=1,bombers=1,pods=1,mutants=0,swarmers=0"
+            "post_reserve_next_playing_enemy_counts: landers=1,bombers=1,pods=1,mutants=0,swarmers=0"
         ));
     }
 
