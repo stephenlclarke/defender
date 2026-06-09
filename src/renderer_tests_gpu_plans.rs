@@ -372,7 +372,7 @@
     }
 
     #[test]
-    fn default_sprite_atlas_uses_source_backed_runtime_regions() {
+    fn default_sprite_atlas_uses_embedded_runtime_regions() {
         let atlas = TextureAtlas::default_sprites();
 
         assert_non_placeholder_region(&atlas, SpriteId::PLAYER_SHIP);
@@ -428,7 +428,7 @@
     }
 
     #[test]
-    fn default_sprite_atlas_regions_match_source_object_picture_sizes() {
+    fn default_sprite_atlas_regions_match_object_bitmap_sizes() {
         let atlas = TextureAtlas::default_sprites();
 
         for (sprite, size) in [
@@ -559,7 +559,7 @@
     }
 
     #[test]
-    fn default_sprite_atlas_decodes_score_digits_in_source_column_order() {
+    fn default_sprite_atlas_decodes_score_digits_in_byte_column_order() {
         let atlas = TextureAtlas::default_sprites();
         let pixels = atlas_region_pixels(&atlas, SpriteId::SCORE_DIGIT_0);
         let is_visible = |x: usize, y: usize| pixels[y * 6 + x][3] != 0;
