@@ -63,7 +63,7 @@
         assert_eq!(blocked_restore.enemy_reserve, detonated.enemy_reserve);
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
 
-        let restored = step_until_driver_source_reserve_activates(&mut driver);
+        let restored = step_until_driver_reserve_activation_spawns_lander(&mut driver);
         assert_eq!(
             restored.enemy_reserve,
             EnemyReserveSnapshot {

@@ -170,7 +170,7 @@ impl ActorGameDriver {
             delayed_sounds.push(SoundCue::PlayerAppear);
         }
         self.advance_pending_player_switch();
-        self.advance_source_reserve_activation_cooldown();
+        self.advance_reserve_activation_cooldown();
         delayed_sounds.extend(self.activate_enemy_reserve_if_ready(&mut step_commands));
         self.advance_first_wave_lander_refill_if_ready(&mut step_commands);
         match self.advance_pending_survivor_bonus() {
@@ -1491,7 +1491,7 @@ impl ActorGameDriver {
         self.projectile_scan_steps_remaining = ENEMY_PROJECTILE_SCAN_INITIAL_DELAY_STEPS;
     }
 
-    fn reset_source_astronaut_process(&mut self) {
+    fn reset_human_walk_process(&mut self) {
         self.human_walk_cursor = Some(0);
         self.human_walk_sleep_ticks = 0;
     }
@@ -1520,12 +1520,12 @@ impl ActorGameDriver {
         self.snapshots.values().find_map(|snapshot| {
             let source = snapshot.human_runtime?;
             (source.target_slot_index == next_cursor
-                && actor_source_astronaut_walk_targetable(human_count, snapshot))
+                && actor_human_walk_targetable(human_count, snapshot))
             .then_some(next_cursor)
         })
     }
 
-    fn advance_source_reserve_activation_cooldown(&mut self) {
+    fn advance_reserve_activation_cooldown(&mut self) {
         self.reserve_activation_cooldown_steps = self
             .reserve_activation_cooldown_steps
             .saturating_sub(1);
@@ -1578,7 +1578,7 @@ impl ActorGameDriver {
         self.wave_spawn_allocations.clear();
         self.enemy_reserve = wave_profile.enemy_reserve;
         self.target_human_cursor = Some(0);
-        self.reset_source_astronaut_process();
+        self.reset_human_walk_process();
         self.reserve_activation_ready = false;
         self.reserve_activation_cooldown_steps = 0;
         self.first_wave_early_reserve_steps_remaining = None;

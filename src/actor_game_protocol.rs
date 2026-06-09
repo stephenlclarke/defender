@@ -693,12 +693,12 @@ fn playfield_terrain_segments() -> Vec<TerrainSegment> {
     ]
 }
 
-fn actor_source_human_target_y(position_x: i16, offset: u8) -> Option<i16> {
-    actor_source_terrain_altitude(position_x)
+fn actor_human_walk_target_y(position_x: i16, offset: u8) -> Option<i16> {
+    actor_playfield_terrain_altitude_at_x(position_x)
         .map(|altitude| i16::from(altitude.wrapping_add(offset).min(HUMAN_MAX_TARGET_Y)))
 }
 
-fn actor_source_terrain_altitude(position_x: i16) -> Option<u8> {
+fn actor_playfield_terrain_altitude_at_x(position_x: i16) -> Option<u8> {
     let object_x = u16::from(u8::try_from(position_x).ok()?);
     playfield_terrain_segments()
         .into_iter()
@@ -710,7 +710,7 @@ fn actor_source_terrain_altitude(position_x: i16) -> Option<u8> {
         .map(|segment| segment.position.y)
 }
 
-fn actor_source_step_human_y(position_y: i16, target_y: i16) -> i16 {
+fn actor_step_human_toward_walk_target_y(position_y: i16, target_y: i16) -> i16 {
     match position_y.cmp(&target_y) {
         Ordering::Less => position_y + 1,
         Ordering::Equal => position_y,

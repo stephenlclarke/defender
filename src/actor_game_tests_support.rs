@@ -1497,7 +1497,9 @@
         sounds
     }
 
-    fn step_until_driver_source_reserve_activates(driver: &mut ActorGameDriver) -> StepReport {
+    fn step_until_driver_reserve_activation_spawns_lander(
+        driver: &mut ActorGameDriver,
+    ) -> StepReport {
         for _ in 0..=SMART_BOMB_RESERVE_DELAY_STEPS {
             let report = driver.step(GameInput::NONE);
             if report
@@ -1509,7 +1511,7 @@
             }
         }
 
-        panic!("source enemy reserve should reactivate after smart-bomb cooldown");
+        panic!("enemy reserve should reactivate after smart-bomb cooldown");
     }
 
     fn step_until_first_wave_early_reserve_materializes(

@@ -75,7 +75,7 @@ impl Human {
                 } else {
                     (
                         1 - frame,
-                        actor_source_human_target_y(self.position.x, HUMAN_LEFT_TARGET_Y_OFFSET),
+                        actor_human_walk_target_y(self.position.x, HUMAN_LEFT_TARGET_Y_OFFSET),
                         HUMAN_LEFT_X_VELOCITY,
                     )
                 }
@@ -84,12 +84,12 @@ impl Human {
             } else {
                 (
                     if frame == 2 { 3 } else { 2 },
-                    actor_source_human_target_y(self.position.x, HUMAN_RIGHT_TARGET_Y_OFFSET),
+                    actor_human_walk_target_y(self.position.x, HUMAN_RIGHT_TARGET_Y_OFFSET),
                     HUMAN_RIGHT_X_VELOCITY,
                 )
             };
             if let Some(target_y) = target_y {
-                self.position.y = actor_source_step_human_y(self.position.y, target_y);
+                self.position.y = actor_step_human_toward_walk_target_y(self.position.y, target_y);
             }
             let (x, x_fraction) =
                 arcade_axis_step(self.position.x, source.x_fraction, velocity);
@@ -255,7 +255,7 @@ fn human_collision_bounds(mode: HumanMode, position: Point) -> Option<Rect> {
     }
 }
 
-fn actor_source_astronaut_walk_targetable(human_count: usize, snapshot: &ActorSnapshot) -> bool {
+fn actor_human_walk_targetable(human_count: usize, snapshot: &ActorSnapshot) -> bool {
     snapshot.kind == ActorKind::Human
         && snapshot.alive
         && snapshot.bounds.is_some()

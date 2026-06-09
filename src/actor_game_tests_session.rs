@@ -1147,7 +1147,7 @@
         sounds.extend(collect_driver_smart_bomb_sound_sequence(&mut driver));
         assert_eq!(sounds, smart_bomb_sound_board_cues());
 
-        let restored = step_until_driver_source_reserve_activates(&mut driver);
+        let restored = step_until_driver_reserve_activation_spawns_lander(&mut driver);
         assert_eq!(
             restored.enemy_reserve,
             EnemyReserveSnapshot {
