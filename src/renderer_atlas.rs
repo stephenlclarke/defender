@@ -1093,9 +1093,9 @@ fn decode_picture_bytes_rgba(
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
 
     for column in 0..usize::from(bytes_per_row) {
-        let source_column = column * usize::from(rows);
+        let byte_column_offset = column * usize::from(rows);
         for row in 0..usize::from(rows) {
-            let value = bytes[source_column + row];
+            let value = bytes[byte_column_offset + row];
             let left = picture_palette_color(value >> 4, palette);
             let right = picture_palette_color(value & 0x0F, palette);
             let offset = ((row * surface.width as usize) + column * 2) * 4;
@@ -1153,9 +1153,9 @@ fn decode_score_digit_rgba(
     let palette = ObjectPicturePalette::white();
 
     for column in 0..usize::from(columns) {
-        let source_column = column * usize::from(rows);
+        let byte_column_offset = column * usize::from(rows);
         for row in 0..usize::from(rows) {
-            let value = bytes[source_column + row];
+            let value = bytes[byte_column_offset + row];
             let left = picture_palette_color(value >> 4, palette);
             let right = picture_palette_color(value & 0x0F, palette);
             let offset = ((row * surface.width as usize) + column * 2) * 4;
@@ -1215,9 +1215,9 @@ fn decode_message_glyph_rgba(
     let palette = ObjectPicturePalette::white();
 
     for column in 0..usize::from(columns) {
-        let source_column = column * usize::from(rows);
+        let byte_column_offset = column * usize::from(rows);
         for row in 0..usize::from(rows) {
-            let value = bytes[source_column + row];
+            let value = bytes[byte_column_offset + row];
             let left = picture_palette_color(value >> 4, palette);
             let right = picture_palette_color(value & 0x0F, palette);
             let offset = ((row * surface.width as usize) + column * 2) * 4;

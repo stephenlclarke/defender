@@ -395,9 +395,9 @@ fn sprite_asset_pixels(spec: SpriteAssetImageSpec) -> Vec<SpriteAssetPixel> {
     }
     let mut pixels = Vec::new();
     for column in 0..usize::from(spec.bytes_per_row) {
-        let source_column = column * usize::from(spec.rows);
+        let byte_column_offset = column * usize::from(spec.rows);
         for row in 0..usize::from(spec.rows) {
-            let value = bytes[source_column + row];
+            let value = bytes[byte_column_offset + row];
             if let Some(tint) = sprite_asset_nibble_tint(value >> 4) {
                 pixels.push(SpriteAssetPixel {
                     x: (column * 2) as u8,
