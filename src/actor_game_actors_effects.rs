@@ -455,7 +455,7 @@ impl EnemyLaserShot {
         self.source.lifetime_ticks = arcade_projectile_lifetime_ticks(*lifetime_steps);
     }
 
-    fn advance_source_projectile(&mut self) -> Velocity {
+    fn advance_arcade_projectile(&mut self) -> Velocity {
         let previous_position = self.position;
         let (x, x_fraction) = arcade_projectile_axis_step(
             self.position.x,
@@ -494,7 +494,7 @@ impl AssetActor for EnemyLaserShot {
                     arcade_projectile_lifetime_ticks(*lifetime_steps);
             }
             if self.lifetime_steps.is_some_and(|steps| steps > 0) {
-                movement_velocity = self.advance_source_projectile();
+                movement_velocity = self.advance_arcade_projectile();
                 draws.push(DrawCommand::sprite(
                     self.id,
                     SpriteKey::EnemyLaser,
