@@ -40,7 +40,7 @@ impl Human {
         let Some(source) = self.source else {
             return Some(bounds);
         };
-        let position = actor_source_project_screen_position(
+        let position = actor_arcade_screen_position(
             self.position,
             source.x_fraction,
             background_left,

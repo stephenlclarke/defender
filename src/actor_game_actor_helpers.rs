@@ -119,22 +119,22 @@ fn actor_collision_body_for_snapshot(
     background_left: u16,
 ) -> Option<CollisionBody> {
     let body = snapshot.collision_body()?;
-    actor_project_source_backed_collision_body(snapshot, body, background_left)
+    actor_project_arcade_state_collision_body(snapshot, body, background_left)
 }
 
-fn actor_project_source_backed_collision_body(
+fn actor_project_arcade_state_collision_body(
     snapshot: &ActorSnapshot,
     body: CollisionBody,
     background_left: u16,
 ) -> Option<CollisionBody> {
-    let Some(x_fraction) = actor_source_backed_x_fraction(snapshot) else {
+    let Some(x_fraction) = actor_arcade_state_x_fraction(snapshot) else {
         return Some(body);
     };
     if center_of(body.bounds) != snapshot.position && snapshot.kind != ActorKind::Human {
         return Some(body);
     }
     let position =
-        actor_source_project_screen_position(snapshot.position, x_fraction, background_left)?;
+        actor_arcade_screen_position(snapshot.position, x_fraction, background_left)?;
     let delta = Velocity::new(
         position.x - snapshot.position.x,
         position.y - snapshot.position.y,

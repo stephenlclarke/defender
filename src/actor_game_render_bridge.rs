@@ -530,41 +530,41 @@ fn actor_draw_screen_position(report: &StepReport, draw: &DrawCommand) -> Option
         return Some(draw.position);
     };
 
-    actor_project_source_backed_draw(snapshot, draw.position, report.background_left)
+    actor_project_arcade_state_draw(snapshot, draw.position, report.background_left)
 }
 
-fn actor_project_source_backed_draw(
+fn actor_project_arcade_state_draw(
     snapshot: &ActorSnapshot,
     draw_position: Point,
     background_left: u16,
 ) -> Option<Point> {
-    let Some(x_fraction) = actor_source_backed_x_fraction(snapshot) else {
+    let Some(x_fraction) = actor_arcade_state_x_fraction(snapshot) else {
         return Some(draw_position);
     };
     if draw_position != snapshot.position && snapshot.kind != ActorKind::Human {
         return Some(draw_position);
     }
-    actor_source_project_screen_position(draw_position, x_fraction, background_left)
+    actor_arcade_screen_position(draw_position, x_fraction, background_left)
 }
 
-fn actor_source_backed_x_fraction(snapshot: &ActorSnapshot) -> Option<u8> {
+fn actor_arcade_state_x_fraction(snapshot: &ActorSnapshot) -> Option<u8> {
     snapshot
         .lander_runtime
-        .map(|source| source.x_fraction)
-        .or_else(|| snapshot.bomber_runtime.map(|source| source.x_fraction))
-        .or_else(|| snapshot.pod_runtime.map(|source| source.x_fraction))
-        .or_else(|| snapshot.swarmer_runtime.map(|source| source.x_fraction))
-        .or_else(|| snapshot.baiter_runtime.map(|source| source.x_fraction))
-        .or_else(|| snapshot.mutant_runtime.map(|source| source.x_fraction))
-        .or_else(|| snapshot.human_runtime.map(|source| source.x_fraction))
+        .map(|arcade| arcade.x_fraction)
+        .or_else(|| snapshot.bomber_runtime.map(|arcade| arcade.x_fraction))
+        .or_else(|| snapshot.pod_runtime.map(|arcade| arcade.x_fraction))
+        .or_else(|| snapshot.swarmer_runtime.map(|arcade| arcade.x_fraction))
+        .or_else(|| snapshot.baiter_runtime.map(|arcade| arcade.x_fraction))
+        .or_else(|| snapshot.mutant_runtime.map(|arcade| arcade.x_fraction))
+        .or_else(|| snapshot.human_runtime.map(|arcade| arcade.x_fraction))
         .or_else(|| {
             snapshot
                 .enemy_projectile_runtime
-                .map(|source| source.x_fraction)
+                .map(|arcade| arcade.x_fraction)
         })
 }
 
-fn actor_source_project_screen_position(
+fn actor_arcade_screen_position(
     position: Point,
     x_fraction: u8,
     background_left: u16,
