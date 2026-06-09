@@ -737,7 +737,7 @@
     #[test]
     fn parsed_arcade_wave_overrides_drive_legacy_shaped_custom_wave() {
         let wave_script = concat!(
-            "name custom source shape\n",
+            "name custom arcade shape\n",
             "arcade_wave 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
             "swarmer_x_velocity 64 swarmer_shot_time 11 baiter_time 24 ",
             "mutant_x_velocity 48 mutant_random_y 2 mutant_shot_time 12\n",
@@ -746,22 +746,22 @@
         .expect("arcade wave overrides should parse");
         let manifest = wave_script.manifest();
         let profile = &manifest.waves[0];
-        let source = profile
+        let arcade_wave = profile
             .arcade_wave
-            .expect("arcade_wave override should preserve source metadata");
+            .expect("arcade_wave override should preserve arcade metadata");
 
-        assert_eq!(source.wave_size, 5);
-        assert_eq!(source.landers, 1);
-        assert_eq!(source.bombers, 1);
-        assert_eq!(source.pods, 1);
-        assert_eq!(source.mutants, 1);
-        assert_eq!(source.swarmers, 1);
-        assert_eq!(source.swarmer_x_velocity, 64);
-        assert_eq!(source.swarmer_shot_time, 11);
-        assert_eq!(source.baiter_delay, 24);
-        assert_eq!(source.mutant_x_velocity, 48);
-        assert_eq!(source.mutant_random_y, 2);
-        assert_eq!(source.mutant_shot_time, 12);
+        assert_eq!(arcade_wave.wave_size, 5);
+        assert_eq!(arcade_wave.landers, 1);
+        assert_eq!(arcade_wave.bombers, 1);
+        assert_eq!(arcade_wave.pods, 1);
+        assert_eq!(arcade_wave.mutants, 1);
+        assert_eq!(arcade_wave.swarmers, 1);
+        assert_eq!(arcade_wave.swarmer_x_velocity, 64);
+        assert_eq!(arcade_wave.swarmer_shot_time, 11);
+        assert_eq!(arcade_wave.baiter_delay, 24);
+        assert_eq!(arcade_wave.mutant_x_velocity, 48);
+        assert_eq!(arcade_wave.mutant_random_y, 2);
+        assert_eq!(arcade_wave.mutant_shot_time, 12);
         assert_eq!(profile.lander_spawns.len(), 1);
         assert_eq!(profile.bomber_spawns.len(), 1);
         assert_eq!(profile.pod_spawns.len(), 1);
@@ -818,7 +818,7 @@
                 .script_manifest()
                 .current_wave_profile
                 .arcade_wave
-                .expect("current wave manifest should expose source override")
+                .expect("current wave manifest should expose arcade override")
                 .mutants,
             1
         );
@@ -827,7 +827,7 @@
     #[test]
     fn parsed_arcade_wave_range_overrides_apply_to_each_expanded_profile() {
         let wave_script = concat!(
-            "name ranged source shape\n",
+            "name ranged arcade shape\n",
             "arcade_waves 1 2 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
             "swarmer_x_velocity 64 swarmer_shot_time 11 baiter_time 24 ",
             "mutant_x_velocity 48 mutant_random_y 2 mutant_shot_time 12\n",
@@ -845,21 +845,21 @@
             vec![1, 2]
         );
         for profile in &manifest.waves {
-            let source = profile
+            let arcade_wave = profile
                 .arcade_wave
-                .expect("range override should preserve source metadata");
-            assert_eq!(source.wave_size, 5);
-            assert_eq!(source.landers, 1);
-            assert_eq!(source.bombers, 1);
-            assert_eq!(source.pods, 1);
-            assert_eq!(source.mutants, 1);
-            assert_eq!(source.swarmers, 1);
-            assert_eq!(source.swarmer_x_velocity, 64);
-            assert_eq!(source.swarmer_shot_time, 11);
-            assert_eq!(source.baiter_delay, 24);
-            assert_eq!(source.mutant_x_velocity, 48);
-            assert_eq!(source.mutant_random_y, 2);
-            assert_eq!(source.mutant_shot_time, 12);
+                .expect("range override should preserve arcade metadata");
+            assert_eq!(arcade_wave.wave_size, 5);
+            assert_eq!(arcade_wave.landers, 1);
+            assert_eq!(arcade_wave.bombers, 1);
+            assert_eq!(arcade_wave.pods, 1);
+            assert_eq!(arcade_wave.mutants, 1);
+            assert_eq!(arcade_wave.swarmers, 1);
+            assert_eq!(arcade_wave.swarmer_x_velocity, 64);
+            assert_eq!(arcade_wave.swarmer_shot_time, 11);
+            assert_eq!(arcade_wave.baiter_delay, 24);
+            assert_eq!(arcade_wave.mutant_x_velocity, 48);
+            assert_eq!(arcade_wave.mutant_random_y, 2);
+            assert_eq!(arcade_wave.mutant_shot_time, 12);
             assert_eq!(profile.lander_spawns.len(), 1);
             assert_eq!(profile.bomber_spawns.len(), 1);
             assert_eq!(profile.pod_spawns.len(), 1);

@@ -78,18 +78,18 @@
     fn default_wave_script_uses_arcade_wave_table_values() {
         let script = ActorWaveScript::default_progression();
         assert_eq!(script.name(), "actor-arcade-wave-table");
-        let first_source = ArcadeWaveProfile::for_wave(1);
-        assert_eq!(first_source.baiter_delay, 192);
-        assert_eq!(first_source.baiter_shot_time, 10);
-        assert_eq!(first_source.baiter_seek_probability, 200);
-        assert_eq!(first_source.mutant_random_y, 1);
-        assert_eq!(first_source.mutant_y_velocity_msb, 0);
-        assert_eq!(first_source.mutant_y_velocity_lsb, 128);
-        assert_eq!(first_source.mutant_x_velocity, 32);
-        assert_eq!(first_source.mutant_shot_time, 32);
+        let first_arcade_profile = ArcadeWaveProfile::for_wave(1);
+        assert_eq!(first_arcade_profile.baiter_delay, 192);
+        assert_eq!(first_arcade_profile.baiter_shot_time, 10);
+        assert_eq!(first_arcade_profile.baiter_seek_probability, 200);
+        assert_eq!(first_arcade_profile.mutant_random_y, 1);
+        assert_eq!(first_arcade_profile.mutant_y_velocity_msb, 0);
+        assert_eq!(first_arcade_profile.mutant_y_velocity_lsb, 128);
+        assert_eq!(first_arcade_profile.mutant_x_velocity, 32);
+        assert_eq!(first_arcade_profile.mutant_shot_time, 32);
 
         let first = script.profile_for_wave(1);
-        assert_eq!(first.arcade_wave, Some(first_source));
+        assert_eq!(first.arcade_wave, Some(first_arcade_profile));
         let first_lander = first
             .behavior_script
             .behavior_for(ActorId::new(1), ActorKind::Lander);

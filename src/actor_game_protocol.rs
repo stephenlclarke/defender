@@ -504,29 +504,29 @@ fn clean_wave(wave: u16) -> u8 {
 
 fn actor_wave_profile_for_report(report: &StepReport) -> WaveProfileSnapshot {
     let mut profile = WaveProfileSnapshot::for_wave(clean_wave(report.wave));
-    let source = report.arcade_wave;
-    profile.landers = source.landers;
-    profile.bombers = source.bombers;
-    profile.pods = source.pods;
-    profile.mutants = source.mutants;
-    profile.swarmers = source.swarmers;
-    profile.lander_x_velocity = source.lander_x_velocity;
-    profile.lander_y_velocity_msb = source.lander_y_velocity_msb;
-    profile.lander_y_velocity_lsb = source.lander_y_velocity_lsb;
-    profile.mutant_random_y = source.mutant_random_y;
-    profile.mutant_y_velocity_msb = source.mutant_y_velocity_msb;
-    profile.mutant_y_velocity_lsb = source.mutant_y_velocity_lsb;
-    profile.mutant_x_velocity = source.mutant_x_velocity;
-    profile.swarmer_x_velocity = source.swarmer_x_velocity;
-    profile.wave_size = source.wave_size;
-    profile.lander_shot_time = source.lander_shot_time;
-    profile.bomber_x_velocity = source.bomber_x_velocity;
-    profile.mutant_shot_time = source.mutant_shot_time;
-    profile.swarmer_shot_time = source.swarmer_shot_time;
-    profile.swarmer_acceleration_mask = source.swarmer_acceleration_mask;
-    profile.baiter_delay = source.baiter_delay;
-    profile.baiter_shot_time = source.baiter_shot_time;
-    profile.baiter_seek_probability = source.baiter_seek_probability;
+    let arcade_wave = report.arcade_wave;
+    profile.landers = arcade_wave.landers;
+    profile.bombers = arcade_wave.bombers;
+    profile.pods = arcade_wave.pods;
+    profile.mutants = arcade_wave.mutants;
+    profile.swarmers = arcade_wave.swarmers;
+    profile.lander_x_velocity = arcade_wave.lander_x_velocity;
+    profile.lander_y_velocity_msb = arcade_wave.lander_y_velocity_msb;
+    profile.lander_y_velocity_lsb = arcade_wave.lander_y_velocity_lsb;
+    profile.mutant_random_y = arcade_wave.mutant_random_y;
+    profile.mutant_y_velocity_msb = arcade_wave.mutant_y_velocity_msb;
+    profile.mutant_y_velocity_lsb = arcade_wave.mutant_y_velocity_lsb;
+    profile.mutant_x_velocity = arcade_wave.mutant_x_velocity;
+    profile.swarmer_x_velocity = arcade_wave.swarmer_x_velocity;
+    profile.wave_size = arcade_wave.wave_size;
+    profile.lander_shot_time = arcade_wave.lander_shot_time;
+    profile.bomber_x_velocity = arcade_wave.bomber_x_velocity;
+    profile.mutant_shot_time = arcade_wave.mutant_shot_time;
+    profile.swarmer_shot_time = arcade_wave.swarmer_shot_time;
+    profile.swarmer_acceleration_mask = arcade_wave.swarmer_acceleration_mask;
+    profile.baiter_delay = arcade_wave.baiter_delay;
+    profile.baiter_shot_time = arcade_wave.baiter_shot_time;
+    profile.baiter_seek_probability = arcade_wave.baiter_seek_probability;
     profile
 }
 

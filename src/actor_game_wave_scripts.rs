@@ -270,50 +270,50 @@ impl ActorWaveScript {
     }
 
     fn arcade_backed_profile(wave: u16) -> ActorWaveProfile {
-        let source = ArcadeWaveProfile::for_wave(wave);
-        Self::arcade_backed_profile_from_profile(wave, source)
+        let arcade_profile = ArcadeWaveProfile::for_wave(wave);
+        Self::arcade_backed_profile_from_profile(wave, arcade_profile)
     }
 
     fn arcade_backed_profile_from_profile(
         wave: u16,
-        source: ArcadeWaveProfile,
+        arcade_profile: ArcadeWaveProfile,
     ) -> ActorWaveProfile {
         Self::arcade_backed_profile_from_profile_with_behavior(
             wave,
-            source,
+            arcade_profile,
             &ActorBehaviorScript::from_arcade_profile(),
         )
     }
 
     fn arcade_backed_profile_from_profile_with_behavior(
         wave: u16,
-        source: ArcadeWaveProfile,
+        arcade_profile: ArcadeWaveProfile,
         base_behavior: &ActorBehaviorScript,
     ) -> ActorWaveProfile {
-        let human_spawns = source.human_spawns(wave);
+        let human_spawns = arcade_profile.human_spawns(wave);
         ActorWaveProfile::with_family_spawns(
             wave,
             base_behavior
                 .clone()
-                .with_kind_behavior(ActorKind::Lander, source.lander_behavior())
+                .with_kind_behavior(ActorKind::Lander, arcade_profile.lander_behavior())
                 .with_kind_behavior(
                     ActorKind::Bomber,
                     ActorBehaviorProfile {
                         bomber_drift_speed: speed_pixels_from_arcade_velocity(
-                            source.bomber_x_velocity,
+                            arcade_profile.bomber_x_velocity,
                         ),
                         ..ActorBehaviorProfile::default()
                     },
                 ),
-            source.lander_spawns(wave, &human_spawns),
-            source.bomber_spawns(),
-            source.pod_spawns(),
+            arcade_profile.lander_spawns(wave, &human_spawns),
+            arcade_profile.bomber_spawns(),
+            arcade_profile.pod_spawns(),
             human_spawns,
         )
-        .with_arcade_wave(source)
-        .with_mutant_spawns(source.mutant_spawns())
-        .with_swarmer_spawns(source.swarmer_spawns())
-        .with_enemy_reserve(source.enemy_reserve_after_active_batch())
+        .with_arcade_wave(arcade_profile)
+        .with_mutant_spawns(arcade_profile.mutant_spawns())
+        .with_swarmer_spawns(arcade_profile.swarmer_spawns())
+        .with_enemy_reserve(arcade_profile.enemy_reserve_after_active_batch())
     }
 
     pub fn name(&self) -> &str {
@@ -1042,12 +1042,12 @@ impl ParsedActorWaveProfile {
 
     fn arcade_backed_from_profile_with_behavior(
         wave: u16,
-        source: ArcadeWaveProfile,
+        arcade_profile: ArcadeWaveProfile,
         base_behavior: &ActorBehaviorScript,
     ) -> Self {
         let profile = ActorWaveScript::arcade_backed_profile_from_profile_with_behavior(
             wave,
-            source,
+            arcade_profile,
             base_behavior,
         );
         Self {
@@ -1188,7 +1188,7 @@ fn parse_wave_behavior_preset_name(
 
 fn parse_arcade_wave_profile_updates<'a>(
     line_number: usize,
-    source: &mut ArcadeWaveProfile,
+    arcade_profile: &mut ArcadeWaveProfile,
     mut parts: impl Iterator<Item = &'a str>,
 ) -> Result<(), ActorWaveScriptParseError> {
     while let Some(field) = parts.next() {
@@ -1198,71 +1198,72 @@ fn parse_arcade_wave_profile_updates<'a>(
                 format!("arcade wave field `{field}` needs a value"),
             )
         })?;
-        apply_arcade_wave_profile_field(line_number, source, field, value)?;
+        apply_arcade_wave_profile_field(line_number, arcade_profile, field, value)?;
     }
     Ok(())
 }
 
 fn apply_arcade_wave_profile_field(
     line_number: usize,
-    source: &mut ArcadeWaveProfile,
+    arcade_profile: &mut ArcadeWaveProfile,
     field: &str,
     value: &str,
 ) -> Result<(), ActorWaveScriptParseError> {
     match normalize_script_token(field).as_str() {
-        "landers" => source.landers = parse_wave_u8(line_number, Some(value), field)?,
-        "bombers" => source.bombers = parse_wave_u8(line_number, Some(value), field)?,
-        "pods" => source.pods = parse_wave_u8(line_number, Some(value), field)?,
-        "mutants" => source.mutants = parse_wave_u8(line_number, Some(value), field)?,
-        "swarmers" => source.swarmers = parse_wave_u8(line_number, Some(value), field)?,
-        "wave_size" => source.wave_size = parse_wave_u8(line_number, Some(value), field)?,
+        "landers" => arcade_profile.landers = parse_wave_u8(line_number, Some(value), field)?,
+        "bombers" => arcade_profile.bombers = parse_wave_u8(line_number, Some(value), field)?,
+        "pods" => arcade_profile.pods = parse_wave_u8(line_number, Some(value), field)?,
+        "mutants" => arcade_profile.mutants = parse_wave_u8(line_number, Some(value), field)?,
+        "swarmers" => arcade_profile.swarmers = parse_wave_u8(line_number, Some(value), field)?,
+        "wave_size" => arcade_profile.wave_size = parse_wave_u8(line_number, Some(value), field)?,
         "lander_x_velocity" => {
-            source.lander_x_velocity = parse_wave_u8(line_number, Some(value), field)?
+            arcade_profile.lander_x_velocity = parse_wave_u8(line_number, Some(value), field)?
         }
         "lander_y_velocity_msb" => {
-            source.lander_y_velocity_msb = parse_wave_u8(line_number, Some(value), field)?
+            arcade_profile.lander_y_velocity_msb = parse_wave_u8(line_number, Some(value), field)?
         }
         "lander_y_velocity_lsb" => {
-            source.lander_y_velocity_lsb = parse_wave_u8(line_number, Some(value), field)?
+            arcade_profile.lander_y_velocity_lsb = parse_wave_u8(line_number, Some(value), field)?
         }
         "bomber_x_velocity" => {
-            source.bomber_x_velocity = parse_wave_u8(line_number, Some(value), field)?
+            arcade_profile.bomber_x_velocity = parse_wave_u8(line_number, Some(value), field)?
         }
         "swarmer_x_velocity" => {
-            source.swarmer_x_velocity = parse_wave_u8(line_number, Some(value), field)?
+            arcade_profile.swarmer_x_velocity = parse_wave_u8(line_number, Some(value), field)?
         }
         "swarmer_shot_time" => {
-            source.swarmer_shot_time = parse_wave_u32(line_number, Some(value), field)?
+            arcade_profile.swarmer_shot_time = parse_wave_u32(line_number, Some(value), field)?
         }
         "swarmer_acceleration_mask" => {
-            source.swarmer_acceleration_mask = parse_wave_u8(line_number, Some(value), field)?
+            arcade_profile.swarmer_acceleration_mask =
+                parse_wave_u8(line_number, Some(value), field)?
         }
         "baiter_time" | "baiter_delay" => {
-            source.baiter_delay = parse_wave_u32(line_number, Some(value), field)?
+            arcade_profile.baiter_delay = parse_wave_u32(line_number, Some(value), field)?
         }
         "baiter_shot_time" => {
-            source.baiter_shot_time = parse_wave_u32(line_number, Some(value), field)?
+            arcade_profile.baiter_shot_time = parse_wave_u32(line_number, Some(value), field)?
         }
         "baiter_seek_probability" => {
-            source.baiter_seek_probability = parse_wave_u8(line_number, Some(value), field)?
+            arcade_profile.baiter_seek_probability = parse_wave_u8(line_number, Some(value), field)?
         }
         "lander_shot_time" => {
-            source.lander_shot_time = parse_wave_u32(line_number, Some(value), field)?
+            arcade_profile.lander_shot_time = parse_wave_u32(line_number, Some(value), field)?
         }
         "mutant_random_y" => {
-            source.mutant_random_y = parse_wave_u8(line_number, Some(value), field)?
+            arcade_profile.mutant_random_y = parse_wave_u8(line_number, Some(value), field)?
         }
         "mutant_y_velocity_msb" => {
-            source.mutant_y_velocity_msb = parse_wave_u8(line_number, Some(value), field)?
+            arcade_profile.mutant_y_velocity_msb = parse_wave_u8(line_number, Some(value), field)?
         }
         "mutant_y_velocity_lsb" => {
-            source.mutant_y_velocity_lsb = parse_wave_u8(line_number, Some(value), field)?
+            arcade_profile.mutant_y_velocity_lsb = parse_wave_u8(line_number, Some(value), field)?
         }
         "mutant_x_velocity" => {
-            source.mutant_x_velocity = parse_wave_u8(line_number, Some(value), field)?
+            arcade_profile.mutant_x_velocity = parse_wave_u8(line_number, Some(value), field)?
         }
         "mutant_shot_time" => {
-            source.mutant_shot_time = parse_wave_u32(line_number, Some(value), field)?
+            arcade_profile.mutant_shot_time = parse_wave_u32(line_number, Some(value), field)?
         }
         _ => {
             return Err(ActorWaveScriptParseError::new(
