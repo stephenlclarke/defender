@@ -154,7 +154,7 @@ impl Lander {
                 }
             }
             LanderBehaviorMode::Drift => {
-                if !self.advance_source_fixed_point_motion() {
+                if !self.advance_arcade_fixed_point_motion() {
                     self.drift(behavior);
                 }
             }
@@ -185,7 +185,7 @@ impl Lander {
                 commands.push(GameCommand::PlaySound(SoundCue::LanderPickup));
                 return;
             }
-            if self.advance_source_fixed_point_motion() {
+            if self.advance_arcade_fixed_point_motion() {
                 return;
             }
             self.position = step_toward(self.position, target.position, behavior.lander_seek_speed);
@@ -195,7 +195,7 @@ impl Lander {
         if let Some(player) = prompt.player_position() {
             self.drift = if player.x < self.position.x { -1 } else { 1 };
         }
-        if !self.advance_source_fixed_point_motion() {
+        if !self.advance_arcade_fixed_point_motion() {
             self.drift(behavior);
         }
     }
@@ -213,7 +213,7 @@ impl Lander {
         ));
     }
 
-    fn advance_source_fixed_point_motion(&mut self) -> bool {
+    fn advance_arcade_fixed_point_motion(&mut self) -> bool {
         let Some(source) = &mut self.source else {
             return false;
         };
