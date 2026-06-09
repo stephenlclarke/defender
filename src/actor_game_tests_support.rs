@@ -1650,7 +1650,7 @@
         snapshot
     }
 
-    fn actor_source_projection_report_for_test(background_left: u16) -> StepReport {
+    fn arcade_world_projection_report_for_test(background_left: u16) -> StepReport {
         let mut player = actor_snapshot(1, ActorKind::Player, Point::new(128, 100));
         player.direction = Some(Direction::Right);
 

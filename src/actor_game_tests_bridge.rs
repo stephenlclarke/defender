@@ -1,4 +1,4 @@
-    fn source_projectile_at_screen(
+    fn arcade_projectile_at_screen(
         position: Point,
         background_left: u16,
     ) -> (Point, EnemyProjectileArcadeState) {
@@ -18,15 +18,19 @@
     }
 
     fn spawn_enemy_laser_at_screen(driver: &mut ActorGameDriver, position: Point) -> ActorId {
-        let (source_position, source) =
-            source_projectile_at_screen(position, driver.background_left);
-        driver.spawn_enemy_laser_from_spawn(source_position, Velocity::new(0, 0), Some(source))
+        let (arcade_position, arcade_state) =
+            arcade_projectile_at_screen(position, driver.background_left);
+        driver.spawn_enemy_laser_from_spawn(
+            arcade_position,
+            Velocity::new(0, 0),
+            Some(arcade_state),
+        )
     }
 
     fn spawn_bomb_at_screen(driver: &mut ActorGameDriver, position: Point) -> ActorId {
-        let (source_position, source) =
-            source_projectile_at_screen(position, driver.background_left);
-        driver.spawn_bomb(source_position, Some(source))
+        let (arcade_position, arcade_state) =
+            arcade_projectile_at_screen(position, driver.background_left);
+        driver.spawn_bomb(arcade_position, Some(arcade_state))
     }
 
     #[test]
@@ -818,9 +822,9 @@
     }
 
     #[test]
-    fn actor_render_projects_source_world_objects_against_scrolling_background() {
-        let still = actor_source_projection_report_for_test(0).render_scene();
-        let scrolled = actor_source_projection_report_for_test(0x0100).render_scene();
+    fn actor_render_projects_arcade_world_objects_against_scrolling_background() {
+        let still = arcade_world_projection_report_for_test(0).render_scene();
+        let scrolled = arcade_world_projection_report_for_test(0x0100).render_scene();
 
         assert_eq!(
             sprite_position_for_test(&still, SpriteId::PLAYER_SHIP, RenderLayer::Objects),
@@ -850,9 +854,9 @@
     }
 
     #[test]
-    fn actor_render_projects_source_world_humans_against_scrolling_background() {
-        let still_report = actor_source_projection_report_for_test(0);
-        let scrolled_report = actor_source_projection_report_for_test(0x0100);
+    fn actor_render_projects_arcade_world_humans_against_scrolling_background() {
+        let still_report = arcade_world_projection_report_for_test(0);
+        let scrolled_report = arcade_world_projection_report_for_test(0x0100);
 
         let still_state = still_report.game_state();
         let scrolled_state = scrolled_report.game_state();
@@ -882,14 +886,14 @@
             .snapshots
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::Human)
-            .expect("source-backed human snapshot should be present");
+            .expect("arcade-state-backed human snapshot should be present");
         let projected = actor_collision_body_for_snapshot(human_runtime, 0)
-            .expect("source-backed human should be projected while visible");
+            .expect("arcade-state-backed human should be projected while visible");
         assert_eq!(projected.position, Point::new(186, 220));
     }
 
     #[test]
-    fn actor_collisions_project_source_world_hostiles_against_background() {
+    fn actor_collisions_project_arcade_world_hostiles_against_background() {
         let mut lander = actor_snapshot(2, ActorKind::Lander, Point::new(0x30, 80));
         lander.bounds = Some(Rect::from_center(lander.position, 8, 8));
         lander.lander_runtime = Some(LanderArcadeState {
@@ -904,7 +908,7 @@
         });
 
         let projected = actor_collision_body_for_snapshot(&lander, 0)
-            .expect("source-backed lander should be projected while visible");
+            .expect("arcade-state-backed lander should be projected while visible");
         assert_eq!(projected.position, Point::new(192, 80));
         assert!(
             projected
@@ -913,12 +917,12 @@
         );
         assert!(
             actor_collision_body_for_snapshot(&lander, 0x4000).is_none(),
-            "offscreen source-backed hostiles should not collide with screen-space player/laser bodies"
+            "offscreen arcade-state-backed hostiles should not collide with screen-space player/laser bodies"
         );
     }
 
     #[test]
-    fn source_backed_falling_human_rescue_uses_projected_world_position() {
+    fn arcade_state_falling_human_rescue_uses_projected_world_position() {
         let mut human = Human::with_source(
             ActorId::new(7),
             Point::new(0x40, 100),
