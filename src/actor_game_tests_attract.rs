@@ -678,7 +678,7 @@
                 entry.enemy,
                 actor_attract_scoring_scene_position(
                     ATTRACT_SCORING_LEGEND_ORIGIN_X16,
-                    actor_attract_scoring_legend_source_y16(
+                    actor_attract_scoring_legend_enemy_y16(
                         entry.enemy,
                         actor_attract_scoring_legend_player_position().1,
                     ),

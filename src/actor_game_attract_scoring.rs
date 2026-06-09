@@ -550,12 +550,12 @@ fn append_actor_attract_scoring_legend_objects(
     };
 
     let entry = ACTOR_ATTRACT_SCORING_LEGEND[index];
-    let source_y = actor_attract_scoring_legend_source_y16(entry.enemy, player_y16);
+    let legend_enemy_y16 = actor_attract_scoring_legend_enemy_y16(entry.enemy, player_y16);
     match stage {
         ActorAttractScoringStage::LegendApproach(_) => {
             let enemy_y = actor_attract_scoring_lerp_y16(
                 ATTRACT_SCORING_LEGEND_ORIGIN_START_Y16,
-                source_y,
+                legend_enemy_y16,
                 local_step,
                 ATTRACT_SCORING_LEGEND_APPROACH_STEPS,
             );
@@ -569,7 +569,7 @@ fn append_actor_attract_scoring_legend_objects(
             objects.push(actor_attract_scoring_enemy_object(
                 entry.enemy,
                 ATTRACT_SCORING_LEGEND_ORIGIN_X16,
-                source_y,
+                legend_enemy_y16,
             ));
             objects.push(actor_attract_scoring_object(
                 ActorAttractScoringObjectKind::PlayerShot,
@@ -581,7 +581,7 @@ fn append_actor_attract_scoring_legend_objects(
             objects.push(actor_attract_scoring_visual_enemy_object(
                 entry.enemy,
                 ATTRACT_SCORING_LEGEND_ORIGIN_X16,
-                source_y,
+                legend_enemy_y16,
                 ActorAttractScoringVisual::Explosion,
                 local_step,
             ));
@@ -616,7 +616,7 @@ fn actor_attract_scoring_revealed_legend_entries(stage: ActorAttractScoringStage
     }
 }
 
-fn actor_attract_scoring_legend_source_y16(
+fn actor_attract_scoring_legend_enemy_y16(
     enemy: ActorAttractScoringEnemyKind,
     player_y16: i32,
 ) -> i32 {
@@ -930,7 +930,7 @@ fn push_actor_scoring_sparse_laser(
             let byte = if fizzle_seed.rem_euclid(5) == 0 {
                 LASER_BODY_BYTE
             } else {
-                actor_source_laser_fizzle_byte(fizzle_seed as u8)
+                actor_laser_fizzle_byte(fizzle_seed as u8)
             };
             (byte, LASER_FIZZLE_TINT)
         };
@@ -983,7 +983,7 @@ fn push_actor_scoring_laser_pixel(
     });
 }
 
-const fn actor_source_laser_fizzle_byte(seed: u8) -> u8 {
+const fn actor_laser_fizzle_byte(seed: u8) -> u8 {
     (seed & 0x01) | ((seed & 0x02) << 3)
 }
 
