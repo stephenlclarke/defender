@@ -81,7 +81,7 @@ impl ExplosionKind {
 pub struct ExplosionSnapshot {
     pub kind: ExplosionKind,
     pub position: ScreenPosition,
-    pub source_center: Option<ScreenPosition>,
+    pub explosion_anchor: Option<ScreenPosition>,
     pub source_size: u16,
     pub frames_remaining: u8,
     pub picture_label: &'static str,
@@ -94,7 +94,7 @@ impl ExplosionSnapshot {
         Self {
             kind,
             position,
-            source_center: None,
+            explosion_anchor: None,
             source_size: EXPLOSION_INITIAL_SIZE,
             frames_remaining: source_explosion_lifetime_frames(kind),
             picture_label: kind.picture_label(),
@@ -108,7 +108,7 @@ impl ExplosionSnapshot {
         Self {
             kind: ExplosionKind::for_enemy(enemy.kind),
             position: enemy.position,
-            source_center: source_enemy_explosion_center(enemy),
+            explosion_anchor: source_enemy_explosion_center(enemy),
             source_size: EXPLOSION_INITIAL_SIZE,
             frames_remaining: EXPLOSION_LIFETIME_FRAMES,
             picture_label: descriptor.label,
@@ -126,7 +126,7 @@ impl ExplosionSnapshot {
             sprite_frame_label: Some(self.picture_label),
             picture_size: Some((width, height)),
             mapped_sprite: Some(self.mapped_sprite),
-            center: Some(self.source_center.unwrap_or(ScreenPosition::new(
+            center: Some(self.explosion_anchor.unwrap_or(ScreenPosition::new(
                 self.position.x.wrapping_add(width / 2),
                 self.position.y.wrapping_add(height / 2),
             ))),
@@ -170,7 +170,7 @@ fn source_explosion_display_size(explosion: ExplosionSnapshot) -> u16 {
             explosion.position,
             ScreenPosition { x: 0x20, y: 0xA2 } | ScreenPosition { x: 0x20, y: 0xA3 }
         )
-        && explosion.source_center == Some(ScreenPosition::new(0x21, 0xA9))
+        && explosion.explosion_anchor == Some(ScreenPosition::new(0x21, 0xA9))
         && explosion.source_size == EXPLOSION_INITIAL_SIZE
     {
         return EXPLOSION_INITIAL_SIZE.wrapping_add(EXPLOSION_SIZE_DELTA);

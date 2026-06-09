@@ -457,12 +457,12 @@ mod tests {
                 "  first_player_laser_sound_commands: 0xeb\n",
                 "  first_player_laser_hit: unavailable,reason=player_laser_hit_not_observed_after_512_steps\n",
                 "  hostile_laser_hit_matrix: ",
-                "lander@2[score_delta=150,score=150,explosions=lander@62,120[source_center=none],sounds=0xf9,spawns=none];",
-                "mutant@2[score_delta=150,score=150,explosions=mutant@62,120[source_center=none],sounds=0xe8,spawns=none];",
-                "bomber@2[score_delta=250,score=250,explosions=bomber@62,120[source_center=none],sounds=0xfe,spawns=none];",
-                "pod@2[score_delta=1000,score=1000,explosions=pod@62,120[source_center=none],sounds=0xfa,spawns=landers=0,bombers=0,pods=0,mutants=0,swarmers=6];",
-                "swarmer@2[score_delta=150,score=150,explosions=swarmer@62,120[source_center=none],sounds=0xf8,spawns=none];",
-                "baiter@2[score_delta=200,score=200,explosions=baiter@62,120[source_center=none],sounds=0xf8,spawns=none]\n",
+                "lander@2[score_delta=150,score=150,explosions=lander@62,120[explosion_anchor=none],sounds=0xf9,spawns=none];",
+                "mutant@2[score_delta=150,score=150,explosions=mutant@62,120[explosion_anchor=none],sounds=0xe8,spawns=none];",
+                "bomber@2[score_delta=250,score=250,explosions=bomber@62,120[explosion_anchor=none],sounds=0xfe,spawns=none];",
+                "pod@2[score_delta=1000,score=1000,explosions=pod@62,120[explosion_anchor=none],sounds=0xfa,spawns=landers=0,bombers=0,pods=0,mutants=0,swarmers=6];",
+                "swarmer@2[score_delta=150,score=150,explosions=swarmer@62,120[explosion_anchor=none],sounds=0xf8,spawns=none];",
+                "baiter@2[score_delta=200,score=200,explosions=baiter@62,120[explosion_anchor=none],sounds=0xf8,spawns=none]\n",
                 "  hostile_projectile_matrix: ",
                 "lander@1[samples=enemy_laser@210,45[velocity=-3/3,source=frac=0xe9/0x60,vel=0xfd00/0x0300,life=90],sounds=0xfc];",
                 "mutant@454[samples=enemy_laser@0,222[velocity=1/-1,source=frac=0x50/0x00,vel=0x009c/0xfe5c,life=90],sounds=0xf6];",
@@ -587,15 +587,15 @@ mod tests {
                 kind: "lander".to_string(),
                 x: 62,
                 y: 120,
-                source_center_x: None,
-                source_center_y: None,
+                explosion_anchor_x: None,
+                explosion_anchor_y: None,
             }]
         );
         assert!(report.first_player_laser_hit_unavailable_reason.is_none());
         assert!(
             report
                 .to_text()
-                .contains("first_player_laser_hit_explosions: lander@62,120[source_center=none]")
+                .contains("first_player_laser_hit_explosions: lander@62,120[explosion_anchor=none]")
         );
         assert!(
             report
@@ -670,8 +670,8 @@ mod tests {
                     kind: kind.to_string(),
                     x: 62,
                     y: 120,
-                    source_center_x: None,
-                    source_center_y: None,
+                    explosion_anchor_x: None,
+                    explosion_anchor_y: None,
                 }],
                 "{kind} explosion"
             );
@@ -683,10 +683,10 @@ mod tests {
 
         let text = report.to_text();
         assert!(text.contains(
-            "hostile_laser_hit_matrix: lander@2[score_delta=150,score=150,explosions=lander@62,120[source_center=none],sounds=0xf9,spawns=none]"
+            "hostile_laser_hit_matrix: lander@2[score_delta=150,score=150,explosions=lander@62,120[explosion_anchor=none],sounds=0xf9,spawns=none]"
         ));
         assert!(text.contains(
-            "pod@2[score_delta=1000,score=1000,explosions=pod@62,120[source_center=none],sounds=0xfa,spawns=landers=0,bombers=0,pods=0,mutants=0,swarmers=6]"
+            "pod@2[score_delta=1000,score=1000,explosions=pod@62,120[explosion_anchor=none],sounds=0xfa,spawns=landers=0,bombers=0,pods=0,mutants=0,swarmers=6]"
         ));
     }
 

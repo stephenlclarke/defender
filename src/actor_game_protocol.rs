@@ -165,7 +165,7 @@ pub enum SpawnRequest {
     Explosion {
         position: Point,
         kind: ExplosionKind,
-        source_center: Option<Point>,
+        explosion_anchor: Option<Point>,
     },
     ScorePopup {
         position: Point,
@@ -913,13 +913,13 @@ fn actor_explosions_for_report(report: &StepReport) -> Vec<CleanExplosionSnapsho
             VisualEffect::ExplosionCloud {
                 kind,
                 age,
-                source_center,
+                explosion_anchor,
             } => {
                 let mut explosion = CleanExplosionSnapshot::source_spawn(
                     clean_explosion_kind(kind),
                     screen_position(draw.position),
                 );
-                explosion.source_center = source_center.map(screen_position);
+                explosion.explosion_anchor = explosion_anchor.map(screen_position);
                 explosion.source_size = actor_source_explosion_size_for_kind(kind, age);
                 Some(explosion)
             }

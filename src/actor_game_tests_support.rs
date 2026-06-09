@@ -782,8 +782,8 @@
                 GameCommand::Spawn(SpawnRequest::Explosion {
                     position,
                     kind,
-                    source_center,
-                }) => Some((*position, *kind, *source_center)),
+                    explosion_anchor,
+                }) => Some((*position, *kind, *explosion_anchor)),
                 _ => None,
             })
             .collect::<Vec<_>>();

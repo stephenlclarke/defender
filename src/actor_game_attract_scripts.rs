@@ -60,7 +60,7 @@ pub enum VisualEffect {
     ExplosionCloud {
         kind: ExplosionKind,
         age: u16,
-        source_center: Option<Point>,
+        explosion_anchor: Option<Point>,
     },
 }
 

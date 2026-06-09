@@ -826,13 +826,13 @@ fn actor_script_check_explosion_command_samples(
             GameCommand::Spawn(SpawnRequest::Explosion {
                 position,
                 kind,
-                source_center,
+                explosion_anchor,
             }) => Some(ActorScriptCheckExplosionSample {
                 kind: explosion_kind_label(*kind).to_string(),
                 x: position.x,
                 y: position.y,
-                source_center_x: source_center.map(|center| center.x),
-                source_center_y: source_center.map(|center| center.y),
+                explosion_anchor_x: explosion_anchor.map(|center| center.x),
+                explosion_anchor_y: explosion_anchor.map(|center| center.y),
             }),
             _ => None,
         })

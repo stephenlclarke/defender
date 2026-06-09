@@ -146,8 +146,8 @@ pub(crate) struct ActorScriptCheckExplosionSample {
     pub(crate) kind: String,
     pub(crate) x: i16,
     pub(crate) y: i16,
-    pub(crate) source_center_x: Option<i16>,
-    pub(crate) source_center_y: Option<i16>,
+    pub(crate) explosion_anchor_x: Option<i16>,
+    pub(crate) explosion_anchor_y: Option<i16>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -870,13 +870,13 @@ fn explosion_samples_summary(samples: &[ActorScriptCheckExplosionSample]) -> Str
     samples
         .iter()
         .map(|sample| {
-            let source_center = match (sample.source_center_x, sample.source_center_y) {
+            let explosion_anchor = match (sample.explosion_anchor_x, sample.explosion_anchor_y) {
                 (Some(x), Some(y)) => format!("{x},{y}"),
                 _ => String::from("none"),
             };
             format!(
-                "{}@{},{}[source_center={}]",
-                sample.kind, sample.x, sample.y, source_center
+                "{}@{},{}[explosion_anchor={}]",
+                sample.kind, sample.x, sample.y, explosion_anchor
             )
         })
         .collect::<Vec<_>>()

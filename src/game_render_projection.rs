@@ -572,7 +572,7 @@ pub(crate) fn push_explosion_cloud_pixels(
     growth_size: u16,
 ) -> bool {
     let mut explosion = ExplosionSnapshot::source_spawn(kind, position);
-    explosion.source_center = cloud_center;
+    explosion.explosion_anchor = cloud_center;
     explosion.source_size = growth_size;
     let detail = explosion.expanded_object_detail();
     if !expanded_object_uses_pixel_cloud(&detail) {

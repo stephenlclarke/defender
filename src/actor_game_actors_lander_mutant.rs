@@ -1265,7 +1265,7 @@ fn actor_source_target6_mutant_uses_fire2524_collision_projection(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ActorExplosionPlacement {
     position: Point,
-    source_center: Option<Point>,
+    explosion_anchor: Option<Point>,
 }
 
 fn actor_player_enemy_collision_explosion_placement(
@@ -1277,12 +1277,12 @@ fn actor_player_enemy_collision_explosion_placement(
     ) {
         ActorExplosionPlacement {
             position: TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_TOP_LEFT,
-            source_center: Some(TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER),
+            explosion_anchor: Some(TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER),
         }
     } else {
         ActorExplosionPlacement {
             position: center_of(enemy.bounds),
-            source_center: None,
+            explosion_anchor: None,
         }
     }
 }

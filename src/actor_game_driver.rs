@@ -585,17 +585,17 @@ impl ActorGameDriver {
     }
 
     fn spawn_explosion(&mut self, position: Point, kind: ExplosionKind) -> ActorId {
-        self.spawn_explosion_with_source_center(position, kind, None)
+        self.spawn_explosion_with_anchor(position, kind, None)
     }
 
-    fn spawn_explosion_with_source_center(
+    fn spawn_explosion_with_anchor(
         &mut self,
         position: Point,
         kind: ExplosionKind,
-        source_center: Option<Point>,
+        explosion_anchor: Option<Point>,
     ) -> ActorId {
         let id = self.allocate_actor_id();
-        self.spawn_actor(Explosion::new(id, position, kind, source_center));
+        self.spawn_actor(Explosion::new(id, position, kind, explosion_anchor));
         id
     }
 
@@ -636,7 +636,7 @@ impl ActorGameDriver {
                         commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
                             position: center_of(enemy.bounds),
                             kind,
-                            source_center: None,
+                            explosion_anchor: None,
                         }));
                     }
                     commands.push(GameCommand::AddScore(score_for_hostile(enemy.kind)));
@@ -681,7 +681,7 @@ impl ActorGameDriver {
                         commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
                             position: placement.position,
                             kind,
-                            source_center: placement.source_center,
+                            explosion_anchor: placement.explosion_anchor,
                         }));
                     }
                     commands.push(GameCommand::AddScore(score_for_hostile(enemy.kind)));
@@ -690,7 +690,7 @@ impl ActorGameDriver {
                 commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
                     position: center_of(player.bounds),
                     kind: player_hazard_explosion_kind(enemy.kind),
-                    source_center: None,
+                    explosion_anchor: None,
                 }));
                 commands.push(GameCommand::PlaySound(player_hazard_sound(enemy.kind)));
                 commands.push(GameCommand::PlayerKilled);
@@ -786,9 +786,9 @@ impl ActorGameDriver {
                 GameCommand::Spawn(SpawnRequest::Explosion {
                     position,
                     kind,
-                    source_center,
+                    explosion_anchor,
                 }) => {
-                    self.spawn_explosion_with_source_center(position, kind, source_center);
+                    self.spawn_explosion_with_anchor(position, kind, explosion_anchor);
                 }
                 GameCommand::Spawn(SpawnRequest::ScorePopup { position, points }) => {
                     self.spawn_score_popup(position, points);
@@ -1150,7 +1150,7 @@ impl ActorGameDriver {
             commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
                 position: draw.position,
                 kind: ExplosionKind::Terrain,
-                source_center: None,
+                explosion_anchor: None,
             }));
         }
 
@@ -1231,7 +1231,7 @@ impl ActorGameDriver {
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Terrain,
                         age: 0,
-                        source_center: None,
+                        explosion_anchor: None,
                     },
                 )
             })
@@ -2164,7 +2164,7 @@ impl ActorGameDriver {
                 commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
                     position,
                     kind: explosion_kind,
-                    source_center: None,
+                    explosion_anchor: None,
                 }));
             }
             let points = score_for_hostile(kind);

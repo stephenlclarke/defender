@@ -147,7 +147,7 @@ impl Human {
                 commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
                     position: self.position,
                     kind: ExplosionKind::Human,
-                    source_center: None,
+                    explosion_anchor: None,
                 }));
                 commands.push(GameCommand::PlaySound(SoundCue::HumanLost));
             }
@@ -537,7 +537,7 @@ struct Explosion {
     id: ActorId,
     position: Point,
     kind: ExplosionKind,
-    source_center: Option<Point>,
+    explosion_anchor: Option<Point>,
     age: u16,
 }
 
@@ -546,13 +546,13 @@ impl Explosion {
         id: ActorId,
         position: Point,
         kind: ExplosionKind,
-        source_center: Option<Point>,
+        explosion_anchor: Option<Point>,
     ) -> Self {
         Self {
             id,
             position,
             kind,
-            source_center,
+            explosion_anchor,
             age: 0,
         }
     }
@@ -576,7 +576,7 @@ impl AssetActor for Explosion {
                 VisualEffect::ExplosionCloud {
                     kind: self.kind,
                     age: self.age,
-                    source_center: self.source_center,
+                    explosion_anchor: self.explosion_anchor,
                 },
             ));
             self.age = self.age.saturating_add(1);

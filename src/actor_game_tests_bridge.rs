@@ -670,7 +670,7 @@
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Lander,
                         age: 2,
-                        source_center: None,
+                        explosion_anchor: None,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -680,7 +680,7 @@
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Mutant,
                         age: 2,
-                        source_center: None,
+                        explosion_anchor: None,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -690,7 +690,7 @@
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Bomber,
                         age: 2,
-                        source_center: None,
+                        explosion_anchor: None,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -700,7 +700,7 @@
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Pod,
                         age: 2,
-                        source_center: None,
+                        explosion_anchor: None,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -710,7 +710,7 @@
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Swarmer,
                         age: 2,
-                        source_center: None,
+                        explosion_anchor: None,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -720,7 +720,7 @@
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Baiter,
                         age: 2,
-                        source_center: None,
+                        explosion_anchor: None,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -730,7 +730,7 @@
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Bomb,
                         age: 2,
-                        source_center: None,
+                        explosion_anchor: None,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -740,7 +740,7 @@
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Human,
                         age: 1,
-                        source_center: None,
+                        explosion_anchor: None,
                     },
                 ),
                 DrawCommand::sprite_with_effect(
@@ -750,7 +750,7 @@
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Player,
                         age: 1,
-                        source_center: None,
+                        explosion_anchor: None,
                     },
                 ),
             ],
@@ -980,9 +980,9 @@
     }
 
     #[test]
-    fn actor_explosion_source_center_reaches_state_and_render_bridges() {
+    fn actor_explosion_anchor_reaches_state_and_render_bridges() {
         let top_left = Point::new(0x20, 0xA2);
-        let source_center = Point::new(0x21, 0xA9);
+        let explosion_anchor = Point::new(0x21, 0xA9);
         let report = StepReport {
             step: 7,
             phase: Phase::Playing,
@@ -1021,7 +1021,7 @@
                 VisualEffect::ExplosionCloud {
                     kind: ExplosionKind::Mutant,
                     age: 2,
-                    source_center: Some(source_center),
+                    explosion_anchor: Some(explosion_anchor),
                 },
             )],
             sounds: Vec::new(),
@@ -1036,7 +1036,7 @@
             ScreenPosition::new(0x20, 0xA2)
         );
         assert_eq!(
-            state.world.explosions[0].source_center,
+            state.world.explosions[0].explosion_anchor,
             Some(ScreenPosition::new(0x21, 0xA9))
         );
         assert_eq!(
@@ -1155,7 +1155,7 @@
                     VisualEffect::ExplosionCloud {
                         kind: ExplosionKind::Lander,
                         age: 0,
-                        source_center: None,
+                        explosion_anchor: None,
                     },
                 ),
                 DrawCommand::sprite(ActorId(18), SpriteKey::Score500, Point::new(122, 88)),
@@ -1274,7 +1274,7 @@
                 VisualEffect::ExplosionCloud {
                     kind,
                     age: 0,
-                    source_center: None,
+                    explosion_anchor: None,
                 },
             )
         })

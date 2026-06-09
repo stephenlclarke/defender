@@ -104,8 +104,8 @@ impl ActorRenderSceneBridge {
             VisualEffect::ExplosionCloud {
                 kind,
                 age,
-                source_center,
-            } => self.push_explosion_sprite(scene, draw.position, kind, age, source_center),
+                explosion_anchor,
+            } => self.push_explosion_sprite(scene, draw.position, kind, age, explosion_anchor),
             VisualEffect::Static
             | VisualEffect::ArcadeMessage { .. }
             | VisualEffect::LanderSpriteFrame { .. }
@@ -194,7 +194,7 @@ impl ActorRenderSceneBridge {
         position: Point,
         kind: ExplosionKind,
         age: u16,
-        source_center: Option<Point>,
+        explosion_anchor: Option<Point>,
     ) {
         let (sprite, base_size) = match kind {
             ExplosionKind::Lander => (SpriteId::ENEMY_LANDER, LANDER_SCENE_SIZE),
@@ -217,7 +217,7 @@ impl ActorRenderSceneBridge {
                 scene,
                 clean_explosion_kind(kind),
                 source_position,
-                source_center.and_then(try_screen_position),
+                explosion_anchor.and_then(try_screen_position),
                 source_size,
             )
         {

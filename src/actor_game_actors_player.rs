@@ -473,7 +473,7 @@ impl PlayerShip {
         commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
             position: self.position,
             kind: ExplosionKind::Player,
-            source_center: None,
+            explosion_anchor: None,
         }));
         commands.push(GameCommand::PlaySound(SoundCue::Explosion));
         commands.push(GameCommand::PlayerKilled);
