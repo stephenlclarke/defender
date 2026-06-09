@@ -3,7 +3,7 @@ struct Bomber {
     id: ActorId,
     position: Point,
     drift: i16,
-    source: Option<BomberArcadeState>,
+    arcade_state: Option<BomberArcadeState>,
 }
 
 impl Bomber {
@@ -17,9 +17,9 @@ impl Bomber {
             position: spawn.position,
             drift: spawn
                 .source
-                .map(|source| arcade_drift_from_velocity(source.x_velocity))
+                .map(|arcade_state| arcade_drift_from_velocity(arcade_state.x_velocity))
                 .unwrap_or(-1),
-            source: spawn.source,
+            arcade_state: spawn.source,
         }
     }
 
@@ -28,7 +28,7 @@ impl Bomber {
     }
 
     fn advance_arcade_motion(&mut self) -> bool {
-        let Some(arcade_state) = &mut self.source else {
+        let Some(arcade_state) = &mut self.arcade_state else {
             return false;
         };
 
@@ -47,7 +47,7 @@ impl Bomber {
     }
 
     fn advance_arcade_tie_step(&mut self, prompt: &StepPrompt, arcade_rng: ActorArcadeRngSnapshot) {
-        let Some(arcade_state) = &mut self.source else {
+        let Some(arcade_state) = &mut self.arcade_state else {
             return;
         };
         if arcade_state.slot != arcade_tie_selected_slot(arcade_rng.seed) {
@@ -80,9 +80,9 @@ impl Bomber {
     }
 
     fn draw_effect(&self) -> VisualEffect {
-        self.source
-            .map(|source| VisualEffect::BomberSpriteFrame {
-                frame: source.picture_frame,
+        self.arcade_state
+            .map(|arcade_state| VisualEffect::BomberSpriteFrame {
+                frame: arcade_state.picture_frame,
             })
             .unwrap_or(VisualEffect::Static)
     }
@@ -93,7 +93,7 @@ impl Bomber {
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) {
-        if let Some(arcade_state) = self.source {
+        if let Some(arcade_state) = self.arcade_state {
             let Some(arcade_rng) = prompt.arcade_rng else {
                 return;
             };
@@ -210,7 +210,7 @@ impl AssetActor for Bomber {
         let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Bomber);
-            if self.source.is_some() {
+            if self.arcade_state.is_some() {
                 self.maybe_spawn_bomb(prompt, behavior, &mut commands);
                 if let Some(arcade_rng) = prompt.arcade_rng {
                     self.advance_arcade_tie_step(prompt, arcade_rng);
@@ -249,7 +249,7 @@ impl AssetActor for Bomber {
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
                 lander_runtime: None,
-                bomber_runtime: self.source,
+                bomber_runtime: self.arcade_state,
                 pod_runtime: None,
                 swarmer_runtime: None,
                 baiter_runtime: None,
@@ -268,7 +268,7 @@ struct Bomb {
     id: ActorId,
     position: Point,
     lifetime_steps: u16,
-    source: EnemyProjectileArcadeState,
+    arcade_state: EnemyProjectileArcadeState,
 }
 
 impl Bomb {
@@ -276,26 +276,26 @@ impl Bomb {
         id: ActorId,
         position: Point,
         lifetime_steps: u16,
-        source: Option<EnemyProjectileArcadeState>,
+        arcade_state: Option<EnemyProjectileArcadeState>,
     ) -> Self {
-        let mut source = source.unwrap_or(EnemyProjectileArcadeState {
+        let mut arcade_state = arcade_state.unwrap_or(EnemyProjectileArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
             y_velocity: 0,
             lifetime_ticks: 0,
         });
-        let lifetime_steps = if source.lifetime_ticks == 0 {
+        let lifetime_steps = if arcade_state.lifetime_ticks == 0 {
             lifetime_steps
         } else {
-            u16::from(source.lifetime_ticks)
+            u16::from(arcade_state.lifetime_ticks)
         };
-        source.lifetime_ticks = arcade_projectile_lifetime_ticks(lifetime_steps);
+        arcade_state.lifetime_ticks = arcade_projectile_lifetime_ticks(lifetime_steps);
         Self {
             id,
             position,
             lifetime_steps,
-            source,
+            arcade_state,
         }
     }
 
@@ -314,7 +314,7 @@ impl AssetActor for Bomb {
         if prompt.phase == Phase::Playing && self.lifetime_steps > 0 {
             if prompt.projectile_scan_tick {
                 self.lifetime_steps = self.lifetime_steps.saturating_sub(1);
-                self.source.lifetime_ticks =
+                self.arcade_state.lifetime_ticks =
                     arcade_projectile_lifetime_ticks(self.lifetime_steps);
             }
             if self.lifetime_steps > 0 {
@@ -339,7 +339,7 @@ impl AssetActor for Bomb {
                 baiter_runtime: None,
                 mutant_runtime: None,
                 human_runtime: None,
-                enemy_projectile_runtime: Some(self.source),
+                enemy_projectile_runtime: Some(self.arcade_state),
             },
             commands: Vec::new(),
             draws,
@@ -352,7 +352,7 @@ struct Pod {
     id: ActorId,
     position: Point,
     drift: i16,
-    source: Option<PodArcadeState>,
+    arcade_state: Option<PodArcadeState>,
 }
 
 impl Pod {
@@ -368,7 +368,7 @@ impl Pod {
                 .source
                 .map(|arcade_state| arcade_drift_from_velocity(arcade_state.x_velocity))
                 .unwrap_or(1),
-            source: spawn.source,
+            arcade_state: spawn.source,
         }
     }
 
@@ -377,7 +377,7 @@ impl Pod {
     }
 
     fn advance_arcade_motion(&mut self) -> bool {
-        let Some(arcade_state) = &mut self.source else {
+        let Some(arcade_state) = &mut self.arcade_state else {
             return false;
         };
         let (x, x_fraction) =
@@ -440,7 +440,7 @@ impl AssetActor for Pod {
                 alive: prompt.phase == Phase::Playing,
                 lander_runtime: None,
                 bomber_runtime: None,
-                pod_runtime: self.source,
+                pod_runtime: self.arcade_state,
                 swarmer_runtime: None,
                 baiter_runtime: None,
                 mutant_runtime: None,
@@ -458,7 +458,7 @@ struct Swarmer {
     id: ActorId,
     position: Point,
     drift: i16,
-    source: Option<SwarmerArcadeState>,
+    arcade_state: Option<SwarmerArcadeState>,
 }
 
 impl Swarmer {
@@ -471,7 +471,7 @@ impl Swarmer {
             id,
             position: spawn.position,
             drift: -1,
-            source: spawn.source,
+            arcade_state: spawn.source,
         }
     }
 
@@ -485,7 +485,7 @@ impl Swarmer {
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) -> bool {
-        let Some(arcade_state) = &mut self.source else {
+        let Some(arcade_state) = &mut self.arcade_state else {
             return false;
         };
         if arcade_state.sleep_ticks > 0 {
@@ -612,7 +612,7 @@ impl AssetActor for Swarmer {
                 lander_runtime: None,
                 bomber_runtime: None,
                 pod_runtime: None,
-                swarmer_runtime: self.source,
+                swarmer_runtime: self.arcade_state,
                 baiter_runtime: None,
                 mutant_runtime: None,
                 human_runtime: None,
@@ -696,7 +696,7 @@ struct Baiter {
     id: ActorId,
     position: Point,
     drift: i16,
-    source: Option<BaiterArcadeState>,
+    arcade_state: Option<BaiterArcadeState>,
 }
 
 impl Baiter {
@@ -709,7 +709,7 @@ impl Baiter {
             id,
             position: spawn.position,
             drift: -1,
-            source: spawn.source,
+            arcade_state: spawn.source,
         }
     }
 
@@ -723,7 +723,7 @@ impl Baiter {
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) -> bool {
-        let Some(arcade_state) = &mut self.source else {
+        let Some(arcade_state) = &mut self.arcade_state else {
             return false;
         };
 
@@ -786,7 +786,7 @@ impl Baiter {
     }
 
     fn draw_effect(&self) -> VisualEffect {
-        self.source
+        self.arcade_state
             .map(|arcade_state| VisualEffect::BaiterSpriteFrame {
                 frame: arcade_state.picture_frame,
             })
@@ -943,7 +943,7 @@ impl AssetActor for Baiter {
                 bomber_runtime: None,
                 pod_runtime: None,
                 swarmer_runtime: None,
-                baiter_runtime: self.source,
+                baiter_runtime: self.arcade_state,
                 mutant_runtime: None,
                 human_runtime: None,
                 enemy_projectile_runtime: None,
