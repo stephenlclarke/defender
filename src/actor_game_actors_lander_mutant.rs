@@ -35,7 +35,7 @@ impl Lander {
             position: spawn.position,
             drift: spawn
                 .source
-                .map(|source| source_lander_drift_from_velocity(source.x_velocity))
+                .map(|source| lander_drift_from_arcade_velocity(source.x_velocity))
                 .unwrap_or(-1),
             mode: LanderMode::Seeking,
             spawn_visibility: lander_spawn_visibility(spawn.source),
@@ -231,7 +231,7 @@ impl Lander {
         self.position = Point::new(x, y);
         source.x_fraction = x_fraction;
         source.y_fraction = y_fraction;
-        self.drift = source_lander_drift_from_velocity(source.x_velocity);
+        self.drift = lander_drift_from_arcade_velocity(source.x_velocity);
         true
     }
 
@@ -362,7 +362,7 @@ impl Lander {
     }
 }
 
-const fn source_lander_drift_from_velocity(x_velocity: u16) -> i16 {
+const fn lander_drift_from_arcade_velocity(x_velocity: u16) -> i16 {
     actor_source_drift_from_velocity(x_velocity)
 }
 
@@ -387,7 +387,7 @@ fn first_wave_refill_lander_spawn_visibility(
         .filter_map(|spawn| spawn.source)
         .enumerate()
         .find_map(|(index, refill_source)| {
-            source_lander_metadata_matches_refill_row(source, refill_source).then_some(
+            lander_arcade_state_matches_refill_row(source, refill_source).then_some(
                 if index == 2 {
                     LanderSpawnVisibility::VisibleFirstWaveRefill
                 } else {
@@ -397,7 +397,7 @@ fn first_wave_refill_lander_spawn_visibility(
         })
 }
 
-fn source_lander_metadata_matches_refill_row(
+fn lander_arcade_state_matches_refill_row(
     source: LanderArcadeState,
     refill_source: LanderArcadeState,
 ) -> bool {
