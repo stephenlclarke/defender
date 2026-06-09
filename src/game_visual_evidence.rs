@@ -104,11 +104,11 @@ impl ExplosionSnapshot {
     }
 
     fn spawn_from_enemy(enemy: EnemySnapshot) -> Self {
-        let descriptor = source_enemy_explosion_picture_descriptor(enemy);
+        let descriptor = arcade_enemy_explosion_picture_descriptor(enemy);
         Self {
             kind: ExplosionKind::for_enemy(enemy.kind),
             position: enemy.position,
-            explosion_anchor: source_enemy_explosion_center(enemy),
+            explosion_anchor: arcade_enemy_explosion_anchor(enemy),
             growth_size: EXPLOSION_INITIAL_SIZE,
             frames_remaining: EXPLOSION_LIFETIME_FRAMES,
             picture_label: descriptor.label,
@@ -179,8 +179,8 @@ fn explosion_display_size(explosion: ExplosionSnapshot) -> u16 {
     explosion.growth_size
 }
 
-fn source_enemy_explosion_center(enemy: EnemySnapshot) -> Option<ScreenPosition> {
-    (source_enemy_uses_target6_dive_projection(enemy)
+fn arcade_enemy_explosion_anchor(enemy: EnemySnapshot) -> Option<ScreenPosition> {
+    (arcade_enemy_uses_target6_dive_projection(enemy)
         && matches!(
             enemy.position,
             ScreenPosition { x: 0x20, y: 0xA2 } | ScreenPosition { x: 0x20, y: 0xA3 }
@@ -188,7 +188,7 @@ fn source_enemy_explosion_center(enemy: EnemySnapshot) -> Option<ScreenPosition>
     .then_some(ScreenPosition::new(0x21, 0xA9))
 }
 
-fn source_enemy_explosion_picture_descriptor(
+fn arcade_enemy_explosion_picture_descriptor(
     enemy: EnemySnapshot,
 ) -> ObjectPictureDescriptor {
     if enemy.kind == EnemyKind::Swarmer {
@@ -220,9 +220,9 @@ impl PlayerExplosionPieceSnapshot {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PlayerExplosionCloudSnapshot {
-    pub source_color: u8,
-    pub source_color_counter: u8,
-    pub source_color_index: u8,
+    pub cloud_color: u8,
+    pub cloud_color_counter: u8,
+    pub cloud_color_index: u8,
     pub frame: u16,
     pub piece_count: u8,
     pub pieces: [PlayerExplosionPieceSnapshot; PLAYER_EXPLOSION_PIECE_LIMIT],
@@ -230,9 +230,9 @@ pub struct PlayerExplosionCloudSnapshot {
 
 impl PlayerExplosionCloudSnapshot {
     pub const EMPTY: Self = Self {
-        source_color: 0,
-        source_color_counter: 0,
-        source_color_index: 0,
+        cloud_color: 0,
+        cloud_color_counter: 0,
+        cloud_color_index: 0,
         frame: 0,
         piece_count: 0,
         pieces: [PlayerExplosionPieceSnapshot::EMPTY; PLAYER_EXPLOSION_PIECE_LIMIT],
@@ -247,11 +247,11 @@ pub struct WorldSnapshot {
     pub enemies: Vec<EnemySnapshot>,
     pub enemy_reserve: EnemyReserveSnapshot,
     pub humans: Vec<HumanSnapshot>,
-    pub source_target_list_cursor_address: Option<u16>,
-    pub source_astronaut_cursor_address: Option<u16>,
+    pub target_list_cursor_address: Option<u16>,
+    pub astronaut_cursor_address: Option<u16>,
     pub human_walk_sleep_ticks: u8,
-    pub source_velocity_frames_remaining: u8,
-    pub source_shell_scan_frames_remaining: u8,
+    pub velocity_ticks_remaining: u8,
+    pub enemy_projectile_scan_ticks_remaining: u8,
     pub projectiles: Vec<ProjectileSnapshot>,
     pub enemy_projectiles: Vec<EnemyProjectileSnapshot>,
     pub enemy_appearances: Vec<EnemyAppearanceSnapshot>,
@@ -351,10 +351,10 @@ impl WorldSnapshot {
             return;
         }
 
-        self.reset_source_terrain_blow_sequence();
+        self.reset_terrain_blow_sequence();
     }
 
-    fn reset_source_terrain_blow_sequence(&mut self) {
+    fn reset_terrain_blow_sequence(&mut self) {
         self.terrain.clear();
         self.clear_terrain_blow_human_state();
         self.explosions
@@ -371,8 +371,8 @@ impl WorldSnapshot {
 
     fn clear_terrain_blow_human_state(&mut self) {
         self.humans.clear();
-        self.source_target_list_cursor_address = None;
-        self.source_astronaut_cursor_address = None;
+        self.target_list_cursor_address = None;
+        self.astronaut_cursor_address = None;
         self.human_walk_sleep_ticks = 0;
     }
 
@@ -660,14 +660,14 @@ fn scanner_radar_object_screen_address(world_x: u16, world_y: u16, scan_left: u1
 }
 
 fn scanner_radar_player_screen_address(player_position: (WorldVector, WorldVector)) -> u16 {
-    let x_word = source_word_from_world_vector(player_position.0);
-    let y_word = source_word_from_world_vector(player_position.1);
+    let x_word = evidence_arcade_word_from_world_vector(player_position.0);
+    let y_word = evidence_arcade_word_from_world_vector(player_position.1);
     let x_byte = x_word.to_be_bytes()[0] >> 4;
     let y_byte = y_word.to_be_bytes()[0] >> 3;
     u16::from_be_bytes([x_byte, y_byte]).wrapping_add(SCANNER_PLAYER_BASE_SCREEN)
 }
 
-fn source_word_from_world_vector(vector: WorldVector) -> u16 {
+fn evidence_arcade_word_from_world_vector(vector: WorldVector) -> u16 {
     (vector.subpixels() >> 8) as u16
 }
 
@@ -678,7 +678,7 @@ fn arcade_world_position(position: ScreenPosition, x_fraction: u8, y_fraction: u
     )
 }
 
-fn source_active_object_screen_position(
+fn arcade_active_object_screen_position(
     position: ScreenPosition,
     x_fraction: u8,
     background_left: u16,
@@ -702,7 +702,7 @@ fn source_active_object_screen_position(
     Some(ScreenPosition::new(screen_x, position.y))
 }
 
-fn source_enemy_screen_position(
+fn arcade_enemy_screen_position(
     enemy: EnemySnapshot,
     background_left: u16,
 ) -> Option<ScreenPosition> {
@@ -710,60 +710,60 @@ fn source_enemy_screen_position(
         let x16 = u16::from_be_bytes([enemy.position.x, mutant_runtime.x_fraction])
             .wrapping_add(mutant_runtime.render_x_correction);
         let [x, x_fraction] = x16.to_be_bytes();
-        return source_active_object_screen_position(
+        return arcade_active_object_screen_position(
             ScreenPosition::new(x, enemy.position.y),
             x_fraction,
             background_left,
         );
     }
 
-    source_enemy_x_fraction(enemy)
+    enemy_arcade_x_fraction(enemy)
         .and_then(|x_fraction| {
-            source_active_object_screen_position(enemy.position, x_fraction, background_left)
+            arcade_active_object_screen_position(enemy.position, x_fraction, background_left)
         })
         .or_else(|| {
-            source_enemy_x_fraction(enemy)
+            enemy_arcade_x_fraction(enemy)
                 .is_none()
                 .then_some(enemy.position)
         })
 }
 
-fn source_first_wave_target6_mutant_uses_dive_projection(
+fn arcade_first_wave_target6_mutant_uses_dive_projection(
     mutant_runtime: MutantRuntimeSnapshot,
 ) -> bool {
     mutant_runtime.render_x_correction == FIRST_WAVE_TARGET6_MUTANT_CONVERSION_X_CORRECTION
         && mutant_runtime.y_velocity == 0x0090
 }
 
-fn source_enemy_uses_target6_dive_projection(enemy: EnemySnapshot) -> bool {
+fn arcade_enemy_uses_target6_dive_projection(enemy: EnemySnapshot) -> bool {
     enemy
         .mutant_runtime
-        .is_some_and(source_first_wave_target6_mutant_uses_dive_projection)
+        .is_some_and(arcade_first_wave_target6_mutant_uses_dive_projection)
 }
 
 fn enemy_appearance_position(enemy: EnemySnapshot) -> ScreenPosition {
-    source_enemy_screen_position(enemy, 0).unwrap_or(enemy.position)
+    arcade_enemy_screen_position(enemy, 0).unwrap_or(enemy.position)
 }
 
-fn source_enemy_x_fraction(enemy: EnemySnapshot) -> Option<u8> {
+fn enemy_arcade_x_fraction(enemy: EnemySnapshot) -> Option<u8> {
     enemy
         .lander_runtime
-        .map(|source| source.x_fraction)
-        .or_else(|| enemy.mutant_runtime.map(|source| source.x_fraction))
-        .or_else(|| enemy.bomber_runtime.map(|source| source.x_fraction))
-        .or_else(|| enemy.swarmer_runtime.map(|source| source.x_fraction))
-        .or_else(|| enemy.baiter_runtime.map(|source| source.x_fraction))
-        .or_else(|| enemy.pod_runtime.map(|source| source.x_fraction))
+        .map(|arcade_state| arcade_state.x_fraction)
+        .or_else(|| enemy.mutant_runtime.map(|arcade_state| arcade_state.x_fraction))
+        .or_else(|| enemy.bomber_runtime.map(|arcade_state| arcade_state.x_fraction))
+        .or_else(|| enemy.swarmer_runtime.map(|arcade_state| arcade_state.x_fraction))
+        .or_else(|| enemy.baiter_runtime.map(|arcade_state| arcade_state.x_fraction))
+        .or_else(|| enemy.pod_runtime.map(|arcade_state| arcade_state.x_fraction))
 }
 
 fn fixed_point_velocity_words(velocity: ScreenVelocity) -> (u16, u16) {
     (
-        source_fixed_velocity_word(velocity.dx),
-        source_fixed_velocity_word(velocity.dy),
+        arcade_fixed_velocity_word(velocity.dx),
+        arcade_fixed_velocity_word(velocity.dy),
     )
 }
 
-fn source_fixed_velocity_word(velocity: i8) -> u16 {
+fn arcade_fixed_velocity_word(velocity: i8) -> u16 {
     ((i16::from(velocity)) << 8) as u16
 }
 
@@ -776,7 +776,7 @@ struct ObjectTableIdentity {
 
 fn object_table_identity(detail_index: usize) -> ObjectTableIdentity {
     let slot = u16::try_from(detail_index)
-        .expect("clean object evidence detail index should fit source object slot");
+        .expect("clean object evidence detail index should fit arcade object slot");
     ObjectTableIdentity {
         address: OBJECT_EVIDENCE_TABLE_BASE_ADDRESS.wrapping_add(OBJECT_EVIDENCE_SLOT_STRIDE.wrapping_mul(slot)),
         slot,
