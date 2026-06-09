@@ -264,19 +264,19 @@ fn move_toward(current: u8, target: u8, step: u8) -> u8 {
     }
 }
 
-fn source_decay_waveform(waveform: &mut [u8], source_waveform: &[u8], decay_factor: u8) {
+fn decay_waveform(waveform: &mut [u8], base_waveform: &[u8], decay_factor: u8) {
     if decay_factor == 0 {
         return;
     }
-    for (sample, source_sample) in waveform.iter_mut().zip(source_waveform) {
-        let decay_step = source_sample >> 4;
+    for (sample, base_sample) in waveform.iter_mut().zip(base_waveform) {
+        let decay_step = base_sample >> 4;
         for _ in 0..decay_factor {
             *sample = sample.wrapping_sub(decay_step);
         }
     }
 }
 
-fn source_adjusted_pattern_range(pattern: &[u8], frequency_offset: i16) -> Option<(usize, usize)> {
+fn adjusted_pattern_range(pattern: &[u8], frequency_offset: i16) -> Option<(usize, usize)> {
     let mut start = None;
     for (index, period) in pattern.iter().enumerate() {
         let adjusted = i16::from(*period) + frequency_offset;
@@ -290,10 +290,10 @@ fn source_adjusted_pattern_range(pattern: &[u8], frequency_offset: i16) -> Optio
     start.map(|start| (start, pattern.len()))
 }
 
-fn source_vari_repeat_count(ticks: u16) -> usize {
+fn vari_repeat_count(ticks: u16) -> usize {
     (usize::from(ticks) / 8).max(1)
 }
 
-fn source_appear_repeat_count(frequency: u8) -> usize {
+fn materialize_repeat_count(frequency: u8) -> usize {
     (usize::from(frequency.max(1)) / APPEAR_DELAY_DIVISOR).max(1)
 }

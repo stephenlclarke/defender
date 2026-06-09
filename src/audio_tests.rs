@@ -161,7 +161,7 @@ mod tests {
     }
 
     #[test]
-    fn synth_mixer_renders_source_audio_and_drains() {
+    fn synth_mixer_renders_sound_board_audio_and_drains() {
         let mut mixer = SynthMixer::new(LIVE_AUDIO_TEST_SAMPLE_RATE_HZ);
 
         mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: 0xE8 });

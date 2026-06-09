@@ -3,7 +3,7 @@ mod tests {
     use super::{
         GWaveSound, LIGHTNING_MIN_SAMPLES, OrganNote, OrganTune, SAMPLE_RATE_HZ, SoundAction,
         SoundBoardSynth, SpecialSound, VariSound, gwave_vector, sound_actions_for_command,
-        source_adjusted_pattern_range, source_decay_waveform,
+        adjusted_pattern_range, decay_waveform,
     };
 
     #[test]
@@ -26,7 +26,7 @@ mod tests {
     }
 
     #[test]
-    fn quasar_vari_uses_source_restart_tail() {
+    fn quasar_vari_uses_arcade_restart_tail() {
         let mut board = SoundBoardSynth::default();
         let rendered = board.render_actions(&[SoundAction::Vari(VariSound::Quasar)]);
 
@@ -35,26 +35,23 @@ mod tests {
     }
 
     #[test]
-    fn source_waveform_decay_uses_wrapping_rom_sample_subtraction() {
-        let source_waveform = [0, 16, 127, 255];
-        let mut waveform = source_waveform;
+    fn waveform_decay_uses_wrapping_sample_subtraction() {
+        let base_waveform = [0, 16, 127, 255];
+        let mut waveform = base_waveform;
 
-        source_decay_waveform(&mut waveform, &source_waveform, 17);
+        decay_waveform(&mut waveform, &base_waveform, 17);
 
         assert_eq!(waveform, [0, 255, 8, 0]);
     }
 
     #[test]
-    fn source_frequency_delta_keeps_contiguous_valid_period_range() {
+    fn frequency_delta_keeps_contiguous_valid_period_range() {
+        assert_eq!(adjusted_pattern_range(&[1, 2, 3, 4], -1), Some((1, 4)));
         assert_eq!(
-            source_adjusted_pattern_range(&[1, 2, 3, 4], -1),
-            Some((1, 4))
-        );
-        assert_eq!(
-            source_adjusted_pattern_range(&[252, 253, 254, 255], 2),
+            adjusted_pattern_range(&[252, 253, 254, 255], 2),
             Some((0, 2))
         );
-        assert_eq!(source_adjusted_pattern_range(&[1, 2], -2), None);
+        assert_eq!(adjusted_pattern_range(&[1, 2], -2), None);
     }
 
     #[test]
@@ -85,7 +82,7 @@ mod tests {
     }
 
     #[test]
-    fn materialize_uses_source_appear_sweep_cadence() {
+    fn materialize_uses_arcade_appear_sweep_cadence() {
         let mut board = SoundBoardSynth::default();
         let rendered = board.render_actions(&[SoundAction::Special(SpecialSound::Materialize)]);
 

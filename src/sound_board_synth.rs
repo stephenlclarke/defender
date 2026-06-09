@@ -87,9 +87,9 @@ impl SoundBoardSynth {
     }
 
     fn render_gwave_vector(&mut self, vector: GWaveVector, out: &mut Vec<f32>) {
-        let source_waveform = vector.waveform;
-        let mut waveform = source_waveform.to_vec();
-        source_decay_waveform(&mut waveform, source_waveform, vector.pre_decay);
+        let base_waveform = vector.waveform;
+        let mut waveform = base_waveform.to_vec();
+        decay_waveform(&mut waveform, base_waveform, vector.pre_decay);
         let mut frequency_offset: i16 = 0;
         let mut delta_counter = vector.delta_frequency_count;
         let mut pattern_start = 0;
@@ -112,7 +112,7 @@ impl SoundBoardSynth {
                     break;
                 }
                 echo_count -= 1;
-                source_decay_waveform(&mut waveform, source_waveform, vector.echo_decay);
+                decay_waveform(&mut waveform, base_waveform, vector.echo_decay);
             }
 
             if vector.delta_frequency_increment == 0 {
@@ -123,7 +123,7 @@ impl SoundBoardSynth {
                 break;
             }
             frequency_offset += i16::from(vector.delta_frequency_increment);
-            let Some((next_start, next_end)) = source_adjusted_pattern_range(
+            let Some((next_start, next_end)) = adjusted_pattern_range(
                 &vector.pattern[pattern_start..pattern_end],
                 frequency_offset,
             ) else {
@@ -133,8 +133,8 @@ impl SoundBoardSynth {
             pattern_end = pattern_start + (next_end - next_start);
             if vector.echo_decay != 0 {
                 waveform.clear();
-                waveform.extend_from_slice(source_waveform);
-                source_decay_waveform(&mut waveform, source_waveform, vector.pre_decay);
+                waveform.extend_from_slice(base_waveform);
+                decay_waveform(&mut waveform, base_waveform, vector.pre_decay);
             }
         }
     }
@@ -315,14 +315,14 @@ impl SoundBoardSynth {
     fn render_materialize_noise(&mut self, out: &mut Vec<f32>) {
         let mut level = 0xFF;
         let mut frequency = APPEAR_INITIAL_FREQUENCY;
-        append_level(out, level, source_appear_repeat_count(frequency));
+        append_level(out, level, materialize_repeat_count(frequency));
 
         loop {
             for _ in 0..APPEAR_CYCLE_COUNT {
-                if self.next_source_random_carry_bit() {
+                if self.next_arcade_random_carry_bit() {
                     level = !level;
                 }
-                append_level(out, level, source_appear_repeat_count(frequency));
+                append_level(out, level, materialize_repeat_count(frequency));
             }
 
             frequency = frequency.wrapping_add(APPEAR_FREQUENCY_DELTA);
@@ -346,7 +346,7 @@ impl SoundBoardSynth {
                 while sweep_counter > 0 && out.len() < max_samples {
                     level = !level;
                     let low_ticks = u16::from(low_count.max(1)).min(sweep_counter);
-                    append_vari_level(out, level, source_vari_repeat_count(low_ticks));
+                    append_vari_level(out, level, vari_repeat_count(low_ticks));
                     sweep_counter = sweep_counter.saturating_sub(low_ticks);
                     if sweep_counter == 0 {
                         break;
@@ -354,7 +354,7 @@ impl SoundBoardSynth {
 
                     level = !level;
                     let high_ticks = u16::from(high_count.max(1)).min(sweep_counter);
-                    append_vari_level(out, level, source_vari_repeat_count(high_ticks));
+                    append_vari_level(out, level, vari_repeat_count(high_ticks));
                     sweep_counter = sweep_counter.saturating_sub(high_ticks);
                 }
 
@@ -490,7 +490,7 @@ impl SoundBoardSynth {
         (self.random_lo & 1) != 0
     }
 
-    fn next_source_random_carry_bit(&mut self) -> bool {
+    fn next_arcade_random_carry_bit(&mut self) -> bool {
         let feedback = ((self.random_lo >> 3) ^ self.random_lo) & 1;
         let high_carry = self.random_hi & 1;
         let low_carry = self.random_lo & 1;
