@@ -758,7 +758,7 @@ const fn arcade_hyperspace_background_left(arcade_seed: ActorHyperspaceArcadeSee
     u16::from_be_bytes([arcade_seed.seed, arcade_seed.hseed])
 }
 
-fn actor_source_world_position(position: Point, x_fraction: u8, y_fraction: u8) -> (u16, u16) {
+fn arcade_world_position(position: Point, x_fraction: u8, y_fraction: u8) -> (u16, u16) {
     (
         u16::from_be_bytes([position.x as u8, x_fraction]),
         u16::from_be_bytes([position.y as u8, y_fraction]),
@@ -920,7 +920,7 @@ fn actor_source_target6_mutant_suppresses_fire2524_regular_shot(
         return false;
     }
 
-    let (_, raw_y16) = actor_source_world_position(position, source.x_fraction, source.y_fraction);
+    let (_, raw_y16) = arcade_world_position(position, source.x_fraction, source.y_fraction);
     (0x4000..=0x4FFF).contains(&raw_y16) || (0x9000..=0x9FFF).contains(&raw_y16)
 }
 
@@ -936,7 +936,7 @@ fn actor_source_target6_mutant_fires_dive_shot(
     }
 
     matches!(
-        actor_source_world_position(position, source.x_fraction, source.y_fraction),
+        arcade_world_position(position, source.x_fraction, source.y_fraction),
         TARGET6_MUTANT_DIVE_FIRST_SHOT_RAW | TARGET6_MUTANT_DIVE_SECOND_SHOT_RAW
     )
 }
@@ -1118,7 +1118,7 @@ fn actor_source_target6_mutant_dive_position(
     }
 
     let (raw_x16, raw_y16) =
-        actor_source_world_position(position, source.x_fraction, source.y_fraction);
+        arcade_world_position(position, source.x_fraction, source.y_fraction);
     if let Some(anchor) = ACTOR_TARGET6_MUTANT_DIVE_PROJECTIONS
         .iter()
         .find(|anchor| anchor.raw_x16 == raw_x16 && anchor.raw_y16 == raw_y16)
@@ -1239,7 +1239,7 @@ fn actor_source_target6_mutant_waits_for_fire2524_collision(
         return false;
     }
 
-    let (_, raw_y16) = actor_source_world_position(position, source.x_fraction, source.y_fraction);
+    let (_, raw_y16) = arcade_world_position(position, source.x_fraction, source.y_fraction);
     source.shot_timer >= 0x80
         && (0x9000..TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MIN).contains(&raw_y16)
 }
@@ -1255,7 +1255,7 @@ fn actor_source_target6_mutant_uses_fire2524_collision_projection(
         return false;
     }
 
-    let (_, raw_y16) = actor_source_world_position(position, source.x_fraction, source.y_fraction);
+    let (_, raw_y16) = arcade_world_position(position, source.x_fraction, source.y_fraction);
     source.shot_timer >= 0x80
         && (TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MIN
             ..TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MAX)
@@ -1295,7 +1295,7 @@ fn actor_source_target6_mutant_shot_position(
         return position;
     }
 
-    match actor_source_world_position(position, source.x_fraction, source.y_fraction) {
+    match arcade_world_position(position, source.x_fraction, source.y_fraction) {
         TARGET6_MUTANT_DIVE_ENTRY_RAW => Point::new(0x13, 0x46),
         TARGET6_MUTANT_DIVE_FIRST_SHOT_RAW => Point::new(0x1E, 0x70),
         TARGET6_MUTANT_DIVE_SECOND_SHOT_RAW => Point::new(0x21, 0x87),
@@ -1339,7 +1339,7 @@ fn actor_source_target6_mutant_fire2524_forced_shot(
         return None;
     }
 
-    match actor_source_world_position(position, source.x_fraction, source.y_fraction) {
+    match arcade_world_position(position, source.x_fraction, source.y_fraction) {
         TARGET6_MUTANT_FIRE2524_FIRST_SHOT_RAW if source.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS => {
             Some(actor_source_target6_mutant_exact_projectile(
                 Point::new(0x1E, 0x54),
