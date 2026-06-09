@@ -825,7 +825,7 @@ fn projectile_spawn_samples_summary(samples: &[ActorScriptCheckProjectileSpawnSa
     samples
         .iter()
         .map(|sample| {
-            let source = match (
+            let arcade_state = match (
                 sample.x_subpixel,
                 sample.y_subpixel,
                 sample.x_velocity_word,
@@ -833,13 +833,18 @@ fn projectile_spawn_samples_summary(samples: &[ActorScriptCheckProjectileSpawnSa
                 sample.lifetime_ticks,
             ) {
                 (Some(x_fraction), Some(y_fraction), Some(x_velocity), Some(y_velocity), Some(lifetime_ticks)) => format!(
-                    "source=frac=0x{x_fraction:02x}/0x{y_fraction:02x},vel=0x{x_velocity:04x}/0x{y_velocity:04x},life={lifetime_ticks}"
+                    "arcade_state=frac=0x{x_fraction:02x}/0x{y_fraction:02x},vel=0x{x_velocity:04x}/0x{y_velocity:04x},life={lifetime_ticks}"
                 ),
-                _ => String::from("source=none"),
+                _ => String::from("arcade_state=none"),
             };
             format!(
                 "{}@{},{}[velocity={}/{},{}]",
-                sample.kind, sample.x, sample.y, sample.velocity_dx, sample.velocity_dy, source,
+                sample.kind,
+                sample.x,
+                sample.y,
+                sample.velocity_dx,
+                sample.velocity_dy,
+                arcade_state,
             )
         })
         .collect::<Vec<_>>()
