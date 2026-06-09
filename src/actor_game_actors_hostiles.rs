@@ -635,7 +635,7 @@ fn push_swarmer_shot(
         if let Some((velocity, projectile_arcade_state)) =
             mini_swarmer_fireball(position, prompt, arcade_state)
         {
-            push_source_enemy_projectile_command(
+            push_arcade_enemy_projectile_command(
                 position,
                 velocity,
                 projectile_arcade_state,
@@ -809,7 +809,7 @@ fn push_baiter_shot(
         if let Some((velocity, projectile_arcade_state)) =
             baiter_fireball(position, prompt, arcade_state, shot_rng)
         {
-            push_source_enemy_projectile_command(
+            push_arcade_enemy_projectile_command(
                 position,
                 velocity,
                 projectile_arcade_state,
@@ -851,7 +851,7 @@ fn baiter_fireball(
     arcade_state: BaiterArcadeState,
     shot_rng: ActorArcadeRngSnapshot,
 ) -> Option<(Velocity, EnemyProjectileArcadeState)> {
-    actor_source_enemy_fireball(
+    arcade_enemy_fireball(
         position,
         arcade_state.x_fraction,
         arcade_state.y_fraction,

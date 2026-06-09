@@ -1905,7 +1905,7 @@
             if source.shot_timer == 0 {
                 let shot_rng = mutant_arcade_shot_rng(prompt, actor, position);
                 source.shot_timer = mutant_arcade_shot_reset(profile, shot_rng.seed);
-                shot = actor_source_mutant_fireball(position, prompt, behavior, source, shot_rng)
+                shot = mutant_arcade_fireball(position, prompt, behavior, source, shot_rng)
                     .map(|(velocity, projectile_source)| (position, velocity, projectile_source));
             }
         }

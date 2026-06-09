@@ -561,7 +561,7 @@ impl Mutant {
             {
                 source.target6_first_shot_deferred = true;
                 source.shot_timer = TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER;
-                push_source_enemy_projectile_command(
+                push_arcade_enemy_projectile_command(
                     position,
                     velocity,
                     projectile_source,
@@ -580,7 +580,7 @@ impl Mutant {
                 let shot_rng = mutant_arcade_shot_rng(prompt, self.id, self.position);
                 let shot_position =
                     actor_source_target6_mutant_shot_position(self.position, *source);
-                push_source_mutant_shot(
+                push_mutant_arcade_shot(
                     shot_position,
                     prompt,
                     behavior,
@@ -633,7 +633,7 @@ impl Mutant {
                     target6_forced_dive_shot_position,
                     *source,
                 );
-                push_source_mutant_shot(
+                push_mutant_arcade_shot(
                     shot_position,
                     prompt,
                     behavior,
@@ -660,7 +660,7 @@ impl Mutant {
                         let default_reset = mutant_arcade_shot_reset(profile, shot_rng.seed);
                         let shot_position =
                             actor_source_target6_mutant_shot_position(self.position, *source);
-                        let fired = push_source_mutant_shot(
+                        let fired = push_mutant_arcade_shot(
                             shot_position,
                             prompt,
                             behavior,
@@ -1389,7 +1389,7 @@ fn actor_source_target6_mutant_exact_projectile(
     )
 }
 
-fn push_source_enemy_projectile_command(
+fn push_arcade_enemy_projectile_command(
     position: Point,
     velocity: Velocity,
     source: EnemyProjectileArcadeState,
@@ -1404,7 +1404,7 @@ fn push_source_enemy_projectile_command(
     commands.push(GameCommand::PlaySound(sound));
 }
 
-fn push_source_mutant_shot(
+fn push_mutant_arcade_shot(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
@@ -1413,11 +1413,11 @@ fn push_source_mutant_shot(
     commands: &mut Vec<GameCommand>,
 ) -> bool {
     let Some((velocity, source)) =
-        actor_source_mutant_fireball(position, prompt, behavior, source, shot_rng)
+        mutant_arcade_fireball(position, prompt, behavior, source, shot_rng)
     else {
         return false;
     };
-    push_source_enemy_projectile_command(
+    push_arcade_enemy_projectile_command(
         position,
         velocity,
         source,
@@ -1427,7 +1427,7 @@ fn push_source_mutant_shot(
     true
 }
 
-fn actor_source_mutant_fireball(
+fn mutant_arcade_fireball(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
@@ -1436,7 +1436,7 @@ fn actor_source_mutant_fireball(
 ) -> Option<(Velocity, EnemyProjectileArcadeState)> {
     let lifetime_ticks =
         arcade_projectile_lifetime_ticks(behavior.mutant_shot_lifetime_steps);
-    actor_source_enemy_fireball(
+    arcade_enemy_fireball(
         position,
         source.x_fraction,
         source.y_fraction,
@@ -1446,7 +1446,7 @@ fn actor_source_mutant_fireball(
     )
 }
 
-fn actor_source_enemy_fireball(
+fn arcade_enemy_fireball(
     position: Point,
     x_fraction: u8,
     y_fraction: u8,
