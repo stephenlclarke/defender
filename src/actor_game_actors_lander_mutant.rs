@@ -1408,14 +1408,14 @@ fn target6_mutant_arcade_exact_projectile(
 fn push_arcade_enemy_projectile_command(
     position: Point,
     velocity: Velocity,
-    source: EnemyProjectileArcadeState,
+    projectile_arcade_state: EnemyProjectileArcadeState,
     sound: SoundCue,
     commands: &mut Vec<GameCommand>,
 ) {
     commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
         position,
         velocity,
-        source: Some(source),
+        source: Some(projectile_arcade_state),
     }));
     commands.push(GameCommand::PlaySound(sound));
 }
@@ -1424,19 +1424,19 @@ fn push_mutant_arcade_shot(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
-    source: MutantArcadeState,
+    arcade_state: MutantArcadeState,
     shot_rng: ActorArcadeRngSnapshot,
     commands: &mut Vec<GameCommand>,
 ) -> bool {
-    let Some((velocity, source)) =
-        mutant_arcade_fireball(position, prompt, behavior, source, shot_rng)
+    let Some((velocity, projectile_arcade_state)) =
+        mutant_arcade_fireball(position, prompt, behavior, arcade_state, shot_rng)
     else {
         return false;
     };
     push_arcade_enemy_projectile_command(
         position,
         velocity,
-        source,
+        projectile_arcade_state,
         SoundCue::MutantShot,
         commands,
     );
@@ -1447,15 +1447,15 @@ fn mutant_arcade_fireball(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
-    source: MutantArcadeState,
+    arcade_state: MutantArcadeState,
     shot_rng: ActorArcadeRngSnapshot,
 ) -> Option<(Velocity, EnemyProjectileArcadeState)> {
     let lifetime_ticks =
         arcade_projectile_lifetime_ticks(behavior.mutant_shot_lifetime_steps);
     arcade_enemy_fireball(
         position,
-        source.x_fraction,
-        source.y_fraction,
+        arcade_state.x_fraction,
+        arcade_state.y_fraction,
         prompt,
         shot_rng,
         lifetime_ticks,
