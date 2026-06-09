@@ -300,7 +300,7 @@
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let source = MutantArcadeState {
+        let arcade_state = MutantArcadeState {
             x_fraction: 0x20,
             y_fraction: 0x40,
             x_velocity: 0,
@@ -318,7 +318,7 @@
         let start = Point::new(100, 80);
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: start,
-            source: Some(source),
+            source: Some(arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -327,27 +327,27 @@
             report.wave,
             report
                 .arcade_rng
-                .expect("playing report should carry source rng"),
+                .expect("playing report should carry arcade rng"),
             Point::new(42, 120),
             Velocity::default(),
         );
         let behavior = ActorBehaviorProfile::default();
-        let (expected_position, expected_source, shot) =
-            expected_mutant_arcade_after_motion(start, source, mutant, &prompt, behavior);
+        let (expected_position, expected_arcade_state, shot) =
+            expected_mutant_arcade_after_motion(start, arcade_state, mutant, &prompt, behavior);
 
         assert_eq!(shot, None);
         let snapshot = snapshot_for(&report, mutant);
         assert_eq!(snapshot.position, expected_position);
-        assert_eq!(snapshot.mutant_runtime, Some(expected_source));
+        assert_eq!(snapshot.mutant_runtime, Some(expected_arcade_state));
         assert_eq!(
-            expected_source.x_velocity,
+            expected_arcade_state.x_velocity,
             mutant_arcade_x_velocity(
                 ArcadeWaveProfile::for_wave(1).mutant_x_velocity,
                 arcade_absolute_x(Point::new(42, 120), 0),
-                arcade_absolute_x(start, source.x_fraction),
+                arcade_absolute_x(start, arcade_state.x_fraction),
             )
         );
-        assert_ne!(expected_source.hop_rng, source.hop_rng);
+        assert_ne!(expected_arcade_state.hop_rng, arcade_state.hop_rng);
     }
 
     #[test]
@@ -365,7 +365,7 @@
             default_profile.mutant_x_velocity
         );
 
-        let source = MutantArcadeState {
+        let arcade_state = MutantArcadeState {
             x_fraction: 0x20,
             y_fraction: 0x40,
             x_velocity: 0,
@@ -394,30 +394,30 @@
             Velocity::default(),
         );
         let behavior = ActorBehaviorProfile::default();
-        let (expected_position, expected_source, _shot) =
-            expected_mutant_arcade_after_motion(start, source, actor, &prompt, behavior);
+        let (expected_position, expected_arcade_state, _shot) =
+            expected_mutant_arcade_after_motion(start, arcade_state, actor, &prompt, behavior);
         let default_x_velocity = mutant_arcade_x_velocity(
             default_profile.mutant_x_velocity,
             arcade_absolute_x(Point::new(42, 120), 0),
-            arcade_absolute_x(start, source.x_fraction),
+            arcade_absolute_x(start, arcade_state.x_fraction),
         );
 
         let mut mutant = Mutant::from_spawn(
             actor,
             ActorMutantSpawn {
                 position: start,
-                source: Some(source),
+                source: Some(arcade_state),
             },
         );
         let reply = mutant.update(&prompt);
-        let updated_source = reply
+        let updated_arcade_state = reply
             .snapshot
             .mutant_runtime
-            .expect("source mutant should keep source metadata");
+            .expect("arcade mutant should keep arcade metadata");
 
-        assert_ne!(updated_source.x_velocity, default_x_velocity);
+        assert_ne!(updated_arcade_state.x_velocity, default_x_velocity);
         assert_eq!(reply.snapshot.position, expected_position);
-        assert_eq!(updated_source, expected_source);
+        assert_eq!(updated_arcade_state, expected_arcade_state);
     }
 
     #[test]
@@ -808,7 +808,7 @@
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let source = MutantArcadeState {
+        let arcade_state = MutantArcadeState {
             x_fraction: 0x12,
             y_fraction: 0x34,
             x_velocity: 0,
@@ -826,7 +826,7 @@
         let start = Point::new(70, 120);
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: start,
-            source: Some(source),
+            source: Some(arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -835,13 +835,13 @@
             report.wave,
             report
                 .arcade_rng
-                .expect("playing report should carry source rng"),
+                .expect("playing report should carry arcade rng"),
             Point::new(42, 120),
             Velocity::default(),
         );
         let behavior = ActorBehaviorProfile::default();
-        let (expected_position, expected_source, expected_shot) =
-            expected_mutant_arcade_after_motion(start, source, mutant, &prompt, behavior);
+        let (expected_position, expected_arcade_state, expected_shot) =
+            expected_mutant_arcade_after_motion(start, arcade_state, mutant, &prompt, behavior);
         let expected_shot = expected_shot.expect("shot timer should emit a mutant fireball");
 
         assert!(report.sounds.contains(&SoundCue::MutantShot));
@@ -852,11 +852,12 @@
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
                     position,
                     velocity,
-                    source,
-                }) => source.map(|source| (*position, *velocity, source)),
+                    source: projectile_arcade_state,
+                }) => projectile_arcade_state
+                    .map(|arcade_state| (*position, *velocity, arcade_state)),
                 _ => None,
             })
-            .expect("source mutant should emit a hostile shot command");
+            .expect("arcade mutant should emit a hostile shot command");
         assert_eq!(mutant_shot, expected_shot);
         assert_eq!(
             mutant_shot.2.lifetime_ticks,
@@ -864,7 +865,7 @@
         );
         let snapshot = snapshot_for(&report, mutant);
         assert_eq!(snapshot.position, expected_position);
-        assert_eq!(snapshot.mutant_runtime, Some(expected_source));
+        assert_eq!(snapshot.mutant_runtime, Some(expected_arcade_state));
     }
 
     #[test]
