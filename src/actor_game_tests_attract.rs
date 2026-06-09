@@ -326,7 +326,8 @@
             draw.sprite == SpriteKey::Text
                 && matches!(
                     draw.effect,
-                    VisualEffect::AttractScoringSurface { scoring_tick: 0 }
+                    VisualEffect::AttractScoringSurface { scoring_tick }
+                        if scoring_tick == crate::TimelineStep::new(0)
                 )
         }));
         let scoring_scene = ActorRenderSceneBridge::new().render_scene_for_report(&scoring);
@@ -418,7 +419,7 @@
             actor_attract_scoring_display_step_for_stage(ActorAttractScoringStage::RescueScore, 0);
         let rescue_score_tick =
             actor_attract_scoring_tick_for_display_step(rescue_score_display_step);
-        for _ in 0..rescue_score_tick {
+        for _ in 0..rescue_score_tick.step() {
             rescue_score = driver.step(GameInput::NONE);
         }
         let rescue_score_scene =
@@ -444,7 +445,9 @@
         let mut next_score_scene = RenderScene::empty(0, ACTOR_RENDER_SURFACE);
         push_attract_scoring_demo_scene(
             &mut next_score_scene,
-            actor_attract_scoring_tick_for_display_step(rescue_score_display_step + 5),
+            actor_attract_scoring_tick_for_display_step(crate::TimelineStep::new(
+                rescue_score_display_step.step() + 5,
+            )),
         );
         let next_score_pixels = score_popup_500_pixels(&next_score_scene, score_position);
         assert_ne!(

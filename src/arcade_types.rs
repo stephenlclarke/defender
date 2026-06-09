@@ -50,3 +50,16 @@ impl SpriteFrameIndex {
         self.0
     }
 }
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TimelineStep(u16);
+
+impl TimelineStep {
+    pub const fn new(step: u16) -> Self {
+        Self(step)
+    }
+
+    pub const fn step(self) -> u16 {
+        self.0
+    }
+}

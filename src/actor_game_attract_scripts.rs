@@ -34,7 +34,7 @@ pub enum VisualEffect {
         visual_offset: Point,
     },
     AttractScoringSurface {
-        scoring_tick: u16,
+        scoring_tick: TimelineStep,
     },
     WilliamsReveal {
         stroke_step: u16,
@@ -1138,7 +1138,9 @@ impl AttractScriptAction {
                 SpriteKey::Text,
                 Point::new(0, 0),
                 VisualEffect::AttractScoringSurface {
-                    scoring_tick: u16::try_from(age.saturating_sub(1)).unwrap_or(u16::MAX),
+                    scoring_tick: TimelineStep::new(
+                        u16::try_from(age.saturating_sub(1)).unwrap_or(u16::MAX),
+                    ),
                 },
             )],
             Self::Credits {

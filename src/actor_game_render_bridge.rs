@@ -181,7 +181,7 @@ impl ActorRenderSceneBridge {
         }
     }
 
-    fn push_attract_scoring_surface(&self, scene: &mut RenderScene, scoring_tick: u16) {
+    fn push_attract_scoring_surface(&self, scene: &mut RenderScene, scoring_tick: TimelineStep) {
         push_background_terrain_sprites(scene, 0, arcade_wave_landscape_tint(1));
         push_attract_scoring_top_display_border(scene);
         push_attract_scoring_scanner_terrain(scene);

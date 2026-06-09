@@ -38,7 +38,7 @@ fn push_attract_scoring_scanner_terrain(scene: &mut RenderScene) {
     }
 }
 
-fn push_attract_scoring_demo_scene(scene: &mut RenderScene, scoring_tick: u16) {
+fn push_attract_scoring_demo_scene(scene: &mut RenderScene, scoring_tick: TimelineStep) {
     let frame = actor_attract_scoring_frame(scoring_tick);
     for object in frame.scanner_objects.iter().copied() {
         push_attract_scoring_scanner_object(scene, object);
@@ -69,17 +69,22 @@ fn push_attract_scoring_demo_scene(scene: &mut RenderScene, scoring_tick: u16) {
     }
 
     if laser_active && let (Some(player_ship), Some(laser_target)) = (player_ship, laser_target) {
-        push_actor_attract_scoring_laser_beam(scene, player_ship, laser_target, frame.display_step);
+        push_actor_attract_scoring_laser_beam(
+            scene,
+            player_ship,
+            laser_target,
+            frame.display_step.step(),
+        );
     }
 
     if let Some(bonus) = frame.bonus {
-        push_actor_attract_scoring_bonus(scene, bonus, frame.display_step);
+        push_actor_attract_scoring_bonus(scene, bonus, frame.display_step.step());
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ActorAttractScoringFrame {
-    display_step: u16,
+    display_step: TimelineStep,
     scene_objects: Vec<ActorAttractScoringObject>,
     scanner_objects: Vec<ActorAttractScoringObject>,
     bonus: Option<ActorAttractScoringBonus>,
@@ -189,10 +194,10 @@ enum ActorAttractScoringStage {
     LegendHold,
 }
 
-fn actor_attract_scoring_frame(scoring_tick: u16) -> ActorAttractScoringFrame {
+fn actor_attract_scoring_frame(scoring_tick: TimelineStep) -> ActorAttractScoringFrame {
     let display_step = actor_attract_scoring_display_step(scoring_tick);
     let (stage, local_step) = actor_attract_scoring_stage_for_step(display_step);
-    let scanner_display_step = display_step - (display_step % 4);
+    let scanner_display_step = TimelineStep::new(display_step.step() - (display_step.step() % 4));
     let (scanner_stage, scanner_local_step) =
         actor_attract_scoring_stage_for_step(scanner_display_step);
     ActorAttractScoringFrame {
@@ -203,25 +208,30 @@ fn actor_attract_scoring_frame(scoring_tick: u16) -> ActorAttractScoringFrame {
     }
 }
 
-fn actor_attract_scoring_display_step(scoring_tick: u16) -> u16 {
-    (scoring_tick % ATTRACT_SCORING_DEMO_TOTAL_STEPS + ATTRACT_SCORING_PROTECTED_DEMO_STEP_OFFSET)
-        % ATTRACT_SCORING_DEMO_TOTAL_STEPS
+fn actor_attract_scoring_display_step(scoring_tick: TimelineStep) -> TimelineStep {
+    TimelineStep::new(
+        (scoring_tick.step() % ATTRACT_SCORING_DEMO_TOTAL_STEPS
+            + ATTRACT_SCORING_PROTECTED_DEMO_STEP_OFFSET)
+            % ATTRACT_SCORING_DEMO_TOTAL_STEPS,
+    )
 }
 
-fn actor_attract_scoring_tick_for_display_step(display_step: u16) -> u16 {
-    (display_step % ATTRACT_SCORING_DEMO_TOTAL_STEPS + ATTRACT_SCORING_DEMO_TOTAL_STEPS
-        - ATTRACT_SCORING_PROTECTED_DEMO_STEP_OFFSET)
-        % ATTRACT_SCORING_DEMO_TOTAL_STEPS
+fn actor_attract_scoring_tick_for_display_step(display_step: TimelineStep) -> TimelineStep {
+    TimelineStep::new(
+        (display_step.step() % ATTRACT_SCORING_DEMO_TOTAL_STEPS + ATTRACT_SCORING_DEMO_TOTAL_STEPS
+            - ATTRACT_SCORING_PROTECTED_DEMO_STEP_OFFSET)
+            % ATTRACT_SCORING_DEMO_TOTAL_STEPS,
+    )
 }
 
 fn actor_attract_scoring_display_step_for_stage(
     target_stage: ActorAttractScoringStage,
     local_step: u16,
-) -> u16 {
+) -> TimelineStep {
     let mut elapsed = 0;
     for (stage, duration) in ACTOR_ATTRACT_SCORING_RESCUE_TIMELINE {
         if stage == target_stage {
-            return elapsed + local_step.min(duration.saturating_sub(1));
+            return TimelineStep::new(elapsed + local_step.min(duration.saturating_sub(1)));
         }
         elapsed += duration;
     }
@@ -229,13 +239,13 @@ fn actor_attract_scoring_display_step_for_stage(
     for index in 0..ACTOR_ATTRACT_SCORING_LEGEND.len() {
         for (stage, duration) in actor_attract_scoring_legend_timeline(index) {
             if stage == target_stage {
-                return elapsed + local_step.min(duration.saturating_sub(1));
+                return TimelineStep::new(elapsed + local_step.min(duration.saturating_sub(1)));
             }
             elapsed += duration;
         }
     }
 
-    elapsed + local_step.min(ATTRACT_SCORING_LEGEND_HOLD_STEPS.saturating_sub(1))
+    TimelineStep::new(elapsed + local_step.min(ATTRACT_SCORING_LEGEND_HOLD_STEPS.saturating_sub(1)))
 }
 
 fn actor_attract_scoring_instruction_text_start_step(line_index: usize) -> u64 {
@@ -250,15 +260,17 @@ fn actor_attract_scoring_instruction_text_start_step(line_index: usize) -> u64 {
     ATTRACT_SCORING_SEQUENCE_START_STEP
         + u64::from(actor_attract_scoring_tick_for_display_step(
             next_actor_attract_scoring_text_process_step(reveal_display_step),
-        ))
+        )
+        .step())
 }
 
-fn next_actor_attract_scoring_text_process_step(step: u16) -> u16 {
+fn next_actor_attract_scoring_text_process_step(step: TimelineStep) -> TimelineStep {
+    let step = step.step();
     let remainder = step % 6;
     if remainder == 0 {
-        step
+        TimelineStep::new(step)
     } else {
-        step + (6 - remainder)
+        TimelineStep::new(step + (6 - remainder))
     }
 }
 
@@ -310,7 +322,10 @@ fn actor_attract_scoring_legend_timeline(index: usize) -> [(ActorAttractScoringS
     ]
 }
 
-fn actor_attract_scoring_stage_for_step(mut display_step: u16) -> (ActorAttractScoringStage, u16) {
+fn actor_attract_scoring_stage_for_step(
+    display_step: TimelineStep,
+) -> (ActorAttractScoringStage, u16) {
+    let mut display_step = display_step.step();
     for (stage, duration) in ACTOR_ATTRACT_SCORING_RESCUE_TIMELINE {
         if display_step < duration {
             return (stage, display_step);

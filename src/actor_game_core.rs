@@ -1,5 +1,5 @@
 use crate::{
-    MessageId, ScreenAddress, SoundCommand, SpriteFrameIndex,
+    MessageId, ScreenAddress, SoundCommand, SpriteFrameIndex, TimelineStep,
     game::{
         ATTRACT_SCORING_SEQUENCE_START_FRAME, AttractPresentationSnapshot,
         Direction as CleanDirection, EnemyKind as CleanEnemyKind,
