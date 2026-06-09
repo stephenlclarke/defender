@@ -291,8 +291,8 @@ impl EnemyProjectileSnapshot {
         self.kind.output_routine_address()
     }
 
-    const fn bomb_object_bitmap_label(self) -> &'static str {
-        ENEMY_BOMB_OBJECT_BITMAP_LABEL
+    const fn bomb_object_bitmap_name(self) -> &'static str {
+        ENEMY_BOMB_OBJECT_BITMAP_NAME
     }
 
     fn arcade_world_position(self) -> (u16, u16) {
@@ -519,7 +519,7 @@ pub struct ObjectEvidenceDetailSnapshot {
     pub world_position: Option<(u16, u16)>,
     pub velocity: Option<(u16, u16)>,
     pub object_bitmap_descriptor_address: Option<u16>,
-    pub object_bitmap_label: Option<&'static str>,
+    pub object_bitmap_name: Option<&'static str>,
     pub object_bitmap_size: Option<(u8, u8)>,
     pub primary_image_address: Option<u16>,
     pub alternate_image_address: Option<u16>,
@@ -538,7 +538,7 @@ impl ObjectEvidenceDetailSnapshot {
         world_position: None,
         velocity: None,
         object_bitmap_descriptor_address: None,
-        object_bitmap_label: None,
+        object_bitmap_name: None,
         object_bitmap_size: None,
         primary_image_address: None,
         alternate_image_address: None,

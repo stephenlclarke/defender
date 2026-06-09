@@ -35,7 +35,7 @@ impl ExplosionKind {
         }
     }
 
-    const fn object_bitmap_label(self) -> &'static str {
+    const fn object_bitmap_name(self) -> &'static str {
         match self {
             Self::Lander => "LNDP1",
             Self::Mutant => "SCZP1",
@@ -139,7 +139,7 @@ pub struct ExplosionSnapshot {
     pub explosion_anchor: Option<ScreenPosition>,
     pub growth_size: u16,
     pub frames_remaining: u8,
-    pub object_bitmap_label: &'static str,
+    pub object_bitmap_name: &'static str,
     pub(crate) sprite_asset_image: SpriteAssetImageSpec,
     pub object_bitmap_size: (u8, u8),
     pub mapped_sprite: SpriteId,
@@ -153,7 +153,7 @@ impl ExplosionSnapshot {
             explosion_anchor: None,
             growth_size: EXPLOSION_INITIAL_SIZE,
             frames_remaining: explosion_lifetime_frames(kind),
-            object_bitmap_label: kind.object_bitmap_label(),
+            object_bitmap_name: kind.object_bitmap_name(),
             sprite_asset_image: kind.sprite_asset_image(),
             object_bitmap_size: kind.object_bitmap_size(),
             mapped_sprite: kind.sprite(),
@@ -168,7 +168,7 @@ impl ExplosionSnapshot {
             explosion_anchor: arcade_enemy_explosion_anchor(enemy),
             growth_size: EXPLOSION_INITIAL_SIZE,
             frames_remaining: EXPLOSION_LIFETIME_FRAMES,
-            object_bitmap_label: descriptor.label,
+            object_bitmap_name: descriptor.name,
             sprite_asset_image: descriptor.image,
             object_bitmap_size: descriptor.size,
             mapped_sprite: descriptor.mapped_sprite,
@@ -251,7 +251,7 @@ fn arcade_enemy_explosion_object_bitmap_descriptor(
 ) -> ObjectBitmapDescriptor {
     if enemy.kind == EnemyKind::Swarmer {
         return ObjectBitmapDescriptor {
-            label: ExplosionKind::Swarmer.object_bitmap_label(),
+            name: ExplosionKind::Swarmer.object_bitmap_name(),
             image: ExplosionKind::Swarmer.sprite_asset_image(),
             address: 0xF8E2,
             size: ExplosionKind::Swarmer.object_bitmap_size(),
@@ -556,7 +556,7 @@ impl ObjectEvidenceSnapshot {
             world_position: Some(enemy.arcade_world_position()),
             velocity: Some(enemy.arcade_velocity_words()),
             object_bitmap_descriptor_address: Some(descriptor.address),
-            object_bitmap_label: Some(descriptor.label),
+            object_bitmap_name: Some(descriptor.name),
             object_bitmap_size: Some(descriptor.size),
             primary_image_address: Some(descriptor.primary_image_address),
             alternate_image_address: descriptor.alternate_image_address,
@@ -583,7 +583,7 @@ impl ObjectEvidenceSnapshot {
             world_position: Some(projectile.arcade_world_position()),
             velocity: Some(projectile.arcade_velocity_words()),
             object_bitmap_descriptor_address: Some(descriptor.address),
-            object_bitmap_label: Some(descriptor.label),
+            object_bitmap_name: Some(descriptor.name),
             object_bitmap_size: Some(descriptor.size),
             primary_image_address: Some(descriptor.primary_image_address),
             alternate_image_address: descriptor.alternate_image_address,
@@ -610,7 +610,7 @@ impl ObjectEvidenceSnapshot {
             world_position: Some(human.arcade_world_position()),
             velocity: Some(human.arcade_velocity_words()),
             object_bitmap_descriptor_address: Some(descriptor.address),
-            object_bitmap_label: Some(descriptor.label),
+            object_bitmap_name: Some(descriptor.name),
             object_bitmap_size: Some(descriptor.size),
             primary_image_address: Some(descriptor.primary_image_address),
             alternate_image_address: descriptor.alternate_image_address,
@@ -636,7 +636,7 @@ impl ObjectEvidenceSnapshot {
             world_position: Some(projectile.arcade_world_position()),
             velocity: Some(projectile.arcade_velocity_words()),
             object_bitmap_descriptor_address: Some(ENEMY_BOMB_OBJECT_BITMAP_DESCRIPTOR_ADDRESS),
-            object_bitmap_label: Some(projectile.bomb_object_bitmap_label()),
+            object_bitmap_name: Some(projectile.bomb_object_bitmap_name()),
             object_bitmap_size: Some(ENEMY_BOMB_OBJECT_BITMAP_SIZE),
             primary_image_address: Some(ENEMY_BOMB_PRIMARY_IMAGE_ADDRESS),
             alternate_image_address: Some(ENEMY_BOMB_ALTERNATE_IMAGE_ADDRESS),
@@ -672,7 +672,7 @@ impl ObjectEvidenceSnapshot {
             world_position: None,
             velocity: None,
             object_bitmap_descriptor_address: Some(descriptor.address),
-            object_bitmap_label: Some(descriptor.label),
+            object_bitmap_name: Some(descriptor.name),
             object_bitmap_size: Some(descriptor.size),
             primary_image_address: Some(descriptor.primary_image_address),
             alternate_image_address: descriptor.alternate_image_address,
@@ -886,7 +886,7 @@ fn saturating_u16_len(value: usize) -> u16 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ObjectBitmapDescriptor {
-    label: &'static str,
+    name: &'static str,
     image: SpriteAssetImageSpec,
     address: u16,
     size: (u8, u8),
@@ -897,7 +897,7 @@ struct ObjectBitmapDescriptor {
 
 const PLAYER_PROJECTILE_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     ObjectBitmapDescriptor {
-        label: "LASP1",
+        name: "LASP1",
         image: SpriteAssetImageSpec::new(crate::arcade_assets::ObjectBitmapId::PlayerLaser, 1, 8),
         address: 0xF96F,
         size: (8, 1),
@@ -907,7 +907,7 @@ const PLAYER_PROJECTILE_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     };
 const HUMAN_ASTP1_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     ObjectBitmapDescriptor {
-        label: "ASTP1",
+        name: "ASTP1",
         image: SpriteAssetImageSpec::new(
             crate::arcade_assets::ObjectBitmapId::HumanStandingPrimary,
             8,
@@ -921,7 +921,7 @@ const HUMAN_ASTP1_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     };
 const HUMAN_ASTP2_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     ObjectBitmapDescriptor {
-        label: "ASTP2",
+        name: "ASTP2",
         image: SpriteAssetImageSpec::new(
             crate::arcade_assets::ObjectBitmapId::HumanWalkingAPrimary,
             8,
@@ -935,7 +935,7 @@ const HUMAN_ASTP2_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     };
 const HUMAN_ASTP3_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     ObjectBitmapDescriptor {
-        label: "ASTP3",
+        name: "ASTP3",
         image: SpriteAssetImageSpec::new(
             crate::arcade_assets::ObjectBitmapId::HumanWalkingBPrimary,
             8,
@@ -949,7 +949,7 @@ const HUMAN_ASTP3_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     };
 const HUMAN_ASTP4_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     ObjectBitmapDescriptor {
-        label: "ASTP4",
+        name: "ASTP4",
         image: SpriteAssetImageSpec::new(
             crate::arcade_assets::ObjectBitmapId::HumanWalkingCPrimary,
             8,
@@ -962,7 +962,7 @@ const HUMAN_ASTP4_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
         mapped_sprite: SpriteId::HUMAN,
     };
 const MUTANT_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDescriptor {
-    label: "SCZP1",
+    name: "SCZP1",
     image: SpriteAssetImageSpec::new(crate::arcade_assets::ObjectBitmapId::MutantPrimary, 8, 5),
     address: 0xF8CE,
     size: (5, 8),
@@ -971,7 +971,7 @@ const MUTANT_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDesc
     mapped_sprite: SpriteId::ENEMY_MUTANT,
 };
 const POD_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDescriptor {
-    label: "PRBP1",
+    name: "PRBP1",
     image: SpriteAssetImageSpec::new(crate::arcade_assets::ObjectBitmapId::PodPrimary, 8, 4),
     address: 0xF8F7,
     size: (4, 8),
@@ -980,7 +980,7 @@ const POD_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDescrip
     mapped_sprite: SpriteId::ENEMY_POD,
 };
 const SWARMER_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDescriptor {
-    label: "SWPIC1",
+    name: "SWPIC1",
     image: SpriteAssetImageSpec::new(crate::arcade_assets::ObjectBitmapId::SwarmerPrimary, 4, 3),
     address: 0xF97B,
     size: (3, 4),
@@ -992,7 +992,7 @@ const SWARMER_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDes
 fn lander_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
     match frame % LANDER_ANIMATION_FRAME_COUNT {
         1 => ObjectBitmapDescriptor {
-            label: "LNDP2",
+            name: "LNDP2",
             image: SpriteAssetImageSpec::new(
                 crate::arcade_assets::ObjectBitmapId::LanderFrame2Primary,
                 8,
@@ -1005,7 +1005,7 @@ fn lander_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
             mapped_sprite: SpriteId::ENEMY_LANDER,
         },
         2 => ObjectBitmapDescriptor {
-            label: "LNDP3",
+            name: "LNDP3",
             image: SpriteAssetImageSpec::new(
                 crate::arcade_assets::ObjectBitmapId::LanderFrame3Primary,
                 8,
@@ -1018,7 +1018,7 @@ fn lander_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
             mapped_sprite: SpriteId::ENEMY_LANDER,
         },
         _ => ObjectBitmapDescriptor {
-            label: "LNDP1",
+            name: "LNDP1",
             image: SpriteAssetImageSpec::new(
                 crate::arcade_assets::ObjectBitmapId::LanderFrame1Primary,
                 8,
@@ -1036,7 +1036,7 @@ fn lander_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
 fn bomber_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
     match frame % BOMBER_ANIMATION_FRAME_COUNT {
         1 => ObjectBitmapDescriptor {
-            label: "TIEP2",
+            name: "TIEP2",
             image: SpriteAssetImageSpec::new(
                 crate::arcade_assets::ObjectBitmapId::BomberFrame2Primary,
                 8,
@@ -1049,7 +1049,7 @@ fn bomber_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
             mapped_sprite: SpriteId::ENEMY_BOMBER,
         },
         2 => ObjectBitmapDescriptor {
-            label: "TIEP3",
+            name: "TIEP3",
             image: SpriteAssetImageSpec::new(
                 crate::arcade_assets::ObjectBitmapId::BomberFrame3Primary,
                 8,
@@ -1062,7 +1062,7 @@ fn bomber_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
             mapped_sprite: SpriteId::ENEMY_BOMBER,
         },
         3 => ObjectBitmapDescriptor {
-            label: "TIEP4",
+            name: "TIEP4",
             image: SpriteAssetImageSpec::new(
                 crate::arcade_assets::ObjectBitmapId::BomberFrame4Primary,
                 8,
@@ -1075,7 +1075,7 @@ fn bomber_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
             mapped_sprite: SpriteId::ENEMY_BOMBER,
         },
         _ => ObjectBitmapDescriptor {
-            label: "TIEP1",
+            name: "TIEP1",
             image: SpriteAssetImageSpec::new(
                 crate::arcade_assets::ObjectBitmapId::BomberFrame1Primary,
                 8,
@@ -1093,7 +1093,7 @@ fn bomber_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
 fn baiter_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
     match frame % BAITER_ANIMATION_FRAME_COUNT {
         1 => ObjectBitmapDescriptor {
-            label: "UFOP2",
+            name: "UFOP2",
             image: SpriteAssetImageSpec::new(
                 crate::arcade_assets::ObjectBitmapId::BaiterFrame2Primary,
                 4,
@@ -1106,7 +1106,7 @@ fn baiter_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
             mapped_sprite: SpriteId::ENEMY_BAITER,
         },
         2 => ObjectBitmapDescriptor {
-            label: "UFOP3",
+            name: "UFOP3",
             image: SpriteAssetImageSpec::new(
                 crate::arcade_assets::ObjectBitmapId::BaiterFrame3Primary,
                 4,
@@ -1119,7 +1119,7 @@ fn baiter_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
             mapped_sprite: SpriteId::ENEMY_BAITER,
         },
         _ => ObjectBitmapDescriptor {
-            label: "UFOP1",
+            name: "UFOP1",
             image: SpriteAssetImageSpec::new(
                 crate::arcade_assets::ObjectBitmapId::BaiterFrame1Primary,
                 4,

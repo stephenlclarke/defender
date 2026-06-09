@@ -107,7 +107,7 @@
         assert!(state.world.explosions.iter().any(|explosion| {
             explosion.kind == CleanExplosionKind::Terrain
                 && explosion.position == ScreenPosition::new(0x4C, 0xC2)
-                && explosion.object_bitmap_label == "TEREX"
+                && explosion.object_bitmap_name == "TEREX"
                 && explosion.mapped_sprite == SpriteId::TERRAIN_EXPLOSION
         }));
 
