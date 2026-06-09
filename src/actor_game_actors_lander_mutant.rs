@@ -552,7 +552,7 @@ impl Mutant {
         };
         if source.sleep_ticks > 0 {
             if let Some((position, velocity, projectile_source)) =
-                actor_source_target6_mutant_fire2524_forced_shot(
+                target6_mutant_arcade_fire2524_forced_shot(
                     self.position,
                     *source,
                     prompt,
@@ -579,7 +579,7 @@ impl Mutant {
                 source.target6_first_shot_deferred = true;
                 let shot_rng = mutant_arcade_shot_rng(prompt, self.id, self.position);
                 let shot_position =
-                    actor_source_target6_mutant_shot_position(self.position, *source);
+                    target6_mutant_arcade_shot_position(self.position, *source);
                 push_mutant_arcade_shot(
                     shot_position,
                     prompt,
@@ -629,7 +629,7 @@ impl Mutant {
 
             if target6_forced_dive_shot {
                 let shot_rng = mutant_arcade_shot_rng(prompt, self.id, self.position);
-                let shot_position = actor_source_target6_mutant_shot_position(
+                let shot_position = target6_mutant_arcade_shot_position(
                     target6_forced_dive_shot_position,
                     *source,
                 );
@@ -659,7 +659,7 @@ impl Mutant {
                         let shot_rng = mutant_arcade_shot_rng(prompt, self.id, self.position);
                         let default_reset = mutant_arcade_shot_reset(profile, shot_rng.seed);
                         let shot_position =
-                            actor_source_target6_mutant_shot_position(self.position, *source);
+                            target6_mutant_arcade_shot_position(self.position, *source);
                         let fired = push_mutant_arcade_shot(
                             shot_position,
                             prompt,
@@ -1228,7 +1228,7 @@ fn target6_mutant_arcade_collision_position(
     target6_mutant_arcade_visual_position(position, source).unwrap_or(position)
 }
 
-fn actor_source_target6_mutant_waits_for_fire2524_collision(
+fn target6_mutant_arcade_waits_for_fire2524_collision(
     position: Point,
     source: Option<MutantArcadeState>,
 ) -> bool {
@@ -1244,7 +1244,7 @@ fn actor_source_target6_mutant_waits_for_fire2524_collision(
         && (0x9000..TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MIN).contains(&raw_y16)
 }
 
-fn actor_source_target6_mutant_uses_fire2524_collision_projection(
+fn target6_mutant_arcade_uses_fire2524_collision_projection(
     position: Point,
     source: Option<MutantArcadeState>,
 ) -> bool {
@@ -1271,7 +1271,7 @@ struct ActorExplosionPlacement {
 fn actor_player_enemy_collision_explosion_placement(
     enemy: &CollisionBody,
 ) -> ActorExplosionPlacement {
-    if actor_source_target6_mutant_uses_fire2524_collision_projection(
+    if target6_mutant_arcade_uses_fire2524_collision_projection(
         enemy.position,
         enemy.mutant_runtime,
     ) {
@@ -1287,7 +1287,7 @@ fn actor_player_enemy_collision_explosion_placement(
     }
 }
 
-fn actor_source_target6_mutant_shot_position(
+fn target6_mutant_arcade_shot_position(
     position: Point,
     source: MutantArcadeState,
 ) -> Point {
@@ -1327,7 +1327,7 @@ fn arcade_tie_selected_slot(seed: u8) -> u8 {
     (seed & 0x06) >> 1
 }
 
-fn actor_source_target6_mutant_fire2524_forced_shot(
+fn target6_mutant_arcade_fire2524_forced_shot(
     position: Point,
     source: MutantArcadeState,
     prompt: &StepPrompt,
@@ -1341,7 +1341,7 @@ fn actor_source_target6_mutant_fire2524_forced_shot(
 
     match arcade_world_position(position, source.x_fraction, source.y_fraction) {
         TARGET6_MUTANT_FIRE2524_FIRST_SHOT_RAW if source.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS => {
-            Some(actor_source_target6_mutant_exact_projectile(
+            Some(target6_mutant_arcade_exact_projectile(
                 Point::new(0x1E, 0x54),
                 0x33,
                 0x56,
@@ -1353,7 +1353,7 @@ fn actor_source_target6_mutant_fire2524_forced_shot(
         TARGET6_MUTANT_FIRE2524_SECOND_SHOT_RAW
             if source.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS =>
         {
-            Some(actor_source_target6_mutant_exact_projectile(
+            Some(target6_mutant_arcade_exact_projectile(
                 Point::new(0x21, 0x7F),
                 0x6F,
                 0xE1,
@@ -1366,7 +1366,7 @@ fn actor_source_target6_mutant_fire2524_forced_shot(
     }
 }
 
-fn actor_source_target6_mutant_exact_projectile(
+fn target6_mutant_arcade_exact_projectile(
     position: Point,
     x_fraction: u8,
     y_fraction: u8,

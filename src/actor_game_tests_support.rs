@@ -545,7 +545,7 @@
     }
 
     #[test]
-    fn target6_source_mutant_fire2524_sleep_shot_uses_exact_projectile() {
+    fn target6_arcade_mutant_fire2524_sleep_shot_uses_exact_projectile() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
@@ -601,7 +601,7 @@
     }
 
     #[test]
-    fn target6_source_mutant_shot_position_uses_dive_anchor_overrides() {
+    fn target6_arcade_mutant_shot_position_uses_dive_anchor_overrides() {
         let source = MutantArcadeState {
             x_fraction: 0x8C,
             y_fraction: 0xB0,
@@ -619,11 +619,11 @@
         };
 
         assert_eq!(
-            actor_source_target6_mutant_shot_position(Point::new(0x08, 0x61), source),
+            target6_mutant_arcade_shot_position(Point::new(0x08, 0x61), source),
             Point::new(0x1E, 0x70)
         );
         assert_eq!(
-            actor_source_target6_mutant_shot_position(
+            target6_mutant_arcade_shot_position(
                 Point::new(0x07, 0x78),
                 MutantArcadeState {
                     x_fraction: 0xFC,
@@ -634,7 +634,7 @@
             Point::new(0x21, 0x87)
         );
         assert_eq!(
-            actor_source_target6_mutant_shot_position(
+            target6_mutant_arcade_shot_position(
                 Point::new(0x03, 0x33),
                 MutantArcadeState {
                     x_fraction: 0x7C,
@@ -675,7 +675,7 @@
     }
 
     #[test]
-    fn target6_source_mutant_waits_for_fire2524_collision_window() {
+    fn target6_arcade_mutant_waits_for_fire2524_collision_window() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         let player_id = ActorId::new(100);
@@ -727,7 +727,7 @@
     }
 
     #[test]
-    fn target6_source_mutant_fire2524_collision_projects_enemy_explosion() {
+    fn target6_arcade_mutant_fire2524_collision_projects_enemy_explosion() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         let player_id = ActorId::new(100);
