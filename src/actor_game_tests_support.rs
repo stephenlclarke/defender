@@ -233,11 +233,11 @@
                 let report = driver.step(GameInput::NONE);
                 report.commands.iter().find_map(|command| {
                     if let GameCommand::Spawn(SpawnRequest::Mutant {
-                        source: Some(source),
+                        source: Some(mutant_arcade_state),
                         ..
                     }) = command
                     {
-                        Some((report.clone(), *source))
+                        Some((report.clone(), *mutant_arcade_state))
                     } else {
                         None
                     }
@@ -984,9 +984,10 @@
             .commands
             .iter()
             .filter_map(|command| match command {
-                GameCommand::Spawn(SpawnRequest::Swarmer { position, source }) => {
-                    Some((*position, *source))
-                }
+                GameCommand::Spawn(SpawnRequest::Swarmer {
+                    position,
+                    source: swarmer_arcade_state,
+                }) => Some((*position, *swarmer_arcade_state)),
                 _ => None,
             })
             .collect::<Vec<_>>();
@@ -1268,7 +1269,7 @@
             return report;
         }
 
-        panic!("player {player} start should complete after source delay");
+        panic!("player {player} start should complete after arcade delay");
     }
 
     fn step_until_driver_smart_bomb_detonates(driver: &mut ActorGameDriver) -> StepReport {
@@ -1279,7 +1280,7 @@
             }
         }
 
-        panic!("source smart bomb should detonate after the source delay");
+        panic!("arcade smart bomb should detonate after the arcade delay");
     }
 
     fn step_until_final_game_over_sleep_returns_to_attract(
@@ -1443,7 +1444,7 @@
             return frame;
         }
 
-        panic!("player {player} start should complete after source delay");
+        panic!("player {player} start should complete after arcade delay");
     }
 
     fn step_until_smart_bomb_detonates(runtime: &mut ActorRuntimeAdapter) -> ActorFrame {
@@ -1454,7 +1455,7 @@
             }
         }
 
-        panic!("source smart bomb should detonate after the source delay");
+        panic!("arcade smart bomb should detonate after the arcade delay");
     }
 
     fn smart_bomb_sound_board_cues() -> Vec<SoundCue> {
@@ -1640,11 +1641,11 @@
     fn mutant_arcade_snapshot_with_bounds(
         id: ActorId,
         position: Point,
-        source: MutantArcadeState,
+        arcade_state: MutantArcadeState,
         bounds: Rect,
     ) -> ActorSnapshot {
         let mut snapshot = actor_snapshot_with_bounds(id, ActorKind::Mutant, position, bounds);
-        snapshot.mutant_runtime = Some(source);
+        snapshot.mutant_runtime = Some(arcade_state);
         snapshot
     }
 
@@ -1871,7 +1872,7 @@
 
     fn expected_mutant_arcade_after_motion(
         mut position: Point,
-        mut source: MutantArcadeState,
+        mut arcade_state: MutantArcadeState,
         actor: ActorId,
         prompt: &StepPrompt,
         behavior: ActorBehaviorProfile,
@@ -1880,9 +1881,9 @@
         MutantArcadeState,
         Option<(Point, Velocity, EnemyProjectileArcadeState)>,
     ) {
-        if source.sleep_ticks > 0 {
-            source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
-            return (position, source, None);
+        if arcade_state.sleep_ticks > 0 {
+            arcade_state.sleep_ticks = arcade_state.sleep_ticks.saturating_sub(1);
+            return (position, arcade_state, None);
         }
 
         let player_position = prompt
@@ -1890,13 +1891,13 @@
             .expect("arcade mutant expected helper needs a player");
         let profile = prompt.arcade_wave;
         let player_absolute_x = arcade_absolute_x(player_position, 0);
-        let object_absolute_x = arcade_absolute_x(position, source.x_fraction);
-        source.x_velocity = mutant_arcade_x_velocity(
+        let object_absolute_x = arcade_absolute_x(position, arcade_state.x_fraction);
+        arcade_state.x_velocity = mutant_arcade_x_velocity(
             profile.mutant_x_velocity,
             player_absolute_x,
             object_absolute_x,
         );
-        source.y_velocity = mutant_arcade_y_velocity(
+        arcade_state.y_velocity = mutant_arcade_y_velocity(
             profile,
             player_position.y,
             player_absolute_x,
@@ -1906,27 +1907,32 @@
 
         let mut shot = None;
         if mutant_arcade_should_hop_and_shoot(player_absolute_x, object_absolute_x, position) {
-            let mut hop_rng = arcade_rng_from_snapshot(source.hop_rng);
+            let mut hop_rng = arcade_rng_from_snapshot(arcade_state.hop_rng);
             let hop_state = hop_rng.advance();
-            source.hop_rng = hop_state.snapshot();
+            arcade_state.hop_rng = hop_state.snapshot();
             position.y = mutant_arcade_hop_y(position.y, profile.mutant_random_y, hop_state.seed);
-            source.shot_timer = source.shot_timer.wrapping_sub(1);
-            if source.shot_timer == 0 {
+            arcade_state.shot_timer = arcade_state.shot_timer.wrapping_sub(1);
+            if arcade_state.shot_timer == 0 {
                 let shot_rng = mutant_arcade_shot_rng(prompt, actor, position);
-                source.shot_timer = mutant_arcade_shot_reset(profile, shot_rng.seed);
-                shot = mutant_arcade_fireball(position, prompt, behavior, source, shot_rng)
-                    .map(|(velocity, projectile_source)| (position, velocity, projectile_source));
+                arcade_state.shot_timer = mutant_arcade_shot_reset(profile, shot_rng.seed);
+                shot = mutant_arcade_fireball(position, prompt, behavior, arcade_state, shot_rng)
+                    .map(|(velocity, projectile_arcade_state)| {
+                        (position, velocity, projectile_arcade_state)
+                    });
             }
         }
 
-        let (x, x_fraction) =
-            arcade_axis_step(position.x, source.x_fraction, source.x_velocity);
+        let (x, x_fraction) = arcade_axis_step(
+            position.x,
+            arcade_state.x_fraction,
+            arcade_state.x_velocity,
+        );
         let (y, y_fraction) =
-            arcade_active_object_y_step(position.y, source.y_fraction, source.y_velocity);
-        source.x_fraction = x_fraction;
-        source.y_fraction = y_fraction;
-        source.sleep_ticks = MUTANT_LOOP_SLEEP_TICKS;
-        (Point::new(x, y), source, shot)
+            arcade_active_object_y_step(position.y, arcade_state.y_fraction, arcade_state.y_velocity);
+        arcade_state.x_fraction = x_fraction;
+        arcade_state.y_fraction = y_fraction;
+        arcade_state.sleep_ticks = MUTANT_LOOP_SLEEP_TICKS;
+        (Point::new(x, y), arcade_state, shot)
     }
 
     fn enemy_projectile_snapshot_count(report: &StepReport) -> usize {
@@ -1952,8 +1958,8 @@
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position,
                 velocity,
-                source: Some(source),
-            }) => Some((*position, *velocity, *source)),
+                source: Some(projectile_arcade_state),
+            }) => Some((*position, *velocity, *projectile_arcade_state)),
             _ => None,
         })
     }
