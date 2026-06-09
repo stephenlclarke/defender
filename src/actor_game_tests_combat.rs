@@ -231,7 +231,7 @@
     }
 
     #[test]
-    fn sectioned_driver_script_preserves_source_line_errors() {
+    fn sectioned_driver_script_preserves_script_line_errors() {
         let error = ActorDriverScripts::parse_text(
             "\
             [attract]\n\
@@ -735,7 +735,7 @@
     }
 
     #[test]
-    fn parsed_arcade_wave_overrides_drive_source_shaped_custom_wave() {
+    fn parsed_arcade_wave_overrides_drive_legacy_shaped_custom_wave() {
         let wave_script = concat!(
             "name custom source shape\n",
             "arcade_wave 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",

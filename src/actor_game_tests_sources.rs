@@ -1,5 +1,5 @@
     #[test]
-    fn hyperspace_lseed_at_source_threshold_survives() {
+    fn hyperspace_lseed_at_arcade_threshold_survives() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         let player = driver.spawn_player();

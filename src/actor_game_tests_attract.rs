@@ -871,7 +871,7 @@
     }
 
     #[test]
-    fn actor_attract_scoring_instruction_labels_follow_source_reveal_cadence() {
+    fn actor_attract_scoring_instruction_labels_follow_arcade_reveal_cadence() {
         assert_eq!(
             ATTRACT_INSTRUCTION_TEXT_LINES
                 .iter()
@@ -899,7 +899,7 @@
     }
 
     #[test]
-    fn default_actor_attract_script_loops_after_source_scoring_cycle() {
+    fn default_actor_attract_script_loops_after_arcade_scoring_cycle() {
         let script = AttractScript::arcade_title();
         let high_scores = HighScoreTable::default().entries;
 
