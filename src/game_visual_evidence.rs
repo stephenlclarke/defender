@@ -61,6 +61,61 @@ impl ExplosionKind {
         }
     }
 
+    const fn sprite_asset_image(self) -> SpriteAssetImageSpec {
+        match self {
+            Self::Lander => SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::LanderFrame1Primary,
+                8,
+                5,
+            ),
+            Self::Mutant => SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::MutantPrimary,
+                8,
+                5,
+            ),
+            Self::Bomber => SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::BomberFrame1Primary,
+                8,
+                4,
+            ),
+            Self::Pod => SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::PodPrimary,
+                8,
+                4,
+            ),
+            Self::Baiter => SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::BaiterFrame1Primary,
+                4,
+                6,
+            ),
+            Self::Bomb => SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::BombExplosion,
+                8,
+                4,
+            ),
+            Self::Swarmer => SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::SwarmerExplosion,
+                8,
+                4,
+            ),
+            Self::Astronaut => SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::AstronautExplosion,
+                8,
+                4,
+            ),
+            Self::PlayerShip => SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::PlayerShipRightPrimary,
+                6,
+                8,
+            ),
+            Self::Terrain => SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::TerrainExplosion,
+                6,
+                8,
+            ),
+        }
+    }
+
     const fn sprite(self) -> SpriteId {
         match self {
             Self::Lander => SpriteId::ENEMY_LANDER,
@@ -85,6 +140,7 @@ pub struct ExplosionSnapshot {
     pub growth_size: u16,
     pub frames_remaining: u8,
     pub object_bitmap_label: &'static str,
+    pub(crate) sprite_asset_image: SpriteAssetImageSpec,
     pub object_bitmap_size: (u8, u8),
     pub mapped_sprite: SpriteId,
 }
@@ -98,6 +154,7 @@ impl ExplosionSnapshot {
             growth_size: EXPLOSION_INITIAL_SIZE,
             frames_remaining: explosion_lifetime_frames(kind),
             object_bitmap_label: kind.object_bitmap_label(),
+            sprite_asset_image: kind.sprite_asset_image(),
             object_bitmap_size: kind.object_bitmap_size(),
             mapped_sprite: kind.sprite(),
         }
@@ -112,6 +169,7 @@ impl ExplosionSnapshot {
             growth_size: EXPLOSION_INITIAL_SIZE,
             frames_remaining: EXPLOSION_LIFETIME_FRAMES,
             object_bitmap_label: descriptor.label,
+            sprite_asset_image: descriptor.image,
             object_bitmap_size: descriptor.size,
             mapped_sprite: descriptor.mapped_sprite,
         }
@@ -123,7 +181,7 @@ impl ExplosionSnapshot {
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::Explosion,
             size: display_size,
-            sprite_asset_label: Some(self.object_bitmap_label),
+            sprite_asset_image: Some(self.sprite_asset_image),
             object_bitmap_size: Some((width, height)),
             mapped_sprite: Some(self.mapped_sprite),
             center: Some(self.explosion_anchor.unwrap_or(ScreenPosition::new(
@@ -194,6 +252,7 @@ fn arcade_enemy_explosion_object_bitmap_descriptor(
     if enemy.kind == EnemyKind::Swarmer {
         return ObjectBitmapDescriptor {
             label: ExplosionKind::Swarmer.object_bitmap_label(),
+            image: ExplosionKind::Swarmer.sprite_asset_image(),
             address: 0xF8E2,
             size: ExplosionKind::Swarmer.object_bitmap_size(),
             primary_image_address: 0xFA6B,
@@ -828,6 +887,7 @@ fn saturating_u16_len(value: usize) -> u16 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ObjectBitmapDescriptor {
     label: &'static str,
+    image: SpriteAssetImageSpec,
     address: u16,
     size: (u8, u8),
     primary_image_address: u16,
@@ -838,6 +898,7 @@ struct ObjectBitmapDescriptor {
 const PLAYER_PROJECTILE_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     ObjectBitmapDescriptor {
         label: "LASP1",
+        image: SpriteAssetImageSpec::new(crate::arcade_assets::ObjectBitmapId::PlayerLaser, 1, 8),
         address: 0xF96F,
         size: (8, 1),
         primary_image_address: 0xF973,
@@ -847,6 +908,11 @@ const PLAYER_PROJECTILE_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
 const HUMAN_ASTP1_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     ObjectBitmapDescriptor {
         label: "ASTP1",
+        image: SpriteAssetImageSpec::new(
+            crate::arcade_assets::ObjectBitmapId::HumanStandingPrimary,
+            8,
+            2,
+        ),
         address: 0xF901,
         size: (2, 8),
         primary_image_address: 0xFACB,
@@ -856,6 +922,11 @@ const HUMAN_ASTP1_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
 const HUMAN_ASTP2_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     ObjectBitmapDescriptor {
         label: "ASTP2",
+        image: SpriteAssetImageSpec::new(
+            crate::arcade_assets::ObjectBitmapId::HumanWalkingAPrimary,
+            8,
+            2,
+        ),
         address: 0xF90B,
         size: (2, 8),
         primary_image_address: 0xFAEB,
@@ -865,6 +936,11 @@ const HUMAN_ASTP2_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
 const HUMAN_ASTP3_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     ObjectBitmapDescriptor {
         label: "ASTP3",
+        image: SpriteAssetImageSpec::new(
+            crate::arcade_assets::ObjectBitmapId::HumanWalkingBPrimary,
+            8,
+            2,
+        ),
         address: 0xF915,
         size: (2, 8),
         primary_image_address: 0xFB0B,
@@ -874,6 +950,11 @@ const HUMAN_ASTP3_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
 const HUMAN_ASTP4_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     ObjectBitmapDescriptor {
         label: "ASTP4",
+        image: SpriteAssetImageSpec::new(
+            crate::arcade_assets::ObjectBitmapId::HumanWalkingCPrimary,
+            8,
+            2,
+        ),
         address: 0xF91F,
         size: (2, 8),
         primary_image_address: 0xFB2B,
@@ -882,6 +963,7 @@ const HUMAN_ASTP4_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     };
 const MUTANT_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDescriptor {
     label: "SCZP1",
+    image: SpriteAssetImageSpec::new(crate::arcade_assets::ObjectBitmapId::MutantPrimary, 8, 5),
     address: 0xF8CE,
     size: (5, 8),
     primary_image_address: 0xF9FB,
@@ -890,6 +972,7 @@ const MUTANT_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDesc
 };
 const POD_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDescriptor {
     label: "PRBP1",
+    image: SpriteAssetImageSpec::new(crate::arcade_assets::ObjectBitmapId::PodPrimary, 8, 4),
     address: 0xF8F7,
     size: (4, 8),
     primary_image_address: 0xFA8B,
@@ -898,6 +981,7 @@ const POD_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDescrip
 };
 const SWARMER_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDescriptor {
     label: "SWPIC1",
+    image: SpriteAssetImageSpec::new(crate::arcade_assets::ObjectBitmapId::SwarmerPrimary, 4, 3),
     address: 0xF97B,
     size: (3, 4),
     primary_image_address: 0xCCC8,
@@ -909,6 +993,11 @@ fn lander_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
     match frame % LANDER_ANIMATION_FRAME_COUNT {
         1 => ObjectBitmapDescriptor {
             label: "LNDP2",
+            image: SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::LanderFrame2Primary,
+                8,
+                5,
+            ),
             address: 0xF98F,
             size: (5, 8),
             primary_image_address: 0xCD30,
@@ -917,6 +1006,11 @@ fn lander_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
         },
         2 => ObjectBitmapDescriptor {
             label: "LNDP3",
+            image: SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::LanderFrame3Primary,
+                8,
+                5,
+            ),
             address: 0xF999,
             size: (5, 8),
             primary_image_address: 0xCD80,
@@ -925,6 +1019,11 @@ fn lander_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
         },
         _ => ObjectBitmapDescriptor {
             label: "LNDP1",
+            image: SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::LanderFrame1Primary,
+                8,
+                5,
+            ),
             address: 0xF985,
             size: (5, 8),
             primary_image_address: 0xCCE0,
@@ -938,6 +1037,11 @@ fn bomber_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
     match frame % BOMBER_ANIMATION_FRAME_COUNT {
         1 => ObjectBitmapDescriptor {
             label: "TIEP2",
+            image: SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::BomberFrame2Primary,
+                8,
+                4,
+            ),
             address: 0xF933,
             size: (4, 8),
             primary_image_address: 0xFB8B,
@@ -946,6 +1050,11 @@ fn bomber_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
         },
         2 => ObjectBitmapDescriptor {
             label: "TIEP3",
+            image: SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::BomberFrame3Primary,
+                8,
+                4,
+            ),
             address: 0xF93D,
             size: (4, 8),
             primary_image_address: 0xFBCB,
@@ -954,6 +1063,11 @@ fn bomber_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
         },
         3 => ObjectBitmapDescriptor {
             label: "TIEP4",
+            image: SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::BomberFrame4Primary,
+                8,
+                4,
+            ),
             address: 0xF947,
             size: (4, 8),
             primary_image_address: 0xFC0B,
@@ -962,6 +1076,11 @@ fn bomber_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
         },
         _ => ObjectBitmapDescriptor {
             label: "TIEP1",
+            image: SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::BomberFrame1Primary,
+                8,
+                4,
+            ),
             address: 0xF929,
             size: (4, 8),
             primary_image_address: 0xFB4B,
@@ -975,6 +1094,11 @@ fn baiter_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
     match frame % BAITER_ANIMATION_FRAME_COUNT {
         1 => ObjectBitmapDescriptor {
             label: "UFOP2",
+            image: SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::BaiterFrame2Primary,
+                4,
+                6,
+            ),
             address: 0xF9AD,
             size: (6, 4),
             primary_image_address: 0xCE00,
@@ -983,6 +1107,11 @@ fn baiter_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
         },
         2 => ObjectBitmapDescriptor {
             label: "UFOP3",
+            image: SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::BaiterFrame3Primary,
+                4,
+                6,
+            ),
             address: 0xF9B7,
             size: (6, 4),
             primary_image_address: 0xCE30,
@@ -991,6 +1120,11 @@ fn baiter_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
         },
         _ => ObjectBitmapDescriptor {
             label: "UFOP1",
+            image: SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::BaiterFrame1Primary,
+                4,
+                6,
+            ),
             address: 0xF9A3,
             size: (6, 4),
             primary_image_address: 0xCDD0,

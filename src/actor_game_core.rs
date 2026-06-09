@@ -11,7 +11,7 @@ use crate::{
         HighScoreTablesSnapshot, HumanSnapshot as CleanHumanSnapshot, PlayerSnapshot,
         PlayerStockSnapshot, ProjectileSnapshot as CleanProjectileSnapshot,
         ScorePopupKind as CleanScorePopupKind, ScorePopupSnapshot as CleanScorePopupSnapshot,
-        ScoreSnapshot, SoundEvent, BaiterRuntimeSnapshot, BomberRuntimeSnapshot,
+        ScoreSnapshot, SoundEvent, SpriteAssetImageSpec, BaiterRuntimeSnapshot, BomberRuntimeSnapshot,
         LanderRuntimeSnapshot, MutantRuntimeSnapshot, PodRuntimeSnapshot, ArcadeRngSnapshot,
         SwarmerRuntimeSnapshot, TERRAIN_BLOW_COMPLETE_FRAME, TERRAIN_BLOW_FLASH_COLOR_BYTES,
         TERRAIN_BLOW_OVERLOAD_COUNTER, TERRAIN_BLOW_START_SOUND_FRAMES,

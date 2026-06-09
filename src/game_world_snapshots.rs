@@ -737,6 +737,27 @@ fn arcade_word_from_world_vector(vector: WorldVector) -> u16 {
 
 pub const EXPANDED_OBJECT_DETAIL_LIMIT: usize = 16;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct SpriteAssetImageSpec {
+    pub(crate) bitmap: crate::arcade_assets::ObjectBitmapId,
+    pub(crate) rows: u8,
+    pub(crate) byte_columns: u8,
+}
+
+impl SpriteAssetImageSpec {
+    pub(crate) const fn new(
+        bitmap: crate::arcade_assets::ObjectBitmapId,
+        rows: u8,
+        byte_columns: u8,
+    ) -> Self {
+        Self {
+            bitmap,
+            rows,
+            byte_columns,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ExpandedObjectKind {
     #[default]
@@ -751,7 +772,7 @@ pub struct ExpandedObjectDetailSnapshot {
     pub slot_address: Option<u16>,
     pub size: u16,
     pub descriptor_address: Option<u16>,
-    pub sprite_asset_label: Option<&'static str>,
+    pub(crate) sprite_asset_image: Option<SpriteAssetImageSpec>,
     pub object_bitmap_size: Option<(u8, u8)>,
     pub mapped_sprite: Option<SpriteId>,
     pub erase_address: Option<u16>,
@@ -770,7 +791,7 @@ impl ExpandedObjectDetailSnapshot {
         slot_address: None,
         size: 0,
         descriptor_address: None,
-        sprite_asset_label: None,
+        sprite_asset_image: None,
         object_bitmap_size: None,
         mapped_sprite: None,
         erase_address: None,
@@ -806,13 +827,6 @@ impl ScorePopupKind {
         }
     }
 
-    const fn object_bitmap_label(self) -> &'static str {
-        match self {
-            Self::Points250 => "C25P1",
-            Self::Points500 => "C5P1",
-        }
-    }
-
     const fn sprite(self) -> SpriteId {
         match self {
             Self::Points250 => SpriteId::SCORE_POPUP_250,
@@ -842,7 +856,6 @@ impl ScorePopupSnapshot {
     fn expanded_object_detail(self) -> ExpandedObjectDetailSnapshot {
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::ScorePopup,
-            sprite_asset_label: Some(self.kind.object_bitmap_label()),
             object_bitmap_size: Some((6, 6)),
             mapped_sprite: Some(self.kind.sprite()),
             top_left: Some(self.position),
@@ -857,7 +870,7 @@ impl ScorePopupSnapshot {
 pub struct EnemyAppearanceSnapshot {
     pub position: ScreenPosition,
     pub growth_size: u16,
-    pub sprite_asset_label: &'static str,
+    pub(crate) sprite_asset_image: SpriteAssetImageSpec,
     pub object_bitmap_size: (u8, u8),
     pub mapped_sprite: SpriteId,
 }
@@ -873,7 +886,7 @@ impl EnemyAppearanceSnapshot {
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::Appearance,
             size: self.growth_size,
-            sprite_asset_label: Some(self.sprite_asset_label),
+            sprite_asset_image: Some(self.sprite_asset_image),
             object_bitmap_size: Some((width, height)),
             mapped_sprite: Some(self.mapped_sprite),
             center: Some(appearance_center(self.position, self.object_bitmap_size)),

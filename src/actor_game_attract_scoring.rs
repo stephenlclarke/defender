@@ -1042,7 +1042,7 @@ fn push_actor_attract_scoring_materialize_pixels(
     let _ = push_appearance_cloud_pixels(
         scene,
         position,
-        descriptor.sprite_asset_label,
+        descriptor.sprite_asset_image,
         descriptor.object_bitmap_size,
         descriptor.sprite,
         growth_size,
@@ -1087,49 +1087,66 @@ fn push_actor_fragment_pixel(scene: &mut RenderScene, position: [f32; 2], tint: 
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ActorAttractScoringSpriteFrameDescriptor {
-    sprite_asset_label: &'static str,
+    sprite_asset_image: SpriteAssetImageSpec,
     object_bitmap_size: (u8, u8),
     sprite: SpriteId,
 }
-
-const ATTRACT_LANDER_SPRITE_ASSET_LABEL: &str = "LNDP1"; // original: LNDP1
-const ATTRACT_MUTANT_SPRITE_ASSET_LABEL: &str = "SCZP1"; // original: SCZP1
-const ATTRACT_BAITER_SPRITE_ASSET_LABEL: &str = "UFOP1"; // original: UFOP1
-const ATTRACT_BOMBER_SPRITE_ASSET_LABEL: &str = "TIEP1"; // original: TIEP1
-const ATTRACT_POD_SPRITE_ASSET_LABEL: &str = "PRBP1"; // original: PRBP1
-const ATTRACT_SWARMER_SPRITE_ASSET_LABEL: &str = "SWPIC1"; // original: SWPIC1
 
 fn actor_attract_scoring_enemy_sprite_frame_descriptor(
     enemy: ActorAttractScoringEnemyKind,
 ) -> ActorAttractScoringSpriteFrameDescriptor {
     match enemy {
         ActorAttractScoringEnemyKind::Lander => ActorAttractScoringSpriteFrameDescriptor {
-            sprite_asset_label: ATTRACT_LANDER_SPRITE_ASSET_LABEL,
+            sprite_asset_image: SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::LanderFrame1Primary,
+                8,
+                5,
+            ),
             object_bitmap_size: (5, 8),
             sprite: SpriteId::ENEMY_LANDER,
         },
         ActorAttractScoringEnemyKind::Mutant => ActorAttractScoringSpriteFrameDescriptor {
-            sprite_asset_label: ATTRACT_MUTANT_SPRITE_ASSET_LABEL,
+            sprite_asset_image: SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::MutantPrimary,
+                8,
+                5,
+            ),
             object_bitmap_size: (5, 8),
             sprite: SpriteId::ENEMY_MUTANT,
         },
         ActorAttractScoringEnemyKind::Baiter => ActorAttractScoringSpriteFrameDescriptor {
-            sprite_asset_label: ATTRACT_BAITER_SPRITE_ASSET_LABEL,
+            sprite_asset_image: SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::BaiterFrame1Primary,
+                4,
+                6,
+            ),
             object_bitmap_size: (6, 4),
             sprite: SpriteId::ENEMY_BAITER,
         },
         ActorAttractScoringEnemyKind::Bomber => ActorAttractScoringSpriteFrameDescriptor {
-            sprite_asset_label: ATTRACT_BOMBER_SPRITE_ASSET_LABEL,
+            sprite_asset_image: SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::BomberFrame1Primary,
+                8,
+                4,
+            ),
             object_bitmap_size: (4, 8),
             sprite: SpriteId::ENEMY_BOMBER,
         },
         ActorAttractScoringEnemyKind::Pod => ActorAttractScoringSpriteFrameDescriptor {
-            sprite_asset_label: ATTRACT_POD_SPRITE_ASSET_LABEL,
+            sprite_asset_image: SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::PodPrimary,
+                8,
+                4,
+            ),
             object_bitmap_size: (4, 8),
             sprite: SpriteId::ENEMY_POD,
         },
         ActorAttractScoringEnemyKind::Swarmer => ActorAttractScoringSpriteFrameDescriptor {
-            sprite_asset_label: ATTRACT_SWARMER_SPRITE_ASSET_LABEL,
+            sprite_asset_image: SpriteAssetImageSpec::new(
+                crate::arcade_assets::ObjectBitmapId::SwarmerPrimary,
+                4,
+                3,
+            ),
             object_bitmap_size: (3, 4),
             sprite: SpriteId::ENEMY_SWARMER,
         },
