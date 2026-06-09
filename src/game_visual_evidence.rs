@@ -652,19 +652,23 @@ fn scanner_radar_object_world_position(
         .map(|position| (u16::from(position.x) << 8, u16::from(position.y) << 8))
 }
 
-fn scanner_radar_object_screen_address(world_x: u16, world_y: u16, scan_left: u16) -> u16 {
+fn scanner_radar_object_cell(
+    world_x: u16,
+    world_y: u16,
+    scan_left: u16,
+) -> crate::ScreenAddress {
     let x_delta = world_x.wrapping_sub(scan_left);
     let x_byte = x_delta.to_be_bytes()[0] >> 2;
     let y_byte = world_y.to_be_bytes()[0] >> 3;
-    u16::from_be_bytes([x_byte, y_byte]).wrapping_add(SCANNER_OBJECT_BASE_SCREEN - 1)
+    crate::ScreenAddress::from_bytes(x_byte, y_byte).wrapping_add(SCANNER_OBJECT_BASE_SCREEN - 1)
 }
 
-fn scanner_radar_player_screen_address(player_position: (WorldVector, WorldVector)) -> u16 {
+fn scanner_radar_player_cell(player_position: (WorldVector, WorldVector)) -> crate::ScreenAddress {
     let x_word = evidence_arcade_word_from_world_vector(player_position.0);
     let y_word = evidence_arcade_word_from_world_vector(player_position.1);
     let x_byte = x_word.to_be_bytes()[0] >> 4;
     let y_byte = y_word.to_be_bytes()[0] >> 3;
-    u16::from_be_bytes([x_byte, y_byte]).wrapping_add(SCANNER_PLAYER_BASE_SCREEN)
+    crate::ScreenAddress::from_bytes(x_byte, y_byte).wrapping_add(SCANNER_PLAYER_BASE_SCREEN)
 }
 
 fn evidence_arcade_word_from_world_vector(vector: WorldVector) -> u16 {

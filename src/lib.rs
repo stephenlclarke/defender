@@ -7,6 +7,7 @@
 pub mod actor_game;
 mod actor_smoke;
 mod arcade_assets;
+pub mod arcade_types;
 pub mod audio;
 mod game;
 mod live_wgpu;
@@ -17,6 +18,7 @@ mod sound_board;
 pub mod systems;
 
 pub use arcade_assets::MessageId;
+pub use arcade_types::ScreenAddress;
 pub use game::{
     AttractPresentationPage, AttractPresentationSnapshot, Direction, EnemyKind,
     EnemyReserveSnapshot, EnemySnapshot, GameEvent, GameEvents, GameFrame, GameInput,

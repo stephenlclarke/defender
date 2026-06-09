@@ -448,7 +448,7 @@ pub(crate) fn push_scanner_radar_sprites(scene: &mut RenderScene, scanner: &Scan
         push_scanner_word_pixels(
             scene,
             SpriteId::SCANNER_OBJECT_BLIP,
-            blip.screen_address,
+            blip.screen_cell,
             blip.color_word,
         );
     }
@@ -464,19 +464,19 @@ pub(crate) fn push_scanner_radar_sprites(scene: &mut RenderScene, scanner: &Scan
         push_scanner_word_pixels(
             scene,
             SpriteId::SCANNER_PLAYER_BLIP,
-            player_blip.screen_address,
+            player_blip.screen_cell,
             player_blip.body_word,
         );
         push_scanner_byte_pixels(
             scene,
             SpriteId::SCANNER_PLAYER_BLIP,
-            player_blip.screen_address.wrapping_add(2),
+            player_blip.screen_cell.wrapping_add(2),
             player_blip.tail_byte,
         );
         push_scanner_byte_pixels(
             scene,
             SpriteId::SCANNER_PLAYER_BLIP,
-            player_blip.screen_address.wrapping_sub(0x00FF),
+            player_blip.screen_cell.wrapping_sub(0x00FF),
             player_blip.upper_byte,
         );
     }
@@ -506,21 +506,21 @@ fn push_scanner_terrain_sprites(scene: &mut RenderScene, scan_left: u16) {
 fn push_scanner_word_pixels(
     scene: &mut RenderScene,
     sprite: SpriteId,
-    screen_address: u16,
+    screen_cell: crate::ScreenAddress,
     word: u16,
 ) {
     let [top, bottom] = word.to_be_bytes();
-    push_scanner_byte_pixels(scene, sprite, screen_address, top);
-    push_scanner_byte_pixels(scene, sprite, screen_address.wrapping_add(1), bottom);
+    push_scanner_byte_pixels(scene, sprite, screen_cell, top);
+    push_scanner_byte_pixels(scene, sprite, screen_cell.wrapping_add(1), bottom);
 }
 
 fn push_scanner_byte_pixels(
     scene: &mut RenderScene,
     sprite: SpriteId,
-    screen_address: u16,
+    screen_cell: crate::ScreenAddress,
     byte: u8,
 ) {
-    let base = screen_position_from_address(screen_address);
+    let base = screen_position_from_address(screen_cell.word());
     for (x_offset, palette_index) in [(0.0, byte >> 4), (1.0, byte & 0x0F)] {
         let tint = video_palette_index_tint(palette_index);
         if tint.rgba[3] == 0 {

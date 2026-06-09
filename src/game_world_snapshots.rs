@@ -591,7 +591,7 @@ pub struct ScannerRadarBlipSnapshot {
     pub kind: ScannerRadarBlipKind,
     pub object_address: Option<u16>,
     pub erase_table_address: u16,
-    pub screen_address: u16,
+    pub screen_cell: crate::ScreenAddress,
     pub color_word: u16,
 }
 
@@ -600,7 +600,7 @@ impl ScannerRadarBlipSnapshot {
         kind: ScannerRadarBlipKind::ActiveObject,
         object_address: None,
         erase_table_address: 0,
-        screen_address: 0,
+        screen_cell: crate::ScreenAddress::new(0),
         color_word: 0,
     };
 }
@@ -614,7 +614,7 @@ impl Default for ScannerRadarBlipSnapshot {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScannerRadarPlayerBlipSnapshot {
     pub erase_table_address: u16,
-    pub screen_address: u16,
+    pub screen_cell: crate::ScreenAddress,
     pub body_word: u16,
     pub tail_byte: u8,
     pub upper_byte: u8,
@@ -686,7 +686,7 @@ impl ScannerRadarSnapshot {
         scanner.push_object_blips(object_evidence, scan_left);
         scanner.player_blip = Some(ScannerRadarPlayerBlipSnapshot {
             erase_table_address: scanner.setend,
-            screen_address: scanner_radar_player_screen_address(player_position),
+            screen_cell: scanner_radar_player_cell(player_position),
             body_word: SCANNER_PLAYER_BODY_WORD,
             tail_byte: SCANNER_PLAYER_TAIL_BYTE,
             upper_byte: SCANNER_PLAYER_UPPER_BYTE,
@@ -716,7 +716,7 @@ impl ScannerRadarSnapshot {
                 kind,
                 object_address: detail.address,
                 erase_table_address: self.setend,
-                screen_address: scanner_radar_object_screen_address(world_x, world_y, scan_left),
+                screen_cell: scanner_radar_object_cell(world_x, world_y, scan_left),
                 color_word,
             };
             self.blip_count += 1;
