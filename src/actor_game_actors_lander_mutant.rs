@@ -54,7 +54,7 @@ impl AssetActor for Lander {
     }
 
     fn apply_driver_command(&mut self, command: ActorDriverCommand) {
-        let ActorDriverCommand::AdjustSourceLanderShotTimer {
+        let ActorDriverCommand::AdjustLanderFireTimer {
             target_human_index,
             x_velocity,
             delta,

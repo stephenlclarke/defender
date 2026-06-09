@@ -1559,7 +1559,7 @@
         assert!(
             right
                 .commands
-                .contains(&GameCommand::SetSourceBackgroundLeft(0xFF00))
+                .contains(&GameCommand::SetWorldScrollLeft(0xFF00))
         );
 
         let reversed = player.update(&playing_player_prompt_for_test(
@@ -1581,7 +1581,7 @@
         assert_eq!(left.snapshot.position.x, PLAYER_SCROLL_CENTER_X);
         assert!(
             left.commands
-                .contains(&GameCommand::SetSourceBackgroundLeft(0x0000))
+                .contains(&GameCommand::SetWorldScrollLeft(0x0000))
         );
     }
 

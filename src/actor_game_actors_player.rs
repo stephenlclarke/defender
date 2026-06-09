@@ -442,7 +442,7 @@ impl PlayerShip {
             self.position = PLAYER_BOUNDS.clamp_point(position);
             self.direction = direction;
             if let Some(background_left) = background_left {
-                commands.push(GameCommand::SetSourceBackgroundLeft(background_left));
+                commands.push(GameCommand::SetWorldScrollLeft(background_left));
             }
             let death_lseed = self
                 .hyperspace_entry_lseed
@@ -529,7 +529,7 @@ impl AssetActor for PlayerShip {
                 self.position.x =
                     clamp_i16(next_position.x, PLAYER_BOUNDS.left, PLAYER_BOUNDS.right);
                 if background_left != prompt.background_left {
-                    commands.push(GameCommand::SetSourceBackgroundLeft(background_left));
+                    commands.push(GameCommand::SetWorldScrollLeft(background_left));
                 }
                 self.laser_cooldown = self.laser_cooldown.saturating_sub(1);
                 if prompt.input.wants_fire() && self.laser_cooldown == 0 {

@@ -180,7 +180,7 @@ pub enum GameCommand {
     StartTwoPlayer,
     Spawn(SpawnRequest),
     Destroy(ActorId),
-    SetSourceBackgroundLeft(u16),
+    SetWorldScrollLeft(u16),
     AttachHuman {
         lander: ActorId,
         human: ActorId,
@@ -295,7 +295,7 @@ trait AssetActor: Send + 'static {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ActorDriverCommand {
-    AdjustSourceLanderShotTimer {
+    AdjustLanderFireTimer {
         target_human_index: usize,
         x_velocity: u16,
         delta: u8,

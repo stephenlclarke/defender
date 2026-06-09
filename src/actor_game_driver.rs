@@ -812,7 +812,7 @@ impl ActorGameDriver {
                         applied.draws.extend(draws);
                     }
                 }
-                GameCommand::SetSourceBackgroundLeft(background_left) => {
+                GameCommand::SetWorldScrollLeft(background_left) => {
                     self.background_left = background_left;
                 }
                 GameCommand::AttachHuman {
@@ -1881,7 +1881,7 @@ impl ActorGameDriver {
 
     fn apply_first_wave_early_reserve_shot_phase_delay(&self) {
         for actor in self.actors.values() {
-            actor.apply_driver_command(ActorDriverCommand::AdjustSourceLanderShotTimer {
+            actor.apply_driver_command(ActorDriverCommand::AdjustLanderFireTimer {
                 target_human_index: 2,
                 x_velocity: 0xFFEE,
                 delta: FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY,

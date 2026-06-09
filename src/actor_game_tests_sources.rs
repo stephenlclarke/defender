@@ -76,7 +76,7 @@
         assert!(
             rematerialized
                 .commands
-                .contains(&GameCommand::SetSourceBackgroundLeft(0x1234))
+                .contains(&GameCommand::SetWorldScrollLeft(0x1234))
         );
         assert!(!rematerialized.commands.contains(&GameCommand::PlayerKilled));
     }
