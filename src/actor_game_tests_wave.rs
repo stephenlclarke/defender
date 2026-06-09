@@ -914,12 +914,12 @@
         };
         driver.background_left = 0x3400;
         let mut expected_rng = driver.arcade_rng;
-        let first_spawn = ActorMutantSpawn::source_restore(
+        let first_spawn = ActorMutantSpawn::from_arcade_restore(
             &mut expected_rng,
             ArcadeWaveProfile::for_wave(2),
             driver.background_left,
         );
-        let second_spawn = ActorMutantSpawn::source_restore(
+        let second_spawn = ActorMutantSpawn::from_arcade_restore(
             &mut expected_rng,
             ArcadeWaveProfile::for_wave(2),
             driver.background_left,
@@ -1041,12 +1041,12 @@
         driver.background_left = 0x5420;
         let profile = ArcadeWaveProfile::for_wave(2);
         let mut expected_rng = driver.arcade_rng;
-        let first_spawn = ActorMutantSpawn::source_restore(
+        let first_spawn = ActorMutantSpawn::from_arcade_restore(
             &mut expected_rng,
             profile,
             driver.background_left,
         );
-        let second_spawn = ActorMutantSpawn::source_restore(
+        let second_spawn = ActorMutantSpawn::from_arcade_restore(
             &mut expected_rng,
             profile,
             driver.background_left,
@@ -1137,7 +1137,7 @@
             lseed: 0x80,
         };
         let mut expected_rng = driver.arcade_rng;
-        let mut expected_pod = ActorPodSpawn::source_restore(&mut expected_rng);
+        let mut expected_pod = ActorPodSpawn::from_arcade_restore(&mut expected_rng);
         if let Some(source) = &mut expected_pod.source {
             let (x, x_fraction) = actor_source_axis_step(
                 expected_pod.position.x,
@@ -1213,7 +1213,7 @@
                 .iter()
                 .filter_map(|snapshot| snapshot.bomber_runtime)
                 .any(|arcade_state| {
-                    let expected_spawn = ActorBomberSpawn::source_restore_batch(
+                    let expected_spawn = ActorBomberSpawn::arcade_restore_batch(
                         ArcadeWaveProfile::for_wave(2),
                         actor_source_absolute_x(player_position, 0),
                         1,
@@ -1246,7 +1246,7 @@
         let profile = ArcadeWaveProfile::for_wave(2);
         let mut expected_rng = driver.arcade_rng;
         let expected_spawns =
-            ActorSwarmerSpawn::source_restore_batch(&mut expected_rng, profile, 4);
+            ActorSwarmerSpawn::arcade_restore_batch(&mut expected_rng, profile, 4);
 
         let restored = driver.step(GameInput::NONE);
 

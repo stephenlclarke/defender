@@ -453,7 +453,7 @@ impl ActorLanderSpawn {
         }
     }
 
-    fn source_restore(
+    fn from_arcade_restore(
         arcade_rng: &mut ActorArcadeRng,
         profile: ArcadeWaveProfile,
         target_human_index: Option<usize>,
@@ -518,7 +518,7 @@ impl ActorBomberSpawn {
         }
     }
 
-    fn source_restore_batch(
+    fn arcade_restore_batch(
         profile: ArcadeWaveProfile,
         player_absolute_x: u16,
         count: usize,
@@ -589,7 +589,7 @@ impl ActorPodSpawn {
         }
     }
 
-    fn source_restore(arcade_rng: &mut ActorArcadeRng) -> Self {
+    fn from_arcade_restore(arcade_rng: &mut ActorArcadeRng) -> Self {
         let state = arcade_rng.advance();
         let [x, x_fraction] =
             u16::from_be_bytes([(state.hseed & 0x3F).wrapping_add(0x10), state.lseed])
@@ -655,7 +655,7 @@ impl ActorSwarmerSpawn {
         }
     }
 
-    fn source_restore_batch(
+    fn arcade_restore_batch(
         arcade_rng: &mut ActorArcadeRng,
         profile: ArcadeWaveProfile,
         count: usize,
@@ -776,7 +776,7 @@ impl ActorMutantSpawn {
         }
     }
 
-    fn source_restore(
+    fn from_arcade_restore(
         arcade_rng: &mut ActorArcadeRng,
         profile: ArcadeWaveProfile,
         background_absolute_x: u16,
@@ -1055,7 +1055,7 @@ impl ArcadeWaveProfile {
                         .copied()
                         .unwrap_or_else(|| ActorLanderSpawn::new(slot.position))
                 } else {
-                    ActorLanderSpawn::source_restore(
+                    ActorLanderSpawn::from_arcade_restore(
                         &mut arcade_rng,
                         self,
                         actor_source_select_lander_target_index(&mut target_cursor, humans),

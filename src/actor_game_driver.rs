@@ -1635,7 +1635,7 @@ impl ActorGameDriver {
                 ActorSourceEnemyKind::Lander => {
                     let target_index = self.select_next_lander_target_human_slot();
                     if let Some(target_index) = target_index {
-                        let spawn = ActorLanderSpawn::source_restore(
+                        let spawn = ActorLanderSpawn::from_arcade_restore(
                             &mut self.arcade_rng,
                             arcade_wave_profile,
                             Some(target_index),
@@ -1652,7 +1652,7 @@ impl ActorGameDriver {
                             .take_while(|&&kind| kind == ActorSourceEnemyKind::Lander)
                             .count();
                         for _ in 0..lander_count {
-                            let spawn = ActorMutantSpawn::source_restore(
+                            let spawn = ActorMutantSpawn::from_arcade_restore(
                                 &mut self.arcade_rng,
                                 arcade_wave_profile,
                                 self.background_left,
@@ -1675,7 +1675,7 @@ impl ActorGameDriver {
                     let player_absolute_x = self
                         .active_player_position()
                         .map_or(0, |position| actor_source_absolute_x(position, 0));
-                    for spawn in ActorBomberSpawn::source_restore_batch(
+                    for spawn in ActorBomberSpawn::arcade_restore_batch(
                         arcade_wave_profile,
                         player_absolute_x,
                         bomber_count,
@@ -1689,7 +1689,7 @@ impl ActorGameDriver {
                     index += bomber_count;
                 }
                 ActorSourceEnemyKind::Pod => {
-                    let spawn = ActorPodSpawn::source_restore(&mut self.arcade_rng);
+                    let spawn = ActorPodSpawn::from_arcade_restore(&mut self.arcade_rng);
                     commands.push(GameCommand::Spawn(SpawnRequest::Pod {
                         position: spawn.position,
                     }));
@@ -1698,7 +1698,7 @@ impl ActorGameDriver {
                     index += 1;
                 }
                 ActorSourceEnemyKind::Mutant => {
-                    let spawn = ActorMutantSpawn::source_restore(
+                    let spawn = ActorMutantSpawn::from_arcade_restore(
                         &mut self.arcade_rng,
                         arcade_wave_profile,
                         self.background_left,
@@ -1716,7 +1716,7 @@ impl ActorGameDriver {
                         .iter()
                         .take_while(|&&kind| kind == ActorSourceEnemyKind::Swarmer)
                         .count();
-                    for spawn in ActorSwarmerSpawn::source_restore_batch(
+                    for spawn in ActorSwarmerSpawn::arcade_restore_batch(
                         &mut self.arcade_rng,
                         arcade_wave_profile,
                         swarmer_count,
