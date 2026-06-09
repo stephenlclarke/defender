@@ -290,7 +290,7 @@ impl Bomb {
         } else {
             u16::from(source.lifetime_ticks)
         };
-        source.lifetime_ticks = actor_source_projectile_lifetime_ticks(lifetime_steps);
+        source.lifetime_ticks = arcade_projectile_lifetime_ticks(lifetime_steps);
         Self {
             id,
             position,
@@ -315,7 +315,7 @@ impl AssetActor for Bomb {
             if prompt.projectile_scan_tick {
                 self.lifetime_steps = self.lifetime_steps.saturating_sub(1);
                 self.source.lifetime_ticks =
-                    actor_source_projectile_lifetime_ticks(self.lifetime_steps);
+                    arcade_projectile_lifetime_ticks(self.lifetime_steps);
             }
             if self.lifetime_steps > 0 {
                 draws.push(DrawCommand::sprite(self.id, SpriteKey::Bomb, self.position));

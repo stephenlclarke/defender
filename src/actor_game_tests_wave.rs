@@ -1645,9 +1645,9 @@
             Some(EnemyProjectileArcadeState {
                 x_fraction: lander_source.x_fraction,
                 y_fraction: lander_source.y_fraction,
-                x_velocity: actor_source_projectile_velocity_component(shot_velocity.dx),
-                y_velocity: actor_source_projectile_velocity_component(shot_velocity.dy),
-                lifetime_ticks: actor_source_projectile_lifetime_ticks(LANDER_SHOT_LIFETIME),
+                x_velocity: arcade_projectile_velocity_component(shot_velocity.dx),
+                y_velocity: arcade_projectile_velocity_component(shot_velocity.dy),
+                lifetime_ticks: arcade_projectile_lifetime_ticks(LANDER_SHOT_LIFETIME),
             })
         );
         let settled = driver.step(GameInput {
@@ -1668,11 +1668,11 @@
             .expect("hostile shot should publish source projectile metadata");
         assert_eq!(
             source_projectile.x_velocity,
-            actor_source_projectile_velocity_component(enemy_laser.velocity.dx)
+            arcade_projectile_velocity_component(enemy_laser.velocity.dx)
         );
         assert_eq!(
             source_projectile.y_velocity,
-            actor_source_projectile_velocity_component(enemy_laser.velocity.dy)
+            arcade_projectile_velocity_component(enemy_laser.velocity.dy)
         );
         assert!(source_projectile.lifetime_ticks > 0);
         assert!(

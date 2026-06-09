@@ -420,8 +420,8 @@ impl EnemyLaserShot {
         let source = source.unwrap_or(EnemyProjectileArcadeState {
             x_fraction: 0,
             y_fraction: 0,
-            x_velocity: actor_source_projectile_velocity_component(velocity.dx),
-            y_velocity: actor_source_projectile_velocity_component(velocity.dy),
+            x_velocity: arcade_projectile_velocity_component(velocity.dx),
+            y_velocity: arcade_projectile_velocity_component(velocity.dy),
             lifetime_ticks: 0,
         });
         let lifetime_steps = if source.lifetime_ticks == 0 {
@@ -452,17 +452,17 @@ impl EnemyLaserShot {
         let lifetime_steps = self
             .lifetime_steps
             .get_or_insert(behavior.lander_shot_lifetime_steps);
-        self.source.lifetime_ticks = actor_source_projectile_lifetime_ticks(*lifetime_steps);
+        self.source.lifetime_ticks = arcade_projectile_lifetime_ticks(*lifetime_steps);
     }
 
     fn advance_source_projectile(&mut self) -> Velocity {
         let previous_position = self.position;
-        let (x, x_fraction) = actor_source_projectile_axis_step(
+        let (x, x_fraction) = arcade_projectile_axis_step(
             self.position.x,
             self.source.x_fraction,
             self.source.x_velocity,
         );
-        let (y, y_fraction) = actor_source_projectile_axis_step(
+        let (y, y_fraction) = arcade_projectile_axis_step(
             self.position.y,
             self.source.y_fraction,
             self.source.y_velocity,
@@ -491,7 +491,7 @@ impl AssetActor for EnemyLaserShot {
             {
                 *lifetime_steps = lifetime_steps.saturating_sub(1);
                 self.source.lifetime_ticks =
-                    actor_source_projectile_lifetime_ticks(*lifetime_steps);
+                    arcade_projectile_lifetime_ticks(*lifetime_steps);
             }
             if self.lifetime_steps.is_some_and(|steps| steps > 0) {
                 movement_velocity = self.advance_source_projectile();

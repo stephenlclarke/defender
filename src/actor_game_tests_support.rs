@@ -585,7 +585,7 @@
                 y_fraction: 0x56,
                 x_velocity: 0xFFE0,
                 y_velocity: 0x0138,
-                lifetime_ticks: actor_source_projectile_lifetime_ticks(MUTANT_SHOT_LIFETIME),
+                lifetime_ticks: arcade_projectile_lifetime_ticks(MUTANT_SHOT_LIFETIME),
             }
         );
         let snapshot = snapshot_for(&report, mutant);
@@ -854,7 +854,7 @@
         assert_eq!(mutant_shot, expected_shot);
         assert_eq!(
             mutant_shot.2.lifetime_ticks,
-            actor_source_projectile_lifetime_ticks(MUTANT_SHOT_LIFETIME)
+            arcade_projectile_lifetime_ticks(MUTANT_SHOT_LIFETIME)
         );
         let snapshot = snapshot_for(&report, mutant);
         assert_eq!(snapshot.position, expected_position);

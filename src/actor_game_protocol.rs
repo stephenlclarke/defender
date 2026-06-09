@@ -1010,16 +1010,16 @@ fn screen_coordinate(value: i16) -> u8 {
     u8::try_from(value.clamp(0, 255)).expect("screen coordinate should be clamped to u8")
 }
 
-fn actor_source_projectile_velocity_component(value: i16) -> u16 {
+fn arcade_projectile_velocity_component(value: i16) -> u16 {
     let clamped = value.clamp(i16::from(i8::MIN), i16::from(i8::MAX)) as i8;
     ((i16::from(clamped)) << 8) as u16
 }
 
-fn actor_source_projectile_lifetime_ticks(remaining_steps: u16) -> u8 {
+fn arcade_projectile_lifetime_ticks(remaining_steps: u16) -> u8 {
     remaining_steps.min(u16::from(u8::MAX)) as u8
 }
 
-fn actor_source_enemy_shot_metadata(
+fn arcade_enemy_projectile_state(
     x_fraction: u8,
     y_fraction: u8,
     velocity: Velocity,
@@ -1028,13 +1028,13 @@ fn actor_source_enemy_shot_metadata(
     EnemyProjectileArcadeState {
         x_fraction,
         y_fraction,
-        x_velocity: actor_source_projectile_velocity_component(velocity.dx),
-        y_velocity: actor_source_projectile_velocity_component(velocity.dy),
-        lifetime_ticks: actor_source_projectile_lifetime_ticks(lifetime_steps),
+        x_velocity: arcade_projectile_velocity_component(velocity.dx),
+        y_velocity: arcade_projectile_velocity_component(velocity.dy),
+        lifetime_ticks: arcade_projectile_lifetime_ticks(lifetime_steps),
     }
 }
 
-fn actor_source_projectile_axis_step(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
+fn arcade_projectile_axis_step(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
     let raw = i32::from(position) * 256 + i32::from(fraction) + i32::from(velocity as i16);
     let next_position = raw.div_euclid(256);
     let next_fraction = raw.rem_euclid(256);

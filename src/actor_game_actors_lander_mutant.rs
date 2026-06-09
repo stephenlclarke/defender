@@ -322,7 +322,7 @@ impl Lander {
     ) {
         let velocity = self.lander_shot_velocity(prompt, behavior);
         let source = self.source.map(|source| {
-            actor_source_enemy_shot_metadata(
+            arcade_enemy_projectile_state(
                 source.x_fraction,
                 source.y_fraction,
                 velocity,
@@ -1382,7 +1382,7 @@ fn actor_source_target6_mutant_exact_projectile(
             y_fraction,
             x_velocity,
             y_velocity,
-            lifetime_ticks: actor_source_projectile_lifetime_ticks(
+            lifetime_ticks: arcade_projectile_lifetime_ticks(
                 behavior.mutant_shot_lifetime_steps,
             ),
         },
@@ -1435,7 +1435,7 @@ fn actor_source_mutant_fireball(
     shot_rng: ActorArcadeRngSnapshot,
 ) -> Option<(Velocity, EnemyProjectileArcadeState)> {
     let lifetime_ticks =
-        actor_source_projectile_lifetime_ticks(behavior.mutant_shot_lifetime_steps);
+        arcade_projectile_lifetime_ticks(behavior.mutant_shot_lifetime_steps);
     actor_source_enemy_fireball(
         position,
         source.x_fraction,
