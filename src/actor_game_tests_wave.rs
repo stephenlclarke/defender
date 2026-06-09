@@ -1293,7 +1293,7 @@
     }
 
     #[test]
-    fn source_pod_y_motion_wraps_through_source_playfield_bounds() {
+    fn pod_y_motion_wraps_through_arcade_playfield_bounds() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         let top = driver.spawn_pod_from_spawn(ActorPodSpawn {
@@ -1346,7 +1346,7 @@
     }
 
     #[test]
-    fn source_hostile_y_motion_wraps_through_source_playfield_bounds() {
+    fn hostile_y_motion_wraps_through_arcade_playfield_bounds() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         let player = driver.spawn_player();
@@ -1687,7 +1687,7 @@
     }
 
     #[test]
-    fn enemy_laser_actor_advances_source_fixed_point_motion_state() {
+    fn enemy_laser_actor_advances_arcade_fixed_point_motion_state() {
         let behavior = ActorBehaviorProfile {
             lander_shot_lifetime_steps: 4,
             ..ActorBehaviorProfile::default()
