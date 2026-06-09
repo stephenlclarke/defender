@@ -366,7 +366,7 @@ impl Pod {
             position: spawn.position,
             drift: spawn
                 .source
-                .map(|source| actor_source_drift_from_velocity(source.x_velocity))
+                .map(|arcade_state| actor_source_drift_from_velocity(arcade_state.x_velocity))
                 .unwrap_or(1),
             source: spawn.source,
         }
@@ -376,21 +376,21 @@ impl Pod {
         Rect::from_center(self.position, 8, 8)
     }
 
-    fn advance_source_motion(&mut self) -> bool {
-        let Some(source) = &mut self.source else {
+    fn advance_arcade_motion(&mut self) -> bool {
+        let Some(arcade_state) = &mut self.source else {
             return false;
         };
         let (x, x_fraction) =
-            actor_source_axis_step(self.position.x, source.x_fraction, source.x_velocity);
+            actor_source_axis_step(self.position.x, arcade_state.x_fraction, arcade_state.x_velocity);
         let (y, y_fraction) = actor_source_active_object_y_step(
             self.position.y,
-            source.y_fraction,
-            source.y_velocity,
+            arcade_state.y_fraction,
+            arcade_state.y_velocity,
         );
         self.position = Point::new(x, y);
-        source.x_fraction = x_fraction;
-        source.y_fraction = y_fraction;
-        self.drift = actor_source_drift_from_velocity(source.x_velocity);
+        arcade_state.x_fraction = x_fraction;
+        arcade_state.y_fraction = y_fraction;
+        self.drift = actor_source_drift_from_velocity(arcade_state.x_velocity);
         true
     }
 }
@@ -405,7 +405,7 @@ impl AssetActor for Pod {
         let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Pod);
-            if !self.advance_source_motion()
+            if !self.advance_arcade_motion()
                 && let Some(position) = move_by_hostile_mode(
                     self.position,
                     behavior.pod_mode,

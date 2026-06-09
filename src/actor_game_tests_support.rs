@@ -951,13 +951,13 @@
         });
         let mut expected_rng = driver.arcade_rng;
         expected_rng.advance();
-        let expected_first_swarmer = ActorSwarmerSpawn::source_from_pod(
+        let expected_first_swarmer = ActorSwarmerSpawn::from_pod_release(
             &mut expected_rng,
             ArcadeWaveProfile::for_wave(2),
             Point::new(64, 120),
         );
         for _ in 1..POD_SWARMER_REQUEST_LIMIT {
-            ActorSwarmerSpawn::source_from_pod(
+            ActorSwarmerSpawn::from_pod_release(
                 &mut expected_rng,
                 ArcadeWaveProfile::for_wave(2),
                 Point::new(64, 120),

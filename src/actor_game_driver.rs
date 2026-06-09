@@ -2071,7 +2071,7 @@ impl ActorGameDriver {
 
         (0..spawn_count)
             .map(|_| {
-                let spawn = ActorSwarmerSpawn::source_from_pod(
+                let spawn = ActorSwarmerSpawn::from_pod_release(
                     &mut self.arcade_rng,
                     arcade_wave_profile,
                     position,

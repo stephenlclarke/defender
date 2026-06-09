@@ -626,7 +626,7 @@ impl ActorSwarmerSpawn {
         }
     }
 
-    fn source_from_pod(
+    fn from_pod_release(
         arcade_rng: &mut ActorArcadeRng,
         profile: ArcadeWaveProfile,
         position: Point,
@@ -682,7 +682,7 @@ impl ActorSwarmerSpawn {
 
         (0..count)
             .map(|_| {
-                let mut spawn = Self::source_from_pod(arcade_rng, profile, position);
+                let mut spawn = Self::from_pod_release(arcade_rng, profile, position);
                 if let Some(source) = &mut spawn.source {
                     source.x_fraction = x_fraction;
                     source.y_fraction = y_fraction;
@@ -1106,7 +1106,7 @@ impl ArcadeWaveProfile {
         self.active_family_slots()
             .into_iter()
             .filter(|slot| slot.kind == ActorSourceEnemyKind::Swarmer)
-            .map(|slot| ActorSwarmerSpawn::source_from_pod(&mut arcade_rng, self, slot.position))
+            .map(|slot| ActorSwarmerSpawn::from_pod_release(&mut arcade_rng, self, slot.position))
             .collect()
     }
 
