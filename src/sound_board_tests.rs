@@ -145,7 +145,7 @@ mod tests {
     }
 
     #[test]
-    fn source_commands_decode_to_sound_board_actions() {
+    fn sound_board_commands_decode_to_actions() {
         assert_eq!(
             sound_actions_for_command(0xF5),
             vec![SoundAction::GWave(GWaveSound::Vector(10))]

@@ -1402,7 +1402,7 @@
     }
 
     #[test]
-    fn source_swarmer_shot_direction_gate_suppresses_fireball_and_sound() {
+    fn swarmer_shot_direction_gate_suppresses_fireball_and_sound() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 2;
@@ -1475,7 +1475,7 @@
     }
 
     #[test]
-    fn source_swarmer_full_shell_cap_suppresses_fireball_and_sound() {
+    fn swarmer_full_shell_cap_suppresses_fireball_and_sound() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 2;
@@ -1616,7 +1616,7 @@
     }
 
     #[test]
-    fn source_baiter_full_shell_cap_suppresses_fireball_and_sound() {
+    fn baiter_full_shell_cap_suppresses_fireball_and_sound() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 1;

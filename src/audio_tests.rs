@@ -110,7 +110,7 @@ mod tests {
     }
 
     #[test]
-    fn source_sound_actions_cover_clean_sound_events() {
+    fn sound_board_actions_cover_clean_sound_events() {
         assert_eq!(
             sound_actions_for_event(SoundEvent::Startup),
             vec![SoundAction::OrganTune(OrganTune::Phantom)]
@@ -247,7 +247,7 @@ mod tests {
     }
 
     #[test]
-    fn synth_mixer_interrupts_foreground_commands_like_the_source_sound_board() {
+    fn synth_mixer_interrupts_foreground_commands_like_the_arcade_sound_board() {
         let mut mixer = SynthMixer::new(LIVE_AUDIO_TEST_SAMPLE_RATE_HZ);
 
         mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: 0xEA });

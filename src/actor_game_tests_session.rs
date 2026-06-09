@@ -1145,7 +1145,7 @@
         assert_eq!(driver.snapshot_count(ActorKind::Lander), 0);
 
         sounds.extend(collect_driver_smart_bomb_sound_sequence(&mut driver));
-        assert_eq!(sounds, source_smart_bomb_sound_cues());
+        assert_eq!(sounds, smart_bomb_sound_board_cues());
 
         let restored = step_until_driver_source_reserve_activates(&mut driver);
         assert_eq!(

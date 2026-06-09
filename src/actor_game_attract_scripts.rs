@@ -109,11 +109,11 @@ pub enum SoundCue {
     BaiterShot,
     AttractPulse,
     GameOver,
-    SourceCommand(u8),
+    SoundBoardCommand(u8),
 }
 
 impl SoundCue {
-    pub const fn source_sound_command(self) -> Option<u8> {
+    pub const fn sound_board_command(self) -> Option<u8> {
         match self {
             Self::Credit => Some(0xE6),
             Self::Start => Some(0xF5),
@@ -144,7 +144,7 @@ impl SoundCue {
             Self::BaiterShot => Some(0xFC),
             Self::AttractPulse => None,
             Self::GameOver => Some(0xEC),
-            Self::SourceCommand(command) => Some(command),
+            Self::SoundBoardCommand(command) => Some(command),
         }
     }
 
@@ -153,7 +153,7 @@ impl SoundCue {
             Self::Credit => Some(SoundEvent::CreditAdded),
             Self::Start => Some(SoundEvent::GameStarted),
             Self::Thrust => Some(SoundEvent::ThrustStarted),
-            _ => match self.source_sound_command() {
+            _ => match self.sound_board_command() {
                 Some(command) => Some(SoundEvent::UnmappedSoundCommand { command }),
                 None => None,
             },

@@ -789,7 +789,7 @@
         assert!(
             delayed_sound
                 .sounds
-                .contains(&SoundCue::SourceCommand(APPEARANCE_SOUND_COMMAND))
+                .contains(&SoundCue::SoundBoardCommand(APPEARANCE_SOUND_COMMAND))
         );
     }
 
@@ -1539,7 +1539,7 @@
     }
 
     #[test]
-    fn source_lander_shot_timer_controls_first_wave_shot_sound() {
+    fn lander_shot_timer_controls_first_wave_sound_board_command() {
         let mut driver = ActorGameDriver::new();
         driver.step(GameInput {
             coin: true,

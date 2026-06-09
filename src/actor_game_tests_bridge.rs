@@ -30,7 +30,7 @@
     }
 
     #[test]
-    fn actor_sound_cues_expose_red_label_sound_commands() {
+    fn actor_sound_cues_expose_sound_board_commands() {
         let expected = [
             (SoundCue::Credit, 0xE6),
             (SoundCue::Start, 0xF5),
@@ -59,14 +59,14 @@
             (SoundCue::BaiterHit, 0xF8),
             (SoundCue::BaiterShot, 0xFC),
             (SoundCue::GameOver, 0xEC),
-            (SoundCue::SourceCommand(0xE8), 0xE8),
+            (SoundCue::SoundBoardCommand(0xE8), 0xE8),
         ];
 
         for (cue, command) in expected {
-            assert_eq!(cue.source_sound_command(), Some(command), "{cue:?}");
+            assert_eq!(cue.sound_board_command(), Some(command), "{cue:?}");
         }
         for cue in [SoundCue::Hyperspace, SoundCue::AttractPulse] {
-            assert_eq!(cue.source_sound_command(), None, "{cue:?}");
+            assert_eq!(cue.sound_board_command(), None, "{cue:?}");
         }
     }
 
@@ -98,7 +98,7 @@
             Some(SoundEvent::UnmappedSoundCommand { command: 0xF6 })
         );
         assert_eq!(
-            SoundCue::SourceCommand(0xE8).sound_event(),
+            SoundCue::SoundBoardCommand(0xE8).sound_event(),
             Some(SoundEvent::UnmappedSoundCommand { command: 0xE8 })
         );
         assert_eq!(
@@ -135,7 +135,7 @@
             [SoundEvent::UnmappedSoundCommand { command: 0xF6 }]
         );
         assert_eq!(
-            ActorSoundEventBridge::new().sound_events_for_cues(&[SoundCue::SourceCommand(0xE8)]),
+            ActorSoundEventBridge::new().sound_events_for_cues(&[SoundCue::SoundBoardCommand(0xE8)]),
             [SoundEvent::UnmappedSoundCommand { command: 0xE8 }]
         );
         assert_eq!(

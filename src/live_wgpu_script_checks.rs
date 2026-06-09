@@ -845,7 +845,7 @@ fn actor_script_check_sound_commands(frame: &ActorFrame) -> Vec<u8> {
         .report
         .sounds
         .iter()
-        .filter_map(|sound| sound.source_sound_command())
+        .filter_map(|sound| sound.sound_board_command())
         .collect()
 }
 
@@ -861,7 +861,7 @@ fn actor_script_check_hit_sound_commands(frame: &ActorFrame) -> Vec<u8> {
             | SoundCue::BombHit
             | SoundCue::PodHit
             | SoundCue::SwarmerHit
-            | SoundCue::BaiterHit => sound.source_sound_command(),
+            | SoundCue::BaiterHit => sound.sound_board_command(),
             _ => None,
         })
         .collect()
@@ -873,7 +873,7 @@ fn actor_script_check_laser_sound_commands(frame: &ActorFrame) -> Vec<u8> {
         .sounds
         .iter()
         .filter_map(|sound| match sound {
-            SoundCue::Laser => sound.source_sound_command(),
+            SoundCue::Laser => sound.sound_board_command(),
             _ => None,
         })
         .collect()
@@ -888,7 +888,7 @@ fn actor_script_check_projectile_sound_commands(frame: &ActorFrame) -> Vec<u8> {
             SoundCue::LanderShot
             | SoundCue::MutantShot
             | SoundCue::SwarmerShot
-            | SoundCue::BaiterShot => sound.source_sound_command(),
+            | SoundCue::BaiterShot => sound.sound_board_command(),
             _ => None,
         })
         .collect()

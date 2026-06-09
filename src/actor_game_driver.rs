@@ -1064,7 +1064,7 @@ impl ActorGameDriver {
         for mut command in self.pending_sound_commands.drain(..) {
             command.steps_remaining = command.steps_remaining.saturating_sub(1);
             if command.steps_remaining == 0 {
-                sounds.push(SoundCue::SourceCommand(command.command));
+                sounds.push(SoundCue::SoundBoardCommand(command.command));
             } else {
                 pending.push(command);
             }
@@ -1163,7 +1163,7 @@ impl ActorGameDriver {
                 terrain_blow.source_sleep_remaining = None;
                 terrain_blow.source_pseudo_color = 0;
             }
-            sounds.push(SoundCue::SourceCommand(TERRAIN_BLOW_SOUND_COMMAND));
+            sounds.push(SoundCue::SoundBoardCommand(TERRAIN_BLOW_SOUND_COMMAND));
             self.queue_terrain_blow_sound_tail();
             return sounds;
         }
@@ -1191,7 +1191,7 @@ impl ActorGameDriver {
             }
         }
         if start_sound_index.is_some() {
-            sounds.push(SoundCue::SourceCommand(SMART_BOMB_SOUND_COMMAND));
+            sounds.push(SoundCue::SoundBoardCommand(SMART_BOMB_SOUND_COMMAND));
         }
         sounds
     }

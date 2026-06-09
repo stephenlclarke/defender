@@ -170,14 +170,14 @@ impl SampleVoice {
 fn sound_actions_for_event(event: SoundEvent) -> Vec<SoundAction> {
     match event {
         SoundEvent::Startup => vec![SoundAction::OrganTune(OrganTune::Phantom)],
-        SoundEvent::CreditAdded => source_command_sound_actions(0xE6),
-        SoundEvent::GameStarted => source_command_sound_actions(0xF5),
+        SoundEvent::CreditAdded => sound_board_command_actions(0xE6),
+        SoundEvent::GameStarted => sound_board_command_actions(0xF5),
         SoundEvent::ThrustStarted => vec![SoundAction::Special(SpecialSound::Thrust)],
-        SoundEvent::ThrustStopped => source_command_sound_actions(0xF0),
-        SoundEvent::UnmappedSoundCommand { command } => source_command_sound_actions(command),
+        SoundEvent::ThrustStopped => sound_board_command_actions(0xF0),
+        SoundEvent::UnmappedSoundCommand { command } => sound_board_command_actions(command),
     }
 }
 
-fn source_command_sound_actions(command: u8) -> Vec<SoundAction> {
+fn sound_board_command_actions(command: u8) -> Vec<SoundAction> {
     sound_actions_for_command(command)
 }

@@ -1,5 +1,5 @@
     #[test]
-    fn falling_human_rescue_queues_source_acsnd_tail() {
+    fn falling_human_rescue_queues_sound_board_command_tail() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
@@ -23,11 +23,11 @@
             vec![
                 (
                     10,
-                    vec![SoundCue::SourceCommand(ASTRONAUT_CATCH_SOUND_COMMAND)]
+                    vec![SoundCue::SoundBoardCommand(ASTRONAUT_CATCH_SOUND_COMMAND)]
                 ),
                 (
                     20,
-                    vec![SoundCue::SourceCommand(ASTRONAUT_CATCH_SOUND_COMMAND)]
+                    vec![SoundCue::SoundBoardCommand(ASTRONAUT_CATCH_SOUND_COMMAND)]
                 ),
             ]
         );
@@ -118,7 +118,7 @@
     }
 
     #[test]
-    fn actor_source_terrain_blow_advances_flash_explosions_and_sound_tail() {
+    fn actor_terrain_blow_advances_flash_explosions_and_sound_tail() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 1;
@@ -167,7 +167,7 @@
         }
 
         assert!(saw_completion);
-        assert_eq!(observed_sounds, source_terrain_blow_sound_cues());
+        assert_eq!(observed_sounds, terrain_blow_sound_board_cues());
     }
 
     #[test]
@@ -891,7 +891,7 @@
     }
 
     #[test]
-    fn driver_resolves_laser_mutant_collision_with_source_score_sound() {
+    fn driver_resolves_laser_mutant_collision_with_sound_board_score_command() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
@@ -914,7 +914,7 @@
     }
 
     #[test]
-    fn driver_resolves_laser_bomber_collision_with_source_score_sound_and_explosion() {
+    fn driver_resolves_laser_bomber_collision_with_sound_board_score_command_and_explosion() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
@@ -938,7 +938,7 @@
     }
 
     #[test]
-    fn driver_resolves_laser_pod_collision_with_source_score_sound_and_explosion() {
+    fn driver_resolves_laser_pod_collision_with_sound_board_score_command_and_explosion() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 2;
@@ -1006,7 +1006,7 @@
     }
 
     #[test]
-    fn driver_resolves_laser_baiter_collision_with_source_score_sound_and_explosion() {
+    fn driver_resolves_laser_baiter_collision_with_sound_board_score_command_and_explosion() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
@@ -1029,7 +1029,7 @@
     }
 
     #[test]
-    fn bomb_collision_enters_game_over_with_source_bomb_sound() {
+    fn bomb_collision_enters_game_over_with_sound_board_bomb_command() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.lives = 1;
@@ -1450,26 +1450,26 @@
         panic!("source smart bomb should detonate after the source delay");
     }
 
-    fn source_smart_bomb_sound_cues() -> Vec<SoundCue> {
+    fn smart_bomb_sound_board_cues() -> Vec<SoundCue> {
         SMART_BOMB_SOUND_SEQUENCE
             .iter()
-            .map(|(_, command)| SoundCue::SourceCommand(*command))
+            .map(|(_, command)| SoundCue::SoundBoardCommand(*command))
             .collect()
     }
 
-    fn source_terrain_blow_sound_cues() -> Vec<(u16, Vec<SoundCue>)> {
+    fn terrain_blow_sound_board_cues() -> Vec<(u16, Vec<SoundCue>)> {
         TERRAIN_BLOW_START_SOUND_FRAMES
             .iter()
             .copied()
             .map(|frame| {
                 (
                     frame,
-                    vec![SoundCue::SourceCommand(SMART_BOMB_SOUND_COMMAND)],
+                    vec![SoundCue::SoundBoardCommand(SMART_BOMB_SOUND_COMMAND)],
                 )
             })
             .chain(std::iter::once((
                 TERRAIN_BLOW_COMPLETE_FRAME,
-                vec![SoundCue::SourceCommand(TERRAIN_BLOW_SOUND_COMMAND)],
+                vec![SoundCue::SoundBoardCommand(TERRAIN_BLOW_SOUND_COMMAND)],
             )))
             .chain(
                 TERRAIN_BLOW_SOUND_TAIL_SEQUENCE
@@ -1478,7 +1478,7 @@
                     .map(|(offset, command)| {
                         (
                             TERRAIN_BLOW_COMPLETE_FRAME + u16::from(offset),
-                            vec![SoundCue::SourceCommand(command)],
+                            vec![SoundCue::SoundBoardCommand(command)],
                         )
                     }),
             )
@@ -1489,7 +1489,7 @@
         let mut sounds = Vec::new();
         let last_step = SMART_BOMB_SOUND_SEQUENCE
             .last()
-            .expect("source smart bomb sound sequence should not be empty")
+            .expect("smart bomb sound sequence should not be empty")
             .0;
         for _ in 0..last_step {
             sounds.extend(driver.step(GameInput::NONE).sounds);
