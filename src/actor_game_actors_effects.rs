@@ -62,15 +62,15 @@ impl Human {
         }
 
         if let Some(arcade_rng) = arcade_rng {
-            self.advance_source_walk(arcade_rng.seed);
+            self.advance_arcade_walk(arcade_rng.seed);
         }
     }
 
-    fn advance_source_walk(&mut self, source_seed: u8) {
+    fn advance_arcade_walk(&mut self, arcade_seed: u8) {
         if let Some(source) = &mut self.source {
             let frame = source.picture_frame % 4;
             let (next_frame, target_y, velocity) = if frame <= 1 {
-                if source_seed <= HUMAN_TURN_SEED_MAX {
+                if arcade_seed <= HUMAN_TURN_SEED_MAX {
                     (2, None, HUMAN_RIGHT_X_VELOCITY)
                 } else {
                     (
@@ -79,7 +79,7 @@ impl Human {
                         HUMAN_LEFT_X_VELOCITY,
                     )
                 }
-            } else if source_seed <= HUMAN_TURN_SEED_MAX {
+            } else if arcade_seed <= HUMAN_TURN_SEED_MAX {
                 (0, None, HUMAN_LEFT_X_VELOCITY)
             } else {
                 (
