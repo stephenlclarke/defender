@@ -6,7 +6,10 @@
 //! world rules in a stable order, and publishes a step description.
 
 include!("actor_game_core.rs");
-include!("actor_game_behavior_sources.rs");
+include!("actor_game_behavior_scripts.rs");
+include!("actor_game_arcade_state.rs");
+include!("actor_game_spawn_patterns.rs");
+include!("actor_game_wave_profile.rs");
 include!("actor_game_wave_scripts.rs");
 include!("actor_game_attract_scripts.rs");
 include!("actor_game_protocol.rs");
