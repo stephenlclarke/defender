@@ -1903,8 +1903,8 @@
             position.y = mutant_arcade_hop_y(position.y, profile.mutant_random_y, hop_state.seed);
             source.shot_timer = source.shot_timer.wrapping_sub(1);
             if source.shot_timer == 0 {
-                let shot_rng = actor_source_mutant_shot_rng(prompt, actor, position);
-                source.shot_timer = actor_source_mutant_shot_reset(profile, shot_rng.seed);
+                let shot_rng = mutant_arcade_shot_rng(prompt, actor, position);
+                source.shot_timer = mutant_arcade_shot_reset(profile, shot_rng.seed);
                 shot = actor_source_mutant_fireball(position, prompt, behavior, source, shot_rng)
                     .map(|(velocity, projectile_source)| (position, velocity, projectile_source));
             }

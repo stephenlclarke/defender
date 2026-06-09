@@ -577,7 +577,7 @@ impl Mutant {
                 )
             {
                 source.target6_first_shot_deferred = true;
-                let shot_rng = actor_source_mutant_shot_rng(prompt, self.id, self.position);
+                let shot_rng = mutant_arcade_shot_rng(prompt, self.id, self.position);
                 let shot_position =
                     actor_source_target6_mutant_shot_position(self.position, *source);
                 push_source_mutant_shot(
@@ -628,7 +628,7 @@ impl Mutant {
                 mutant_arcade_hop_y(self.position.y, profile.mutant_random_y, hop_state.seed);
 
             if target6_forced_dive_shot {
-                let shot_rng = actor_source_mutant_shot_rng(prompt, self.id, self.position);
+                let shot_rng = mutant_arcade_shot_rng(prompt, self.id, self.position);
                 let shot_position = actor_source_target6_mutant_shot_position(
                     target6_forced_dive_shot_position,
                     *source,
@@ -656,8 +656,8 @@ impl Mutant {
                         source.shot_timer = TARGET6_MUTANT_DEFERRED_SHOT_TIMER;
                         next_sleep_ticks = 0;
                     } else {
-                        let shot_rng = actor_source_mutant_shot_rng(prompt, self.id, self.position);
-                        let default_reset = actor_source_mutant_shot_reset(profile, shot_rng.seed);
+                        let shot_rng = mutant_arcade_shot_rng(prompt, self.id, self.position);
+                        let default_reset = mutant_arcade_shot_reset(profile, shot_rng.seed);
                         let shot_position =
                             actor_source_target6_mutant_shot_position(self.position, *source);
                         let fired = push_source_mutant_shot(
@@ -848,7 +848,7 @@ fn mutant_arcade_hop_y(position_y: i16, random_y: u8, seed: u8) -> i16 {
     i16::from(y)
 }
 
-fn actor_source_mutant_shot_rng(
+fn mutant_arcade_shot_rng(
     prompt: &StepPrompt,
     actor: ActorId,
     position: Point,
@@ -864,7 +864,7 @@ fn actor_source_mutant_shot_rng(
     arcade_rng.advance().snapshot()
 }
 
-fn actor_source_mutant_shot_reset(profile: ArcadeWaveProfile, seed: u8) -> u8 {
+fn mutant_arcade_shot_reset(profile: ArcadeWaveProfile, seed: u8) -> u8 {
     arcade_rmax(
         profile.mutant_shot_time.max(1).min(u32::from(u8::MAX)) as u8,
         seed,
