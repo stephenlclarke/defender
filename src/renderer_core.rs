@@ -564,19 +564,19 @@ fn blit_scene_raster_nearest(
 
     for target_y in layout.origin[1]..layout.origin[1] + layout.size.height {
         let viewport_y = target_y - layout.origin[1];
-        let source_y =
-            nearest_source_coordinate(viewport_y, layout.size.height, raster.surface.height);
+        let raster_y =
+            nearest_sample_coordinate(viewport_y, layout.size.height, raster.surface.height);
         for target_x in layout.origin[0]..layout.origin[0] + layout.size.width {
             let viewport_x = target_x - layout.origin[0];
-            let source_x =
-                nearest_source_coordinate(viewport_x, layout.size.width, raster.surface.width);
-            let source_index =
-                rgba_index(raster.surface, source_x, source_y).expect("raster index in bounds");
+            let raster_x =
+                nearest_sample_coordinate(viewport_x, layout.size.width, raster.surface.width);
+            let raster_index =
+                rgba_index(raster.surface, raster_x, raster_y).expect("raster index in bounds");
             let target_index =
                 rgba_index(target, target_x, target_y).expect("target index in bounds");
             blend_rgba(
                 &mut pixels[target_index..target_index + 4],
-                &raster.pixels()[source_index..source_index + 4],
+                &raster.pixels()[raster_index..raster_index + 4],
             );
         }
     }
@@ -612,16 +612,16 @@ fn blit_scene_sprite_nearest(
 
     for y in clip_top..clip_bottom {
         let local_y = (y as i32 - target_y) as u32;
-        let source_y = nearest_source_coordinate(local_y, target_height, region.size[1]);
+        let sprite_y = nearest_sample_coordinate(local_y, target_height, region.size[1]);
         for x in clip_left..clip_right {
             let local_x = (x as i32 - target_x) as u32;
-            let source_x = nearest_source_coordinate(local_x, target_width, region.size[0]);
-            let atlas_x = region.origin[0] + source_x;
-            let atlas_y = region.origin[1] + source_y;
-            let Some(source_index) = rgba_index(atlas.surface, atlas_x, atlas_y) else {
+            let sprite_x = nearest_sample_coordinate(local_x, target_width, region.size[0]);
+            let atlas_x = region.origin[0] + sprite_x;
+            let atlas_y = region.origin[1] + sprite_y;
+            let Some(atlas_index) = rgba_index(atlas.surface, atlas_x, atlas_y) else {
                 continue;
             };
-            let tinted = tint_rgba(&atlas.pixels()[source_index..source_index + 4], sprite.tint);
+            let tinted = tint_rgba(&atlas.pixels()[atlas_index..atlas_index + 4], sprite.tint);
             if tinted[3] == 0 {
                 continue;
             }
@@ -635,17 +635,17 @@ fn scaled_sprite_extent(extent: f32, scale: f32) -> u32 {
     (extent * scale).round().max(1.0) as u32
 }
 
-fn nearest_source_coordinate(
+fn nearest_sample_coordinate(
     target_coordinate: u32,
     target_extent: u32,
-    source_extent: u32,
+    sample_extent: u32,
 ) -> u32 {
-    if target_extent == 0 || source_extent == 0 {
+    if target_extent == 0 || sample_extent == 0 {
         return 0;
     }
 
-    ((u64::from(target_coordinate) * u64::from(source_extent)) / u64::from(target_extent))
-        .min(u64::from(source_extent.saturating_sub(1))) as u32
+    ((u64::from(target_coordinate) * u64::from(sample_extent)) / u64::from(target_extent))
+        .min(u64::from(sample_extent.saturating_sub(1))) as u32
 }
 
 fn rgba_index(surface: SurfaceSize, x: u32, y: u32) -> Option<usize> {
@@ -658,12 +658,12 @@ fn rgba_index(surface: SurfaceSize, x: u32, y: u32) -> Option<usize> {
     pixel_offset.checked_mul(4)
 }
 
-fn tint_rgba(source: &[u8], tint: Color) -> [u8; 4] {
+fn tint_rgba(input_pixel: &[u8], tint: Color) -> [u8; 4] {
     [
-        multiply_u8(source[0], tint.rgba[0]),
-        multiply_u8(source[1], tint.rgba[1]),
-        multiply_u8(source[2], tint.rgba[2]),
-        multiply_u8(source[3], tint.rgba[3]),
+        multiply_u8(input_pixel[0], tint.rgba[0]),
+        multiply_u8(input_pixel[1], tint.rgba[1]),
+        multiply_u8(input_pixel[2], tint.rgba[2]),
+        multiply_u8(input_pixel[3], tint.rgba[3]),
     ]
 }
 
@@ -671,11 +671,11 @@ fn multiply_u8(left: u8, right: u8) -> u8 {
     ((u16::from(left) * u16::from(right) + 127) / 255) as u8
 }
 
-fn blend_rgba(destination: &mut [u8], source: &[u8]) {
-    let alpha = u16::from(source[3]);
+fn blend_rgba(destination: &mut [u8], input_pixel: &[u8]) {
+    let alpha = u16::from(input_pixel[3]);
     let inverse_alpha = 255 - alpha;
     for channel in 0..3 {
-        destination[channel] = ((u16::from(source[channel]) * alpha
+        destination[channel] = ((u16::from(input_pixel[channel]) * alpha
             + u16::from(destination[channel]) * inverse_alpha
             + 127)
             / 255) as u8;
