@@ -1144,7 +1144,7 @@
                 source.x_fraction,
                 source.x_velocity,
             );
-            let (y, y_fraction) = actor_source_active_object_y_step(
+            let (y, y_fraction) = arcade_active_object_y_step(
                 expected_pod.position.y,
                 source.y_fraction,
                 source.y_velocity,

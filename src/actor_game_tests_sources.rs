@@ -1361,7 +1361,7 @@
             arcade_state.x_fraction,
             expected_arcade_state.x_velocity,
         );
-        let (expected_y, expected_y_fraction) = actor_source_active_object_y_step(
+        let (expected_y, expected_y_fraction) = arcade_active_object_y_step(
             start.y,
             arcade_state.y_fraction,
             expected_arcade_state.y_velocity,
@@ -1448,7 +1448,7 @@
             arcade_state.x_fraction,
             expected_arcade_state.x_velocity,
         );
-        let (expected_y, expected_y_fraction) = actor_source_active_object_y_step(
+        let (expected_y, expected_y_fraction) = arcade_active_object_y_step(
             start.y,
             arcade_state.y_fraction,
             expected_arcade_state.y_velocity,
@@ -1605,7 +1605,7 @@
             expected_arcade_state.x_fraction,
             baiter_screen_x_velocity(expected_arcade_state.x_velocity),
         );
-        let (expected_y, expected_y_fraction) = actor_source_active_object_y_step(
+        let (expected_y, expected_y_fraction) = arcade_active_object_y_step(
             120,
             expected_arcade_state.y_fraction,
             expected_arcade_state.y_velocity,

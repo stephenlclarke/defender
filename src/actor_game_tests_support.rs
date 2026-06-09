@@ -1588,7 +1588,7 @@
         let (x, x_fraction) =
             arcade_axis_step(position.x, arcade_state.x_fraction, arcade_state.x_velocity);
         let (y, y_fraction) =
-            actor_source_active_object_y_step(position.y, arcade_state.y_fraction, arcade_state.y_velocity);
+            arcade_active_object_y_step(position.y, arcade_state.y_fraction, arcade_state.y_velocity);
         arcade_state.x_fraction = x_fraction;
         arcade_state.y_fraction = y_fraction;
         (Point::new(x, y), arcade_state)
@@ -1915,7 +1915,7 @@
         let (x, x_fraction) =
             arcade_axis_step(position.x, source.x_fraction, source.x_velocity);
         let (y, y_fraction) =
-            actor_source_active_object_y_step(position.y, source.y_fraction, source.y_velocity);
+            arcade_active_object_y_step(position.y, source.y_fraction, source.y_velocity);
         source.x_fraction = x_fraction;
         source.y_fraction = y_fraction;
         source.sleep_ticks = MUTANT_LOOP_SLEEP_TICKS;
