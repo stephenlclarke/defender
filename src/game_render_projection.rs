@@ -2,7 +2,7 @@ fn attract_title_reference_sample_index(page_frame: u16) -> usize {
     usize::from(page_frame / ATTRACT_TITLE_REFERENCE_SAMPLE_STEP_FRAMES).saturating_sub(1)
 }
 
-fn source_pseudo_color_tint(value: u8) -> Color {
+fn williams_color_byte_tint(value: u8) -> Color {
     if value == 0 {
         return Color::from_rgba(0, 0, 0, 0);
     }
@@ -18,7 +18,7 @@ fn source_pseudo_color_tint(value: u8) -> Color {
 pub(crate) fn arcade_wave_landscape_tint(wave: u16) -> Color {
     let wave = wave.max(1);
     let index = usize::from((wave - 1) % WAVE_LANDSCAPE_COLOR_BYTES.len() as u16);
-    source_pseudo_color_tint(WAVE_LANDSCAPE_COLOR_BYTES[index])
+    williams_color_byte_tint(WAVE_LANDSCAPE_COLOR_BYTES[index])
 }
 
 pub(crate) fn terrain_blow_flash_tint(elapsed: u16) -> Color {
@@ -26,15 +26,15 @@ pub(crate) fn terrain_blow_flash_tint(elapsed: u16) -> Color {
         .iter()
         .find_map(|(start, end, color)| (*start <= elapsed && elapsed <= *end).then_some(*color))
         .unwrap_or(0);
-    source_pseudo_color_tint(color)
+    williams_color_byte_tint(color)
 }
 
-fn source_video_palette_index_tint(index: u8) -> Color {
-    source_pseudo_color_tint(NORMAL_PALETTE_BYTES[usize::from(index & 0x0F)])
+fn video_palette_index_tint(index: u8) -> Color {
+    williams_color_byte_tint(NORMAL_PALETTE_BYTES[usize::from(index & 0x0F)])
 }
 
-fn source_video_word_tint(word: u16) -> Color {
-    source_video_palette_index_tint((word & 0x000F) as u8)
+fn video_word_tint(word: u16) -> Color {
+    video_palette_index_tint((word & 0x000F) as u8)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -427,7 +427,7 @@ fn sprite_asset_nibble_tint(index: u8) -> Option<Color> {
     match index {
         0x0 => None,
         0x1 | 0xA | 0xC | 0xD | 0xE | 0xF => Some(Color::WHITE),
-        0x2..=0x9 => Some(source_pseudo_color_tint(
+        0x2..=0x9 => Some(williams_color_byte_tint(
             NORMAL_PALETTE_BYTES[usize::from(index)],
         )),
         0xB => Some(Color::from_rgba(170, 170, 186, 0xFF)),
@@ -528,7 +528,7 @@ fn push_scanner_byte_pixels(
 ) {
     let base = source_screen_position(screen_address);
     for (x_offset, palette_index) in [(0.0, byte >> 4), (1.0, byte & 0x0F)] {
-        let tint = source_video_palette_index_tint(palette_index);
+        let tint = video_palette_index_tint(palette_index);
         if tint.rgba[3] == 0 {
             continue;
         }
@@ -879,7 +879,7 @@ fn pixel_cloud_tint(source_tint: Color, tick: u32, index: usize) -> Color {
 }
 
 fn cycling_palette_tint(phase: usize) -> Color {
-    source_pseudo_color_tint(COLTAB_COLOR_BYTES[phase % COLTAB_ACTIVE_BYTES])
+    williams_color_byte_tint(COLTAB_COLOR_BYTES[phase % COLTAB_ACTIVE_BYTES])
 }
 
 const EXPLOSION_RENDER_MAX_SCALE: u8 = 3; // original: SOURCE_EXPLOSION_RENDER_MAX_SCALE

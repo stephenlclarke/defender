@@ -364,15 +364,15 @@ impl SourceVisualStateSnapshot {
     }
 
     pub(crate) fn top_display_scanner_marker_tint(self) -> Color {
-        source_video_word_tint(self.top_display_scanner_marker_word)
+        video_word_tint(self.top_display_scanner_marker_word)
     }
 
-    pub(crate) fn scanner_object_blip_tint(self, source_color_word: u16) -> Color {
-        source_video_word_tint(source_color_word)
+    pub(crate) fn scanner_object_blip_tint(self, color_word: u16) -> Color {
+        video_word_tint(color_word)
     }
 
     pub(crate) fn scanner_player_blip_tint(self, body_word: u16) -> Color {
-        source_video_word_tint(body_word)
+        video_word_tint(body_word)
     }
 
     pub(crate) fn attract_williams_logo_tint_for_frame(self, page_frame: u16) -> Color {
@@ -381,13 +381,13 @@ impl SourceVisualStateSnapshot {
             .copied()
             .filter(|color_byte| *color_byte != 0)
         {
-            return source_pseudo_color_tint(color_byte);
+            return williams_color_byte_tint(color_byte);
         }
 
-        let source_rate_tick = page_frame.saturating_sub(ATTRACT_WILLIAMS_TIE_COLOR_PRIME_FRAMES)
+        let color_cycle_tick = page_frame.saturating_sub(ATTRACT_WILLIAMS_TIE_COLOR_PRIME_FRAMES)
             / ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_FRAMES.max(1);
-        let tie_triplet = usize::from(source_rate_tick % 3) * 3;
-        source_pseudo_color_tint(
+        let tie_triplet = usize::from(color_cycle_tick % 3) * 3;
+        williams_color_byte_tint(
             TIE_COLOR_BYTES[tie_triplet + ATTRACT_WILLIAMS_TIE_COLOR_SLOT_OFFSET],
         )
     }
