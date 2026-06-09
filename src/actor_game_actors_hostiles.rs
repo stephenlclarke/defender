@@ -755,7 +755,7 @@ impl Baiter {
                 let seed = prompt
                     .arcade_rng
                     .map(|arcade_rng| arcade_rng.seed)
-                    .unwrap_or_else(|| actor_source_motion_seed(prompt.step, self.id));
+                    .unwrap_or_else(|| arcade_motion_seed(prompt.step, self.id));
                 update_baiter_arcade_velocity(
                     arcade_state,
                     self.position,
@@ -835,7 +835,7 @@ fn baiter_shot_arcade_rng(
     position: Point,
 ) -> ActorArcadeRngSnapshot {
     prompt.arcade_rng.unwrap_or(ActorArcadeRngSnapshot {
-        seed: actor_source_motion_seed(prompt.step, actor),
+        seed: arcade_motion_seed(prompt.step, actor),
         hseed: position.x as u8,
         lseed: position.y as u8,
     })
@@ -1013,7 +1013,7 @@ fn actor_source_velocity_word(value: i16) -> u16 {
     value as u16
 }
 
-fn actor_source_motion_seed(step: u64, id: ActorId) -> u8 {
+fn arcade_motion_seed(step: u64, id: ActorId) -> u8 {
     (step as u8).wrapping_mul(17).wrapping_add(id.value() as u8)
 }
 

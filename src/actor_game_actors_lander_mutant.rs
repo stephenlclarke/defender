@@ -857,7 +857,7 @@ fn actor_source_mutant_shot_rng(
         .arcade_rng
         .map(arcade_rng_from_snapshot)
         .unwrap_or(ActorArcadeRng {
-            seed: actor_source_motion_seed(prompt.step, actor),
+            seed: arcade_motion_seed(prompt.step, actor),
             hseed: position.x as u8,
             lseed: position.y as u8,
         });
