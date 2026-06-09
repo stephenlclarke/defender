@@ -579,7 +579,7 @@ pub(crate) fn push_explosion_cloud_pixels(
 pub(crate) fn push_appearance_cloud_pixels(
     scene: &mut RenderScene,
     position: ScreenPosition,
-    sprite_frame_label: &'static str,
+    sprite_asset_label: &'static str,
     picture_size: (u8, u8),
     mapped_sprite: SpriteId,
     growth_size: u16,
@@ -587,7 +587,7 @@ pub(crate) fn push_appearance_cloud_pixels(
     let detail = ExpandedObjectDetailSnapshot {
         kind: ExpandedObjectKind::Appearance,
         size: growth_size,
-        sprite_frame_label: Some(sprite_frame_label),
+        sprite_asset_label: Some(sprite_asset_label),
         picture_size: Some(picture_size),
         mapped_sprite: Some(mapped_sprite),
         center: Some(appearance_center(position, picture_size)),
@@ -668,29 +668,29 @@ const PIXEL_CLOUD_EXPLOSION_FIRST_VISIBLE_FRAME: u8 = 2; // original: SOURCE_EXP
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct PixelCloudAsset {
-    sprite_frame_label: &'static str,
+    sprite_asset_label: &'static str,
     image: SpriteAssetImageSpec,
 }
 
-const LANDER_FIRST_SPRITE_FRAME_LABEL: &str = "LNDP1"; // original: LNDP1
-const LANDER_SECOND_SPRITE_FRAME_LABEL: &str = "LNDP2"; // original: LNDP2
-const LANDER_THIRD_SPRITE_FRAME_LABEL: &str = "LNDP3"; // original: LNDP3
-const MUTANT_SPRITE_FRAME_LABEL: &str = "SCZP1"; // original: SCZP1
-const BOMBER_FIRST_SPRITE_FRAME_LABEL: &str = "TIEP1"; // original: TIEP1
-const BOMBER_SECOND_SPRITE_FRAME_LABEL: &str = "TIEP2"; // original: TIEP2
-const BOMBER_THIRD_SPRITE_FRAME_LABEL: &str = "TIEP3"; // original: TIEP3
-const BOMBER_FOURTH_SPRITE_FRAME_LABEL: &str = "TIEP4"; // original: TIEP4
-const POD_SPRITE_FRAME_LABEL: &str = "PRBP1"; // original: PRBP1
-const BAITER_FIRST_SPRITE_FRAME_LABEL: &str = "UFOP1"; // original: UFOP1
-const BAITER_SECOND_SPRITE_FRAME_LABEL: &str = "UFOP2"; // original: UFOP2
-const BAITER_THIRD_SPRITE_FRAME_LABEL: &str = "UFOP3"; // original: UFOP3
-const SWARMER_SPRITE_FRAME_LABEL: &str = "SWPIC1"; // original: SWPIC1
-const SWARMER_EXPLOSION_SPRITE_FRAME_LABEL: &str = "SWXP1"; // original: SWXP1
-const TERRAIN_EXPLOSION_SPRITE_FRAME_LABEL: &str = "TEREX"; // original: TEREX
+const LANDER_FIRST_SPRITE_ASSET_LABEL: &str = "LNDP1"; // original: LNDP1
+const LANDER_SECOND_SPRITE_ASSET_LABEL: &str = "LNDP2"; // original: LNDP2
+const LANDER_THIRD_SPRITE_ASSET_LABEL: &str = "LNDP3"; // original: LNDP3
+const MUTANT_SPRITE_ASSET_LABEL: &str = "SCZP1"; // original: SCZP1
+const BOMBER_FIRST_SPRITE_ASSET_LABEL: &str = "TIEP1"; // original: TIEP1
+const BOMBER_SECOND_SPRITE_ASSET_LABEL: &str = "TIEP2"; // original: TIEP2
+const BOMBER_THIRD_SPRITE_ASSET_LABEL: &str = "TIEP3"; // original: TIEP3
+const BOMBER_FOURTH_SPRITE_ASSET_LABEL: &str = "TIEP4"; // original: TIEP4
+const POD_SPRITE_ASSET_LABEL: &str = "PRBP1"; // original: PRBP1
+const BAITER_FIRST_SPRITE_ASSET_LABEL: &str = "UFOP1"; // original: UFOP1
+const BAITER_SECOND_SPRITE_ASSET_LABEL: &str = "UFOP2"; // original: UFOP2
+const BAITER_THIRD_SPRITE_ASSET_LABEL: &str = "UFOP3"; // original: UFOP3
+const SWARMER_SPRITE_ASSET_LABEL: &str = "SWPIC1"; // original: SWPIC1
+const SWARMER_EXPLOSION_SPRITE_ASSET_LABEL: &str = "SWXP1"; // original: SWXP1
+const TERRAIN_EXPLOSION_SPRITE_ASSET_LABEL: &str = "TEREX"; // original: TEREX
 
 const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
     PixelCloudAsset {
-        sprite_frame_label: LANDER_FIRST_SPRITE_FRAME_LABEL,
+        sprite_asset_label: LANDER_FIRST_SPRITE_ASSET_LABEL,
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::LanderFrame1Primary,
             rows: 8,
@@ -698,7 +698,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         },
     },
     PixelCloudAsset {
-        sprite_frame_label: LANDER_SECOND_SPRITE_FRAME_LABEL,
+        sprite_asset_label: LANDER_SECOND_SPRITE_ASSET_LABEL,
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::LanderFrame2Primary,
             rows: 8,
@@ -706,7 +706,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         },
     },
     PixelCloudAsset {
-        sprite_frame_label: LANDER_THIRD_SPRITE_FRAME_LABEL,
+        sprite_asset_label: LANDER_THIRD_SPRITE_ASSET_LABEL,
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::LanderFrame3Primary,
             rows: 8,
@@ -714,7 +714,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         },
     },
     PixelCloudAsset {
-        sprite_frame_label: MUTANT_SPRITE_FRAME_LABEL,
+        sprite_asset_label: MUTANT_SPRITE_ASSET_LABEL,
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::MutantPrimary,
             rows: 8,
@@ -722,7 +722,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         },
     },
     PixelCloudAsset {
-        sprite_frame_label: BOMBER_FIRST_SPRITE_FRAME_LABEL,
+        sprite_asset_label: BOMBER_FIRST_SPRITE_ASSET_LABEL,
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::BomberFrame1Primary,
             rows: 8,
@@ -730,7 +730,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         },
     },
     PixelCloudAsset {
-        sprite_frame_label: BOMBER_SECOND_SPRITE_FRAME_LABEL,
+        sprite_asset_label: BOMBER_SECOND_SPRITE_ASSET_LABEL,
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::BomberFrame2Primary,
             rows: 8,
@@ -738,7 +738,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         },
     },
     PixelCloudAsset {
-        sprite_frame_label: BOMBER_THIRD_SPRITE_FRAME_LABEL,
+        sprite_asset_label: BOMBER_THIRD_SPRITE_ASSET_LABEL,
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::BomberFrame3Primary,
             rows: 8,
@@ -746,7 +746,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         },
     },
     PixelCloudAsset {
-        sprite_frame_label: BOMBER_FOURTH_SPRITE_FRAME_LABEL,
+        sprite_asset_label: BOMBER_FOURTH_SPRITE_ASSET_LABEL,
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::BomberFrame4Primary,
             rows: 8,
@@ -754,7 +754,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         },
     },
     PixelCloudAsset {
-        sprite_frame_label: POD_SPRITE_FRAME_LABEL,
+        sprite_asset_label: POD_SPRITE_ASSET_LABEL,
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::PodPrimary,
             rows: 8,
@@ -762,7 +762,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         },
     },
     PixelCloudAsset {
-        sprite_frame_label: BAITER_FIRST_SPRITE_FRAME_LABEL,
+        sprite_asset_label: BAITER_FIRST_SPRITE_ASSET_LABEL,
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::BaiterFrame1Primary,
             rows: 4,
@@ -770,7 +770,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         },
     },
     PixelCloudAsset {
-        sprite_frame_label: BAITER_SECOND_SPRITE_FRAME_LABEL,
+        sprite_asset_label: BAITER_SECOND_SPRITE_ASSET_LABEL,
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::BaiterFrame2Primary,
             rows: 4,
@@ -778,7 +778,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         },
     },
     PixelCloudAsset {
-        sprite_frame_label: BAITER_THIRD_SPRITE_FRAME_LABEL,
+        sprite_asset_label: BAITER_THIRD_SPRITE_ASSET_LABEL,
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::BaiterFrame3Primary,
             rows: 4,
@@ -786,7 +786,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         },
     },
     PixelCloudAsset {
-        sprite_frame_label: SWARMER_SPRITE_FRAME_LABEL,
+        sprite_asset_label: SWARMER_SPRITE_ASSET_LABEL,
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::SwarmerPrimary,
             rows: 4,
@@ -794,7 +794,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         },
     },
     PixelCloudAsset {
-        sprite_frame_label: SWARMER_EXPLOSION_SPRITE_FRAME_LABEL,
+        sprite_asset_label: SWARMER_EXPLOSION_SPRITE_ASSET_LABEL,
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::SwarmerExplosion,
             rows: 8,
@@ -802,7 +802,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         },
     },
     PixelCloudAsset {
-        sprite_frame_label: TERRAIN_EXPLOSION_SPRITE_FRAME_LABEL,
+        sprite_asset_label: TERRAIN_EXPLOSION_SPRITE_ASSET_LABEL,
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::TerrainExplosion,
             rows: 6,
@@ -812,10 +812,10 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
 ];
 
 fn pixel_cloud_sprite_asset(detail: &ExpandedObjectDetailSnapshot) -> Option<SpriteAssetImageSpec> {
-    let sprite_frame_label = detail.sprite_frame_label?;
+    let sprite_asset_label = detail.sprite_asset_label?;
     PIXEL_CLOUD_SPRITE_ASSETS
         .iter()
-        .find(|asset| asset.sprite_frame_label == sprite_frame_label)
+        .find(|asset| asset.sprite_asset_label == sprite_asset_label)
         .map(|asset| asset.image)
 }
 

@@ -892,96 +892,96 @@
     }
 
     #[test]
-    fn object_picture_labels_map_reclassified_clean_sprite_assets() {
+    fn legacy_object_bitmap_labels_map_reclassified_clean_sprite_assets() {
         assert_eq!(
-            SpriteId::for_object_picture_label("PLAPIC"),
+            SpriteId::for_legacy_object_bitmap_label("PLAPIC"),
             Some(SpriteId::PLAYER_SHIP)
         );
         assert_eq!(
-            SpriteId::for_object_picture_label("PLBPIC"),
+            SpriteId::for_legacy_object_bitmap_label("PLBPIC"),
             Some(SpriteId::PLAYER_SHIP_LEFT)
         );
         for label in ["LNDP1", "LNDP2", "LNDP3"] {
             assert_eq!(
-                SpriteId::for_object_picture_label(label),
+                SpriteId::for_legacy_object_bitmap_label(label),
                 Some(SpriteId::ENEMY_LANDER)
             );
         }
         for label in ["ASTP1", "ASTP2", "ASTP3", "ASTP4"] {
             assert_eq!(
-                SpriteId::for_object_picture_label(label),
+                SpriteId::for_legacy_object_bitmap_label(label),
                 Some(SpriteId::HUMAN)
             );
         }
         assert_eq!(
-            SpriteId::for_object_picture_label("LASP1"),
+            SpriteId::for_legacy_object_bitmap_label("LASP1"),
             Some(SpriteId::PLAYER_PROJECTILE)
         );
         assert_eq!(
-            SpriteId::for_object_picture_label("SCZP1"),
+            SpriteId::for_legacy_object_bitmap_label("SCZP1"),
             Some(SpriteId::ENEMY_MUTANT)
         );
         for label in ["UFOP1", "UFOP2", "UFOP3"] {
             assert_eq!(
-                SpriteId::for_object_picture_label(label),
+                SpriteId::for_legacy_object_bitmap_label(label),
                 Some(SpriteId::ENEMY_BAITER)
             );
         }
         for label in ["TIEP1", "TIEP2", "TIEP3", "TIEP4"] {
             assert_eq!(
-                SpriteId::for_object_picture_label(label),
+                SpriteId::for_legacy_object_bitmap_label(label),
                 Some(SpriteId::ENEMY_BOMBER)
             );
         }
         assert_eq!(
-            SpriteId::for_object_picture_label("PRBP1"),
+            SpriteId::for_legacy_object_bitmap_label("PRBP1"),
             Some(SpriteId::ENEMY_POD)
         );
         assert_eq!(
-            SpriteId::for_object_picture_label("SWPIC1"),
+            SpriteId::for_legacy_object_bitmap_label("SWPIC1"),
             Some(SpriteId::ENEMY_SWARMER)
         );
         for label in ["BMBP1", "BMBP2"] {
             assert_eq!(
-                SpriteId::for_object_picture_label(label),
+                SpriteId::for_legacy_object_bitmap_label(label),
                 Some(SpriteId::ENEMY_BOMB)
             );
         }
         assert_eq!(
-            SpriteId::for_object_picture_label("BXPIC"),
+            SpriteId::for_legacy_object_bitmap_label("BXPIC"),
             Some(SpriteId::BOMB_EXPLOSION)
         );
         assert_eq!(
-            SpriteId::for_object_picture_label("SWXP1"),
+            SpriteId::for_legacy_object_bitmap_label("SWXP1"),
             Some(SpriteId::SWARMER_EXPLOSION)
         );
         assert_eq!(
-            SpriteId::for_object_picture_label("C25P1"),
+            SpriteId::for_legacy_object_bitmap_label("C25P1"),
             Some(SpriteId::SCORE_POPUP_250)
         );
         assert_eq!(
-            SpriteId::for_object_picture_label("C5P1"),
+            SpriteId::for_legacy_object_bitmap_label("C5P1"),
             Some(SpriteId::SCORE_POPUP_500)
         );
         assert_eq!(
-            SpriteId::for_object_picture_label("PLAMIN"),
+            SpriteId::for_legacy_object_bitmap_label("PLAMIN"),
             Some(SpriteId::PLAYER_LIFE_STOCK)
         );
         assert_eq!(
-            SpriteId::for_object_picture_label("SBPIC"),
+            SpriteId::for_legacy_object_bitmap_label("SBPIC"),
             Some(SpriteId::SMART_BOMB_STOCK)
         );
         assert_eq!(
-            SpriteId::for_object_picture_label("ASXP1"),
+            SpriteId::for_legacy_object_bitmap_label("ASXP1"),
             Some(SpriteId::ASTRONAUT_EXPLOSION)
         );
         assert_eq!(
-            SpriteId::for_object_picture_label("NULOB"),
+            SpriteId::for_legacy_object_bitmap_label("NULOB"),
             Some(SpriteId::NULL_OBJECT)
         );
         assert_eq!(
-            SpriteId::for_object_picture_label("TEREX"),
+            SpriteId::for_legacy_object_bitmap_label("TEREX"),
             Some(SpriteId::TERRAIN_EXPLOSION)
         );
-        assert_eq!(SpriteId::for_object_picture_label("UNKNOWN"), None);
+        assert_eq!(SpriteId::for_legacy_object_bitmap_label("UNKNOWN"), None);
     }

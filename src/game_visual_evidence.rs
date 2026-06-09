@@ -35,7 +35,7 @@ impl ExplosionKind {
         }
     }
 
-    const fn picture_label(self) -> &'static str {
+    const fn object_bitmap_label(self) -> &'static str {
         match self {
             Self::Lander => "LNDP1",
             Self::Mutant => "SCZP1",
@@ -84,7 +84,7 @@ pub struct ExplosionSnapshot {
     pub explosion_anchor: Option<ScreenPosition>,
     pub growth_size: u16,
     pub frames_remaining: u8,
-    pub picture_label: &'static str,
+    pub object_bitmap_label: &'static str,
     pub picture_size: (u8, u8),
     pub mapped_sprite: SpriteId,
 }
@@ -97,7 +97,7 @@ impl ExplosionSnapshot {
             explosion_anchor: None,
             growth_size: EXPLOSION_INITIAL_SIZE,
             frames_remaining: explosion_lifetime_frames(kind),
-            picture_label: kind.picture_label(),
+            object_bitmap_label: kind.object_bitmap_label(),
             picture_size: kind.picture_size(),
             mapped_sprite: kind.sprite(),
         }
@@ -111,7 +111,7 @@ impl ExplosionSnapshot {
             explosion_anchor: arcade_enemy_explosion_anchor(enemy),
             growth_size: EXPLOSION_INITIAL_SIZE,
             frames_remaining: EXPLOSION_LIFETIME_FRAMES,
-            picture_label: descriptor.label,
+            object_bitmap_label: descriptor.label,
             picture_size: descriptor.size,
             mapped_sprite: descriptor.mapped_sprite,
         }
@@ -123,7 +123,7 @@ impl ExplosionSnapshot {
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::Explosion,
             size: display_size,
-            sprite_frame_label: Some(self.picture_label),
+            sprite_asset_label: Some(self.object_bitmap_label),
             picture_size: Some((width, height)),
             mapped_sprite: Some(self.mapped_sprite),
             center: Some(self.explosion_anchor.unwrap_or(ScreenPosition::new(
@@ -193,7 +193,7 @@ fn arcade_enemy_explosion_picture_descriptor(
 ) -> ObjectPictureDescriptor {
     if enemy.kind == EnemyKind::Swarmer {
         return ObjectPictureDescriptor {
-            label: ExplosionKind::Swarmer.picture_label(),
+            label: ExplosionKind::Swarmer.object_bitmap_label(),
             address: 0xF8E2,
             size: ExplosionKind::Swarmer.picture_size(),
             primary_image_address: 0xFA6B,
@@ -497,7 +497,7 @@ impl ObjectEvidenceSnapshot {
             world_position: Some(enemy.arcade_world_position()),
             velocity: Some(enemy.arcade_velocity_words()),
             picture_address: Some(descriptor.address),
-            picture_label: Some(descriptor.label),
+            object_bitmap_label: Some(descriptor.label),
             picture_size: Some(descriptor.size),
             primary_image_address: Some(descriptor.primary_image_address),
             alternate_image_address: descriptor.alternate_image_address,
@@ -524,7 +524,7 @@ impl ObjectEvidenceSnapshot {
             world_position: Some(projectile.arcade_world_position()),
             velocity: Some(projectile.arcade_velocity_words()),
             picture_address: Some(descriptor.address),
-            picture_label: Some(descriptor.label),
+            object_bitmap_label: Some(descriptor.label),
             picture_size: Some(descriptor.size),
             primary_image_address: Some(descriptor.primary_image_address),
             alternate_image_address: descriptor.alternate_image_address,
@@ -551,7 +551,7 @@ impl ObjectEvidenceSnapshot {
             world_position: Some(human.arcade_world_position()),
             velocity: Some(human.arcade_velocity_words()),
             picture_address: Some(descriptor.address),
-            picture_label: Some(descriptor.label),
+            object_bitmap_label: Some(descriptor.label),
             picture_size: Some(descriptor.size),
             primary_image_address: Some(descriptor.primary_image_address),
             alternate_image_address: descriptor.alternate_image_address,
@@ -577,7 +577,7 @@ impl ObjectEvidenceSnapshot {
             world_position: Some(projectile.arcade_world_position()),
             velocity: Some(projectile.arcade_velocity_words()),
             picture_address: Some(ENEMY_BOMB_PICTURE_DESCRIPTOR_ADDRESS),
-            picture_label: Some(projectile.bomb_picture_label()),
+            object_bitmap_label: Some(projectile.bomb_object_bitmap_label()),
             picture_size: Some(ENEMY_BOMB_PICTURE_SIZE),
             primary_image_address: Some(ENEMY_BOMB_PRIMARY_IMAGE_ADDRESS),
             alternate_image_address: Some(ENEMY_BOMB_ALTERNATE_IMAGE_ADDRESS),
@@ -613,7 +613,7 @@ impl ObjectEvidenceSnapshot {
             world_position: None,
             velocity: None,
             picture_address: Some(descriptor.address),
-            picture_label: Some(descriptor.label),
+            object_bitmap_label: Some(descriptor.label),
             picture_size: Some(descriptor.size),
             primary_image_address: Some(descriptor.primary_image_address),
             alternate_image_address: descriptor.alternate_image_address,

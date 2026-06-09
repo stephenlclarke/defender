@@ -416,7 +416,7 @@ impl SpriteId {
             .map(|(_, _, size)| *size)
     }
 
-    pub fn for_object_picture_label(label: &str) -> Option<Self> {
+    pub fn for_legacy_object_bitmap_label(label: &str) -> Option<Self> {
         match label {
             "PLAPIC" => Some(Self::PLAYER_SHIP),
             "PLBPIC" => Some(Self::PLAYER_SHIP_LEFT),

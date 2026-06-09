@@ -291,7 +291,7 @@ impl EnemyProjectileSnapshot {
         self.kind.output_routine_address()
     }
 
-    const fn bomb_picture_label(self) -> &'static str {
+    const fn bomb_object_bitmap_label(self) -> &'static str {
         ENEMY_BOMB_PICTURE_LABEL
     }
 
@@ -519,7 +519,7 @@ pub struct ObjectEvidenceDetailSnapshot {
     pub world_position: Option<(u16, u16)>,
     pub velocity: Option<(u16, u16)>,
     pub picture_address: Option<u16>,
-    pub picture_label: Option<&'static str>,
+    pub object_bitmap_label: Option<&'static str>,
     pub picture_size: Option<(u8, u8)>,
     pub primary_image_address: Option<u16>,
     pub alternate_image_address: Option<u16>,
@@ -538,7 +538,7 @@ impl ObjectEvidenceDetailSnapshot {
         world_position: None,
         velocity: None,
         picture_address: None,
-        picture_label: None,
+        object_bitmap_label: None,
         picture_size: None,
         primary_image_address: None,
         alternate_image_address: None,
@@ -751,7 +751,7 @@ pub struct ExpandedObjectDetailSnapshot {
     pub slot_address: Option<u16>,
     pub size: u16,
     pub descriptor_address: Option<u16>,
-    pub sprite_frame_label: Option<&'static str>,
+    pub sprite_asset_label: Option<&'static str>,
     pub picture_size: Option<(u8, u8)>,
     pub mapped_sprite: Option<SpriteId>,
     pub erase_address: Option<u16>,
@@ -770,7 +770,7 @@ impl ExpandedObjectDetailSnapshot {
         slot_address: None,
         size: 0,
         descriptor_address: None,
-        sprite_frame_label: None,
+        sprite_asset_label: None,
         picture_size: None,
         mapped_sprite: None,
         erase_address: None,
@@ -806,7 +806,7 @@ impl ScorePopupKind {
         }
     }
 
-    const fn picture_label(self) -> &'static str {
+    const fn object_bitmap_label(self) -> &'static str {
         match self {
             Self::Points250 => "C25P1",
             Self::Points500 => "C5P1",
@@ -842,7 +842,7 @@ impl ScorePopupSnapshot {
     fn expanded_object_detail(self) -> ExpandedObjectDetailSnapshot {
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::ScorePopup,
-            sprite_frame_label: Some(self.kind.picture_label()),
+            sprite_asset_label: Some(self.kind.object_bitmap_label()),
             picture_size: Some((6, 6)),
             mapped_sprite: Some(self.kind.sprite()),
             top_left: Some(self.position),
@@ -857,7 +857,7 @@ impl ScorePopupSnapshot {
 pub struct EnemyAppearanceSnapshot {
     pub position: ScreenPosition,
     pub growth_size: u16,
-    pub sprite_frame_label: &'static str,
+    pub sprite_asset_label: &'static str,
     pub picture_size: (u8, u8),
     pub mapped_sprite: SpriteId,
 }
@@ -873,7 +873,7 @@ impl EnemyAppearanceSnapshot {
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::Appearance,
             size: self.growth_size,
-            sprite_frame_label: Some(self.sprite_frame_label),
+            sprite_asset_label: Some(self.sprite_asset_label),
             picture_size: Some((width, height)),
             mapped_sprite: Some(self.mapped_sprite),
             center: Some(appearance_center(self.position, self.picture_size)),
