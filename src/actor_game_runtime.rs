@@ -475,7 +475,7 @@ impl ParsedActorDriverScriptSections {
             ActorDriverScriptBundleSection::Behavior => &mut self.behavior,
             ActorDriverScriptBundleSection::Wave => &mut self.wave,
         };
-        append_source_line_with_original_number(target, line_number, line);
+        append_script_line_with_original_number(target, line_number, line);
     }
 
     fn require_sections(&self) -> Result<(), ActorDriverScriptsParseError> {
@@ -520,7 +520,7 @@ fn parse_actor_driver_script_section_header(
     )?))
 }
 
-fn append_source_line_with_original_number(target: &mut String, line_number: usize, line: &str) {
+fn append_script_line_with_original_number(target: &mut String, line_number: usize, line: &str) {
     let current_line_count = target.lines().count();
     for _ in current_line_count..line_number.saturating_sub(1) {
         target.push('\n');

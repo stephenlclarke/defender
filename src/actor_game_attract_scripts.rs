@@ -1271,7 +1271,7 @@ fn hall_score_table_draws(
         draws.push(DrawCommand::text(
             actor,
             offset_point(
-                source_screen_point_with_offset(top_left_screen_address, 0, vertical_offset),
+                screen_point_with_offset(top_left_screen_address, 0, vertical_offset),
                 visual_offset,
             ),
             char::from(b'1' + u8::try_from(index).expect("high-score rank fits u8")).to_string(),
@@ -1279,7 +1279,7 @@ fn hall_score_table_draws(
         draws.push(DrawCommand::text(
             actor,
             offset_point(
-                source_screen_point_with_offset(
+                screen_point_with_offset(
                     top_left_screen_address,
                     ATTRACT_HALL_TABLE_INITIALS_OFFSET,
                     vertical_offset,
@@ -1291,7 +1291,7 @@ fn hall_score_table_draws(
         draws.push(DrawCommand::text(
             actor,
             offset_point(
-                source_screen_point_with_offset(
+                screen_point_with_offset(
                     top_left_screen_address,
                     ATTRACT_HALL_TABLE_SCORE_OFFSET,
                     vertical_offset,
@@ -1304,11 +1304,7 @@ fn hall_score_table_draws(
     draws
 }
 
-fn source_screen_point_with_offset(
-    top_left_screen_address: u16,
-    horizontal: u8,
-    vertical: u8,
-) -> Point {
+fn screen_point_with_offset(top_left_screen_address: u16, horizontal: u8, vertical: u8) -> Point {
     let [column, row] = top_left_screen_address.to_be_bytes();
     Point::new(
         i16::from(column.wrapping_add(horizontal)) * 2,

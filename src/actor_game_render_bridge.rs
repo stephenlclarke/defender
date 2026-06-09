@@ -212,11 +212,11 @@ impl ActorRenderSceneBridge {
             ),
         };
         let growth_size = actor_explosion_growth_size_for_kind(kind, age);
-        if let Some(source_position) = try_screen_position(position)
+        if let Some(screen_position) = try_screen_position(position)
             && push_explosion_cloud_pixels(
                 scene,
                 clean_explosion_kind(kind),
-                source_position,
+                screen_position,
                 explosion_anchor.and_then(try_screen_position),
                 growth_size,
             )

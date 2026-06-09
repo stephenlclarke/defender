@@ -469,13 +469,13 @@ impl ParsedActorWaveScript {
             }
             "arcade_wave" | "source_wave" | "source_backed_wave" => {
                 let wave = parse_wave_u16(line_number, parts.next(), "wave")?;
-                let mut source = ArcadeWaveProfile::for_wave(wave);
-                parse_arcade_wave_profile_updates(line_number, &mut source, parts)?;
+                let mut arcade_profile = ArcadeWaveProfile::for_wave(wave);
+                parse_arcade_wave_profile_updates(line_number, &mut arcade_profile, parts)?;
                 self.push_profile(
                     line_number,
                     ParsedActorWaveProfile::arcade_backed_from_profile_with_behavior(
                         wave,
-                        source,
+                        arcade_profile,
                         &self.base_behavior,
                     ),
                 )
@@ -483,7 +483,7 @@ impl ParsedActorWaveScript {
             "arcade_waves" | "source_waves" | "source_backed_waves" => {
                 let first = parse_wave_u16(line_number, parts.next(), "first wave")?.max(1);
                 let last = parse_wave_u16(line_number, parts.next(), "last wave")?.max(1);
-                let source_update_tokens = parts.collect::<Vec<_>>();
+                let arcade_profile_update_tokens = parts.collect::<Vec<_>>();
                 if last < first {
                     return Err(ActorWaveScriptParseError::new(
                         line_number,
@@ -491,17 +491,17 @@ impl ParsedActorWaveScript {
                     ));
                 }
                 for wave in first..=last {
-                    let mut source = ArcadeWaveProfile::for_wave(wave);
+                    let mut arcade_profile = ArcadeWaveProfile::for_wave(wave);
                     parse_arcade_wave_profile_updates(
                         line_number,
-                        &mut source,
-                        source_update_tokens.iter().copied(),
+                        &mut arcade_profile,
+                        arcade_profile_update_tokens.iter().copied(),
                     )?;
                     self.push_profile(
                         line_number,
                         ParsedActorWaveProfile::arcade_backed_from_profile_with_behavior(
                             wave,
-                            source,
+                            arcade_profile,
                             &self.base_behavior,
                         ),
                     )?;
