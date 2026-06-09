@@ -201,7 +201,11 @@
         assert!(live.draws.iter().any(|draw| {
             draw.actor == human.id
                 && draw.sprite == SpriteKey::Human
-                && matches!(draw.effect, VisualEffect::HumanSpriteFrame { frame: 3 })
+                && matches!(
+                    draw.effect,
+                    VisualEffect::HumanSpriteFrame { animation_frame }
+                        if animation_frame == crate::SpriteFrameIndex::new(3)
+                )
         }));
     }
 
@@ -820,8 +824,9 @@
             draw.actor == bomber
                 && matches!(
                     draw.effect,
-                    VisualEffect::BomberSpriteFrame { frame }
-                        if frame == expected_arcade_state.picture_frame
+                    VisualEffect::BomberSpriteFrame { animation_frame }
+                        if animation_frame
+                            == crate::SpriteFrameIndex::new(expected_arcade_state.picture_frame)
                 )
         }));
         assert!(
@@ -1310,7 +1315,11 @@
         }));
         assert!(live.draws.iter().any(|draw| {
             draw.sprite == SpriteKey::Baiter
-                && matches!(draw.effect, VisualEffect::BaiterSpriteFrame { frame: 1 })
+                && matches!(
+                    draw.effect,
+                    VisualEffect::BaiterSpriteFrame { animation_frame }
+                        if animation_frame == crate::SpriteFrameIndex::new(1)
+                )
         }));
     }
 

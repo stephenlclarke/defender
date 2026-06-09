@@ -45,17 +45,17 @@ pub enum VisualEffect {
         row_pair: u8,
     },
     LanderSpriteFrame {
-        frame: u8,
+        animation_frame: SpriteFrameIndex,
     },
     BomberSpriteFrame {
-        frame: u8,
+        animation_frame: SpriteFrameIndex,
     },
     PodSprite,
     BaiterSpriteFrame {
-        frame: u8,
+        animation_frame: SpriteFrameIndex,
     },
     HumanSpriteFrame {
-        frame: u8,
+        animation_frame: SpriteFrameIndex,
     },
     ExplosionCloud {
         kind: ExplosionKind,

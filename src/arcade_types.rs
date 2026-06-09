@@ -37,3 +37,16 @@ impl SoundCommand {
         self.0
     }
 }
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SpriteFrameIndex(u8);
+
+impl SpriteFrameIndex {
+    pub const fn new(index: u8) -> Self {
+        Self(index)
+    }
+
+    pub const fn index(self) -> u8 {
+        self.0
+    }
+}

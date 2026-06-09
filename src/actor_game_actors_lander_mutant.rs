@@ -361,7 +361,7 @@ impl Lander {
     fn draw_effect(&self) -> VisualEffect {
         self.arcade_state
             .map(|arcade_state| VisualEffect::LanderSpriteFrame {
-                frame: arcade_state.picture_frame,
+                animation_frame: SpriteFrameIndex::new(arcade_state.picture_frame),
             })
             .unwrap_or(VisualEffect::Static)
     }

@@ -455,8 +455,9 @@
                 .any(|draw| draw.sprite == SpriteKey::Bomber
                     && matches!(
                         draw.effect,
-                        VisualEffect::BomberSpriteFrame { frame }
-                            if frame == expected_bomber_source.picture_frame
+                        VisualEffect::BomberSpriteFrame { animation_frame }
+                            if animation_frame
+                                == crate::SpriteFrameIndex::new(expected_bomber_source.picture_frame)
                     ))
         );
         assert!(
@@ -1486,7 +1487,11 @@
         assert!(live.draws.iter().any(|draw| {
             draw.actor == lander.id
                 && draw.sprite == SpriteKey::Lander
-                && matches!(draw.effect, VisualEffect::LanderSpriteFrame { frame: 1 })
+                && matches!(
+                    draw.effect,
+                    VisualEffect::LanderSpriteFrame { animation_frame }
+                        if animation_frame == crate::SpriteFrameIndex::new(1)
+                )
         }));
     }
 

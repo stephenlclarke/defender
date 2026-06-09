@@ -82,7 +82,7 @@ impl Bomber {
     fn draw_effect(&self) -> VisualEffect {
         self.arcade_state
             .map(|arcade_state| VisualEffect::BomberSpriteFrame {
-                frame: arcade_state.picture_frame,
+                animation_frame: SpriteFrameIndex::new(arcade_state.picture_frame),
             })
             .unwrap_or(VisualEffect::Static)
     }
@@ -788,7 +788,7 @@ impl Baiter {
     fn draw_effect(&self) -> VisualEffect {
         self.arcade_state
             .map(|arcade_state| VisualEffect::BaiterSpriteFrame {
-                frame: arcade_state.picture_frame,
+                animation_frame: SpriteFrameIndex::new(arcade_state.picture_frame),
             })
             .unwrap_or(VisualEffect::Static)
     }
