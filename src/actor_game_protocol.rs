@@ -764,7 +764,7 @@ fn clean_lander_runtime(arcade_state: LanderArcadeState) -> LanderRuntimeSnapsho
         y_velocity: arcade_state.y_velocity,
         shot_timer: arcade_state.shot_timer,
         sleep_ticks: arcade_state.sleep_ticks,
-        picture_frame: arcade_state.animation_frame.index(),
+        animation_frame: arcade_state.animation_frame.index(),
         target_human_index: arcade_state.target_human_index,
     }
 }
@@ -775,7 +775,7 @@ fn clean_bomber_runtime(arcade_state: BomberArcadeState) -> BomberRuntimeSnapsho
         y_fraction: arcade_state.y_fraction,
         x_velocity: arcade_state.x_velocity,
         y_velocity: arcade_state.y_velocity,
-        picture_frame: arcade_state.animation_frame.index(),
+        animation_frame: arcade_state.animation_frame.index(),
         cruise_altitude: screen_coordinate(arcade_state.cruise_altitude),
         sleep_ticks: arcade_state.sleep_ticks,
         slot: arcade_state.slot,
@@ -812,7 +812,7 @@ fn clean_baiter_runtime(arcade_state: BaiterArcadeState) -> BaiterRuntimeSnapsho
         y_velocity: arcade_state.y_velocity,
         shot_timer: arcade_state.shot_timer,
         sleep_ticks: arcade_state.sleep_ticks,
-        picture_frame: arcade_state.animation_frame.index(),
+        animation_frame: arcade_state.animation_frame.index(),
     }
 }
 
@@ -850,7 +850,7 @@ fn actor_humans_for_report(report: &StepReport) -> Vec<CleanHumanSnapshot> {
             });
             if let Some(arcade_state) = snapshot.human_runtime {
                 human.x_subpixel = arcade_state.x_fraction;
-                human.picture_frame = arcade_state.animation_frame.index();
+                human.animation_frame = arcade_state.animation_frame.index();
             }
             human
         })

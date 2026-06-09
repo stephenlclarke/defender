@@ -540,7 +540,7 @@ impl ObjectEvidenceSnapshot {
         if index >= OBJECT_EVIDENCE_DETAIL_LIMIT {
             return;
         }
-        let descriptor = human_picture_descriptor(human.picture_frame);
+        let descriptor = human_picture_descriptor(human.animation_frame);
         let identity = object_table_identity(index);
         self.details[index] = ObjectEvidenceDetailSnapshot {
             list: ObjectEvidenceList::Active,

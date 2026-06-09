@@ -1216,13 +1216,13 @@
                 y_velocity: 0x0070,
                 shot_timer: 0x3B,
                 sleep_ticks: 0x04,
-                picture_frame: 1,
+                animation_frame: 1,
                 target_human_index: Some(2),
             })
         );
         assert_eq!(state.world.humans.len(), 1);
         assert!(state.world.humans[0].carried);
-        assert_eq!(state.world.humans[0].picture_frame, 3);
+        assert_eq!(state.world.humans[0].animation_frame, 3);
         assert_eq!(state.world.projectiles.len(), 1);
         assert_eq!(
             state.world.projectiles[0].velocity,

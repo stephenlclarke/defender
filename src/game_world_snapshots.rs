@@ -53,20 +53,20 @@ impl EnemySnapshot {
         match self.kind {
             EnemyKind::Lander => lander_picture_descriptor(
                 self.lander_runtime
-                    .map(|arcade_state| arcade_state.picture_frame)
+                    .map(|arcade_state| arcade_state.animation_frame)
                     .unwrap_or_default(),
             ),
             EnemyKind::Mutant => MUTANT_PICTURE_DESCRIPTOR,
             EnemyKind::Bomber => bomber_picture_descriptor(
                 self.bomber_runtime
-                    .map(|arcade_state| arcade_state.picture_frame)
+                    .map(|arcade_state| arcade_state.animation_frame)
                     .unwrap_or_default(),
             ),
             EnemyKind::Pod => POD_PICTURE_DESCRIPTOR,
             EnemyKind::Swarmer => SWARMER_PICTURE_DESCRIPTOR,
             EnemyKind::Baiter => baiter_picture_descriptor(
                 self.baiter_runtime
-                    .map(|arcade_state| arcade_state.picture_frame)
+                    .map(|arcade_state| arcade_state.animation_frame)
                     .unwrap_or_default(),
             ),
         }
@@ -180,7 +180,7 @@ pub struct LanderRuntimeSnapshot {
     pub y_velocity: u16,
     pub shot_timer: u8,
     pub sleep_ticks: u8,
-    pub picture_frame: u8,
+    pub animation_frame: u8,
     pub target_human_index: Option<usize>,
 }
 
@@ -203,7 +203,7 @@ pub struct BomberRuntimeSnapshot {
     pub y_fraction: u8,
     pub x_velocity: u16,
     pub y_velocity: u16,
-    pub picture_frame: u8,
+    pub animation_frame: u8,
     pub cruise_altitude: u8,
     pub sleep_ticks: u8,
     pub slot: u8,
@@ -229,7 +229,7 @@ pub struct BaiterRuntimeSnapshot {
     pub y_velocity: u16,
     pub shot_timer: u8,
     pub sleep_ticks: u8,
-    pub picture_frame: u8,
+    pub animation_frame: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -343,7 +343,7 @@ pub struct HumanSnapshot {
     pub carried: bool,
     pub carried_by_player: bool,
     pub x_subpixel: u8,
-    pub picture_frame: u8,
+    pub animation_frame: u8,
     pub fall_velocity: u16,
     pub fall_y_subpixel: u8,
     pub target_slot_address: Option<u16>,
@@ -356,7 +356,7 @@ impl HumanSnapshot {
             carried: false,
             carried_by_player: false,
             x_subpixel: 0,
-            picture_frame: 0,
+            animation_frame: 0,
             fall_velocity: 0,
             fall_y_subpixel: 0,
             target_slot_address: None,
