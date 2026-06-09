@@ -25,9 +25,8 @@ use crate::{
     renderer::{
         Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
         push_arcade_controlled_message_sprites, push_message_text_bytes_sprites,
-        attract_defender_appearance_pixels,
-        source_attract_williams_logo_operation_pixel_counts,
-        source_attract_williams_logo_pixel_path, screen_position_from_address,
+        attract_defender_appearance_pixels, attract_williams_logo_operation_pixel_counts,
+        attract_williams_logo_pixel_path, screen_position_from_address,
         screen_position_from_address_with_offset,
     },
     systems::{

@@ -124,7 +124,7 @@ impl ActorRenderSceneBridge {
         color_frame: u16,
     ) {
         let tint = VISUAL_STATE.attract_williams_logo_tint_for_frame(color_frame);
-        let pixel_path = source_attract_williams_logo_pixel_path();
+        let pixel_path = attract_williams_logo_pixel_path();
         let visible_pixel_count =
             williams_reveal_visible_pixel_count(stroke_step, pixel_path.len());
         if visible_pixel_count < pixel_path.len() {
@@ -595,7 +595,7 @@ fn williams_reveal_visible_pixel_count(stroke_step: u16, total_pixels: usize) ->
         return 0;
     }
 
-    let operation_counts = source_attract_williams_logo_operation_pixel_counts();
+    let operation_counts = attract_williams_logo_operation_pixel_counts();
     let operation_index = usize::from(stroke_step)
         .saturating_mul(operation_counts.len())
         .checked_div(usize::from(WILLIAMS_REVEAL_STEPS))

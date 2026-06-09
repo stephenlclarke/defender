@@ -22,9 +22,8 @@ mod tests {
         screen_position_from_address_with_offset,
     };
     use crate::renderer::{
-        EmbeddedSprite, WHITE_RGBA, decode_source_attract_williams_logo_rgba,
-        source_attract_williams_logo_operation_pixel_counts,
-        source_attract_williams_logo_pixel_path,
+        EmbeddedSprite, WHITE_RGBA, attract_williams_logo_operation_pixel_counts,
+        attract_williams_logo_pixel_path, decode_attract_williams_logo_rgba,
     };
 
     include!("renderer_tests_core.rs");

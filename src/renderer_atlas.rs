@@ -742,7 +742,7 @@ fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) ->
     let message_glyphs = decode_message_glyph_sprites();
     let hall_of_fame_logo = decode_hall_of_fame_defender_logo_rgba();
     let attract_copyright_strip = decode_source_attract_copyright_strip_rgba();
-    let attract_williams_logo = decode_source_attract_williams_logo_rgba();
+    let attract_williams_logo = decode_attract_williams_logo_rgba();
     let terrain_word_7007 = decode_source_terrain_word_rgba(0x7007);
     let terrain_word_0770 = decode_source_terrain_word_rgba(0x0770);
     let font_sheet = decode_embedded_png_rgba("font-sheet.png", FONT_SHEET_PNG);
@@ -1293,14 +1293,14 @@ fn decode_source_attract_copyright_strip_rgba() -> EmbeddedSprite {
     EmbeddedSprite { surface, pixels }
 }
 
-fn decode_source_attract_williams_logo_rgba() -> EmbeddedSprite {
+fn decode_attract_williams_logo_rgba() -> EmbeddedSprite {
     let surface = SurfaceSize::new(
         u32::from(WILLIAMS_LOGO_COLUMNS) * 2,
         u32::from(WILLIAMS_LOGO_ROWS),
     );
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
 
-    for [pixel_x, pixel_y] in source_attract_williams_logo_pixel_path() {
+    for [pixel_x, pixel_y] in attract_williams_logo_pixel_path() {
         let offset = ((usize::from(pixel_y) * surface.width as usize) + usize::from(pixel_x)) * 4;
         pixels[offset..offset + 4].copy_from_slice(&WHITE_RGBA);
     }
@@ -1308,21 +1308,21 @@ fn decode_source_attract_williams_logo_rgba() -> EmbeddedSprite {
     EmbeddedSprite { surface, pixels }
 }
 
-pub(crate) fn source_attract_williams_logo_pixel_path() -> Vec<[u8; 2]> {
-    source_attract_williams_logo_walk().pixels
+pub(crate) fn attract_williams_logo_pixel_path() -> Vec<[u8; 2]> {
+    attract_williams_logo_walk().pixels
 }
 
-pub(crate) fn source_attract_williams_logo_operation_pixel_counts() -> Vec<usize> {
-    source_attract_williams_logo_walk().operation_pixel_counts
+pub(crate) fn attract_williams_logo_operation_pixel_counts() -> Vec<usize> {
+    attract_williams_logo_walk().operation_pixel_counts
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct SourceAttractWilliamsLogoWalk {
+struct AttractWilliamsLogoWalk {
     pixels: Vec<[u8; 2]>,
     operation_pixel_counts: Vec<usize>,
 }
 
-fn source_attract_williams_logo_walk() -> SourceAttractWilliamsLogoWalk {
+fn attract_williams_logo_walk() -> AttractWilliamsLogoWalk {
     let mut path = Vec::new();
     let mut operation_pixel_counts = Vec::new();
     let mut seen = [false; WILLIAMS_LOGO_PIXEL_COUNT];
@@ -1348,20 +1348,20 @@ fn source_attract_williams_logo_walk() -> SourceAttractWilliamsLogoWalk {
             };
             pointer += 2;
             cursor = u16::from_be_bytes([cursor_high, cursor_low]);
-            push_source_attract_williams_logo_pixel(&mut path, &mut seen, cursor);
+            push_attract_williams_logo_pixel(&mut path, &mut seen, cursor);
             operation_pixel_counts.push(path.len());
         } else {
             let mut accumulator = opcode;
             loop {
                 accumulator =
-                    source_attract_williams_logo_horizontal_bit(accumulator, &mut cursor, true);
+                    attract_williams_logo_horizontal_bit(accumulator, &mut cursor, true);
                 accumulator =
-                    source_attract_williams_logo_horizontal_bit(accumulator, &mut cursor, false);
+                    attract_williams_logo_horizontal_bit(accumulator, &mut cursor, false);
                 accumulator =
-                    source_attract_williams_logo_vertical_bit(accumulator, &mut cursor, true);
+                    attract_williams_logo_vertical_bit(accumulator, &mut cursor, true);
                 accumulator =
-                    source_attract_williams_logo_vertical_bit(accumulator, &mut cursor, false);
-                push_source_attract_williams_logo_pixel(&mut path, &mut seen, cursor);
+                    attract_williams_logo_vertical_bit(accumulator, &mut cursor, false);
+                push_attract_williams_logo_pixel(&mut path, &mut seen, cursor);
                 if accumulator == 0 {
                     break;
                 }
@@ -1370,13 +1370,13 @@ fn source_attract_williams_logo_walk() -> SourceAttractWilliamsLogoWalk {
         }
     }
 
-    SourceAttractWilliamsLogoWalk {
+    AttractWilliamsLogoWalk {
         pixels: path,
         operation_pixel_counts,
     }
 }
 
-fn source_attract_williams_logo_horizontal_bit(
+fn attract_williams_logo_horizontal_bit(
     mut accumulator: u8,
     cursor: &mut u16,
     decrement: bool,
@@ -1395,7 +1395,7 @@ fn source_attract_williams_logo_horizontal_bit(
     accumulator
 }
 
-fn source_attract_williams_logo_vertical_bit(
+fn attract_williams_logo_vertical_bit(
     mut accumulator: u8,
     cursor: &mut u16,
     decrement: bool,
@@ -1414,12 +1414,12 @@ fn source_attract_williams_logo_vertical_bit(
     accumulator
 }
 
-fn push_source_attract_williams_logo_pixel(
+fn push_attract_williams_logo_pixel(
     path: &mut Vec<[u8; 2]>,
     seen: &mut [bool],
     cursor: u16,
 ) {
-    let Some([pixel_x, pixel_y]) = source_attract_williams_logo_pixel(cursor) else {
+    let Some([pixel_x, pixel_y]) = attract_williams_logo_pixel(cursor) else {
         return;
     };
     let index =
@@ -1430,7 +1430,7 @@ fn push_source_attract_williams_logo_pixel(
     }
 }
 
-fn source_attract_williams_logo_pixel(cursor: u16) -> Option<[u8; 2]> {
+fn attract_williams_logo_pixel(cursor: u16) -> Option<[u8; 2]> {
     let [x, y] = cursor.to_be_bytes();
     let column = x >> 1;
     let relative_column = column.checked_sub(WILLIAMS_LOGO_FIRST_SCREEN_COLUMN)?;

@@ -763,10 +763,10 @@
     }
 
     #[test]
-    fn source_attract_williams_logo_decodes_table_pixels() {
-        let sprite = decode_source_attract_williams_logo_rgba();
-        let path = source_attract_williams_logo_pixel_path();
-        let operation_counts = source_attract_williams_logo_operation_pixel_counts();
+    fn attract_williams_logo_decodes_table_pixels() {
+        let sprite = decode_attract_williams_logo_rgba();
+        let path = attract_williams_logo_pixel_path();
+        let operation_counts = attract_williams_logo_operation_pixel_counts();
 
         assert_eq!(sprite.surface, SurfaceSize::new(92, 19));
         assert_eq!(path.len(), 660);
