@@ -22,7 +22,7 @@ mod tests {
     #[test]
     fn live_smoke_report_formats_current_cli_output() {
         let report = LiveSmokeReport {
-            frame_source: "actor_game",
+            render_path: "actor_game",
             legacy_presenter_used: false,
             window_created: false,
             rendered_frames: 3,
@@ -58,7 +58,7 @@ mod tests {
             report.to_text(),
             concat!(
                 "wgpu live smoke passed\n",
-                "  frame_source: actor_game\n",
+                "  render_path: actor_game\n",
                 "  legacy_presenter_used: false\n",
                 "  window_created: false\n",
                 "  rendered_frames: 3\n",
@@ -87,10 +87,10 @@ mod tests {
     }
 
     #[test]
-    fn live_smoke_uses_actor_frame_source() {
+    fn live_smoke_uses_actor_render_path() {
         let report = run_smoke(super::LiveInputProfile::Test, None).expect("actor live smoke");
 
-        assert_eq!(report.frame_source, "actor_game");
+        assert_eq!(report.render_path, "actor_game");
         assert!(!report.legacy_presenter_used);
         assert!(!report.window_created);
         assert_eq!(report.clean_game_frames, 0);
@@ -106,10 +106,10 @@ mod tests {
     }
 
     #[test]
-    fn actor_wgpu_smoke_uses_actor_frame_source() {
+    fn actor_wgpu_smoke_uses_actor_render_path() {
         let report = run_actor_wgpu_smoke().expect("actor wgpu smoke");
 
-        assert_eq!(report.frame_source, "actor_game");
+        assert_eq!(report.render_path, "actor_game");
         assert!(!report.legacy_presenter_used);
         assert!(!report.window_created);
         assert_eq!(report.clean_game_frames, 0);

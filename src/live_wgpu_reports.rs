@@ -66,7 +66,7 @@ pub(crate) enum LiveInputProfile {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct LiveSmokeReport {
-    pub(crate) frame_source: &'static str,
+    pub(crate) render_path: &'static str,
     pub(crate) legacy_presenter_used: bool,
     pub(crate) window_created: bool,
     pub(crate) rendered_frames: u32,
@@ -371,8 +371,8 @@ impl LiveSmokeReport {
             .map(|signature| format!("{signature:016x}"))
             .unwrap_or_else(|| String::from("unrecorded"));
         format!(
-            "wgpu live smoke passed\n  frame_source: {}\n  legacy_presenter_used: {}\n  window_created: {}\n  rendered_frames: {}\n  first_frame_size: {}\n  distinct_frame_signatures: {}\n  saw_non_blank_frame: {}\n  saw_attract: {} (visual_frames: {}, visual_signatures: {})\n  saw_credit: {} (visual_frames: {}, visual_signatures: {})\n  saw_playing: {} (visual_frames: {}, visual_signatures: {})\n  clean_game_frames: {}\n  actor_frames: {}\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  temporary_raster_frames: {}\n  temporary_raster_commands: {}\n  offscreen_wgpu_frames: {}\n  offscreen_non_blank_frames: {}\n  offscreen_distinct_frame_signatures: {}\n  offscreen_first_frame_signature: {}\n  offscreen_last_frame_signature: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
-            self.frame_source,
+            "wgpu live smoke passed\n  render_path: {}\n  legacy_presenter_used: {}\n  window_created: {}\n  rendered_frames: {}\n  first_frame_size: {}\n  distinct_frame_signatures: {}\n  saw_non_blank_frame: {}\n  saw_attract: {} (visual_frames: {}, visual_signatures: {})\n  saw_credit: {} (visual_frames: {}, visual_signatures: {})\n  saw_playing: {} (visual_frames: {}, visual_signatures: {})\n  clean_game_frames: {}\n  actor_frames: {}\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  temporary_raster_frames: {}\n  temporary_raster_commands: {}\n  offscreen_wgpu_frames: {}\n  offscreen_non_blank_frames: {}\n  offscreen_distinct_frame_signatures: {}\n  offscreen_first_frame_signature: {}\n  offscreen_last_frame_signature: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
+            self.render_path,
             self.legacy_presenter_used,
             self.window_created,
             self.rendered_frames,
@@ -967,7 +967,7 @@ fn spawned_actor_samples_summary(samples: &[ActorScriptCheckSpawnedActorSample])
 impl From<ActorSmokeReport> for LiveSmokeReport {
     fn from(report: ActorSmokeReport) -> Self {
         Self {
-            frame_source: "actor_game",
+            render_path: "actor_game",
             legacy_presenter_used: false,
             window_created: false,
             rendered_frames: report.frames,
