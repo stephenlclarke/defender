@@ -576,9 +576,9 @@ impl ObjectEvidenceSnapshot {
             screen_position: Some(projectile.position),
             world_position: Some(projectile.arcade_world_position()),
             velocity: Some(projectile.arcade_velocity_words()),
-            picture_address: Some(ENEMY_BOMB_PICTURE_DESCRIPTOR_ADDRESS),
+            picture_address: Some(ENEMY_BOMB_OBJECT_BITMAP_DESCRIPTOR_ADDRESS),
             object_bitmap_label: Some(projectile.bomb_object_bitmap_label()),
-            picture_size: Some(ENEMY_BOMB_PICTURE_SIZE),
+            picture_size: Some(ENEMY_BOMB_OBJECT_BITMAP_SIZE),
             primary_image_address: Some(ENEMY_BOMB_PRIMARY_IMAGE_ADDRESS),
             alternate_image_address: Some(ENEMY_BOMB_ALTERNATE_IMAGE_ADDRESS),
             mapped_sprite: Some(SpriteId::ENEMY_BOMB),
@@ -906,7 +906,7 @@ const SWARMER_PICTURE_DESCRIPTOR: ObjectPictureDescriptor = ObjectPictureDescrip
 };
 
 fn lander_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
-    match frame % LANDER_PICTURE_FRAME_COUNT {
+    match frame % LANDER_ANIMATION_FRAME_COUNT {
         1 => ObjectPictureDescriptor {
             label: "LNDP2",
             address: 0xF98F,
@@ -935,7 +935,7 @@ fn lander_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
 }
 
 fn bomber_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
-    match frame % BOMBER_PICTURE_FRAME_COUNT {
+    match frame % BOMBER_ANIMATION_FRAME_COUNT {
         1 => ObjectPictureDescriptor {
             label: "TIEP2",
             address: 0xF933,
@@ -972,7 +972,7 @@ fn bomber_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
 }
 
 fn baiter_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
-    match frame % BAITER_PICTURE_FRAME_COUNT {
+    match frame % BAITER_ANIMATION_FRAME_COUNT {
         1 => ObjectPictureDescriptor {
             label: "UFOP2",
             address: 0xF9AD,

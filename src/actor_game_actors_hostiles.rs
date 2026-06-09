@@ -148,7 +148,7 @@ fn bomber_sprite_frame_after_arcade_seed(seed: u8, current: u8) -> u8 {
     if step & 0x80 != 0 {
         current
             .saturating_add(1)
-            .min(BOMBER_PICTURE_FRAME_COUNT - 1)
+            .min(BOMBER_ANIMATION_FRAME_COUNT - 1)
     } else {
         current.saturating_sub(1)
     }

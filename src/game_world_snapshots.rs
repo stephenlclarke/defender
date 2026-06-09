@@ -292,7 +292,7 @@ impl EnemyProjectileSnapshot {
     }
 
     const fn bomb_object_bitmap_label(self) -> &'static str {
-        ENEMY_BOMB_PICTURE_LABEL
+        ENEMY_BOMB_OBJECT_BITMAP_LABEL
     }
 
     fn arcade_world_position(self) -> (u16, u16) {
