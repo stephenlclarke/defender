@@ -552,17 +552,17 @@
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::Bomb)
             .expect("spawned bomb should publish an actor snapshot");
-        let source_projectile = bomb
+        let projectile_arcade_state = bomb
             .enemy_projectile_runtime
-            .expect("bomb should publish source projectile metadata");
-        assert_eq!(source_projectile.x_velocity, 0);
-        assert_eq!(source_projectile.y_velocity, 0);
-        assert!(source_projectile.lifetime_ticks > 0);
+            .expect("bomb should publish enemy projectile arcade metadata");
+        assert_eq!(projectile_arcade_state.x_velocity, 0);
+        assert_eq!(projectile_arcade_state.y_velocity, 0);
+        assert!(projectile_arcade_state.lifetime_ticks > 0);
         assert!(live.draws.iter().any(|draw| draw.sprite == SpriteKey::Bomb));
     }
 
     #[test]
-    fn source_bomber_bomb_spawn_carries_enemy_projectile_fractions() {
+    fn bomber_bomb_spawn_carries_enemy_projectile_fractions() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.arcade_rng = ActorArcadeRng {
@@ -601,7 +601,7 @@
         });
 
         let report = driver.step(GameInput::NONE);
-        let (expected_position, expected_source) = expected_source_bomber_after_motion(
+        let (expected_position, expected_source) = expected_bomber_after_arcade_motion(
             Point::new(100, 80),
             initial_source,
             report.step,
@@ -611,8 +611,8 @@
         );
         let expected_lifetime_ticks = report
             .arcade_rng
-            .map(actor_source_bomber_bomb_lifetime_ticks)
-            .expect("playing report should carry source rng");
+            .map(bomber_bomb_lifetime_ticks)
+            .expect("playing report should carry arcade rng");
         let bomber_snapshot = snapshot_for(&report, bomber);
         assert_eq!(bomber_snapshot.position, expected_position);
         assert_eq!(bomber_snapshot.bomber_runtime, Some(expected_source));
@@ -646,7 +646,7 @@
                         && source.y_fraction == initial_source.y_fraction
                 })
             })
-            .expect("source-backed bomber bomb should publish enemy projectile fractions");
+            .expect("arcade-backed bomber bomb should publish enemy projectile fractions");
 
         assert_eq!(
             bomb.enemy_projectile_runtime,
@@ -694,7 +694,7 @@
         let report = driver.step(GameInput::NONE);
         let arcade_rng = report
             .arcade_rng
-            .expect("playing report should carry source rng");
+            .expect("playing report should carry arcade rng");
 
         assert_ne!(arcade_rng.lseed & 0x07, 0);
         assert!(
@@ -705,7 +705,7 @@
     }
 
     #[test]
-    fn source_bomber_bomb_spawn_respects_getshl_bounds() {
+    fn bomber_bomb_spawn_respects_enemy_projectile_bounds() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.arcade_rng = ActorArcadeRng {
@@ -763,7 +763,7 @@
     }
 
     #[test]
-    fn source_bomber_motion_uses_seeded_picture_and_y_velocity() {
+    fn bomber_motion_uses_seeded_sprite_frame_and_y_velocity() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.set_kind_behavior(
@@ -803,7 +803,7 @@
         });
 
         let report = driver.step(GameInput::NONE);
-        let (expected_position, expected_source) = expected_source_bomber_after_motion(
+        let (expected_position, expected_source) = expected_bomber_after_arcade_motion(
             bomber_position,
             initial_source,
             report.step,
@@ -832,7 +832,7 @@
     }
 
     #[test]
-    fn source_bomber_offscreen_motion_adjusts_cruise_altitude() {
+    fn bomber_offscreen_motion_adjusts_cruise_altitude() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.arcade_rng = ActorArcadeRng {
@@ -864,7 +864,7 @@
         });
 
         let report = driver.step(GameInput::NONE);
-        let (expected_position, expected_source) = expected_source_bomber_after_motion(
+        let (expected_position, expected_source) = expected_bomber_after_arcade_motion(
             bomber_position,
             initial_source,
             report.step,

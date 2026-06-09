@@ -1550,48 +1550,48 @@
         }
     }
 
-    fn expected_source_bomber_after_motion(
+    fn expected_bomber_after_arcade_motion(
         position: Point,
-        mut source: BomberArcadeState,
+        mut arcade_state: BomberArcadeState,
         _step: u64,
         _id: ActorId,
         arcade_rng: Option<ActorArcadeRngSnapshot>,
         player_position: Option<Point>,
     ) -> (Point, BomberArcadeState) {
         if let Some(arcade_rng) = arcade_rng
-            && source.slot == actor_source_tie_selected_slot(arcade_rng.seed)
+            && arcade_state.slot == actor_source_tie_selected_slot(arcade_rng.seed)
         {
-            if source.sleep_ticks > 0 {
-                source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
+            if arcade_state.sleep_ticks > 0 {
+                arcade_state.sleep_ticks = arcade_state.sleep_ticks.saturating_sub(1);
             } else {
-                source.picture_frame =
-                    actor_source_bomber_picture_frame(arcade_rng.seed, source.picture_frame);
-                source.y_velocity =
-                    actor_source_bomber_random_y_velocity(source.y_velocity, arcade_rng.seed);
+                arcade_state.picture_frame =
+                    bomber_sprite_frame_after_arcade_seed(arcade_rng.seed, arcade_state.picture_frame);
+                arcade_state.y_velocity =
+                    bomber_seeded_y_velocity(arcade_state.y_velocity, arcade_rng.seed);
                 if position.y == 0 {
-                    source.y_velocity = actor_source_bomber_cruise_y_velocity(
-                        source.y_velocity,
-                        &mut source.cruise_altitude,
+                    arcade_state.y_velocity = bomber_cruise_y_velocity(
+                        arcade_state.y_velocity,
+                        &mut arcade_state.cruise_altitude,
                         position.y,
                         arcade_rng.seed,
                     );
                 } else if let Some(player) = player_position
                     && let Some(delta) =
-                        actor_source_bomber_onscreen_y_velocity_delta(position.y, player.y)
+                        bomber_player_tracking_y_velocity_delta(position.y, player.y)
                 {
-                    source.y_velocity = source.y_velocity.wrapping_add(delta);
+                    arcade_state.y_velocity = arcade_state.y_velocity.wrapping_add(delta);
                 }
-                source.sleep_ticks = BOMBER_LOOP_SLEEP_TICKS;
+                arcade_state.sleep_ticks = BOMBER_LOOP_SLEEP_TICKS;
             }
         }
 
         let (x, x_fraction) =
-            actor_source_axis_step(position.x, source.x_fraction, source.x_velocity);
+            actor_source_axis_step(position.x, arcade_state.x_fraction, arcade_state.x_velocity);
         let (y, y_fraction) =
-            actor_source_active_object_y_step(position.y, source.y_fraction, source.y_velocity);
-        source.x_fraction = x_fraction;
-        source.y_fraction = y_fraction;
-        (Point::new(x, y), source)
+            actor_source_active_object_y_step(position.y, arcade_state.y_fraction, arcade_state.y_velocity);
+        arcade_state.x_fraction = x_fraction;
+        arcade_state.y_fraction = y_fraction;
+        (Point::new(x, y), arcade_state)
     }
 
     fn actor_snapshot(id: u64, kind: ActorKind, position: Point) -> ActorSnapshot {

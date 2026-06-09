@@ -403,9 +403,9 @@
             .snapshots
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::Bomber)
-            .expect("second wave should publish source bomber snapshot");
+            .expect("second wave should publish bomber arcade snapshot");
         let (expected_bomber_position, expected_bomber_source) =
-            expected_source_bomber_after_motion(
+            expected_bomber_after_arcade_motion(
                 Point::new(228, 104),
                 BomberArcadeState {
                     x_fraction: 0,
@@ -1117,7 +1117,7 @@
     }
 
     #[test]
-    fn actor_source_bomber_and_pod_reserves_use_restore_state() {
+    fn actor_bomber_and_pod_reserves_use_arcade_restore_state() {
         let (mut driver, seeded) = started_arcade_wave_driver(2);
         let player_position = seeded
             .snapshots
@@ -1195,12 +1195,12 @@
                 .all(|snapshot| snapshot.bomber_runtime.is_some())
         );
         assert!(bombers.iter().any(|snapshot| {
-            let source = snapshot.bomber_runtime.expect("source bomber");
-            source.x_velocity
+            let arcade_state = snapshot.bomber_runtime.expect("bomber arcade state");
+            arcade_state.x_velocity
                 == actor_sign_extend_u8_to_u16(
                     ArcadeWaveProfile::for_wave(2).bomber_x_velocity,
                 )
-                && source.slot == 0
+                && arcade_state.slot == 0
         }));
         assert!(restored.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Pod
@@ -1212,19 +1212,20 @@
                 .snapshots
                 .iter()
                 .filter_map(|snapshot| snapshot.bomber_runtime)
-                .any(|source| {
+                .any(|arcade_state| {
                     let expected_spawn = ActorBomberSpawn::source_restore_batch(
                         ArcadeWaveProfile::for_wave(2),
                         actor_source_absolute_x(player_position, 0),
                         1,
                     )[0];
-                    let expected_source = expected_spawn.source.expect("expected source bomber");
+                    let expected_arcade_state =
+                        expected_spawn.source.expect("expected bomber arcade state");
                     let (_, x_fraction) = actor_source_axis_step(
                         expected_spawn.position.x,
-                        expected_source.x_fraction,
-                        expected_source.x_velocity,
+                        expected_arcade_state.x_fraction,
+                        expected_arcade_state.x_velocity,
                     );
-                    source.x_fraction == x_fraction
+                    arcade_state.x_fraction == x_fraction
                 })
         );
     }

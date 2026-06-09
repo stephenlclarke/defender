@@ -27,56 +27,56 @@ impl Bomber {
         Rect::from_center(self.position, 8, 8)
     }
 
-    fn advance_source_motion(&mut self) -> bool {
-        let Some(source) = &mut self.source else {
+    fn advance_arcade_motion(&mut self) -> bool {
+        let Some(arcade_state) = &mut self.source else {
             return false;
         };
 
         let (x, x_fraction) =
-            actor_source_axis_step(self.position.x, source.x_fraction, source.x_velocity);
+            actor_source_axis_step(self.position.x, arcade_state.x_fraction, arcade_state.x_velocity);
         let (y, y_fraction) = actor_source_active_object_y_step(
             self.position.y,
-            source.y_fraction,
-            source.y_velocity,
+            arcade_state.y_fraction,
+            arcade_state.y_velocity,
         );
         self.position = Point::new(x, y);
-        source.x_fraction = x_fraction;
-        source.y_fraction = y_fraction;
-        self.drift = actor_source_drift_from_velocity(source.x_velocity);
+        arcade_state.x_fraction = x_fraction;
+        arcade_state.y_fraction = y_fraction;
+        self.drift = actor_source_drift_from_velocity(arcade_state.x_velocity);
         true
     }
 
-    fn advance_source_tie_step(&mut self, prompt: &StepPrompt, arcade_rng: ActorArcadeRngSnapshot) {
-        let Some(source) = &mut self.source else {
+    fn advance_arcade_tie_step(&mut self, prompt: &StepPrompt, arcade_rng: ActorArcadeRngSnapshot) {
+        let Some(arcade_state) = &mut self.source else {
             return;
         };
-        if source.slot != actor_source_tie_selected_slot(arcade_rng.seed) {
+        if arcade_state.slot != actor_source_tie_selected_slot(arcade_rng.seed) {
             return;
         }
-        if source.sleep_ticks > 0 {
-            source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
+        if arcade_state.sleep_ticks > 0 {
+            arcade_state.sleep_ticks = arcade_state.sleep_ticks.saturating_sub(1);
             return;
         }
 
-        source.picture_frame =
-            actor_source_bomber_picture_frame(arcade_rng.seed, source.picture_frame);
-        source.y_velocity =
-            actor_source_bomber_random_y_velocity(source.y_velocity, arcade_rng.seed);
+        arcade_state.picture_frame =
+            bomber_sprite_frame_after_arcade_seed(arcade_rng.seed, arcade_state.picture_frame);
+        arcade_state.y_velocity =
+            bomber_seeded_y_velocity(arcade_state.y_velocity, arcade_rng.seed);
         if self.position.y == 0 {
-            source.y_velocity = actor_source_bomber_cruise_y_velocity(
-                source.y_velocity,
-                &mut source.cruise_altitude,
+            arcade_state.y_velocity = bomber_cruise_y_velocity(
+                arcade_state.y_velocity,
+                &mut arcade_state.cruise_altitude,
                 self.position.y,
                 arcade_rng.seed,
             );
         } else if let Some(player) = prompt.player_position()
             && let Some(delta) =
-                actor_source_bomber_onscreen_y_velocity_delta(self.position.y, player.y)
+                bomber_player_tracking_y_velocity_delta(self.position.y, player.y)
         {
-            source.y_velocity = source.y_velocity.wrapping_add(delta);
+            arcade_state.y_velocity = arcade_state.y_velocity.wrapping_add(delta);
         }
 
-        source.sleep_ticks = BOMBER_LOOP_SLEEP_TICKS;
+        arcade_state.sleep_ticks = BOMBER_LOOP_SLEEP_TICKS;
     }
 
     fn draw_effect(&self) -> VisualEffect {
@@ -93,12 +93,12 @@ impl Bomber {
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) {
-        if let Some(source) = self.source {
+        if let Some(arcade_state) = self.source {
             let Some(arcade_rng) = prompt.arcade_rng else {
                 return;
             };
-            if source.slot != actor_source_tie_selected_slot(arcade_rng.seed)
-                || source.sleep_ticks > 0
+            if arcade_state.slot != actor_source_tie_selected_slot(arcade_rng.seed)
+                || arcade_state.sleep_ticks > 0
                 || self.position.y == 0
                 || arcade_rng.lseed & 0x07 != 0
                 || actor_bomb_projectile_count(prompt) >= ACTIVE_BOMBER_BOMB_LIMIT
@@ -111,11 +111,11 @@ impl Bomber {
             commands.push(GameCommand::Spawn(SpawnRequest::Bomb {
                 position: self.position,
                 source: Some(EnemyProjectileArcadeState {
-                    x_fraction: source.x_fraction,
-                    y_fraction: source.y_fraction,
+                    x_fraction: arcade_state.x_fraction,
+                    y_fraction: arcade_state.y_fraction,
                     x_velocity: 0,
                     y_velocity: 0,
-                    lifetime_ticks: actor_source_bomber_bomb_lifetime_ticks(arcade_rng),
+                    lifetime_ticks: bomber_bomb_lifetime_ticks(arcade_rng),
                 }),
             }));
             return;
@@ -141,7 +141,7 @@ impl Bomber {
     }
 }
 
-fn actor_source_bomber_picture_frame(seed: u8, current: u8) -> u8 {
+fn bomber_sprite_frame_after_arcade_seed(seed: u8, current: u8) -> u8 {
     let step = (seed & 0x3F).wrapping_sub(0x20);
     if step & 0x80 != 0 {
         current
@@ -152,7 +152,7 @@ fn actor_source_bomber_picture_frame(seed: u8, current: u8) -> u8 {
     }
 }
 
-fn actor_source_bomber_random_y_velocity(previous: u16, seed: u8) -> u16 {
+fn bomber_seeded_y_velocity(previous: u16, seed: u8) -> u16 {
     let random_delta = actor_sign_extend_u8_to_u16((seed & 0x3F).wrapping_sub(0x20));
     let mut velocity = previous.wrapping_add(random_delta);
     let damping_byte = 0u8.wrapping_sub(velocity.wrapping_shl(3).to_be_bytes()[0]);
@@ -160,7 +160,7 @@ fn actor_source_bomber_random_y_velocity(previous: u16, seed: u8) -> u16 {
     velocity
 }
 
-fn actor_source_bomber_cruise_y_velocity(
+fn bomber_cruise_y_velocity(
     mut velocity: u16,
     cruise_altitude: &mut i16,
     object_y: i16,
@@ -180,7 +180,7 @@ fn actor_source_bomber_cruise_y_velocity(
     velocity
 }
 
-fn actor_source_bomber_onscreen_y_velocity_delta(object_y: i16, player_y: i16) -> Option<u16> {
+fn bomber_player_tracking_y_velocity_delta(object_y: i16, player_y: i16) -> Option<u16> {
     let delta = object_y - player_y;
     if delta >= 0 {
         if delta >= 0x20 {
@@ -213,9 +213,9 @@ impl AssetActor for Bomber {
             if self.source.is_some() {
                 self.maybe_spawn_bomb(prompt, behavior, &mut commands);
                 if let Some(arcade_rng) = prompt.arcade_rng {
-                    self.advance_source_tie_step(prompt, arcade_rng);
+                    self.advance_arcade_tie_step(prompt, arcade_rng);
                 }
-                self.advance_source_motion();
+                self.advance_arcade_motion();
             } else if let Some(position) = move_by_hostile_mode(
                 self.position,
                 behavior.bomber_mode,

@@ -1319,7 +1319,7 @@ fn actor_bomb_projectile_count(prompt: &StepPrompt) -> usize {
         .count()
 }
 
-fn actor_source_bomber_bomb_lifetime_ticks(arcade_rng: ActorArcadeRngSnapshot) -> u8 {
+fn bomber_bomb_lifetime_ticks(arcade_rng: ActorArcadeRngSnapshot) -> u8 {
     (arcade_rng.seed & 0x1F).wrapping_add(1)
 }
 
