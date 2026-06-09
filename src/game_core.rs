@@ -164,7 +164,7 @@ const TERRAIN_BLOW_FLASH_WINDOWS: [(u16, u16, u8); 16] = [
 ];
 pub const PLAYER_EXPLOSION_PIECE_LIMIT: usize = 128;
 
-pub(crate) const VISUAL_STATE: SourceVisualStateSnapshot = SourceVisualStateSnapshot {
+pub(crate) const VISUAL_STATE: ArcadeVisualStateSnapshot = ArcadeVisualStateSnapshot {
     attract_williams_status: 0xFB,
     attract_williams_logo_color_index: 0x3F,
     attract_copyright_williams_color_index: 0x0F,
@@ -210,7 +210,7 @@ pub struct AttractPresentationSnapshot {
     pub page_frame: u16,
     pub page: AttractPresentationPage,
     pub stage_sleep_ticks: Option<u8>,
-    pub source_stall_ticks: Option<u8>,
+    pub stall_ticks: Option<u8>,
 }
 
 impl AttractPresentationSnapshot {
@@ -218,7 +218,7 @@ impl AttractPresentationSnapshot {
         page_frame: 0,
         page: AttractPresentationPage::Inactive,
         stage_sleep_ticks: None,
-        source_stall_ticks: None,
+        stall_ticks: None,
     };
 
     pub fn for_page_frame(page_frame: u16) -> Self {
@@ -227,7 +227,7 @@ impl AttractPresentationSnapshot {
         } else {
             page_frame % ATTRACT_CYCLE_FRAME_COUNT
         };
-        let (page, stage_sleep_ticks, source_stall_ticks) =
+        let (page, stage_sleep_ticks, stall_ticks) =
             if page_frame >= ATTRACT_SCORING_SEQUENCE_START_FRAME {
                 (
                     AttractPresentationPage::ScoringSequence,
@@ -270,7 +270,7 @@ impl AttractPresentationSnapshot {
             page_frame,
             page,
             stage_sleep_ticks,
-            source_stall_ticks,
+            stall_ticks,
         }
     }
 
@@ -337,7 +337,7 @@ pub struct PostGamePlayfieldSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct SourceVisualStateSnapshot {
+pub(crate) struct ArcadeVisualStateSnapshot {
     pub(crate) attract_williams_status: u8,
     pub(crate) attract_williams_logo_color_index: u8,
     pub(crate) attract_copyright_williams_color_index: u16,
@@ -357,9 +357,9 @@ pub(crate) struct SourceVisualStateSnapshot {
     pub(crate) top_display_scanner_marker_word: u16,
 }
 
-impl SourceVisualStateSnapshot {
+impl ArcadeVisualStateSnapshot {
     pub(crate) const fn hud_tint(self) -> Color {
-        let _source_border_word = self.top_display_border_word;
+        let _top_display_border_word = self.top_display_border_word;
         Color::WHITE
     }
 
@@ -523,11 +523,11 @@ fn wave_table_value(metric: crate::arcade_assets::WaveMetric, wave: u8) -> i32 {
     crate::arcade_assets::wave_metric_value(
         metric,
         wave,
-        source_getwv_inter_wall_delta_iterations(wave.max(1)),
+        arcade_wave_difficulty_iterations(wave.max(1)),
     )
 }
 
-fn source_getwv_inter_wall_delta_iterations(wave: u8) -> u16 {
+fn arcade_wave_difficulty_iterations(wave: u8) -> u16 {
     let wave_delta = wave.saturating_sub(4);
     let pre_ceiling = DEFAULT_DIFFICULTY_INITIAL.saturating_add(wave_delta);
     u16::from(pre_ceiling.min(DEFAULT_DIFFICULTY_CEILING))
