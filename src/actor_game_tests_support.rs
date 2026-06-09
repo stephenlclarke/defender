@@ -421,7 +421,7 @@
     }
 
     #[test]
-    fn target6_source_lander_conversion_sets_mutant_render_correction() {
+    fn target6_arcade_lander_conversion_sets_mutant_render_correction() {
         let profile = ArcadeWaveProfile::for_wave(1);
         let hop_rng = ActorArcadeRngSnapshot {
             seed: 0x33,
@@ -461,7 +461,7 @@
     }
 
     #[test]
-    fn target6_source_mutant_defers_first_entry_shot() {
+    fn target6_arcade_mutant_defers_first_entry_shot() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
@@ -501,7 +501,7 @@
     }
 
     #[test]
-    fn target6_source_mutant_visible_entry_shot_uses_projected_position() {
+    fn target6_arcade_mutant_visible_entry_shot_uses_projected_position() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
