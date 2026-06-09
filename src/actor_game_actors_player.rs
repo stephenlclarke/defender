@@ -296,11 +296,6 @@ fn player_message(player: u8) -> MessageId {
     }
 }
 
-#[cfg(test)]
-fn player_source_message_label(player: u8) -> &'static str {
-    if player == 2 { "PLYR2" } else { "PLYR1" }
-}
-
 #[derive(Debug)]
 struct PlayerShip {
     id: ActorId,

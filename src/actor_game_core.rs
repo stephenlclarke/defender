@@ -37,8 +37,6 @@ use crate::{
     },
 };
 
-#[cfg(test)]
-use crate::renderer::source_message_text;
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},

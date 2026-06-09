@@ -43,7 +43,7 @@
                 player: 1,
             })
         );
-        assert_no_source_message(&started, "PLYR1", PLAYER_START_PROMPT_SCREEN_ADDRESS);
+        assert_no_arcade_message(&started, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_ADDRESS);
         assert_eq!(driver.snapshot_count(ActorKind::Player), 0);
 
         let start_sound = driver.step(GameInput::NONE);

@@ -1246,7 +1246,7 @@
                         .commands
                         .contains(&GameCommand::AdvanceWave { wave: 1 })
                 );
-                assert_no_source_message(&report, "PLYR1", PLAYER_START_PROMPT_SCREEN_ADDRESS);
+                assert_no_arcade_message(&report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_ADDRESS);
                 continue;
             }
 
@@ -1289,8 +1289,8 @@
                 waiting.state.game_over.player_death_sleep_remaining,
                 Some(expected_sleep)
             );
-            assert_source_message(&waiting.report, "GO", FINAL_GAME_OVER_SCREEN_ADDRESS);
-            assert_source_message_scene(&waiting.scene, "GO", FINAL_GAME_OVER_SCREEN_ADDRESS);
+            assert_arcade_message(&waiting.report, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_ADDRESS);
+            assert_arcade_message_scene(&waiting.scene, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_ADDRESS);
             assert!(
                 !waiting
                     .report
@@ -1301,7 +1301,7 @@
         }
 
         let returned = runtime.step(GameInput::NONE);
-        assert_no_source_message(&returned.report, "GO", FINAL_GAME_OVER_SCREEN_ADDRESS);
+        assert_no_arcade_message(&returned.report, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_ADDRESS);
         returned
     }
 
@@ -1327,29 +1327,29 @@
             );
             assert!(!waiting.events.gameplay().contains(&GameEvent::GameOver));
             assert!(!waiting.report.sounds.contains(&SoundCue::GameOver));
-            assert_source_message(
+            assert_arcade_message(
                 &waiting.report,
-                player_source_message_label(from_player),
+                player_message(from_player),
                 PLAYER_SWITCH_LABEL_SCREEN_ADDRESS,
             );
-            assert_source_message(
+            assert_arcade_message(
                 &waiting.report,
-                "GO",
+                MessageId::GameOver,
                 PLAYER_SWITCH_GAME_OVER_SCREEN_ADDRESS,
             );
-            assert_source_message_scene(
+            assert_arcade_message_scene(
                 &waiting.scene,
-                player_source_message_label(from_player),
+                player_message(from_player),
                 PLAYER_SWITCH_LABEL_SCREEN_ADDRESS,
             );
-            assert_source_message_scene(
+            assert_arcade_message_scene(
                 &waiting.scene,
-                "GO",
+                MessageId::GameOver,
                 PLAYER_SWITCH_GAME_OVER_SCREEN_ADDRESS,
             );
-            assert_no_source_message(
+            assert_no_arcade_message(
                 &waiting.report,
-                player_source_message_label(to_player),
+                player_message(to_player),
                 PLAYER_START_PROMPT_SCREEN_ADDRESS,
             );
             assert!(
@@ -1362,24 +1362,24 @@
         }
 
         let switched = runtime.step(GameInput::NONE);
-        assert_no_source_message(
+        assert_no_arcade_message(
             &switched.report,
-            player_source_message_label(from_player),
+            player_message(from_player),
             PLAYER_SWITCH_LABEL_SCREEN_ADDRESS,
         );
-        assert_no_source_message(
+        assert_no_arcade_message(
             &switched.report,
-            "GO",
+            MessageId::GameOver,
             PLAYER_SWITCH_GAME_OVER_SCREEN_ADDRESS,
         );
-        assert_source_message(
+        assert_arcade_message(
             &switched.report,
-            player_source_message_label(to_player),
+            player_message(to_player),
             PLAYER_START_PROMPT_SCREEN_ADDRESS,
         );
-        assert_source_message_scene(
+        assert_arcade_message_scene(
             &switched.scene,
-            player_source_message_label(to_player),
+            player_message(to_player),
             PLAYER_START_PROMPT_SCREEN_ADDRESS,
         );
         switched
@@ -1399,20 +1399,20 @@
                 assert!(!frame.events.gameplay().contains(&GameEvent::WaveStarted));
                 assert!(frame.state.world.enemies.is_empty());
                 if frame.report.player_count > 1 {
-                    assert_source_message(
+                    assert_arcade_message(
                         &frame.report,
-                        player_source_message_label(player),
+                        player_message(player),
                         PLAYER_START_PROMPT_SCREEN_ADDRESS,
                     );
-                    assert_no_source_message(
+                    assert_no_arcade_message(
                         &frame.report,
-                        "GO",
+                        MessageId::GameOver,
                         PLAYER_SWITCH_GAME_OVER_SCREEN_ADDRESS,
                     );
                 } else {
-                    assert_no_source_message(
+                    assert_no_arcade_message(
                         &frame.report,
-                        player_source_message_label(player),
+                        player_message(player),
                         PLAYER_START_PROMPT_SCREEN_ADDRESS,
                     );
                 }
@@ -1421,12 +1421,12 @@
 
             assert_eq!(frame.report.phase, Phase::Playing);
             assert_eq!(frame.report.current_player, player);
-            assert_no_source_message(
+            assert_no_arcade_message(
                 &frame.report,
-                player_source_message_label(player),
+                player_message(player),
                 PLAYER_START_PROMPT_SCREEN_ADDRESS,
             );
-            assert_no_source_message(&frame.report, "GO", PLAYER_SWITCH_GAME_OVER_SCREEN_ADDRESS);
+            assert_no_arcade_message(&frame.report, MessageId::GameOver, PLAYER_SWITCH_GAME_OVER_SCREEN_ADDRESS);
             assert!(frame.events.gameplay().contains(&GameEvent::WaveStarted));
             assert_eq!(
                 frame.events.sounds(),
@@ -1979,14 +1979,22 @@
         );
     }
 
-    fn assert_source_message(report: &StepReport, label: &str, top_left_screen_address: u16) {
+    fn assert_arcade_message(
+        report: &StepReport,
+        message: MessageId,
+        top_left_screen_address: u16,
+    ) {
         let scene = report.render_scene();
-        assert_source_message_scene(&scene, label, top_left_screen_address);
+        assert_arcade_message_scene(&scene, message, top_left_screen_address);
     }
 
-    fn assert_source_message_scene(scene: &RenderScene, label: &str, top_left_screen_address: u16) {
+    fn assert_arcade_message_scene(
+        scene: &RenderScene,
+        message: MessageId,
+        top_left_screen_address: u16,
+    ) {
         for (sprite_id, position, size) in
-            expected_plain_source_message_sprites(label, top_left_screen_address)
+            expected_plain_arcade_message_sprites(message, top_left_screen_address)
         {
             assert!(
                 scene.sprites.iter().any(|sprite| {
@@ -1996,21 +2004,21 @@
                         && sprite.size == size
                         && sprite.tint == Color::WHITE
                 }),
-                "expected full source message {label} glyph {sprite_id:?} at {top_left_screen_address:#06x}"
+                "expected full arcade message {message:?} glyph {sprite_id:?} at {top_left_screen_address:#06x}"
             );
         }
     }
 
-    fn expected_plain_source_message_sprites(
-        label: &str,
+    fn expected_plain_arcade_message_sprites(
+        message: MessageId,
         top_left_screen_address: u16,
     ) -> Vec<(SpriteId, [f32; 2], [f32; 2])> {
-        let text = source_message_text(label).expect("source message label should exist");
+        let text = crate::arcade_assets::message_text(message);
         let mut cursor = top_left_screen_address;
         let mut expected = Vec::new();
         for character in text.chars() {
             let size = SpriteId::message_glyph_size(character)
-                .expect("test source prompt should use clean message glyphs");
+                .expect("test arcade prompt should use clean message glyphs");
             if character != ' ' {
                 let sprite =
                     SpriteId::message_glyph(character).expect("visible prompt glyph should exist");
@@ -2020,28 +2028,32 @@
                     [size[0] as f32, size[1] as f32],
                 ));
             }
-            cursor = source_test_text_cursor_after_glyph(cursor, size[0]);
+            cursor = arcade_test_text_cursor_after_glyph(cursor, size[0]);
         }
         assert!(
             !expected.is_empty(),
-            "source message {label} should contain visible glyphs"
+            "arcade message {message:?} should contain visible glyphs"
         );
         expected
     }
 
-    fn source_test_text_cursor_after_glyph(cursor: u16, width_pixels: u32) -> u16 {
+    fn arcade_test_text_cursor_after_glyph(cursor: u16, width_pixels: u32) -> u16 {
         let [column, row] = cursor.to_be_bytes();
         let width_columns =
-            u8::try_from(width_pixels / 2).expect("source glyph width should fit in u8");
+            u8::try_from(width_pixels / 2).expect("arcade glyph width should fit in u8");
         u16::from_be_bytes([column.wrapping_add(width_columns).wrapping_add(1), row])
     }
 
-    fn assert_no_source_message(report: &StepReport, label: &str, top_left_screen_address: u16) {
-        let text = source_message_text(label).expect("source message label should exist");
+    fn assert_no_arcade_message(
+        report: &StepReport,
+        message: MessageId,
+        top_left_screen_address: u16,
+    ) {
+        let text = crate::arcade_assets::message_text(message);
         let first_glyph = text
             .chars()
             .find_map(SpriteId::message_glyph)
-            .expect("source message should contain a visible glyph");
+            .expect("arcade message should contain a visible glyph");
         let position = source_screen_position(top_left_screen_address);
         let scene = report.render_scene();
         assert!(
@@ -2050,6 +2062,6 @@
                     || sprite.layer != RenderLayer::Overlay
                     || sprite.position != position
             }),
-            "unexpected source message {label} at {top_left_screen_address:#06x}"
+            "unexpected arcade message {message:?} at {top_left_screen_address:#06x}"
         );
     }
