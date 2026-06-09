@@ -850,7 +850,7 @@ fn actor_humans_for_report(report: &StepReport) -> Vec<CleanHumanSnapshot> {
             });
             if let Some(arcade_state) = snapshot.human_runtime {
                 human.x_subpixel = arcade_state.x_fraction;
-                human.picture_frame = arcade_state.picture_frame;
+                human.picture_frame = arcade_state.animation_frame.index();
             }
             human
         })

@@ -127,7 +127,7 @@
             Some(HumanArcadeState {
                 x_fraction: 0x81,
                 y_fraction: 0x00,
-                picture_frame: 3,
+                animation_frame: crate::SpriteFrameIndex::new(3),
                 target_slot_index: 1,
             })
         );
@@ -265,7 +265,7 @@
             Some(HumanArcadeState {
                 x_fraction: 0xAD,
                 y_fraction: 0,
-                picture_frame: 2,
+                animation_frame: crate::SpriteFrameIndex::new(2),
                 target_slot_index: 0,
             })
         );
@@ -274,7 +274,7 @@
             Some(HumanArcadeState {
                 x_fraction: 0x69,
                 y_fraction: 0,
-                picture_frame: 2,
+                animation_frame: crate::SpriteFrameIndex::new(2),
                 target_slot_index: 9,
             })
         );
@@ -1453,7 +1453,7 @@
     }
 
     #[test]
-    fn first_wave_landers_publish_arcade_state_and_picture_frames() {
+    fn first_wave_landers_publish_arcade_state_and_animation_frames() {
         let mut driver = ActorGameDriver::new();
         driver.step(GameInput {
             coin: true,

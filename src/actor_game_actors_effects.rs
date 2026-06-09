@@ -68,13 +68,13 @@ impl Human {
 
     fn advance_arcade_walk(&mut self, arcade_seed: u8) {
         if let Some(arcade_state) = &mut self.arcade_state {
-            let frame = arcade_state.picture_frame % 4;
-            let (next_frame, target_y, velocity) = if frame <= 1 {
+            let animation_frame = arcade_state.animation_frame.index() % 4;
+            let (next_frame, target_y, velocity) = if animation_frame <= 1 {
                 if arcade_seed <= HUMAN_TURN_SEED_MAX {
                     (2, None, HUMAN_RIGHT_X_VELOCITY)
                 } else {
                     (
-                        1 - frame,
+                        1 - animation_frame,
                         actor_human_walk_target_y(self.position.x, HUMAN_LEFT_TARGET_Y_OFFSET),
                         HUMAN_LEFT_X_VELOCITY,
                     )
@@ -83,7 +83,7 @@ impl Human {
                 (0, None, HUMAN_LEFT_X_VELOCITY)
             } else {
                 (
-                    if frame == 2 { 3 } else { 2 },
+                    if animation_frame == 2 { 3 } else { 2 },
                     actor_human_walk_target_y(self.position.x, HUMAN_RIGHT_TARGET_Y_OFFSET),
                     HUMAN_RIGHT_X_VELOCITY,
                 )
@@ -95,7 +95,7 @@ impl Human {
                 arcade_axis_step(self.position.x, arcade_state.x_fraction, velocity);
             self.position.x = x;
             arcade_state.x_fraction = x_fraction;
-            arcade_state.picture_frame = next_frame;
+            arcade_state.animation_frame = SpriteFrameIndex::new(next_frame);
         }
     }
 
@@ -236,7 +236,7 @@ impl Human {
     fn draw_effect(&self) -> VisualEffect {
         self.arcade_state
             .map(|arcade_state| VisualEffect::HumanSpriteFrame {
-                animation_frame: SpriteFrameIndex::new(arcade_state.picture_frame),
+                animation_frame: arcade_state.animation_frame,
             })
             .unwrap_or(VisualEffect::Static)
     }

@@ -1546,7 +1546,7 @@
     fn arcade_human_spawn_for_test(
         position: Point,
         target_slot_index: usize,
-        picture_frame: u8,
+        animation_frame: u8,
     ) -> ActorHumanSpawn {
         ActorHumanSpawn {
             position,
@@ -1554,7 +1554,7 @@
             arcade_state: Some(HumanArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
-                picture_frame,
+                animation_frame: crate::SpriteFrameIndex::new(animation_frame),
                 target_slot_index,
             }),
         }
@@ -1702,7 +1702,7 @@
         human.human_runtime = Some(HumanArcadeState {
             x_fraction: 0x80,
             y_fraction: 0,
-            picture_frame: 2,
+            animation_frame: crate::SpriteFrameIndex::new(2),
             target_slot_index: 4,
         });
 

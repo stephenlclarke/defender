@@ -169,7 +169,7 @@
     }
 
     #[test]
-    fn first_wave_humans_publish_arcade_state_and_picture_frames() {
+    fn first_wave_humans_publish_arcade_state_and_animation_frames() {
         let mut driver = ActorGameDriver::new();
         driver.step(GameInput {
             coin: true,
@@ -194,7 +194,7 @@
             Some(HumanArcadeState {
                 x_fraction: 0x81,
                 y_fraction: 0x00,
-                picture_frame: 3,
+                animation_frame: crate::SpriteFrameIndex::new(3),
                 target_slot_index: 1,
             })
         );
@@ -233,7 +233,7 @@
         assert_eq!(
             human
                 .human_runtime
-                .map(|arcade_state| (arcade_state.x_fraction, arcade_state.picture_frame)),
+                .map(|arcade_state| (arcade_state.x_fraction, arcade_state.animation_frame.index())),
             Some((0xE0, 1))
         );
     }
@@ -259,7 +259,7 @@
         assert_eq!(
             human
                 .human_runtime
-                .map(|arcade_state| (arcade_state.x_fraction, arcade_state.picture_frame)),
+                .map(|arcade_state| (arcade_state.x_fraction, arcade_state.animation_frame.index())),
             Some((0x20, 2))
         );
     }
@@ -411,7 +411,7 @@
             arcade_state: Some(HumanArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
                 target_slot_index: 7,
             }),
         });

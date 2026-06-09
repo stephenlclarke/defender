@@ -162,7 +162,7 @@ pub struct ActorMutantSpawn {
 pub struct HumanArcadeState {
     pub x_fraction: u8,
     pub y_fraction: u8,
-    pub picture_frame: u8,
+    pub animation_frame: SpriteFrameIndex,
     pub target_slot_index: usize,
 }
 
@@ -189,5 +189,5 @@ struct FirstWaveLanderSpawnRecord {
 struct FirstWaveHumanSpawnRecord {
     world_x: u16,
     world_y: u16,
-    picture_frame: u8,
+    animation_frame: SpriteFrameIndex,
 }

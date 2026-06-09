@@ -940,7 +940,7 @@
             Some(HumanArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
                 target_slot_index: 0,
             }),
         );
@@ -1101,7 +1101,7 @@
         human.human_runtime = Some(HumanArcadeState {
             x_fraction: 0x81,
             y_fraction: 0,
-            picture_frame: 3,
+            animation_frame: crate::SpriteFrameIndex::new(3),
             target_slot_index: 1,
         });
         let mut laser = actor_snapshot(14, ActorKind::Laser, Point::new(80, 72));

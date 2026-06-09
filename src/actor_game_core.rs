@@ -449,7 +449,7 @@ const ACTOR_FIRST_WAVE_HUMAN_SPAWNS: [ActorHumanSpawn; 10] = [
         FirstWaveHumanSpawnRecord {
             world_x: 0x18C3,
             world_y: 0xE000,
-            picture_frame: 2,
+            animation_frame: SpriteFrameIndex::new(2),
         },
     ),
     ActorHumanSpawn::from_first_wave_record(
@@ -457,7 +457,7 @@ const ACTOR_FIRST_WAVE_HUMAN_SPAWNS: [ActorHumanSpawn; 10] = [
         FirstWaveHumanSpawnRecord {
             world_x: 0x1C81,
             world_y: 0xE100,
-            picture_frame: 3,
+            animation_frame: SpriteFrameIndex::new(3),
         },
     ),
     ActorHumanSpawn::from_first_wave_record(
@@ -465,7 +465,7 @@ const ACTOR_FIRST_WAVE_HUMAN_SPAWNS: [ActorHumanSpawn; 10] = [
         FirstWaveHumanSpawnRecord {
             world_x: 0x4E30,
             world_y: 0xE000,
-            picture_frame: 0,
+            animation_frame: SpriteFrameIndex::new(0),
         },
     ),
     ActorHumanSpawn::from_first_wave_record(
@@ -473,7 +473,7 @@ const ACTOR_FIRST_WAVE_HUMAN_SPAWNS: [ActorHumanSpawn; 10] = [
         FirstWaveHumanSpawnRecord {
             world_x: 0x5718,
             world_y: 0xE000,
-            picture_frame: 0,
+            animation_frame: SpriteFrameIndex::new(0),
         },
     ),
     ActorHumanSpawn::from_first_wave_record(
@@ -481,7 +481,7 @@ const ACTOR_FIRST_WAVE_HUMAN_SPAWNS: [ActorHumanSpawn; 10] = [
         FirstWaveHumanSpawnRecord {
             world_x: 0x9B8C,
             world_y: 0xE000,
-            picture_frame: 0,
+            animation_frame: SpriteFrameIndex::new(0),
         },
     ),
     ActorHumanSpawn::from_first_wave_record(
@@ -489,7 +489,7 @@ const ACTOR_FIRST_WAVE_HUMAN_SPAWNS: [ActorHumanSpawn; 10] = [
         FirstWaveHumanSpawnRecord {
             world_x: 0x9DC6,
             world_y: 0xE000,
-            picture_frame: 0,
+            animation_frame: SpriteFrameIndex::new(0),
         },
     ),
     ActorHumanSpawn::from_first_wave_record(
@@ -497,7 +497,7 @@ const ACTOR_FIRST_WAVE_HUMAN_SPAWNS: [ActorHumanSpawn; 10] = [
         FirstWaveHumanSpawnRecord {
             world_x: 0xCEE3,
             world_y: 0xE000,
-            picture_frame: 2,
+            animation_frame: SpriteFrameIndex::new(2),
         },
     ),
     ActorHumanSpawn::from_first_wave_record(
@@ -505,7 +505,7 @@ const ACTOR_FIRST_WAVE_HUMAN_SPAWNS: [ActorHumanSpawn; 10] = [
         FirstWaveHumanSpawnRecord {
             world_x: 0xD771,
             world_y: 0xE000,
-            picture_frame: 2,
+            animation_frame: SpriteFrameIndex::new(2),
         },
     ),
     ActorHumanSpawn::from_first_wave_record(
@@ -513,7 +513,7 @@ const ACTOR_FIRST_WAVE_HUMAN_SPAWNS: [ActorHumanSpawn; 10] = [
         FirstWaveHumanSpawnRecord {
             world_x: 0xD2B8,
             world_y: 0xE000,
-            picture_frame: 0,
+            animation_frame: SpriteFrameIndex::new(0),
         },
     ),
     ActorHumanSpawn::from_first_wave_record(
@@ -521,7 +521,7 @@ const ACTOR_FIRST_WAVE_HUMAN_SPAWNS: [ActorHumanSpawn; 10] = [
         FirstWaveHumanSpawnRecord {
             world_x: 0xE8DC,
             world_y: 0xE000,
-            picture_frame: 0,
+            animation_frame: SpriteFrameIndex::new(0),
         },
     ),
 ];

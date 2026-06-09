@@ -434,14 +434,14 @@ fn push_arcade_target_list_restore_human_group(
     for _ in 0..count {
         let state = arcade_rng.advance();
         let spawn_x = (state.hseed & 0x1F).wrapping_add(x_bank);
-        let picture_frame = if state.lseed & 0x01 != 0 { 2 } else { 0 };
+        let animation_frame = SpriteFrameIndex::new(if state.lseed & 0x01 != 0 { 2 } else { 0 });
         humans.push(ActorHumanSpawn {
             position: Point::new(i16::from(spawn_x), i16::from(ASTRONAUT_RESTORE_Y)),
             mode: HumanMode::Grounded,
             arcade_state: Some(HumanArcadeState {
                 x_fraction: state.lseed,
                 y_fraction: 0,
-                picture_frame,
+                animation_frame,
                 target_slot_index: slot_index,
             }),
         });
@@ -515,7 +515,7 @@ impl ActorHumanSpawn {
             arcade_state: Some(HumanArcadeState {
                 x_fraction: (start.world_x & 0x00FF) as u8,
                 y_fraction: (start.world_y & 0x00FF) as u8,
-                picture_frame: start.picture_frame,
+                animation_frame: start.animation_frame,
                 target_slot_index,
             }),
         }
