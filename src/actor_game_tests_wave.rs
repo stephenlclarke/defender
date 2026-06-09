@@ -888,7 +888,7 @@
     }
 
     #[test]
-    fn actor_source_reserve_landers_without_humans_restore_source_mutants() {
+    fn actor_lander_reserve_without_humans_restores_arcade_mutants() {
         let (mut driver, live) = started_arcade_wave_driver(2);
         let player_position = live
             .snapshots
@@ -960,7 +960,7 @@
         assert_eq!(
             restored
                 .arcade_rng
-                .expect("playing report should carry source rng"),
+                .expect("playing report should carry arcade rng"),
             expected_rng.advance().snapshot()
         );
 
@@ -969,27 +969,27 @@
             restored.wave,
             restored
                 .arcade_rng
-                .expect("playing report should carry source rng"),
+                .expect("playing report should carry arcade rng"),
             player_position,
             Velocity::default(),
         );
         let behavior = ActorBehaviorProfile::default();
-        let source_mutants = restored
+        let arcade_mutants = restored
             .snapshots
             .iter()
             .filter(|snapshot| snapshot.kind == ActorKind::Mutant)
             .collect::<Vec<_>>();
-        assert_eq!(source_mutants.len(), 2);
-        for (snapshot, spawn) in source_mutants.iter().zip([first_spawn, second_spawn]) {
-            let (expected_position, expected_source, _) = expected_mutant_arcade_after_motion(
+        assert_eq!(arcade_mutants.len(), 2);
+        for (snapshot, spawn) in arcade_mutants.iter().zip([first_spawn, second_spawn]) {
+            let (expected_position, expected_arcade, _) = expected_mutant_arcade_after_motion(
                 spawn.position,
-                spawn.source.expect("source mutant restore metadata"),
+                spawn.source.expect("mutant arcade restore state"),
                 snapshot.id,
                 &prompt,
                 behavior,
             );
             assert_eq!(snapshot.position, expected_position);
-            assert_eq!(snapshot.mutant_runtime, Some(expected_source));
+            assert_eq!(snapshot.mutant_runtime, Some(expected_arcade));
             assert!(snapshot.lander_runtime.is_none());
         }
 
@@ -1020,7 +1020,7 @@
     }
 
     #[test]
-    fn actor_source_mutant_reserves_use_restore_state() {
+    fn actor_mutant_reserves_use_arcade_restore_state() {
         let (mut driver, seeded) = started_arcade_wave_driver(2);
         let player_position = seeded
             .snapshots
@@ -1081,7 +1081,7 @@
         assert_eq!(
             restored
                 .arcade_rng
-                .expect("playing report should carry source rng"),
+                .expect("playing report should carry arcade rng"),
             expected_rng.advance().snapshot()
         );
 
@@ -1090,28 +1090,28 @@
             restored.wave,
             restored
                 .arcade_rng
-                .expect("playing report should carry source rng"),
+                .expect("playing report should carry arcade rng"),
             player_position,
             Velocity::default(),
         );
         let behavior = ActorBehaviorProfile::default();
-        let mut source_mutants = restored
+        let mut arcade_mutants = restored
             .snapshots
             .iter()
             .filter(|snapshot| snapshot.kind == ActorKind::Mutant)
             .collect::<Vec<_>>();
-        source_mutants.sort_by_key(|snapshot| snapshot.id);
-        assert_eq!(source_mutants.len(), 2);
-        for (snapshot, spawn) in source_mutants.iter().zip([first_spawn, second_spawn]) {
-            let (expected_position, expected_source, _) = expected_mutant_arcade_after_motion(
+        arcade_mutants.sort_by_key(|snapshot| snapshot.id);
+        assert_eq!(arcade_mutants.len(), 2);
+        for (snapshot, spawn) in arcade_mutants.iter().zip([first_spawn, second_spawn]) {
+            let (expected_position, expected_arcade, _) = expected_mutant_arcade_after_motion(
                 spawn.position,
-                spawn.source.expect("source mutant restore metadata"),
+                spawn.source.expect("mutant arcade restore state"),
                 snapshot.id,
                 &prompt,
                 behavior,
             );
             assert_eq!(snapshot.position, expected_position);
-            assert_eq!(snapshot.mutant_runtime, Some(expected_source));
+            assert_eq!(snapshot.mutant_runtime, Some(expected_arcade));
             assert!(snapshot.lander_runtime.is_none());
         }
     }
@@ -1265,7 +1265,7 @@
         assert_eq!(
             restored
                 .arcade_rng
-                .expect("playing report should carry source rng"),
+                .expect("playing report should carry arcade rng"),
             expected_rng.advance().snapshot()
         );
 
