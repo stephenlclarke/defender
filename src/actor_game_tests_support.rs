@@ -1254,7 +1254,7 @@
                         .commands
                         .contains(&GameCommand::AdvanceWave { wave: 1 })
                 );
-                assert_no_arcade_message(&report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_ADDRESS);
+                assert_no_arcade_message(&report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
                 continue;
             }
 
@@ -1297,8 +1297,8 @@
                 waiting.state.game_over.player_death_sleep_remaining,
                 Some(expected_sleep)
             );
-            assert_arcade_message(&waiting.report, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_ADDRESS);
-            assert_arcade_message_scene(&waiting.scene, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_ADDRESS);
+            assert_arcade_message(&waiting.report, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_CELL);
+            assert_arcade_message_scene(&waiting.scene, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_CELL);
             assert!(
                 !waiting
                     .report
@@ -1309,7 +1309,7 @@
         }
 
         let returned = runtime.step(GameInput::NONE);
-        assert_no_arcade_message(&returned.report, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_ADDRESS);
+        assert_no_arcade_message(&returned.report, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_CELL);
         returned
     }
 
@@ -1338,27 +1338,27 @@
             assert_arcade_message(
                 &waiting.report,
                 player_message(from_player),
-                PLAYER_SWITCH_LABEL_SCREEN_ADDRESS,
+                PLAYER_SWITCH_LABEL_SCREEN_CELL,
             );
             assert_arcade_message(
                 &waiting.report,
                 MessageId::GameOver,
-                PLAYER_SWITCH_GAME_OVER_SCREEN_ADDRESS,
+                PLAYER_SWITCH_GAME_OVER_SCREEN_CELL,
             );
             assert_arcade_message_scene(
                 &waiting.scene,
                 player_message(from_player),
-                PLAYER_SWITCH_LABEL_SCREEN_ADDRESS,
+                PLAYER_SWITCH_LABEL_SCREEN_CELL,
             );
             assert_arcade_message_scene(
                 &waiting.scene,
                 MessageId::GameOver,
-                PLAYER_SWITCH_GAME_OVER_SCREEN_ADDRESS,
+                PLAYER_SWITCH_GAME_OVER_SCREEN_CELL,
             );
             assert_no_arcade_message(
                 &waiting.report,
                 player_message(to_player),
-                PLAYER_START_PROMPT_SCREEN_ADDRESS,
+                PLAYER_START_PROMPT_SCREEN_CELL,
             );
             assert!(
                 !waiting
@@ -1373,22 +1373,22 @@
         assert_no_arcade_message(
             &switched.report,
             player_message(from_player),
-            PLAYER_SWITCH_LABEL_SCREEN_ADDRESS,
+            PLAYER_SWITCH_LABEL_SCREEN_CELL,
         );
         assert_no_arcade_message(
             &switched.report,
             MessageId::GameOver,
-            PLAYER_SWITCH_GAME_OVER_SCREEN_ADDRESS,
+            PLAYER_SWITCH_GAME_OVER_SCREEN_CELL,
         );
         assert_arcade_message(
             &switched.report,
             player_message(to_player),
-            PLAYER_START_PROMPT_SCREEN_ADDRESS,
+            PLAYER_START_PROMPT_SCREEN_CELL,
         );
         assert_arcade_message_scene(
             &switched.scene,
             player_message(to_player),
-            PLAYER_START_PROMPT_SCREEN_ADDRESS,
+            PLAYER_START_PROMPT_SCREEN_CELL,
         );
         switched
     }
@@ -1410,18 +1410,18 @@
                     assert_arcade_message(
                         &frame.report,
                         player_message(player),
-                        PLAYER_START_PROMPT_SCREEN_ADDRESS,
+                        PLAYER_START_PROMPT_SCREEN_CELL,
                     );
                     assert_no_arcade_message(
                         &frame.report,
                         MessageId::GameOver,
-                        PLAYER_SWITCH_GAME_OVER_SCREEN_ADDRESS,
+                        PLAYER_SWITCH_GAME_OVER_SCREEN_CELL,
                     );
                 } else {
                     assert_no_arcade_message(
                         &frame.report,
                         player_message(player),
-                        PLAYER_START_PROMPT_SCREEN_ADDRESS,
+                        PLAYER_START_PROMPT_SCREEN_CELL,
                     );
                 }
                 continue;
@@ -1432,9 +1432,9 @@
             assert_no_arcade_message(
                 &frame.report,
                 player_message(player),
-                PLAYER_START_PROMPT_SCREEN_ADDRESS,
+                PLAYER_START_PROMPT_SCREEN_CELL,
             );
-            assert_no_arcade_message(&frame.report, MessageId::GameOver, PLAYER_SWITCH_GAME_OVER_SCREEN_ADDRESS);
+            assert_no_arcade_message(&frame.report, MessageId::GameOver, PLAYER_SWITCH_GAME_OVER_SCREEN_CELL);
             assert!(frame.events.gameplay().contains(&GameEvent::WaveStarted));
             assert_eq!(
                 frame.events.sounds(),
@@ -1995,19 +1995,18 @@
     fn assert_arcade_message(
         report: &StepReport,
         message: MessageId,
-        top_left_screen_address: u16,
+        screen_cell: ScreenAddress,
     ) {
         let scene = report.render_scene();
-        assert_arcade_message_scene(&scene, message, top_left_screen_address);
+        assert_arcade_message_scene(&scene, message, screen_cell);
     }
 
     fn assert_arcade_message_scene(
         scene: &RenderScene,
         message: MessageId,
-        top_left_screen_address: u16,
+        screen_cell: ScreenAddress,
     ) {
-        for (sprite_id, position, size) in
-            expected_plain_arcade_message_sprites(message, top_left_screen_address)
+        for (sprite_id, position, size) in expected_plain_arcade_message_sprites(message, screen_cell)
         {
             assert!(
                 scene.sprites.iter().any(|sprite| {
@@ -2017,17 +2016,18 @@
                         && sprite.size == size
                         && sprite.tint == Color::WHITE
                 }),
-                "expected full arcade message {message:?} glyph {sprite_id:?} at {top_left_screen_address:#06x}"
+                "expected full arcade message {message:?} glyph {sprite_id:?} at {:#06x}",
+                screen_cell.word()
             );
         }
     }
 
     fn expected_plain_arcade_message_sprites(
         message: MessageId,
-        top_left_screen_address: u16,
+        screen_cell: ScreenAddress,
     ) -> Vec<(SpriteId, [f32; 2], [f32; 2])> {
         let text = crate::arcade_assets::message_text(message);
-        let mut cursor = top_left_screen_address;
+        let mut cursor = screen_cell;
         let mut expected = Vec::new();
         for character in text.chars() {
             let size = SpriteId::message_glyph_size(character)
@@ -2037,7 +2037,7 @@
                     SpriteId::message_glyph(character).expect("visible prompt glyph should exist");
                 expected.push((
                     sprite,
-                    screen_position_from_address(cursor),
+                    screen_position_from_cell(cursor),
                     [size[0] as f32, size[1] as f32],
                 ));
             }
@@ -2050,24 +2050,24 @@
         expected
     }
 
-    fn arcade_test_text_cursor_after_glyph(cursor: u16, width_pixels: u32) -> u16 {
-        let [column, row] = cursor.to_be_bytes();
+    fn arcade_test_text_cursor_after_glyph(cursor: ScreenAddress, width_pixels: u32) -> ScreenAddress {
+        let [column, row] = cursor.word().to_be_bytes();
         let width_columns =
             u8::try_from(width_pixels / 2).expect("arcade glyph width should fit in u8");
-        u16::from_be_bytes([column.wrapping_add(width_columns).wrapping_add(1), row])
+        ScreenAddress::from_bytes(column.wrapping_add(width_columns).wrapping_add(1), row)
     }
 
     fn assert_no_arcade_message(
         report: &StepReport,
         message: MessageId,
-        top_left_screen_address: u16,
+        screen_cell: ScreenAddress,
     ) {
         let text = crate::arcade_assets::message_text(message);
         let first_glyph = text
             .chars()
             .find_map(SpriteId::message_glyph)
             .expect("arcade message should contain a visible glyph");
-        let position = screen_position_from_address(top_left_screen_address);
+        let position = screen_position_from_cell(screen_cell);
         let scene = report.render_scene();
         assert!(
             scene.sprites.iter().all(|sprite| {
@@ -2075,6 +2075,7 @@
                     || sprite.layer != RenderLayer::Overlay
                     || sprite.position != position
             }),
-            "unexpected arcade message {message:?} at {top_left_screen_address:#06x}"
+            "unexpected arcade message {message:?} at {:#06x}",
+            screen_cell.word()
         );
     }

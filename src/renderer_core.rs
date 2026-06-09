@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::ScreenAddress;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SurfaceSize {
     pub width: u32,
@@ -780,24 +782,24 @@ impl RenderScene {
     }
 }
 
-pub fn screen_position_from_address(screen_address: u16) -> [f32; 2] {
-    let [column, row] = screen_address.to_be_bytes();
+pub fn screen_position_from_cell(screen_cell: ScreenAddress) -> [f32; 2] {
+    let [column, row] = screen_cell.word().to_be_bytes();
     [
         f32::from(column) * SCREEN_COLUMN_WIDTH_PIXELS,
         f32::from(row),
     ]
 }
 
-pub fn screen_position_from_address_with_offset(
-    top_left_screen_address: u16,
+pub fn screen_position_from_cell_with_offset(
+    top_left_screen_cell: ScreenAddress,
     horizontal: u8,
     vertical: u8,
 ) -> [f32; 2] {
-    let [column, row] = top_left_screen_address.to_be_bytes();
-    screen_position_from_address(u16::from_be_bytes([
+    let [column, row] = top_left_screen_cell.word().to_be_bytes();
+    screen_position_from_cell(ScreenAddress::from_bytes(
         column.wrapping_add(horizontal),
         row.wrapping_add(vertical),
-    ]))
+    ))
 }
 
 pub fn push_message_sprites(
@@ -853,12 +855,12 @@ pub fn push_message_text_bytes_sprites(
 pub fn push_arcade_controlled_message_sprites(
     scene: &mut RenderScene,
     text: &str,
-    top_left_screen_address: u16,
+    top_left_screen_cell: ScreenAddress,
     layer: RenderLayer,
 ) {
     let mut layout = ArcadeMessageTextLayout {
-        top_left: top_left_screen_address,
-        cursor: top_left_screen_address,
+        top_left: top_left_screen_cell,
+        cursor: top_left_screen_cell,
         line_spacing: MESSAGE_LINE_SPACING_ROWS,
     };
 
@@ -872,7 +874,7 @@ pub fn push_arcade_controlled_message_sprites(
         }
 
         let bytes = word.as_bytes();
-        push_message_text_bytes_sprites(scene, bytes, screen_position_from_address(layout.cursor), layer);
+        push_message_text_bytes_sprites(scene, bytes, screen_position_from_cell(layout.cursor), layer);
         layout.cursor = message_text_cursor_after_bytes(layout.cursor, bytes);
         layout.cursor = message_text_cursor_after_bytes(layout.cursor, b" ");
     }
@@ -892,7 +894,7 @@ fn message_text_byte_sprite(byte: u8) -> Option<(Option<SpriteId>, [u32; 2])> {
     Some((SpriteId::message_glyph(character), size))
 }
 
-fn message_text_cursor_after_bytes(mut cursor: u16, bytes: &[u8]) -> u16 {
+fn message_text_cursor_after_bytes(mut cursor: ScreenAddress, bytes: &[u8]) -> ScreenAddress {
     for byte in bytes {
         let Some((_sprite, size)) = message_text_byte_sprite(*byte) else {
             continue;
@@ -902,17 +904,17 @@ fn message_text_cursor_after_bytes(mut cursor: u16, bytes: &[u8]) -> u16 {
     cursor
 }
 
-fn message_text_cursor_advance(cursor: u16, width_pixels: u32) -> u16 {
-    let [column, row] = cursor.to_be_bytes();
+fn message_text_cursor_advance(cursor: ScreenAddress, width_pixels: u32) -> ScreenAddress {
+    let [column, row] = cursor.word().to_be_bytes();
     let width_columns = u8::try_from(width_pixels / u32::from(SCREEN_COLUMN_WIDTH_PIXELS_U8))
         .expect("message glyph width fits in u8");
-    u16::from_be_bytes([column.wrapping_add(width_columns).wrapping_add(1), row])
+    ScreenAddress::from_bytes(column.wrapping_add(width_columns).wrapping_add(1), row)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ArcadeMessageTextLayout {
-    top_left: u16,
-    cursor: u16,
+    top_left: ScreenAddress,
+    cursor: ScreenAddress,
     line_spacing: u8,
 }
 
@@ -921,30 +923,30 @@ impl ArcadeMessageTextLayout {
         match control {
             ArcadeMessageControl::HorizontalFromTopLeft(delta) => {
                 let [top_x, cursor_y] =
-                    [self.top_left.to_be_bytes()[0], self.cursor.to_be_bytes()[1]];
-                self.cursor = u16::from_be_bytes([top_x.wrapping_add(delta), cursor_y]);
+                    [self.top_left.word().to_be_bytes()[0], self.cursor.word().to_be_bytes()[1]];
+                self.cursor = ScreenAddress::from_bytes(top_x.wrapping_add(delta), cursor_y);
             }
             ArcadeMessageControl::HorizontalFromCursor(delta) => {
-                let [cursor_x, cursor_y] = self.cursor.to_be_bytes();
-                self.cursor = u16::from_be_bytes([cursor_x.wrapping_add(delta), cursor_y]);
+                let [cursor_x, cursor_y] = self.cursor.word().to_be_bytes();
+                self.cursor = ScreenAddress::from_bytes(cursor_x.wrapping_add(delta), cursor_y);
             }
             ArcadeMessageControl::VerticalFromTopLeft(delta) => {
-                let [cursor_x, _cursor_y] = self.cursor.to_be_bytes();
-                let top_y = self.top_left.to_be_bytes()[1];
-                self.cursor = u16::from_be_bytes([cursor_x, top_y.wrapping_add(delta)]);
+                let [cursor_x, _cursor_y] = self.cursor.word().to_be_bytes();
+                let top_y = self.top_left.word().to_be_bytes()[1];
+                self.cursor = ScreenAddress::from_bytes(cursor_x, top_y.wrapping_add(delta));
             }
             ArcadeMessageControl::VerticalFromCursor(delta) => {
-                let [cursor_x, cursor_y] = self.cursor.to_be_bytes();
-                self.cursor = u16::from_be_bytes([cursor_x, cursor_y.wrapping_add(delta)]);
+                let [cursor_x, cursor_y] = self.cursor.word().to_be_bytes();
+                self.cursor = ScreenAddress::from_bytes(cursor_x, cursor_y.wrapping_add(delta));
             }
-            ArcadeMessageControl::ResetTopLeftAndCursor(address) => {
-                self.top_left = address;
-                self.cursor = address;
+            ArcadeMessageControl::ResetTopLeftAndCursor(screen_cell) => {
+                self.top_left = screen_cell;
+                self.cursor = screen_cell;
             }
             ArcadeMessageControl::ReturnLineFeed => {
-                let [top_x, _top_y] = self.top_left.to_be_bytes();
-                let cursor_y = self.cursor.to_be_bytes()[1];
-                self.cursor = u16::from_be_bytes([top_x, cursor_y.wrapping_add(self.line_spacing)]);
+                let [top_x, _top_y] = self.top_left.word().to_be_bytes();
+                let cursor_y = self.cursor.word().to_be_bytes()[1];
+                self.cursor = ScreenAddress::from_bytes(top_x, cursor_y.wrapping_add(self.line_spacing));
             }
         }
     }
@@ -956,7 +958,7 @@ enum ArcadeMessageControl {
     HorizontalFromCursor(u8),
     VerticalFromTopLeft(u8),
     VerticalFromCursor(u8),
-    ResetTopLeftAndCursor(u16),
+    ResetTopLeftAndCursor(ScreenAddress),
     ReturnLineFeed,
 }
 
@@ -979,10 +981,10 @@ fn arcade_message_control(word: &str) -> Option<ArcadeMessageControl> {
         "RTC" => {
             let (x, y) = arguments.split_once(',')?;
             Some(ArcadeMessageControl::ResetTopLeftAndCursor(
-                u16::from_be_bytes([
+                ScreenAddress::from_bytes(
                     arcade_message_control_byte(x)?,
                     arcade_message_control_byte(y)?,
-                ]),
+                ),
             ))
         }
         "RLF" if arguments.is_empty() => Some(ArcadeMessageControl::ReturnLineFeed),

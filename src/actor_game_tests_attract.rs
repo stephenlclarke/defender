@@ -43,7 +43,7 @@
                 player: 1,
             })
         );
-        assert_no_arcade_message(&started, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_ADDRESS);
+        assert_no_arcade_message(&started, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
         assert_eq!(driver.snapshot_count(ActorKind::Player), 0);
 
         let start_sound = driver.step(GameInput::NONE);
@@ -139,7 +139,7 @@
                 && matches!(
                     draw.effect,
                     VisualEffect::ArcadeMessage {
-                        top_left_screen_address: ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
+                        screen_cell: ATTRACT_PRESENTS_ELECTRONICS_CELL,
                         visual_offset: Point { x: 0, y: 0 },
                     }
                 )
@@ -222,9 +222,9 @@
                 && matches!(
                     draw.effect,
                     VisualEffect::ArcadeMessage {
-                        top_left_screen_address: 0x3854,
+                        screen_cell,
                         visual_offset: ATTRACT_HALL_TABLE_VISUAL_OFFSET,
-                    }
+                    } if screen_cell == crate::ScreenAddress::new(0x3854)
                 )
         }));
         let hall_greatest_text =
@@ -307,9 +307,9 @@
                 && matches!(
                     draw.effect,
                     VisualEffect::ArcadeMessage {
-                        top_left_screen_address: 0x4330,
+                        screen_cell,
                         visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
-                    }
+                    } if screen_cell == crate::ScreenAddress::new(0x4330)
                 )
         }));
         for (message, _) in ATTRACT_INSTRUCTION_TEXT_LINES.iter().skip(1) {
@@ -471,9 +471,9 @@
                 && matches!(
                     draw.effect,
                     VisualEffect::ArcadeMessage {
-                        top_left_screen_address: 0x1C70,
+                        screen_cell,
                         visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
-                    }
+                    } if screen_cell == crate::ScreenAddress::new(0x1C70)
                 )
         }));
         assert!(
@@ -498,16 +498,16 @@
             last_label = driver.step(GameInput::NONE);
         }
         assert_eq!(last_label.step, last_label_start);
-        for (message, screen_address) in ATTRACT_INSTRUCTION_TEXT_LINES {
+        for (message, screen_cell) in ATTRACT_INSTRUCTION_TEXT_LINES {
             let text = actor_message_text(message);
             assert!(last_label.draws.iter().any(|draw| {
                 draw.text.as_deref() == Some(text)
                     && matches!(
                         draw.effect,
                         VisualEffect::ArcadeMessage {
-                            top_left_screen_address,
+                            screen_cell: actual_cell,
                             visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
-                        } if top_left_screen_address == screen_address
+                        } if actual_cell == screen_cell
                     )
             }));
         }
@@ -770,7 +770,7 @@
             event.action,
             AttractScriptActionManifest::ArcadeMessage {
                 ref message,
-                top_left_screen_address: ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
+                screen_cell: ATTRACT_PRESENTS_ELECTRONICS_CELL,
                 visual_offset: Point { x: 0, y: 0 },
             } if message == "WilliamsElectronics"
         ) && event.start_after_steps
@@ -785,8 +785,8 @@
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
             AttractScriptActionManifest::HallScores {
-                todays_top_left_screen_address: ATTRACT_HALL_TODAYS_TABLE_SCREEN,
-                all_time_top_left_screen_address: ATTRACT_HALL_ALL_TIME_TABLE_SCREEN,
+                todays_table_cell: ATTRACT_HALL_TODAYS_TABLE_CELL,
+                all_time_table_cell: ATTRACT_HALL_ALL_TIME_TABLE_CELL,
                 visual_offset: ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             } if event.start_after_steps == ATTRACT_HALL_OF_FAME_START_STEP
                 && event.duration_steps == Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS)
@@ -814,10 +814,11 @@
             event.action,
             AttractScriptActionManifest::ArcadeMessage {
                 ref message,
-                top_left_screen_address: 0x3854,
+                screen_cell,
                 visual_offset: ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             } if event.start_after_steps == ATTRACT_HALL_OF_FAME_START_STEP
                 && message == "HallTitle"
+                && screen_cell == crate::ScreenAddress::new(0x3854)
                 && event.duration_steps == Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS)
         )));
         assert_eq!(
@@ -829,10 +830,11 @@
                     event.action,
                     AttractScriptActionManifest::ArcadeMessage {
                         ref message,
-                        top_left_screen_address: 0x1E72 | 0x5F72,
+                        screen_cell,
                         visual_offset: ATTRACT_HALL_TABLE_VISUAL_OFFSET,
                     } if event.start_after_steps == ATTRACT_HALL_OF_FAME_START_STEP
                         && message == "HallGreatest"
+                        && matches!(screen_cell.word(), 0x1E72 | 0x5F72)
                         && event.duration_steps == Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS)
                 ))
                 .count(),
@@ -852,20 +854,20 @@
                 if event.start_after_steps == ATTRACT_SCORING_SEQUENCE_START_STEP
                     && event.duration_steps.is_none()
         )));
-        for (line_index, (message, screen_address)) in
+        for (line_index, (message, screen_cell)) in
             ATTRACT_INSTRUCTION_TEXT_LINES.iter().copied().enumerate()
         {
             assert!(parsed.manifest().events.iter().any(|event| matches!(
                 event.action,
                 AttractScriptActionManifest::ArcadeMessage {
                     message: ref event_message,
-                    top_left_screen_address,
+                    screen_cell: actual_cell,
                     visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
                 } if event.start_after_steps
                     == actor_attract_scoring_instruction_text_start_step(line_index)
                     && event.duration_steps.is_none()
                     && event_message == &format!("{message:?}")
-                    && top_left_screen_address == screen_address
+                    && actual_cell == screen_cell
             )));
         }
     }
@@ -1137,8 +1139,8 @@
         assert_eq!(
             manifest.events[2].action,
             AttractScriptActionManifest::HallScores {
-                todays_top_left_screen_address: ATTRACT_HALL_TODAYS_TABLE_SCREEN,
-                all_time_top_left_screen_address: ATTRACT_HALL_ALL_TIME_TABLE_SCREEN,
+                todays_table_cell: ATTRACT_HALL_TODAYS_TABLE_CELL,
+                all_time_table_cell: ATTRACT_HALL_ALL_TIME_TABLE_CELL,
                 visual_offset: ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             }
         );
@@ -1306,7 +1308,7 @@
             script.manifest().events[0].action,
             AttractScriptActionManifest::ArcadeMessage {
                 message: "WilliamsElectronics".to_string(),
-                top_left_screen_address: 0x3258,
+                screen_cell: crate::ScreenAddress::new(0x3258),
                 visual_offset: Point::new(0, 0),
             }
         );
@@ -1319,9 +1321,9 @@
                 && matches!(
                     draw.effect,
                     VisualEffect::ArcadeMessage {
-                        top_left_screen_address: 0x3258,
+                        screen_cell,
                         visual_offset: Point { x: 0, y: 0 },
-                    }
+                    } if screen_cell == crate::ScreenAddress::new(0x3258)
                 )
         }));
 
@@ -1348,7 +1350,7 @@
             script.manifest().events[0].action,
             AttractScriptActionManifest::ArcadeMessage {
                 message: "WilliamsElectronics".to_string(),
-                top_left_screen_address: 0x3258,
+                screen_cell: crate::ScreenAddress::new(0x3258),
                 visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
             }
         );
@@ -1361,9 +1363,9 @@
                 && matches!(
                     draw.effect,
                     VisualEffect::ArcadeMessage {
-                        top_left_screen_address: 0x3258,
+                        screen_cell,
                         visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
-                    }
+                    } if screen_cell == crate::ScreenAddress::new(0x3258)
                 )
         }));
 

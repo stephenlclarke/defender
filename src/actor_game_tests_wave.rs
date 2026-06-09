@@ -881,8 +881,8 @@
         }));
         assert!(next_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::TOP_DISPLAY_BORDER_WORD
-                && sprite.position != screen_position_from_address(0x4C07)
-                && sprite.position != screen_position_from_address(0x4C28)
+                && sprite.position != screen_position_from_cell(crate::ScreenAddress::new(0x4C07))
+                && sprite.position != screen_position_from_cell(crate::ScreenAddress::new(0x4C28))
                 && sprite.tint == arcade_wave_landscape_tint(2)
         }));
     }

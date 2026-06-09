@@ -68,14 +68,14 @@ impl ActorRenderSceneBridge {
                 RenderLayer::Hud
             };
             if let VisualEffect::ArcadeMessage {
-                top_left_screen_address,
+                screen_cell,
                 visual_offset,
             } = draw.effect
             {
                 push_arcade_controlled_message_sprites_with_offset(
                     scene,
                     text,
-                    top_left_screen_address,
+                    screen_cell,
                     layer,
                     visual_offset,
                 );
@@ -262,12 +262,12 @@ fn push_actor_wave_completion_status_sprites(scene: &mut RenderScene, report: &S
         return;
     }
 
-    for (message, screen_address) in WAVE_COMPLETION_STATUS_LINES {
+    for (message, screen_cell) in WAVE_COMPLETION_STATUS_LINES {
         let text = crate::arcade_assets::message_text(*message);
         push_message_text_bytes_sprites(
             scene,
             text.as_bytes(),
-            screen_position_from_address(*screen_address),
+            screen_position_from_cell(*screen_cell),
             RenderLayer::Overlay,
         );
     }
@@ -276,7 +276,7 @@ fn push_actor_wave_completion_status_sprites(scene: &mut RenderScene, report: &S
     push_message_text_bytes_sprites(
         scene,
         &wave_digits[..wave_digit_count],
-        screen_position_from_address(WAVE_COMPLETION_WAVE_NUMBER_SCREEN),
+        screen_position_from_cell(WAVE_COMPLETION_WAVE_NUMBER_SCREEN_CELL),
         RenderLayer::Overlay,
     );
 
@@ -285,7 +285,7 @@ fn push_actor_wave_completion_status_sprites(scene: &mut RenderScene, report: &S
     push_message_text_bytes_sprites(
         scene,
         &multiplier_digits[..multiplier_digit_count],
-        screen_position_from_address(WAVE_COMPLETION_MULTIPLIER_NUMBER_SCREEN),
+        screen_position_from_cell(WAVE_COMPLETION_MULTIPLIER_NUMBER_SCREEN_CELL),
         RenderLayer::Overlay,
     );
 }
@@ -299,8 +299,8 @@ fn push_actor_survivor_bonus_icon_sprites(scene: &mut RenderScene, report: &Step
         scene.push_sprite(SceneSprite {
             sprite: SpriteId::HUMAN,
             layer: RenderLayer::Overlay,
-            position: screen_position_from_address_with_offset(
-                SURVIVOR_BONUS_FIRST_HUMAN_SCREEN,
+            position: screen_position_from_cell_with_offset(
+                SURVIVOR_BONUS_FIRST_HUMAN_SCREEN_CELL,
                 (index as u8) * SURVIVOR_BONUS_HUMAN_STEP,
                 0,
             ),
@@ -331,13 +331,13 @@ fn push_actor_player_switch_prompt_sprites(scene: &mut RenderScene, report: &Ste
     push_actor_message_sprites(
         scene,
         player_message(player_switch.from_player),
-        PLAYER_SWITCH_LABEL_SCREEN_ADDRESS,
+        PLAYER_SWITCH_LABEL_SCREEN_CELL,
         RenderLayer::Overlay,
     );
     push_actor_message_sprites(
         scene,
         MessageId::GameOver,
-        PLAYER_SWITCH_GAME_OVER_SCREEN_ADDRESS,
+        PLAYER_SWITCH_GAME_OVER_SCREEN_CELL,
         RenderLayer::Overlay,
     );
 }
@@ -350,7 +350,7 @@ fn push_actor_final_game_over_prompt_sprites(scene: &mut RenderScene, report: &S
     push_actor_message_sprites(
         scene,
         MessageId::GameOver,
-        FINAL_GAME_OVER_SCREEN_ADDRESS,
+        FINAL_GAME_OVER_SCREEN_CELL,
         RenderLayer::Overlay,
     );
 }
@@ -366,7 +366,7 @@ fn push_actor_player_start_prompt_sprites(scene: &mut RenderScene, report: &Step
     push_actor_message_sprites(
         scene,
         player_message(player_start.player),
-        PLAYER_START_PROMPT_SCREEN_ADDRESS,
+        PLAYER_START_PROMPT_SCREEN_CELL,
         RenderLayer::Overlay,
     );
 }
@@ -374,13 +374,13 @@ fn push_actor_player_start_prompt_sprites(scene: &mut RenderScene, report: &Step
 fn push_actor_message_sprites(
     scene: &mut RenderScene,
     message: MessageId,
-    top_left_screen_address: u16,
+    screen_cell: ScreenAddress,
     layer: RenderLayer,
 ) {
     push_arcade_controlled_message_sprites(
         scene,
         crate::arcade_assets::message_text(message),
-        top_left_screen_address,
+        screen_cell,
         layer,
     );
 }
@@ -404,22 +404,22 @@ fn actor_visible_decimal_digits(value: u8) -> ([u8; 2], usize) {
 fn push_arcade_controlled_message_sprites_with_offset(
     scene: &mut RenderScene,
     text: &str,
-    top_left_screen_address: u16,
+    screen_cell: ScreenAddress,
     layer: RenderLayer,
     visual_offset: Point,
 ) {
     let first_sprite = scene.sprites.len();
-    push_arcade_controlled_message_sprites(scene, text, top_left_screen_address, layer);
+    push_arcade_controlled_message_sprites(scene, text, screen_cell, layer);
     offset_new_sprites(scene, first_sprite, point_position(visual_offset));
 }
 
 fn push_actor_playing_top_display_border(scene: &mut RenderScene, wave: u16) {
-    for (screen_address_word, size) in TOP_DISPLAY_BORDER_SEGMENTS {
-        let screen_cell = crate::ScreenAddress::new(screen_address_word);
+    for (screen_cell_word, size) in TOP_DISPLAY_BORDER_SEGMENTS {
+        let screen_cell = crate::ScreenAddress::new(screen_cell_word);
         scene.push_sprite(SceneSprite {
             sprite: SpriteId::TOP_DISPLAY_BORDER_WORD,
             layer: RenderLayer::Hud,
-            position: screen_position_from_address(screen_cell.word()),
+            position: screen_position_from_cell(screen_cell),
             size,
             tint: if matches!(screen_cell.word(), 0x4C07 | 0x4C28) {
                 VISUAL_STATE.top_display_scanner_marker_tint()

@@ -1433,7 +1433,7 @@
             })
         );
         assert!(started.state.world.enemies.is_empty());
-        assert_no_arcade_message(&started.report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_ADDRESS);
+        assert_no_arcade_message(&started.report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
         assert!(started.events.sounds().is_empty());
 
         let start_sound = runtime.step(GameInput::NONE);

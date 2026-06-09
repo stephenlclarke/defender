@@ -30,7 +30,7 @@ pub enum VisualEffect {
     #[default]
     Static,
     ArcadeMessage {
-        top_left_screen_address: u16,
+        screen_cell: ScreenAddress,
         visual_offset: Point,
     },
     AttractScoringSurface {
@@ -239,7 +239,7 @@ impl AttractScript {
                 ATTRACT_PRESENTS_START_STEP,
                 Some(ATTRACT_PRESENTS_DURATION_STEPS),
                 PRESENTS_MESSAGE,
-                ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
+                ATTRACT_PRESENTS_ELECTRONICS_CELL,
             ),
             AttractScriptEvent::defender_wordmark(
                 DEFENDER_WORDMARK_START_STEP,
@@ -262,35 +262,35 @@ impl AttractScript {
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 ATTRACT_HALL_TITLE_MESSAGE,
-                0x3854,
+                ScreenAddress::new(0x3854),
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
             AttractScriptEvent::arcade_message_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 ATTRACT_HALL_TODAYS_MESSAGE,
-                0x2268,
+                ScreenAddress::new(0x2268),
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
             AttractScriptEvent::arcade_message_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 ATTRACT_HALL_ALL_TIME_MESSAGE,
-                0x6068,
+                ScreenAddress::new(0x6068),
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
             AttractScriptEvent::arcade_message_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 ATTRACT_HALL_GREATEST_MESSAGE,
-                0x1E72,
+                ScreenAddress::new(0x1E72),
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
             AttractScriptEvent::arcade_message_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 ATTRACT_HALL_GREATEST_MESSAGE,
-                0x5F72,
+                ScreenAddress::new(0x5F72),
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
             AttractScriptEvent::sprite(
@@ -302,8 +302,8 @@ impl AttractScript {
             AttractScriptEvent::hall_scores(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
-                ATTRACT_HALL_TODAYS_TABLE_SCREEN,
-                ATTRACT_HALL_ALL_TIME_TABLE_SCREEN,
+                ATTRACT_HALL_TODAYS_TABLE_CELL,
+                ATTRACT_HALL_ALL_TIME_TABLE_CELL,
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
         ];
@@ -311,14 +311,14 @@ impl AttractScript {
             ATTRACT_SCORING_SEQUENCE_START_STEP,
             None,
         ));
-        for (line_index, (message, screen_address)) in
+        for (line_index, (message, screen_cell)) in
             ATTRACT_INSTRUCTION_TEXT_LINES.iter().copied().enumerate()
         {
             events.push(AttractScriptEvent::arcade_message_with_offset(
                 actor_attract_scoring_instruction_text_start_step(line_index),
                 None,
                 message,
-                screen_address,
+                screen_cell,
                 ATTRACT_SCORING_VISUAL_OFFSET,
             ));
         }
@@ -473,14 +473,17 @@ fn parse_attract_script_event(
         }
         "message" => {
             let message = parse_attract_message_id(line_number, parts.next())?;
-            let top_left_screen_address =
-                parse_attract_u16(line_number, parts.next(), "top-left screen address")?;
+            let screen_cell = ScreenAddress::new(parse_attract_u16(
+                line_number,
+                parts.next(),
+                "top-left screen cell",
+            )?);
             let visual_offset = parse_optional_attract_point(line_number, &mut parts)?;
             Ok(AttractScriptEvent::arcade_message_with_offset(
                 start_after_steps,
                 duration_steps,
                 message,
-                top_left_screen_address,
+                screen_cell,
                 visual_offset,
             ))
         }
@@ -537,17 +540,23 @@ fn parse_attract_script_event(
             ))
         }
         "hall_scores" | "hall_of_fame_scores" | "hall_of_fame_table" => {
-            let todays_top_left_screen_address =
-                parse_attract_u16(line_number, parts.next(), "today's table screen address")?;
-            let all_time_top_left_screen_address =
-                parse_attract_u16(line_number, parts.next(), "all-time table screen address")?;
+            let todays_table_cell = ScreenAddress::new(parse_attract_u16(
+                line_number,
+                parts.next(),
+                "today's table screen cell",
+            )?);
+            let all_time_table_cell = ScreenAddress::new(parse_attract_u16(
+                line_number,
+                parts.next(),
+                "all-time table screen cell",
+            )?);
             let visual_offset = parse_attract_point(line_number, &mut parts)?;
             reject_extra_attract_fields(line_number, parts)?;
             Ok(AttractScriptEvent::hall_scores(
                 start_after_steps,
                 duration_steps,
-                todays_top_left_screen_address,
-                all_time_top_left_screen_address,
+                todays_table_cell,
+                all_time_table_cell,
                 visual_offset,
             ))
         }
@@ -784,13 +793,13 @@ impl AttractScriptEvent {
         start_after_steps: u64,
         duration_steps: Option<u64>,
         message: MessageId,
-        top_left_screen_address: u16,
+        screen_cell: ScreenAddress,
     ) -> Self {
         Self::arcade_message_with_offset(
             start_after_steps,
             duration_steps,
             message,
-            top_left_screen_address,
+            screen_cell,
             Point::new(0, 0),
         )
     }
@@ -799,7 +808,7 @@ impl AttractScriptEvent {
         start_after_steps: u64,
         duration_steps: Option<u64>,
         message: MessageId,
-        top_left_screen_address: u16,
+        screen_cell: ScreenAddress,
         visual_offset: Point,
     ) -> Self {
         Self {
@@ -807,7 +816,7 @@ impl AttractScriptEvent {
             duration_steps,
             action: AttractScriptAction::ArcadeMessage {
                 message,
-                top_left_screen_address,
+                screen_cell,
                 visual_offset,
             },
         }
@@ -879,16 +888,16 @@ impl AttractScriptEvent {
     pub fn hall_scores(
         start_after_steps: u64,
         duration_steps: Option<u64>,
-        todays_top_left_screen_address: u16,
-        all_time_top_left_screen_address: u16,
+        todays_table_cell: ScreenAddress,
+        all_time_table_cell: ScreenAddress,
         visual_offset: Point,
     ) -> Self {
         Self {
             start_after_steps,
             duration_steps,
             action: AttractScriptAction::HallScores {
-                todays_top_left_screen_address,
-                all_time_top_left_screen_address,
+                todays_table_cell,
+                all_time_table_cell,
                 visual_offset,
             },
         }
@@ -979,7 +988,7 @@ pub enum AttractScriptAction {
     },
     ArcadeMessage {
         message: MessageId,
-        top_left_screen_address: u16,
+        screen_cell: ScreenAddress,
         visual_offset: Point,
     },
     Sprite {
@@ -1002,8 +1011,8 @@ pub enum AttractScriptAction {
         rows: usize,
     },
     HallScores {
-        todays_top_left_screen_address: u16,
-        all_time_top_left_screen_address: u16,
+        todays_table_cell: ScreenAddress,
+        all_time_table_cell: ScreenAddress,
         visual_offset: Point,
     },
     ScoringSurface,
@@ -1028,12 +1037,12 @@ impl AttractScriptAction {
             }
             Self::ArcadeMessage {
                 message,
-                top_left_screen_address,
+                screen_cell,
                 visual_offset,
             } => vec![DrawCommand::arcade_message_with_offset(
                 actor,
                 crate::arcade_assets::message_text(*message),
-                *top_left_screen_address,
+                *screen_cell,
                 *visual_offset,
             )],
             Self::Sprite { sprite, position } => {
@@ -1105,21 +1114,21 @@ impl AttractScriptAction {
                 })
                 .collect(),
             Self::HallScores {
-                todays_top_left_screen_address,
-                all_time_top_left_screen_address,
+                todays_table_cell,
+                all_time_table_cell,
                 visual_offset,
             } => {
                 let entries = hall_score_seed_entries();
                 let mut draws = hall_score_table_draws(
                     actor,
                     entries,
-                    *todays_top_left_screen_address,
+                    *todays_table_cell,
                     *visual_offset,
                 );
                 draws.extend(hall_score_table_draws(
                     actor,
                     entries,
-                    *all_time_top_left_screen_address,
+                    *all_time_table_cell,
                     *visual_offset,
                 ));
                 draws
@@ -1161,11 +1170,11 @@ impl AttractScriptAction {
             },
             Self::ArcadeMessage {
                 message,
-                top_left_screen_address,
+                screen_cell,
                 visual_offset,
             } => AttractScriptActionManifest::ArcadeMessage {
                 message: format!("{message:?}"),
-                top_left_screen_address: *top_left_screen_address,
+                screen_cell: *screen_cell,
                 visual_offset: *visual_offset,
             },
             Self::Sprite { sprite, position } => AttractScriptActionManifest::Sprite {
@@ -1200,12 +1209,12 @@ impl AttractScriptAction {
                 rows: *rows,
             },
             Self::HallScores {
-                todays_top_left_screen_address,
-                all_time_top_left_screen_address,
+                todays_table_cell,
+                all_time_table_cell,
                 visual_offset,
             } => AttractScriptActionManifest::HallScores {
-                todays_top_left_screen_address: *todays_top_left_screen_address,
-                all_time_top_left_screen_address: *all_time_top_left_screen_address,
+                todays_table_cell: *todays_table_cell,
+                all_time_table_cell: *all_time_table_cell,
                 visual_offset: *visual_offset,
             },
             Self::ScoringSurface => AttractScriptActionManifest::ScoringSurface,
@@ -1261,7 +1270,7 @@ fn high_score_seed_entry(index: usize) -> HighScoreTableEntrySnapshot {
 fn hall_score_table_draws(
     actor: ActorId,
     entries: [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES],
-    top_left_screen_address: u16,
+    top_left_screen_cell: ScreenAddress,
     visual_offset: Point,
 ) -> Vec<DrawCommand> {
     let mut draws = Vec::with_capacity(entries.len() * 3);
@@ -1271,7 +1280,7 @@ fn hall_score_table_draws(
         draws.push(DrawCommand::text(
             actor,
             offset_point(
-                screen_point_with_offset(top_left_screen_address, 0, vertical_offset),
+                screen_point_with_offset(top_left_screen_cell, 0, vertical_offset),
                 visual_offset,
             ),
             char::from(b'1' + u8::try_from(index).expect("high-score rank fits u8")).to_string(),
@@ -1280,7 +1289,7 @@ fn hall_score_table_draws(
             actor,
             offset_point(
                 screen_point_with_offset(
-                    top_left_screen_address,
+                    top_left_screen_cell,
                     ATTRACT_HALL_TABLE_INITIALS_OFFSET,
                     vertical_offset,
                 ),
@@ -1292,7 +1301,7 @@ fn hall_score_table_draws(
             actor,
             offset_point(
                 screen_point_with_offset(
-                    top_left_screen_address,
+                    top_left_screen_cell,
                     ATTRACT_HALL_TABLE_SCORE_OFFSET,
                     vertical_offset,
                 ),
@@ -1304,8 +1313,8 @@ fn hall_score_table_draws(
     draws
 }
 
-fn screen_point_with_offset(top_left_screen_address: u16, horizontal: u8, vertical: u8) -> Point {
-    let [column, row] = top_left_screen_address.to_be_bytes();
+fn screen_point_with_offset(top_left_screen_cell: ScreenAddress, horizontal: u8, vertical: u8) -> Point {
+    let [column, row] = top_left_screen_cell.word().to_be_bytes();
     Point::new(
         i16::from(column.wrapping_add(horizontal)) * 2,
         i16::from(row.wrapping_add(vertical)),
@@ -1362,7 +1371,7 @@ pub enum AttractScriptActionManifest {
     },
     ArcadeMessage {
         message: String,
-        top_left_screen_address: u16,
+        screen_cell: ScreenAddress,
         visual_offset: Point,
     },
     Sprite {
@@ -1385,8 +1394,8 @@ pub enum AttractScriptActionManifest {
         rows: usize,
     },
     HallScores {
-        todays_top_left_screen_address: u16,
-        all_time_top_left_screen_address: u16,
+        todays_table_cell: ScreenAddress,
+        all_time_table_cell: ScreenAddress,
         visual_offset: Point,
     },
     ScoringSurface,

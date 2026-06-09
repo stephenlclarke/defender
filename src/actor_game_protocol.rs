@@ -97,15 +97,15 @@ impl DrawCommand {
     pub fn arcade_message(
         actor: ActorId,
         value: impl Into<String>,
-        top_left_screen_address: u16,
+        screen_cell: ScreenAddress,
     ) -> Self {
-        Self::arcade_message_with_offset(actor, value, top_left_screen_address, Point::new(0, 0))
+        Self::arcade_message_with_offset(actor, value, screen_cell, Point::new(0, 0))
     }
 
     pub fn arcade_message_with_offset(
         actor: ActorId,
         value: impl Into<String>,
-        top_left_screen_address: u16,
+        screen_cell: ScreenAddress,
         visual_offset: Point,
     ) -> Self {
         Self {
@@ -113,7 +113,7 @@ impl DrawCommand {
             sprite: SpriteKey::Text,
             position: Point::new(0, 0),
             effect: VisualEffect::ArcadeMessage {
-                top_left_screen_address,
+                screen_cell,
                 visual_offset,
             },
             text: Some(value.into()),

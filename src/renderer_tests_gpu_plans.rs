@@ -805,9 +805,12 @@
         assert_eq!(message_text(MessageId::PlayerOne), "PLAYER ONE");
         assert_eq!(message_text(MessageId::PlayerTwo), "PLAYER TWO");
         assert_eq!(message_text(MessageId::GameOver), "GAME OVER");
-        assert_eq!(screen_position_from_address(0x3C78), [120.0, 120.0]);
         assert_eq!(
-            screen_position_from_address_with_offset(0x1458, 0, 0x0A),
+            screen_position_from_cell(crate::ScreenAddress::new(0x3C78)),
+            [120.0, 120.0]
+        );
+        assert_eq!(
+            screen_position_from_cell_with_offset(crate::ScreenAddress::new(0x1458), 0, 0x0A),
             [40.0, 98.0]
         );
         assert_eq!(
@@ -838,7 +841,7 @@
         push_message_text_bytes_sprites(
             &mut scene,
             b" 2A",
-            screen_position_from_address(0x2B86),
+            screen_position_from_cell(crate::ScreenAddress::new(0x2B86)),
             RenderLayer::Overlay,
         );
 
@@ -862,7 +865,12 @@
         let mut scene = RenderScene::empty(0, SurfaceSize::new(292, 240));
         let text = message_text(MessageId::WilliamsElectronics);
 
-        push_arcade_controlled_message_sprites(&mut scene, text, 0x3258, RenderLayer::Overlay);
+        push_arcade_controlled_message_sprites(
+            &mut scene,
+            text,
+            crate::ScreenAddress::new(0x3258),
+            RenderLayer::Overlay,
+        );
 
         assert_eq!(scene.sprites.len(), 23);
         assert!(scene.sprites.iter().all(|sprite| {

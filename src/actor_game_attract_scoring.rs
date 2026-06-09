@@ -1,11 +1,11 @@
 fn push_attract_scoring_top_display_border(scene: &mut RenderScene) {
-    for (screen_address_word, size) in TOP_DISPLAY_BORDER_SEGMENTS {
-        let screen_cell = crate::ScreenAddress::new(screen_address_word);
+    for (screen_cell_word, size) in TOP_DISPLAY_BORDER_SEGMENTS {
+        let screen_cell = crate::ScreenAddress::new(screen_cell_word);
         scene.push_sprite(SceneSprite {
             sprite: SpriteId::TOP_DISPLAY_BORDER_WORD,
             layer: RenderLayer::Hud,
             position: offset_f32_position(
-                screen_position_from_address(screen_cell.word()),
+                screen_position_from_cell(screen_cell),
                 point_position(ATTRACT_SCORING_VISUAL_OFFSET),
             ),
             size,
@@ -17,7 +17,7 @@ fn push_attract_scoring_top_display_border(scene: &mut RenderScene) {
 fn push_attract_scoring_scanner_terrain(scene: &mut RenderScene) {
     for record in scanner_mini_terrain_records() {
         let origin = offset_f32_position(
-            screen_position_from_address(record.screen_cell.word()),
+            screen_position_from_cell(record.screen_cell),
             point_position(ATTRACT_SCORING_VISUAL_OFFSET),
         );
         for (row, byte) in record.word.to_be_bytes().into_iter().enumerate() {
