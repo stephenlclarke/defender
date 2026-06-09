@@ -674,7 +674,7 @@ fn mini_swarmer_fireball(
         u16::from_be_bytes([(player.y as u8).wrapping_sub(position.y as u8), 0]),
         5,
     );
-    let velocity = actor_source_screen_velocity(x_velocity, y_velocity);
+    let velocity = arcade_screen_velocity(x_velocity, y_velocity);
     Some((
         velocity,
         EnemyProjectileArcadeState {

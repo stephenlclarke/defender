@@ -1376,7 +1376,7 @@ fn actor_source_target6_mutant_exact_projectile(
 ) -> (Point, Velocity, EnemyProjectileArcadeState) {
     (
         position,
-        actor_source_screen_velocity(x_velocity, y_velocity),
+        arcade_screen_velocity(x_velocity, y_velocity),
         EnemyProjectileArcadeState {
             x_fraction,
             y_fraction,
@@ -1475,7 +1475,7 @@ fn actor_source_enemy_fireball(
         .wrapping_add(player_position.y as u8)
         .wrapping_sub(position.y as u8);
     let y_velocity = actor_sign_extend_u8_to_u16(y_delta).wrapping_shl(2);
-    let velocity = actor_source_screen_velocity(x_velocity, y_velocity);
+    let velocity = arcade_screen_velocity(x_velocity, y_velocity);
     Some((
         velocity,
         EnemyProjectileArcadeState {
@@ -1488,14 +1488,14 @@ fn actor_source_enemy_fireball(
     ))
 }
 
-fn actor_source_screen_velocity(x_velocity: u16, y_velocity: u16) -> Velocity {
+fn arcade_screen_velocity(x_velocity: u16, y_velocity: u16) -> Velocity {
     Velocity::new(
-        actor_source_screen_velocity_component(x_velocity),
-        actor_source_screen_velocity_component(y_velocity),
+        arcade_screen_velocity_component(x_velocity),
+        arcade_screen_velocity_component(y_velocity),
     )
 }
 
-fn actor_source_screen_velocity_component(velocity: u16) -> i16 {
+fn arcade_screen_velocity_component(velocity: u16) -> i16 {
     let signed = velocity as i16;
     if signed == 0 {
         return 0;

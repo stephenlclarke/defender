@@ -1740,7 +1740,7 @@
         );
         assert_eq!(
             velocity,
-            actor_source_screen_velocity(expected_x_velocity, expected_y_velocity)
+            arcade_screen_velocity(expected_x_velocity, expected_y_velocity)
         );
     }
 

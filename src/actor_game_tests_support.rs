@@ -577,7 +577,7 @@
 
         assert!(report.sounds.contains(&SoundCue::MutantShot));
         assert_eq!(shot.0, Point::new(0x1E, 0x54));
-        assert_eq!(shot.1, actor_source_screen_velocity(0xFFE0, 0x0138));
+        assert_eq!(shot.1, arcade_screen_velocity(0xFFE0, 0x0138));
         assert_eq!(
             shot.2,
             EnemyProjectileArcadeState {
