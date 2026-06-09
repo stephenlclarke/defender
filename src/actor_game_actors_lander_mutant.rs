@@ -865,7 +865,7 @@ fn actor_source_mutant_shot_rng(
 }
 
 fn actor_source_mutant_shot_reset(profile: ArcadeWaveProfile, seed: u8) -> u8 {
-    source_rmax(
+    arcade_rmax(
         profile.mutant_shot_time.max(1).min(u32::from(u8::MAX)) as u8,
         seed,
     )

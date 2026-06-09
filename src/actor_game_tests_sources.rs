@@ -1369,7 +1369,7 @@
         let expected_position = Point::new(expected_x, expected_y);
         expected_arcade_state.x_fraction = expected_x_fraction;
         expected_arcade_state.y_fraction = expected_y_fraction;
-        expected_arcade_state.shot_timer = source_rmax(
+        expected_arcade_state.shot_timer = arcade_rmax(
             clamped_swarmer_shot_reset(ArcadeWaveProfile::for_wave(report.wave)),
             report_arcade_rng.seed,
         );
@@ -1455,7 +1455,7 @@
         );
         expected_arcade_state.x_fraction = expected_x_fraction;
         expected_arcade_state.y_fraction = expected_y_fraction;
-        expected_arcade_state.shot_timer = source_rmax(
+        expected_arcade_state.shot_timer = arcade_rmax(
             clamped_swarmer_shot_reset(ArcadeWaveProfile::for_wave(report.wave)),
             report_arcade_rng.seed,
         );

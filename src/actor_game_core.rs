@@ -1322,7 +1322,7 @@ impl ActorArcadeRng {
 
     fn advance_rmax(&mut self, max: u8) -> u8 {
         let state = self.advance();
-        source_rmax(max, state.seed)
+        arcade_rmax(max, state.seed)
     }
 
     const fn snapshot(self) -> ActorArcadeRngSnapshot {

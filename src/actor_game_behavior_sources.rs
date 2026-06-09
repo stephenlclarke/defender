@@ -1331,7 +1331,7 @@ fn adc8(lhs: u8, rhs: u8, carry: bool) -> (u8, bool) {
     ((sum & 0xFF) as u8, sum > 0xFF)
 }
 
-fn source_rmax(max: u8, mut seed: u8) -> u8 {
+fn arcade_rmax(max: u8, mut seed: u8) -> u8 {
     while seed > max {
         seed >>= 1;
     }

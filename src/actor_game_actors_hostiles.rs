@@ -550,7 +550,7 @@ impl Swarmer {
             if arcade_state.shot_timer == 0 {
                 arcade_state.shot_timer = prompt
                     .arcade_rng
-                    .map(|rng| source_rmax(clamped_swarmer_shot_reset(profile), rng.seed))
+                    .map(|rng| arcade_rmax(clamped_swarmer_shot_reset(profile), rng.seed))
                     .unwrap_or_else(|| clamped_swarmer_shot_reset(profile));
                 push_swarmer_shot(self.position, prompt, behavior, Some(*arcade_state), commands);
             }
@@ -842,7 +842,7 @@ fn baiter_shot_arcade_rng(
 }
 
 fn baiter_shot_timer_reset(profile: ArcadeWaveProfile, seed: u8) -> u8 {
-    source_rmax(clamped_baiter_shot_timer_reset(profile), seed)
+    arcade_rmax(clamped_baiter_shot_timer_reset(profile), seed)
 }
 
 fn baiter_fireball(
