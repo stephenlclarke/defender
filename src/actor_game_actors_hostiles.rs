@@ -748,9 +748,10 @@ impl Baiter {
                 );
             }
 
-            arcade_state.picture_frame =
-                (arcade_state.picture_frame + 1) % BAITER_PICTURE_FRAME_COUNT;
-            if arcade_state.picture_frame == 0
+            arcade_state.animation_frame = SpriteFrameIndex::new(
+                (arcade_state.animation_frame.index() + 1) % BAITER_ANIMATION_FRAME_COUNT,
+            );
+            if arcade_state.animation_frame.index() == 0
                 && let Some(player) = prompt.player_position()
             {
                 let profile = prompt.arcade_wave;
@@ -790,7 +791,7 @@ impl Baiter {
     fn draw_effect(&self) -> VisualEffect {
         self.arcade_state
             .map(|arcade_state| VisualEffect::BaiterSpriteFrame {
-                animation_frame: SpriteFrameIndex::new(arcade_state.picture_frame),
+                animation_frame: arcade_state.animation_frame,
             })
             .unwrap_or(VisualEffect::Static)
     }

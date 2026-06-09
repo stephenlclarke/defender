@@ -76,7 +76,7 @@ pub struct BaiterArcadeState {
     pub y_velocity: u16,
     pub shot_timer: u8,
     pub sleep_ticks: u8,
-    pub picture_frame: u8,
+    pub animation_frame: SpriteFrameIndex,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

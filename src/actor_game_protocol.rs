@@ -812,7 +812,7 @@ fn clean_baiter_runtime(arcade_state: BaiterArcadeState) -> BaiterRuntimeSnapsho
         y_velocity: arcade_state.y_velocity,
         shot_timer: arcade_state.shot_timer,
         sleep_ticks: arcade_state.sleep_ticks,
-        picture_frame: arcade_state.picture_frame,
+        picture_frame: arcade_state.animation_frame.index(),
     }
 }
 

@@ -292,7 +292,7 @@ impl ActorBaiterSpawn {
             y_velocity: 0,
             shot_timer: BAITER_INITIAL_SHOT_TIMER,
             sleep_ticks: 0,
-            picture_frame: 0,
+            animation_frame: SpriteFrameIndex::new(0),
         };
         update_baiter_arcade_velocity(
             &mut arcade_state,

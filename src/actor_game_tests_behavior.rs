@@ -1291,7 +1291,7 @@
                     y_velocity: 0xFF80,
                     shot_timer: BAITER_INITIAL_SHOT_TIMER,
                     sleep_ticks: 0,
-                    picture_frame: 0,
+                    animation_frame: crate::SpriteFrameIndex::new(0),
                 })
             )
         );
@@ -1309,7 +1309,7 @@
                         y_velocity: 0xFF80,
                         shot_timer: 7,
                         sleep_ticks: BAITER_LOOP_SLEEP_TICKS,
-                        picture_frame: 1,
+                        animation_frame: crate::SpriteFrameIndex::new(1),
                     })
         }));
         assert!(live.draws.iter().any(|draw| {
@@ -1555,7 +1555,7 @@
                 y_velocity: 0,
                 shot_timer: 1,
                 sleep_ticks: 0,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
             }),
         });
 
@@ -1580,7 +1580,7 @@
                 report_arcade_rng.seed,
             ),
             sleep_ticks: BAITER_LOOP_SLEEP_TICKS,
-            picture_frame: 1,
+            animation_frame: crate::SpriteFrameIndex::new(1),
         };
         let (expected_velocity, expected_projectile_arcade_state) = baiter_fireball(
             Point::new(70, 120),
@@ -1659,7 +1659,7 @@
                 y_velocity: 0,
                 shot_timer: 1,
                 sleep_ticks: 0,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
             }),
         });
 
@@ -1690,7 +1690,7 @@
                     report_arcade_rng.seed,
                 ),
                 sleep_ticks: BAITER_LOOP_SLEEP_TICKS,
-                picture_frame: 1,
+                animation_frame: crate::SpriteFrameIndex::new(1),
             })
         );
     }
@@ -1716,7 +1716,7 @@
             y_velocity: 0,
             shot_timer: 1,
             sleep_ticks: 0,
-            picture_frame: 0,
+            animation_frame: crate::SpriteFrameIndex::new(0),
         };
 
         let (velocity, projectile) =
@@ -1778,7 +1778,7 @@
                     y_velocity: 0,
                     shot_timer: 2,
                     sleep_ticks: 0,
-                    picture_frame: 2,
+                    animation_frame: crate::SpriteFrameIndex::new(2),
                 }),
             });
 
@@ -1800,7 +1800,7 @@
                 y_velocity: 0,
                 shot_timer: 1,
                 sleep_ticks: BAITER_LOOP_SLEEP_TICKS,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
             })
         );
 
@@ -1822,7 +1822,7 @@
                 y_velocity: 0,
                 shot_timer: 1,
                 sleep_ticks: BAITER_LOOP_SLEEP_TICKS,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
             })
         );
     }
@@ -1850,7 +1850,7 @@
                 y_velocity: 0,
                 shot_timer: 2,
                 sleep_ticks: 0,
-                picture_frame: 2,
+                animation_frame: crate::SpriteFrameIndex::new(2),
             }),
         });
 
@@ -1870,7 +1870,7 @@
                 y_velocity: 0xFF82,
                 shot_timer: 1,
                 sleep_ticks: BAITER_LOOP_SLEEP_TICKS,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
             })
         );
     }

@@ -1394,7 +1394,7 @@
                 y_velocity: 0xFFFF,
                 shot_timer: 3,
                 sleep_ticks: 1,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
             }),
         });
 
@@ -1447,7 +1447,7 @@
                 y_velocity: 0xFFFF,
                 shot_timer: 3,
                 sleep_ticks: 0,
-                picture_frame: 0,
+                animation_frame: crate::SpriteFrameIndex::new(0),
             })
         );
     }
