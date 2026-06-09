@@ -805,9 +805,9 @@
         assert_eq!(message_text(MessageId::PlayerOne), "PLAYER ONE");
         assert_eq!(message_text(MessageId::PlayerTwo), "PLAYER TWO");
         assert_eq!(message_text(MessageId::GameOver), "GAME OVER");
-        assert_eq!(source_screen_position(0x3C78), [120.0, 120.0]);
+        assert_eq!(screen_position_from_address(0x3C78), [120.0, 120.0]);
         assert_eq!(
-            source_screen_position_with_offset(0x1458, 0, 0x0A),
+            screen_position_from_address_with_offset(0x1458, 0, 0x0A),
             [40.0, 98.0]
         );
         assert_eq!(
@@ -832,13 +832,13 @@
     }
 
     #[test]
-    fn source_text_bytes_render_mixed_score_digits_and_message_glyphs() {
+    fn message_text_bytes_render_mixed_score_digits_and_message_glyphs() {
         let mut scene = RenderScene::empty(0, SurfaceSize::new(292, 240));
 
-        push_source_text_bytes_sprites(
+        push_message_text_bytes_sprites(
             &mut scene,
             b" 2A",
-            source_screen_position(0x2B86),
+            screen_position_from_address(0x2B86),
             RenderLayer::Overlay,
         );
 
@@ -858,7 +858,7 @@
     }
 
     #[test]
-    fn source_controlled_message_sprites_apply_source_cursor_controls() {
+    fn arcade_controlled_message_sprites_apply_cursor_controls() {
         let mut scene = RenderScene::empty(0, SurfaceSize::new(292, 240));
         let text = message_text(MessageId::WilliamsElectronics);
 

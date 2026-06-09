@@ -18,8 +18,8 @@ mod tests {
         SpriteVertexBufferBinding, SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas,
         ViewportLayout, WgpuFrameCommand, WgpuFramePlan, WgpuPassPlan, WgpuViewportCommand,
         decode_object_picture_asset_rgba, pseudo_color_rgba, push_arcade_controlled_message_sprites,
-        push_source_text_bytes_sprites, render_scene_with_atlas_to_rgba, source_screen_position,
-        source_screen_position_with_offset,
+        push_message_text_bytes_sprites, render_scene_with_atlas_to_rgba, screen_position_from_address,
+        screen_position_from_address_with_offset,
     };
     use crate::renderer::{
         EmbeddedSprite, WHITE_RGBA, decode_source_attract_williams_logo_rgba,

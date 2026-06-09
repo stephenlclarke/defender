@@ -2,7 +2,7 @@ use std::sync::OnceLock;
 
 use crate::{
     arcade_assets::ObjectBitmapId,
-    renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, source_screen_position},
+    renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, screen_position_from_address},
     systems::{HighScoreInitialsState, ScreenPosition, ScreenVelocity},
 };
 

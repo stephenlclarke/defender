@@ -780,7 +780,7 @@ impl RenderScene {
     }
 }
 
-pub fn source_screen_position(screen_address: u16) -> [f32; 2] {
+pub fn screen_position_from_address(screen_address: u16) -> [f32; 2] {
     let [column, row] = screen_address.to_be_bytes();
     [
         f32::from(column) * SCREEN_COLUMN_WIDTH_PIXELS,
@@ -788,19 +788,19 @@ pub fn source_screen_position(screen_address: u16) -> [f32; 2] {
     ]
 }
 
-pub fn source_screen_position_with_offset(
+pub fn screen_position_from_address_with_offset(
     top_left_screen_address: u16,
     horizontal: u8,
     vertical: u8,
 ) -> [f32; 2] {
     let [column, row] = top_left_screen_address.to_be_bytes();
-    source_screen_position(u16::from_be_bytes([
+    screen_position_from_address(u16::from_be_bytes([
         column.wrapping_add(horizontal),
         row.wrapping_add(vertical),
     ]))
 }
 
-pub fn push_source_message_sprites(
+pub fn push_message_sprites(
     scene: &mut RenderScene,
     text: &str,
     origin: [f32; 2],
@@ -826,7 +826,7 @@ pub fn push_source_message_sprites(
     }
 }
 
-pub fn push_source_text_bytes_sprites(
+pub fn push_message_text_bytes_sprites(
     scene: &mut RenderScene,
     bytes: &[u8],
     origin: [f32; 2],
@@ -834,7 +834,7 @@ pub fn push_source_text_bytes_sprites(
 ) {
     let mut cursor_x = origin[0];
     for byte in bytes {
-        let Some((sprite, size)) = source_text_byte_sprite(*byte) else {
+        let Some((sprite, size)) = message_text_byte_sprite(*byte) else {
             continue;
         };
         if let Some(sprite) = sprite {
@@ -872,13 +872,13 @@ pub fn push_arcade_controlled_message_sprites(
         }
 
         let bytes = word.as_bytes();
-        push_source_text_bytes_sprites(scene, bytes, source_screen_position(layout.cursor), layer);
-        layout.cursor = source_text_cursor_after_bytes(layout.cursor, bytes);
-        layout.cursor = source_text_cursor_after_bytes(layout.cursor, b" ");
+        push_message_text_bytes_sprites(scene, bytes, screen_position_from_address(layout.cursor), layer);
+        layout.cursor = message_text_cursor_after_bytes(layout.cursor, bytes);
+        layout.cursor = message_text_cursor_after_bytes(layout.cursor, b" ");
     }
 }
 
-fn source_text_byte_sprite(byte: u8) -> Option<(Option<SpriteId>, [u32; 2])> {
+fn message_text_byte_sprite(byte: u8) -> Option<(Option<SpriteId>, [u32; 2])> {
     if byte == b' ' {
         return Some((None, SpriteId::message_glyph_size(' ')?));
     }
@@ -892,20 +892,20 @@ fn source_text_byte_sprite(byte: u8) -> Option<(Option<SpriteId>, [u32; 2])> {
     Some((SpriteId::message_glyph(character), size))
 }
 
-fn source_text_cursor_after_bytes(mut cursor: u16, bytes: &[u8]) -> u16 {
+fn message_text_cursor_after_bytes(mut cursor: u16, bytes: &[u8]) -> u16 {
     for byte in bytes {
-        let Some((_sprite, size)) = source_text_byte_sprite(*byte) else {
+        let Some((_sprite, size)) = message_text_byte_sprite(*byte) else {
             continue;
         };
-        cursor = source_text_cursor_advance(cursor, size[0]);
+        cursor = message_text_cursor_advance(cursor, size[0]);
     }
     cursor
 }
 
-fn source_text_cursor_advance(cursor: u16, width_pixels: u32) -> u16 {
+fn message_text_cursor_advance(cursor: u16, width_pixels: u32) -> u16 {
     let [column, row] = cursor.to_be_bytes();
     let width_columns = u8::try_from(width_pixels / u32::from(SCREEN_COLUMN_WIDTH_PIXELS_U8))
-        .expect("source glyph width fits in u8");
+        .expect("message glyph width fits in u8");
     u16::from_be_bytes([column.wrapping_add(width_columns).wrapping_add(1), row])
 }
 

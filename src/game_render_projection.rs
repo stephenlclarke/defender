@@ -102,7 +102,7 @@ pub(crate) fn push_background_terrain_sprites(
         scene.push_sprite(SceneSprite {
             sprite: terrain_word_sprite(record.word),
             layer: RenderLayer::Terrain,
-            position: source_screen_position(record.screen_address),
+            position: screen_position_from_address(record.screen_address),
             size: TERRAIN_WORD_SIZE,
             tint,
         });
@@ -484,7 +484,7 @@ pub(crate) fn push_scanner_radar_sprites(scene: &mut RenderScene, scanner: &Scan
 
 fn push_scanner_terrain_sprites(scene: &mut RenderScene, scan_left: u16) {
     for record in scanner_mini_terrain_records_for_scan_left(scan_left) {
-        let origin = source_screen_position(record.screen_address);
+        let origin = screen_position_from_address(record.screen_address);
         for (row, byte) in record.word.to_be_bytes().into_iter().enumerate() {
             for column in 0..2 {
                 let nibble = if column == 0 { byte >> 4 } else { byte & 0x0F };
@@ -520,7 +520,7 @@ fn push_scanner_byte_pixels(
     screen_address: u16,
     byte: u8,
 ) {
-    let base = source_screen_position(screen_address);
+    let base = screen_position_from_address(screen_address);
     for (x_offset, palette_index) in [(0.0, byte >> 4), (1.0, byte & 0x0F)] {
         let tint = video_palette_index_tint(palette_index);
         if tint.rgba[3] == 0 {

@@ -2024,7 +2024,7 @@
                     SpriteId::message_glyph(character).expect("visible prompt glyph should exist");
                 expected.push((
                     sprite,
-                    source_screen_position(cursor),
+                    screen_position_from_address(cursor),
                     [size[0] as f32, size[1] as f32],
                 ));
             }
@@ -2054,7 +2054,7 @@
             .chars()
             .find_map(SpriteId::message_glyph)
             .expect("arcade message should contain a visible glyph");
-        let position = source_screen_position(top_left_screen_address);
+        let position = screen_position_from_address(top_left_screen_address);
         let scene = report.render_scene();
         assert!(
             scene.sprites.iter().all(|sprite| {

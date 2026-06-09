@@ -81,7 +81,7 @@ impl ActorRenderSceneBridge {
                 );
                 return;
             }
-            push_source_text_bytes_sprites(
+            push_message_text_bytes_sprites(
                 scene,
                 text.as_bytes(),
                 point_position(draw.position),
@@ -264,28 +264,28 @@ fn push_actor_wave_completion_status_sprites(scene: &mut RenderScene, report: &S
 
     for (message, screen_address) in WAVE_COMPLETION_STATUS_LINES {
         let text = crate::arcade_assets::message_text(*message);
-        push_source_text_bytes_sprites(
+        push_message_text_bytes_sprites(
             scene,
             text.as_bytes(),
-            source_screen_position(*screen_address),
+            screen_position_from_address(*screen_address),
             RenderLayer::Overlay,
         );
     }
 
     let (wave_digits, wave_digit_count) = actor_visible_decimal_digits(clean_wave(report.wave));
-    push_source_text_bytes_sprites(
+    push_message_text_bytes_sprites(
         scene,
         &wave_digits[..wave_digit_count],
-        source_screen_position(WAVE_COMPLETION_WAVE_NUMBER_SCREEN),
+        screen_position_from_address(WAVE_COMPLETION_WAVE_NUMBER_SCREEN),
         RenderLayer::Overlay,
     );
 
     let multiplier = clean_wave(report.wave).min(5);
     let (multiplier_digits, multiplier_digit_count) = actor_visible_decimal_digits(multiplier);
-    push_source_text_bytes_sprites(
+    push_message_text_bytes_sprites(
         scene,
         &multiplier_digits[..multiplier_digit_count],
-        source_screen_position(WAVE_COMPLETION_MULTIPLIER_NUMBER_SCREEN),
+        screen_position_from_address(WAVE_COMPLETION_MULTIPLIER_NUMBER_SCREEN),
         RenderLayer::Overlay,
     );
 }
@@ -299,7 +299,7 @@ fn push_actor_survivor_bonus_icon_sprites(scene: &mut RenderScene, report: &Step
         scene.push_sprite(SceneSprite {
             sprite: SpriteId::HUMAN,
             layer: RenderLayer::Overlay,
-            position: source_screen_position_with_offset(
+            position: screen_position_from_address_with_offset(
                 SURVIVOR_BONUS_FIRST_HUMAN_SCREEN,
                 (index as u8) * SURVIVOR_BONUS_HUMAN_STEP,
                 0,
@@ -418,7 +418,7 @@ fn push_actor_playing_top_display_border(scene: &mut RenderScene, wave: u16) {
         scene.push_sprite(SceneSprite {
             sprite: SpriteId::TOP_DISPLAY_BORDER_WORD,
             layer: RenderLayer::Hud,
-            position: source_screen_position(screen_address),
+            position: screen_position_from_address(screen_address),
             size,
             tint: if matches!(screen_address, 0x4C07 | 0x4C28) {
                 VISUAL_STATE.top_display_scanner_marker_tint()
