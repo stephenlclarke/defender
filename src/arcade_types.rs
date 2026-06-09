@@ -24,3 +24,16 @@ impl ScreenAddress {
         Self(self.0.wrapping_sub(rhs))
     }
 }
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SoundCommand(u8);
+
+impl SoundCommand {
+    pub const fn new(byte: u8) -> Self {
+        Self(byte)
+    }
+
+    pub const fn byte(self) -> u8 {
+        self.0
+    }
+}

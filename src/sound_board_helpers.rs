@@ -30,8 +30,8 @@ struct OrganStep {
     samples: usize,
 }
 
-pub(crate) fn sound_actions_for_command(command: u8) -> Vec<SoundAction> {
-    let sound_number = (!command) & 0x1F;
+pub(crate) fn sound_actions_for_command(command: crate::SoundCommand) -> Vec<SoundAction> {
+    let sound_number = (!command.byte()) & 0x1F;
     let action = match sound_number {
         0 => return Vec::new(),
         1..=13 => SoundAction::GWave(GWaveSound::Vector(sound_number)),

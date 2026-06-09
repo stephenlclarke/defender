@@ -204,7 +204,7 @@
         assert!(active.events.gameplay().contains(&GameEvent::WaveStarted));
         assert_eq!(
             active.events.sounds(),
-            &[SoundEvent::UnmappedSoundCommand { command: 0xEA }]
+            &[SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEA) }]
         );
         assert_eq!(active.state.world.humans.len(), 10);
         assert!(active.state.world.enemies.iter().any(|enemy| {

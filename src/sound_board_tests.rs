@@ -144,25 +144,25 @@ mod tests {
     #[test]
     fn sound_board_commands_decode_to_actions() {
         assert_eq!(
-            sound_actions_for_command(0xF5),
+            sound_actions_for_command(crate::SoundCommand::new(0xF5)),
             vec![SoundAction::GWave(GWaveSound::Vector(10))]
         );
         assert_eq!(
-            sound_actions_for_command(0xEB),
+            sound_actions_for_command(crate::SoundCommand::new(0xEB)),
             vec![SoundAction::Special(SpecialSound::Turbo)]
         );
         assert_eq!(
-            sound_actions_for_command(0xE8),
+            sound_actions_for_command(crate::SoundCommand::new(0xE8)),
             vec![SoundAction::Special(SpecialSound::Cannon)]
         );
         assert_eq!(
-            sound_actions_for_command(0xEE),
+            sound_actions_for_command(crate::SoundCommand::new(0xEE)),
             vec![SoundAction::Special(SpecialSound::Lightning)]
         );
         assert_eq!(
-            sound_actions_for_command(0xE5),
+            sound_actions_for_command(crate::SoundCommand::new(0xE5)),
             vec![SoundAction::Special(SpecialSound::Scream)]
         );
-        assert!(sound_actions_for_command(0xFF).is_empty());
+        assert!(sound_actions_for_command(crate::SoundCommand::new(0xFF)).is_empty());
     }
 }

@@ -63,11 +63,18 @@
             (SoundCue::BaiterHit, 0xF8),
             (SoundCue::BaiterShot, 0xFC),
             (SoundCue::GameOver, 0xEC),
-            (SoundCue::SoundBoardCommand(0xE8), 0xE8),
+            (
+                SoundCue::SoundBoardCommand(crate::SoundCommand::new(0xE8)),
+                0xE8,
+            ),
         ];
 
         for (cue, command) in expected {
-            assert_eq!(cue.sound_board_command(), Some(command), "{cue:?}");
+            assert_eq!(
+                cue.sound_board_command().map(crate::SoundCommand::byte),
+                Some(command),
+                "{cue:?}"
+            );
         }
         for cue in [SoundCue::Hyperspace, SoundCue::AttractPulse] {
             assert_eq!(cue.sound_board_command(), None, "{cue:?}");
@@ -87,27 +94,27 @@
         );
         assert_eq!(
             SoundCue::Laser.sound_event(),
-            Some(SoundEvent::UnmappedSoundCommand { command: 0xEB })
+            Some(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEB) })
         );
         assert_eq!(
             SoundCue::PlayerAppear.sound_event(),
-            Some(SoundEvent::UnmappedSoundCommand { command: 0xEA })
+            Some(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEA) })
         );
         assert_eq!(
             SoundCue::LanderShot.sound_event(),
-            Some(SoundEvent::UnmappedSoundCommand { command: 0xFC })
+            Some(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xFC) })
         );
         assert_eq!(
             SoundCue::MutantShot.sound_event(),
-            Some(SoundEvent::UnmappedSoundCommand { command: 0xF6 })
+            Some(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xF6) })
         );
         assert_eq!(
-            SoundCue::SoundBoardCommand(0xE8).sound_event(),
-            Some(SoundEvent::UnmappedSoundCommand { command: 0xE8 })
+            SoundCue::SoundBoardCommand(crate::SoundCommand::new(0xE8)).sound_event(),
+            Some(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xE8) })
         );
         assert_eq!(
             SoundCue::HumanReleased.sound_event(),
-            Some(SoundEvent::UnmappedSoundCommand { command: 0xE5 })
+            Some(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xE5) })
         );
         assert_eq!(SoundCue::Hyperspace.sound_event(), None);
     }
@@ -120,32 +127,35 @@
             bridge.sound_events_for_cues(&[SoundCue::Credit, SoundCue::Laser]),
             [
                 SoundEvent::CreditAdded,
-                SoundEvent::UnmappedSoundCommand { command: 0xEB },
+                SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEB) },
             ]
         );
         assert_eq!(
             bridge.sound_events_for_cues(&[SoundCue::Thrust, SoundCue::LanderShot]),
             [
                 SoundEvent::ThrustStarted,
-                SoundEvent::UnmappedSoundCommand { command: 0xFC },
+                SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xFC) },
             ]
         );
         assert_eq!(
             bridge.sound_events_for_cues(&[SoundCue::Thrust, SoundCue::SwarmerShot]),
-            [SoundEvent::UnmappedSoundCommand { command: 0xF3 }]
+            [SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xF3) }]
         );
         assert_eq!(
             ActorSoundEventBridge::new().sound_events_for_cues(&[SoundCue::MutantShot]),
-            [SoundEvent::UnmappedSoundCommand { command: 0xF6 }]
+            [SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xF6) }]
         );
         assert_eq!(
-            ActorSoundEventBridge::new().sound_events_for_cues(&[SoundCue::SoundBoardCommand(0xE8)]),
-            [SoundEvent::UnmappedSoundCommand { command: 0xE8 }]
+            ActorSoundEventBridge::new()
+                .sound_events_for_cues(&[SoundCue::SoundBoardCommand(crate::SoundCommand::new(
+                    0xE8,
+                ))]),
+            [SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xE8) }]
         );
         assert_eq!(
             bridge.sound_events_for_cues(&[SoundCue::HumanReleased]),
             [
-                SoundEvent::UnmappedSoundCommand { command: 0xE5 },
+                SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xE5) },
                 SoundEvent::ThrustStopped,
             ]
         );
@@ -164,7 +174,7 @@
 
         assert_eq!(
             fired.sound_events(&mut bridge),
-            [SoundEvent::UnmappedSoundCommand { command: 0xEB }]
+            [SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEB) }]
         );
 
         let thrusting = driver.step(GameInput {

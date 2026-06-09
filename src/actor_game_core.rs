@@ -1,5 +1,5 @@
 use crate::{
-    MessageId, ScreenAddress,
+    MessageId, ScreenAddress, SoundCommand,
     game::{
         ATTRACT_SCORING_SEQUENCE_START_FRAME, AttractPresentationSnapshot,
         Direction as CleanDirection, EnemyKind as CleanEnemyKind,
@@ -69,13 +69,13 @@ const ENEMY_PROJECTILE_LIFETIME_TICKS: u8 = 20; // original: SOURCE_SHELL_LIFETI
 const SMART_BOMB_DETONATION_DELAY_STEPS: u8 = 3; // original: SOURCE_SMART_BOMB_DETONATION_DELAY_STEPS
 const SMART_BOMB_FLASH_STEPS: u8 = 5; // original: SOURCE_SMART_BOMB_FLASH_STEPS
 const SMART_BOMB_RESERVE_DELAY_STEPS: u16 = 240; // original: SOURCE_SMART_BOMB_RESERVE_DELAY_STEPS
-const SMART_BOMB_SOUND_COMMAND: u8 = 0xEE; // original: SBSND
-const CANNON_SOUND_COMMAND: u8 = 0xE8; // original: CANNON
-const TERRAIN_BLOW_SOUND_COMMAND: u8 = 0xEB; // original: TBSND
-const ASTRONAUT_CATCH_SOUND_COMMAND: u8 = 0xF7; // original: ACSND
-const ASTRONAUT_SHORT_CATCH_SOUND_COMMAND: u8 = 0xE5; // original: ASCSND
-const APPEARANCE_SOUND_COMMAND: u8 = 0xEA; // original: APPEAR
-const SMART_BOMB_SOUND_SEQUENCE: [(u8, u8); 7] = [
+const SMART_BOMB_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEE); // original: SBSND
+const CANNON_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE8); // original: CANNON
+const TERRAIN_BLOW_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEB); // original: TBSND
+const ASTRONAUT_CATCH_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF7); // original: ACSND
+const ASTRONAUT_SHORT_CATCH_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE5); // original: ASCSND
+const APPEARANCE_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEA); // original: APPEAR
+const SMART_BOMB_SOUND_SEQUENCE: [(u8, SoundCommand); 7] = [
     // original: SOURCE_SMART_BOMB_SOUND_SEQUENCE
     (4, SMART_BOMB_SOUND_COMMAND),
     (8, SMART_BOMB_SOUND_COMMAND),
@@ -85,14 +85,14 @@ const SMART_BOMB_SOUND_SEQUENCE: [(u8, u8); 7] = [
     (24, SMART_BOMB_SOUND_COMMAND),
     (28, CANNON_SOUND_COMMAND),
 ];
-const TERRAIN_BLOW_SOUND_TAIL_SEQUENCE: [(u8, u8); 4] = [
+const TERRAIN_BLOW_SOUND_TAIL_SEQUENCE: [(u8, SoundCommand); 4] = [
     // original: SOURCE_TERRAIN_BLOW_SOUND_TAIL_SEQUENCE
     (4, SMART_BOMB_SOUND_COMMAND),
     (10, SMART_BOMB_SOUND_COMMAND),
     (16, CANNON_SOUND_COMMAND),
     (26, CANNON_SOUND_COMMAND),
 ];
-const ASTRONAUT_CATCH_SOUND_TAIL_SEQUENCE: [(u8, u8); 2] = [
+const ASTRONAUT_CATCH_SOUND_TAIL_SEQUENCE: [(u8, SoundCommand); 2] = [
     // original: SOURCE_ACSND_SOUND_TAIL_SEQUENCE
     (10, ASTRONAUT_CATCH_SOUND_COMMAND),
     (20, ASTRONAUT_CATCH_SOUND_COMMAND),

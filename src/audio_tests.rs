@@ -132,31 +132,31 @@ mod tests {
             vec![SoundAction::Special(SpecialSound::BackgroundNoise)]
         );
         assert_eq!(
-            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: 0xEB }),
+            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEB) }),
             vec![SoundAction::Special(SpecialSound::Turbo)]
         );
         assert_eq!(
-            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: 0xEA }),
+            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEA) }),
             vec![SoundAction::Special(SpecialSound::Materialize)]
         );
         assert_eq!(
-            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: 0xE6 }),
+            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xE6) }),
             vec![SoundAction::Special(SpecialSound::Hyper)]
         );
         assert_eq!(
-            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: 0xEE }),
+            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEE) }),
             vec![SoundAction::Special(SpecialSound::Lightning)]
         );
         assert_eq!(
-            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: 0xF7 }),
+            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xF7) }),
             vec![SoundAction::GWave(GWaveSound::Vector(8))]
         );
         assert_eq!(
-            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: 0xFC }),
+            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xFC) }),
             vec![SoundAction::GWave(GWaveSound::Vector(3))]
         );
         assert!(
-            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: 0xFF }).is_empty()
+            sound_actions_for_event(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xFF) }).is_empty()
         );
     }
 
@@ -164,7 +164,7 @@ mod tests {
     fn synth_mixer_renders_sound_board_audio_and_drains() {
         let mut mixer = SynthMixer::new(LIVE_AUDIO_TEST_SAMPLE_RATE_HZ);
 
-        mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: 0xE8 });
+        mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xE8) });
         assert!(mixer.foreground_voice.is_some());
 
         let mut saw_nonzero_sample = false;
@@ -179,7 +179,7 @@ mod tests {
     #[test]
     fn offline_timeline_renderer_places_events_on_frame_boundaries() {
         let samples = render_sound_event_timeline_to_samples(
-            &[(1, vec![SoundEvent::UnmappedSoundCommand { command: 0xE8 }])],
+            &[(1, vec![SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xE8) }])],
             2,
             1_000,
             1_000,
@@ -241,7 +241,7 @@ mod tests {
         mixer.queue_event(SoundEvent::ThrustStarted);
         assert!(mixer.thrust_voice.is_some());
 
-        mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: 0xEC });
+        mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEC) });
 
         assert!(mixer.thrust_voice.is_none());
     }
@@ -250,9 +250,9 @@ mod tests {
     fn synth_mixer_interrupts_foreground_commands_like_the_arcade_sound_board() {
         let mut mixer = SynthMixer::new(LIVE_AUDIO_TEST_SAMPLE_RATE_HZ);
 
-        mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: 0xEA });
+        mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEA) });
         assert!(mixer.foreground_voice.is_some());
-        mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: 0xEB });
+        mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEB) });
 
         assert!(mixer.foreground_voice.is_some());
 
@@ -265,7 +265,7 @@ mod tests {
     fn synth_mixer_thrust_start_preempts_foreground_sound() {
         let mut mixer = SynthMixer::new(LIVE_AUDIO_TEST_SAMPLE_RATE_HZ);
 
-        mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: 0xEA });
+        mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEA) });
         assert!(mixer.foreground_voice.is_some());
 
         mixer.queue_event(SoundEvent::ThrustStarted);

@@ -1438,7 +1438,7 @@
             assert!(frame.events.gameplay().contains(&GameEvent::WaveStarted));
             assert_eq!(
                 frame.events.sounds(),
-                &[SoundEvent::UnmappedSoundCommand { command: 0xEA }]
+                &[SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEA) }]
             );
             assert_eq!(frame.report.sounds, [SoundCue::PlayerAppear]);
             return frame;

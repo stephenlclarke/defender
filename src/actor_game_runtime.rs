@@ -231,7 +231,7 @@ impl PendingPlayerStart {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct PendingActorSoundCommand {
     steps_remaining: u8,
-    command: u8,
+    command: SoundCommand,
     trigger: PendingActorSoundTrigger,
 }
 

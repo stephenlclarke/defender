@@ -225,7 +225,9 @@ pub enum SoundEvent {
     GameStarted,
     ThrustStarted,
     ThrustStopped,
-    UnmappedSoundCommand { command: u8 },
+    UnmappedSoundCommand {
+        command: crate::SoundCommand,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

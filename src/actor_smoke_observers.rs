@@ -204,7 +204,7 @@ fn observe_post_game_frame(
             .events
             .sounds()
             .iter()
-            .filter(|event| **event == SoundEvent::UnmappedSoundCommand { command: 0xEC })
+            .filter(|event| **event == SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEC) })
             .count(),
     );
 
