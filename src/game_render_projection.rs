@@ -384,17 +384,17 @@ struct SpriteAssetPixel {
 struct SpriteAssetImageSpec {
     bitmap: crate::arcade_assets::ObjectBitmapId,
     rows: u8,
-    bytes_per_row: u8,
+    byte_columns: u8,
 }
 
 fn sprite_asset_pixels(spec: SpriteAssetImageSpec) -> Vec<SpriteAssetPixel> {
     let bytes = crate::arcade_assets::object_bitmap_bytes(spec.bitmap);
-    let expected_byte_count = usize::from(spec.rows) * usize::from(spec.bytes_per_row);
+    let expected_byte_count = usize::from(spec.rows) * usize::from(spec.byte_columns);
     if bytes.len() != expected_byte_count {
         return Vec::new();
     }
     let mut pixels = Vec::new();
-    for column in 0..usize::from(spec.bytes_per_row) {
+    for column in 0..usize::from(spec.byte_columns) {
         let byte_column_offset = column * usize::from(spec.rows);
         for row in 0..usize::from(spec.rows) {
             let value = bytes[byte_column_offset + row];
@@ -694,7 +694,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::LanderFrame1Primary,
             rows: 8,
-            bytes_per_row: 5,
+            byte_columns: 5,
         },
     },
     PixelCloudAsset {
@@ -702,7 +702,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::LanderFrame2Primary,
             rows: 8,
-            bytes_per_row: 5,
+            byte_columns: 5,
         },
     },
     PixelCloudAsset {
@@ -710,7 +710,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::LanderFrame3Primary,
             rows: 8,
-            bytes_per_row: 5,
+            byte_columns: 5,
         },
     },
     PixelCloudAsset {
@@ -718,7 +718,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::MutantPrimary,
             rows: 8,
-            bytes_per_row: 5,
+            byte_columns: 5,
         },
     },
     PixelCloudAsset {
@@ -726,7 +726,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::BomberFrame1Primary,
             rows: 8,
-            bytes_per_row: 4,
+            byte_columns: 4,
         },
     },
     PixelCloudAsset {
@@ -734,7 +734,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::BomberFrame2Primary,
             rows: 8,
-            bytes_per_row: 4,
+            byte_columns: 4,
         },
     },
     PixelCloudAsset {
@@ -742,7 +742,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::BomberFrame3Primary,
             rows: 8,
-            bytes_per_row: 4,
+            byte_columns: 4,
         },
     },
     PixelCloudAsset {
@@ -750,7 +750,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::BomberFrame4Primary,
             rows: 8,
-            bytes_per_row: 4,
+            byte_columns: 4,
         },
     },
     PixelCloudAsset {
@@ -758,7 +758,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::PodPrimary,
             rows: 8,
-            bytes_per_row: 4,
+            byte_columns: 4,
         },
     },
     PixelCloudAsset {
@@ -766,7 +766,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::BaiterFrame1Primary,
             rows: 4,
-            bytes_per_row: 6,
+            byte_columns: 6,
         },
     },
     PixelCloudAsset {
@@ -774,7 +774,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::BaiterFrame2Primary,
             rows: 4,
-            bytes_per_row: 6,
+            byte_columns: 6,
         },
     },
     PixelCloudAsset {
@@ -782,7 +782,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::BaiterFrame3Primary,
             rows: 4,
-            bytes_per_row: 6,
+            byte_columns: 6,
         },
     },
     PixelCloudAsset {
@@ -790,7 +790,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::SwarmerPrimary,
             rows: 4,
-            bytes_per_row: 3,
+            byte_columns: 3,
         },
     },
     PixelCloudAsset {
@@ -798,7 +798,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::SwarmerExplosion,
             rows: 8,
-            bytes_per_row: 4,
+            byte_columns: 4,
         },
     },
     PixelCloudAsset {
@@ -806,7 +806,7 @@ const PIXEL_CLOUD_SPRITE_ASSETS: &[PixelCloudAsset] = &[
         image: SpriteAssetImageSpec {
             bitmap: ObjectBitmapId::TerrainExplosion,
             rows: 6,
-            bytes_per_row: 8,
+            byte_columns: 8,
         },
     },
 ];

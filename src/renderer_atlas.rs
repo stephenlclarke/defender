@@ -43,7 +43,7 @@ struct SpriteAtlasBlitRegion {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ObjectPictureGrid {
     rows: u8,
-    bytes_per_row: u8,
+    byte_columns: u8,
     bytes: &'static [u8],
     palette: ObjectPicturePalette,
 }
@@ -203,19 +203,19 @@ const TERRAIN_EXPLOSION_BYTES: [u8; 48] = [
 ];
 const ASTRONAUT_EXPLOSION_GRID: ObjectPictureGrid = ObjectPictureGrid {
     rows: 8,
-    bytes_per_row: 4,
+    byte_columns: 4,
     bytes: &ASTRONAUT_EXPLOSION_BYTES,
     palette: ObjectPicturePalette::burst(),
 };
 const NULL_OBJECT_GRID: ObjectPictureGrid = ObjectPictureGrid {
     rows: 1,
-    bytes_per_row: 1,
+    byte_columns: 1,
     bytes: &NULL_OBJECT_BYTES,
     palette: ObjectPicturePalette::white(),
 };
 const TERRAIN_EXPLOSION_GRID: ObjectPictureGrid = ObjectPictureGrid {
     rows: 6,
-    bytes_per_row: 8,
+    byte_columns: 8,
     bytes: &TERRAIN_EXPLOSION_BYTES,
     palette: ObjectPicturePalette::burst(),
 };
@@ -1060,7 +1060,7 @@ fn decode_picture_grid_rgba(name: &'static str, grid: ObjectPictureGrid) -> Embe
     decode_picture_bytes_rgba(
         name,
         grid.rows,
-        grid.bytes_per_row,
+        grid.byte_columns,
         grid.bytes,
         grid.palette,
     )
@@ -1069,30 +1069,30 @@ fn decode_picture_grid_rgba(name: &'static str, grid: ObjectPictureGrid) -> Embe
 fn decode_object_picture_asset_rgba(
     bitmap: ObjectBitmapId,
     rows: u8,
-    bytes_per_row: u8,
+    byte_columns: u8,
     palette: ObjectPicturePalette,
 ) -> EmbeddedSprite {
     let bytes = object_bitmap_bytes(bitmap);
-    decode_picture_bytes_rgba("object bitmap", rows, bytes_per_row, bytes, palette)
+    decode_picture_bytes_rgba("object bitmap", rows, byte_columns, bytes, palette)
 }
 
 fn decode_picture_bytes_rgba(
     name: &'static str,
     rows: u8,
-    bytes_per_row: u8,
+    byte_columns: u8,
     bytes: &[u8],
     palette: ObjectPicturePalette,
 ) -> EmbeddedSprite {
-    let expected = usize::from(rows) * usize::from(bytes_per_row);
+    let expected = usize::from(rows) * usize::from(byte_columns);
     assert_eq!(
         bytes.len(),
         expected,
         "object picture {name} byte grid must match its declared dimensions"
     );
-    let surface = SurfaceSize::new(u32::from(bytes_per_row) * 2, u32::from(rows));
+    let surface = SurfaceSize::new(u32::from(byte_columns) * 2, u32::from(rows));
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
 
-    for column in 0..usize::from(bytes_per_row) {
+    for column in 0..usize::from(byte_columns) {
         let byte_column_offset = column * usize::from(rows);
         for row in 0..usize::from(rows) {
             let value = bytes[byte_column_offset + row];

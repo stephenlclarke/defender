@@ -839,13 +839,13 @@ fn push_actor_attract_scoring_score_500_pixels(
 ) {
     let bytes = crate::arcade_assets::object_bitmap_bytes(SCORE_POPUP_500_PIXEL_BITMAP);
     let rows = 6_usize;
-    let bytes_per_row = 6_usize;
-    if bytes.len() != rows * bytes_per_row {
+    let byte_columns = 6_usize;
+    if bytes.len() != rows * byte_columns {
         return;
     }
 
     let phase = usize::from((display_step / 5) % SCORE_POPUP_500_COLOR_CYCLE.len() as u16);
-    for column in 0..bytes_per_row {
+    for column in 0..byte_columns {
         let column_start = column * rows;
         for row in 0..rows {
             let byte = bytes[column_start + row];
