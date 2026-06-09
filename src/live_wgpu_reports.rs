@@ -281,7 +281,7 @@ pub(crate) struct ActorScriptCheckAttractCycleSummary {
     pub(crate) saw_defender_coalescence: bool,
     pub(crate) saw_hall_of_fame: bool,
     pub(crate) saw_scoring_surface: bool,
-    pub(crate) saw_final_scoring_label: bool,
+    pub(crate) saw_final_scoring_instruction: bool,
     pub(crate) saw_cycle_return: bool,
 }
 
@@ -446,7 +446,7 @@ impl ActorScriptCheckReport {
             .as_ref()
             .map(|summary| {
                 format!(
-                    "  attract_cycle_steps: {}\n  attract_cycle_sampled_steps: {}\n  attract_cycle_frames: attract={},non_attract={}\n  attract_cycle_draws: {}\n  attract_cycle_scene_sprites: {}\n  attract_cycle_milestones: williams_reveal={},defender_coalescence={},hall_of_fame={},scoring_surface={},final_scoring_label={},cycle_return={}\n",
+                    "  attract_cycle_steps: {}\n  attract_cycle_sampled_steps: {}\n  attract_cycle_frames: attract={},non_attract={}\n  attract_cycle_draws: {}\n  attract_cycle_scene_sprites: {}\n  attract_cycle_milestones: williams_reveal={},defender_coalescence={},hall_of_fame={},scoring_surface={},final_scoring_instruction={},cycle_return={}\n",
                     summary.cycle_steps,
                     summary.sampled_steps,
                     summary.attract_frames,
@@ -457,7 +457,7 @@ impl ActorScriptCheckReport {
                     summary.saw_defender_coalescence,
                     summary.saw_hall_of_fame,
                     summary.saw_scoring_surface,
-                    summary.saw_final_scoring_label,
+                    summary.saw_final_scoring_instruction,
                     summary.saw_cycle_return,
                 )
             })

@@ -241,10 +241,10 @@ fn observe_post_game_frame(
 
 fn observe_attract_cycle_draws(report: &mut ActorAttractCycleSmokeReport, frame: &ActorFrame) {
     let hall_title = message_text(MessageId::HallTitle);
-    let final_scoring_label = message_text(MessageId::SwarmerInstruction);
+    let final_scoring_instruction = message_text(MessageId::SwarmerInstruction);
     let mut cycle_has_first_williams_step = false;
     let mut cycle_has_scoring_surface = false;
-    let mut cycle_has_final_label = false;
+    let mut cycle_has_final_instruction = false;
 
     for draw in &frame.report.draws {
         if draw.sprite == SpriteKey::WilliamsLogo
@@ -262,9 +262,9 @@ fn observe_attract_cycle_draws(report: &mut ActorAttractCycleSmokeReport, frame:
             report.saw_scoring_surface = true;
             cycle_has_scoring_surface = true;
         }
-        if draw.text.as_deref() == Some(final_scoring_label) {
-            report.saw_final_scoring_label = true;
-            cycle_has_final_label = true;
+        if draw.text.as_deref() == Some(final_scoring_instruction) {
+            report.saw_final_scoring_instruction = true;
+            cycle_has_final_instruction = true;
         }
         if frame.report.step == report.cycle_steps
             && draw.sprite == SpriteKey::WilliamsLogo
@@ -279,7 +279,7 @@ fn observe_attract_cycle_draws(report: &mut ActorAttractCycleSmokeReport, frame:
 
     if frame.report.step == report.cycle_steps {
         report.saw_cycle_return =
-            cycle_has_first_williams_step && !cycle_has_scoring_surface && !cycle_has_final_label;
+            cycle_has_first_williams_step && !cycle_has_scoring_surface && !cycle_has_final_instruction;
     }
 }
 

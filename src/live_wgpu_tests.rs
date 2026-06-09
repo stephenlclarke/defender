@@ -279,7 +279,7 @@ mod tests {
         assert!(attract_cycle.saw_defender_coalescence);
         assert!(attract_cycle.saw_hall_of_fame);
         assert!(attract_cycle.saw_scoring_surface);
-        assert!(attract_cycle.saw_final_scoring_label);
+        assert!(attract_cycle.saw_final_scoring_instruction);
         assert!(attract_cycle.saw_cycle_return);
         assert!(report.attract_cycle_unavailable_reason.is_none());
         assert_eq!(report.behavior_kind_profiles, 2);
@@ -433,7 +433,7 @@ mod tests {
                 "  attract_cycle_frames: attract=96,non_attract=0\n",
                 "  attract_cycle_draws: 193\n",
                 "  attract_cycle_scene_sprites: 22385\n",
-                "  attract_cycle_milestones: williams_reveal=true,defender_coalescence=true,hall_of_fame=true,scoring_surface=true,final_scoring_label=true,cycle_return=true\n",
+                "  attract_cycle_milestones: williams_reveal=true,defender_coalescence=true,hall_of_fame=true,scoring_surface=true,final_scoring_instruction=true,cycle_return=true\n",
                 "  behavior_kind_profiles: 2\n",
                 "  behavior_actor_profiles: 0\n",
                 "  wave_profiles: 1\n",
@@ -543,12 +543,12 @@ mod tests {
         assert!(summary.saw_defender_coalescence);
         assert!(summary.saw_hall_of_fame);
         assert!(summary.saw_scoring_surface);
-        assert!(summary.saw_final_scoring_label);
+        assert!(summary.saw_final_scoring_instruction);
         assert!(summary.saw_cycle_return);
         assert!(report.attract_cycle_unavailable_reason.is_none());
         assert!(report.to_text().contains("attract_cycle_steps: 12"));
         assert!(report.to_text().contains(
-            "attract_cycle_milestones: williams_reveal=true,defender_coalescence=true,hall_of_fame=true,scoring_surface=true,final_scoring_label=true,cycle_return=true"
+            "attract_cycle_milestones: williams_reveal=true,defender_coalescence=true,hall_of_fame=true,scoring_surface=true,final_scoring_instruction=true,cycle_return=true"
         ));
 
         let _ = fs::remove_file(path);

@@ -101,7 +101,7 @@ pub(crate) struct ActorAttractCycleSmokeReport {
     pub(crate) saw_defender_coalescence: bool,
     pub(crate) saw_hall_of_fame: bool,
     pub(crate) saw_scoring_surface: bool,
-    pub(crate) saw_final_scoring_label: bool,
+    pub(crate) saw_final_scoring_instruction: bool,
     pub(crate) saw_cycle_return: bool,
     pub(crate) clean_exit: bool,
 }
@@ -325,8 +325,8 @@ impl ActorAttractCycleSmokeReport {
         if !self.saw_scoring_surface {
             bail!("actor attract smoke did not cover scoring surface");
         }
-        if !self.saw_final_scoring_label {
-            bail!("actor attract smoke did not cover final scoring label");
+        if !self.saw_final_scoring_instruction {
+            bail!("actor attract smoke did not cover final scoring instruction");
         }
         if !self.saw_cycle_return {
             bail!("actor attract smoke did not return to Williams after cycle boundary");
@@ -339,7 +339,7 @@ impl ActorAttractCycleSmokeReport {
 
     pub(crate) fn to_text(&self) -> String {
         format!(
-            "actor attract smoke passed\n  frames: {}\n  cycle_steps: {}\n  distinct_scene_signatures: {}\n  attract_frames: {}\n  non_attract_frames: {}\n  actor_event_frames: {}\n  actor_sound_frames: {}\n  actor_sound_events: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  wgpu_frame_commands: {}\n  missing_sprite_regions: {}\n  saw_williams_reveal: {}\n  saw_defender_coalescence: {}\n  saw_hall_of_fame: {}\n  saw_scoring_surface: {}\n  saw_final_scoring_label: {}\n  saw_cycle_return: {}\n  clean_exit: {}\n",
+            "actor attract smoke passed\n  frames: {}\n  cycle_steps: {}\n  distinct_scene_signatures: {}\n  attract_frames: {}\n  non_attract_frames: {}\n  actor_event_frames: {}\n  actor_sound_frames: {}\n  actor_sound_events: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  wgpu_frame_commands: {}\n  missing_sprite_regions: {}\n  saw_williams_reveal: {}\n  saw_defender_coalescence: {}\n  saw_hall_of_fame: {}\n  saw_scoring_surface: {}\n  saw_final_scoring_instruction: {}\n  saw_cycle_return: {}\n  clean_exit: {}\n",
             self.frames,
             self.cycle_steps,
             self.distinct_scene_signatures,
@@ -358,7 +358,7 @@ impl ActorAttractCycleSmokeReport {
             self.saw_defender_coalescence,
             self.saw_hall_of_fame,
             self.saw_scoring_surface,
-            self.saw_final_scoring_label,
+            self.saw_final_scoring_instruction,
             self.saw_cycle_return,
             self.clean_exit
         )

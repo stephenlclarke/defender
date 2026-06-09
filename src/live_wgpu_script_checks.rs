@@ -180,10 +180,10 @@ fn actor_script_check_observe_attract_cycle_frame(
     frame: &ActorFrame,
 ) {
     let hall_title = message_text(MessageId::HallTitle);
-    let final_scoring_label = message_text(MessageId::SwarmerInstruction);
+    let final_scoring_instruction = message_text(MessageId::SwarmerInstruction);
     let mut cycle_has_first_williams_step = false;
     let mut cycle_has_scoring_surface = false;
-    let mut cycle_has_final_label = false;
+    let mut cycle_has_final_instruction = false;
 
     summary.sampled_steps = summary.sampled_steps.saturating_add(1);
     if frame.report.phase == Phase::Attract {
@@ -214,9 +214,9 @@ fn actor_script_check_observe_attract_cycle_frame(
             summary.saw_scoring_surface = true;
             cycle_has_scoring_surface = true;
         }
-        if draw.text.as_deref() == Some(final_scoring_label) {
-            summary.saw_final_scoring_label = true;
-            cycle_has_final_label = true;
+        if draw.text.as_deref() == Some(final_scoring_instruction) {
+            summary.saw_final_scoring_instruction = true;
+            cycle_has_final_instruction = true;
         }
         if frame.report.step == summary.cycle_steps
             && draw.sprite == SpriteKey::WilliamsLogo
@@ -243,7 +243,7 @@ fn actor_script_check_observe_attract_cycle_frame(
 
     if frame.report.step == summary.cycle_steps {
         summary.saw_cycle_return =
-            cycle_has_first_williams_step && !cycle_has_scoring_surface && !cycle_has_final_label;
+            cycle_has_first_williams_step && !cycle_has_scoring_surface && !cycle_has_final_instruction;
     }
 }
 

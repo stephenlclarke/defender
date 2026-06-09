@@ -58,7 +58,7 @@ mod tests {
         assert!(report.saw_defender_coalescence);
         assert!(report.saw_hall_of_fame);
         assert!(report.saw_scoring_surface);
-        assert!(report.saw_final_scoring_label);
+        assert!(report.saw_final_scoring_instruction);
         assert!(report.saw_cycle_return);
         assert!(report.clean_exit);
     }
@@ -120,7 +120,7 @@ mod tests {
             saw_defender_coalescence: true,
             saw_hall_of_fame: true,
             saw_scoring_surface: true,
-            saw_final_scoring_label: true,
+            saw_final_scoring_instruction: true,
             saw_cycle_return: true,
             clean_exit: true,
             ..ActorAttractCycleSmokeReport::default()
@@ -356,7 +356,7 @@ mod tests {
             saw_defender_coalescence: true,
             saw_hall_of_fame: true,
             saw_scoring_surface: true,
-            saw_final_scoring_label: true,
+            saw_final_scoring_instruction: true,
             saw_cycle_return: true,
             clean_exit: true,
             ..ActorAttractCycleSmokeReport::default()
