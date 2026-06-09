@@ -1862,7 +1862,7 @@ impl ActorGameDriver {
             .copied()
             .take(reserve_count)
         {
-            materialized |= spawn.source.is_some_and(source_lander_output_visible);
+            materialized |= spawn.source.is_some_and(lander_spawn_is_visible);
             commands.push(GameCommand::Spawn(SpawnRequest::Lander {
                 position: spawn.position,
             }));

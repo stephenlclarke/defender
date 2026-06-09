@@ -5,7 +5,7 @@ struct Lander {
     drift: i16,
     mode: LanderMode,
     source: Option<LanderArcadeState>,
-    source_output: SourceLanderOutput,
+    spawn_visibility: LanderSpawnVisibility,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -18,7 +18,7 @@ enum LanderMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SourceLanderOutput {
+enum LanderSpawnVisibility {
     Normal,
     VisibleFirstWaveRefill,
     HiddenFirstWaveRefill,
@@ -38,7 +38,7 @@ impl Lander {
                 .map(|source| source_lander_drift_from_velocity(source.x_velocity))
                 .unwrap_or(-1),
             mode: LanderMode::Seeking,
-            source_output: source_lander_output(spawn.source),
+            spawn_visibility: lander_spawn_visibility(spawn.source),
             source: spawn.source,
         }
     }
@@ -73,7 +73,7 @@ impl AssetActor for Lander {
         let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Lander);
-            if self.source_output != SourceLanderOutput::HiddenFirstWaveRefill
+            if self.spawn_visibility != LanderSpawnVisibility::HiddenFirstWaveRefill
                 && !self.tick_source_sleep()
             {
                 match self.mode {
@@ -133,7 +133,7 @@ impl AssetActor for Lander {
 
 impl Lander {
     fn output_visible(&self) -> bool {
-        self.source_output != SourceLanderOutput::HiddenFirstWaveRefill
+        self.spawn_visibility != LanderSpawnVisibility::HiddenFirstWaveRefill
     }
 
     fn update_seeking(
@@ -366,21 +366,21 @@ const fn source_lander_drift_from_velocity(x_velocity: u16) -> i16 {
     actor_source_drift_from_velocity(x_velocity)
 }
 
-fn source_lander_output(source: Option<LanderArcadeState>) -> SourceLanderOutput {
+fn lander_spawn_visibility(source: Option<LanderArcadeState>) -> LanderSpawnVisibility {
     let Some(source) = source else {
-        return SourceLanderOutput::Normal;
+        return LanderSpawnVisibility::Normal;
     };
-    source_first_wave_refill_lander_output(source).unwrap_or(SourceLanderOutput::Normal)
+    first_wave_refill_lander_spawn_visibility(source).unwrap_or(LanderSpawnVisibility::Normal)
 }
 
-fn source_lander_output_visible(source: LanderArcadeState) -> bool {
-    source_first_wave_refill_lander_output(source)
-        == Some(SourceLanderOutput::VisibleFirstWaveRefill)
+fn lander_spawn_is_visible(source: LanderArcadeState) -> bool {
+    first_wave_refill_lander_spawn_visibility(source)
+        == Some(LanderSpawnVisibility::VisibleFirstWaveRefill)
 }
 
-fn source_first_wave_refill_lander_output(
+fn first_wave_refill_lander_spawn_visibility(
     source: LanderArcadeState,
-) -> Option<SourceLanderOutput> {
+) -> Option<LanderSpawnVisibility> {
     ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS
         .iter()
         .copied()
@@ -389,9 +389,9 @@ fn source_first_wave_refill_lander_output(
         .find_map(|(index, refill_source)| {
             source_lander_metadata_matches_refill_row(source, refill_source).then_some(
                 if index == 2 {
-                    SourceLanderOutput::VisibleFirstWaveRefill
+                    LanderSpawnVisibility::VisibleFirstWaveRefill
                 } else {
-                    SourceLanderOutput::HiddenFirstWaveRefill
+                    LanderSpawnVisibility::HiddenFirstWaveRefill
                 },
             )
         })
