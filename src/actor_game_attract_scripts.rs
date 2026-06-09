@@ -1113,7 +1113,7 @@ impl AttractScriptAction {
                 all_time_top_left_screen_address,
                 visual_offset,
             } => {
-                let entries = source_hall_score_seed_entries();
+                let entries = hall_score_seed_entries();
                 let mut draws = hall_score_table_draws(
                     actor,
                     entries,
@@ -1145,7 +1145,7 @@ impl AttractScriptAction {
                     Vec::new()
                 } else {
                     vec![
-                        DrawCommand::text(actor, *label_position, source_credits_label_text()),
+                        DrawCommand::text(actor, *label_position, credits_label_text()),
                         DrawCommand::text(
                             actor,
                             *count_position,
@@ -1226,19 +1226,19 @@ impl AttractScriptAction {
     }
 }
 
-fn source_credits_label_text() -> &'static str {
+fn credits_label_text() -> &'static str {
     crate::arcade_assets::message_text(CREDITS_MESSAGE)
 }
 
-fn source_hall_score_seed_entries() -> [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] {
-    std::array::from_fn(source_high_score_seed_entry)
+fn hall_score_seed_entries() -> [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] {
+    std::array::from_fn(high_score_seed_entry)
 }
 
-fn source_hall_score_entries(
+fn hall_score_entries(
     high_scores: &[u32; 5],
 ) -> [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] {
     std::array::from_fn(|index| {
-        let seed = source_high_score_seed_entry(index);
+        let seed = high_score_seed_entry(index);
         HighScoreTableEntrySnapshot {
             rank: seed.rank,
             score: high_scores.get(index).copied().unwrap_or(seed.score),
@@ -1247,7 +1247,7 @@ fn source_hall_score_entries(
     })
 }
 
-fn source_high_score_seed_entry(index: usize) -> HighScoreTableEntrySnapshot {
+fn high_score_seed_entry(index: usize) -> HighScoreTableEntrySnapshot {
     let seed = crate::arcade_assets::HIGH_SCORE_SEEDS
         .get(index)
         .unwrap_or_else(|| panic!("missing embedded high-score seed row {index}"));

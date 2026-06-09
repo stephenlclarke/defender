@@ -20,7 +20,7 @@
             credited
                 .draws
                 .iter()
-                .any(|draw| draw.text.as_deref() == Some(source_credits_label_text()))
+                .any(|draw| draw.text.as_deref() == Some(credits_label_text()))
         );
         assert!(
             credited
@@ -106,7 +106,7 @@
             williams
                 .draws
                 .iter()
-                .all(|draw| draw.text.as_deref() != Some(source_credits_label_text()))
+                .all(|draw| draw.text.as_deref() != Some(credits_label_text()))
         );
         assert!(
             williams
@@ -208,7 +208,7 @@
         assert!(
             hall.draws
                 .iter()
-                .any(|draw| draw.text.as_deref() == Some(source_credits_label_text()))
+                .any(|draw| draw.text.as_deref() == Some(credits_label_text()))
         );
         assert!(
             hall.draws
@@ -1276,12 +1276,12 @@
             .parse::<AttractScript>()
             .expect("credit script action should parse");
         let mut driver = ActorGameDriver::with_attract_script(script);
-        let source_credits_label = actor_message_text(CREDITS_MESSAGE);
+        let credits_label = actor_message_text(CREDITS_MESSAGE);
 
         let first = driver.step(GameInput::NONE);
         assert!(first.draws.iter().any(|draw| {
             draw.position == Point::new(12, 228)
-                && draw.text.as_deref() == Some(source_credits_label)
+                && draw.text.as_deref() == Some(credits_label)
         }));
         assert!(first.draws.iter().any(|draw| {
             draw.position == Point::new(82, 228) && draw.text.as_deref() == Some("00")
@@ -1298,10 +1298,10 @@
     }
 
     #[test]
-    fn parsed_attract_script_draws_source_message_with_controls() {
+    fn parsed_attract_script_draws_arcade_message_with_controls() {
         let script = "message 1 forever ELECV 0x3258"
             .parse::<AttractScript>()
-            .expect("source message script action should parse");
+            .expect("arcade message script action should parse");
         assert_eq!(
             script.manifest().events[0].action,
             AttractScriptActionManifest::ArcadeMessage {
@@ -1311,11 +1311,11 @@
             }
         );
         let mut driver = ActorGameDriver::with_attract_script(script);
-        let source_text = actor_message_text(PRESENTS_MESSAGE);
+        let message_text = actor_message_text(PRESENTS_MESSAGE);
 
         let report = driver.step(GameInput::NONE);
         assert!(report.draws.iter().any(|draw| {
-            draw.text.as_deref() == Some(source_text)
+            draw.text.as_deref() == Some(message_text)
                 && matches!(
                     draw.effect,
                     VisualEffect::ArcadeMessage {
@@ -1340,10 +1340,10 @@
     }
 
     #[test]
-    fn parsed_attract_script_draws_source_message_with_visual_offset() {
+    fn parsed_attract_script_draws_arcade_message_with_visual_offset() {
         let script = "message 1 forever ELECV 0x3258 -11 -7"
             .parse::<AttractScript>()
-            .expect("source message script action should parse with offset");
+            .expect("arcade message script action should parse with offset");
         assert_eq!(
             script.manifest().events[0].action,
             AttractScriptActionManifest::ArcadeMessage {
@@ -1353,11 +1353,11 @@
             }
         );
         let mut driver = ActorGameDriver::with_attract_script(script);
-        let source_text = actor_message_text(PRESENTS_MESSAGE);
+        let message_text = actor_message_text(PRESENTS_MESSAGE);
 
         let report = driver.step(GameInput::NONE);
         assert!(report.draws.iter().any(|draw| {
-            draw.text.as_deref() == Some(source_text)
+            draw.text.as_deref() == Some(message_text)
                 && matches!(
                     draw.effect,
                     VisualEffect::ArcadeMessage {

@@ -582,7 +582,7 @@ fn player_direction_for_report(report: &StepReport) -> CleanDirection {
 }
 
 fn high_score_tables_for_report(report: &StepReport) -> HighScoreTablesSnapshot {
-    let entries = source_hall_score_entries(&report.high_scores);
+    let entries = hall_score_entries(&report.high_scores);
     HighScoreTablesSnapshot {
         all_time: entries,
         todays_greatest: entries,
