@@ -49,22 +49,22 @@ impl EnemySnapshot {
         }
     }
 
-    fn arcade_picture_descriptor(self) -> ObjectPictureDescriptor {
+    fn arcade_object_bitmap_descriptor(self) -> ObjectBitmapDescriptor {
         match self.kind {
-            EnemyKind::Lander => lander_picture_descriptor(
+            EnemyKind::Lander => lander_object_bitmap_descriptor(
                 self.lander_runtime
                     .map(|arcade_state| arcade_state.animation_frame)
                     .unwrap_or_default(),
             ),
-            EnemyKind::Mutant => MUTANT_PICTURE_DESCRIPTOR,
-            EnemyKind::Bomber => bomber_picture_descriptor(
+            EnemyKind::Mutant => MUTANT_OBJECT_BITMAP_DESCRIPTOR,
+            EnemyKind::Bomber => bomber_object_bitmap_descriptor(
                 self.bomber_runtime
                     .map(|arcade_state| arcade_state.animation_frame)
                     .unwrap_or_default(),
             ),
-            EnemyKind::Pod => POD_PICTURE_DESCRIPTOR,
-            EnemyKind::Swarmer => SWARMER_PICTURE_DESCRIPTOR,
-            EnemyKind::Baiter => baiter_picture_descriptor(
+            EnemyKind::Pod => POD_OBJECT_BITMAP_DESCRIPTOR,
+            EnemyKind::Swarmer => SWARMER_OBJECT_BITMAP_DESCRIPTOR,
+            EnemyKind::Baiter => baiter_object_bitmap_descriptor(
                 self.baiter_runtime
                     .map(|arcade_state| arcade_state.animation_frame)
                     .unwrap_or_default(),
@@ -518,9 +518,9 @@ pub struct ObjectEvidenceDetailSnapshot {
     pub screen_position: Option<ScreenPosition>,
     pub world_position: Option<(u16, u16)>,
     pub velocity: Option<(u16, u16)>,
-    pub picture_address: Option<u16>,
+    pub object_bitmap_descriptor_address: Option<u16>,
     pub object_bitmap_label: Option<&'static str>,
-    pub picture_size: Option<(u8, u8)>,
+    pub object_bitmap_size: Option<(u8, u8)>,
     pub primary_image_address: Option<u16>,
     pub alternate_image_address: Option<u16>,
     pub mapped_sprite: Option<SpriteId>,
@@ -537,9 +537,9 @@ impl ObjectEvidenceDetailSnapshot {
         screen_position: None,
         world_position: None,
         velocity: None,
-        picture_address: None,
+        object_bitmap_descriptor_address: None,
         object_bitmap_label: None,
-        picture_size: None,
+        object_bitmap_size: None,
         primary_image_address: None,
         alternate_image_address: None,
         mapped_sprite: None,
@@ -752,7 +752,7 @@ pub struct ExpandedObjectDetailSnapshot {
     pub size: u16,
     pub descriptor_address: Option<u16>,
     pub sprite_asset_label: Option<&'static str>,
-    pub picture_size: Option<(u8, u8)>,
+    pub object_bitmap_size: Option<(u8, u8)>,
     pub mapped_sprite: Option<SpriteId>,
     pub erase_address: Option<u16>,
     pub center: Option<ScreenPosition>,
@@ -771,7 +771,7 @@ impl ExpandedObjectDetailSnapshot {
         size: 0,
         descriptor_address: None,
         sprite_asset_label: None,
-        picture_size: None,
+        object_bitmap_size: None,
         mapped_sprite: None,
         erase_address: None,
         center: None,
@@ -843,7 +843,7 @@ impl ScorePopupSnapshot {
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::ScorePopup,
             sprite_asset_label: Some(self.kind.object_bitmap_label()),
-            picture_size: Some((6, 6)),
+            object_bitmap_size: Some((6, 6)),
             mapped_sprite: Some(self.kind.sprite()),
             top_left: Some(self.position),
             score_popup_lifetime_ticks: Some(self.lifetime_ticks),
@@ -858,25 +858,25 @@ pub struct EnemyAppearanceSnapshot {
     pub position: ScreenPosition,
     pub growth_size: u16,
     pub sprite_asset_label: &'static str,
-    pub picture_size: (u8, u8),
+    pub object_bitmap_size: (u8, u8),
     pub mapped_sprite: SpriteId,
 }
 
 impl EnemyAppearanceSnapshot {
     fn matches_enemy(self, enemy: EnemySnapshot) -> bool {
         self.position == enemy_appearance_position(enemy)
-            && self.mapped_sprite == enemy.arcade_picture_descriptor().mapped_sprite
+            && self.mapped_sprite == enemy.arcade_object_bitmap_descriptor().mapped_sprite
     }
 
     fn expanded_object_detail(self) -> ExpandedObjectDetailSnapshot {
-        let (width, height) = self.picture_size;
+        let (width, height) = self.object_bitmap_size;
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::Appearance,
             size: self.growth_size,
             sprite_asset_label: Some(self.sprite_asset_label),
-            picture_size: Some((width, height)),
+            object_bitmap_size: Some((width, height)),
             mapped_sprite: Some(self.mapped_sprite),
-            center: Some(appearance_center(self.position, self.picture_size)),
+            center: Some(appearance_center(self.position, self.object_bitmap_size)),
             top_left: Some(self.position),
             ..ExpandedObjectDetailSnapshot::EMPTY
         }

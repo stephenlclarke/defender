@@ -1,5 +1,5 @@
-fn appearance_center(top_left: ScreenPosition, picture_size: (u8, u8)) -> ScreenPosition {
-    let (width, height) = picture_size;
+fn appearance_center(top_left: ScreenPosition, object_bitmap_size: (u8, u8)) -> ScreenPosition {
+    let (width, height) = object_bitmap_size;
     let first_product_high = ((u16::from(top_left.x) * 0x00DA) >> 8) as u8;
     let doubled = first_product_high.wrapping_shl(1);
     let center_x_offset = ((u16::from(doubled) * u16::from(width)) >> 8) as u8;
@@ -50,7 +50,7 @@ impl ExplosionKind {
         }
     }
 
-    const fn picture_size(self) -> (u8, u8) {
+    const fn object_bitmap_size(self) -> (u8, u8) {
         match self {
             Self::Lander | Self::Mutant => (5, 8),
             Self::Bomber | Self::Pod => (4, 8),
@@ -85,7 +85,7 @@ pub struct ExplosionSnapshot {
     pub growth_size: u16,
     pub frames_remaining: u8,
     pub object_bitmap_label: &'static str,
-    pub picture_size: (u8, u8),
+    pub object_bitmap_size: (u8, u8),
     pub mapped_sprite: SpriteId,
 }
 
@@ -98,13 +98,13 @@ impl ExplosionSnapshot {
             growth_size: EXPLOSION_INITIAL_SIZE,
             frames_remaining: explosion_lifetime_frames(kind),
             object_bitmap_label: kind.object_bitmap_label(),
-            picture_size: kind.picture_size(),
+            object_bitmap_size: kind.object_bitmap_size(),
             mapped_sprite: kind.sprite(),
         }
     }
 
     fn spawn_from_enemy(enemy: EnemySnapshot) -> Self {
-        let descriptor = arcade_enemy_explosion_picture_descriptor(enemy);
+        let descriptor = arcade_enemy_explosion_object_bitmap_descriptor(enemy);
         Self {
             kind: ExplosionKind::for_enemy(enemy.kind),
             position: enemy.position,
@@ -112,19 +112,19 @@ impl ExplosionSnapshot {
             growth_size: EXPLOSION_INITIAL_SIZE,
             frames_remaining: EXPLOSION_LIFETIME_FRAMES,
             object_bitmap_label: descriptor.label,
-            picture_size: descriptor.size,
+            object_bitmap_size: descriptor.size,
             mapped_sprite: descriptor.mapped_sprite,
         }
     }
 
     fn expanded_object_detail(self) -> ExpandedObjectDetailSnapshot {
-        let (width, height) = self.picture_size;
+        let (width, height) = self.object_bitmap_size;
         let display_size = explosion_display_size(self);
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::Explosion,
             size: display_size,
             sprite_asset_label: Some(self.object_bitmap_label),
-            picture_size: Some((width, height)),
+            object_bitmap_size: Some((width, height)),
             mapped_sprite: Some(self.mapped_sprite),
             center: Some(self.explosion_anchor.unwrap_or(ScreenPosition::new(
                 self.position.x.wrapping_add(width / 2),
@@ -188,21 +188,21 @@ fn arcade_enemy_explosion_anchor(enemy: EnemySnapshot) -> Option<ScreenPosition>
     .then_some(ScreenPosition::new(0x21, 0xA9))
 }
 
-fn arcade_enemy_explosion_picture_descriptor(
+fn arcade_enemy_explosion_object_bitmap_descriptor(
     enemy: EnemySnapshot,
-) -> ObjectPictureDescriptor {
+) -> ObjectBitmapDescriptor {
     if enemy.kind == EnemyKind::Swarmer {
-        return ObjectPictureDescriptor {
+        return ObjectBitmapDescriptor {
             label: ExplosionKind::Swarmer.object_bitmap_label(),
             address: 0xF8E2,
-            size: ExplosionKind::Swarmer.picture_size(),
+            size: ExplosionKind::Swarmer.object_bitmap_size(),
             primary_image_address: 0xFA6B,
             alternate_image_address: Some(0xFA6B),
             mapped_sprite: ExplosionKind::Swarmer.sprite(),
         };
     }
 
-    enemy.arcade_picture_descriptor()
+    enemy.arcade_object_bitmap_descriptor()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -485,7 +485,7 @@ impl ObjectEvidenceSnapshot {
         if index >= OBJECT_EVIDENCE_DETAIL_LIMIT {
             return;
         }
-        let descriptor = enemy.arcade_picture_descriptor();
+        let descriptor = enemy.arcade_object_bitmap_descriptor();
         let identity = object_table_identity(index);
         let object_category = enemy.kind.object_category();
         self.details[index] = ObjectEvidenceDetailSnapshot {
@@ -496,9 +496,9 @@ impl ObjectEvidenceSnapshot {
             screen_position: Some(enemy.position),
             world_position: Some(enemy.arcade_world_position()),
             velocity: Some(enemy.arcade_velocity_words()),
-            picture_address: Some(descriptor.address),
+            object_bitmap_descriptor_address: Some(descriptor.address),
             object_bitmap_label: Some(descriptor.label),
-            picture_size: Some(descriptor.size),
+            object_bitmap_size: Some(descriptor.size),
             primary_image_address: Some(descriptor.primary_image_address),
             alternate_image_address: descriptor.alternate_image_address,
             mapped_sprite: Some(descriptor.mapped_sprite),
@@ -513,7 +513,7 @@ impl ObjectEvidenceSnapshot {
         if index >= OBJECT_EVIDENCE_DETAIL_LIMIT {
             return;
         }
-        let descriptor = PLAYER_PROJECTILE_PICTURE_DESCRIPTOR;
+        let descriptor = PLAYER_PROJECTILE_OBJECT_BITMAP_DESCRIPTOR;
         let identity = object_table_identity(index);
         self.details[index] = ObjectEvidenceDetailSnapshot {
             list: ObjectEvidenceList::Projectile,
@@ -523,9 +523,9 @@ impl ObjectEvidenceSnapshot {
             screen_position: Some(projectile.position),
             world_position: Some(projectile.arcade_world_position()),
             velocity: Some(projectile.arcade_velocity_words()),
-            picture_address: Some(descriptor.address),
+            object_bitmap_descriptor_address: Some(descriptor.address),
             object_bitmap_label: Some(descriptor.label),
-            picture_size: Some(descriptor.size),
+            object_bitmap_size: Some(descriptor.size),
             primary_image_address: Some(descriptor.primary_image_address),
             alternate_image_address: descriptor.alternate_image_address,
             mapped_sprite: Some(descriptor.mapped_sprite),
@@ -540,7 +540,7 @@ impl ObjectEvidenceSnapshot {
         if index >= OBJECT_EVIDENCE_DETAIL_LIMIT {
             return;
         }
-        let descriptor = human_picture_descriptor(human.animation_frame);
+        let descriptor = human_object_bitmap_descriptor(human.animation_frame);
         let identity = object_table_identity(index);
         self.details[index] = ObjectEvidenceDetailSnapshot {
             list: ObjectEvidenceList::Active,
@@ -550,9 +550,9 @@ impl ObjectEvidenceSnapshot {
             screen_position: Some(human.position),
             world_position: Some(human.arcade_world_position()),
             velocity: Some(human.arcade_velocity_words()),
-            picture_address: Some(descriptor.address),
+            object_bitmap_descriptor_address: Some(descriptor.address),
             object_bitmap_label: Some(descriptor.label),
-            picture_size: Some(descriptor.size),
+            object_bitmap_size: Some(descriptor.size),
             primary_image_address: Some(descriptor.primary_image_address),
             alternate_image_address: descriptor.alternate_image_address,
             mapped_sprite: Some(descriptor.mapped_sprite),
@@ -576,9 +576,9 @@ impl ObjectEvidenceSnapshot {
             screen_position: Some(projectile.position),
             world_position: Some(projectile.arcade_world_position()),
             velocity: Some(projectile.arcade_velocity_words()),
-            picture_address: Some(ENEMY_BOMB_OBJECT_BITMAP_DESCRIPTOR_ADDRESS),
+            object_bitmap_descriptor_address: Some(ENEMY_BOMB_OBJECT_BITMAP_DESCRIPTOR_ADDRESS),
             object_bitmap_label: Some(projectile.bomb_object_bitmap_label()),
-            picture_size: Some(ENEMY_BOMB_OBJECT_BITMAP_SIZE),
+            object_bitmap_size: Some(ENEMY_BOMB_OBJECT_BITMAP_SIZE),
             primary_image_address: Some(ENEMY_BOMB_PRIMARY_IMAGE_ADDRESS),
             alternate_image_address: Some(ENEMY_BOMB_ALTERNATE_IMAGE_ADDRESS),
             mapped_sprite: Some(SpriteId::ENEMY_BOMB),
@@ -601,7 +601,7 @@ impl ObjectEvidenceSnapshot {
         if index >= OBJECT_EVIDENCE_DETAIL_LIMIT {
             return;
         }
-        let descriptor = reserve_picture_descriptor(kind);
+        let descriptor = reserve_object_bitmap_descriptor(kind);
         let identity = object_table_identity(index);
         let object_category = kind.object_category();
         self.details[index] = ObjectEvidenceDetailSnapshot {
@@ -612,9 +612,9 @@ impl ObjectEvidenceSnapshot {
             screen_position: None,
             world_position: None,
             velocity: None,
-            picture_address: Some(descriptor.address),
+            object_bitmap_descriptor_address: Some(descriptor.address),
             object_bitmap_label: Some(descriptor.label),
-            picture_size: Some(descriptor.size),
+            object_bitmap_size: Some(descriptor.size),
             primary_image_address: Some(descriptor.primary_image_address),
             alternate_image_address: descriptor.alternate_image_address,
             mapped_sprite: Some(descriptor.mapped_sprite),
@@ -788,23 +788,23 @@ fn object_table_identity(detail_index: usize) -> ObjectTableIdentity {
     }
 }
 
-fn reserve_picture_descriptor(kind: EnemyKind) -> ObjectPictureDescriptor {
+fn reserve_object_bitmap_descriptor(kind: EnemyKind) -> ObjectBitmapDescriptor {
     match kind {
-        EnemyKind::Lander => lander_picture_descriptor(0),
-        EnemyKind::Mutant => MUTANT_PICTURE_DESCRIPTOR,
-        EnemyKind::Bomber => bomber_picture_descriptor(0),
-        EnemyKind::Pod => POD_PICTURE_DESCRIPTOR,
-        EnemyKind::Swarmer => SWARMER_PICTURE_DESCRIPTOR,
-        EnemyKind::Baiter => baiter_picture_descriptor(0),
+        EnemyKind::Lander => lander_object_bitmap_descriptor(0),
+        EnemyKind::Mutant => MUTANT_OBJECT_BITMAP_DESCRIPTOR,
+        EnemyKind::Bomber => bomber_object_bitmap_descriptor(0),
+        EnemyKind::Pod => POD_OBJECT_BITMAP_DESCRIPTOR,
+        EnemyKind::Swarmer => SWARMER_OBJECT_BITMAP_DESCRIPTOR,
+        EnemyKind::Baiter => baiter_object_bitmap_descriptor(0),
     }
 }
 
-fn human_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
+fn human_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
     match frame % 4 {
-        1 => HUMAN_ASTP2_PICTURE_DESCRIPTOR,
-        2 => HUMAN_ASTP3_PICTURE_DESCRIPTOR,
-        3 => HUMAN_ASTP4_PICTURE_DESCRIPTOR,
-        _ => HUMAN_ASTP1_PICTURE_DESCRIPTOR,
+        1 => HUMAN_ASTP2_OBJECT_BITMAP_DESCRIPTOR,
+        2 => HUMAN_ASTP3_OBJECT_BITMAP_DESCRIPTOR,
+        3 => HUMAN_ASTP4_OBJECT_BITMAP_DESCRIPTOR,
+        _ => HUMAN_ASTP1_OBJECT_BITMAP_DESCRIPTOR,
     }
 }
 
@@ -826,7 +826,7 @@ fn saturating_u16_len(value: usize) -> u16 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ObjectPictureDescriptor {
+struct ObjectBitmapDescriptor {
     label: &'static str,
     address: u16,
     size: (u8, u8),
@@ -835,8 +835,8 @@ struct ObjectPictureDescriptor {
     mapped_sprite: SpriteId,
 }
 
-const PLAYER_PROJECTILE_PICTURE_DESCRIPTOR: ObjectPictureDescriptor =
-    ObjectPictureDescriptor {
+const PLAYER_PROJECTILE_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
+    ObjectBitmapDescriptor {
         label: "LASP1",
         address: 0xF96F,
         size: (8, 1),
@@ -844,8 +844,8 @@ const PLAYER_PROJECTILE_PICTURE_DESCRIPTOR: ObjectPictureDescriptor =
         alternate_image_address: None,
         mapped_sprite: SpriteId::PLAYER_PROJECTILE,
     };
-const HUMAN_ASTP1_PICTURE_DESCRIPTOR: ObjectPictureDescriptor =
-    ObjectPictureDescriptor {
+const HUMAN_ASTP1_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
+    ObjectBitmapDescriptor {
         label: "ASTP1",
         address: 0xF901,
         size: (2, 8),
@@ -853,8 +853,8 @@ const HUMAN_ASTP1_PICTURE_DESCRIPTOR: ObjectPictureDescriptor =
         alternate_image_address: Some(0xFADB),
         mapped_sprite: SpriteId::HUMAN,
     };
-const HUMAN_ASTP2_PICTURE_DESCRIPTOR: ObjectPictureDescriptor =
-    ObjectPictureDescriptor {
+const HUMAN_ASTP2_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
+    ObjectBitmapDescriptor {
         label: "ASTP2",
         address: 0xF90B,
         size: (2, 8),
@@ -862,8 +862,8 @@ const HUMAN_ASTP2_PICTURE_DESCRIPTOR: ObjectPictureDescriptor =
         alternate_image_address: Some(0xFAFB),
         mapped_sprite: SpriteId::HUMAN,
     };
-const HUMAN_ASTP3_PICTURE_DESCRIPTOR: ObjectPictureDescriptor =
-    ObjectPictureDescriptor {
+const HUMAN_ASTP3_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
+    ObjectBitmapDescriptor {
         label: "ASTP3",
         address: 0xF915,
         size: (2, 8),
@@ -871,8 +871,8 @@ const HUMAN_ASTP3_PICTURE_DESCRIPTOR: ObjectPictureDescriptor =
         alternate_image_address: Some(0xFB1B),
         mapped_sprite: SpriteId::HUMAN,
     };
-const HUMAN_ASTP4_PICTURE_DESCRIPTOR: ObjectPictureDescriptor =
-    ObjectPictureDescriptor {
+const HUMAN_ASTP4_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
+    ObjectBitmapDescriptor {
         label: "ASTP4",
         address: 0xF91F,
         size: (2, 8),
@@ -880,7 +880,7 @@ const HUMAN_ASTP4_PICTURE_DESCRIPTOR: ObjectPictureDescriptor =
         alternate_image_address: Some(0xFB3B),
         mapped_sprite: SpriteId::HUMAN,
     };
-const MUTANT_PICTURE_DESCRIPTOR: ObjectPictureDescriptor = ObjectPictureDescriptor {
+const MUTANT_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDescriptor {
     label: "SCZP1",
     address: 0xF8CE,
     size: (5, 8),
@@ -888,7 +888,7 @@ const MUTANT_PICTURE_DESCRIPTOR: ObjectPictureDescriptor = ObjectPictureDescript
     alternate_image_address: Some(0xFA23),
     mapped_sprite: SpriteId::ENEMY_MUTANT,
 };
-const POD_PICTURE_DESCRIPTOR: ObjectPictureDescriptor = ObjectPictureDescriptor {
+const POD_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDescriptor {
     label: "PRBP1",
     address: 0xF8F7,
     size: (4, 8),
@@ -896,7 +896,7 @@ const POD_PICTURE_DESCRIPTOR: ObjectPictureDescriptor = ObjectPictureDescriptor 
     alternate_image_address: Some(0xFAAB),
     mapped_sprite: SpriteId::ENEMY_POD,
 };
-const SWARMER_PICTURE_DESCRIPTOR: ObjectPictureDescriptor = ObjectPictureDescriptor {
+const SWARMER_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDescriptor {
     label: "SWPIC1",
     address: 0xF97B,
     size: (3, 4),
@@ -905,9 +905,9 @@ const SWARMER_PICTURE_DESCRIPTOR: ObjectPictureDescriptor = ObjectPictureDescrip
     mapped_sprite: SpriteId::ENEMY_SWARMER,
 };
 
-fn lander_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
+fn lander_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
     match frame % LANDER_ANIMATION_FRAME_COUNT {
-        1 => ObjectPictureDescriptor {
+        1 => ObjectBitmapDescriptor {
             label: "LNDP2",
             address: 0xF98F,
             size: (5, 8),
@@ -915,7 +915,7 @@ fn lander_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
             alternate_image_address: Some(0xCD58),
             mapped_sprite: SpriteId::ENEMY_LANDER,
         },
-        2 => ObjectPictureDescriptor {
+        2 => ObjectBitmapDescriptor {
             label: "LNDP3",
             address: 0xF999,
             size: (5, 8),
@@ -923,7 +923,7 @@ fn lander_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
             alternate_image_address: Some(0xCDA8),
             mapped_sprite: SpriteId::ENEMY_LANDER,
         },
-        _ => ObjectPictureDescriptor {
+        _ => ObjectBitmapDescriptor {
             label: "LNDP1",
             address: 0xF985,
             size: (5, 8),
@@ -934,9 +934,9 @@ fn lander_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
     }
 }
 
-fn bomber_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
+fn bomber_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
     match frame % BOMBER_ANIMATION_FRAME_COUNT {
-        1 => ObjectPictureDescriptor {
+        1 => ObjectBitmapDescriptor {
             label: "TIEP2",
             address: 0xF933,
             size: (4, 8),
@@ -944,7 +944,7 @@ fn bomber_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
             alternate_image_address: Some(0xFBAB),
             mapped_sprite: SpriteId::ENEMY_BOMBER,
         },
-        2 => ObjectPictureDescriptor {
+        2 => ObjectBitmapDescriptor {
             label: "TIEP3",
             address: 0xF93D,
             size: (4, 8),
@@ -952,7 +952,7 @@ fn bomber_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
             alternate_image_address: Some(0xFBEB),
             mapped_sprite: SpriteId::ENEMY_BOMBER,
         },
-        3 => ObjectPictureDescriptor {
+        3 => ObjectBitmapDescriptor {
             label: "TIEP4",
             address: 0xF947,
             size: (4, 8),
@@ -960,7 +960,7 @@ fn bomber_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
             alternate_image_address: Some(0xFC2B),
             mapped_sprite: SpriteId::ENEMY_BOMBER,
         },
-        _ => ObjectPictureDescriptor {
+        _ => ObjectBitmapDescriptor {
             label: "TIEP1",
             address: 0xF929,
             size: (4, 8),
@@ -971,9 +971,9 @@ fn bomber_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
     }
 }
 
-fn baiter_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
+fn baiter_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
     match frame % BAITER_ANIMATION_FRAME_COUNT {
-        1 => ObjectPictureDescriptor {
+        1 => ObjectBitmapDescriptor {
             label: "UFOP2",
             address: 0xF9AD,
             size: (6, 4),
@@ -981,7 +981,7 @@ fn baiter_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
             alternate_image_address: Some(0xCE18),
             mapped_sprite: SpriteId::ENEMY_BAITER,
         },
-        2 => ObjectPictureDescriptor {
+        2 => ObjectBitmapDescriptor {
             label: "UFOP3",
             address: 0xF9B7,
             size: (6, 4),
@@ -989,7 +989,7 @@ fn baiter_picture_descriptor(frame: u8) -> ObjectPictureDescriptor {
             alternate_image_address: Some(0xCE48),
             mapped_sprite: SpriteId::ENEMY_BAITER,
         },
-        _ => ObjectPictureDescriptor {
+        _ => ObjectBitmapDescriptor {
             label: "UFOP1",
             address: 0xF9A3,
             size: (6, 4),

@@ -1028,7 +1028,7 @@ fn push_actor_attract_scoring_materialize_pixels(
         scene,
         position,
         descriptor.sprite_asset_label,
-        descriptor.picture_size,
+        descriptor.object_bitmap_size,
         descriptor.sprite,
         growth_size,
     );
@@ -1073,7 +1073,7 @@ fn push_actor_fragment_pixel(scene: &mut RenderScene, position: [f32; 2], tint: 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ActorAttractScoringSpriteFrameDescriptor {
     sprite_asset_label: &'static str,
-    picture_size: (u8, u8),
+    object_bitmap_size: (u8, u8),
     sprite: SpriteId,
 }
 
@@ -1090,32 +1090,32 @@ fn actor_attract_scoring_enemy_sprite_frame_descriptor(
     match enemy {
         ActorAttractScoringEnemyKind::Lander => ActorAttractScoringSpriteFrameDescriptor {
             sprite_asset_label: ATTRACT_LANDER_SPRITE_ASSET_LABEL,
-            picture_size: (5, 8),
+            object_bitmap_size: (5, 8),
             sprite: SpriteId::ENEMY_LANDER,
         },
         ActorAttractScoringEnemyKind::Mutant => ActorAttractScoringSpriteFrameDescriptor {
             sprite_asset_label: ATTRACT_MUTANT_SPRITE_ASSET_LABEL,
-            picture_size: (5, 8),
+            object_bitmap_size: (5, 8),
             sprite: SpriteId::ENEMY_MUTANT,
         },
         ActorAttractScoringEnemyKind::Baiter => ActorAttractScoringSpriteFrameDescriptor {
             sprite_asset_label: ATTRACT_BAITER_SPRITE_ASSET_LABEL,
-            picture_size: (6, 4),
+            object_bitmap_size: (6, 4),
             sprite: SpriteId::ENEMY_BAITER,
         },
         ActorAttractScoringEnemyKind::Bomber => ActorAttractScoringSpriteFrameDescriptor {
             sprite_asset_label: ATTRACT_BOMBER_SPRITE_ASSET_LABEL,
-            picture_size: (4, 8),
+            object_bitmap_size: (4, 8),
             sprite: SpriteId::ENEMY_BOMBER,
         },
         ActorAttractScoringEnemyKind::Pod => ActorAttractScoringSpriteFrameDescriptor {
             sprite_asset_label: ATTRACT_POD_SPRITE_ASSET_LABEL,
-            picture_size: (4, 8),
+            object_bitmap_size: (4, 8),
             sprite: SpriteId::ENEMY_POD,
         },
         ActorAttractScoringEnemyKind::Swarmer => ActorAttractScoringSpriteFrameDescriptor {
             sprite_asset_label: ATTRACT_SWARMER_SPRITE_ASSET_LABEL,
-            picture_size: (3, 4),
+            object_bitmap_size: (3, 4),
             sprite: SpriteId::ENEMY_SWARMER,
         },
     }

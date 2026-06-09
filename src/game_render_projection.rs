@@ -580,7 +580,7 @@ pub(crate) fn push_appearance_cloud_pixels(
     scene: &mut RenderScene,
     position: ScreenPosition,
     sprite_asset_label: &'static str,
-    picture_size: (u8, u8),
+    object_bitmap_size: (u8, u8),
     mapped_sprite: SpriteId,
     growth_size: u16,
 ) -> bool {
@@ -588,9 +588,9 @@ pub(crate) fn push_appearance_cloud_pixels(
         kind: ExpandedObjectKind::Appearance,
         size: growth_size,
         sprite_asset_label: Some(sprite_asset_label),
-        picture_size: Some(picture_size),
+        object_bitmap_size: Some(object_bitmap_size),
         mapped_sprite: Some(mapped_sprite),
-        center: Some(appearance_center(position, picture_size)),
+        center: Some(appearance_center(position, object_bitmap_size)),
         top_left: Some(position),
         ..ExpandedObjectDetailSnapshot::EMPTY
     };
