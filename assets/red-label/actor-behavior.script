@@ -6,7 +6,7 @@ default player_laser_cooldown_steps 8
 default player_hyperspace_hidden_steps 33
 default player_hyperspace_rematerialize_x 128
 default player_hyperspace_rematerialize_y 120
-default player_hyperspace_source_seed none
+default player_hyperspace_arcade_seed none
 default player_hyperspace_death_delay_steps 39
 default player_hyperspace_death_lseed 0x0C
 default player_takes_enemy_collision_damage true

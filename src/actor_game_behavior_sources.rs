@@ -96,11 +96,11 @@ fn parse_behavior_bool_value(
     }
 }
 
-fn parse_behavior_hyperspace_seed_value(
+fn parse_behavior_hyperspace_arcade_seed_value(
     line_number: usize,
     values: &[&str],
     field: &str,
-) -> Result<Option<ActorHyperspaceSourceSeed>, ActorBehaviorScriptParseError> {
+) -> Result<Option<ActorHyperspaceArcadeSeed>, ActorBehaviorScriptParseError> {
     if values.len() == 1 && normalize_script_token(values[0]) == "none" {
         return Ok(None);
     }
@@ -110,7 +110,7 @@ fn parse_behavior_hyperspace_seed_value(
             format!("{field} needs `none` or three seed bytes"),
         ));
     }
-    Ok(Some(ActorHyperspaceSourceSeed {
+    Ok(Some(ActorHyperspaceArcadeSeed {
         seed: parse_behavior_u8_value(line_number, &values[0..1], "seed")?,
         hseed: parse_behavior_u8_value(line_number, &values[1..2], "hseed")?,
         lseed: parse_behavior_u8_value(line_number, &values[2..3], "lseed")?,

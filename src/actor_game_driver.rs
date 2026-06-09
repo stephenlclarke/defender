@@ -216,7 +216,7 @@ impl ActorGameDriver {
         };
         if let Some(arcade_rng) = arcade_rng {
             behavior_script =
-                behavior_script.with_hyperspace_source_seed(arcade_rng.hyperspace_seed());
+                behavior_script.with_hyperspace_arcade_seed(arcade_rng.hyperspace_arcade_seed());
         }
         let human_walk_target_slot = self.advance_human_walk_process(arcade_rng);
         let projectile_scan_tick = if self.phase == Phase::Playing

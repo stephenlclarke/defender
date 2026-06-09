@@ -1274,7 +1274,7 @@ pub enum HostileMovementMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ActorHyperspaceSourceSeed {
+pub struct ActorHyperspaceArcadeSeed {
     pub seed: u8,
     pub hseed: u8,
     pub lseed: u8,
@@ -1288,8 +1288,8 @@ pub struct ActorArcadeRngSnapshot {
 }
 
 impl ActorArcadeRngSnapshot {
-    const fn hyperspace_seed(self) -> ActorHyperspaceSourceSeed {
-        ActorHyperspaceSourceSeed {
+    const fn hyperspace_arcade_seed(self) -> ActorHyperspaceArcadeSeed {
+        ActorHyperspaceArcadeSeed {
             seed: self.seed,
             hseed: self.hseed,
             lseed: self.lseed,
@@ -1341,7 +1341,7 @@ pub struct ActorBehaviorProfile {
     pub player_hyperspace_hidden_steps: u8,
     pub player_hyperspace_rematerialize_x: i16,
     pub player_hyperspace_rematerialize_y: i16,
-    pub player_hyperspace_source_seed: Option<ActorHyperspaceSourceSeed>,
+    pub player_hyperspace_arcade_seed: Option<ActorHyperspaceArcadeSeed>,
     pub player_hyperspace_death_delay_steps: u8,
     pub player_hyperspace_death_lseed: u8,
     pub player_takes_enemy_collision_damage: bool,
@@ -1390,7 +1390,7 @@ impl ActorBehaviorProfile {
         player_hyperspace_hidden_steps: PLAYER_HYPERSPACE_HIDDEN_STEPS,
         player_hyperspace_rematerialize_x: PLAYER_HYPERSPACE_REMATERIALIZE_X,
         player_hyperspace_rematerialize_y: PLAYER_HYPERSPACE_REMATERIALIZE_Y,
-        player_hyperspace_source_seed: None,
+        player_hyperspace_arcade_seed: None,
         player_hyperspace_death_delay_steps: PLAYER_HYPERSPACE_DEATH_DELAY_STEPS,
         player_hyperspace_death_lseed: PLAYER_HYPERSPACE_DEATH_LOW_SEED,
         player_takes_enemy_collision_damage: true,
@@ -1569,18 +1569,18 @@ impl ActorBehaviorScript {
         }
     }
 
-    fn with_hyperspace_source_seed(&self, seed: ActorHyperspaceSourceSeed) -> Self {
+    fn with_hyperspace_arcade_seed(&self, seed: ActorHyperspaceArcadeSeed) -> Self {
         let mut script = self.clone();
         if script
             .default_profile
-            .player_hyperspace_source_seed
+            .player_hyperspace_arcade_seed
             .is_none()
         {
-            script.default_profile.player_hyperspace_source_seed = Some(seed);
+            script.default_profile.player_hyperspace_arcade_seed = Some(seed);
         }
         for profile in script.kind_profiles.values_mut() {
-            if profile.player_hyperspace_source_seed.is_none() {
-                profile.player_hyperspace_source_seed = Some(seed);
+            if profile.player_hyperspace_arcade_seed.is_none() {
+                profile.player_hyperspace_arcade_seed = Some(seed);
             }
         }
         script
@@ -1742,9 +1742,9 @@ fn apply_behavior_profile_field(
             profile.player_hyperspace_rematerialize_y =
                 parse_behavior_i16_value(line_number, values, field.as_str())?;
         }
-        "player_hyperspace_source_seed" => {
-            profile.player_hyperspace_source_seed =
-                parse_behavior_hyperspace_seed_value(line_number, values, field.as_str())?;
+        "player_hyperspace_arcade_seed" => {
+            profile.player_hyperspace_arcade_seed =
+                parse_behavior_hyperspace_arcade_seed_value(line_number, values, field.as_str())?;
         }
         "player_hyperspace_death_delay_steps" => {
             profile.player_hyperspace_death_delay_steps =

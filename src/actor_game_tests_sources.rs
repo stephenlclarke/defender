@@ -32,7 +32,7 @@
     }
 
     #[test]
-    fn hyperspace_source_seed_controls_rematerialization_position_and_direction() {
+    fn hyperspace_arcade_seed_controls_rematerialization_position_and_direction() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         let player = driver.spawn_player();
@@ -42,7 +42,7 @@
                 player_hyperspace_hidden_steps: 1,
                 player_hyperspace_rematerialize_x: 150,
                 player_hyperspace_rematerialize_y: 92,
-                player_hyperspace_source_seed: Some(ActorHyperspaceSourceSeed {
+                player_hyperspace_arcade_seed: Some(ActorHyperspaceArcadeSeed {
                     seed: 0x12,
                     hseed: 0x34,
                     lseed: 0,
@@ -1948,7 +1948,7 @@
             kind lander lander_mode chase_player\n\
             kind lander lander_seek_speed 6\n\
             actor 42 lander_drift_speed 7\n\
-            actor 42 player_hyperspace_source_seed 0x52 0x62 0x0c\n",
+            actor 42 player_hyperspace_arcade_seed 0x52 0x62 0x0c\n",
         )
         .expect("behavior script text should parse");
 
@@ -1966,8 +1966,8 @@
             .expect("actor profile should be parsed");
         assert_eq!(actor.lander_drift_speed, 7);
         assert_eq!(
-            actor.player_hyperspace_source_seed,
-            Some(ActorHyperspaceSourceSeed {
+            actor.player_hyperspace_arcade_seed,
+            Some(ActorHyperspaceArcadeSeed {
                 seed: 0x52,
                 hseed: 0x62,
                 lseed: 0x0C,

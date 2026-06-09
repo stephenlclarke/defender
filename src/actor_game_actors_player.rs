@@ -337,9 +337,9 @@ impl PlayerShip {
 
     fn hyperspace_death_lseed(behavior: ActorBehaviorProfile) -> u8 {
         behavior
-            .player_hyperspace_source_seed
-            .map_or(behavior.player_hyperspace_death_lseed, |source| {
-                source.lseed
+            .player_hyperspace_arcade_seed
+            .map_or(behavior.player_hyperspace_death_lseed, |arcade_seed| {
+                arcade_seed.lseed
             })
     }
 
@@ -397,17 +397,17 @@ impl PlayerShip {
         &self,
         behavior: ActorBehaviorProfile,
     ) -> (Point, Direction, Option<u16>) {
-        if let Some(source) = behavior.player_hyperspace_source_seed {
-            let (x, direction) = if source.hseed & 1 != 0 {
+        if let Some(arcade_seed) = behavior.player_hyperspace_arcade_seed {
+            let (x, direction) = if arcade_seed.hseed & 1 != 0 {
                 (0x20, Direction::Right)
             } else {
                 (0x70, Direction::Left)
             };
-            let y = (source.hseed >> 1).wrapping_add(PLAYFIELD_TOP_EDGE_Y);
+            let y = (arcade_seed.hseed >> 1).wrapping_add(PLAYFIELD_TOP_EDGE_Y);
             return (
                 Point::new(x, i16::from(y)),
                 direction,
-                Some(actor_source_hyperspace_background_left(source)),
+                Some(arcade_hyperspace_background_left(arcade_seed)),
             );
         }
 
