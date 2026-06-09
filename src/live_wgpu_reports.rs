@@ -28,8 +28,9 @@ use crate::{
         SoundCue, SpawnRequest, SpriteKey, VisualEffect, XyzzyController, XyzzyMode,
     },
     actor_smoke::ActorSmokeReport,
+    arcade_assets::{MessageId, message_text},
     audio::LiveAudioMode,
-    renderer::{SpriteId, source_message_text},
+    renderer::SpriteId,
 };
 #[cfg(all(not(test), not(coverage)))]
 use crate::{

@@ -179,8 +179,8 @@ fn actor_script_check_observe_attract_cycle_frame(
     summary: &mut ActorScriptCheckAttractCycleSummary,
     frame: &ActorFrame,
 ) {
-    let hall_title = source_message_text("HALLD_TITLE").expect("HALLD_TITLE message is checked in");
-    let final_scoring_label = source_message_text("SWARMV").expect("SWARMV message is checked in");
+    let hall_title = message_text(MessageId::HallTitle);
+    let final_scoring_label = message_text(MessageId::SwarmerInstruction);
     let mut cycle_has_first_williams_step = false;
     let mut cycle_has_scoring_surface = false;
     let mut cycle_has_final_label = false;

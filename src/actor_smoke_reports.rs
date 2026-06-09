@@ -7,10 +7,10 @@ use crate::{
         ActorFrame, ActorKind, ActorRuntimeAdapter, AttractScript, GameInput, Phase, Point,
         SpriteKey, VisualEffect,
     },
+    arcade_assets::{MessageId, message_text},
     game::{GameEvent, GameOverSnapshot, SoundEvent},
     renderer::{
         NativeRenderPipeline, NativeSceneRenderer, RenderLayer, SceneDrawPlan, SpriteId,
-        source_message_text,
     },
 };
 
