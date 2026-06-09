@@ -294,7 +294,7 @@
     }
 
     #[test]
-    fn source_mutant_actor_advances_wave_velocity_and_hop_rng() {
+    fn arcade_mutant_actor_advances_wave_velocity_and_hop_rng() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
@@ -322,7 +322,7 @@
         });
 
         let report = driver.step(GameInput::NONE);
-        let prompt = source_mutant_prompt_for_test(
+        let prompt = mutant_arcade_prompt_for_test(
             report.step,
             report.wave,
             report
@@ -333,7 +333,7 @@
         );
         let behavior = ActorBehaviorProfile::default();
         let (expected_position, expected_source, shot) =
-            expected_source_mutant_after_motion(start, source, mutant, &prompt, behavior);
+            expected_mutant_arcade_after_motion(start, source, mutant, &prompt, behavior);
 
         assert_eq!(shot, None);
         let snapshot = snapshot_for(&report, mutant);
@@ -351,17 +351,17 @@
     }
 
     #[test]
-    fn source_mutant_actor_uses_prompt_arcade_wave_profile() {
+    fn arcade_mutant_actor_uses_prompt_arcade_wave_profile() {
         let actor = ActorId::new(1001);
         let default_profile = ArcadeWaveProfile::for_wave(1);
-        let mut source_profile = default_profile;
-        source_profile.mutant_x_velocity = 0x48;
-        source_profile.mutant_y_velocity_msb = 0x00;
-        source_profile.mutant_y_velocity_lsb = 0x40;
-        source_profile.mutant_random_y = 2;
-        source_profile.mutant_shot_time = 12;
+        let mut custom_arcade_profile = default_profile;
+        custom_arcade_profile.mutant_x_velocity = 0x48;
+        custom_arcade_profile.mutant_y_velocity_msb = 0x00;
+        custom_arcade_profile.mutant_y_velocity_lsb = 0x40;
+        custom_arcade_profile.mutant_random_y = 2;
+        custom_arcade_profile.mutant_shot_time = 12;
         assert_ne!(
-            source_profile.mutant_x_velocity,
+            custom_arcade_profile.mutant_x_velocity,
             default_profile.mutant_x_velocity
         );
 
@@ -381,10 +381,10 @@
             target6_first_shot_deferred: false,
         };
         let start = Point::new(100, 80);
-        let prompt = source_mutant_prompt_with_arcade_wave_for_test(
+        let prompt = mutant_arcade_prompt_with_arcade_wave_for_test(
             12,
             1,
-            source_profile,
+            custom_arcade_profile,
             ActorArcadeRngSnapshot {
                 seed: 0x52,
                 hseed: 0x34,
@@ -395,7 +395,7 @@
         );
         let behavior = ActorBehaviorProfile::default();
         let (expected_position, expected_source, _shot) =
-            expected_source_mutant_after_motion(start, source, actor, &prompt, behavior);
+            expected_mutant_arcade_after_motion(start, source, actor, &prompt, behavior);
         let default_x_velocity = mutant_arcade_x_velocity(
             default_profile.mutant_x_velocity,
             arcade_absolute_x(Point::new(42, 120), 0),
@@ -709,7 +709,7 @@
         );
         driver.snapshots.insert(
             mutant_id,
-            source_mutant_snapshot_with_bounds(
+            mutant_arcade_snapshot_with_bounds(
                 mutant_id,
                 raw_position,
                 source,
@@ -760,7 +760,7 @@
         );
         driver.snapshots.insert(
             mutant_id,
-            source_mutant_snapshot_with_bounds(
+            mutant_arcade_snapshot_with_bounds(
                 mutant_id,
                 raw_position,
                 source,
@@ -796,7 +796,7 @@
     }
 
     #[test]
-    fn source_mutant_shot_timer_spawns_source_projectile() {
+    fn arcade_mutant_shot_timer_spawns_arcade_projectile() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
@@ -824,7 +824,7 @@
         });
 
         let report = driver.step(GameInput::NONE);
-        let prompt = source_mutant_prompt_for_test(
+        let prompt = mutant_arcade_prompt_for_test(
             report.step,
             report.wave,
             report
@@ -835,7 +835,7 @@
         );
         let behavior = ActorBehaviorProfile::default();
         let (expected_position, expected_source, expected_shot) =
-            expected_source_mutant_after_motion(start, source, mutant, &prompt, behavior);
+            expected_mutant_arcade_after_motion(start, source, mutant, &prompt, behavior);
         let expected_shot = expected_shot.expect("shot timer should emit a mutant fireball");
 
         assert!(report.sounds.contains(&SoundCue::MutantShot));
@@ -1628,7 +1628,7 @@
         }
     }
 
-    fn source_mutant_snapshot_with_bounds(
+    fn mutant_arcade_snapshot_with_bounds(
         id: ActorId,
         position: Point,
         source: MutantArcadeState,
@@ -1769,14 +1769,14 @@
             .collect()
     }
 
-    fn source_mutant_prompt_for_test(
+    fn mutant_arcade_prompt_for_test(
         step: u64,
         wave: u16,
         arcade_rng: ActorArcadeRngSnapshot,
         player_position: Point,
         player_velocity: Velocity,
     ) -> StepPrompt {
-        source_mutant_prompt_with_arcade_wave_for_test(
+        mutant_arcade_prompt_with_arcade_wave_for_test(
             step,
             wave,
             ArcadeWaveProfile::for_wave(wave),
@@ -1817,7 +1817,7 @@
         }
     }
 
-    fn source_mutant_prompt_with_arcade_wave_for_test(
+    fn mutant_arcade_prompt_with_arcade_wave_for_test(
         step: u64,
         wave: u16,
         arcade_wave: ArcadeWaveProfile,
@@ -1860,7 +1860,7 @@
         }
     }
 
-    fn expected_source_mutant_after_motion(
+    fn expected_mutant_arcade_after_motion(
         mut position: Point,
         mut source: MutantArcadeState,
         actor: ActorId,
@@ -1878,7 +1878,7 @@
 
         let player_position = prompt
             .player_position()
-            .expect("source mutant expected helper needs a player");
+            .expect("arcade mutant expected helper needs a player");
         let profile = prompt.arcade_wave;
         let player_absolute_x = arcade_absolute_x(player_position, 0);
         let object_absolute_x = arcade_absolute_x(position, source.x_fraction);

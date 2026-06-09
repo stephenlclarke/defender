@@ -964,7 +964,7 @@
             expected_rng.advance().snapshot()
         );
 
-        let prompt = source_mutant_prompt_for_test(
+        let prompt = mutant_arcade_prompt_for_test(
             restored.step,
             restored.wave,
             restored
@@ -981,7 +981,7 @@
             .collect::<Vec<_>>();
         assert_eq!(source_mutants.len(), 2);
         for (snapshot, spawn) in source_mutants.iter().zip([first_spawn, second_spawn]) {
-            let (expected_position, expected_source, _) = expected_source_mutant_after_motion(
+            let (expected_position, expected_source, _) = expected_mutant_arcade_after_motion(
                 spawn.position,
                 spawn.source.expect("source mutant restore metadata"),
                 snapshot.id,
@@ -1085,7 +1085,7 @@
             expected_rng.advance().snapshot()
         );
 
-        let prompt = source_mutant_prompt_for_test(
+        let prompt = mutant_arcade_prompt_for_test(
             restored.step,
             restored.wave,
             restored
@@ -1103,7 +1103,7 @@
         source_mutants.sort_by_key(|snapshot| snapshot.id);
         assert_eq!(source_mutants.len(), 2);
         for (snapshot, spawn) in source_mutants.iter().zip([first_spawn, second_spawn]) {
-            let (expected_position, expected_source, _) = expected_source_mutant_after_motion(
+            let (expected_position, expected_source, _) = expected_mutant_arcade_after_motion(
                 spawn.position,
                 spawn.source.expect("source mutant restore metadata"),
                 snapshot.id,

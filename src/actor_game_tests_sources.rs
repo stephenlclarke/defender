@@ -1341,7 +1341,7 @@
         let report_arcade_rng = report
             .arcade_rng
             .expect("playing report should carry arcade rng");
-        let prompt = source_mutant_prompt_for_test(
+        let prompt = mutant_arcade_prompt_for_test(
             report.step,
             report.wave,
             report_arcade_rng,
@@ -1552,7 +1552,7 @@
         let report_arcade_rng = report
             .arcade_rng
             .expect("playing report should carry arcade rng");
-        let prompt = source_mutant_prompt_for_test(
+        let prompt = mutant_arcade_prompt_for_test(
             report.step,
             report.wave,
             report_arcade_rng,
@@ -1691,7 +1691,7 @@
             hseed: 0,
             lseed: 0x44,
         };
-        let prompt = source_mutant_prompt_for_test(
+        let prompt = mutant_arcade_prompt_for_test(
             7,
             2,
             arcade_rng,
