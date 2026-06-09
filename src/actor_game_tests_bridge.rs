@@ -184,7 +184,7 @@
     }
 
     #[test]
-    fn actor_render_scene_bridge_projects_attract_source_pixels() {
+    fn actor_render_scene_bridge_projects_attract_pixel_sprites() {
         let mut driver = ActorGameDriver::new();
 
         let williams = driver.step(GameInput::NONE);
@@ -310,7 +310,7 @@
     }
 
     #[test]
-    fn actor_wave_clear_delays_next_wave_and_draws_source_survivor_bonus_scene() {
+    fn actor_wave_clear_delays_next_wave_and_draws_survivor_bonus_interstitial() {
         let wave_script = ActorWaveScript::new(
             "wave-clear-interstitial",
             vec![
@@ -787,10 +787,10 @@
                 !scene.sprites.iter().any(
                     |sprite| sprite.sprite == sprite_id && sprite.layer == RenderLayer::Objects
                 ),
-                "source-family explosion should use pixel cloud, not {sprite_id:?}"
+                "enemy-family explosion should use pixel cloud, not {sprite_id:?}"
             );
         }
-        let source_cloud_pixels = scene
+        let explosion_cloud_pixels = scene
             .sprites
             .iter()
             .filter(|sprite| {
@@ -799,8 +799,8 @@
             })
             .count();
         assert!(
-            source_cloud_pixels > 1,
-            "source-family explosions should project expanded-object pixels"
+            explosion_cloud_pixels > 1,
+            "enemy-family explosions should project expanded-object pixels"
         );
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::BOMB_EXPLOSION && sprite.layer == RenderLayer::Objects
