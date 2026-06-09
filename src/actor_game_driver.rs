@@ -1512,7 +1512,7 @@ impl ActorGameDriver {
             .human_walk_cursor
             .filter(|slot| *slot < ASTRONAUT_TARGET_CURSOR_ENTRY_COUNT)
             .unwrap_or(0);
-        let next_cursor = actor_source_astronaut_next_slot_index(current_cursor);
+        let next_cursor = next_astronaut_target_slot_index(current_cursor);
         self.human_walk_cursor = Some(next_cursor);
         self.human_walk_sleep_ticks = ASTRONAUT_PROCESS_SLEEP_TICKS;
 

@@ -919,7 +919,7 @@ const fn next_target_list_slot_index(slot_index: usize) -> usize {
     }
 }
 
-const fn actor_source_astronaut_next_slot_index(slot_index: usize) -> usize {
+const fn next_astronaut_target_slot_index(slot_index: usize) -> usize {
     if slot_index + 1 < ASTRONAUT_TARGET_CURSOR_ENTRY_COUNT {
         slot_index + 1
     } else {
