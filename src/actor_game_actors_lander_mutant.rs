@@ -296,7 +296,7 @@ impl Lander {
                 source.shot_timer = source.shot_timer.saturating_sub(1);
             }
             if source.shot_timer == 0 {
-                source.shot_timer = clamped_source_lander_shot_reset(behavior);
+                source.shot_timer = clamped_lander_fire_timer_reset(behavior);
                 source_fired = true;
             }
         }
@@ -429,7 +429,7 @@ fn drift_direction(drift: i16) -> Direction {
     }
 }
 
-fn clamped_source_lander_shot_reset(behavior: ActorBehaviorProfile) -> u8 {
+fn clamped_lander_fire_timer_reset(behavior: ActorBehaviorProfile) -> u8 {
     let clamped = behavior
         .lander_fire_period_steps
         .max(1)
