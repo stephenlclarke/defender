@@ -1586,7 +1586,7 @@
         }
 
         let (x, x_fraction) =
-            actor_source_axis_step(position.x, arcade_state.x_fraction, arcade_state.x_velocity);
+            arcade_axis_step(position.x, arcade_state.x_fraction, arcade_state.x_velocity);
         let (y, y_fraction) =
             actor_source_active_object_y_step(position.y, arcade_state.y_fraction, arcade_state.y_velocity);
         arcade_state.x_fraction = x_fraction;
@@ -1913,7 +1913,7 @@
         }
 
         let (x, x_fraction) =
-            actor_source_axis_step(position.x, source.x_fraction, source.x_velocity);
+            arcade_axis_step(position.x, source.x_fraction, source.x_velocity);
         let (y, y_fraction) =
             actor_source_active_object_y_step(position.y, source.y_fraction, source.y_velocity);
         source.x_fraction = x_fraction;

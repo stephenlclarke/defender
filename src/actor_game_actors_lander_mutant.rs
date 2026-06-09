@@ -222,7 +222,7 @@ impl Lander {
         }
 
         let (x, x_fraction) =
-            actor_source_axis_step(self.position.x, source.x_fraction, source.x_velocity);
+            arcade_axis_step(self.position.x, source.x_fraction, source.x_velocity);
         let (y, y_fraction) = actor_source_active_object_y_step(
             self.position.y,
             source.y_fraction,
@@ -437,7 +437,7 @@ fn clamped_lander_fire_timer_reset(behavior: ActorBehaviorProfile) -> u8 {
     u8::try_from(clamped).unwrap_or(u8::MAX)
 }
 
-fn actor_source_axis_step(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
+fn arcade_axis_step(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
     let [position, fraction] = u16::from_be_bytes([position as u8, fraction])
         .wrapping_add(velocity)
         .to_be_bytes();
@@ -677,7 +677,7 @@ impl Mutant {
         }
 
         let (x, x_fraction) =
-            actor_source_axis_step(self.position.x, source.x_fraction, source.x_velocity);
+            arcade_axis_step(self.position.x, source.x_fraction, source.x_velocity);
         let (y, y_fraction) = actor_source_active_object_y_step(
             self.position.y,
             source.y_fraction,

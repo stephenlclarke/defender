@@ -1356,7 +1356,7 @@
             start.y,
             report_arcade_rng.seed,
         );
-        let (expected_x, expected_x_fraction) = actor_source_axis_step(
+        let (expected_x, expected_x_fraction) = arcade_axis_step(
             start.x,
             arcade_state.x_fraction,
             expected_arcade_state.x_velocity,
@@ -1443,7 +1443,7 @@
             start.y,
             report_arcade_rng.seed,
         );
-        let (expected_x, expected_x_fraction) = actor_source_axis_step(
+        let (expected_x, expected_x_fraction) = arcade_axis_step(
             start.x,
             arcade_state.x_fraction,
             expected_arcade_state.x_velocity,
@@ -1600,7 +1600,7 @@
                 Some(expected_projectile_arcade_state)
             )
         );
-        let (expected_x, expected_x_fraction) = actor_source_axis_step(
+        let (expected_x, expected_x_fraction) = arcade_axis_step(
             70,
             expected_arcade_state.x_fraction,
             baiter_screen_x_velocity(expected_arcade_state.x_velocity),

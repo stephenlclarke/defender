@@ -92,7 +92,7 @@ impl Human {
                 self.position.y = actor_source_step_human_y(self.position.y, target_y);
             }
             let (x, x_fraction) =
-                actor_source_axis_step(self.position.x, source.x_fraction, velocity);
+                arcade_axis_step(self.position.x, source.x_fraction, velocity);
             self.position.x = x;
             source.x_fraction = x_fraction;
             source.picture_frame = next_frame;

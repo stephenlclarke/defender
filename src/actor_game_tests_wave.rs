@@ -1139,7 +1139,7 @@
         let mut expected_rng = driver.arcade_rng;
         let mut expected_pod = ActorPodSpawn::from_arcade_restore(&mut expected_rng);
         if let Some(source) = &mut expected_pod.source {
-            let (x, x_fraction) = actor_source_axis_step(
+            let (x, x_fraction) = arcade_axis_step(
                 expected_pod.position.x,
                 source.x_fraction,
                 source.x_velocity,
@@ -1220,7 +1220,7 @@
                     )[0];
                     let expected_arcade_state =
                         expected_spawn.source.expect("expected bomber arcade state");
-                    let (_, x_fraction) = actor_source_axis_step(
+                    let (_, x_fraction) = arcade_axis_step(
                         expected_spawn.position.x,
                         expected_arcade_state.x_fraction,
                         expected_arcade_state.x_velocity,

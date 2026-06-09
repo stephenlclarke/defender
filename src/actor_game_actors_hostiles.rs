@@ -33,7 +33,7 @@ impl Bomber {
         };
 
         let (x, x_fraction) =
-            actor_source_axis_step(self.position.x, arcade_state.x_fraction, arcade_state.x_velocity);
+            arcade_axis_step(self.position.x, arcade_state.x_fraction, arcade_state.x_velocity);
         let (y, y_fraction) = actor_source_active_object_y_step(
             self.position.y,
             arcade_state.y_fraction,
@@ -381,7 +381,7 @@ impl Pod {
             return false;
         };
         let (x, x_fraction) =
-            actor_source_axis_step(self.position.x, arcade_state.x_fraction, arcade_state.x_velocity);
+            arcade_axis_step(self.position.x, arcade_state.x_fraction, arcade_state.x_velocity);
         let (y, y_fraction) = actor_source_active_object_y_step(
             self.position.y,
             arcade_state.y_fraction,
@@ -536,7 +536,7 @@ impl Swarmer {
         };
 
         let (x, x_fraction) =
-            actor_source_axis_step(self.position.x, arcade_state.x_fraction, arcade_state.x_velocity);
+            arcade_axis_step(self.position.x, arcade_state.x_fraction, arcade_state.x_velocity);
         let (y, y_fraction) = actor_source_active_object_y_step(
             self.position.y,
             arcade_state.y_fraction,
@@ -769,7 +769,7 @@ impl Baiter {
             arcade_state.sleep_ticks = BAITER_LOOP_SLEEP_TICKS;
         }
 
-        let (x, x_fraction) = actor_source_axis_step(
+        let (x, x_fraction) = arcade_axis_step(
             self.position.x,
             arcade_state.x_fraction,
             baiter_screen_x_velocity(arcade_state.x_velocity),
