@@ -836,7 +836,7 @@ pub struct EnemyAppearanceSnapshot {
 
 impl EnemyAppearanceSnapshot {
     fn matches_enemy(self, enemy: EnemySnapshot) -> bool {
-        self.position == source_enemy_appearance_position(enemy)
+        self.position == enemy_appearance_position(enemy)
             && self.mapped_sprite == enemy.arcade_picture_descriptor().mapped_sprite
     }
 
@@ -848,7 +848,7 @@ impl EnemyAppearanceSnapshot {
             sprite_frame_label: Some(self.sprite_frame_label),
             picture_size: Some((width, height)),
             mapped_sprite: Some(self.mapped_sprite),
-            center: Some(source_appearance_center(self.position, self.picture_size)),
+            center: Some(appearance_center(self.position, self.picture_size)),
             top_left: Some(self.position),
             ..ExpandedObjectDetailSnapshot::EMPTY
         }

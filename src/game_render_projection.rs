@@ -590,7 +590,7 @@ pub(crate) fn push_appearance_cloud_pixels(
         sprite_frame_label: Some(sprite_frame_label),
         picture_size: Some(picture_size),
         mapped_sprite: Some(mapped_sprite),
-        center: Some(source_appearance_center(position, picture_size)),
+        center: Some(appearance_center(position, picture_size)),
         top_left: Some(position),
         ..ExpandedObjectDetailSnapshot::EMPTY
     };
@@ -865,11 +865,11 @@ fn push_expanded_object_pixel_cloud(
     }
 }
 
-fn pixel_cloud_tint(source_tint: Color, tick: u32, index: usize) -> Color {
+fn pixel_cloud_tint(base_tint: Color, tick: u32, index: usize) -> Color {
     if tick < 2 && index.is_multiple_of(3) {
         return cycling_palette_tint(index);
     }
-    source_tint
+    base_tint
 }
 
 fn cycling_palette_tint(phase: usize) -> Color {

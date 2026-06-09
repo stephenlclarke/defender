@@ -1,4 +1,4 @@
-fn source_appearance_center(top_left: ScreenPosition, picture_size: (u8, u8)) -> ScreenPosition {
+fn appearance_center(top_left: ScreenPosition, picture_size: (u8, u8)) -> ScreenPosition {
     let (width, height) = picture_size;
     let first_product_high = ((u16::from(top_left.x) * 0x00DA) >> 8) as u8;
     let doubled = first_product_high.wrapping_shl(1);
@@ -741,7 +741,7 @@ fn source_enemy_uses_target6_dive_projection(enemy: EnemySnapshot) -> bool {
         .is_some_and(source_first_wave_target6_mutant_uses_dive_projection)
 }
 
-fn source_enemy_appearance_position(enemy: EnemySnapshot) -> ScreenPosition {
+fn enemy_appearance_position(enemy: EnemySnapshot) -> ScreenPosition {
     source_enemy_screen_position(enemy, 0).unwrap_or(enemy.position)
 }
 
