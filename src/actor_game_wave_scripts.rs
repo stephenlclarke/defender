@@ -467,7 +467,7 @@ impl ParsedActorWaveScript {
                     ParsedActorWaveProfile::new_with_behavior(wave, self.base_behavior.clone()),
                 )
             }
-            "arcade_wave" | "source_wave" | "source_backed_wave" => {
+            "arcade_wave" => {
                 let wave = parse_wave_u16(line_number, parts.next(), "wave")?;
                 let mut arcade_profile = ArcadeWaveProfile::for_wave(wave);
                 parse_arcade_wave_profile_updates(line_number, &mut arcade_profile, parts)?;
@@ -480,7 +480,7 @@ impl ParsedActorWaveScript {
                     ),
                 )
             }
-            "arcade_waves" | "source_waves" | "source_backed_waves" => {
+            "arcade_waves" => {
                 let first = parse_wave_u16(line_number, parts.next(), "first wave")?.max(1);
                 let last = parse_wave_u16(line_number, parts.next(), "last wave")?.max(1);
                 let arcade_profile_update_tokens = parts.collect::<Vec<_>>();

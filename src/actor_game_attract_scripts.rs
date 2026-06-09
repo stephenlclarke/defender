@@ -471,7 +471,7 @@ fn parse_attract_script_event(
                 value,
             ))
         }
-        "message" | "source_message" => {
+        "message" => {
             let message = parse_attract_message_id(line_number, parts.next())?;
             let top_left_screen_address =
                 parse_attract_u16(line_number, parts.next(), "top-left screen address")?;
