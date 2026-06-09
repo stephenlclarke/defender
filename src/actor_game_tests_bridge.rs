@@ -295,15 +295,15 @@
     fn actor_render_scene_bridge_ignores_armed_terrain_flash_until_erased() {
         let mut driver = started_driver();
         let mut report = driver.step(GameInput::NONE);
-        let mut terrain_blow = TerrainBlowSnapshot::source_armed_terrain_visible();
-        terrain_blow.source_elapsed_frames = 2;
+        let mut terrain_blow = TerrainBlowSnapshot::armed_terrain_visible();
+        terrain_blow.elapsed_ticks = 2;
         report.terrain_blow = Some(terrain_blow);
 
         let scene = report.render_scene();
 
         assert!(!terrain_blow.terrain_erased());
         assert_ne!(
-            source_terrain_blow_flash_tint(terrain_blow.source_elapsed_frames),
+            terrain_blow_flash_tint(terrain_blow.elapsed_ticks),
             Color { rgba: [0; 4] }
         );
         assert_eq!(scene.clear_color, Color { rgba: [0; 4] });

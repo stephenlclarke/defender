@@ -1133,7 +1133,7 @@ impl ActorGameDriver {
             return Vec::new();
         }
 
-        self.terrain_blow = Some(TerrainBlowSnapshot::source_started());
+        self.terrain_blow = Some(TerrainBlowSnapshot::started());
         self.spawn_terrain_blow_explosion_births(0)
     }
 
@@ -1145,7 +1145,7 @@ impl ActorGameDriver {
             return Vec::new();
         }
 
-        let elapsed = terrain_blow.source_elapsed_frames.saturating_add(1);
+        let elapsed = terrain_blow.elapsed_ticks.saturating_add(1);
         for draw in self.spawn_terrain_blow_explosion_births(elapsed) {
             commands.push(GameCommand::Spawn(SpawnRequest::Explosion {
                 position: draw.position,
@@ -1158,10 +1158,10 @@ impl ActorGameDriver {
         if elapsed >= TERRAIN_BLOW_COMPLETE_FRAME {
             if let Some(terrain_blow) = self.terrain_blow.as_mut() {
                 terrain_blow.stage = TerrainBlowStage::Completed;
-                terrain_blow.source_elapsed_frames = elapsed;
-                terrain_blow.source_iteration = terrain_blow.source_iteration_limit;
-                terrain_blow.source_sleep_remaining = None;
-                terrain_blow.source_pseudo_color = 0;
+                terrain_blow.elapsed_ticks = elapsed;
+                terrain_blow.explosion_pass = terrain_blow.explosion_pass_limit;
+                terrain_blow.sleep_ticks_remaining = None;
+                terrain_blow.flash_color_byte = 0;
             }
             sounds.push(SoundCue::SoundBoardCommand(TERRAIN_BLOW_SOUND_COMMAND));
             self.queue_terrain_blow_sound_tail();
@@ -1177,17 +1177,17 @@ impl ActorGameDriver {
             .find(|frame| *frame > elapsed)
             .unwrap_or(TERRAIN_BLOW_COMPLETE_FRAME);
         if let Some(terrain_blow) = self.terrain_blow.as_mut() {
-            terrain_blow.source_elapsed_frames = elapsed;
-            terrain_blow.source_sleep_remaining = u8::try_from(next_frame - elapsed).ok();
-            terrain_blow.source_overload_counter = TERRAIN_BLOW_OVERLOAD_COUNTER;
+            terrain_blow.elapsed_ticks = elapsed;
+            terrain_blow.sleep_ticks_remaining = u8::try_from(next_frame - elapsed).ok();
+            terrain_blow.overload_counter = TERRAIN_BLOW_OVERLOAD_COUNTER;
             if let Some(start_sound_index) = start_sound_index {
                 terrain_blow.stage = TerrainBlowStage::ExplosionPassSleeping;
-                terrain_blow.source_iteration = terrain_blow.source_iteration.saturating_add(1);
-                terrain_blow.source_pseudo_color =
+                terrain_blow.explosion_pass = terrain_blow.explosion_pass.saturating_add(1);
+                terrain_blow.flash_color_byte =
                     TERRAIN_BLOW_FLASH_COLOR_BYTES[start_sound_index];
             } else {
                 terrain_blow.stage = TerrainBlowStage::FlashClearedSleeping;
-                terrain_blow.source_pseudo_color = 0;
+                terrain_blow.flash_color_byte = 0;
             }
         }
         if start_sound_index.is_some() {

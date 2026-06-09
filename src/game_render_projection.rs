@@ -21,7 +21,7 @@ pub(crate) fn arcade_wave_landscape_tint(wave: u16) -> Color {
     source_pseudo_color_tint(WAVE_LANDSCAPE_COLOR_BYTES[index])
 }
 
-pub(crate) fn source_terrain_blow_flash_tint(elapsed: u16) -> Color {
+pub(crate) fn terrain_blow_flash_tint(elapsed: u16) -> Color {
     let color = TERRAIN_BLOW_FLASH_WINDOWS
         .iter()
         .find_map(|(start, end, color)| (*start <= elapsed && elapsed <= *end).then_some(*color))

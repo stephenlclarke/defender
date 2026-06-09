@@ -387,12 +387,12 @@ pub enum TerrainBlowStage {
 pub struct TerrainBlowSnapshot {
     pub stage: TerrainBlowStage,
     pub status_terrain_blown: bool,
-    pub source_elapsed_frames: u16,
-    pub source_iteration: u8,
-    pub source_iteration_limit: u8,
-    pub source_sleep_remaining: Option<u8>,
-    pub source_pseudo_color: u8,
-    pub source_overload_counter: u8,
+    pub elapsed_ticks: u16,
+    pub explosion_pass: u8,
+    pub explosion_pass_limit: u8,
+    pub sleep_ticks_remaining: Option<u8>,
+    pub flash_color_byte: u8,
+    pub overload_counter: u8,
     pub terrain_erase_entries: u16,
     pub scanner_terrain_erase_entries: u16,
     pub terrain_words_remaining: u16,
@@ -404,12 +404,12 @@ impl TerrainBlowSnapshot {
     pub const EMPTY: Self = Self {
         stage: TerrainBlowStage::ExplosionPassSleeping,
         status_terrain_blown: false,
-        source_elapsed_frames: 0,
-        source_iteration: 0,
-        source_iteration_limit: TERRAIN_BLOW_ITERATION_LIMIT,
-        source_sleep_remaining: None,
-        source_pseudo_color: 0,
-        source_overload_counter: 0,
+        elapsed_ticks: 0,
+        explosion_pass: 0,
+        explosion_pass_limit: TERRAIN_BLOW_ITERATION_LIMIT,
+        sleep_ticks_remaining: None,
+        flash_color_byte: 0,
+        overload_counter: 0,
         terrain_erase_entries: 0,
         scanner_terrain_erase_entries: 0,
         terrain_words_remaining: 0,
@@ -417,16 +417,16 @@ impl TerrainBlowSnapshot {
         explosions_per_pass: 0,
     };
 
-    pub fn source_started() -> Self {
+    pub fn started() -> Self {
         Self {
             stage: TerrainBlowStage::ExplosionPassSleeping,
             status_terrain_blown: TERRAIN_BLOW_STATUS_BIT != 0,
-            source_elapsed_frames: 0,
-            source_iteration: 0,
-            source_iteration_limit: TERRAIN_BLOW_ITERATION_LIMIT,
-            source_sleep_remaining: Some(1),
-            source_pseudo_color: 0,
-            source_overload_counter: TERRAIN_BLOW_OVERLOAD_COUNTER,
+            elapsed_ticks: 0,
+            explosion_pass: 0,
+            explosion_pass_limit: TERRAIN_BLOW_ITERATION_LIMIT,
+            sleep_ticks_remaining: Some(1),
+            flash_color_byte: 0,
+            overload_counter: TERRAIN_BLOW_OVERLOAD_COUNTER,
             terrain_erase_entries: TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES,
             scanner_terrain_erase_entries: TERRAIN_BLOW_SCANNER_ERASE_ENTRIES,
             terrain_words_remaining: 0,
@@ -435,16 +435,16 @@ impl TerrainBlowSnapshot {
         }
     }
 
-    pub fn source_armed_terrain_visible() -> Self {
+    pub fn armed_terrain_visible() -> Self {
         Self {
             stage: TerrainBlowStage::ExplosionPassSleeping,
             status_terrain_blown: false,
-            source_elapsed_frames: 0,
-            source_iteration: 0,
-            source_iteration_limit: TERRAIN_BLOW_ITERATION_LIMIT,
-            source_sleep_remaining: Some(1),
-            source_pseudo_color: 0,
-            source_overload_counter: TERRAIN_BLOW_OVERLOAD_COUNTER,
+            elapsed_ticks: 0,
+            explosion_pass: 0,
+            explosion_pass_limit: TERRAIN_BLOW_ITERATION_LIMIT,
+            sleep_ticks_remaining: Some(1),
+            flash_color_byte: 0,
+            overload_counter: TERRAIN_BLOW_OVERLOAD_COUNTER,
             terrain_erase_entries: TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES,
             scanner_terrain_erase_entries: TERRAIN_BLOW_SCANNER_ERASE_ENTRIES,
             terrain_words_remaining: TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES,

@@ -90,11 +90,11 @@
         let terrain_blow = report.terrain_blow.expect("terrain blow should start");
         assert!(terrain_blow.status_terrain_blown);
         assert_eq!(terrain_blow.stage, TerrainBlowStage::ExplosionPassSleeping);
-        assert_eq!(terrain_blow.source_elapsed_frames, 0);
-        assert_eq!(terrain_blow.source_iteration, 0);
-        assert_eq!(terrain_blow.source_sleep_remaining, Some(1));
+        assert_eq!(terrain_blow.elapsed_ticks, 0);
+        assert_eq!(terrain_blow.explosion_pass, 0);
+        assert_eq!(terrain_blow.sleep_ticks_remaining, Some(1));
         assert_eq!(
-            terrain_blow.source_overload_counter,
+            terrain_blow.overload_counter,
             TERRAIN_BLOW_OVERLOAD_COUNTER
         );
         assert!(terrain_blow.terrain_erased());
@@ -140,7 +140,7 @@
             if offset == 2 {
                 assert_eq!(
                     report.render_scene().clear_color,
-                    source_terrain_blow_flash_tint(terrain_blow.source_elapsed_frames)
+                    terrain_blow_flash_tint(terrain_blow.elapsed_ticks)
                 );
             }
             if offset == 4 {
@@ -159,10 +159,10 @@
             if terrain_blow.stage == TerrainBlowStage::Completed {
                 saw_completion = true;
                 assert_eq!(
-                    terrain_blow.source_iteration,
+                    terrain_blow.explosion_pass,
                     TERRAIN_BLOW_START_SOUND_FRAMES.len() as u8
                 );
-                assert_eq!(terrain_blow.source_sleep_remaining, None);
+                assert_eq!(terrain_blow.sleep_ticks_remaining, None);
             }
         }
 

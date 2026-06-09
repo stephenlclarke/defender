@@ -359,7 +359,7 @@ impl WorldSnapshot {
         self.clear_terrain_blow_human_state();
         self.explosions
             .retain(|explosion| explosion.kind != ExplosionKind::Terrain);
-        self.terrain_blow = Some(TerrainBlowSnapshot::source_started());
+        self.terrain_blow = Some(TerrainBlowSnapshot::started());
         for (_, position) in TERRAIN_BLOW_EXPLOSION_BIRTHS
             .iter()
             .copied()

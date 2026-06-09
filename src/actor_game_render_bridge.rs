@@ -29,7 +29,7 @@ impl ActorRenderSceneBridge {
             && let Some(terrain_blow) = report.terrain_blow
             && terrain_blow.terrain_erased()
         {
-            let flash_tint = source_terrain_blow_flash_tint(terrain_blow.source_elapsed_frames);
+            let flash_tint = terrain_blow_flash_tint(terrain_blow.elapsed_ticks);
             if flash_tint.rgba[3] != 0 {
                 scene.clear_color = flash_tint;
             }
