@@ -1500,7 +1500,7 @@ impl ActorGameDriver {
         &mut self,
         arcade_rng: Option<ActorArcadeRngSnapshot>,
     ) -> Option<usize> {
-        if arcade_rng.is_none() || !self.has_source_human_snapshots() {
+        if arcade_rng.is_none() || !self.has_targetable_human_snapshots() {
             return None;
         }
         if self.human_walk_sleep_ticks > 0 {
@@ -1633,7 +1633,7 @@ impl ActorGameDriver {
         while index < reserve_kinds.len() {
             match reserve_kinds[index] {
                 ActorSourceEnemyKind::Lander => {
-                    let target_index = self.select_next_source_lander_target_index();
+                    let target_index = self.select_next_lander_target_human_slot();
                     if let Some(target_index) = target_index {
                         let spawn = ActorLanderSpawn::source_restore(
                             &mut self.arcade_rng,
@@ -1927,7 +1927,7 @@ impl ActorGameDriver {
             .map(|snapshot| snapshot.position)
     }
 
-    fn has_source_human_snapshots(&self) -> bool {
+    fn has_targetable_human_snapshots(&self) -> bool {
         self.snapshots.values().any(|snapshot| {
             snapshot.kind == ActorKind::Human && snapshot.alive && snapshot.human_runtime.is_some()
         })
@@ -1954,8 +1954,8 @@ impl ActorGameDriver {
             .count()
     }
 
-    fn select_next_source_lander_target_index(&mut self) -> Option<usize> {
-        if !self.has_source_human_snapshots() {
+    fn select_next_lander_target_human_slot(&mut self) -> Option<usize> {
+        if !self.has_targetable_human_snapshots() {
             return None;
         }
 
