@@ -585,7 +585,7 @@
                 ..ActorBehaviorProfile::default()
             },
         );
-        let initial_source = BomberArcadeState {
+        let initial_arcade_state = BomberArcadeState {
             x_fraction: 0x6D,
             y_fraction: 0x7B,
             x_velocity: 0,
@@ -597,13 +597,13 @@
         };
         let bomber = driver.spawn_bomber_from_spawn(ActorBomberSpawn {
             position: Point::new(100, 80),
-            arcade_state: Some(initial_source),
+            arcade_state: Some(initial_arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
-        let (expected_position, expected_source) = expected_bomber_after_arcade_motion(
+        let (expected_position, expected_arcade_state) = expected_bomber_after_arcade_motion(
             Point::new(100, 80),
-            initial_source,
+            initial_arcade_state,
             report.step,
             bomber,
             report.arcade_rng,
@@ -615,7 +615,7 @@
             .expect("playing report should carry arcade rng");
         let bomber_snapshot = snapshot_for(&report, bomber);
         assert_eq!(bomber_snapshot.position, expected_position);
-        assert_eq!(bomber_snapshot.bomber_runtime, Some(expected_source));
+        assert_eq!(bomber_snapshot.bomber_runtime, Some(expected_arcade_state));
 
         assert!(report.commands.iter().any(|command| {
             matches!(
@@ -630,8 +630,8 @@
                         lifetime_ticks,
                     }),
                 }) if *position == Point::new(100, 80)
-                    && *x_fraction == initial_source.x_fraction
-                    && *y_fraction == initial_source.y_fraction
+                    && *x_fraction == initial_arcade_state.x_fraction
+                    && *y_fraction == initial_arcade_state.y_fraction
                     && *lifetime_ticks == expected_lifetime_ticks
             )
         }));
@@ -641,9 +641,9 @@
             .snapshots
             .iter()
             .find(|snapshot| {
-                snapshot.enemy_projectile_runtime.is_some_and(|source| {
-                    source.x_fraction == initial_source.x_fraction
-                        && source.y_fraction == initial_source.y_fraction
+                snapshot.enemy_projectile_runtime.is_some_and(|arcade_state| {
+                    arcade_state.x_fraction == initial_arcade_state.x_fraction
+                        && arcade_state.y_fraction == initial_arcade_state.y_fraction
                 })
             })
             .expect("arcade-backed bomber bomb should publish enemy projectile fractions");
@@ -651,8 +651,8 @@
         assert_eq!(
             bomb.enemy_projectile_runtime,
             Some(EnemyProjectileArcadeState {
-                x_fraction: initial_source.x_fraction,
-                y_fraction: initial_source.y_fraction,
+                x_fraction: initial_arcade_state.x_fraction,
+                y_fraction: initial_arcade_state.y_fraction,
                 x_velocity: 0,
                 y_velocity: 0,
                 lifetime_ticks: expected_lifetime_ticks,
@@ -786,7 +786,7 @@
             hseed: 0,
             lseed: 10,
         };
-        let initial_source = BomberArcadeState {
+        let initial_arcade_state = BomberArcadeState {
             x_fraction: 0x10,
             y_fraction: 0x20,
             x_velocity: 0x0100,
@@ -799,13 +799,13 @@
         let bomber_position = Point::new(96, player_position.y - 8);
         let bomber = driver.spawn_bomber_from_spawn(ActorBomberSpawn {
             position: bomber_position,
-            arcade_state: Some(initial_source),
+            arcade_state: Some(initial_arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
-        let (expected_position, expected_source) = expected_bomber_after_arcade_motion(
+        let (expected_position, expected_arcade_state) = expected_bomber_after_arcade_motion(
             bomber_position,
-            initial_source,
+            initial_arcade_state,
             report.step,
             bomber,
             report.arcade_rng,
@@ -814,14 +814,14 @@
         let snapshot = snapshot_for(&report, bomber);
 
         assert_eq!(snapshot.position, expected_position);
-        assert_eq!(snapshot.bomber_runtime, Some(expected_source));
-        assert_ne!(expected_source.y_velocity, 0);
+        assert_eq!(snapshot.bomber_runtime, Some(expected_arcade_state));
+        assert_ne!(expected_arcade_state.y_velocity, 0);
         assert!(report.draws.iter().any(|draw| {
             draw.actor == bomber
                 && matches!(
                     draw.effect,
                     VisualEffect::BomberSpriteFrame { frame }
-                        if frame == expected_source.picture_frame
+                        if frame == expected_arcade_state.picture_frame
                 )
         }));
         assert!(
@@ -847,7 +847,7 @@
                 ..ActorBehaviorProfile::default()
             },
         );
-        let initial_source = BomberArcadeState {
+        let initial_arcade_state = BomberArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -860,13 +860,13 @@
         let bomber_position = Point::new(100, 0);
         let bomber = driver.spawn_bomber_from_spawn(ActorBomberSpawn {
             position: bomber_position,
-            arcade_state: Some(initial_source),
+            arcade_state: Some(initial_arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
-        let (expected_position, expected_source) = expected_bomber_after_arcade_motion(
+        let (expected_position, expected_arcade_state) = expected_bomber_after_arcade_motion(
             bomber_position,
-            initial_source,
+            initial_arcade_state,
             report.step,
             bomber,
             report.arcade_rng,
@@ -875,9 +875,12 @@
         let snapshot = snapshot_for(&report, bomber);
 
         assert_eq!(snapshot.position, expected_position);
-        assert_eq!(snapshot.bomber_runtime, Some(expected_source));
-        assert_ne!(expected_source.cruise_altitude, BOMBER_CRUISE_ALTITUDE);
-        assert_ne!(expected_source.y_velocity, 0);
+        assert_eq!(snapshot.bomber_runtime, Some(expected_arcade_state));
+        assert_ne!(
+            expected_arcade_state.cruise_altitude,
+            BOMBER_CRUISE_ALTITUDE
+        );
+        assert_ne!(expected_arcade_state.y_velocity, 0);
     }
 
     #[test]

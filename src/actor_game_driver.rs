@@ -1538,8 +1538,8 @@ impl ActorGameDriver {
 
         let human_count = self.human_snapshot_count();
         self.snapshots.values().find_map(|snapshot| {
-            let source = snapshot.human_runtime?;
-            (source.target_slot_index == next_cursor
+            let arcade_state = snapshot.human_runtime?;
+            (arcade_state.target_slot_index == next_cursor
                 && actor_human_walk_targetable(human_count, snapshot))
             .then_some(next_cursor)
         })
@@ -1994,7 +1994,7 @@ impl ActorGameDriver {
                     && snapshot.alive
                     && snapshot
                         .human_runtime
-                        .is_some_and(|source| source.target_slot_index == probe)
+                        .is_some_and(|arcade_state| arcade_state.target_slot_index == probe)
             }) {
                 self.target_human_cursor = Some(probe);
                 return Some(probe);

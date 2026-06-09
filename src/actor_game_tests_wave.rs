@@ -728,7 +728,7 @@
                 snapshot.kind == ActorKind::Lander
                     && snapshot
                         .lander_runtime
-                        .is_some_and(|source| source.y_velocity == 0x0090)
+                        .is_some_and(|arcade_state| arcade_state.y_velocity == 0x0090)
             })
             .collect::<Vec<_>>();
         assert_eq!(refill_landers.len(), 5);
@@ -766,7 +766,7 @@
                     matches!(enemy.kind, CleanEnemyKind::Lander)
                         && enemy
                             .lander_runtime
-                            .is_some_and(|source| source.y_velocity == 0x0090)
+                            .is_some_and(|arcade_state| arcade_state.y_velocity == 0x0090)
                 })
                 .count(),
             1
@@ -865,7 +865,7 @@
             !matches!(enemy.kind, CleanEnemyKind::Lander)
                 || enemy
                     .lander_runtime
-                    .is_none_or(|source| source.y_velocity != 0x0090)
+                    .is_none_or(|arcade_state| arcade_state.y_velocity != 0x0090)
         }));
 
         let next_wave = step_until_wave_started(&mut driver, 2);
@@ -1625,7 +1625,7 @@
         let shot_report = shot_report.expect("arcade lander should spawn a hostile shot");
 
         assert!(shot_report.sounds.contains(&SoundCue::LanderShot));
-        let (shot_position, shot_velocity, shot_source) = shot_report
+        let (shot_position, shot_velocity, shot_arcade_state) = shot_report
             .commands
             .iter()
             .find_map(|command| match command {
@@ -1646,7 +1646,7 @@
             .and_then(|snapshot| snapshot.lander_runtime)
             .expect("arcade lander snapshot should own shot fractions");
         assert_eq!(
-            shot_source,
+            shot_arcade_state,
             Some(EnemyProjectileArcadeState {
                 x_fraction: lander_arcade.x_fraction,
                 y_fraction: lander_arcade.y_fraction,
@@ -1729,8 +1729,8 @@
             Velocity::new(1, -1),
             None,
         );
-        shot.source.x_velocity = 0x0180;
-        shot.source.y_velocity = 0xFF80;
+        shot.arcade_state.x_velocity = 0x0180;
+        shot.arcade_state.y_velocity = 0xFF80;
 
         let first = shot.update(&prompt);
 

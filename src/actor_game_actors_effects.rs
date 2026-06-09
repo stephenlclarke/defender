@@ -259,8 +259,8 @@ fn actor_human_walk_targetable(human_count: usize, snapshot: &ActorSnapshot) -> 
     snapshot.kind == ActorKind::Human
         && snapshot.alive
         && snapshot.bounds.is_some()
-        && snapshot.human_runtime.is_some_and(|source| {
-            human_count != usize::from(START_HUMAN_COUNT) || source.target_slot_index < 2
+        && snapshot.human_runtime.is_some_and(|arcade_state| {
+            human_count != usize::from(START_HUMAN_COUNT) || arcade_state.target_slot_index < 2
         })
 }
 
@@ -406,7 +406,7 @@ impl AssetActor for LaserShot {
 struct EnemyLaserShot {
     id: ActorId,
     position: Point,
-    source: EnemyProjectileArcadeState,
+    arcade_state: EnemyProjectileArcadeState,
     lifetime_steps: Option<u16>,
 }
 
@@ -415,24 +415,24 @@ impl EnemyLaserShot {
         id: ActorId,
         position: Point,
         velocity: Velocity,
-        source: Option<EnemyProjectileArcadeState>,
+        arcade_state: Option<EnemyProjectileArcadeState>,
     ) -> Self {
-        let source = source.unwrap_or(EnemyProjectileArcadeState {
+        let arcade_state = arcade_state.unwrap_or(EnemyProjectileArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: arcade_projectile_velocity_component(velocity.dx),
             y_velocity: arcade_projectile_velocity_component(velocity.dy),
             lifetime_ticks: 0,
         });
-        let lifetime_steps = if source.lifetime_ticks == 0 {
+        let lifetime_steps = if arcade_state.lifetime_ticks == 0 {
             None
         } else {
-            Some(u16::from(source.lifetime_ticks))
+            Some(u16::from(arcade_state.lifetime_ticks))
         };
         Self {
             id,
             position,
-            source,
+            arcade_state,
             lifetime_steps,
         }
     }
@@ -452,24 +452,24 @@ impl EnemyLaserShot {
         let lifetime_steps = self
             .lifetime_steps
             .get_or_insert(behavior.lander_shot_lifetime_steps);
-        self.source.lifetime_ticks = arcade_projectile_lifetime_ticks(*lifetime_steps);
+        self.arcade_state.lifetime_ticks = arcade_projectile_lifetime_ticks(*lifetime_steps);
     }
 
     fn advance_arcade_projectile(&mut self) -> Velocity {
         let previous_position = self.position;
         let (x, x_fraction) = arcade_projectile_axis_step(
             self.position.x,
-            self.source.x_fraction,
-            self.source.x_velocity,
+            self.arcade_state.x_fraction,
+            self.arcade_state.x_velocity,
         );
         let (y, y_fraction) = arcade_projectile_axis_step(
             self.position.y,
-            self.source.y_fraction,
-            self.source.y_velocity,
+            self.arcade_state.y_fraction,
+            self.arcade_state.y_velocity,
         );
         self.position = Point::new(x, y);
-        self.source.x_fraction = x_fraction;
-        self.source.y_fraction = y_fraction;
+        self.arcade_state.x_fraction = x_fraction;
+        self.arcade_state.y_fraction = y_fraction;
         observed_velocity(previous_position, self.position)
     }
 }
@@ -490,7 +490,7 @@ impl AssetActor for EnemyLaserShot {
                 && let Some(lifetime_steps) = &mut self.lifetime_steps
             {
                 *lifetime_steps = lifetime_steps.saturating_sub(1);
-                self.source.lifetime_ticks =
+                self.arcade_state.lifetime_ticks =
                     arcade_projectile_lifetime_ticks(*lifetime_steps);
             }
             if self.lifetime_steps.is_some_and(|steps| steps > 0) {
@@ -524,7 +524,7 @@ impl AssetActor for EnemyLaserShot {
                 baiter_runtime: None,
                 mutant_runtime: None,
                 human_runtime: None,
-                enemy_projectile_runtime: Some(self.source),
+                enemy_projectile_runtime: Some(self.arcade_state),
             },
             commands,
             draws,
