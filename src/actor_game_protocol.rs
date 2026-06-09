@@ -131,32 +131,32 @@ pub enum SpawnRequest {
     EnemyLaser {
         position: Point,
         velocity: Velocity,
-        source: Option<EnemyProjectileArcadeState>,
+        arcade_state: Option<EnemyProjectileArcadeState>,
     },
     Lander {
         position: Point,
     },
     Mutant {
         position: Point,
-        source: Option<MutantArcadeState>,
+        arcade_state: Option<MutantArcadeState>,
     },
     Bomber {
         position: Point,
     },
     Bomb {
         position: Point,
-        source: Option<EnemyProjectileArcadeState>,
+        arcade_state: Option<EnemyProjectileArcadeState>,
     },
     Pod {
         position: Point,
     },
     Swarmer {
         position: Point,
-        source: Option<SwarmerArcadeState>,
+        arcade_state: Option<SwarmerArcadeState>,
     },
     Baiter {
         position: Point,
-        source: Option<BaiterArcadeState>,
+        arcade_state: Option<BaiterArcadeState>,
     },
     Human {
         position: Point,

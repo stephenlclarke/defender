@@ -540,7 +540,7 @@
                 command,
                 GameCommand::Spawn(SpawnRequest::Bomb {
                     position: Point { x: 100, y: 80 },
-                    source: None,
+                    arcade_state: None,
                 })
             )
         }));
@@ -622,7 +622,7 @@
                 command,
                 GameCommand::Spawn(SpawnRequest::Bomb {
                     position,
-                    source: Some(EnemyProjectileArcadeState {
+                    arcade_state: Some(EnemyProjectileArcadeState {
                         x_fraction,
                         y_fraction,
                         x_velocity: 0,
@@ -888,7 +888,7 @@
         driver.apply_commands(&[
             GameCommand::Spawn(SpawnRequest::Bomb {
                 position: Point::new(ENEMY_PROJECTILE_MAX_SCREEN_X, 100),
-                source: Some(EnemyProjectileArcadeState {
+                arcade_state: Some(EnemyProjectileArcadeState {
                     x_fraction: 0,
                     y_fraction: 0,
                     x_velocity: 0,
@@ -901,7 +901,7 @@
                     ENEMY_PROJECTILE_MAX_SCREEN_X - 1,
                     i16::from(PLAYFIELD_TOP_EDGE_Y),
                 ),
-                source: Some(EnemyProjectileArcadeState {
+                arcade_state: Some(EnemyProjectileArcadeState {
                     x_fraction: 0,
                     y_fraction: 0,
                     x_velocity: 0,
@@ -911,7 +911,7 @@
             }),
             GameCommand::Spawn(SpawnRequest::Bomb {
                 position: Point::new(ENEMY_PROJECTILE_MAX_SCREEN_X, 108),
-                source: None,
+                arcade_state: None,
             }),
         ]);
         let report = driver.step(GameInput::NONE);
@@ -941,7 +941,7 @@
         );
         driver.apply_commands(&[GameCommand::Spawn(SpawnRequest::Bomb {
             position: Point::new(80, 100),
-            source: Some(EnemyProjectileArcadeState {
+            arcade_state: Some(EnemyProjectileArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -975,7 +975,7 @@
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position: Point::new(ENEMY_PROJECTILE_MAX_SCREEN_X, 100),
                 velocity: Velocity::new(0, 0),
-                source: None,
+                arcade_state: None,
             }),
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position: Point::new(
@@ -983,12 +983,12 @@
                     i16::from(PLAYFIELD_TOP_EDGE_Y),
                 ),
                 velocity: Velocity::new(0, 0),
-                source: None,
+                arcade_state: None,
             }),
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position: Point::new(ENEMY_PROJECTILE_MAX_SCREEN_X - 1, 100),
                 velocity: Velocity::new(0, 0),
-                source: None,
+                arcade_state: None,
             }),
         ]);
         let report = driver.step(GameInput::NONE);
@@ -1019,7 +1019,7 @@
         driver.apply_commands(&[GameCommand::Spawn(SpawnRequest::EnemyLaser {
             position: Point::new(80, 100),
             velocity: Velocity::new(0, 0),
-            source: Some(EnemyProjectileArcadeState {
+            arcade_state: Some(EnemyProjectileArcadeState {
                 x_fraction: 0x55,
                 y_fraction: 0x66,
                 x_velocity: 0,
@@ -1077,11 +1077,11 @@
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position: Point::new(96, 96),
                 velocity: Velocity::new(0, 0),
-                source: None,
+                arcade_state: None,
             }),
             GameCommand::Spawn(SpawnRequest::Bomb {
                 position: Point::new(100, 100),
-                source: None,
+                arcade_state: None,
             }),
         ]);
         let capped = driver.step(GameInput::NONE);
@@ -1106,7 +1106,7 @@
             GameCommand::Destroy(freed_shell),
             GameCommand::Spawn(SpawnRequest::Bomb {
                 position: Point::new(100, 100),
-                source: None,
+                arcade_state: None,
             }),
         ]);
         let refilled = driver.step(GameInput::NONE);
@@ -1140,12 +1140,12 @@
         driver.apply_commands(&[
             GameCommand::Spawn(SpawnRequest::Bomb {
                 position: Point::new(112, 100),
-                source: None,
+                arcade_state: None,
             }),
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position: Point::new(116, 100),
                 velocity: Velocity::new(0, 0),
-                source: None,
+                arcade_state: None,
             }),
         ]);
         let capped = driver.step(GameInput::NONE);
@@ -1169,7 +1169,7 @@
             GameCommand::Destroy(freed_bomb),
             GameCommand::Spawn(SpawnRequest::Bomb {
                 position: Point::new(112, 100),
-                source: None,
+                arcade_state: None,
             }),
         ]);
         let refilled = driver.step(GameInput::NONE);
@@ -1267,8 +1267,8 @@
             .commands
             .iter()
             .find_map(|command| match command {
-                GameCommand::Spawn(SpawnRequest::Baiter { position, source }) => {
-                    Some((*position, *source))
+                GameCommand::Spawn(SpawnRequest::Baiter { position, arcade_state }) => {
+                    Some((*position, *arcade_state))
                 }
                 _ => None,
             })
@@ -1386,8 +1386,8 @@
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
                     position,
                     velocity,
-                    source,
-                }) => Some((*position, *velocity, *source)),
+                    arcade_state,
+                }) => Some((*position, *velocity, *arcade_state)),
                 _ => None,
             })
             .expect("swarmer should emit a hostile shot command");
@@ -1466,7 +1466,7 @@
             matches!(
                 command,
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
-                    source: Some(_),
+                    arcade_state: Some(_),
                     ..
                 })
             )
@@ -1519,7 +1519,7 @@
             matches!(
                 command,
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
-                    source: Some(_),
+                    arcade_state: Some(_),
                     ..
                 })
             )
@@ -1587,8 +1587,8 @@
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
                     position,
                     velocity,
-                    source,
-                }) => Some((*position, *velocity, *source)),
+                    arcade_state,
+                }) => Some((*position, *velocity, *arcade_state)),
                 _ => None,
             })
             .expect("baiter should emit a hostile shot command");
@@ -1662,7 +1662,7 @@
             matches!(
                 command,
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
-                    source: Some(_),
+                    arcade_state: Some(_),
                     ..
                 })
             )

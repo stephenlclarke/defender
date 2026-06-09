@@ -1632,8 +1632,8 @@
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
                     position,
                     velocity,
-                    source,
-                }) => Some((*position, *velocity, *source)),
+                    arcade_state,
+                }) => Some((*position, *velocity, *arcade_state)),
                 _ => None,
             })
             .expect("arcade lander should emit a hostile shot command");

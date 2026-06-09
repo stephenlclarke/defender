@@ -110,7 +110,7 @@ impl Bomber {
 
             commands.push(GameCommand::Spawn(SpawnRequest::Bomb {
                 position: self.position,
-                source: Some(EnemyProjectileArcadeState {
+                arcade_state: Some(EnemyProjectileArcadeState {
                     x_fraction: arcade_state.x_fraction,
                     y_fraction: arcade_state.y_fraction,
                     x_velocity: 0,
@@ -135,7 +135,7 @@ impl Bomber {
         if prompt.step % bomb_period == phase % bomb_period {
             commands.push(GameCommand::Spawn(SpawnRequest::Bomb {
                 position: self.position,
-                source: None,
+                arcade_state: None,
             }));
         }
     }
@@ -650,7 +650,7 @@ fn push_swarmer_shot(
     commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
         position,
         velocity,
-        source: None,
+        arcade_state: None,
     }));
     commands.push(GameCommand::PlaySound(SoundCue::SwarmerShot));
 }
@@ -824,7 +824,7 @@ fn push_baiter_shot(
     commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
         position,
         velocity,
-        source: None,
+        arcade_state: None,
     }));
     commands.push(GameCommand::PlaySound(SoundCue::BaiterShot));
 }

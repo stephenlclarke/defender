@@ -508,14 +508,14 @@ impl ActorGameDriver {
     fn spawn_bomb(
         &mut self,
         position: Point,
-        source: Option<EnemyProjectileArcadeState>,
+        arcade_state: Option<EnemyProjectileArcadeState>,
     ) -> ActorId {
         let id = self.allocate_actor_id();
         let lifetime = self
             .behavior_script
             .behavior_for(id, ActorKind::Bomb)
             .bomb_lifetime_steps;
-        self.spawn_actor(Bomb::new(id, position, lifetime, source));
+        self.spawn_actor(Bomb::new(id, position, lifetime, arcade_state));
         id
     }
 
@@ -577,10 +577,10 @@ impl ActorGameDriver {
         &mut self,
         position: Point,
         velocity: Velocity,
-        source: Option<EnemyProjectileArcadeState>,
+        arcade_state: Option<EnemyProjectileArcadeState>,
     ) -> ActorId {
         let id = self.allocate_actor_id();
-        self.spawn_actor(EnemyLaserShot::new(id, position, velocity, source));
+        self.spawn_actor(EnemyLaserShot::new(id, position, velocity, arcade_state));
         id
     }
 
@@ -736,22 +736,25 @@ impl ActorGameDriver {
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
                     position,
                     velocity,
-                    source,
+                    arcade_state,
                 }) => {
                     if enemy_projectile_spawn_in_bounds(position)
                         && reserve_enemy_projectile_slot(&mut active_enemy_projectiles)
                     {
-                        self.spawn_enemy_laser_from_spawn(position, velocity, source);
+                        self.spawn_enemy_laser_from_spawn(position, velocity, arcade_state);
                     }
                 }
                 GameCommand::Spawn(SpawnRequest::Lander { position }) => {
                     let actor = self.spawn_lander(position);
                     self.apply_next_wave_spawn_behavior(ActorKind::Lander, actor);
                 }
-                GameCommand::Spawn(SpawnRequest::Mutant { position, source }) => {
+                GameCommand::Spawn(SpawnRequest::Mutant {
+                    position,
+                    arcade_state,
+                }) => {
                     let actor = self.spawn_mutant_from_spawn(ActorMutantSpawn {
                         position,
-                        arcade_state: source,
+                        arcade_state,
                     });
                     self.apply_next_wave_spawn_behavior(ActorKind::Mutant, actor);
                 }
@@ -759,31 +762,40 @@ impl ActorGameDriver {
                     let actor = self.spawn_bomber(position);
                     self.apply_next_wave_spawn_behavior(ActorKind::Bomber, actor);
                 }
-                GameCommand::Spawn(SpawnRequest::Bomb { position, source }) => {
-                    if bomb_projectile_spawn_in_arcade_bounds(position, source)
+                GameCommand::Spawn(SpawnRequest::Bomb {
+                    position,
+                    arcade_state,
+                }) => {
+                    if bomb_projectile_spawn_in_arcade_bounds(position, arcade_state)
                         && enemy_projectile_slot_available(active_enemy_projectiles)
                         && bomb_projectile_slot_available(active_bomb_projectiles)
                     {
                         active_enemy_projectiles += 1;
                         active_bomb_projectiles += 1;
-                        self.spawn_bomb(position, source);
+                        self.spawn_bomb(position, arcade_state);
                     }
                 }
                 GameCommand::Spawn(SpawnRequest::Pod { position }) => {
                     let actor = self.spawn_pod(position);
                     self.apply_next_wave_spawn_behavior(ActorKind::Pod, actor);
                 }
-                GameCommand::Spawn(SpawnRequest::Swarmer { position, source }) => {
+                GameCommand::Spawn(SpawnRequest::Swarmer {
+                    position,
+                    arcade_state,
+                }) => {
                     let actor = self.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
                         position,
-                        arcade_state: source,
+                        arcade_state,
                     });
                     self.apply_next_wave_spawn_behavior(ActorKind::Swarmer, actor);
                 }
-                GameCommand::Spawn(SpawnRequest::Baiter { position, source }) => {
+                GameCommand::Spawn(SpawnRequest::Baiter {
+                    position,
+                    arcade_state,
+                }) => {
                     let actor = self.spawn_baiter_from_spawn(ActorBaiterSpawn {
                         position,
-                        arcade_state: source,
+                        arcade_state,
                     });
                     self.apply_next_wave_spawn_behavior(ActorKind::Baiter, actor);
                 }
@@ -1667,7 +1679,7 @@ impl ActorGameDriver {
                             );
                             commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
                                 position: spawn.position,
-                                source: spawn.arcade_state,
+                                arcade_state: spawn.arcade_state,
                             }));
                             let actor = self.spawn_mutant_from_spawn(spawn);
                             self.apply_next_wave_spawn_behavior(ActorKind::Mutant, actor);
@@ -1713,7 +1725,7 @@ impl ActorGameDriver {
                     );
                     commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
                         position: spawn.position,
-                        source: spawn.arcade_state,
+                        arcade_state: spawn.arcade_state,
                     }));
                     let actor = self.spawn_mutant_from_spawn(spawn);
                     self.apply_next_wave_spawn_behavior(ActorKind::Mutant, actor);
@@ -1731,7 +1743,7 @@ impl ActorGameDriver {
                     ) {
                         commands.push(GameCommand::Spawn(SpawnRequest::Swarmer {
                             position: spawn.position,
-                            source: spawn.arcade_state,
+                            arcade_state: spawn.arcade_state,
                         }));
                         let actor = self.spawn_swarmer_from_spawn(spawn);
                         self.apply_next_wave_spawn_behavior(ActorKind::Swarmer, actor);
@@ -2089,7 +2101,7 @@ impl ActorGameDriver {
                 );
                 GameCommand::Spawn(SpawnRequest::Swarmer {
                     position: spawn.position,
-                    source: spawn.arcade_state,
+                    arcade_state: spawn.arcade_state,
                 })
             })
             .collect()
@@ -2138,7 +2150,7 @@ impl ActorGameDriver {
         let spawn = ActorBaiterSpawn::from_player_position(profile, player_position, active_baiters);
         commands.push(GameCommand::Spawn(SpawnRequest::Baiter {
             position: spawn.position,
-            source: spawn.arcade_state,
+            arcade_state: spawn.arcade_state,
         }));
     }
 

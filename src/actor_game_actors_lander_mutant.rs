@@ -263,7 +263,7 @@ impl Lander {
             commands.push(GameCommand::Destroy(human_id));
             commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
                 position: self.position,
-                source: self.mutant_arcade_conversion(prompt),
+                arcade_state: self.mutant_arcade_conversion(prompt),
             }));
             commands.push(GameCommand::PlaySound(SoundCue::MutantSpawn));
         }
@@ -337,7 +337,7 @@ impl Lander {
         commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
             position: self.position,
             velocity,
-            source: projectile_arcade_state,
+            arcade_state: projectile_arcade_state,
         }));
         commands.push(GameCommand::PlaySound(SoundCue::LanderShot));
     }
@@ -1415,7 +1415,7 @@ fn push_arcade_enemy_projectile_command(
     commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
         position,
         velocity,
-        source: Some(projectile_arcade_state),
+        arcade_state: Some(projectile_arcade_state),
     }));
     commands.push(GameCommand::PlaySound(sound));
 }

@@ -764,13 +764,13 @@ fn actor_script_check_projectile_spawn_command_samples(
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position,
                 velocity,
-                source,
-            }) => Some(("enemy_laser", *position, *velocity, *source)),
-            GameCommand::Spawn(SpawnRequest::Bomb { position, source }) => Some((
+                arcade_state,
+            }) => Some(("enemy_laser", *position, *velocity, *arcade_state)),
+            GameCommand::Spawn(SpawnRequest::Bomb { position, arcade_state }) => Some((
                 "bomb",
                 *position,
                 crate::actor_game::Velocity::default(),
-                *source,
+                *arcade_state,
             )),
             _ => None,
         })

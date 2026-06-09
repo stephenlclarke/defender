@@ -233,7 +233,7 @@
                 let report = driver.step(GameInput::NONE);
                 report.commands.iter().find_map(|command| {
                     if let GameCommand::Spawn(SpawnRequest::Mutant {
-                        source: Some(mutant_arcade_state),
+                        arcade_state: Some(mutant_arcade_state),
                         ..
                     }) = command
                     {
@@ -852,7 +852,7 @@
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
                     position,
                     velocity,
-                    source: projectile_arcade_state,
+                    arcade_state: projectile_arcade_state,
                 }) => projectile_arcade_state
                     .map(|arcade_state| (*position, *velocity, arcade_state)),
                 _ => None,
@@ -986,7 +986,7 @@
             .filter_map(|command| match command {
                 GameCommand::Spawn(SpawnRequest::Swarmer {
                     position,
-                    source: swarmer_arcade_state,
+                    arcade_state: swarmer_arcade_state,
                 }) => Some((*position, *swarmer_arcade_state)),
                 _ => None,
             })
@@ -1958,7 +1958,7 @@
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position,
                 velocity,
-                source: Some(projectile_arcade_state),
+                arcade_state: Some(projectile_arcade_state),
             }) => Some((*position, *velocity, *projectile_arcade_state)),
             _ => None,
         })
