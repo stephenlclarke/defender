@@ -20,22 +20,22 @@
     }
 
     #[test]
-    fn default_sprite_blitters_skip_missing_or_empty_sources() {
+    fn default_sprite_blitters_skip_missing_or_empty_embedded_sprites() {
         let atlas_surface = SurfaceSize::new(2, 2);
-        let source = super::EmbeddedSprite {
+        let embedded_sprite = super::EmbeddedSprite {
             surface: SurfaceSize::new(1, 1),
             pixels: vec![10, 20, 30, 255],
         };
         let mut atlas_pixels = vec![0; atlas_surface.rgba_len().expect("atlas byte length")];
         let unchanged = atlas_pixels.clone();
 
-        super::blit_default_region_from_source(
+        super::blit_default_region_from_embedded_sprite(
             &mut atlas_pixels,
             atlas_surface,
             &[],
             SpriteId::PLAYER_SHIP,
-            &source,
-            super::SpriteAtlasSourceRegion {
+            &embedded_sprite,
+            super::SpriteAtlasBlitRegion {
                 origin: [0, 0],
                 size: [1, 1],
             },
@@ -50,32 +50,38 @@
                 origin: [0, 0],
                 size: [0, 1],
             },
-            &source,
-            super::SpriteAtlasSourceRegion {
+            &embedded_sprite,
+            super::SpriteAtlasBlitRegion {
                 origin: [0, 0],
                 size: [1, 1],
             },
         );
         assert_eq!(atlas_pixels, unchanged);
 
-        super::copy_source_pixel(&mut atlas_pixels, atlas_surface, [0, 0], &source, [1, 0]);
+        super::copy_embedded_sprite_pixel(
+            &mut atlas_pixels,
+            atlas_surface,
+            [0, 0],
+            &embedded_sprite,
+            [1, 0],
+        );
         assert_eq!(atlas_pixels, unchanged);
     }
 
     #[test]
-    fn star_blitter_skips_missing_region_or_transparent_source() {
+    fn star_blitter_skips_missing_region_or_transparent_embedded_sprite() {
         let atlas_surface = SurfaceSize::new(2, 2);
-        let source = super::EmbeddedSprite {
+        let embedded_sprite = super::EmbeddedSprite {
             surface: SurfaceSize::new(1, 1),
             pixels: vec![10, 20, 30, 255],
         };
         let mut atlas_pixels = vec![0; atlas_surface.rgba_len().expect("atlas byte length")];
         let unchanged = atlas_pixels.clone();
 
-        super::blit_star_region(&mut atlas_pixels, atlas_surface, &[], &source);
+        super::blit_star_region(&mut atlas_pixels, atlas_surface, &[], &embedded_sprite);
         assert_eq!(atlas_pixels, unchanged);
 
-        let transparent_source = super::EmbeddedSprite {
+        let transparent_sprite = super::EmbeddedSprite {
             surface: SurfaceSize::new(1, 1),
             pixels: vec![10, 20, 30, 0],
         };
@@ -87,7 +93,7 @@
                 origin: [0, 0],
                 size: [1, 1],
             }],
-            &transparent_source,
+            &transparent_sprite,
         );
         assert_eq!(atlas_pixels, unchanged);
     }
@@ -174,7 +180,7 @@
         );
     }
 
-    fn source_sprite_pixel(sprite: &EmbeddedSprite, x: u32, y: u32) -> [u8; 4] {
+    fn embedded_sprite_pixel(sprite: &EmbeddedSprite, x: u32, y: u32) -> [u8; 4] {
         let start = ((y as usize * sprite.surface.width as usize) + x as usize) * 4;
         let pixel = &sprite.pixels[start..start + 4];
         [pixel[0], pixel[1], pixel[2], pixel[3]]
@@ -185,7 +191,7 @@
             .map(|y| {
                 (0..sprite.surface.width)
                     .map(|x| {
-                        if source_sprite_pixel(sprite, x, y)[3] == 0 {
+                        if embedded_sprite_pixel(sprite, x, y)[3] == 0 {
                             '.'
                         } else {
                             '#'

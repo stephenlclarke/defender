@@ -35,7 +35,7 @@ struct EmbeddedSprite {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SpriteAtlasSourceRegion {
+struct SpriteAtlasBlitRegion {
     origin: [u32; 2],
     size: [u32; 2],
 }
@@ -966,24 +966,24 @@ fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) ->
             blit_default_region(&mut pixels, surface, regions, sprite_id, sprite);
         }
     }
-    blit_default_region_from_source(
+    blit_default_region_from_embedded_sprite(
         &mut pixels,
         surface,
         regions,
         SpriteId::SCORE_TEXT,
         &font_sheet,
-        SpriteAtlasSourceRegion {
+        SpriteAtlasBlitRegion {
             origin: [0, 0],
             size: [64, 8],
         },
     );
-    blit_default_region_from_source(
+    blit_default_region_from_embedded_sprite(
         &mut pixels,
         surface,
         regions,
         SpriteId::STATUS_TEXT,
         &font_sheet,
-        SpriteAtlasSourceRegion {
+        SpriteAtlasBlitRegion {
             origin: [0, 8],
             size: [64, 8],
         },
@@ -1693,28 +1693,31 @@ fn blit_default_region(
     atlas_surface: SurfaceSize,
     regions: &[AtlasRegion],
     sprite: SpriteId,
-    source: &EmbeddedSprite,
+    embedded_sprite: &EmbeddedSprite,
 ) {
-    blit_default_region_from_source(
+    blit_default_region_from_embedded_sprite(
         atlas_pixels,
         atlas_surface,
         regions,
         sprite,
-        source,
-        SpriteAtlasSourceRegion {
+        embedded_sprite,
+        SpriteAtlasBlitRegion {
             origin: [0, 0],
-            size: [source.surface.width, source.surface.height],
+            size: [
+                embedded_sprite.surface.width,
+                embedded_sprite.surface.height,
+            ],
         },
     );
 }
 
-fn blit_default_region_from_source(
+fn blit_default_region_from_embedded_sprite(
     atlas_pixels: &mut [u8],
     atlas_surface: SurfaceSize,
     regions: &[AtlasRegion],
     sprite: SpriteId,
-    source: &EmbeddedSprite,
-    source_region: SpriteAtlasSourceRegion,
+    embedded_sprite: &EmbeddedSprite,
+    blit_region: SpriteAtlasBlitRegion,
 ) {
     let Some(region) = regions
         .iter()
@@ -1723,7 +1726,13 @@ fn blit_default_region_from_source(
     else {
         return;
     };
-    blit_scaled_region(atlas_pixels, atlas_surface, region, source, source_region);
+    blit_scaled_region(
+        atlas_pixels,
+        atlas_surface,
+        region,
+        embedded_sprite,
+        blit_region,
+    );
 }
 
 fn fill_default_region(
@@ -1760,13 +1769,13 @@ fn blit_scaled_region(
     atlas_pixels: &mut [u8],
     atlas_surface: SurfaceSize,
     region: AtlasRegion,
-    source: &EmbeddedSprite,
-    source_region: SpriteAtlasSourceRegion,
+    embedded_sprite: &EmbeddedSprite,
+    blit_region: SpriteAtlasBlitRegion,
 ) {
     if region.size[0] == 0
         || region.size[1] == 0
-        || source_region.size[0] == 0
-        || source_region.size[1] == 0
+        || blit_region.size[0] == 0
+        || blit_region.size[1] == 0
     {
         return;
     }
@@ -1774,16 +1783,16 @@ fn blit_scaled_region(
     let width = region.size[0].min(atlas_surface.width.saturating_sub(region.origin[0]));
     let height = region.size[1].min(atlas_surface.height.saturating_sub(region.origin[1]));
     for dest_y in 0..height {
-        let src_y = source_region.origin[1]
-            .saturating_add(dest_y.saturating_mul(source_region.size[1]) / region.size[1]);
+        let src_y = blit_region.origin[1]
+            .saturating_add(dest_y.saturating_mul(blit_region.size[1]) / region.size[1]);
         for dest_x in 0..width {
-            let src_x = source_region.origin[0]
-                .saturating_add(dest_x.saturating_mul(source_region.size[0]) / region.size[0]);
-            copy_source_pixel(
+            let src_x = blit_region.origin[0]
+                .saturating_add(dest_x.saturating_mul(blit_region.size[0]) / region.size[0]);
+            copy_embedded_sprite_pixel(
                 atlas_pixels,
                 atlas_surface,
                 [region.origin[0] + dest_x, region.origin[1] + dest_y],
-                source,
+                embedded_sprite,
                 [src_x, src_y],
             );
         }
@@ -1794,7 +1803,7 @@ fn blit_star_region(
     atlas_pixels: &mut [u8],
     atlas_surface: SurfaceSize,
     regions: &[AtlasRegion],
-    source: &EmbeddedSprite,
+    embedded_sprite: &EmbeddedSprite,
 ) {
     let Some(region) = regions
         .iter()
@@ -1803,7 +1812,7 @@ fn blit_star_region(
     else {
         return;
     };
-    let Some(pixel) = first_visible_pixel(source) else {
+    let Some(pixel) = first_visible_pixel(embedded_sprite) else {
         return;
     };
     let start = atlas_pixel_offset(atlas_surface, region.origin);
@@ -1813,27 +1822,32 @@ fn blit_star_region(
     }
 }
 
-fn first_visible_pixel(source: &EmbeddedSprite) -> Option<&[u8]> {
-    source.pixels.chunks_exact(4).find(|pixel| pixel[3] != 0)
+fn first_visible_pixel(embedded_sprite: &EmbeddedSprite) -> Option<&[u8]> {
+    embedded_sprite
+        .pixels
+        .chunks_exact(4)
+        .find(|pixel| pixel[3] != 0)
 }
 
-fn copy_source_pixel(
+fn copy_embedded_sprite_pixel(
     atlas_pixels: &mut [u8],
     atlas_surface: SurfaceSize,
     atlas_position: [u32; 2],
-    source: &EmbeddedSprite,
-    source_position: [u32; 2],
+    embedded_sprite: &EmbeddedSprite,
+    sprite_position: [u32; 2],
 ) {
-    if source_position[0] >= source.surface.width || source_position[1] >= source.surface.height {
+    if sprite_position[0] >= embedded_sprite.surface.width
+        || sprite_position[1] >= embedded_sprite.surface.height
+    {
         return;
     }
-    let source_start = atlas_pixel_offset(source.surface, source_position);
-    let source_end = source_start + 4;
+    let sprite_start = atlas_pixel_offset(embedded_sprite.surface, sprite_position);
+    let sprite_end = sprite_start + 4;
     let dest_start = atlas_pixel_offset(atlas_surface, atlas_position);
     let dest_end = dest_start + 4;
-    if source_end <= source.pixels.len() && dest_end <= atlas_pixels.len() {
+    if sprite_end <= embedded_sprite.pixels.len() && dest_end <= atlas_pixels.len() {
         atlas_pixels[dest_start..dest_end]
-            .copy_from_slice(&source.pixels[source_start..source_end]);
+            .copy_from_slice(&embedded_sprite.pixels[sprite_start..sprite_end]);
     }
 }
 

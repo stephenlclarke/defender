@@ -793,9 +793,9 @@
                 .count(),
             660
         );
-        assert_eq!(source_sprite_pixel(&sprite, 8, 4), WHITE_RGBA);
-        assert_eq!(source_sprite_pixel(&sprite, 89, 9), WHITE_RGBA);
-        assert_eq!(source_sprite_pixel(&sprite, 0, 0), [0, 0, 0, 0]);
+        assert_eq!(embedded_sprite_pixel(&sprite, 8, 4), WHITE_RGBA);
+        assert_eq!(embedded_sprite_pixel(&sprite, 89, 9), WHITE_RGBA);
+        assert_eq!(embedded_sprite_pixel(&sprite, 0, 0), [0, 0, 0, 0]);
     }
 
     #[test]
