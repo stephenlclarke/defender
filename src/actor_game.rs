@@ -23,6 +23,7 @@ include!("actor_game_actors_hostile_projectiles.rs");
 include!("actor_game_actors_player.rs");
 include!("actor_game_actors_lander.rs");
 include!("actor_game_actors_mutant.rs");
+include!("actor_game_actors_mutant_dive.rs");
 include!("actor_game_actors_hostiles.rs");
 include!("actor_game_actors_effects.rs");
 include!("actor_game_tests.rs");
