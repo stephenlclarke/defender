@@ -57,7 +57,7 @@
     }
 
     #[test]
-    fn actor_playing_state_and_render_bridge_project_source_terrain_until_blow() {
+    fn actor_playing_state_and_render_bridge_projects_terrain_until_blow() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 1;
@@ -76,7 +76,7 @@
     }
 
     #[test]
-    fn last_human_loss_starts_actor_source_terrain_blow() {
+    fn last_human_loss_starts_actor_terrain_blow() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 1;
