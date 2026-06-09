@@ -741,10 +741,10 @@ fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) ->
     let score_digits = decode_score_digit_sprites();
     let message_glyphs = decode_message_glyph_sprites();
     let hall_of_fame_logo = decode_hall_of_fame_defender_logo_rgba();
-    let attract_copyright_strip = decode_source_attract_copyright_strip_rgba();
+    let attract_copyright_strip = decode_attract_copyright_strip_rgba();
     let attract_williams_logo = decode_attract_williams_logo_rgba();
-    let terrain_word_7007 = decode_source_terrain_word_rgba(0x7007);
-    let terrain_word_0770 = decode_source_terrain_word_rgba(0x0770);
+    let terrain_word_7007 = decode_arcade_terrain_word_rgba(0x7007);
+    let terrain_word_0770 = decode_arcade_terrain_word_rgba(0x0770);
     let font_sheet = decode_embedded_png_rgba("font-sheet.png", FONT_SHEET_PNG);
 
     blit_default_region(
@@ -1007,7 +1007,7 @@ fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) ->
     pixels
 }
 
-fn decode_source_terrain_word_rgba(word: u16) -> EmbeddedSprite {
+fn decode_arcade_terrain_word_rgba(word: u16) -> EmbeddedSprite {
     const WIDTH: u32 = 2;
     const HEIGHT: u32 = 2;
     let mut pixels = vec![0; (WIDTH * HEIGHT * 4) as usize];
@@ -1268,7 +1268,7 @@ fn decode_hall_of_fame_defender_logo_rgba() -> EmbeddedSprite {
     EmbeddedSprite { surface, pixels }
 }
 
-fn decode_source_attract_copyright_strip_rgba() -> EmbeddedSprite {
+fn decode_attract_copyright_strip_rgba() -> EmbeddedSprite {
     let surface = SurfaceSize::new(
         u32::from(COPYRIGHT_STRIP_COLUMNS) * 2,
         u32::from(COPYRIGHT_STRIP_ROWS),
