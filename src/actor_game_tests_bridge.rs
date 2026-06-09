@@ -1221,24 +1221,24 @@
             .enemy_projectiles
             .iter()
             .find(|projectile| projectile.kind == EnemyProjectileKind::Fireball)
-            .expect("actor enemy laser should bridge as a source fireball");
+            .expect("actor enemy laser should bridge as an enemy fireball");
         assert_eq!(fireball.velocity, ScreenVelocity::new(-3, 2));
         assert_eq!(fireball.x_subpixel, 0x22);
         assert_eq!(fireball.y_subpixel, 0x77);
         assert_eq!(fireball.x_velocity_word, 0xFD00);
         assert_eq!(fireball.y_velocity_word, 0x0200);
         assert_eq!(fireball.lifetime_ticks, 17);
-        let bomb_shell = state
+        let bomber_bomb = state
             .world
             .enemy_projectiles
             .iter()
             .find(|projectile| projectile.kind == EnemyProjectileKind::BomberBombShell)
-            .expect("actor bomb should bridge as a source bomb shell");
-        assert_eq!(bomb_shell.x_subpixel, 0x44);
-        assert_eq!(bomb_shell.y_subpixel, 0x55);
-        assert_eq!(bomb_shell.x_velocity_word, 0);
-        assert_eq!(bomb_shell.y_velocity_word, 0);
-        assert_eq!(bomb_shell.lifetime_ticks, 9);
+            .expect("actor bomb should bridge as a bomber bomb projectile");
+        assert_eq!(bomber_bomb.x_subpixel, 0x44);
+        assert_eq!(bomber_bomb.y_subpixel, 0x55);
+        assert_eq!(bomber_bomb.x_velocity_word, 0);
+        assert_eq!(bomber_bomb.y_velocity_word, 0);
+        assert_eq!(bomber_bomb.lifetime_ticks, 9);
         assert!(
             state
                 .world

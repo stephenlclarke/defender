@@ -701,10 +701,10 @@ impl ActorGameDriver {
 
     fn apply_commands(&mut self, commands: &[GameCommand]) -> AppliedCommands {
         let mut applied = AppliedCommands::default();
-        let mut active_source_shells = self.active_source_shell_count();
-        let mut active_bomb_shells = self.active_bomb_shell_count();
-        let mut removed_source_shells = BTreeSet::new();
-        let mut removed_bomb_shells = BTreeSet::new();
+        let mut active_enemy_projectiles = self.active_enemy_projectile_count();
+        let mut active_bomb_projectiles = self.active_bomb_projectile_count();
+        let mut removed_enemy_projectiles = BTreeSet::new();
+        let mut removed_bomb_projectiles = BTreeSet::new();
         let mut terrain_blow_started_this_batch = false;
         for command in commands {
             match *command {
@@ -738,8 +738,8 @@ impl ActorGameDriver {
                     velocity,
                     source,
                 }) => {
-                    if source_shell_spawn_in_bounds(position)
-                        && reserve_source_shell_slot(&mut active_source_shells)
+                    if enemy_projectile_spawn_in_bounds(position)
+                        && reserve_enemy_projectile_slot(&mut active_enemy_projectiles)
                     {
                         self.spawn_enemy_laser_from_spawn(position, velocity, source);
                     }
@@ -757,12 +757,12 @@ impl ActorGameDriver {
                     self.apply_next_wave_spawn_behavior(ActorKind::Bomber, actor);
                 }
                 GameCommand::Spawn(SpawnRequest::Bomb { position, source }) => {
-                    if bomb_shell_spawn_in_source_bounds(position, source)
-                        && source_shell_slot_available(active_source_shells)
-                        && bomb_shell_slot_available(active_bomb_shells)
+                    if bomb_projectile_spawn_in_arcade_bounds(position, source)
+                        && enemy_projectile_slot_available(active_enemy_projectiles)
+                        && bomb_projectile_slot_available(active_bomb_projectiles)
                     {
-                        active_source_shells += 1;
-                        active_bomb_shells += 1;
+                        active_enemy_projectiles += 1;
+                        active_bomb_projectiles += 1;
                         self.spawn_bomb(position, source);
                     }
                 }
@@ -796,11 +796,11 @@ impl ActorGameDriver {
                 GameCommand::Destroy(id) => {
                     let removed_kind = self.snapshots.get(&id).map(|snapshot| snapshot.kind);
                     if let Some(snapshot) = self.snapshots.get(&id) {
-                        if removed_source_shells.insert(id) && is_source_shell_kind(snapshot.kind) {
-                            active_source_shells = active_source_shells.saturating_sub(1);
+                        if removed_enemy_projectiles.insert(id) && is_enemy_projectile_kind(snapshot.kind) {
+                            active_enemy_projectiles = active_enemy_projectiles.saturating_sub(1);
                         }
-                        if removed_bomb_shells.insert(id) && snapshot.kind == ActorKind::Bomb {
-                            active_bomb_shells = active_bomb_shells.saturating_sub(1);
+                        if removed_bomb_projectiles.insert(id) && snapshot.kind == ActorKind::Bomb {
+                            active_bomb_projectiles = active_bomb_projectiles.saturating_sub(1);
                         }
                     }
                     self.snapshots.remove(&id);
@@ -886,14 +886,14 @@ impl ActorGameDriver {
         self.credits = self.credits.saturating_sub(player_count.clamp(1, 2));
     }
 
-    fn active_source_shell_count(&self) -> usize {
+    fn active_enemy_projectile_count(&self) -> usize {
         self.snapshots
             .values()
-            .filter(|snapshot| is_source_shell_kind(snapshot.kind) && snapshot.alive)
+            .filter(|snapshot| is_enemy_projectile_kind(snapshot.kind) && snapshot.alive)
             .count()
     }
 
-    fn active_bomb_shell_count(&self) -> usize {
+    fn active_bomb_projectile_count(&self) -> usize {
         self.snapshots
             .values()
             .filter(|snapshot| snapshot.kind == ActorKind::Bomb && snapshot.alive)
@@ -1038,7 +1038,7 @@ impl ActorGameDriver {
         self.background_left = 0;
         self.reserve_activation_cooldown_steps = 0;
         self.first_wave_early_reserve_steps_remaining = None;
-        self.reset_source_shell_scan();
+        self.reset_enemy_projectile_scan();
         self.clear_turn_playfield_actors();
         self.apply_wave_profile();
     }
@@ -1331,7 +1331,7 @@ impl ActorGameDriver {
         self.wave = 0;
         self.arcade_rng = PLAYFIELD_START_RNG;
         self.background_left = 0;
-        self.reset_source_shell_scan();
+        self.reset_enemy_projectile_scan();
         self.high_score_initials = HighScoreInitialsState::EMPTY;
         self.player_death_sleep_remaining = None;
         self.game_over_hall_of_fame_stall_remaining = None;
@@ -1412,7 +1412,7 @@ impl ActorGameDriver {
         self.first_wave_early_reserve_steps_remaining = None;
         self.arcade_rng = PLAYFIELD_START_RNG;
         self.background_left = 0;
-        self.reset_source_shell_scan();
+        self.reset_enemy_projectile_scan();
         self.clear_turn_playfield_actors();
         self.apply_wave_profile();
         self.pending_player_start = Some(PendingPlayerStart::new(self.current_player));
@@ -1487,7 +1487,7 @@ impl ActorGameDriver {
         SurvivorBonusStep::Waiting
     }
 
-    fn reset_source_shell_scan(&mut self) {
+    fn reset_enemy_projectile_scan(&mut self) {
         self.projectile_scan_steps_remaining = ENEMY_PROJECTILE_SCAN_INITIAL_DELAY_STEPS;
     }
 
@@ -2199,7 +2199,7 @@ impl ActorGameDriver {
         let targets = self
             .snapshots
             .values()
-            .filter(|snapshot| is_source_shell_kind(snapshot.kind))
+            .filter(|snapshot| is_enemy_projectile_kind(snapshot.kind))
             .map(|snapshot| snapshot.id)
             .collect::<Vec<_>>();
         for id in targets {

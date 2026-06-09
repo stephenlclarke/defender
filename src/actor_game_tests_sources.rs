@@ -562,7 +562,7 @@
     }
 
     #[test]
-    fn source_bomber_bomb_spawn_carries_source_shell_fractions() {
+    fn source_bomber_bomb_spawn_carries_enemy_projectile_fractions() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.arcade_rng = ActorArcadeRng {
@@ -646,7 +646,7 @@
                         && source.y_fraction == initial_source.y_fraction
                 })
             })
-            .expect("source-backed bomber bomb should publish source shell fractions");
+            .expect("source-backed bomber bomb should publish enemy projectile fractions");
 
         assert_eq!(
             bomb.enemy_projectile_runtime,
@@ -759,7 +759,7 @@
             })
         );
         let live = driver.step(GameInput::NONE);
-        assert_eq!(bomb_shell_snapshot_count(&live), 0);
+        assert_eq!(bomb_projectile_snapshot_count(&live), 0);
     }
 
     #[test]
@@ -1057,7 +1057,7 @@
     }
 
     #[test]
-    fn source_shell_cap_blocks_and_releases_hostile_projectile_slots() {
+    fn enemy_projectile_cap_blocks_and_releases_slots() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         for index in 0..ENEMY_PROJECTILE_SLOT_LIMIT {
@@ -1069,7 +1069,7 @@
         }
         let filled = driver.step(GameInput::NONE);
         assert_eq!(
-            source_shell_snapshot_count(&filled),
+            enemy_projectile_snapshot_count(&filled),
             ENEMY_PROJECTILE_SLOT_LIMIT
         );
 
@@ -1086,7 +1086,7 @@
         ]);
         let capped = driver.step(GameInput::NONE);
         assert_eq!(
-            source_shell_snapshot_count(&capped),
+            enemy_projectile_snapshot_count(&capped),
             ENEMY_PROJECTILE_SLOT_LIMIT
         );
         assert!(
@@ -1100,7 +1100,7 @@
             .snapshots
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::EnemyLaser)
-            .expect("filled source shell list should contain enemy lasers")
+            .expect("filled enemy projectile list should contain enemy lasers")
             .id;
         driver.apply_commands(&[
             GameCommand::Destroy(freed_shell),
@@ -1112,7 +1112,7 @@
         let refilled = driver.step(GameInput::NONE);
 
         assert_eq!(
-            source_shell_snapshot_count(&refilled),
+            enemy_projectile_snapshot_count(&refilled),
             ENEMY_PROJECTILE_SLOT_LIMIT
         );
         assert!(
@@ -1124,17 +1124,17 @@
     }
 
     #[test]
-    fn source_bomb_shell_cap_blocks_bombs_without_blocking_enemy_lasers() {
+    fn bomb_projectile_cap_blocks_bombs_without_blocking_enemy_lasers() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         for index in 0..ACTIVE_BOMBER_BOMB_LIMIT {
             driver.spawn_bomb_for_test(Point::new(40 + (index as i16 * 4), 120));
         }
         let filled = driver.step(GameInput::NONE);
-        assert_eq!(bomb_shell_snapshot_count(&filled), ACTIVE_BOMBER_BOMB_LIMIT);
+        assert_eq!(bomb_projectile_snapshot_count(&filled), ACTIVE_BOMBER_BOMB_LIMIT);
         assert!(
-            source_shell_snapshot_count(&filled) < ENEMY_PROJECTILE_SLOT_LIMIT,
-            "bomb shell cap should fill before the shared source shell cap"
+            enemy_projectile_snapshot_count(&filled) < ENEMY_PROJECTILE_SLOT_LIMIT,
+            "bomb projectile cap should fill before the shared enemy projectile cap"
         );
 
         driver.apply_commands(&[
@@ -1149,7 +1149,7 @@
             }),
         ]);
         let capped = driver.step(GameInput::NONE);
-        assert_eq!(bomb_shell_snapshot_count(&capped), ACTIVE_BOMBER_BOMB_LIMIT);
+        assert_eq!(bomb_projectile_snapshot_count(&capped), ACTIVE_BOMBER_BOMB_LIMIT);
         assert_eq!(enemy_laser_snapshot_count(&capped), 1);
         assert!(
             capped
@@ -1163,7 +1163,7 @@
             .snapshots
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::Bomb)
-            .expect("filled source bomb list should contain bomb shells")
+            .expect("filled bomb projectile list should contain bombs")
             .id;
         driver.apply_commands(&[
             GameCommand::Destroy(freed_bomb),
@@ -1175,7 +1175,7 @@
         let refilled = driver.step(GameInput::NONE);
 
         assert_eq!(
-            bomb_shell_snapshot_count(&refilled),
+            bomb_projectile_snapshot_count(&refilled),
             ACTIVE_BOMBER_BOMB_LIMIT
         );
         assert_eq!(enemy_laser_snapshot_count(&refilled), 1);

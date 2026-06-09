@@ -1761,7 +1761,7 @@
     }
 
     #[test]
-    fn driver_applies_source_shell_scan_lifetime_cadence() {
+    fn driver_applies_enemy_projectile_scan_lifetime_cadence() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.set_kind_behavior(
@@ -1826,7 +1826,7 @@
     }
 
     #[test]
-    fn hyperspace_clears_source_shells_without_spending_stock_or_life() {
+    fn hyperspace_clears_enemy_projectiles_without_spending_stock_or_life() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.lives = 3;

@@ -1922,15 +1922,15 @@
         (Point::new(x, y), source, shot)
     }
 
-    fn source_shell_snapshot_count(report: &StepReport) -> usize {
+    fn enemy_projectile_snapshot_count(report: &StepReport) -> usize {
         report
             .snapshots
             .iter()
-            .filter(|snapshot| is_source_shell_kind(snapshot.kind))
+            .filter(|snapshot| is_enemy_projectile_kind(snapshot.kind))
             .count()
     }
 
-    fn bomb_shell_snapshot_count(report: &StepReport) -> usize {
+    fn bomb_projectile_snapshot_count(report: &StepReport) -> usize {
         report
             .snapshots
             .iter()

@@ -1303,15 +1303,15 @@ fn actor_source_target6_mutant_shot_position(
     }
 }
 
-fn actor_source_shell_count(prompt: &StepPrompt) -> usize {
+fn actor_enemy_projectile_count(prompt: &StepPrompt) -> usize {
     prompt
         .snapshots
         .iter()
-        .filter(|snapshot| is_source_shell_kind(snapshot.kind))
+        .filter(|snapshot| is_enemy_projectile_kind(snapshot.kind))
         .count()
 }
 
-fn actor_source_bomb_shell_count(prompt: &StepPrompt) -> usize {
+fn actor_bomb_projectile_count(prompt: &StepPrompt) -> usize {
     prompt
         .snapshots
         .iter()
@@ -1334,7 +1334,7 @@ fn actor_source_target6_mutant_fire2524_forced_shot(
     behavior: ActorBehaviorProfile,
 ) -> Option<(Point, Velocity, EnemyProjectileArcadeState)> {
     if !actor_source_target6_mutant_uses_dive_projection(source)
-        || actor_source_shell_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
+        || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
     {
         return None;
     }
@@ -1454,8 +1454,8 @@ fn actor_source_enemy_fireball(
     shot_rng: ActorArcadeRngSnapshot,
     lifetime_ticks: u8,
 ) -> Option<(Velocity, EnemyProjectileArcadeState)> {
-    if !source_shell_spawn_in_bounds(position)
-        || actor_source_shell_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
+    if !enemy_projectile_spawn_in_bounds(position)
+        || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
     {
         return None;
     }

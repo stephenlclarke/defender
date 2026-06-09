@@ -69,34 +69,34 @@ fn is_player_laser_target(kind: ActorKind) -> bool {
     )
 }
 
-fn is_source_shell_kind(kind: ActorKind) -> bool {
+fn is_enemy_projectile_kind(kind: ActorKind) -> bool {
     matches!(kind, ActorKind::EnemyLaser | ActorKind::Bomb)
 }
 
-fn source_shell_slot_available(active_source_shells: usize) -> bool {
-    active_source_shells < ENEMY_PROJECTILE_SLOT_LIMIT
+fn enemy_projectile_slot_available(active_enemy_projectiles: usize) -> bool {
+    active_enemy_projectiles < ENEMY_PROJECTILE_SLOT_LIMIT
 }
 
-fn bomb_shell_slot_available(active_bomb_shells: usize) -> bool {
-    active_bomb_shells < ACTIVE_BOMBER_BOMB_LIMIT
+fn bomb_projectile_slot_available(active_bomb_projectiles: usize) -> bool {
+    active_bomb_projectiles < ACTIVE_BOMBER_BOMB_LIMIT
 }
 
-fn source_shell_spawn_in_bounds(position: Point) -> bool {
+fn enemy_projectile_spawn_in_bounds(position: Point) -> bool {
     position.x < ENEMY_PROJECTILE_MAX_SCREEN_X && position.y > i16::from(PLAYFIELD_TOP_EDGE_Y)
 }
 
-fn bomb_shell_spawn_in_source_bounds(
+fn bomb_projectile_spawn_in_arcade_bounds(
     position: Point,
-    source: Option<EnemyProjectileArcadeState>,
+    arcade_state: Option<EnemyProjectileArcadeState>,
 ) -> bool {
-    source.is_none() || source_shell_spawn_in_bounds(position)
+    arcade_state.is_none() || enemy_projectile_spawn_in_bounds(position)
 }
 
-fn reserve_source_shell_slot(active_source_shells: &mut usize) -> bool {
-    if !source_shell_slot_available(*active_source_shells) {
+fn reserve_enemy_projectile_slot(active_enemy_projectiles: &mut usize) -> bool {
+    if !enemy_projectile_slot_available(*active_enemy_projectiles) {
         return false;
     }
-    *active_source_shells += 1;
+    *active_enemy_projectiles += 1;
     true
 }
 

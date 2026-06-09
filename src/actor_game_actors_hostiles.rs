@@ -101,9 +101,9 @@ impl Bomber {
                 || source.sleep_ticks > 0
                 || self.position.y == 0
                 || arcade_rng.lseed & 0x07 != 0
-                || actor_source_bomb_shell_count(prompt) >= ACTIVE_BOMBER_BOMB_LIMIT
-                || actor_source_shell_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
-                || !source_shell_spawn_in_bounds(self.position)
+                || actor_bomb_projectile_count(prompt) >= ACTIVE_BOMBER_BOMB_LIMIT
+                || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
+                || !enemy_projectile_spawn_in_bounds(self.position)
             {
                 return;
             }
@@ -664,7 +664,7 @@ fn actor_source_mini_swarmer_fireball(
     let player_delta = actor_source_absolute_x(player, 0)
         .wrapping_sub(actor_source_absolute_x(position, source.x_fraction));
     if (player_delta.to_be_bytes()[0] ^ source.x_velocity.to_be_bytes()[0]) & 0x80 != 0
-        || actor_source_shell_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
+        || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
     {
         return None;
     }
