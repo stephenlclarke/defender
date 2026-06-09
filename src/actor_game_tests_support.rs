@@ -467,7 +467,7 @@
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let source = MutantArcadeState {
+        let arcade_state = MutantArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -484,7 +484,7 @@
         };
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: Point::new(4, 0x50),
-            source: Some(source),
+            source: Some(arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -492,12 +492,15 @@
         assert!(!report.sounds.contains(&SoundCue::MutantShot));
         assert!(first_enemy_laser_command(&report).is_none());
         let snapshot = snapshot_for(&report, mutant);
-        let source = snapshot
+        let updated_arcade_state = snapshot
             .mutant_runtime
-            .expect("target6 mutant should keep source metadata");
-        assert!(source.target6_first_shot_deferred);
-        assert_eq!(source.shot_timer, TARGET6_MUTANT_DEFERRED_SHOT_TIMER);
-        assert_eq!(source.sleep_ticks, 0);
+            .expect("target6 mutant should keep arcade metadata");
+        assert!(updated_arcade_state.target6_first_shot_deferred);
+        assert_eq!(
+            updated_arcade_state.shot_timer,
+            TARGET6_MUTANT_DEFERRED_SHOT_TIMER
+        );
+        assert_eq!(updated_arcade_state.sleep_ticks, 0);
     }
 
     #[test]
@@ -507,7 +510,7 @@
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let source = MutantArcadeState {
+        let arcade_state = MutantArcadeState {
             x_fraction: 0x7C,
             y_fraction: 0x80,
             x_velocity: 0x0030,
@@ -524,7 +527,7 @@
         };
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: Point::new(0x03, 0x33),
-            source: Some(source),
+            source: Some(arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -533,15 +536,18 @@
 
         assert!(report.sounds.contains(&SoundCue::MutantShot));
         assert_eq!(shot.0, Point::new(0x13, 0x46));
-        assert_eq!(shot.2.x_fraction, source.x_fraction);
-        assert_eq!(shot.2.y_fraction, source.y_fraction);
+        assert_eq!(shot.2.x_fraction, arcade_state.x_fraction);
+        assert_eq!(shot.2.y_fraction, arcade_state.y_fraction);
         let snapshot = snapshot_for(&report, mutant);
-        let source = snapshot
+        let updated_arcade_state = snapshot
             .mutant_runtime
-            .expect("target6 mutant should keep source metadata");
-        assert!(source.target6_first_shot_deferred);
-        assert_eq!(source.shot_timer, TARGET6_MUTANT_DEFERRED_SHOT_TIMER);
-        assert_eq!(source.sleep_ticks, MUTANT_LOOP_SLEEP_TICKS - 1);
+            .expect("target6 mutant should keep arcade metadata");
+        assert!(updated_arcade_state.target6_first_shot_deferred);
+        assert_eq!(
+            updated_arcade_state.shot_timer,
+            TARGET6_MUTANT_DEFERRED_SHOT_TIMER
+        );
+        assert_eq!(updated_arcade_state.sleep_ticks, MUTANT_LOOP_SLEEP_TICKS - 1);
     }
 
     #[test]
@@ -551,7 +557,7 @@
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let source = MutantArcadeState {
+        let arcade_state = MutantArcadeState {
             x_fraction: 0x2C,
             y_fraction: 0x60,
             x_velocity: 0x0030,
@@ -568,7 +574,7 @@
         };
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: Point::new(0x08, 0x51),
-            source: Some(source),
+            source: Some(arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -589,20 +595,20 @@
             }
         );
         let snapshot = snapshot_for(&report, mutant);
-        let source = snapshot
+        let updated_arcade_state = snapshot
             .mutant_runtime
-            .expect("target6 mutant should keep source metadata");
-        assert!(source.target6_first_shot_deferred);
+            .expect("target6 mutant should keep arcade metadata");
+        assert!(updated_arcade_state.target6_first_shot_deferred);
         assert_eq!(
-            source.shot_timer,
+            updated_arcade_state.shot_timer,
             TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER
         );
-        assert_eq!(source.sleep_ticks, MUTANT_LOOP_SLEEP_TICKS - 1);
+        assert_eq!(updated_arcade_state.sleep_ticks, MUTANT_LOOP_SLEEP_TICKS - 1);
     }
 
     #[test]
     fn target6_arcade_mutant_shot_position_uses_dive_anchor_overrides() {
-        let source = MutantArcadeState {
+        let arcade_state = MutantArcadeState {
             x_fraction: 0x8C,
             y_fraction: 0xB0,
             x_velocity: 0,
@@ -619,7 +625,7 @@
         };
 
         assert_eq!(
-            target6_mutant_arcade_shot_position(Point::new(0x08, 0x61), source),
+            target6_mutant_arcade_shot_position(Point::new(0x08, 0x61), arcade_state),
             Point::new(0x1E, 0x70)
         );
         assert_eq!(
@@ -628,7 +634,7 @@
                 MutantArcadeState {
                     x_fraction: 0xFC,
                     y_fraction: 0x00,
-                    ..source
+                    ..arcade_state
                 },
             ),
             Point::new(0x21, 0x87)
@@ -639,7 +645,7 @@
                 MutantArcadeState {
                     x_fraction: 0x7C,
                     y_fraction: 0x80,
-                    ..source
+                    ..arcade_state
                 },
             ),
             Point::new(0x13, 0x46)
@@ -648,7 +654,7 @@
 
     #[test]
     fn target6_arcade_mutant_collision_position_offsets_dive_projection() {
-        let source = MutantArcadeState {
+        let arcade_state = MutantArcadeState {
             x_fraction: 0x8C,
             y_fraction: 0xB0,
             x_velocity: 0,
@@ -665,11 +671,11 @@
         };
 
         assert_eq!(
-            target6_mutant_arcade_scene_position(Point::new(0x08, 0x61), Some(source)),
+            target6_mutant_arcade_scene_position(Point::new(0x08, 0x61), Some(arcade_state)),
             Point::new(0x1E, 0x71)
         );
         assert_eq!(
-            target6_mutant_arcade_collision_position(Point::new(0x08, 0x61), Some(source)),
+            target6_mutant_arcade_collision_position(Point::new(0x08, 0x61), Some(arcade_state)),
             Point::new(0x1E, 0x72)
         );
     }
@@ -681,7 +687,7 @@
         let player_id = ActorId::new(100);
         let mutant_id = ActorId::new(101);
         let raw_position = Point::new(0x08, 0x99);
-        let source = MutantArcadeState {
+        let arcade_state = MutantArcadeState {
             x_fraction: 0x5C,
             y_fraction: 0xE0,
             x_velocity: 0x0030,
@@ -697,7 +703,7 @@
             target6_first_shot_deferred: true,
         };
         let collision_position =
-            target6_mutant_arcade_collision_position(raw_position, Some(source));
+            target6_mutant_arcade_collision_position(raw_position, Some(arcade_state));
         driver.snapshots.insert(
             player_id,
             actor_snapshot_with_bounds(
@@ -712,7 +718,7 @@
             mutant_arcade_snapshot_with_bounds(
                 mutant_id,
                 raw_position,
-                source,
+                arcade_state,
                 Rect::from_center(collision_position, 14, 12),
             ),
         );
@@ -734,7 +740,7 @@
         let mutant_id = ActorId::new(101);
         let raw_position = Point::new(0x08, 0xA5);
         let player_position = TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER;
-        let source = MutantArcadeState {
+        let arcade_state = MutantArcadeState {
             x_fraction: 0x00,
             y_fraction: 0x00,
             x_velocity: 0x0030,
@@ -763,7 +769,7 @@
             mutant_arcade_snapshot_with_bounds(
                 mutant_id,
                 raw_position,
-                source,
+                arcade_state,
                 Rect::from_center(player_position, 14, 12),
             ),
         );
