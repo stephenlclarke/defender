@@ -418,31 +418,6 @@ impl SpriteId {
             .map(|(_, _, size)| *size)
     }
 
-    pub fn for_legacy_object_bitmap_label(label: &str) -> Option<Self> {
-        match label {
-            "PLAPIC" => Some(Self::PLAYER_SHIP),
-            "PLBPIC" => Some(Self::PLAYER_SHIP_LEFT),
-            "LNDP1" | "LNDP2" | "LNDP3" => Some(Self::ENEMY_LANDER),
-            "ASTP1" | "ASTP2" | "ASTP3" | "ASTP4" => Some(Self::HUMAN),
-            "LASP1" => Some(Self::PLAYER_PROJECTILE),
-            "SCZP1" => Some(Self::ENEMY_MUTANT),
-            "UFOP1" | "UFOP2" | "UFOP3" => Some(Self::ENEMY_BAITER),
-            "TIEP1" | "TIEP2" | "TIEP3" | "TIEP4" => Some(Self::ENEMY_BOMBER),
-            "PRBP1" => Some(Self::ENEMY_POD),
-            "SWPIC1" => Some(Self::ENEMY_SWARMER),
-            "BMBP1" | "BMBP2" => Some(Self::ENEMY_BOMB),
-            "BXPIC" => Some(Self::BOMB_EXPLOSION),
-            "SWXP1" => Some(Self::SWARMER_EXPLOSION),
-            "C25P1" => Some(Self::SCORE_POPUP_250),
-            "C5P1" => Some(Self::SCORE_POPUP_500),
-            "PLAMIN" => Some(Self::PLAYER_LIFE_STOCK),
-            "SBPIC" => Some(Self::SMART_BOMB_STOCK),
-            "ASXP1" => Some(Self::ASTRONAUT_EXPLOSION),
-            "NULOB" => Some(Self::NULL_OBJECT),
-            "TEREX" => Some(Self::TERRAIN_EXPLOSION),
-            _ => None,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
