@@ -1628,11 +1628,11 @@ impl ActorGameDriver {
         self.clear_first_wave_lander_refill();
         let arcade_wave_profile = self.current_arcade_wave_profile();
         let reserve_kinds =
-            actor_source_reserve_enemy_kinds(&mut self.enemy_reserve, arcade_wave_profile);
+            reserve_wave_enemy_kinds(&mut self.enemy_reserve, arcade_wave_profile);
         let mut index = 0;
         while index < reserve_kinds.len() {
             match reserve_kinds[index] {
-                ActorSourceEnemyKind::Lander => {
+                WaveEnemyKind::Lander => {
                     let target_index = self.select_next_lander_target_human_slot();
                     if let Some(target_index) = target_index {
                         let spawn = ActorLanderSpawn::from_arcade_restore(
@@ -1649,7 +1649,7 @@ impl ActorGameDriver {
                     } else {
                         let lander_count = reserve_kinds[index..]
                             .iter()
-                            .take_while(|&&kind| kind == ActorSourceEnemyKind::Lander)
+                            .take_while(|&&kind| kind == WaveEnemyKind::Lander)
                             .count();
                         for _ in 0..lander_count {
                             let spawn = ActorMutantSpawn::from_arcade_restore(
@@ -1667,10 +1667,10 @@ impl ActorGameDriver {
                         index += lander_count;
                     }
                 }
-                ActorSourceEnemyKind::Bomber => {
+                WaveEnemyKind::Bomber => {
                     let bomber_count = reserve_kinds[index..]
                         .iter()
-                        .take_while(|&&kind| kind == ActorSourceEnemyKind::Bomber)
+                        .take_while(|&&kind| kind == WaveEnemyKind::Bomber)
                         .count();
                     let player_absolute_x = self
                         .active_player_position()
@@ -1688,7 +1688,7 @@ impl ActorGameDriver {
                     }
                     index += bomber_count;
                 }
-                ActorSourceEnemyKind::Pod => {
+                WaveEnemyKind::Pod => {
                     let spawn = ActorPodSpawn::from_arcade_restore(&mut self.arcade_rng);
                     commands.push(GameCommand::Spawn(SpawnRequest::Pod {
                         position: spawn.position,
@@ -1697,7 +1697,7 @@ impl ActorGameDriver {
                     self.apply_next_wave_spawn_behavior(ActorKind::Pod, actor);
                     index += 1;
                 }
-                ActorSourceEnemyKind::Mutant => {
+                WaveEnemyKind::Mutant => {
                     let spawn = ActorMutantSpawn::from_arcade_restore(
                         &mut self.arcade_rng,
                         arcade_wave_profile,
@@ -1711,10 +1711,10 @@ impl ActorGameDriver {
                     self.apply_next_wave_spawn_behavior(ActorKind::Mutant, actor);
                     index += 1;
                 }
-                ActorSourceEnemyKind::Swarmer => {
+                WaveEnemyKind::Swarmer => {
                     let swarmer_count = reserve_kinds[index..]
                         .iter()
-                        .take_while(|&&kind| kind == ActorSourceEnemyKind::Swarmer)
+                        .take_while(|&&kind| kind == WaveEnemyKind::Swarmer)
                         .count();
                     for spawn in ActorSwarmerSpawn::arcade_restore_batch(
                         &mut self.arcade_rng,

@@ -1046,7 +1046,7 @@ impl ArcadeWaveProfile {
         self.active_family_slots()
             .into_iter()
             .filter_map(|slot| {
-                if slot.kind != ActorSourceEnemyKind::Lander {
+                if slot.kind != WaveEnemyKind::Lander {
                     return None;
                 }
                 let spawn = if wave == 1 {
@@ -1078,7 +1078,7 @@ impl ArcadeWaveProfile {
     fn bomber_spawns(self) -> Vec<ActorBomberSpawn> {
         self.active_family_slots()
             .into_iter()
-            .filter(|slot| slot.kind == ActorSourceEnemyKind::Bomber)
+            .filter(|slot| slot.kind == WaveEnemyKind::Bomber)
             .map(|slot| {
                 ActorBomberSpawn::from_wave_slot(slot.position, self.bomber_x_velocity, slot.index)
             })
@@ -1088,7 +1088,7 @@ impl ArcadeWaveProfile {
     fn pod_spawns(self) -> Vec<ActorPodSpawn> {
         self.active_family_slots()
             .into_iter()
-            .filter(|slot| slot.kind == ActorSourceEnemyKind::Pod)
+            .filter(|slot| slot.kind == WaveEnemyKind::Pod)
             .map(|slot| ActorPodSpawn::from_wave_slot(slot.position, slot.index))
             .collect()
     }
@@ -1096,7 +1096,7 @@ impl ArcadeWaveProfile {
     fn mutant_spawns(self) -> Vec<ActorMutantSpawn> {
         self.active_family_slots()
             .into_iter()
-            .filter(|slot| slot.kind == ActorSourceEnemyKind::Mutant)
+            .filter(|slot| slot.kind == WaveEnemyKind::Mutant)
             .map(|slot| ActorMutantSpawn::from_wave_slot(slot.position, self, slot.index))
             .collect()
     }
@@ -1105,7 +1105,7 @@ impl ArcadeWaveProfile {
         let mut arcade_rng = DEFAULT_RNG;
         self.active_family_slots()
             .into_iter()
-            .filter(|slot| slot.kind == ActorSourceEnemyKind::Swarmer)
+            .filter(|slot| slot.kind == WaveEnemyKind::Swarmer)
             .map(|slot| ActorSwarmerSpawn::from_pod_release(&mut arcade_rng, self, slot.position))
             .collect()
     }
@@ -1124,8 +1124,8 @@ impl ArcadeWaveProfile {
         reserve
     }
 
-    fn active_family_slots(self) -> Vec<ActorSourceEnemySlot> {
-        let mut counts = ActorSourceEnemyCounts {
+    fn active_family_slots(self) -> Vec<WaveEnemySlot> {
+        let mut counts = WaveEnemyCounts {
             landers: self.landers,
             bombers: self.bombers,
             pods: self.pods,
@@ -1138,20 +1138,20 @@ impl ArcadeWaveProfile {
         let mut kinds = Vec::with_capacity(target);
 
         for kind in [
-            ActorSourceEnemyKind::Lander,
-            ActorSourceEnemyKind::Bomber,
-            ActorSourceEnemyKind::Pod,
-            ActorSourceEnemyKind::Mutant,
-            ActorSourceEnemyKind::Swarmer,
+            WaveEnemyKind::Lander,
+            WaveEnemyKind::Bomber,
+            WaveEnemyKind::Pod,
+            WaveEnemyKind::Mutant,
+            WaveEnemyKind::Swarmer,
         ] {
-            push_actor_source_kind(&mut kinds, &mut counts, target, kind);
+            push_wave_enemy_kind(&mut kinds, &mut counts, target, kind);
         }
         for kind in [
-            ActorSourceEnemyKind::Lander,
-            ActorSourceEnemyKind::Bomber,
-            ActorSourceEnemyKind::Pod,
-            ActorSourceEnemyKind::Mutant,
-            ActorSourceEnemyKind::Swarmer,
+            WaveEnemyKind::Lander,
+            WaveEnemyKind::Bomber,
+            WaveEnemyKind::Pod,
+            WaveEnemyKind::Mutant,
+            WaveEnemyKind::Swarmer,
         ] {
             while kinds.len() < target && counts.take(kind) {
                 kinds.push(kind);
@@ -1161,7 +1161,7 @@ impl ArcadeWaveProfile {
         kinds
             .into_iter()
             .enumerate()
-            .map(|(index, kind)| ActorSourceEnemySlot {
+            .map(|(index, kind)| WaveEnemySlot {
                 kind,
                 index,
                 position: ACTOR_WAVE_ACTIVE_SPAWN_SLOTS[index],
@@ -1171,14 +1171,14 @@ impl ArcadeWaveProfile {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ActorSourceEnemySlot {
-    kind: ActorSourceEnemyKind,
+struct WaveEnemySlot {
+    kind: WaveEnemyKind,
     index: usize,
     position: Point,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ActorSourceEnemyKind {
+enum WaveEnemyKind {
     Lander,
     Bomber,
     Pod,
@@ -1187,7 +1187,7 @@ enum ActorSourceEnemyKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ActorSourceEnemyCounts {
+struct WaveEnemyCounts {
     landers: u8,
     bombers: u8,
     pods: u8,
@@ -1195,7 +1195,7 @@ struct ActorSourceEnemyCounts {
     swarmers: u8,
 }
 
-impl ActorSourceEnemyCounts {
+impl WaveEnemyCounts {
     const fn total(self) -> u8 {
         self.landers
             .saturating_add(self.bombers)
@@ -1204,13 +1204,13 @@ impl ActorSourceEnemyCounts {
             .saturating_add(self.swarmers)
     }
 
-    fn take(&mut self, kind: ActorSourceEnemyKind) -> bool {
+    fn take(&mut self, kind: WaveEnemyKind) -> bool {
         let count = match kind {
-            ActorSourceEnemyKind::Lander => &mut self.landers,
-            ActorSourceEnemyKind::Bomber => &mut self.bombers,
-            ActorSourceEnemyKind::Pod => &mut self.pods,
-            ActorSourceEnemyKind::Mutant => &mut self.mutants,
-            ActorSourceEnemyKind::Swarmer => &mut self.swarmers,
+            WaveEnemyKind::Lander => &mut self.landers,
+            WaveEnemyKind::Bomber => &mut self.bombers,
+            WaveEnemyKind::Pod => &mut self.pods,
+            WaveEnemyKind::Mutant => &mut self.mutants,
+            WaveEnemyKind::Swarmer => &mut self.swarmers,
         };
         if *count == 0 {
             return false;
@@ -1220,11 +1220,11 @@ impl ActorSourceEnemyCounts {
     }
 }
 
-fn push_actor_source_kind(
-    kinds: &mut Vec<ActorSourceEnemyKind>,
-    counts: &mut ActorSourceEnemyCounts,
+fn push_wave_enemy_kind(
+    kinds: &mut Vec<WaveEnemyKind>,
+    counts: &mut WaveEnemyCounts,
     target: usize,
-    kind: ActorSourceEnemyKind,
+    kind: WaveEnemyKind,
 ) {
     if kinds.len() < target && counts.take(kind) {
         kinds.push(kind);
@@ -1246,14 +1246,14 @@ fn actor_enemy_reserve_is_empty(reserve: EnemyReserveSnapshot) -> bool {
 
 fn actor_enemy_reserve_take(
     reserve: &mut EnemyReserveSnapshot,
-    kind: ActorSourceEnemyKind,
+    kind: WaveEnemyKind,
 ) -> bool {
     let count = match kind {
-        ActorSourceEnemyKind::Lander => &mut reserve.landers,
-        ActorSourceEnemyKind::Bomber => &mut reserve.bombers,
-        ActorSourceEnemyKind::Pod => &mut reserve.pods,
-        ActorSourceEnemyKind::Mutant => &mut reserve.mutants,
-        ActorSourceEnemyKind::Swarmer => &mut reserve.swarmers,
+        WaveEnemyKind::Lander => &mut reserve.landers,
+        WaveEnemyKind::Bomber => &mut reserve.bombers,
+        WaveEnemyKind::Pod => &mut reserve.pods,
+        WaveEnemyKind::Mutant => &mut reserve.mutants,
+        WaveEnemyKind::Swarmer => &mut reserve.swarmers,
     };
     if *count == 0 {
         return false;
@@ -1262,17 +1262,17 @@ fn actor_enemy_reserve_take(
     true
 }
 
-fn actor_source_reserve_enemy_kinds(
+fn reserve_wave_enemy_kinds(
     reserve: &mut EnemyReserveSnapshot,
     profile: ArcadeWaveProfile,
-) -> Vec<ActorSourceEnemyKind> {
+) -> Vec<WaveEnemyKind> {
     if reserve.landers > 0 {
         let target = MAX_ACTIVE_WAVE_ENEMIES.min(usize::from(reserve.landers));
         let mut kinds = Vec::with_capacity(target);
         while kinds.len() < target
-            && actor_enemy_reserve_take(reserve, ActorSourceEnemyKind::Lander)
+            && actor_enemy_reserve_take(reserve, WaveEnemyKind::Lander)
         {
-            kinds.push(ActorSourceEnemyKind::Lander);
+            kinds.push(WaveEnemyKind::Lander);
         }
         return kinds;
     }
@@ -1283,21 +1283,21 @@ fn actor_source_reserve_enemy_kinds(
     let mut kinds = Vec::with_capacity(target);
 
     for kind in [
-        ActorSourceEnemyKind::Lander,
-        ActorSourceEnemyKind::Bomber,
-        ActorSourceEnemyKind::Pod,
-        ActorSourceEnemyKind::Mutant,
-        ActorSourceEnemyKind::Swarmer,
+        WaveEnemyKind::Lander,
+        WaveEnemyKind::Bomber,
+        WaveEnemyKind::Pod,
+        WaveEnemyKind::Mutant,
+        WaveEnemyKind::Swarmer,
     ] {
         push_actor_reserve_kind(&mut kinds, reserve, target, kind);
     }
 
     for kind in [
-        ActorSourceEnemyKind::Lander,
-        ActorSourceEnemyKind::Bomber,
-        ActorSourceEnemyKind::Pod,
-        ActorSourceEnemyKind::Mutant,
-        ActorSourceEnemyKind::Swarmer,
+        WaveEnemyKind::Lander,
+        WaveEnemyKind::Bomber,
+        WaveEnemyKind::Pod,
+        WaveEnemyKind::Mutant,
+        WaveEnemyKind::Swarmer,
     ] {
         while kinds.len() < target && actor_enemy_reserve_take(reserve, kind) {
             kinds.push(kind);
@@ -1308,10 +1308,10 @@ fn actor_source_reserve_enemy_kinds(
 }
 
 fn push_actor_reserve_kind(
-    kinds: &mut Vec<ActorSourceEnemyKind>,
+    kinds: &mut Vec<WaveEnemyKind>,
     reserve: &mut EnemyReserveSnapshot,
     target: usize,
-    kind: ActorSourceEnemyKind,
+    kind: WaveEnemyKind,
 ) {
     if kinds.len() < target && actor_enemy_reserve_take(reserve, kind) {
         kinds.push(kind);
