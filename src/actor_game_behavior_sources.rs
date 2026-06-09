@@ -497,7 +497,7 @@ impl ActorBomberSpawn {
         }
     }
 
-    const fn source_initial(position: Point, x_velocity_word: u8, spawn_index: usize) -> Self {
+    const fn from_wave_slot(position: Point, x_velocity_word: u8, spawn_index: usize) -> Self {
         let velocity_low = if spawn_index < 2 {
             0u8.wrapping_sub(x_velocity_word)
         } else {
@@ -572,7 +572,7 @@ impl ActorPodSpawn {
         }
     }
 
-    const fn source_initial(position: Point, spawn_index: usize) -> Self {
+    const fn from_wave_slot(position: Point, spawn_index: usize) -> Self {
         let velocity_low = if spawn_index < 2 {
             0u8.wrapping_sub(INITIAL_POD_X_SPEED)
         } else {
@@ -749,7 +749,7 @@ impl ActorMutantSpawn {
         }
     }
 
-    fn source_initial(
+    fn from_wave_slot(
         position: Point,
         profile: ArcadeWaveProfile,
         spawn_index: usize,
@@ -1080,7 +1080,7 @@ impl ArcadeWaveProfile {
             .into_iter()
             .filter(|slot| slot.kind == ActorSourceEnemyKind::Bomber)
             .map(|slot| {
-                ActorBomberSpawn::source_initial(slot.position, self.bomber_x_velocity, slot.index)
+                ActorBomberSpawn::from_wave_slot(slot.position, self.bomber_x_velocity, slot.index)
             })
             .collect()
     }
@@ -1089,7 +1089,7 @@ impl ArcadeWaveProfile {
         self.active_family_slots()
             .into_iter()
             .filter(|slot| slot.kind == ActorSourceEnemyKind::Pod)
-            .map(|slot| ActorPodSpawn::source_initial(slot.position, slot.index))
+            .map(|slot| ActorPodSpawn::from_wave_slot(slot.position, slot.index))
             .collect()
     }
 
@@ -1097,7 +1097,7 @@ impl ArcadeWaveProfile {
         self.active_family_slots()
             .into_iter()
             .filter(|slot| slot.kind == ActorSourceEnemyKind::Mutant)
-            .map(|slot| ActorMutantSpawn::source_initial(slot.position, self, slot.index))
+            .map(|slot| ActorMutantSpawn::from_wave_slot(slot.position, self, slot.index))
             .collect()
     }
 
