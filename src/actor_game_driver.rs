@@ -2124,7 +2124,7 @@ impl ActorGameDriver {
         else {
             return;
         };
-        let spawn = ActorBaiterSpawn::source_from_player(profile, player_position, active_baiters);
+        let spawn = ActorBaiterSpawn::from_player_position(profile, player_position, active_baiters);
         commands.push(GameCommand::Spawn(SpawnRequest::Baiter {
             position: spawn.position,
             source: spawn.source,

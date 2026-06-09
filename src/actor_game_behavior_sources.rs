@@ -701,7 +701,7 @@ impl ActorBaiterSpawn {
         }
     }
 
-    fn source_from_player(
+    fn from_player_position(
         profile: ArcadeWaveProfile,
         player_position: Point,
         active_baiters: usize,
@@ -716,7 +716,7 @@ impl ActorBaiterSpawn {
             - (i16::try_from(active_baiters % 3).unwrap_or(0) * 24))
             .clamp(PLAYER_BOUNDS.top + 8, HUMAN_GROUND_Y - 24);
         let position = Point::new(spawn_x, spawn_y);
-        let mut source = BaiterArcadeState {
+        let mut arcade_state = BaiterArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -726,7 +726,7 @@ impl ActorBaiterSpawn {
             picture_frame: 0,
         };
         update_baiter_arcade_velocity(
-            &mut source,
+            &mut arcade_state,
             position,
             profile,
             player_position,
@@ -736,7 +736,7 @@ impl ActorBaiterSpawn {
         );
         Self {
             position,
-            source: Some(source),
+            source: Some(arcade_state),
         }
     }
 }
