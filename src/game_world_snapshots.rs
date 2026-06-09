@@ -53,20 +53,20 @@ impl EnemySnapshot {
         match self.kind {
             EnemyKind::Lander => lander_picture_descriptor(
                 self.lander_runtime
-                    .map(|source| source.picture_frame)
+                    .map(|arcade_state| arcade_state.picture_frame)
                     .unwrap_or_default(),
             ),
             EnemyKind::Mutant => MUTANT_PICTURE_DESCRIPTOR,
             EnemyKind::Bomber => bomber_picture_descriptor(
                 self.bomber_runtime
-                    .map(|source| source.picture_frame)
+                    .map(|arcade_state| arcade_state.picture_frame)
                     .unwrap_or_default(),
             ),
             EnemyKind::Pod => POD_PICTURE_DESCRIPTOR,
             EnemyKind::Swarmer => SWARMER_PICTURE_DESCRIPTOR,
             EnemyKind::Baiter => baiter_picture_descriptor(
                 self.baiter_runtime
-                    .map(|source| source.picture_frame)
+                    .map(|arcade_state| arcade_state.picture_frame)
                     .unwrap_or_default(),
             ),
         }
@@ -76,38 +76,62 @@ impl EnemySnapshot {
         match self.kind {
             EnemyKind::Lander => self
                 .lander_runtime
-                .map(|source| {
-                    arcade_world_position(self.position, source.x_fraction, source.y_fraction)
+                .map(|arcade_state| {
+                    arcade_world_position(
+                        self.position,
+                        arcade_state.x_fraction,
+                        arcade_state.y_fraction,
+                    )
                 })
                 .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
             EnemyKind::Mutant => self
                 .mutant_runtime
-                .map(|source| {
-                    arcade_world_position(self.position, source.x_fraction, source.y_fraction)
+                .map(|arcade_state| {
+                    arcade_world_position(
+                        self.position,
+                        arcade_state.x_fraction,
+                        arcade_state.y_fraction,
+                    )
                 })
                 .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
             EnemyKind::Bomber => self
                 .bomber_runtime
-                .map(|source| {
-                    arcade_world_position(self.position, source.x_fraction, source.y_fraction)
+                .map(|arcade_state| {
+                    arcade_world_position(
+                        self.position,
+                        arcade_state.x_fraction,
+                        arcade_state.y_fraction,
+                    )
                 })
                 .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
             EnemyKind::Pod => self
                 .pod_runtime
-                .map(|source| {
-                    arcade_world_position(self.position, source.x_fraction, source.y_fraction)
+                .map(|arcade_state| {
+                    arcade_world_position(
+                        self.position,
+                        arcade_state.x_fraction,
+                        arcade_state.y_fraction,
+                    )
                 })
                 .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
             EnemyKind::Swarmer => self
                 .swarmer_runtime
-                .map(|source| {
-                    arcade_world_position(self.position, source.x_fraction, source.y_fraction)
+                .map(|arcade_state| {
+                    arcade_world_position(
+                        self.position,
+                        arcade_state.x_fraction,
+                        arcade_state.y_fraction,
+                    )
                 })
                 .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
             EnemyKind::Baiter => self
                 .baiter_runtime
-                .map(|source| {
-                    arcade_world_position(self.position, source.x_fraction, source.y_fraction)
+                .map(|arcade_state| {
+                    arcade_world_position(
+                        self.position,
+                        arcade_state.x_fraction,
+                        arcade_state.y_fraction,
+                    )
                 })
                 .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
         }
@@ -117,30 +141,30 @@ impl EnemySnapshot {
         match self.kind {
             EnemyKind::Lander => self
                 .lander_runtime
-                .map(|source| (source.x_velocity, source.y_velocity))
+                .map(|arcade_state| (arcade_state.x_velocity, arcade_state.y_velocity))
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Mutant => self
                 .mutant_runtime
-                .map(|source| (source.x_velocity, source.y_velocity))
+                .map(|arcade_state| (arcade_state.x_velocity, arcade_state.y_velocity))
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Bomber => self
                 .bomber_runtime
-                .map(|source| (source.x_velocity, source.y_velocity))
+                .map(|arcade_state| (arcade_state.x_velocity, arcade_state.y_velocity))
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Pod => self
                 .pod_runtime
-                .map(|source| (source.x_velocity, source.y_velocity))
+                .map(|arcade_state| (arcade_state.x_velocity, arcade_state.y_velocity))
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Swarmer => self
                 .swarmer_runtime
-                .map(|source| (source.x_velocity, source.y_velocity))
+                .map(|arcade_state| (arcade_state.x_velocity, arcade_state.y_velocity))
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Baiter => self
                 .baiter_runtime
-                .map(|source| {
+                .map(|arcade_state| {
                     (
-                        baiter_screen_x_velocity(source.x_velocity),
-                        source.y_velocity,
+                        baiter_screen_x_velocity(arcade_state.x_velocity),
+                        arcade_state.y_velocity,
                     )
                 })
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
@@ -601,7 +625,7 @@ pub struct ScannerRadarSnapshot {
     pub enabled: bool,
     pub stage: ScannerRadarStage,
     pub stage_sleep_ticks: u8,
-    pub source_process_sleep_ticks: [u8; 3],
+    pub process_sleep_ticks: [u8; 3],
     pub selected_map: u8,
     pub scan_left: Option<u16>,
     pub terrain_enabled: bool,
@@ -617,7 +641,7 @@ impl ScannerRadarSnapshot {
         enabled: false,
         stage: ScannerRadarStage::InactiveObjectScan,
         stage_sleep_ticks: 0,
-        source_process_sleep_ticks: SCANNER_PROCESS_SLEEP_TICKS,
+        process_sleep_ticks: SCANNER_PROCESS_SLEEP_TICKS,
         selected_map: 0,
         scan_left: None,
         terrain_enabled: false,
@@ -642,13 +666,13 @@ impl ScannerRadarSnapshot {
         }
 
         let stage = scanner_radar_stage_for_frame(frame);
-        let scan_anchor_word = source_word_from_world_vector(scan_anchor);
+        let scan_anchor_word = arcade_word_from_world_vector(scan_anchor);
         let scan_left = scan_anchor_word.wrapping_sub(SCANNER_SCAN_CENTER_OFFSET);
         let mut scanner = Self {
             enabled: true,
             stage,
             stage_sleep_ticks: stage.stage_sleep_ticks(),
-            source_process_sleep_ticks: SCANNER_PROCESS_SLEEP_TICKS,
+            process_sleep_ticks: SCANNER_PROCESS_SLEEP_TICKS,
             selected_map: SCANNER_SELECTED_MAP,
             scan_left: Some(scan_left),
             terrain_enabled: true,
@@ -705,6 +729,10 @@ impl Default for ScannerRadarSnapshot {
     fn default() -> Self {
         Self::DISABLED
     }
+}
+
+fn arcade_word_from_world_vector(vector: WorldVector) -> u16 {
+    (vector.subpixels() >> 8) as u16
 }
 
 pub const EXPANDED_OBJECT_DETAIL_LIMIT: usize = 16;

@@ -943,7 +943,10 @@
 
         assert_eq!(reply.snapshot.position, Point::new(0x40, 101));
         assert_eq!(
-            reply.snapshot.human_runtime.map(|source| source.x_fraction),
+            reply
+                .snapshot
+                .human_runtime
+                .map(|arcade_state| arcade_state.x_fraction),
             Some(0)
         );
         assert!(

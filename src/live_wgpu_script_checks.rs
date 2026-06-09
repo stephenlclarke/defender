@@ -687,25 +687,25 @@ fn actor_script_check_actor_subpixels(
     match snapshot.kind {
         ActorKind::Lander => snapshot
             .lander_runtime
-            .map(|source| (source.x_fraction, source.y_fraction)),
+            .map(|arcade_state| (arcade_state.x_fraction, arcade_state.y_fraction)),
         ActorKind::Mutant => snapshot
             .mutant_runtime
-            .map(|source| (source.x_fraction, source.y_fraction)),
+            .map(|arcade_state| (arcade_state.x_fraction, arcade_state.y_fraction)),
         ActorKind::Bomber => snapshot
             .bomber_runtime
-            .map(|source| (source.x_fraction, source.y_fraction)),
+            .map(|arcade_state| (arcade_state.x_fraction, arcade_state.y_fraction)),
         ActorKind::Pod => snapshot
             .pod_runtime
-            .map(|source| (source.x_fraction, source.y_fraction)),
+            .map(|arcade_state| (arcade_state.x_fraction, arcade_state.y_fraction)),
         ActorKind::Swarmer => snapshot
             .swarmer_runtime
-            .map(|source| (source.x_fraction, source.y_fraction)),
+            .map(|arcade_state| (arcade_state.x_fraction, arcade_state.y_fraction)),
         ActorKind::Baiter => snapshot
             .baiter_runtime
-            .map(|source| (source.x_fraction, source.y_fraction)),
+            .map(|arcade_state| (arcade_state.x_fraction, arcade_state.y_fraction)),
         ActorKind::Human => snapshot
             .human_runtime
-            .map(|source| (source.x_fraction, source.y_fraction)),
+            .map(|arcade_state| (arcade_state.x_fraction, arcade_state.y_fraction)),
         _ => None,
     }
 }
@@ -732,7 +732,7 @@ fn actor_script_check_enemy_projectile_samples(
         .iter()
         .filter(|snapshot| snapshot.alive)
         .filter_map(|snapshot| {
-            let source = snapshot.enemy_projectile_runtime?;
+            let arcade_state = snapshot.enemy_projectile_runtime?;
             let kind = match snapshot.kind {
                 ActorKind::EnemyLaser => "enemy_laser",
                 ActorKind::Bomb => "bomb",
@@ -742,11 +742,11 @@ fn actor_script_check_enemy_projectile_samples(
                 kind: kind.to_string(),
                 x: snapshot.position.x,
                 y: snapshot.position.y,
-                x_subpixel: source.x_fraction,
-                y_subpixel: source.y_fraction,
-                x_velocity_word: source.x_velocity,
-                y_velocity_word: source.y_velocity,
-                lifetime_ticks: source.lifetime_ticks,
+                x_subpixel: arcade_state.x_fraction,
+                y_subpixel: arcade_state.y_fraction,
+                x_velocity_word: arcade_state.x_velocity,
+                y_velocity_word: arcade_state.y_velocity,
+                lifetime_ticks: arcade_state.lifetime_ticks,
             })
         })
         .take(ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_LIMIT)
@@ -776,17 +776,17 @@ fn actor_script_check_projectile_spawn_command_samples(
         })
         .take(ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_LIMIT)
         .map(
-            |(kind, position, velocity, source)| ActorScriptCheckProjectileSpawnSample {
+            |(kind, position, velocity, arcade_state)| ActorScriptCheckProjectileSpawnSample {
                 kind: kind.to_string(),
                 x: position.x,
                 y: position.y,
                 velocity_dx: velocity.dx,
                 velocity_dy: velocity.dy,
-                x_subpixel: source.map(|source| source.x_fraction),
-                y_subpixel: source.map(|source| source.y_fraction),
-                x_velocity_word: source.map(|source| source.x_velocity),
-                y_velocity_word: source.map(|source| source.y_velocity),
-                lifetime_ticks: source.map(|source| source.lifetime_ticks),
+                x_subpixel: arcade_state.map(|arcade_state| arcade_state.x_fraction),
+                y_subpixel: arcade_state.map(|arcade_state| arcade_state.y_fraction),
+                x_velocity_word: arcade_state.map(|arcade_state| arcade_state.x_velocity),
+                y_velocity_word: arcade_state.map(|arcade_state| arcade_state.y_velocity),
+                lifetime_ticks: arcade_state.map(|arcade_state| arcade_state.lifetime_ticks),
             },
         )
         .collect()
