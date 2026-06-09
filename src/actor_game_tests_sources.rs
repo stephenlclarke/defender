@@ -1312,7 +1312,7 @@
     }
 
     #[test]
-    fn source_swarmer_shot_timer_spawns_hostile_projectile() {
+    fn swarmer_shot_timer_spawns_hostile_projectile() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 2;
@@ -1322,7 +1322,7 @@
             actor_snapshot(player.value(), ActorKind::Player, Point::new(42, 120)),
         );
         let start = Point::new(25, 100);
-        let source = SwarmerArcadeState {
+        let arcade_state = SwarmerArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0x0020,
@@ -1334,7 +1334,7 @@
         };
         let swarmer = driver.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
             position: start,
-            source: Some(source),
+            source: Some(arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -1348,32 +1348,35 @@
             Point::new(42, 120),
             Velocity::default(),
         );
-        let mut expected_source = source;
-        expected_source.y_velocity = source_mini_swarmer_y_velocity(
-            source.y_velocity,
-            source.acceleration,
+        let mut expected_arcade_state = arcade_state;
+        expected_arcade_state.y_velocity = mini_swarmer_y_velocity(
+            arcade_state.y_velocity,
+            arcade_state.acceleration,
             120,
             start.y,
             report_arcade_rng.seed,
         );
-        let (expected_x, expected_x_fraction) =
-            actor_source_axis_step(start.x, source.x_fraction, expected_source.x_velocity);
+        let (expected_x, expected_x_fraction) = actor_source_axis_step(
+            start.x,
+            arcade_state.x_fraction,
+            expected_arcade_state.x_velocity,
+        );
         let (expected_y, expected_y_fraction) = actor_source_active_object_y_step(
             start.y,
-            source.y_fraction,
-            expected_source.y_velocity,
+            arcade_state.y_fraction,
+            expected_arcade_state.y_velocity,
         );
         let expected_position = Point::new(expected_x, expected_y);
-        expected_source.x_fraction = expected_x_fraction;
-        expected_source.y_fraction = expected_y_fraction;
-        expected_source.shot_timer = source_rmax(
-            clamped_source_swarmer_shot_reset(ArcadeWaveProfile::for_wave(report.wave)),
+        expected_arcade_state.x_fraction = expected_x_fraction;
+        expected_arcade_state.y_fraction = expected_y_fraction;
+        expected_arcade_state.shot_timer = source_rmax(
+            clamped_swarmer_shot_reset(ArcadeWaveProfile::for_wave(report.wave)),
             report_arcade_rng.seed,
         );
-        expected_source.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
-        let (expected_velocity, expected_projectile_source) =
-            actor_source_mini_swarmer_fireball(expected_position, &prompt, expected_source)
-                .expect("expected source swarmer fireball");
+        expected_arcade_state.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
+        let (expected_velocity, expected_projectile_arcade_state) =
+            mini_swarmer_fireball(expected_position, &prompt, expected_arcade_state)
+                .expect("expected swarmer fireball");
 
         assert!(report.sounds.contains(&SoundCue::SwarmerShot));
         let swarmer_shot = report
@@ -1387,18 +1390,18 @@
                 }) => Some((*position, *velocity, *source)),
                 _ => None,
             })
-            .expect("source swarmer should emit a hostile shot command");
+            .expect("swarmer should emit a hostile shot command");
         assert_eq!(
             swarmer_shot,
             (
                 expected_position,
                 expected_velocity,
-                Some(expected_projectile_source)
+                Some(expected_projectile_arcade_state)
             )
         );
         assert_eq!(
             snapshot_for(&report, swarmer).swarmer_runtime,
-            Some(expected_source)
+            Some(expected_arcade_state)
         );
     }
 
@@ -1413,7 +1416,7 @@
             actor_snapshot(player.value(), ActorKind::Player, Point::new(42, 120)),
         );
         let start = Point::new(48, 100);
-        let source = SwarmerArcadeState {
+        let arcade_state = SwarmerArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0x0020,
@@ -1425,35 +1428,38 @@
         };
         let swarmer = driver.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
             position: start,
-            source: Some(source),
+            source: Some(arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
         let report_arcade_rng = report
             .arcade_rng
             .expect("playing report should carry arcade rng");
-        let mut expected_source = source;
-        expected_source.y_velocity = source_mini_swarmer_y_velocity(
-            source.y_velocity,
-            source.acceleration,
+        let mut expected_arcade_state = arcade_state;
+        expected_arcade_state.y_velocity = mini_swarmer_y_velocity(
+            arcade_state.y_velocity,
+            arcade_state.acceleration,
             120,
             start.y,
             report_arcade_rng.seed,
         );
-        let (expected_x, expected_x_fraction) =
-            actor_source_axis_step(start.x, source.x_fraction, expected_source.x_velocity);
+        let (expected_x, expected_x_fraction) = actor_source_axis_step(
+            start.x,
+            arcade_state.x_fraction,
+            expected_arcade_state.x_velocity,
+        );
         let (expected_y, expected_y_fraction) = actor_source_active_object_y_step(
             start.y,
-            source.y_fraction,
-            expected_source.y_velocity,
+            arcade_state.y_fraction,
+            expected_arcade_state.y_velocity,
         );
-        expected_source.x_fraction = expected_x_fraction;
-        expected_source.y_fraction = expected_y_fraction;
-        expected_source.shot_timer = source_rmax(
-            clamped_source_swarmer_shot_reset(ArcadeWaveProfile::for_wave(report.wave)),
+        expected_arcade_state.x_fraction = expected_x_fraction;
+        expected_arcade_state.y_fraction = expected_y_fraction;
+        expected_arcade_state.shot_timer = source_rmax(
+            clamped_swarmer_shot_reset(ArcadeWaveProfile::for_wave(report.wave)),
             report_arcade_rng.seed,
         );
-        expected_source.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
+        expected_arcade_state.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
 
         assert!(!report.sounds.contains(&SoundCue::SwarmerShot));
         assert!(!report.commands.iter().any(|command| {
@@ -1471,7 +1477,7 @@
         );
         assert_eq!(
             snapshot_for(&report, swarmer).swarmer_runtime,
-            Some(expected_source)
+            Some(expected_arcade_state)
         );
     }
 

@@ -1231,7 +1231,7 @@
     }
 
     #[test]
-    fn actor_source_swarmer_reserves_use_plres_restore_state() {
+    fn actor_swarmer_reserves_use_arcade_restore_state() {
         let (mut driver, seeded) = started_arcade_wave_driver(2);
         destroy_wave_hostiles(&mut driver, &seeded);
         driver.enemy_reserve = EnemyReserveSnapshot {
@@ -1269,24 +1269,26 @@
             expected_rng.advance().snapshot()
         );
 
-        let mut source_swarmers = restored
+        let mut arcade_swarmers = restored
             .snapshots
             .iter()
             .filter(|snapshot| snapshot.kind == ActorKind::Swarmer)
             .collect::<Vec<_>>();
-        source_swarmers.sort_by_key(|snapshot| snapshot.id);
-        assert_eq!(source_swarmers.len(), 4);
-        for (snapshot, spawn) in source_swarmers.iter().zip(expected_spawns) {
-            let mut expected_source = spawn.source.expect("source swarmer restore metadata");
-            expected_source.sleep_ticks = expected_source.sleep_ticks.saturating_sub(1);
+        arcade_swarmers.sort_by_key(|snapshot| snapshot.id);
+        assert_eq!(arcade_swarmers.len(), 4);
+        for (snapshot, spawn) in arcade_swarmers.iter().zip(expected_spawns) {
+            let mut expected_arcade_state =
+                spawn.source.expect("swarmer arcade restore metadata");
+            expected_arcade_state.sleep_ticks =
+                expected_arcade_state.sleep_ticks.saturating_sub(1);
             assert_eq!(snapshot.position, spawn.position);
-            assert_eq!(snapshot.swarmer_runtime, Some(expected_source));
+            assert_eq!(snapshot.swarmer_runtime, Some(expected_arcade_state));
         }
-        assert!(source_swarmers.iter().all(|snapshot| {
-            let source = snapshot.swarmer_runtime.expect("source swarmer");
-            snapshot.position == source_swarmers[0].position
-                && source.x_fraction == MINI_SWARMER_RESTORE_X_LOW
-                && source.y_fraction == 0
+        assert!(arcade_swarmers.iter().all(|snapshot| {
+            let arcade_state = snapshot.swarmer_runtime.expect("swarmer arcade state");
+            snapshot.position == arcade_swarmers[0].position
+                && arcade_state.x_fraction == MINI_SWARMER_RESTORE_X_LOW
+                && arcade_state.y_fraction == 0
         }));
     }
 

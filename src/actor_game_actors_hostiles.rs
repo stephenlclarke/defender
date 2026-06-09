@@ -479,17 +479,17 @@ impl Swarmer {
         Rect::from_center(self.position, 6, 4)
     }
 
-    fn advance_source_motion(
+    fn advance_arcade_motion(
         &mut self,
         prompt: &StepPrompt,
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) -> bool {
-        let Some(source) = &mut self.source else {
+        let Some(arcade_state) = &mut self.source else {
             return false;
         };
-        if source.sleep_ticks > 0 {
-            source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
+        if arcade_state.sleep_ticks > 0 {
+            arcade_state.sleep_ticks = arcade_state.sleep_ticks.saturating_sub(1);
             return true;
         }
 
@@ -498,35 +498,35 @@ impl Swarmer {
         };
         let profile = prompt.arcade_wave;
         let mut horizontal_seek_only = false;
-        if source.horizontal_seek_pending {
-            source.x_velocity = source_mini_swarmer_seek_velocity(
+        if arcade_state.horizontal_seek_pending {
+            arcade_state.x_velocity = mini_swarmer_seek_velocity(
                 profile.swarmer_x_velocity,
                 player.x,
                 self.position.x,
             );
-            source.horizontal_seek_pending = false;
-            source.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
+            arcade_state.horizontal_seek_pending = false;
+            arcade_state.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
             horizontal_seek_only = true;
         }
 
         let in_shot_window = if horizontal_seek_only {
             false
         } else {
-            source.y_velocity = source_mini_swarmer_y_velocity(
-                source.y_velocity,
-                source.acceleration,
+            arcade_state.y_velocity = mini_swarmer_y_velocity(
+                arcade_state.y_velocity,
+                arcade_state.acceleration,
                 player.y,
                 self.position.y,
                 prompt.arcade_rng.map(|rng| rng.seed).unwrap_or(0),
             );
             let player_absolute_x = actor_source_absolute_x(player, 0);
-            let object_absolute_x = actor_source_absolute_x(self.position, source.x_fraction);
+            let object_absolute_x = actor_source_absolute_x(self.position, arcade_state.x_fraction);
             let past_window = player_absolute_x
                 .wrapping_sub(object_absolute_x)
                 .wrapping_add(MINI_SWARMER_TURN_WINDOW_HALF);
             let in_shot_window = past_window <= MINI_SWARMER_TURN_WINDOW;
             if !in_shot_window {
-                source.x_velocity = source_mini_swarmer_seek_velocity(
+                arcade_state.x_velocity = mini_swarmer_seek_velocity(
                     profile.swarmer_x_velocity,
                     player.x,
                     self.position.x,
@@ -536,26 +536,26 @@ impl Swarmer {
         };
 
         let (x, x_fraction) =
-            actor_source_axis_step(self.position.x, source.x_fraction, source.x_velocity);
+            actor_source_axis_step(self.position.x, arcade_state.x_fraction, arcade_state.x_velocity);
         let (y, y_fraction) = actor_source_active_object_y_step(
             self.position.y,
-            source.y_fraction,
-            source.y_velocity,
+            arcade_state.y_fraction,
+            arcade_state.y_velocity,
         );
         self.position = Point::new(x, y);
-        source.x_fraction = x_fraction;
-        source.y_fraction = y_fraction;
+        arcade_state.x_fraction = x_fraction;
+        arcade_state.y_fraction = y_fraction;
         if in_shot_window {
-            source.shot_timer = source.shot_timer.wrapping_sub(1);
-            if source.shot_timer == 0 {
-                source.shot_timer = prompt
+            arcade_state.shot_timer = arcade_state.shot_timer.wrapping_sub(1);
+            if arcade_state.shot_timer == 0 {
+                arcade_state.shot_timer = prompt
                     .arcade_rng
-                    .map(|rng| source_rmax(clamped_source_swarmer_shot_reset(profile), rng.seed))
-                    .unwrap_or_else(|| clamped_source_swarmer_shot_reset(profile));
-                push_swarmer_shot(self.position, prompt, behavior, Some(*source), commands);
+                    .map(|rng| source_rmax(clamped_swarmer_shot_reset(profile), rng.seed))
+                    .unwrap_or_else(|| clamped_swarmer_shot_reset(profile));
+                push_swarmer_shot(self.position, prompt, behavior, Some(*arcade_state), commands);
             }
         }
-        source.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
+        arcade_state.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
         true
     }
 }
@@ -571,7 +571,7 @@ impl AssetActor for Swarmer {
         let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Swarmer);
-            if !self.advance_source_motion(prompt, behavior, &mut commands) {
+            if !self.advance_arcade_motion(prompt, behavior, &mut commands) {
                 if let Some(position) = move_by_hostile_mode(
                     self.position,
                     behavior.swarmer_mode,
@@ -628,17 +628,17 @@ fn push_swarmer_shot(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
-    source: Option<SwarmerArcadeState>,
+    arcade_state: Option<SwarmerArcadeState>,
     commands: &mut Vec<GameCommand>,
 ) {
-    if let Some(source) = source {
-        if let Some((velocity, projectile_source)) =
-            actor_source_mini_swarmer_fireball(position, prompt, source)
+    if let Some(arcade_state) = arcade_state {
+        if let Some((velocity, projectile_arcade_state)) =
+            mini_swarmer_fireball(position, prompt, arcade_state)
         {
             push_source_enemy_projectile_command(
                 position,
                 velocity,
-                projectile_source,
+                projectile_arcade_state,
                 SoundCue::SwarmerShot,
                 commands,
             );
@@ -655,21 +655,21 @@ fn push_swarmer_shot(
     commands.push(GameCommand::PlaySound(SoundCue::SwarmerShot));
 }
 
-fn actor_source_mini_swarmer_fireball(
+fn mini_swarmer_fireball(
     position: Point,
     prompt: &StepPrompt,
-    source: SwarmerArcadeState,
+    arcade_state: SwarmerArcadeState,
 ) -> Option<(Velocity, EnemyProjectileArcadeState)> {
     let player = prompt.player_position()?;
     let player_delta = actor_source_absolute_x(player, 0)
-        .wrapping_sub(actor_source_absolute_x(position, source.x_fraction));
-    if (player_delta.to_be_bytes()[0] ^ source.x_velocity.to_be_bytes()[0]) & 0x80 != 0
+        .wrapping_sub(actor_source_absolute_x(position, arcade_state.x_fraction));
+    if (player_delta.to_be_bytes()[0] ^ arcade_state.x_velocity.to_be_bytes()[0]) & 0x80 != 0
         || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
     {
         return None;
     }
 
-    let x_velocity = source.x_velocity.wrapping_shl(3);
+    let x_velocity = arcade_state.x_velocity.wrapping_shl(3);
     let y_velocity = actor_arithmetic_shift_right_word(
         u16::from_be_bytes([(player.y as u8).wrapping_sub(position.y as u8), 0]),
         5,
@@ -687,7 +687,7 @@ fn actor_source_mini_swarmer_fireball(
     ))
 }
 
-fn clamped_source_swarmer_shot_reset(profile: ArcadeWaveProfile) -> u8 {
+fn clamped_swarmer_shot_reset(profile: ArcadeWaveProfile) -> u8 {
     profile.swarmer_shot_time.max(1).min(u32::from(u8::MAX)) as u8
 }
 
@@ -1016,7 +1016,7 @@ fn actor_source_motion_seed(step: u64, id: ActorId) -> u8 {
     (step as u8).wrapping_mul(17).wrapping_add(id.value() as u8)
 }
 
-fn source_mini_swarmer_seek_velocity(x_velocity_word: u8, player_x: i16, swarmer_x: i16) -> u16 {
+fn mini_swarmer_seek_velocity(x_velocity_word: u8, player_x: i16, swarmer_x: i16) -> u16 {
     if player_x >= swarmer_x {
         actor_sign_extend_u8_to_u16(x_velocity_word)
     } else {
@@ -1024,7 +1024,7 @@ fn source_mini_swarmer_seek_velocity(x_velocity_word: u8, player_x: i16, swarmer
     }
 }
 
-fn source_mini_swarmer_y_velocity(
+fn mini_swarmer_y_velocity(
     previous_y_velocity: u16,
     acceleration: u8,
     player_y: i16,
@@ -1044,13 +1044,13 @@ fn source_mini_swarmer_y_velocity(
     if (y_velocity as i16) <= (MINI_SWARMER_MIN_Y_VELOCITY as i16) {
         y_velocity = MINI_SWARMER_MIN_Y_VELOCITY;
     }
-    y_velocity = y_velocity.wrapping_add(source_mini_swarmer_damping_adjustment(y_velocity));
+    y_velocity = y_velocity.wrapping_add(mini_swarmer_damping_adjustment(y_velocity));
     y_velocity.wrapping_add(actor_sign_extend_u8_to_u16(
         (seed & 0x1F).wrapping_sub(0x10),
     ))
 }
 
-fn source_mini_swarmer_damping_adjustment(value: u16) -> u16 {
+fn mini_swarmer_damping_adjustment(value: u16) -> u16 {
     let [mut a, mut b] = value.to_be_bytes();
     a = !a;
     b = !b;
