@@ -423,8 +423,8 @@
             atlas_region_alpha_rows(&atlas, SpriteId::TERRAIN_TILE_ALT),
             vec![".#", "#."]
         );
-        assert_eq!(terrain_7007[0], pseudo_color_rgba(PICTURE_COLOR_TABLE[7]));
-        assert_eq!(terrain_0770[1], pseudo_color_rgba(PICTURE_COLOR_TABLE[7]));
+        assert_eq!(terrain_7007[0], pseudo_color_rgba(OBJECT_BITMAP_COLOR_TABLE[7]));
+        assert_eq!(terrain_0770[1], pseudo_color_rgba(OBJECT_BITMAP_COLOR_TABLE[7]));
     }
 
     #[test]
@@ -458,29 +458,29 @@
 
     #[test]
     fn object_bitmaps_decode_arcade_bytes_and_palettes() {
-        let ship = decode_object_picture_asset_rgba(
+        let ship = decode_object_bitmap_asset_rgba(
             ObjectBitmapId::PlayerShipRightPrimary,
             6,
             8,
-            ObjectPicturePalette::ship(),
+            ObjectBitmapPalette::ship(),
         );
-        let ship_left = decode_object_picture_asset_rgba(
+        let ship_left = decode_object_bitmap_asset_rgba(
             ObjectBitmapId::PlayerShipLeftPrimary,
             6,
             8,
-            ObjectPicturePalette::ship(),
+            ObjectBitmapPalette::ship(),
         );
-        let shot = decode_object_picture_asset_rgba(
+        let shot = decode_object_bitmap_asset_rgba(
             ObjectBitmapId::PlayerLaser,
             1,
             8,
-            ObjectPicturePalette::player_shot(),
+            ObjectBitmapPalette::player_shot(),
         );
-        let human = decode_object_picture_asset_rgba(
+        let human = decode_object_bitmap_asset_rgba(
             ObjectBitmapId::HumanStandingPrimary,
             8,
             2,
-            ObjectPicturePalette::white(),
+            ObjectBitmapPalette::white(),
         );
 
         assert_eq!(ship.surface, SurfaceSize::new(16, 6));
@@ -530,7 +530,7 @@
     }
 
     #[test]
-    fn default_sprite_atlas_uses_object_picture_grid_regions() {
+    fn default_sprite_atlas_uses_object_bitmap_grid_regions() {
         let atlas = TextureAtlas::default_sprites();
 
         assert_visible_region(&atlas, SpriteId::ASTRONAUT_EXPLOSION);

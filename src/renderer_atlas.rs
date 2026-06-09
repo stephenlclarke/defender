@@ -41,15 +41,15 @@ struct SpriteAtlasBlitRegion {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ObjectPictureGrid {
+struct ObjectBitmapGrid {
     rows: u8,
     byte_columns: u8,
     bytes: &'static [u8],
-    palette: ObjectPicturePalette,
+    palette: ObjectBitmapPalette,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ObjectPicturePalette {
+struct ObjectBitmapPalette {
     one: [u8; 4],
     a: [u8; 4],
     c: [u8; 4],
@@ -58,7 +58,7 @@ struct ObjectPicturePalette {
     f: [u8; 4],
 }
 
-impl ObjectPicturePalette {
+impl ObjectBitmapPalette {
     const fn white() -> Self {
         Self {
             one: WHITE_RGBA,
@@ -82,7 +82,7 @@ impl ObjectPicturePalette {
     }
 
     fn ship() -> Self {
-        let white = pseudo_color_rgba(PICTURE_COLOR_TABLE[9]);
+        let white = pseudo_color_rgba(OBJECT_BITMAP_COLOR_TABLE[9]);
         Self {
             one: white,
             a: white,
@@ -172,7 +172,7 @@ const GRAY_RGBA: [u8; 4] = [170, 170, 186, 255];
 const PURPLE_RGBA: [u8; 4] = [182, 48, 255, 255];
 const PALE_YELLOW_RGBA: [u8; 4] = [255, 234, 128, 255];
 const TRANSPARENT_RGBA: [u8; 4] = [0, 0, 0, 0];
-const PICTURE_COLOR_TABLE: [u8; 16] = [
+const OBJECT_BITMAP_COLOR_TABLE: [u8; 16] = [
     0x00, 0x00, 0x07, 0x28, 0x2F, 0x81, 0xA4, 0x15, 0xC7, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 const BOMBER_COLOR_SEQUENCE: [u8; 9] = [0x81, 0x81, 0x2F, 0x81, 0x2F, 0x07, 0x2F, 0x81, 0x07]; // original: SOURCE_TIE_COLOR_TABLE
@@ -201,23 +201,23 @@ const TERRAIN_EXPLOSION_BYTES: [u8; 48] = [
     0x77, 0xDE, 0x07, 0x71, 0x17, 0x17, 0xDE, 0xF7, 0x71, 0x17, 0x71, 0x7C, 0xDE, 0xF0, 0x07, 0x77,
     0xC7, 0x71, 0x17, 0x70, 0x70, 0x7C, 0xD7, 0x77, 0x77, 0x70, 0x01, 0xCD, 0xFF, 0xD7, 0x70, 0xF0,
 ];
-const ASTRONAUT_EXPLOSION_GRID: ObjectPictureGrid = ObjectPictureGrid {
+const ASTRONAUT_EXPLOSION_GRID: ObjectBitmapGrid = ObjectBitmapGrid {
     rows: 8,
     byte_columns: 4,
     bytes: &ASTRONAUT_EXPLOSION_BYTES,
-    palette: ObjectPicturePalette::burst(),
+    palette: ObjectBitmapPalette::burst(),
 };
-const NULL_OBJECT_GRID: ObjectPictureGrid = ObjectPictureGrid {
+const NULL_OBJECT_GRID: ObjectBitmapGrid = ObjectBitmapGrid {
     rows: 1,
     byte_columns: 1,
     bytes: &NULL_OBJECT_BYTES,
-    palette: ObjectPicturePalette::white(),
+    palette: ObjectBitmapPalette::white(),
 };
-const TERRAIN_EXPLOSION_GRID: ObjectPictureGrid = ObjectPictureGrid {
+const TERRAIN_EXPLOSION_GRID: ObjectBitmapGrid = ObjectBitmapGrid {
     rows: 6,
     byte_columns: 8,
     bytes: &TERRAIN_EXPLOSION_BYTES,
-    palette: ObjectPicturePalette::burst(),
+    palette: ObjectBitmapPalette::burst(),
 };
 const HALL_OF_FAME_DEFENDER_LOGO_COLUMNS: u8 = 0x3C; // original: SOURCE_DEFENDER_LOGO_COLUMNS
 const HALL_OF_FAME_DEFENDER_LOGO_ROWS: u8 = 0x18; // original: SOURCE_DEFENDER_LOGO_ROWS
@@ -633,111 +633,111 @@ fn attract_defender_wordmark_block_regions() -> Vec<AtlasRegion> {
 fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) -> Vec<u8> {
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
 
-    let player_ship = decode_object_picture_asset_rgba(
+    let player_ship = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::PlayerShipRightPrimary,
         6,
         8,
-        ObjectPicturePalette::ship(),
+        ObjectBitmapPalette::ship(),
     );
-    let player_ship_left = decode_object_picture_asset_rgba(
+    let player_ship_left = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::PlayerShipLeftPrimary,
         6,
         8,
-        ObjectPicturePalette::ship(),
+        ObjectBitmapPalette::ship(),
     );
-    let player_projectile = decode_object_picture_asset_rgba(
+    let player_projectile = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::PlayerLaser,
         1,
         8,
-        ObjectPicturePalette::player_shot(),
+        ObjectBitmapPalette::player_shot(),
     );
-    let enemy_lander = decode_object_picture_asset_rgba(
+    let enemy_lander = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::LanderFrame1Primary,
         8,
         5,
-        ObjectPicturePalette::white(),
+        ObjectBitmapPalette::white(),
     );
-    let human = decode_object_picture_asset_rgba(
+    let human = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::HumanStandingPrimary,
         8,
         2,
-        ObjectPicturePalette::white(),
+        ObjectBitmapPalette::white(),
     );
-    let enemy_mutant = decode_object_picture_asset_rgba(
+    let enemy_mutant = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::MutantPrimary,
         8,
         5,
-        ObjectPicturePalette::white(),
+        ObjectBitmapPalette::white(),
     );
-    let enemy_baiter = decode_object_picture_asset_rgba(
+    let enemy_baiter = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::BaiterFrame1Primary,
         4,
         6,
-        ObjectPicturePalette::white(),
+        ObjectBitmapPalette::white(),
     );
-    let enemy_bomber = decode_object_picture_asset_rgba(
+    let enemy_bomber = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::BomberFrame1Primary,
         8,
         4,
-        ObjectPicturePalette::tie(0),
+        ObjectBitmapPalette::tie(0),
     );
-    let enemy_pod = decode_object_picture_asset_rgba(
+    let enemy_pod = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::PodPrimary,
         8,
         4,
-        ObjectPicturePalette::white(),
+        ObjectBitmapPalette::white(),
     );
-    let enemy_swarmer = decode_object_picture_asset_rgba(
+    let enemy_swarmer = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::SwarmerPrimary,
         4,
         3,
-        ObjectPicturePalette::white(),
+        ObjectBitmapPalette::white(),
     );
-    let enemy_bomb = decode_object_picture_asset_rgba(
+    let enemy_bomb = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::EnemyBombFrame1Primary,
         3,
         2,
-        ObjectPicturePalette::bomb(0),
+        ObjectBitmapPalette::bomb(0),
     );
-    let bomb_explosion = decode_object_picture_asset_rgba(
+    let bomb_explosion = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::BombExplosion,
         8,
         4,
-        ObjectPicturePalette::burst(),
+        ObjectBitmapPalette::burst(),
     );
-    let swarmer_explosion = decode_object_picture_asset_rgba(
+    let swarmer_explosion = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::SwarmerExplosion,
         8,
         4,
-        ObjectPicturePalette::burst(),
+        ObjectBitmapPalette::burst(),
     );
-    let score_popup_250 = decode_object_picture_asset_rgba(
+    let score_popup_250 = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::Score250Primary,
         6,
         6,
-        ObjectPicturePalette::score_250(0),
+        ObjectBitmapPalette::score_250(0),
     );
-    let score_popup_500 = decode_object_picture_asset_rgba(
+    let score_popup_500 = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::Score500Primary,
         6,
         6,
-        ObjectPicturePalette::score_500(0),
+        ObjectBitmapPalette::score_500(0),
     );
-    let player_life_stock = decode_object_picture_asset_rgba(
+    let player_life_stock = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::PlayerLifeStock,
         4,
         5,
-        ObjectPicturePalette::ship(),
+        ObjectBitmapPalette::ship(),
     );
-    let smart_bomb_stock = decode_object_picture_asset_rgba(
+    let smart_bomb_stock = decode_object_bitmap_asset_rgba(
         ObjectBitmapId::SmartBombStock,
         3,
         3,
-        ObjectPicturePalette::white(),
+        ObjectBitmapPalette::white(),
     );
-    let astronaut_explosion = decode_picture_grid_rgba("ASXP1", ASTRONAUT_EXPLOSION_GRID);
-    let null_object = decode_picture_grid_rgba("NULOB", NULL_OBJECT_GRID);
-    let terrain_explosion = decode_picture_grid_rgba("TEREX", TERRAIN_EXPLOSION_GRID);
+    let astronaut_explosion = decode_object_bitmap_grid_rgba("ASXP1", ASTRONAUT_EXPLOSION_GRID);
+    let null_object = decode_object_bitmap_grid_rgba("NULOB", NULL_OBJECT_GRID);
+    let terrain_explosion = decode_object_bitmap_grid_rgba("TEREX", TERRAIN_EXPLOSION_GRID);
     let score_digits = decode_score_digit_sprites();
     let message_glyphs = decode_message_glyph_sprites();
     let hall_of_fame_logo = decode_hall_of_fame_defender_logo_rgba();
@@ -1015,7 +1015,7 @@ fn decode_arcade_terrain_word_rgba(word: u16) -> EmbeddedSprite {
     for (row, byte) in word.to_be_bytes().into_iter().enumerate() {
         for column in 0..2 {
             let nibble = if column == 0 { byte >> 4 } else { byte & 0x0F };
-            let color = picture_palette_color(nibble, ObjectPicturePalette::white());
+            let color = object_bitmap_palette_color(nibble, ObjectBitmapPalette::white());
             let start = (row * WIDTH as usize + column) * 4;
             pixels[start..start + 4].copy_from_slice(&color);
         }
@@ -1056,8 +1056,8 @@ fn decode_embedded_png_rgba(name: &'static str, bytes: &[u8]) -> EmbeddedSprite 
     }
 }
 
-fn decode_picture_grid_rgba(name: &'static str, grid: ObjectPictureGrid) -> EmbeddedSprite {
-    decode_picture_bytes_rgba(
+fn decode_object_bitmap_grid_rgba(name: &'static str, grid: ObjectBitmapGrid) -> EmbeddedSprite {
+    decode_object_bitmap_bytes_rgba(
         name,
         grid.rows,
         grid.byte_columns,
@@ -1066,28 +1066,28 @@ fn decode_picture_grid_rgba(name: &'static str, grid: ObjectPictureGrid) -> Embe
     )
 }
 
-fn decode_object_picture_asset_rgba(
+fn decode_object_bitmap_asset_rgba(
     bitmap: ObjectBitmapId,
     rows: u8,
     byte_columns: u8,
-    palette: ObjectPicturePalette,
+    palette: ObjectBitmapPalette,
 ) -> EmbeddedSprite {
     let bytes = object_bitmap_bytes(bitmap);
-    decode_picture_bytes_rgba("object bitmap", rows, byte_columns, bytes, palette)
+    decode_object_bitmap_bytes_rgba("object bitmap", rows, byte_columns, bytes, palette)
 }
 
-fn decode_picture_bytes_rgba(
+fn decode_object_bitmap_bytes_rgba(
     name: &'static str,
     rows: u8,
     byte_columns: u8,
     bytes: &[u8],
-    palette: ObjectPicturePalette,
+    palette: ObjectBitmapPalette,
 ) -> EmbeddedSprite {
     let expected = usize::from(rows) * usize::from(byte_columns);
     assert_eq!(
         bytes.len(),
         expected,
-        "object picture {name} byte grid must match its declared dimensions"
+        "object bitmap {name} byte grid must match its declared dimensions"
     );
     let surface = SurfaceSize::new(u32::from(byte_columns) * 2, u32::from(rows));
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
@@ -1096,8 +1096,8 @@ fn decode_picture_bytes_rgba(
         let byte_column_offset = column * usize::from(rows);
         for row in 0..usize::from(rows) {
             let value = bytes[byte_column_offset + row];
-            let left = picture_palette_color(value >> 4, palette);
-            let right = picture_palette_color(value & 0x0F, palette);
+            let left = object_bitmap_palette_color(value >> 4, palette);
+            let right = object_bitmap_palette_color(value & 0x0F, palette);
             let offset = ((row * surface.width as usize) + column * 2) * 4;
             pixels[offset..offset + 4].copy_from_slice(&left);
             pixels[offset + 4..offset + 8].copy_from_slice(&right);
@@ -1150,14 +1150,14 @@ fn decode_score_digit_rgba(
     );
     let surface = SurfaceSize::new(u32::from(columns) * 2, u32::from(rows));
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
-    let palette = ObjectPicturePalette::white();
+    let palette = ObjectBitmapPalette::white();
 
     for column in 0..usize::from(columns) {
         let byte_column_offset = column * usize::from(rows);
         for row in 0..usize::from(rows) {
             let value = bytes[byte_column_offset + row];
-            let left = picture_palette_color(value >> 4, palette);
-            let right = picture_palette_color(value & 0x0F, palette);
+            let left = object_bitmap_palette_color(value >> 4, palette);
+            let right = object_bitmap_palette_color(value & 0x0F, palette);
             let offset = ((row * surface.width as usize) + column * 2) * 4;
             pixels[offset..offset + 4].copy_from_slice(&left);
             pixels[offset + 4..offset + 8].copy_from_slice(&right);
@@ -1212,14 +1212,14 @@ fn decode_message_glyph_rgba(
     );
     let surface = SurfaceSize::new(u32::from(columns) * 2, u32::from(rows));
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
-    let palette = ObjectPicturePalette::white();
+    let palette = ObjectBitmapPalette::white();
 
     for column in 0..usize::from(columns) {
         let byte_column_offset = column * usize::from(rows);
         for row in 0..usize::from(rows) {
             let value = bytes[byte_column_offset + row];
-            let left = picture_palette_color(value >> 4, palette);
-            let right = picture_palette_color(value & 0x0F, palette);
+            let left = object_bitmap_palette_color(value >> 4, palette);
+            let right = object_bitmap_palette_color(value & 0x0F, palette);
             let offset = ((row * surface.width as usize) + column * 2) * 4;
             pixels[offset..offset + 4].copy_from_slice(&left);
             pixels[offset + 4..offset + 8].copy_from_slice(&right);
@@ -1229,11 +1229,11 @@ fn decode_message_glyph_rgba(
     EmbeddedSprite { surface, pixels }
 }
 
-fn picture_palette_color(index: u8, palette: ObjectPicturePalette) -> [u8; 4] {
+fn object_bitmap_palette_color(index: u8, palette: ObjectBitmapPalette) -> [u8; 4] {
     match index {
         0x0 => TRANSPARENT_RGBA,
         0x1 => palette.one,
-        0x2..=0x9 => pseudo_color_rgba(PICTURE_COLOR_TABLE[index as usize]),
+        0x2..=0x9 => pseudo_color_rgba(OBJECT_BITMAP_COLOR_TABLE[index as usize]),
         0xA => palette.a,
         0xB => GRAY_RGBA,
         0xC => palette.c,
@@ -1251,14 +1251,14 @@ fn decode_hall_of_fame_defender_logo_rgba() -> EmbeddedSprite {
         u32::from(HALL_OF_FAME_DEFENDER_LOGO_ROWS),
     );
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
-    let palette = ObjectPicturePalette::defender_logo();
+    let palette = ObjectBitmapPalette::defender_logo();
 
     for column in 0..usize::from(HALL_OF_FAME_DEFENDER_LOGO_COLUMNS) {
         let logo_byte_column = column * usize::from(HALL_OF_FAME_DEFENDER_LOGO_ROWS);
         for row in 0..usize::from(HALL_OF_FAME_DEFENDER_LOGO_ROWS) {
             let value = bytes[logo_byte_column + row];
-            let left = picture_palette_color(value >> 4, palette);
-            let right = picture_palette_color(value & 0x0F, palette);
+            let left = object_bitmap_palette_color(value >> 4, palette);
+            let right = object_bitmap_palette_color(value & 0x0F, palette);
             let offset = ((row * surface.width as usize) + column * 2) * 4;
             pixels[offset..offset + 4].copy_from_slice(&left);
             pixels[offset + 4..offset + 8].copy_from_slice(&right);
@@ -1574,7 +1574,7 @@ fn draw_defender_wordmark_block(
     target_x_byte: i32,
     target_y: i32,
 ) {
-    let palette = ObjectPicturePalette::defender_logo();
+    let palette = ObjectBitmapPalette::defender_logo();
     for dy in 0..2 {
         for dx in 0..2 {
             let Some(nibble) = defender_wordmark_nibble(logo_bytes, wordmark_x + dx, wordmark_y + dy)
@@ -1584,7 +1584,7 @@ fn draw_defender_wordmark_block(
             if nibble == 0 {
                 continue;
             }
-            let color = picture_palette_color(nibble, palette);
+            let color = object_bitmap_palette_color(nibble, palette);
             write_native_rgba_pixel(
                 pixels,
                 surface,
