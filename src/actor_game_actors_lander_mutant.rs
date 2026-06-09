@@ -888,34 +888,35 @@ fn target6_mutant_arcade_conversion_x_correction(
 }
 
 fn target6_mutant_arcade_has_conversion_correction(
-    source: MutantArcadeState,
+    arcade_state: MutantArcadeState,
 ) -> bool {
-    source.render_x_correction == TARGET6_MUTANT_CONVERSION_X_CORRECTION
+    arcade_state.render_x_correction == TARGET6_MUTANT_CONVERSION_X_CORRECTION
 }
 
-fn target6_mutant_arcade_uses_dive_projection(source: MutantArcadeState) -> bool {
-    target6_mutant_arcade_has_conversion_correction(source) && source.y_velocity == 0x0090
+fn target6_mutant_arcade_uses_dive_projection(arcade_state: MutantArcadeState) -> bool {
+    target6_mutant_arcade_has_conversion_correction(arcade_state)
+        && arcade_state.y_velocity == 0x0090
 }
 
 fn target6_mutant_arcade_defers_first_shot(
     position: Point,
-    source: MutantArcadeState,
+    arcade_state: MutantArcadeState,
 ) -> bool {
-    target6_mutant_arcade_has_conversion_correction(source)
-        && !source.target6_first_shot_deferred
+    target6_mutant_arcade_has_conversion_correction(arcade_state)
+        && !arcade_state.target6_first_shot_deferred
         && position.x <= 0x04
         && position.y <= 0x60
 }
 
 fn target6_mutant_arcade_fires_visible_entry_shot(
     position: Point,
-    source: MutantArcadeState,
+    arcade_state: MutantArcadeState,
     player_position: Point,
 ) -> bool {
-    target6_mutant_arcade_has_conversion_correction(source)
-        && !source.target6_first_shot_deferred
-        && source.shot_timer == TARGET6_MUTANT_DEFERRED_SHOT_TIMER
-        && source.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS
+    target6_mutant_arcade_has_conversion_correction(arcade_state)
+        && !arcade_state.target6_first_shot_deferred
+        && arcade_state.shot_timer == TARGET6_MUTANT_DEFERRED_SHOT_TIMER
+        && arcade_state.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS
         && position.x <= 0x04
         && position.y <= 0x60
         && player_position.y <= FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y
@@ -923,38 +924,39 @@ fn target6_mutant_arcade_fires_visible_entry_shot(
 
 fn target6_mutant_arcade_suppresses_fire2524_regular_shot(
     position: Point,
-    source: MutantArcadeState,
+    arcade_state: MutantArcadeState,
 ) -> bool {
-    if !target6_mutant_arcade_uses_dive_projection(source) {
+    if !target6_mutant_arcade_uses_dive_projection(arcade_state) {
         return false;
     }
 
-    let (_, raw_y16) = arcade_world_position(position, source.x_fraction, source.y_fraction);
+    let (_, raw_y16) =
+        arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction);
     (0x4000..=0x4FFF).contains(&raw_y16) || (0x9000..=0x9FFF).contains(&raw_y16)
 }
 
 fn target6_mutant_arcade_fires_dive_shot(
     position: Point,
-    source: MutantArcadeState,
+    arcade_state: MutantArcadeState,
 ) -> bool {
-    if !target6_mutant_arcade_uses_dive_projection(source)
-        || !source.target6_first_shot_deferred
-        || source.sleep_ticks != 0
+    if !target6_mutant_arcade_uses_dive_projection(arcade_state)
+        || !arcade_state.target6_first_shot_deferred
+        || arcade_state.sleep_ticks != 0
     {
         return false;
     }
 
     matches!(
-        arcade_world_position(position, source.x_fraction, source.y_fraction),
+        arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction),
         TARGET6_MUTANT_DIVE_FIRST_SHOT_RAW | TARGET6_MUTANT_DIVE_SECOND_SHOT_RAW
     )
 }
 
 fn target6_mutant_arcade_post_shot_timer(
-    source: MutantArcadeState,
+    arcade_state: MutantArcadeState,
     fired: bool,
 ) -> Option<u8> {
-    (fired && target6_mutant_arcade_has_conversion_correction(source))
+    (fired && target6_mutant_arcade_has_conversion_correction(arcade_state))
         .then_some(TARGET6_MUTANT_POST_SHOT_TIMER)
 }
 
@@ -1120,14 +1122,14 @@ const ACTOR_TARGET6_MUTANT_VISUAL_ROWS: &[(u16, i16)] = &[
 
 fn target6_mutant_arcade_dive_position(
     position: Point,
-    source: MutantArcadeState,
+    arcade_state: MutantArcadeState,
 ) -> Option<Point> {
-    if !target6_mutant_arcade_uses_dive_projection(source) {
+    if !target6_mutant_arcade_uses_dive_projection(arcade_state) {
         return None;
     }
 
     let (raw_x16, raw_y16) =
-        arcade_world_position(position, source.x_fraction, source.y_fraction);
+        arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction);
     if let Some(anchor) = ACTOR_TARGET6_MUTANT_DIVE_PROJECTIONS
         .iter()
         .find(|anchor| anchor.raw_x16 == raw_x16 && anchor.raw_y16 == raw_y16)
@@ -1190,14 +1192,15 @@ fn arcade_lerp_i16(
 
 fn target6_mutant_arcade_visual_position(
     position: Point,
-    source: MutantArcadeState,
+    arcade_state: MutantArcadeState,
 ) -> Option<Point> {
-    if !target6_mutant_arcade_has_conversion_correction(source) || source.x_velocity != 0x0030
+    if !target6_mutant_arcade_has_conversion_correction(arcade_state)
+        || arcade_state.x_velocity != 0x0030
     {
         return None;
     }
 
-    let x16 = arcade_absolute_x(position, source.x_fraction)
+    let x16 = arcade_absolute_x(position, arcade_state.x_fraction)
         .wrapping_add(TARGET6_MUTANT_VISUAL_X_CORRECTION);
     if (x16 as i16) < 0 {
         return None;
@@ -1214,58 +1217,60 @@ fn target6_mutant_arcade_visual_position(
 
 fn target6_mutant_arcade_scene_position(
     position: Point,
-    source: Option<MutantArcadeState>,
+    arcade_state: Option<MutantArcadeState>,
 ) -> Point {
-    let Some(source) = source else {
+    let Some(arcade_state) = arcade_state else {
         return position;
     };
-    target6_mutant_arcade_dive_position(position, source)
-        .or_else(|| target6_mutant_arcade_visual_position(position, source))
+    target6_mutant_arcade_dive_position(position, arcade_state)
+        .or_else(|| target6_mutant_arcade_visual_position(position, arcade_state))
         .unwrap_or(position)
 }
 
 fn target6_mutant_arcade_collision_position(
     position: Point,
-    source: Option<MutantArcadeState>,
+    arcade_state: Option<MutantArcadeState>,
 ) -> Point {
-    let Some(source) = source else {
+    let Some(arcade_state) = arcade_state else {
         return position;
     };
-    if let Some(position) = target6_mutant_arcade_dive_position(position, source) {
+    if let Some(position) = target6_mutant_arcade_dive_position(position, arcade_state) {
         return position.offset(Velocity::new(0, 1));
     }
-    target6_mutant_arcade_visual_position(position, source).unwrap_or(position)
+    target6_mutant_arcade_visual_position(position, arcade_state).unwrap_or(position)
 }
 
 fn target6_mutant_arcade_waits_for_fire2524_collision(
     position: Point,
-    source: Option<MutantArcadeState>,
+    arcade_state: Option<MutantArcadeState>,
 ) -> bool {
-    let Some(source) = source else {
+    let Some(arcade_state) = arcade_state else {
         return false;
     };
-    if !target6_mutant_arcade_uses_dive_projection(source) {
+    if !target6_mutant_arcade_uses_dive_projection(arcade_state) {
         return false;
     }
 
-    let (_, raw_y16) = arcade_world_position(position, source.x_fraction, source.y_fraction);
-    source.shot_timer >= 0x80
+    let (_, raw_y16) =
+        arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction);
+    arcade_state.shot_timer >= 0x80
         && (0x9000..TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MIN).contains(&raw_y16)
 }
 
 fn target6_mutant_arcade_uses_fire2524_collision_projection(
     position: Point,
-    source: Option<MutantArcadeState>,
+    arcade_state: Option<MutantArcadeState>,
 ) -> bool {
-    let Some(source) = source else {
+    let Some(arcade_state) = arcade_state else {
         return false;
     };
-    if !target6_mutant_arcade_uses_dive_projection(source) {
+    if !target6_mutant_arcade_uses_dive_projection(arcade_state) {
         return false;
     }
 
-    let (_, raw_y16) = arcade_world_position(position, source.x_fraction, source.y_fraction);
-    source.shot_timer >= 0x80
+    let (_, raw_y16) =
+        arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction);
+    arcade_state.shot_timer >= 0x80
         && (TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MIN
             ..TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MAX)
             .contains(&raw_y16)
@@ -1298,17 +1303,17 @@ fn actor_player_enemy_collision_explosion_placement(
 
 fn target6_mutant_arcade_shot_position(
     position: Point,
-    source: MutantArcadeState,
+    arcade_state: MutantArcadeState,
 ) -> Point {
-    if !target6_mutant_arcade_uses_dive_projection(source) {
+    if !target6_mutant_arcade_uses_dive_projection(arcade_state) {
         return position;
     }
 
-    match arcade_world_position(position, source.x_fraction, source.y_fraction) {
+    match arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction) {
         TARGET6_MUTANT_DIVE_ENTRY_RAW => Point::new(0x13, 0x46),
         TARGET6_MUTANT_DIVE_FIRST_SHOT_RAW => Point::new(0x1E, 0x70),
         TARGET6_MUTANT_DIVE_SECOND_SHOT_RAW => Point::new(0x21, 0x87),
-        _ => target6_mutant_arcade_dive_position(position, source).unwrap_or(position),
+        _ => target6_mutant_arcade_dive_position(position, arcade_state).unwrap_or(position),
     }
 }
 
@@ -1338,18 +1343,20 @@ fn arcade_tie_selected_slot(seed: u8) -> u8 {
 
 fn target6_mutant_arcade_fire2524_forced_shot(
     position: Point,
-    source: MutantArcadeState,
+    arcade_state: MutantArcadeState,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
 ) -> Option<(Point, Velocity, EnemyProjectileArcadeState)> {
-    if !target6_mutant_arcade_uses_dive_projection(source)
+    if !target6_mutant_arcade_uses_dive_projection(arcade_state)
         || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
     {
         return None;
     }
 
-    match arcade_world_position(position, source.x_fraction, source.y_fraction) {
-        TARGET6_MUTANT_FIRE2524_FIRST_SHOT_RAW if source.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS => {
+    match arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction) {
+        TARGET6_MUTANT_FIRE2524_FIRST_SHOT_RAW
+            if arcade_state.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS =>
+        {
             Some(target6_mutant_arcade_exact_projectile(
                 Point::new(0x1E, 0x54),
                 0x33,
@@ -1360,7 +1367,7 @@ fn target6_mutant_arcade_fire2524_forced_shot(
             ))
         }
         TARGET6_MUTANT_FIRE2524_SECOND_SHOT_RAW
-            if source.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS =>
+            if arcade_state.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS =>
         {
             Some(target6_mutant_arcade_exact_projectile(
                 Point::new(0x21, 0x7F),
