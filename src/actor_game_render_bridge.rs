@@ -429,7 +429,7 @@ fn push_actor_playing_top_display_border(scene: &mut RenderScene, wave: u16) {
     }
 }
 
-fn source_pseudo_color_tint(value: u8) -> Color {
+fn williams_color_byte_tint(value: u8) -> Color {
     if value == 0 {
         return Color::from_rgba(0, 0, 0, 0);
     }
@@ -441,46 +441,45 @@ fn source_pseudo_color_tint(value: u8) -> Color {
     )
 }
 
-fn source_scanner_mini_terrain_records()
--> &'static [SourceScannerTerrainRecord; SCANNER_TERRAIN_RECORDS] {
-    static RECORDS: OnceLock<[SourceScannerTerrainRecord; SCANNER_TERRAIN_RECORDS]> =
+fn scanner_mini_terrain_records() -> &'static [ScannerMiniTerrainRecord; SCANNER_TERRAIN_RECORDS] {
+    static RECORDS: OnceLock<[ScannerMiniTerrainRecord; SCANNER_TERRAIN_RECORDS]> =
         OnceLock::new();
     RECORDS.get_or_init(|| {
-        source_generate_scanner_mini_terrain_records(0u16.wrapping_sub(SCANNER_SCAN_CENTER_OFFSET))
+        generate_scanner_mini_terrain_records(0u16.wrapping_sub(SCANNER_SCAN_CENTER_OFFSET))
     })
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-struct SourceScannerTerrainRecord {
+struct ScannerMiniTerrainRecord {
     screen_address: u16,
     word: u16,
 }
 
-fn source_generate_scanner_mini_terrain_records(
+fn generate_scanner_mini_terrain_records(
     scan_left: u16,
-) -> [SourceScannerTerrainRecord; SCANNER_TERRAIN_RECORDS] {
-    let bytes = source_mterr_bytes();
+) -> [ScannerMiniTerrainRecord; SCANNER_TERRAIN_RECORDS] {
+    let bytes = main_terrain_record_bytes();
     let first_record = usize::from(scan_left.to_be_bytes()[0] >> 2);
     assert!(
         first_record + SCANNER_TERRAIN_RECORDS <= SCANNER_MINI_TERRAIN_RECORDS,
-        "MTERR slice must contain 64 source scanner terrain records"
+        "main terrain slice must contain 64 scanner terrain records"
     );
 
-    let mut records = [SourceScannerTerrainRecord::default(); SCANNER_TERRAIN_RECORDS];
-    let mut source_column = SCANNER_OBJECT_BASE_SCREEN.to_be_bytes()[0];
+    let mut records = [ScannerMiniTerrainRecord::default(); SCANNER_TERRAIN_RECORDS];
+    let mut screen_column = SCANNER_OBJECT_BASE_SCREEN.to_be_bytes()[0];
     for (index, record) in records.iter_mut().enumerate() {
-        let source_index = (first_record + index) * 3;
-        *record = SourceScannerTerrainRecord {
-            screen_address: u16::from_be_bytes([source_column, bytes[source_index]]),
-            word: u16::from_be_bytes([bytes[source_index + 1], bytes[source_index + 2]]),
+        let record_byte_index = (first_record + index) * 3;
+        *record = ScannerMiniTerrainRecord {
+            screen_address: u16::from_be_bytes([screen_column, bytes[record_byte_index]]),
+            word: u16::from_be_bytes([bytes[record_byte_index + 1], bytes[record_byte_index + 2]]),
         };
-        source_column = source_column.wrapping_add(1);
+        screen_column = screen_column.wrapping_add(1);
     }
 
     records
 }
 
-fn source_mterr_bytes() -> &'static [u8; MAIN_TERRAIN_RECORD_BYTE_COUNT] {
+fn main_terrain_record_bytes() -> &'static [u8; MAIN_TERRAIN_RECORD_BYTE_COUNT] {
     crate::arcade_assets::MAIN_TERRAIN_BYTES
 }
 

@@ -14,7 +14,7 @@ fn push_attract_scoring_top_display_border(scene: &mut RenderScene) {
 }
 
 fn push_attract_scoring_scanner_terrain(scene: &mut RenderScene) {
-    for record in source_scanner_mini_terrain_records() {
+    for record in scanner_mini_terrain_records() {
         let origin = offset_f32_position(
             source_screen_position(record.screen_address),
             point_position(ATTRACT_SCORING_VISUAL_OFFSET),
@@ -772,7 +772,7 @@ fn push_attract_scoring_scanner_object(scene: &mut RenderScene, object: ActorAtt
         layer: RenderLayer::Hud,
         position: actor_attract_scoring_scanner_position(object),
         size,
-        tint: source_pseudo_color_tint((color_word & 0x00FF) as u8),
+        tint: williams_color_byte_tint((color_word & 0x00FF) as u8),
     });
 }
 
@@ -1160,7 +1160,7 @@ fn actor_sprite_asset_nibble_tint(nibble: u8) -> Option<Color> {
     match nibble {
         0x0 => None,
         0x1 | 0xA | 0xC | 0xD | 0xE | 0xF => Some(Color::WHITE),
-        0x2..=0x9 => Some(source_pseudo_color_tint(
+        0x2..=0x9 => Some(williams_color_byte_tint(
             NORMAL_PALETTE_BYTES[usize::from(nibble)],
         )),
         0xB => Some(Color::from_rgba(170, 170, 186, 0xFF)),

@@ -403,7 +403,7 @@
                 && (sprite.position[0] - 98.6).abs() < 0.01
                 && (sprite.position[1] - 3.0).abs() < 0.01
                 && sprite.size == ATTRACT_SCORING_PLAYER_SCANNER_SIZE
-                && sprite.tint == source_pseudo_color_tint(0x99)
+                && sprite.tint == williams_color_byte_tint(0x99)
         }));
         assert_eq!(
             scoring_scene
@@ -942,49 +942,49 @@
     }
 
     #[test]
-    fn actor_source_scanner_mini_terrain_records_match_reference_slice() {
-        let records = source_scanner_mini_terrain_records();
+    fn actor_scanner_mini_terrain_records_match_arcade_reference_slice() {
+        let records = scanner_mini_terrain_records();
 
         assert_eq!(records.len(), SCANNER_TERRAIN_RECORDS);
         assert_eq!(
             &records[..8],
             &[
-                SourceScannerTerrainRecord {
+                ScannerMiniTerrainRecord {
                     screen_address: 0x3025,
                     word: 0x7700,
                 },
-                SourceScannerTerrainRecord {
+                ScannerMiniTerrainRecord {
                     screen_address: 0x3124,
                     word: 0x7700,
                 },
-                SourceScannerTerrainRecord {
+                ScannerMiniTerrainRecord {
                     screen_address: 0x3222,
                     word: 0x0770,
                 },
-                SourceScannerTerrainRecord {
+                ScannerMiniTerrainRecord {
                     screen_address: 0x3320,
                     word: 0x0770,
                 },
-                SourceScannerTerrainRecord {
+                ScannerMiniTerrainRecord {
                     screen_address: 0x341E,
                     word: 0x0770,
                 },
-                SourceScannerTerrainRecord {
+                ScannerMiniTerrainRecord {
                     screen_address: 0x351C,
                     word: 0x0770,
                 },
-                SourceScannerTerrainRecord {
+                ScannerMiniTerrainRecord {
                     screen_address: 0x361D,
                     word: 0x7007,
                 },
-                SourceScannerTerrainRecord {
+                ScannerMiniTerrainRecord {
                     screen_address: 0x371F,
                     word: 0x7007,
                 },
             ]
         );
         assert_eq!(
-            &source_mterr_bytes()[..9],
+            &main_terrain_record_bytes()[..9],
             &[0x25, 0x70, 0x07, 0x26, 0x77, 0x00, 0x26, 0x07, 0x70]
         );
     }
