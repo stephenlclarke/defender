@@ -814,12 +814,12 @@ impl ActorMutantSpawn {
     }
 }
 
-fn actor_source_initial_target_list_humans() -> Vec<ActorHumanSpawn> {
+fn initial_target_list_humans() -> Vec<ActorHumanSpawn> {
     let mut arcade_rng = DEFAULT_RNG;
-    actor_source_target_list_restore_humans(&mut arcade_rng, START_HUMAN_COUNT)
+    arcade_target_list_restore_humans(&mut arcade_rng, START_HUMAN_COUNT)
 }
 
-fn actor_source_target_list_restore_humans(
+fn arcade_target_list_restore_humans(
     arcade_rng: &mut ActorArcadeRng,
     target_count: u8,
 ) -> Vec<ActorHumanSpawn> {
@@ -830,7 +830,7 @@ fn actor_source_target_list_restore_humans(
     if target_count > 7 {
         let quadrant_count = target_count >> 2;
         for x_bank in [0x00, 0x40, 0x80, 0xC0] {
-            slot_index = actor_source_target_list_restore_human_group(
+            slot_index = push_arcade_target_list_restore_human_group(
                 &mut humans,
                 arcade_rng,
                 quadrant_count,
@@ -843,7 +843,7 @@ fn actor_source_target_list_restore_humans(
 
     for _ in 0..remainder {
         let x_bank = arcade_rng.hseed;
-        slot_index = actor_source_target_list_restore_human_group(
+        slot_index = push_arcade_target_list_restore_human_group(
             &mut humans,
             arcade_rng,
             1,
@@ -855,7 +855,7 @@ fn actor_source_target_list_restore_humans(
     humans
 }
 
-fn actor_source_target_list_restore_human_group(
+fn push_arcade_target_list_restore_human_group(
     humans: &mut Vec<ActorHumanSpawn>,
     arcade_rng: &mut ActorArcadeRng,
     count: u8,
@@ -864,10 +864,10 @@ fn actor_source_target_list_restore_human_group(
 ) -> usize {
     for _ in 0..count {
         let state = arcade_rng.advance();
-        let source_x = (state.hseed & 0x1F).wrapping_add(x_bank);
+        let spawn_x = (state.hseed & 0x1F).wrapping_add(x_bank);
         let picture_frame = if state.lseed & 0x01 != 0 { 2 } else { 0 };
         humans.push(ActorHumanSpawn {
-            position: Point::new(i16::from(source_x), i16::from(ASTRONAUT_RESTORE_Y)),
+            position: Point::new(i16::from(spawn_x), i16::from(ASTRONAUT_RESTORE_Y)),
             mode: HumanMode::Grounded,
             source: Some(HumanArcadeState {
                 x_fraction: state.lseed,
@@ -881,7 +881,7 @@ fn actor_source_target_list_restore_human_group(
     slot_index
 }
 
-fn actor_source_select_lander_target_index(
+fn select_next_lander_target_slot_index(
     cursor: &mut Option<usize>,
     humans: &[ActorHumanSpawn],
 ) -> Option<usize> {
@@ -894,7 +894,7 @@ fn actor_source_select_lander_target_index(
         .unwrap_or(0);
     let mut probe = original_cursor;
     for _ in 0..TARGET_LIST_ENTRY_COUNT {
-        probe = actor_source_target_list_next_slot_index(probe);
+        probe = next_target_list_slot_index(probe);
         if humans.iter().any(|human| {
             human
                 .source
@@ -911,7 +911,7 @@ fn actor_source_select_lander_target_index(
     None
 }
 
-const fn actor_source_target_list_next_slot_index(slot_index: usize) -> usize {
+const fn next_target_list_slot_index(slot_index: usize) -> usize {
     if slot_index + 1 < TARGET_LIST_ENTRY_COUNT {
         slot_index + 1
     } else {
@@ -1040,7 +1040,7 @@ impl ArcadeWaveProfile {
     }
 
     fn lander_spawns(self, wave: u16, humans: &[ActorHumanSpawn]) -> Vec<ActorLanderSpawn> {
-        let mut source_lander_index = 0;
+        let mut first_wave_lander_index = 0;
         let mut arcade_rng = DEFAULT_RNG;
         let mut target_cursor = Some(0usize);
         self.active_family_slots()
@@ -1051,17 +1051,17 @@ impl ArcadeWaveProfile {
                 }
                 let spawn = if wave == 1 {
                     ACTOR_FIRST_WAVE_LANDER_SPAWNS
-                        .get(source_lander_index)
+                        .get(first_wave_lander_index)
                         .copied()
                         .unwrap_or_else(|| ActorLanderSpawn::new(slot.position))
                 } else {
                     ActorLanderSpawn::from_arcade_restore(
                         &mut arcade_rng,
                         self,
-                        actor_source_select_lander_target_index(&mut target_cursor, humans),
+                        select_next_lander_target_slot_index(&mut target_cursor, humans),
                     )
                 };
-                source_lander_index += 1;
+                first_wave_lander_index += 1;
                 Some(spawn)
             })
             .collect()
@@ -1071,7 +1071,7 @@ impl ArcadeWaveProfile {
         if wave == 1 {
             ACTOR_FIRST_WAVE_HUMAN_SPAWNS.to_vec()
         } else {
-            actor_source_initial_target_list_humans()
+            initial_target_list_humans()
         }
     }
 

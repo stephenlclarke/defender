@@ -1965,7 +1965,7 @@ impl ActorGameDriver {
             .unwrap_or(0);
         let mut probe = original_cursor;
         for _ in 0..TARGET_LIST_ENTRY_COUNT {
-            probe = actor_source_target_list_next_slot_index(probe);
+            probe = next_target_list_slot_index(probe);
             if self.snapshots.values().any(|snapshot| {
                 snapshot.kind == ActorKind::Human
                     && snapshot.alive
