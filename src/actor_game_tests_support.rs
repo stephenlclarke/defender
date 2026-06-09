@@ -1199,7 +1199,7 @@
         )
     }
 
-    fn destroy_source_counted_hostiles(driver: &mut ActorGameDriver, report: &StepReport) {
+    fn destroy_wave_hostiles(driver: &mut ActorGameDriver, report: &StepReport) {
         let commands = report
             .snapshots
             .iter()

@@ -1261,7 +1261,7 @@
             }
         );
 
-        destroy_source_counted_hostiles(&mut driver, &initial);
+        destroy_wave_hostiles(&mut driver, &initial);
         let restored = driver.step(GameInput::NONE);
         let mut reserve_landers = restored
             .snapshots

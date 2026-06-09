@@ -1780,7 +1780,7 @@ impl ActorGameDriver {
             return;
         }
 
-        let active_landers = self.source_counted_lander_snapshot_count();
+        let active_landers = self.wave_lander_snapshot_count();
         if active_landers == 0
             || active_landers >= FIRST_WAVE_LANDER_REFILL_ACTIVE_THRESHOLD
             || self.enemy_reserve.landers == 0
@@ -1812,7 +1812,7 @@ impl ActorGameDriver {
         }
 
         self.first_wave_early_reserve_steps_remaining = None;
-        if self.source_counted_hostile_snapshot_count() >= FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT {
+        if self.wave_hostile_snapshot_count() >= FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT {
             return false;
         }
 
@@ -1940,14 +1940,14 @@ impl ActorGameDriver {
             .count()
     }
 
-    fn source_counted_hostile_snapshot_count(&self) -> usize {
+    fn wave_hostile_snapshot_count(&self) -> usize {
         self.snapshots
             .values()
             .filter(|snapshot| is_hostile(snapshot.kind))
             .count()
     }
 
-    fn source_counted_lander_snapshot_count(&self) -> usize {
+    fn wave_lander_snapshot_count(&self) -> usize {
         self.snapshots
             .values()
             .filter(|snapshot| snapshot.kind == ActorKind::Lander)

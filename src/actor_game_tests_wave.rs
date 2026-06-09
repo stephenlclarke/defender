@@ -478,7 +478,7 @@
             }
         );
 
-        destroy_source_counted_hostiles(&mut driver, &live);
+        destroy_wave_hostiles(&mut driver, &live);
         let restored = driver.step(GameInput::NONE);
 
         assert_eq!(restored.phase, Phase::Playing);
@@ -579,7 +579,7 @@
                 driver.reserve_activation_cooldown_steps,
                 driver.first_wave_early_reserve_steps_remaining,
                 driver.enemy_reserve,
-                driver.source_counted_hostile_snapshot_count(),
+                driver.wave_hostile_snapshot_count(),
                 driver.phase
             )
         });
@@ -1028,7 +1028,7 @@
             .find(|snapshot| snapshot.kind == ActorKind::Player)
             .expect("seed step should publish the player")
             .position;
-        destroy_source_counted_hostiles(&mut driver, &seeded);
+        destroy_wave_hostiles(&mut driver, &seeded);
         driver.enemy_reserve = EnemyReserveSnapshot {
             mutants: 2,
             ..EnemyReserveSnapshot::default()
@@ -1125,7 +1125,7 @@
             .find(|snapshot| snapshot.kind == ActorKind::Player)
             .expect("seed step should publish the player")
             .position;
-        destroy_source_counted_hostiles(&mut driver, &seeded);
+        destroy_wave_hostiles(&mut driver, &seeded);
         driver.enemy_reserve = EnemyReserveSnapshot {
             bombers: 5,
             pods: 2,
@@ -1232,7 +1232,7 @@
     #[test]
     fn actor_source_swarmer_reserves_use_plres_restore_state() {
         let (mut driver, seeded) = started_arcade_wave_driver(2);
-        destroy_source_counted_hostiles(&mut driver, &seeded);
+        destroy_wave_hostiles(&mut driver, &seeded);
         driver.enemy_reserve = EnemyReserveSnapshot {
             swarmers: 4,
             ..EnemyReserveSnapshot::default()
