@@ -569,12 +569,12 @@ fn actor_arcade_screen_position(
     x_fraction: u8,
     background_left: u16,
 ) -> Option<Point> {
-    let x16 = arcade_absolute_x(position, x_fraction);
+    let world_x_word = arcade_absolute_x(position, x_fraction);
     let active_left = background_left.wrapping_sub(OBJECT_ACTIVE_LEFT_MARGIN);
-    if x16.wrapping_sub(active_left) >= OBJECT_ACTIVE_WORLD_WIDTH {
+    if world_x_word.wrapping_sub(active_left) >= OBJECT_ACTIVE_WORLD_WIDTH {
         return None;
     }
-    let screen_word = x16.wrapping_sub(background_left);
+    let screen_word = world_x_word.wrapping_sub(background_left);
     if screen_word & 0x8000 != 0 {
         return None;
     }

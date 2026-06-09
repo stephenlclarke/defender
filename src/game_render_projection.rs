@@ -839,9 +839,9 @@ fn push_expanded_object_pixel_cloud(
     let center_x = i32::from(center.x);
     let center_y = i32::from(center.y);
     let x_start = center_x - scale * (center_x - top_left_x);
-    let y_offset_raw = center_y - top_left_y;
-    let y_flavor = y_offset_raw & 1;
-    let y_offset = y_offset_raw / 2;
+    let vertical_delta = center_y - top_left_y;
+    let y_flavor = vertical_delta & 1;
+    let y_offset = vertical_delta / 2;
     let y_start = center_y - (scale * 2 * y_offset) - y_flavor;
 
     for (index, pixel) in pixels.into_iter().enumerate() {

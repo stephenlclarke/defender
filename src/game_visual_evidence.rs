@@ -687,12 +687,12 @@ fn arcade_active_object_screen_position(
     x_fraction: u8,
     background_left: u16,
 ) -> Option<ScreenPosition> {
-    let (x16, _) = arcade_world_position(position, x_fraction, 0);
+    let (world_x_word, _) = arcade_world_position(position, x_fraction, 0);
     let active_left = background_left.wrapping_sub(OBJECT_ACTIVE_LEFT_MARGIN);
-    if x16.wrapping_sub(active_left) >= OBJECT_ACTIVE_WORLD_WIDTH {
+    if world_x_word.wrapping_sub(active_left) >= OBJECT_ACTIVE_WORLD_WIDTH {
         return None;
     }
-    let screen_word = x16.wrapping_sub(background_left);
+    let screen_word = world_x_word.wrapping_sub(background_left);
     if screen_word & 0x8000 != 0 {
         return None;
     }
@@ -711,9 +711,9 @@ fn arcade_enemy_screen_position(
     background_left: u16,
 ) -> Option<ScreenPosition> {
     if let Some(mutant_runtime) = enemy.mutant_runtime {
-        let x16 = u16::from_be_bytes([enemy.position.x, mutant_runtime.x_fraction])
+        let corrected_world_x_word = u16::from_be_bytes([enemy.position.x, mutant_runtime.x_fraction])
             .wrapping_add(mutant_runtime.render_x_correction);
-        let [x, x_fraction] = x16.to_be_bytes();
+        let [x, x_fraction] = corrected_world_x_word.to_be_bytes();
         return arcade_active_object_screen_position(
             ScreenPosition::new(x, enemy.position.y),
             x_fraction,
