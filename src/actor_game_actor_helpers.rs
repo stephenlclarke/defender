@@ -239,7 +239,7 @@ fn player_hazard_explosion_kind(kind: ActorKind) -> ExplosionKind {
     }
 }
 
-fn source_baiter_accelerated_timer_steps(
+fn accelerated_baiter_timer_steps(
     current_steps: u32,
     profile: ArcadeWaveProfile,
     enemy_total: usize,
@@ -256,7 +256,7 @@ fn source_baiter_accelerated_timer_steps(
     current_steps.min(target_steps)
 }
 
-fn source_baiter_reset_timer_steps(profile: ArcadeWaveProfile, enemy_total: usize) -> u32 {
+fn baiter_timer_reset_steps(profile: ArcadeWaveProfile, enemy_total: usize) -> u32 {
     if enemy_total < 4 {
         (profile.baiter_delay / 4).max(1)
     } else {

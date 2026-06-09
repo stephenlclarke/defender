@@ -725,7 +725,7 @@ impl ActorBaiterSpawn {
             sleep_ticks: 0,
             picture_frame: 0,
         };
-        source_baiter_velocity_update(
+        update_baiter_arcade_velocity(
             &mut source,
             position,
             profile,

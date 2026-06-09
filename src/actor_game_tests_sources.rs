@@ -1257,7 +1257,7 @@
     }
 
     #[test]
-    fn baiter_timer_spawns_source_baiter_from_wave_profile() {
+    fn baiter_timer_spawns_arcade_baiter_from_wave_profile() {
         let mut driver = started_driver();
 
         driver.set_baiter_timer_for_test(1);
@@ -1527,7 +1527,7 @@
     }
 
     #[test]
-    fn source_baiter_shot_timer_spawns_hostile_projectile() {
+    fn baiter_shot_timer_spawns_hostile_projectile() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 1;
@@ -1559,25 +1559,25 @@
             Point::new(42, 120),
             Velocity::default(),
         );
-        let mut expected_source = BaiterArcadeState {
+        let mut expected_arcade_state = BaiterArcadeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
             y_velocity: 0,
-            shot_timer: actor_source_baiter_shot_reset(
+            shot_timer: baiter_shot_timer_reset(
                 ArcadeWaveProfile::for_wave(report.wave),
                 report_arcade_rng.seed,
             ),
             sleep_ticks: BAITER_LOOP_SLEEP_TICKS,
             picture_frame: 1,
         };
-        let (expected_velocity, expected_projectile_source) = actor_source_baiter_fireball(
+        let (expected_velocity, expected_projectile_arcade_state) = baiter_fireball(
             Point::new(70, 120),
             &prompt,
-            expected_source,
+            expected_arcade_state,
             report_arcade_rng,
         )
-        .expect("expected source baiter fireball");
+        .expect("expected baiter fireball");
 
         assert!(report.sounds.contains(&SoundCue::BaiterShot));
         let baiter_shot = report
@@ -1591,34 +1591,34 @@
                 }) => Some((*position, *velocity, *source)),
                 _ => None,
             })
-            .expect("source baiter should emit a hostile shot command");
+            .expect("baiter should emit a hostile shot command");
         assert_eq!(
             baiter_shot,
             (
                 Point::new(70, 120),
                 expected_velocity,
-                Some(expected_projectile_source)
+                Some(expected_projectile_arcade_state)
             )
         );
         let (expected_x, expected_x_fraction) = actor_source_axis_step(
             70,
-            expected_source.x_fraction,
-            actor_source_baiter_screen_x_velocity(expected_source.x_velocity),
+            expected_arcade_state.x_fraction,
+            baiter_screen_x_velocity(expected_arcade_state.x_velocity),
         );
         let (expected_y, expected_y_fraction) = actor_source_active_object_y_step(
             120,
-            expected_source.y_fraction,
-            expected_source.y_velocity,
+            expected_arcade_state.y_fraction,
+            expected_arcade_state.y_velocity,
         );
-        expected_source.x_fraction = expected_x_fraction;
-        expected_source.y_fraction = expected_y_fraction;
+        expected_arcade_state.x_fraction = expected_x_fraction;
+        expected_arcade_state.y_fraction = expected_y_fraction;
         assert_eq!(
             snapshot_for(&report, baiter).position,
             Point::new(expected_x, expected_y)
         );
         assert_eq!(
             snapshot_for(&report, baiter).baiter_runtime,
-            Some(expected_source)
+            Some(expected_arcade_state)
         );
     }
 
@@ -1674,7 +1674,7 @@
                 y_fraction: 0,
                 x_velocity: 0,
                 y_velocity: 0,
-                shot_timer: actor_source_baiter_shot_reset(
+                shot_timer: baiter_shot_timer_reset(
                     ArcadeWaveProfile::for_wave(report.wave),
                     report_arcade_rng.seed,
                 ),
@@ -1685,7 +1685,7 @@
     }
 
     #[test]
-    fn source_baiter_fireball_adds_player_velocity_when_seed_is_high() {
+    fn baiter_fireball_adds_player_velocity_when_seed_is_high() {
         let arcade_rng = ActorArcadeRngSnapshot {
             seed: 0x90,
             hseed: 0,
@@ -1698,7 +1698,7 @@
             Point::new(80, 120),
             Velocity::new(5, -2),
         );
-        let source = BaiterArcadeState {
+        let arcade_state = BaiterArcadeState {
             x_fraction: 0x12,
             y_fraction: 0x34,
             x_velocity: 0,
@@ -1709,7 +1709,7 @@
         };
 
         let (velocity, projectile) =
-            actor_source_baiter_fireball(Point::new(70, 100), &prompt, source, arcade_rng)
+            baiter_fireball(Point::new(70, 100), &prompt, arcade_state, arcade_rng)
                 .expect("high-seed baiter shot should allocate");
 
         let expected_x_velocity = actor_sign_extend_u8_to_u16(
@@ -1731,8 +1731,8 @@
         assert_eq!(
             projectile,
             EnemyProjectileArcadeState {
-                x_fraction: source.x_fraction,
-                y_fraction: source.y_fraction,
+                x_fraction: arcade_state.x_fraction,
+                y_fraction: arcade_state.y_fraction,
                 x_velocity: expected_x_velocity,
                 y_velocity: expected_y_velocity,
                 lifetime_ticks: ENEMY_PROJECTILE_LIFETIME_TICKS,
@@ -1817,7 +1817,7 @@
     }
 
     #[test]
-    fn source_baiter_retarget_adds_player_velocity() {
+    fn baiter_retarget_adds_player_velocity() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 1;

@@ -2104,14 +2104,14 @@ impl ActorGameDriver {
         self.baiter_pacing_steps_remaining = ACTOR_BAITER_TIMER_PACING_STEPS;
 
         let profile = self.current_arcade_wave_profile();
-        let timer_steps = source_baiter_accelerated_timer_steps(timer_steps, profile, enemy_total);
+        let timer_steps = accelerated_baiter_timer_steps(timer_steps, profile, enemy_total);
         let decremented_steps = timer_steps.saturating_sub(1);
         if decremented_steps > 0 {
             self.baiter_timer_steps = Some(decremented_steps);
             return;
         }
 
-        self.baiter_timer_steps = Some(source_baiter_reset_timer_steps(profile, enemy_total));
+        self.baiter_timer_steps = Some(baiter_timer_reset_steps(profile, enemy_total));
         let active_baiters = self.snapshot_count(ActorKind::Baiter);
         if active_baiters >= ACTIVE_BAITER_LIMIT {
             return;

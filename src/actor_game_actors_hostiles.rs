@@ -717,37 +717,38 @@ impl Baiter {
         Rect::from_center(self.position, 12, 4)
     }
 
-    fn advance_source_motion(
+    fn advance_arcade_motion(
         &mut self,
         prompt: &StepPrompt,
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) -> bool {
-        let Some(source) = &mut self.source else {
+        let Some(arcade_state) = &mut self.source else {
             return false;
         };
 
-        if source.sleep_ticks > 0 {
-            source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
+        if arcade_state.sleep_ticks > 0 {
+            arcade_state.sleep_ticks = arcade_state.sleep_ticks.saturating_sub(1);
         } else {
-            source.shot_timer = source.shot_timer.wrapping_sub(1);
-            if source.shot_timer == 0 {
+            arcade_state.shot_timer = arcade_state.shot_timer.wrapping_sub(1);
+            if arcade_state.shot_timer == 0 {
                 let profile = prompt.arcade_wave;
-                let shot_rng = actor_source_baiter_shot_rng(prompt, self.id, self.position);
-                source.shot_timer = actor_source_baiter_shot_reset(profile, shot_rng.seed);
+                let shot_rng = baiter_shot_arcade_rng(prompt, self.id, self.position);
+                arcade_state.shot_timer = baiter_shot_timer_reset(profile, shot_rng.seed);
                 push_baiter_shot(
                     self.id,
                     self.position,
                     prompt,
                     behavior,
-                    Some(*source),
+                    Some(*arcade_state),
                     Some(shot_rng),
                     commands,
                 );
             }
 
-            source.picture_frame = (source.picture_frame + 1) % BAITER_PICTURE_FRAME_COUNT;
-            if source.picture_frame == 0
+            arcade_state.picture_frame =
+                (arcade_state.picture_frame + 1) % BAITER_PICTURE_FRAME_COUNT;
+            if arcade_state.picture_frame == 0
                 && let Some(player) = prompt.player_position()
             {
                 let profile = prompt.arcade_wave;
@@ -755,8 +756,8 @@ impl Baiter {
                     .arcade_rng
                     .map(|arcade_rng| arcade_rng.seed)
                     .unwrap_or_else(|| actor_source_motion_seed(prompt.step, self.id));
-                source_baiter_velocity_update(
-                    source,
+                update_baiter_arcade_velocity(
+                    arcade_state,
                     self.position,
                     profile,
                     player,
@@ -765,29 +766,29 @@ impl Baiter {
                     seed,
                 );
             }
-            source.sleep_ticks = BAITER_LOOP_SLEEP_TICKS;
+            arcade_state.sleep_ticks = BAITER_LOOP_SLEEP_TICKS;
         }
 
         let (x, x_fraction) = actor_source_axis_step(
             self.position.x,
-            source.x_fraction,
-            actor_source_baiter_screen_x_velocity(source.x_velocity),
+            arcade_state.x_fraction,
+            baiter_screen_x_velocity(arcade_state.x_velocity),
         );
         let (y, y_fraction) = actor_source_active_object_y_step(
             self.position.y,
-            source.y_fraction,
-            source.y_velocity,
+            arcade_state.y_fraction,
+            arcade_state.y_velocity,
         );
         self.position = Point::new(x, y);
-        source.x_fraction = x_fraction;
-        source.y_fraction = y_fraction;
+        arcade_state.x_fraction = x_fraction;
+        arcade_state.y_fraction = y_fraction;
         true
     }
 
     fn draw_effect(&self) -> VisualEffect {
         self.source
-            .map(|source| VisualEffect::BaiterSpriteFrame {
-                frame: source.picture_frame,
+            .map(|arcade_state| VisualEffect::BaiterSpriteFrame {
+                frame: arcade_state.picture_frame,
             })
             .unwrap_or(VisualEffect::Static)
     }
@@ -798,20 +799,20 @@ fn push_baiter_shot(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
-    source: Option<BaiterArcadeState>,
+    arcade_state: Option<BaiterArcadeState>,
     shot_rng: Option<ActorArcadeRngSnapshot>,
     commands: &mut Vec<GameCommand>,
 ) {
-    if let Some(source) = source {
+    if let Some(arcade_state) = arcade_state {
         let shot_rng =
-            shot_rng.unwrap_or_else(|| actor_source_baiter_shot_rng(prompt, actor, position));
-        if let Some((velocity, projectile_source)) =
-            actor_source_baiter_fireball(position, prompt, source, shot_rng)
+            shot_rng.unwrap_or_else(|| baiter_shot_arcade_rng(prompt, actor, position));
+        if let Some((velocity, projectile_arcade_state)) =
+            baiter_fireball(position, prompt, arcade_state, shot_rng)
         {
             push_source_enemy_projectile_command(
                 position,
                 velocity,
-                projectile_source,
+                projectile_arcade_state,
                 SoundCue::BaiterShot,
                 commands,
             );
@@ -828,7 +829,7 @@ fn push_baiter_shot(
     commands.push(GameCommand::PlaySound(SoundCue::BaiterShot));
 }
 
-fn actor_source_baiter_shot_rng(
+fn baiter_shot_arcade_rng(
     prompt: &StepPrompt,
     actor: ActorId,
     position: Point,
@@ -840,20 +841,20 @@ fn actor_source_baiter_shot_rng(
     })
 }
 
-fn actor_source_baiter_shot_reset(profile: ArcadeWaveProfile, seed: u8) -> u8 {
-    source_rmax(clamped_source_baiter_shot_reset(profile), seed)
+fn baiter_shot_timer_reset(profile: ArcadeWaveProfile, seed: u8) -> u8 {
+    source_rmax(clamped_baiter_shot_timer_reset(profile), seed)
 }
 
-fn actor_source_baiter_fireball(
+fn baiter_fireball(
     position: Point,
     prompt: &StepPrompt,
-    source: BaiterArcadeState,
+    arcade_state: BaiterArcadeState,
     shot_rng: ActorArcadeRngSnapshot,
 ) -> Option<(Velocity, EnemyProjectileArcadeState)> {
     actor_source_enemy_fireball(
         position,
-        source.x_fraction,
-        source.y_fraction,
+        arcade_state.x_fraction,
+        arcade_state.y_fraction,
         prompt,
         shot_rng,
         ENEMY_PROJECTILE_LIFETIME_TICKS,
@@ -891,7 +892,7 @@ impl AssetActor for Baiter {
         let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Baiter);
-            if !self.advance_source_motion(prompt, behavior, &mut commands) {
+            if !self.advance_arcade_motion(prompt, behavior, &mut commands) {
                 if let Some(position) = move_by_hostile_mode(
                     self.position,
                     behavior.baiter_mode,
@@ -953,16 +954,16 @@ impl AssetActor for Baiter {
     }
 }
 
-fn clamped_source_baiter_shot_reset(profile: ArcadeWaveProfile) -> u8 {
+fn clamped_baiter_shot_timer_reset(profile: ArcadeWaveProfile) -> u8 {
     profile.baiter_shot_time.max(1).min(u32::from(u8::MAX)) as u8
 }
 
-fn actor_source_baiter_screen_x_velocity(x_velocity_word: u16) -> u16 {
+fn baiter_screen_x_velocity(x_velocity_word: u16) -> u16 {
     x_velocity_word.wrapping_shl(2)
 }
 
-fn source_baiter_velocity_update(
-    source: &mut BaiterArcadeState,
+fn update_baiter_arcade_velocity(
+    arcade_state: &mut BaiterArcadeState,
     position: Point,
     profile: ArcadeWaveProfile,
     player_position: Point,
@@ -983,7 +984,7 @@ fn source_baiter_velocity_update(
         };
         let player_x_velocity =
             actor_arithmetic_shift_right_word(actor_source_velocity_word(player_velocity.dx), 2);
-        source.x_velocity =
+        arcade_state.x_velocity =
             actor_sign_extend_u8_to_u16(x_seek_byte).wrapping_add(player_x_velocity);
     }
 
@@ -994,7 +995,7 @@ fn source_baiter_velocity_update(
         } else {
             BAITER_Y_SEEK_BYTE
         };
-        source.y_velocity = actor_arithmetic_shift_right_word(
+        arcade_state.y_velocity = actor_arithmetic_shift_right_word(
             u16::from_be_bytes([y_seek_byte, 0])
                 .wrapping_add(actor_source_velocity_word(player_velocity.dy)),
             1,
