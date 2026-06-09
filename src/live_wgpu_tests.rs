@@ -301,10 +301,10 @@ mod tests {
         assert_eq!(report.first_playing_reserve_pods, 0);
         assert_eq!(report.first_playing_reserve_mutants, 0);
         assert_eq!(report.first_playing_reserve_swarmers, 0);
-        assert_eq!(report.first_playing_source_background_left, 0);
-        assert_eq!(report.first_playing_source_rng_seed, Some(0xbe));
-        assert_eq!(report.first_playing_source_rng_hseed, Some(0xb1));
-        assert_eq!(report.first_playing_source_rng_lseed, Some(0x06));
+        assert_eq!(report.first_playing_world_scroll_left, 0);
+        assert_eq!(report.first_playing_arcade_rng_seed, Some(0xbe));
+        assert_eq!(report.first_playing_arcade_rng_hseed, Some(0xb1));
+        assert_eq!(report.first_playing_arcade_rng_lseed, Some(0x06));
         assert!(report.first_playing_actor_samples.is_empty());
         assert!(report.first_playing_enemy_projectile_samples.is_empty());
         assert_eq!(report.first_playing_sound_commands, [0xea]);
@@ -444,7 +444,7 @@ mod tests {
                 "  first_playing_enemy_counts: landers=15,bombers=0,pods=0,mutants=0,swarmers=0\n",
                 "  first_playing_world_counts: enemies=2,humans=2\n",
                 "  first_playing_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0\n",
-                "  first_playing_source_state: background_left=0x0000,rng=seed=0xbe,hseed=0xb1,lseed=0x06\n",
+                "  first_playing_arcade_state: world_scroll_left=0x0000,rng=seed=0xbe,hseed=0xb1,lseed=0x06\n",
                 "  first_playing_actor_samples: none\n",
                 "  first_playing_enemy_projectile_samples: none\n",
                 "  first_playing_sound_commands: 0xea\n",
@@ -487,7 +487,7 @@ mod tests {
                 "  next_playing_enemy_counts: landers=20,bombers=3,pods=1,mutants=0,swarmers=0\n",
                 "  next_playing_world_counts: enemies=2,humans=2\n",
                 "  next_playing_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0\n",
-                "  next_playing_source_state: background_left=0x0000,rng=seed=0x82,hseed=0x35,lseed=0x88\n",
+                "  next_playing_arcade_state: world_scroll_left=0x0000,rng=seed=0x82,hseed=0x35,lseed=0x88\n",
                 "  next_playing_actor_samples: none\n",
                 "  next_playing_enemy_projectile_samples: none\n",
                 "  next_playing_sound_commands: none\n",
@@ -958,7 +958,7 @@ mod tests {
     }
 
     #[test]
-    fn actor_script_check_reports_reserve_and_source_state_at_play_start() {
+    fn actor_script_check_reports_reserve_and_arcade_state_at_play_start() {
         let path = write_actor_script_file(
             "actor-script-reserve-check",
             concat!(
@@ -982,15 +982,15 @@ mod tests {
         assert_eq!(report.first_playing_reserve_pods, 1);
         assert_eq!(report.first_playing_reserve_mutants, 1);
         assert_eq!(report.first_playing_reserve_swarmers, 1);
-        assert_eq!(report.first_playing_source_background_left, 0);
-        assert!(report.first_playing_source_rng_seed.is_some());
+        assert_eq!(report.first_playing_world_scroll_left, 0);
+        assert!(report.first_playing_arcade_rng_seed.is_some());
         assert!(report.to_text().contains(
             "first_playing_reserve_counts: landers=3,bombers=2,pods=1,mutants=1,swarmers=1"
         ));
         assert!(
             report
                 .to_text()
-                .contains("first_playing_source_state: background_left=0x0000,rng=seed=")
+                .contains("first_playing_arcade_state: world_scroll_left=0x0000,rng=seed=")
         );
     }
 

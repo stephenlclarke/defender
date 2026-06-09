@@ -166,10 +166,10 @@ pub(crate) struct ActorScriptCheckPlayingSummary {
     pub(crate) reserve_pods: u8,
     pub(crate) reserve_mutants: u8,
     pub(crate) reserve_swarmers: u8,
-    pub(crate) background_left: u16,
-    pub(crate) source_rng_seed: Option<u8>,
-    pub(crate) source_rng_hseed: Option<u8>,
-    pub(crate) source_rng_lseed: Option<u8>,
+    pub(crate) world_scroll_left: u16,
+    pub(crate) arcade_rng_seed: Option<u8>,
+    pub(crate) arcade_rng_hseed: Option<u8>,
+    pub(crate) arcade_rng_lseed: Option<u8>,
     pub(crate) player_takes_enemy_collision_damage: bool,
     pub(crate) player_laser_cooldown_steps: u8,
     pub(crate) lander_mode: String,
@@ -309,10 +309,10 @@ pub(crate) struct ActorScriptCheckReport {
     pub(crate) first_playing_reserve_pods: u8,
     pub(crate) first_playing_reserve_mutants: u8,
     pub(crate) first_playing_reserve_swarmers: u8,
-    pub(crate) first_playing_source_background_left: u16,
-    pub(crate) first_playing_source_rng_seed: Option<u8>,
-    pub(crate) first_playing_source_rng_hseed: Option<u8>,
-    pub(crate) first_playing_source_rng_lseed: Option<u8>,
+    pub(crate) first_playing_world_scroll_left: u16,
+    pub(crate) first_playing_arcade_rng_seed: Option<u8>,
+    pub(crate) first_playing_arcade_rng_hseed: Option<u8>,
+    pub(crate) first_playing_arcade_rng_lseed: Option<u8>,
     pub(crate) first_playing_actor_samples: Vec<ActorScriptCheckActorSample>,
     pub(crate) first_playing_enemy_projectile_samples: Vec<ActorScriptCheckEnemyProjectileSample>,
     pub(crate) first_playing_sound_commands: Vec<u8>,
@@ -436,9 +436,9 @@ impl LiveSmokeReport {
 impl ActorScriptCheckReport {
     pub(crate) fn to_text(&self) -> String {
         let arcade_rng = arcade_rng_summary(
-            self.first_playing_source_rng_seed,
-            self.first_playing_source_rng_hseed,
-            self.first_playing_source_rng_lseed,
+            self.first_playing_arcade_rng_seed,
+            self.first_playing_arcade_rng_hseed,
+            self.first_playing_arcade_rng_lseed,
         );
         let attract_cycle = self
             .attract_cycle
@@ -643,7 +643,7 @@ impl ActorScriptCheckReport {
                 )
             });
         format!(
-            "actor script check passed\n  path: {}\n  attract_events: {}\n{}  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_enemy_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_source_state: background_left=0x{:04x},rng={}\n  first_playing_actor_samples: {}\n  first_playing_enemy_projectile_samples: {}\n  first_playing_sound_commands: {}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}{}{}{}{}{}{}{}{}{}{}  clean_exit: {}\n",
+            "actor script check passed\n  path: {}\n  attract_events: {}\n{}  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_enemy_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_arcade_state: world_scroll_left=0x{:04x},rng={}\n  first_playing_actor_samples: {}\n  first_playing_enemy_projectile_samples: {}\n  first_playing_sound_commands: {}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}{}{}{}{}{}{}{}{}{}{}  clean_exit: {}\n",
             self.path,
             self.attract_events,
             attract_cycle,
@@ -666,7 +666,7 @@ impl ActorScriptCheckReport {
             self.first_playing_reserve_pods,
             self.first_playing_reserve_mutants,
             self.first_playing_reserve_swarmers,
-            self.first_playing_source_background_left,
+            self.first_playing_world_scroll_left,
             arcade_rng,
             actor_samples_summary(&self.first_playing_actor_samples),
             enemy_projectile_samples_summary(&self.first_playing_enemy_projectile_samples),
@@ -734,12 +734,12 @@ fn optional_u8_summary(value: Option<u8>) -> String {
 
 fn playing_summary_to_text(prefix: &str, summary: &ActorScriptCheckPlayingSummary) -> String {
     let arcade_rng = arcade_rng_summary(
-        summary.source_rng_seed,
-        summary.source_rng_hseed,
-        summary.source_rng_lseed,
+        summary.arcade_rng_seed,
+        summary.arcade_rng_hseed,
+        summary.arcade_rng_lseed,
     );
     format!(
-        "  {prefix}_wave: {}\n  {prefix}_wave_size: {}\n  {prefix}_enemy_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  {prefix}_world_counts: enemies={},humans={}\n  {prefix}_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  {prefix}_source_state: background_left=0x{:04x},rng={}\n  {prefix}_actor_samples: {}\n  {prefix}_enemy_projectile_samples: {}\n  {prefix}_sound_commands: {}\n  {prefix}_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  {prefix}_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  {prefix}_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  {prefix}_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n",
+        "  {prefix}_wave: {}\n  {prefix}_wave_size: {}\n  {prefix}_enemy_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  {prefix}_world_counts: enemies={},humans={}\n  {prefix}_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  {prefix}_arcade_state: world_scroll_left=0x{:04x},rng={}\n  {prefix}_actor_samples: {}\n  {prefix}_enemy_projectile_samples: {}\n  {prefix}_sound_commands: {}\n  {prefix}_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  {prefix}_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  {prefix}_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  {prefix}_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n",
         summary.wave,
         summary.wave_size,
         summary.enemy_landers,
@@ -754,7 +754,7 @@ fn playing_summary_to_text(prefix: &str, summary: &ActorScriptCheckPlayingSummar
         summary.reserve_pods,
         summary.reserve_mutants,
         summary.reserve_swarmers,
-        summary.background_left,
+        summary.world_scroll_left,
         arcade_rng,
         actor_samples_summary(&summary.actor_samples),
         enemy_projectile_samples_summary(&summary.enemy_projectile_samples),
