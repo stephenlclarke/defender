@@ -1179,23 +1179,23 @@
         (driver, report)
     }
 
-    fn source_lander_spawn_row_for_test(
+    fn arcade_lander_spawn_row_for_test(
         spawn: ActorLanderSpawn,
     ) -> (u16, u16, u16, u16, u8, u8, u8, Option<usize>) {
-        let source = spawn
+        let arcade_state = spawn
             .source
-            .expect("source lander spawn should carry metadata");
-        let x16 = u16::from_be_bytes([spawn.position.x as u8, source.x_fraction]);
-        let y16 = u16::from_be_bytes([spawn.position.y as u8, source.y_fraction]);
+            .expect("arcade lander spawn should carry state");
+        let x16 = u16::from_be_bytes([spawn.position.x as u8, arcade_state.x_fraction]);
+        let y16 = u16::from_be_bytes([spawn.position.y as u8, arcade_state.y_fraction]);
         (
             x16,
             y16,
-            source.x_velocity,
-            source.y_velocity,
-            source.shot_timer,
-            source.sleep_ticks,
-            source.picture_frame,
-            source.target_human_index,
+            arcade_state.x_velocity,
+            arcade_state.y_velocity,
+            arcade_state.shot_timer,
+            arcade_state.sleep_ticks,
+            arcade_state.picture_frame,
+            arcade_state.target_human_index,
         )
     }
 

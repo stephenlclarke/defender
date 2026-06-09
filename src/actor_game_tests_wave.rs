@@ -305,7 +305,7 @@
         let rows = ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS
             .iter()
             .copied()
-            .map(source_lander_spawn_row_for_test)
+            .map(arcade_lander_spawn_row_for_test)
             .collect::<Vec<_>>();
 
         assert_eq!(
@@ -326,7 +326,7 @@
         let rows = ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS
             .iter()
             .copied()
-            .map(source_lander_spawn_row_for_test)
+            .map(arcade_lander_spawn_row_for_test)
             .collect::<Vec<_>>();
 
         assert_eq!(
@@ -1445,7 +1445,7 @@
     }
 
     #[test]
-    fn first_wave_landers_publish_source_metadata_and_picture_frames() {
+    fn first_wave_landers_publish_arcade_state_and_picture_frames() {
         let mut driver = ActorGameDriver::new();
         driver.step(GameInput {
             coin: true,
@@ -1463,7 +1463,7 @@
             .find(|snapshot| {
                 snapshot.kind == ActorKind::Lander && snapshot.position == Point::new(0xFB, 0x2C)
             })
-            .expect("source first-wave lander should publish its restore position");
+            .expect("arcade-state first-wave lander should publish its restore position");
 
         assert_eq!(
             lander.lander_runtime,
@@ -1486,7 +1486,7 @@
     }
 
     #[test]
-    fn source_lander_sleep_ticks_delay_first_wave_motion() {
+    fn lander_sleep_ticks_delay_first_wave_motion() {
         let mut driver = ActorGameDriver::new();
         driver.step(GameInput {
             coin: true,
@@ -1514,26 +1514,33 @@
                     };
                     snapshot.kind == ActorKind::Lander && matches_known_lander
                 })
-                .expect("sleeping source lander should stay visible");
+                .expect("sleeping arcade-state lander should stay visible");
             lander_id = Some(lander.id);
             assert_eq!(lander.position, initial);
             assert_eq!(
-                lander.lander_runtime.map(|source| source.sleep_ticks),
+                lander
+                    .lander_runtime
+                    .map(|arcade_state| arcade_state.sleep_ticks),
                 Some(expected_sleep)
             );
         }
 
         let awake = driver.step(GameInput::NONE);
-        let lander = snapshot_for(&awake, lander_id.expect("source lander id should be known"));
+        let lander = snapshot_for(
+            &awake,
+            lander_id.expect("arcade-state lander id should be known"),
+        );
         assert_eq!(lander.position, Point::new(0xFB, 0x2D));
         assert_eq!(
             lander
                 .lander_runtime
-                .map(|source| (source.x_fraction, source.y_fraction)),
+                .map(|arcade_state| (arcade_state.x_fraction, arcade_state.y_fraction)),
             Some((0x11, 0x50))
         );
         assert_eq!(
-            lander.lander_runtime.map(|source| source.sleep_ticks),
+            lander
+                .lander_runtime
+                .map(|arcade_state| arcade_state.sleep_ticks),
             Some(0)
         );
     }
