@@ -21,8 +21,8 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         actor_script_check_first_player_laser_hit(scripts.clone())?;
     let hostile_laser_hit_matrix = actor_script_check_hostile_laser_hit_matrix()?;
     let hostile_projectile_matrix = actor_script_check_hostile_projectile_matrix()?;
-    let (first_source_projectile, first_source_projectile_unavailable_reason) =
-        actor_script_check_first_source_projectile(scripts)?;
+    let (first_enemy_projectile, first_enemy_projectile_unavailable_reason) =
+        actor_script_check_first_enemy_projectile(scripts)?;
     let next_wave_progression =
         run_actor_script_check_to_next_wave_progression(&mut runtime, &playing);
     let reserve_activation = actor_script_check_reserve_activations(
@@ -67,8 +67,8 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         first_playing_source_rng_seed: first_playing.source_rng_seed,
         first_playing_source_rng_hseed: first_playing.source_rng_hseed,
         first_playing_source_rng_lseed: first_playing.source_rng_lseed,
-        first_playing_source_actor_samples: first_playing.source_actor_samples,
-        first_playing_source_projectile_samples: first_playing.source_projectile_samples,
+        first_playing_actor_samples: first_playing.actor_samples,
+        first_playing_enemy_projectile_samples: first_playing.enemy_projectile_samples,
         first_playing_sound_commands: first_playing.sound_commands,
         first_player_laser,
         first_player_laser_unavailable_reason,
@@ -76,8 +76,8 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         first_player_laser_hit_unavailable_reason,
         hostile_laser_hit_matrix,
         hostile_projectile_matrix,
-        first_source_projectile,
-        first_source_projectile_unavailable_reason,
+        first_enemy_projectile,
+        first_enemy_projectile_unavailable_reason,
         first_playing_player_takes_enemy_collision_damage: first_playing
             .player_takes_enemy_collision_damage,
         first_playing_player_laser_cooldown_steps: first_playing.player_laser_cooldown_steps,
@@ -247,10 +247,10 @@ fn actor_script_check_observe_attract_cycle_frame(
     }
 }
 
-fn actor_script_check_first_source_projectile(
+fn actor_script_check_first_enemy_projectile(
     scripts: ActorDriverScripts,
 ) -> anyhow::Result<(
-    Option<ActorScriptCheckFirstSourceProjectileSummary>,
+    Option<ActorScriptCheckFirstEnemyProjectileSummary>,
     Option<String>,
 )> {
     let mut runtime = ActorRuntimeAdapter::with_scripts(scripts);
@@ -258,7 +258,7 @@ fn actor_script_check_first_source_projectile(
     let mut recent_projectile_sound_commands = actor_script_check_projectile_sound_commands(&frame);
 
     for sample_steps in 0..=ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_STEP_LIMIT {
-        let samples = actor_script_check_source_projectile_samples(&frame);
+        let samples = actor_script_check_enemy_projectile_samples(&frame);
         if !samples.is_empty() {
             let sound_commands = actor_script_check_projectile_sound_commands(&frame);
             let sound_commands = if sound_commands.is_empty() {
@@ -267,7 +267,7 @@ fn actor_script_check_first_source_projectile(
                 sound_commands
             };
             return Ok((
-                Some(ActorScriptCheckFirstSourceProjectileSummary {
+                Some(ActorScriptCheckFirstEnemyProjectileSummary {
                     sample_steps: sample_steps as u32,
                     samples,
                     sound_commands,
@@ -290,7 +290,7 @@ fn actor_script_check_first_source_projectile(
     Ok((
         None,
         Some(format!(
-            "source_projectile_not_observed_after_{}_steps",
+            "enemy_projectile_not_observed_after_{}_steps",
             ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_STEP_LIMIT
         )),
     ))
@@ -312,7 +312,7 @@ fn actor_script_check_hostile_projectile_matrix()
 fn actor_script_check_hostile_projectile_matrix_sample_for(
     kind: ActorKind,
 ) -> anyhow::Result<ActorScriptCheckHostileProjectileSample> {
-    let kind_label = actor_script_check_source_actor_kind_label(kind);
+    let kind_label = actor_script_check_actor_kind_label(kind);
     let source = actor_script_check_hostile_projectile_matrix_script(kind);
     let scripts = ActorDriverScripts::parse_text(&source).with_context(|| {
         format!("parsing built-in hostile projectile matrix script `{kind_label}`")
@@ -398,7 +398,7 @@ fn actor_script_check_hostile_projectile_matrix_script(kind: ActorKind) -> Strin
             "{arcade_wave}",
             "human 100 214\n",
         ),
-        kind_label = actor_script_check_source_actor_kind_label(kind),
+        kind_label = actor_script_check_actor_kind_label(kind),
         arcade_wave = arcade_wave
     )
 }
@@ -526,7 +526,7 @@ fn actor_script_check_hostile_laser_hit_matrix()
 fn actor_script_check_hostile_laser_hit_matrix_sample_for(
     kind: ActorKind,
 ) -> anyhow::Result<ActorScriptCheckHostileLaserHitSample> {
-    let kind_label = actor_script_check_source_actor_kind_label(kind);
+    let kind_label = actor_script_check_actor_kind_label(kind);
     let source = actor_script_check_hostile_laser_hit_matrix_script(kind);
     let scripts = ActorDriverScripts::parse_text(&source).with_context(|| {
         format!("parsing built-in hostile laser-hit matrix script `{kind_label}`")
@@ -573,7 +573,7 @@ fn actor_script_check_hostile_laser_hit_matrix_sample_for(
 }
 
 fn actor_script_check_hostile_laser_hit_matrix_script(kind: ActorKind) -> String {
-    let kind_label = actor_script_check_source_actor_kind_label(kind);
+    let kind_label = actor_script_check_actor_kind_label(kind);
     format!(
         concat!(
             "[attract]\n",
@@ -652,24 +652,24 @@ fn actor_script_check_playing_summary(frame: &ActorFrame) -> ActorScriptCheckPla
         baiter_mode: hostile_movement_mode_label(baiter_behavior.baiter_mode).to_string(),
         swarmer_fire_period_steps: swarmer_behavior.swarmer_fire_period_steps,
         baiter_fire_period_steps: baiter_behavior.baiter_fire_period_steps,
-        source_actor_samples: actor_script_check_source_actor_samples(frame),
-        source_projectile_samples: actor_script_check_source_projectile_samples(frame),
+        actor_samples: actor_script_check_actor_samples(frame),
+        enemy_projectile_samples: actor_script_check_enemy_projectile_samples(frame),
         sound_commands: actor_script_check_sound_commands(frame),
     }
 }
 
-fn actor_script_check_source_actor_samples(
+fn actor_script_check_actor_samples(
     frame: &ActorFrame,
-) -> Vec<ActorScriptCheckSourceActorSample> {
+) -> Vec<ActorScriptCheckActorSample> {
     frame
         .report
         .snapshots
         .iter()
         .filter(|snapshot| snapshot.alive)
         .filter_map(|snapshot| {
-            actor_script_check_source_actor_fraction(snapshot).map(
-                |(x_subpixel, y_subpixel)| ActorScriptCheckSourceActorSample {
-                    kind: actor_script_check_source_actor_kind_label(snapshot.kind).to_string(),
+            actor_script_check_actor_subpixels(snapshot).map(
+                |(x_subpixel, y_subpixel)| ActorScriptCheckActorSample {
+                    kind: actor_script_check_actor_kind_label(snapshot.kind).to_string(),
                     x: snapshot.position.x,
                     y: snapshot.position.y,
                     x_subpixel,
@@ -681,7 +681,7 @@ fn actor_script_check_source_actor_samples(
         .collect()
 }
 
-fn actor_script_check_source_actor_fraction(
+fn actor_script_check_actor_subpixels(
     snapshot: &crate::actor_game::ActorSnapshot,
 ) -> Option<(u8, u8)> {
     match snapshot.kind {
@@ -710,7 +710,7 @@ fn actor_script_check_source_actor_fraction(
     }
 }
 
-fn actor_script_check_source_actor_kind_label(kind: ActorKind) -> &'static str {
+fn actor_script_check_actor_kind_label(kind: ActorKind) -> &'static str {
     match kind {
         ActorKind::Lander => "lander",
         ActorKind::Mutant => "mutant",
@@ -723,9 +723,9 @@ fn actor_script_check_source_actor_kind_label(kind: ActorKind) -> &'static str {
     }
 }
 
-fn actor_script_check_source_projectile_samples(
+fn actor_script_check_enemy_projectile_samples(
     frame: &ActorFrame,
-) -> Vec<ActorScriptCheckSourceProjectileSample> {
+) -> Vec<ActorScriptCheckEnemyProjectileSample> {
     frame
         .report
         .snapshots
@@ -738,7 +738,7 @@ fn actor_script_check_source_projectile_samples(
                 ActorKind::Bomb => "bomb",
                 _ => return None,
             };
-            Some(ActorScriptCheckSourceProjectileSample {
+            Some(ActorScriptCheckEnemyProjectileSample {
                 kind: kind.to_string(),
                 x: snapshot.position.x,
                 y: snapshot.position.y,

@@ -13,7 +13,7 @@ mod tests {
 
     use super::{
         ActorScriptCheckExplosionSample, ActorScriptCheckPlayerLaserSample,
-        ActorScriptCheckSourceActorSample, ActorScriptCheckSourceProjectileSample,
+        ActorScriptCheckActorSample, ActorScriptCheckEnemyProjectileSample,
         ActorScriptCheckSpawnedActorSample, ActorScriptCheckSpawnedCounts, LiveInputState,
         LiveSmokeReport, actor_live_runtime_from_script_path, actor_runtime_from_script_path,
         run_actor_live, run_actor_script_check, run_actor_wgpu_smoke, run_smoke,
@@ -305,8 +305,8 @@ mod tests {
         assert_eq!(report.first_playing_source_rng_seed, Some(0xbe));
         assert_eq!(report.first_playing_source_rng_hseed, Some(0xb1));
         assert_eq!(report.first_playing_source_rng_lseed, Some(0x06));
-        assert!(report.first_playing_source_actor_samples.is_empty());
-        assert!(report.first_playing_source_projectile_samples.is_empty());
+        assert!(report.first_playing_actor_samples.is_empty());
+        assert!(report.first_playing_enemy_projectile_samples.is_empty());
         assert_eq!(report.first_playing_sound_commands, [0xea]);
         assert_eq!(
             report
@@ -331,10 +331,10 @@ mod tests {
             report.first_player_laser_hit_unavailable_reason.as_deref(),
             Some("player_laser_hit_not_observed_after_512_steps")
         );
-        assert!(report.first_source_projectile.is_none());
+        assert!(report.first_enemy_projectile.is_none());
         assert_eq!(
-            report.first_source_projectile_unavailable_reason.as_deref(),
-            Some("source_projectile_not_observed_after_512_steps")
+            report.first_enemy_projectile_unavailable_reason.as_deref(),
+            Some("enemy_projectile_not_observed_after_512_steps")
         );
         assert!(report.first_playing_player_takes_enemy_collision_damage);
         assert_eq!(report.first_playing_player_laser_cooldown_steps, 6);
@@ -445,8 +445,8 @@ mod tests {
                 "  first_playing_world_counts: enemies=2,humans=2\n",
                 "  first_playing_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0\n",
                 "  first_playing_source_state: background_left=0x0000,rng=seed=0xbe,hseed=0xb1,lseed=0x06\n",
-                "  first_playing_source_actor_samples: none\n",
-                "  first_playing_source_projectile_samples: none\n",
+                "  first_playing_actor_samples: none\n",
+                "  first_playing_enemy_projectile_samples: none\n",
                 "  first_playing_sound_commands: 0xea\n",
                 "  first_playing_player_behavior: takes_enemy_collision_damage=true,laser_cooldown_steps=6\n",
                 "  first_playing_lander_behavior: mode=drift,seek_speed=1,drift_speed=3,fire_period_steps=96\n",
@@ -468,7 +468,7 @@ mod tests {
                 "mutant@454[samples=enemy_laser@0,222[velocity=1/-1,source=frac=0x50/0x00,vel=0x009c/0xfe5c,life=90],sounds=0xf6];",
                 "swarmer@0[samples=enemy_laser@62,120[velocity=3/0,source=none],sounds=0xf3];",
                 "baiter@79[samples=enemy_laser@28,120[velocity=1/-1,source=frac=0x00/0x00,vel=0x002c/0xffc4,life=20],sounds=0xfc]\n",
-                "  first_source_projectile: unavailable,reason=source_projectile_not_observed_after_512_steps\n",
+                "  first_enemy_projectile: unavailable,reason=enemy_projectile_not_observed_after_512_steps\n",
                 "  wave_clear_assist_steps: 4\n",
                 "  wave_clear_next_wave: 2\n",
                 "  wave_clear_score: 400\n",
@@ -488,8 +488,8 @@ mod tests {
                 "  next_playing_world_counts: enemies=2,humans=2\n",
                 "  next_playing_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0\n",
                 "  next_playing_source_state: background_left=0x0000,rng=seed=0x82,hseed=0x35,lseed=0x88\n",
-                "  next_playing_source_actor_samples: none\n",
-                "  next_playing_source_projectile_samples: none\n",
+                "  next_playing_actor_samples: none\n",
+                "  next_playing_enemy_projectile_samples: none\n",
                 "  next_playing_sound_commands: none\n",
                 "  next_playing_player_behavior: takes_enemy_collision_damage=true,laser_cooldown_steps=6\n",
                 "  next_playing_lander_behavior: mode=drift,seek_speed=1,drift_speed=3,fire_period_steps=96\n",
@@ -735,7 +735,7 @@ mod tests {
                         .samples
                         .iter()
                         .all(|projectile| projectile.lifetime_ticks.unwrap_or_default() > 0),
-                    "{kind} source projectile metadata"
+                    "{kind} enemy projectile metadata"
                 );
             }
         }
@@ -800,7 +800,7 @@ mod tests {
     }
 
     #[test]
-    fn actor_script_check_reports_source_projectile_and_sound_samples() {
+    fn actor_script_check_reports_enemy_projectile_and_sound_samples() {
         let path = write_actor_script_file(
             "actor-script-source-projectile-check",
             concat!(
@@ -818,15 +818,15 @@ mod tests {
 
         let report = run_actor_script_check(&path).expect("projectile script should check");
         let first_projectile = report
-            .first_source_projectile
+            .first_enemy_projectile
             .as_ref()
-            .expect("checker should sample the first source projectile");
+            .expect("checker should sample the first enemy projectile");
 
         assert_eq!(first_projectile.sample_steps, 455);
         assert_eq!(first_projectile.sound_commands, [0xf6]);
         assert_eq!(
             first_projectile.samples,
-            vec![ActorScriptCheckSourceProjectileSample {
+            vec![ActorScriptCheckEnemyProjectileSample {
                 kind: "enemy_laser".to_string(),
                 x: 0,
                 y: 220,
@@ -837,14 +837,14 @@ mod tests {
                 lifetime_ticks: 90,
             }]
         );
-        assert!(report.first_source_projectile_unavailable_reason.is_none());
+        assert!(report.first_enemy_projectile_unavailable_reason.is_none());
         assert!(report.to_text().contains(
-            "first_source_projectile_samples: enemy_laser@0,220[frac=0xec/0x5c,vel=0x009c/0xfe5c,life=90]"
+            "first_enemy_projectile_samples: enemy_laser@0,220[frac=0xec/0x5c,vel=0x009c/0xfe5c,life=90]"
         ));
         assert!(
             report
                 .to_text()
-                .contains("first_source_projectile_sound_commands: 0xf6")
+                .contains("first_enemy_projectile_sound_commands: 0xf6")
         );
 
         let _ = fs::remove_file(path);
@@ -884,58 +884,58 @@ mod tests {
         assert_eq!(report.first_playing_reserve_mutants, 0);
         assert_eq!(report.first_playing_reserve_swarmers, 0);
         assert_eq!(
-            report.first_playing_source_actor_samples,
+            report.first_playing_actor_samples,
             vec![
-                ActorScriptCheckSourceActorSample {
+                ActorScriptCheckActorSample {
                     kind: "lander".to_string(),
                     x: 251,
                     y: 44,
                     x_subpixel: 0x33,
                     y_subpixel: 0xe0,
                 },
-                ActorScriptCheckSourceActorSample {
+                ActorScriptCheckActorSample {
                     kind: "bomber".to_string(),
                     x: 227,
                     y: 104,
                     x_subpixel: 0xe0,
                     y_subpixel: 0x00,
                 },
-                ActorScriptCheckSourceActorSample {
+                ActorScriptCheckActorSample {
                     kind: "pod".to_string(),
                     x: 184,
                     y: 72,
                     x_subpixel: 0x20,
                     y_subpixel: 0x00,
                 },
-                ActorScriptCheckSourceActorSample {
+                ActorScriptCheckActorSample {
                     kind: "mutant".to_string(),
                     x: 148,
                     y: 96,
                     x_subpixel: 0x00,
                     y_subpixel: 0x00,
                 },
-                ActorScriptCheckSourceActorSample {
+                ActorScriptCheckActorSample {
                     kind: "swarmer".to_string(),
                     x: 236,
                     y: 66,
                     x_subpixel: 0x00,
                     y_subpixel: 0x00,
                 },
-                ActorScriptCheckSourceActorSample {
+                ActorScriptCheckActorSample {
                     kind: "human".to_string(),
                     x: 24,
                     y: 224,
                     x_subpixel: 0xc3,
                     y_subpixel: 0x00,
                 },
-                ActorScriptCheckSourceActorSample {
+                ActorScriptCheckActorSample {
                     kind: "human".to_string(),
                     x: 28,
                     y: 225,
                     x_subpixel: 0x81,
                     y_subpixel: 0x00,
                 },
-                ActorScriptCheckSourceActorSample {
+                ActorScriptCheckActorSample {
                     kind: "human".to_string(),
                     x: 78,
                     y: 224,
@@ -953,7 +953,7 @@ mod tests {
                 .contains("first_playing_world_counts: enemies=5,humans=10")
         );
         assert!(report.to_text().contains(
-            "first_playing_source_actor_samples: lander@251,44[frac=0x33/0xe0];bomber@227,104[frac=0xe0/0x00];pod@184,72[frac=0x20/0x00];mutant@148,96[frac=0x00/0x00];swarmer@236,66[frac=0x00/0x00]"
+            "first_playing_actor_samples: lander@251,44[frac=0x33/0xe0];bomber@227,104[frac=0xe0/0x00];pod@184,72[frac=0x20/0x00];mutant@148,96[frac=0x00/0x00];swarmer@236,66[frac=0x00/0x00]"
         ));
     }
 
