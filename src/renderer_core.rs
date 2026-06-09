@@ -158,7 +158,7 @@ pub struct Color {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct SourceAttractDefenderAppearancePixel {
+pub(crate) struct AttractDefenderAppearancePixel {
     pub position: [u16; 2],
     pub color: [u8; 4],
 }

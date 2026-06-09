@@ -740,7 +740,7 @@ fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) ->
     let terrain_explosion = decode_picture_grid_rgba("TEREX", TERRAIN_EXPLOSION_GRID);
     let score_digits = decode_score_digit_sprites();
     let message_glyphs = decode_message_glyph_sprites();
-    let hall_of_fame_logo = decode_source_defender_logo_rgba();
+    let hall_of_fame_logo = decode_hall_of_fame_defender_logo_rgba();
     let attract_copyright_strip = decode_source_attract_copyright_strip_rgba();
     let attract_williams_logo = decode_source_attract_williams_logo_rgba();
     let terrain_word_7007 = decode_source_terrain_word_rgba(0x7007);
@@ -1244,8 +1244,8 @@ fn picture_palette_color(index: u8, palette: ObjectPicturePalette) -> [u8; 4] {
     }
 }
 
-fn decode_source_defender_logo_rgba() -> EmbeddedSprite {
-    let bytes = expand_source_defender_logo_bytes();
+fn decode_hall_of_fame_defender_logo_rgba() -> EmbeddedSprite {
+    let bytes = expand_hall_of_fame_defender_logo_bytes();
     let surface = SurfaceSize::new(
         u32::from(HALL_OF_FAME_DEFENDER_LOGO_COLUMNS) * 2,
         u32::from(HALL_OF_FAME_DEFENDER_LOGO_ROWS),
@@ -1254,9 +1254,9 @@ fn decode_source_defender_logo_rgba() -> EmbeddedSprite {
     let palette = ObjectPicturePalette::defender_logo();
 
     for column in 0..usize::from(HALL_OF_FAME_DEFENDER_LOGO_COLUMNS) {
-        let source_column = column * usize::from(HALL_OF_FAME_DEFENDER_LOGO_ROWS);
+        let logo_byte_column = column * usize::from(HALL_OF_FAME_DEFENDER_LOGO_ROWS);
         for row in 0..usize::from(HALL_OF_FAME_DEFENDER_LOGO_ROWS) {
-            let value = bytes[source_column + row];
+            let value = bytes[logo_byte_column + row];
             let left = picture_palette_color(value >> 4, palette);
             let right = picture_palette_color(value & 0x0F, palette);
             let offset = ((row * surface.width as usize) + column * 2) * 4;
@@ -1446,7 +1446,7 @@ fn source_attract_williams_logo_pixel(cursor: u16) -> Option<[u8; 2]> {
     ])
 }
 
-fn expand_source_defender_logo_bytes() -> [u8; HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT] {
+fn expand_hall_of_fame_defender_logo_bytes() -> [u8; HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT] {
     let mut output = [0; HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT];
     let mut cursor = 0usize;
     let mut length = 0u8;
@@ -1460,7 +1460,7 @@ fn expand_source_defender_logo_bytes() -> [u8; HALL_OF_FAME_DEFENDER_LOGO_BYTE_C
             }
 
             length = (nibble & 0x03).wrapping_add(length);
-            let color = source_defender_logo_color_byte(nibble);
+            let color = defender_wordmark_color_byte(nibble);
             if cursor >= HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT {
                 cursor = cursor + 1 - HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT;
             }
@@ -1499,10 +1499,10 @@ fn expand_source_defender_logo_bytes() -> [u8; HALL_OF_FAME_DEFENDER_LOGO_BYTE_C
     output
 }
 
-pub(crate) fn source_attract_defender_appearance_pixels(
+pub(crate) fn attract_defender_appearance_pixels(
     surface: SurfaceSize,
     appearance_tick: u8,
-) -> Vec<SourceAttractDefenderAppearancePixel> {
+) -> Vec<AttractDefenderAppearancePixel> {
     const LOGO_LEFT_BYTE: i32 = 0x30;
     const LOGO_TOP_SCANLINE: i32 = 0x90;
     const CHUNK_WIDTH_BYTES: i32 = 4;
@@ -1512,7 +1512,7 @@ pub(crate) fn source_attract_defender_appearance_pixels(
     const CHUNK_CENTER_Y_SCANLINES: i32 = 12;
     const DEFENDER_WORDMARK_FINAL_APPEARANCE_TICK: u8 = 0x2E;
 
-    let source = expand_source_defender_logo_bytes();
+    let logo_bytes = expand_hall_of_fame_defender_logo_bytes();
     let mut pixels = BTreeMap::new();
     let size =
         i32::from(DEFENDER_WORDMARK_FINAL_APPEARANCE_TICK.saturating_sub(appearance_tick)).max(1);
@@ -1527,24 +1527,24 @@ pub(crate) fn source_attract_defender_appearance_pixels(
 
         for byte_column in 0..CHUNK_WIDTH_BYTES {
             let target_x_byte = start_x_byte + byte_column * size;
-            let source_x = chunk_index * CHUNK_WIDTH_PIXELS + byte_column * 2;
+            let wordmark_x = chunk_index * CHUNK_WIDTH_PIXELS + byte_column * 2;
 
             for row_pair in 0..CHUNK_ROW_PAIRS {
                 let target_y = start_y + row_pair * row_pair_step;
-                let source_y = row_pair * 2;
-                draw_source_defender_logo_word(
+                let wordmark_y = row_pair * 2;
+                draw_defender_wordmark_block(
                     &mut pixels,
                     surface,
-                    &source,
-                    source_x,
-                    source_y,
+                    &logo_bytes,
+                    wordmark_x,
+                    wordmark_y,
                     target_x_byte,
                     target_y,
                 );
             }
         }
 
-        clear_source_defender_logo_word(
+        clear_defender_wordmark_block(
             &mut pixels,
             logo_left_byte + CHUNK_CENTER_X_BYTES,
             LOGO_TOP_SCANLINE + CHUNK_CENTER_Y_SCANLINES,
@@ -1554,7 +1554,7 @@ pub(crate) fn source_attract_defender_appearance_pixels(
     pixels
         .into_iter()
         .map(
-            |([native_x, native_y], color)| SourceAttractDefenderAppearancePixel {
+            |([native_x, native_y], color)| AttractDefenderAppearancePixel {
                 position: [
                     u16::try_from(native_x).expect("Defender appearance x fits in u16"),
                     u16::try_from(native_y).expect("Defender appearance y fits in u16"),
@@ -1565,19 +1565,19 @@ pub(crate) fn source_attract_defender_appearance_pixels(
         .collect()
 }
 
-fn draw_source_defender_logo_word(
+fn draw_defender_wordmark_block(
     pixels: &mut BTreeMap<[u32; 2], [u8; 4]>,
     surface: SurfaceSize,
-    source: &[u8; HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT],
-    source_x: i32,
-    source_y: i32,
+    logo_bytes: &[u8; HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT],
+    wordmark_x: i32,
+    wordmark_y: i32,
     target_x_byte: i32,
     target_y: i32,
 ) {
     let palette = ObjectPicturePalette::defender_logo();
     for dy in 0..2 {
         for dx in 0..2 {
-            let Some(nibble) = source_defender_logo_nibble(source, source_x + dx, source_y + dy)
+            let Some(nibble) = defender_wordmark_nibble(logo_bytes, wordmark_x + dx, wordmark_y + dy)
             else {
                 continue;
             };
@@ -1596,7 +1596,7 @@ fn draw_source_defender_logo_word(
     }
 }
 
-fn clear_source_defender_logo_word(
+fn clear_defender_wordmark_block(
     pixels: &mut BTreeMap<[u32; 2], [u8; 4]>,
     target_x_byte: i32,
     target_y: i32,
@@ -1617,8 +1617,8 @@ fn clear_source_defender_logo_word(
     }
 }
 
-fn source_defender_logo_nibble(
-    source: &[u8; HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT],
+fn defender_wordmark_nibble(
+    logo_bytes: &[u8; HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT],
     native_x: i32,
     native_y: i32,
 ) -> Option<u8> {
@@ -1632,7 +1632,7 @@ fn source_defender_logo_nibble(
 
     let byte_column = usize::try_from(native_x / 2).ok()?;
     let row = usize::try_from(native_y).ok()?;
-    let packed = source[byte_column * usize::from(HALL_OF_FAME_DEFENDER_LOGO_ROWS) + row];
+    let packed = logo_bytes[byte_column * usize::from(HALL_OF_FAME_DEFENDER_LOGO_ROWS) + row];
     if native_x % 2 == 0 {
         Some(packed >> 4)
     } else {
@@ -1662,7 +1662,7 @@ fn write_native_rgba_pixel(
     pixels.insert(position, color);
 }
 
-const fn source_defender_logo_color_byte(nibble: u8) -> u8 {
+const fn defender_wordmark_color_byte(nibble: u8) -> u8 {
     match (nibble & 0x0C) >> 2 {
         1 => 0x22,
         2 => 0xCC,

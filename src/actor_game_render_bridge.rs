@@ -170,7 +170,7 @@ impl ActorRenderSceneBridge {
             .expect("Defender appearance tick fits")
             .min(ATTRACT_DEFENDER_APPEARANCE_FINAL_TICK);
 
-        for pixel in source_attract_defender_appearance_pixels(scene.surface, appearance_tick) {
+        for pixel in attract_defender_appearance_pixels(scene.surface, appearance_tick) {
             scene.push_sprite(SceneSprite {
                 sprite: SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL,
                 layer: RenderLayer::Overlay,
