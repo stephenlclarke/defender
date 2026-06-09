@@ -621,7 +621,7 @@ impl Mutant {
             let target6_forced_dive_shot =
                 actor_source_target6_mutant_fires_dive_shot(self.position, *source);
             let target6_forced_dive_shot_position = self.position;
-            let mut hop_rng = actor_source_rng_from_snapshot(source.hop_rng);
+            let mut hop_rng = arcade_rng_from_snapshot(source.hop_rng);
             let hop_state = hop_rng.advance();
             source.hop_rng = hop_state.snapshot();
             self.position.y =
@@ -765,7 +765,7 @@ fn actor_source_world_position(position: Point, x_fraction: u8, y_fraction: u8) 
     )
 }
 
-const fn actor_source_rng_from_snapshot(snapshot: ActorArcadeRngSnapshot) -> ActorArcadeRng {
+const fn arcade_rng_from_snapshot(snapshot: ActorArcadeRngSnapshot) -> ActorArcadeRng {
     ActorArcadeRng {
         seed: snapshot.seed,
         hseed: snapshot.hseed,
@@ -855,7 +855,7 @@ fn actor_source_mutant_shot_rng(
 ) -> ActorArcadeRngSnapshot {
     let mut arcade_rng = prompt
         .arcade_rng
-        .map(actor_source_rng_from_snapshot)
+        .map(arcade_rng_from_snapshot)
         .unwrap_or(ActorArcadeRng {
             seed: actor_source_motion_seed(prompt.step, actor),
             hseed: position.x as u8,

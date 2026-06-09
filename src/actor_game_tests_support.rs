@@ -1898,7 +1898,7 @@
         let mut shot = None;
         if actor_source_mutant_should_hop_and_shoot(player_absolute_x, object_absolute_x, position)
         {
-            let mut hop_rng = actor_source_rng_from_snapshot(source.hop_rng);
+            let mut hop_rng = arcade_rng_from_snapshot(source.hop_rng);
             let hop_state = hop_rng.advance();
             source.hop_rng = hop_state.snapshot();
             position.y =

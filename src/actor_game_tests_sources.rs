@@ -82,7 +82,7 @@
     }
 
     #[test]
-    fn driver_advances_hyperspace_source_rng_for_default_player_behavior() {
+    fn driver_advances_hyperspace_arcade_rng_for_default_player_behavior() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         let player = driver.spawn_player();
@@ -95,9 +95,9 @@
                 ..ActorBehaviorProfile::default()
             },
         );
-        let mut expected_source = PLAYFIELD_START_RNG;
-        expected_source.advance();
-        expected_source.advance();
+        let mut expected_arcade_rng = PLAYFIELD_START_RNG;
+        expected_arcade_rng.advance();
+        expected_arcade_rng.advance();
 
         driver.step(GameInput {
             hyperspace: true,
@@ -105,8 +105,9 @@
         });
         let rematerialized = driver.step(GameInput::NONE);
 
-        let expected_y = i16::from((expected_source.hseed >> 1).wrapping_add(PLAYFIELD_TOP_EDGE_Y));
-        let expected_position = if expected_source.hseed & 1 != 0 {
+        let expected_y =
+            i16::from((expected_arcade_rng.hseed >> 1).wrapping_add(PLAYFIELD_TOP_EDGE_Y));
+        let expected_position = if expected_arcade_rng.hseed & 1 != 0 {
             Point::new(0x20, expected_y)
         } else {
             Point::new(0x70, expected_y)
@@ -115,28 +116,28 @@
         assert_eq!(player_snapshot.position, expected_position);
         assert_eq!(
             rematerialized.background_left,
-            u16::from_be_bytes([expected_source.seed, expected_source.hseed])
+            u16::from_be_bytes([expected_arcade_rng.seed, expected_arcade_rng.hseed])
         );
         assert!(rematerialized.draws.iter().any(|draw| {
             draw.actor == player
                 && draw.position == expected_position
                 && matches!(
-                    (expected_source.hseed & 1 != 0, draw.sprite),
+                    (expected_arcade_rng.hseed & 1 != 0, draw.sprite),
                     (true, SpriteKey::PlayerRight) | (false, SpriteKey::PlayerLeft)
                 )
         }));
     }
 
     #[test]
-    fn playing_step_report_carries_driver_source_rng_snapshot() {
+    fn playing_step_report_carries_driver_arcade_rng_snapshot() {
         let mut driver = ActorGameDriver::new();
 
         let attract = driver.step(GameInput::NONE);
         assert_eq!(attract.arcade_rng, None);
 
         driver.phase = Phase::Playing;
-        let mut expected_source = PLAYFIELD_START_RNG;
-        let expected_snapshot = expected_source.advance().snapshot();
+        let mut expected_arcade_rng = PLAYFIELD_START_RNG;
+        let expected_snapshot = expected_arcade_rng.advance().snapshot();
 
         let playing = driver.step(GameInput::NONE);
 
@@ -660,7 +661,7 @@
     }
 
     #[test]
-    fn source_bomber_bomb_spawn_uses_source_rng_gate() {
+    fn bomber_bomb_spawn_uses_arcade_rng_gate() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.arcade_rng = ActorArcadeRng {
@@ -1337,13 +1338,13 @@
         });
 
         let report = driver.step(GameInput::NONE);
-        let report_source_rng = report
+        let report_arcade_rng = report
             .arcade_rng
-            .expect("playing report should carry source rng");
+            .expect("playing report should carry arcade rng");
         let prompt = source_mutant_prompt_for_test(
             report.step,
             report.wave,
-            report_source_rng,
+            report_arcade_rng,
             Point::new(42, 120),
             Velocity::default(),
         );
@@ -1353,7 +1354,7 @@
             source.acceleration,
             120,
             start.y,
-            report_source_rng.seed,
+            report_arcade_rng.seed,
         );
         let (expected_x, expected_x_fraction) =
             actor_source_axis_step(start.x, source.x_fraction, expected_source.x_velocity);
@@ -1367,7 +1368,7 @@
         expected_source.y_fraction = expected_y_fraction;
         expected_source.shot_timer = source_rmax(
             clamped_source_swarmer_shot_reset(ArcadeWaveProfile::for_wave(report.wave)),
-            report_source_rng.seed,
+            report_arcade_rng.seed,
         );
         expected_source.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
         let (expected_velocity, expected_projectile_source) =
@@ -1428,16 +1429,16 @@
         });
 
         let report = driver.step(GameInput::NONE);
-        let report_source_rng = report
+        let report_arcade_rng = report
             .arcade_rng
-            .expect("playing report should carry source rng");
+            .expect("playing report should carry arcade rng");
         let mut expected_source = source;
         expected_source.y_velocity = source_mini_swarmer_y_velocity(
             source.y_velocity,
             source.acceleration,
             120,
             start.y,
-            report_source_rng.seed,
+            report_arcade_rng.seed,
         );
         let (expected_x, expected_x_fraction) =
             actor_source_axis_step(start.x, source.x_fraction, expected_source.x_velocity);
@@ -1450,7 +1451,7 @@
         expected_source.y_fraction = expected_y_fraction;
         expected_source.shot_timer = source_rmax(
             clamped_source_swarmer_shot_reset(ArcadeWaveProfile::for_wave(report.wave)),
-            report_source_rng.seed,
+            report_arcade_rng.seed,
         );
         expected_source.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
 
@@ -1542,13 +1543,13 @@
         });
 
         let report = driver.step(GameInput::NONE);
-        let report_source_rng = report
+        let report_arcade_rng = report
             .arcade_rng
-            .expect("playing report should carry source rng");
+            .expect("playing report should carry arcade rng");
         let prompt = source_mutant_prompt_for_test(
             report.step,
             report.wave,
-            report_source_rng,
+            report_arcade_rng,
             Point::new(42, 120),
             Velocity::default(),
         );
@@ -1559,7 +1560,7 @@
             y_velocity: 0,
             shot_timer: actor_source_baiter_shot_reset(
                 ArcadeWaveProfile::for_wave(report.wave),
-                report_source_rng.seed,
+                report_arcade_rng.seed,
             ),
             sleep_ticks: BAITER_LOOP_SLEEP_TICKS,
             picture_frame: 1,
@@ -1568,7 +1569,7 @@
             Point::new(70, 120),
             &prompt,
             expected_source,
-            report_source_rng,
+            report_arcade_rng,
         )
         .expect("expected source baiter fireball");
 
@@ -1646,9 +1647,9 @@
         });
 
         let report = driver.step(GameInput::NONE);
-        let report_source_rng = report
+        let report_arcade_rng = report
             .arcade_rng
-            .expect("playing report should carry source rng");
+            .expect("playing report should carry arcade rng");
 
         assert!(!report.sounds.contains(&SoundCue::BaiterShot));
         assert!(!report.commands.iter().any(|command| {
@@ -1669,7 +1670,7 @@
                 y_velocity: 0,
                 shot_timer: actor_source_baiter_shot_reset(
                     ArcadeWaveProfile::for_wave(report.wave),
-                    report_source_rng.seed,
+                    report_arcade_rng.seed,
                 ),
                 sleep_ticks: BAITER_LOOP_SLEEP_TICKS,
                 picture_frame: 1,
@@ -1738,8 +1739,8 @@
     }
 
     #[test]
-    fn source_baiter_retarget_uses_driver_source_rng_snapshot() {
-        fn step_baiter_after_source_seed(seed: u8) -> (StepReport, ActorId) {
+    fn baiter_retarget_uses_driver_arcade_rng_snapshot() {
+        fn step_baiter_after_arcade_seed(seed: u8) -> (StepReport, ActorId) {
             let mut driver = ActorGameDriver::new();
             driver.phase = Phase::Playing;
             driver.wave = 1;
@@ -1767,7 +1768,7 @@
             (driver.step(GameInput::NONE), baiter)
         }
 
-        let (held, held_baiter) = step_baiter_after_source_seed(0);
+        let (held, held_baiter) = step_baiter_after_arcade_seed(0);
         assert_eq!(held.arcade_rng.map(|arcade_rng| arcade_rng.seed), Some(17));
         assert_eq!(
             snapshot_for(&held, held_baiter).position,
@@ -1786,7 +1787,7 @@
             })
         );
 
-        let (retargeted, retargeted_baiter) = step_baiter_after_source_seed(70);
+        let (retargeted, retargeted_baiter) = step_baiter_after_arcade_seed(70);
         assert_eq!(
             retargeted.arcade_rng.map(|arcade_rng| arcade_rng.seed),
             Some(227)
