@@ -1323,7 +1323,7 @@ fn bomber_bomb_lifetime_ticks(arcade_rng: ActorArcadeRngSnapshot) -> u8 {
     (arcade_rng.seed & 0x1F).wrapping_add(1)
 }
 
-fn actor_source_tie_selected_slot(seed: u8) -> u8 {
+fn arcade_tie_selected_slot(seed: u8) -> u8 {
     (seed & 0x06) >> 1
 }
 

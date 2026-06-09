@@ -50,7 +50,7 @@ impl Bomber {
         let Some(arcade_state) = &mut self.source else {
             return;
         };
-        if arcade_state.slot != actor_source_tie_selected_slot(arcade_rng.seed) {
+        if arcade_state.slot != arcade_tie_selected_slot(arcade_rng.seed) {
             return;
         }
         if arcade_state.sleep_ticks > 0 {
@@ -97,7 +97,7 @@ impl Bomber {
             let Some(arcade_rng) = prompt.arcade_rng else {
                 return;
             };
-            if arcade_state.slot != actor_source_tie_selected_slot(arcade_rng.seed)
+            if arcade_state.slot != arcade_tie_selected_slot(arcade_rng.seed)
                 || arcade_state.sleep_ticks > 0
                 || self.position.y == 0
                 || arcade_rng.lseed & 0x07 != 0

@@ -1559,7 +1559,7 @@
         player_position: Option<Point>,
     ) -> (Point, BomberArcadeState) {
         if let Some(arcade_rng) = arcade_rng
-            && arcade_state.slot == actor_source_tie_selected_slot(arcade_rng.seed)
+            && arcade_state.slot == arcade_tie_selected_slot(arcade_rng.seed)
         {
             if arcade_state.sleep_ticks > 0 {
                 arcade_state.sleep_ticks = arcade_state.sleep_ticks.saturating_sub(1);
