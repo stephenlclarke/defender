@@ -34,14 +34,14 @@ impl Lander {
             id,
             position: spawn.position,
             drift: spawn
-                .source
+                .arcade_state
                 .map(|arcade_state| {
                     lander_drift_from_arcade_velocity(arcade_state.x_velocity)
                 })
                 .unwrap_or(-1),
             mode: LanderMode::Seeking,
-            spawn_visibility: lander_spawn_visibility(spawn.source),
-            arcade_state: spawn.source,
+            spawn_visibility: lander_spawn_visibility(spawn.arcade_state),
+            arcade_state: spawn.arcade_state,
         }
     }
 
@@ -390,7 +390,7 @@ fn first_wave_refill_lander_spawn_visibility(
     ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS
         .iter()
         .copied()
-        .filter_map(|spawn| spawn.source)
+        .filter_map(|spawn| spawn.arcade_state)
         .enumerate()
         .find_map(|(index, refill_arcade_state)| {
             lander_arcade_state_matches_refill_row(arcade_state, refill_arcade_state).then_some(
@@ -528,10 +528,10 @@ impl Mutant {
             id,
             position: spawn.position,
             drift: spawn
-                .source
+                .arcade_state
                 .map(|arcade_state| arcade_drift_from_velocity(arcade_state.x_velocity))
                 .unwrap_or(-1),
-            arcade_state: spawn.source,
+            arcade_state: spawn.arcade_state,
         }
     }
 

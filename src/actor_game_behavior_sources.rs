@@ -362,37 +362,37 @@ pub struct EnemyProjectileArcadeState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorLanderSpawn {
     pub position: Point,
-    pub source: Option<LanderArcadeState>,
+    pub arcade_state: Option<LanderArcadeState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorBomberSpawn {
     pub position: Point,
-    pub source: Option<BomberArcadeState>,
+    pub arcade_state: Option<BomberArcadeState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorPodSpawn {
     pub position: Point,
-    pub source: Option<PodArcadeState>,
+    pub arcade_state: Option<PodArcadeState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorSwarmerSpawn {
     pub position: Point,
-    pub source: Option<SwarmerArcadeState>,
+    pub arcade_state: Option<SwarmerArcadeState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorBaiterSpawn {
     pub position: Point,
-    pub source: Option<BaiterArcadeState>,
+    pub arcade_state: Option<BaiterArcadeState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorMutantSpawn {
     pub position: Point,
-    pub source: Option<MutantArcadeState>,
+    pub arcade_state: Option<MutantArcadeState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -407,7 +407,7 @@ pub struct HumanArcadeState {
 pub struct ActorHumanSpawn {
     pub position: Point,
     pub mode: HumanMode,
-    pub source: Option<HumanArcadeState>,
+    pub arcade_state: Option<HumanArcadeState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -433,14 +433,14 @@ impl ActorLanderSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            source: None,
+            arcade_state: None,
         }
     }
 
     const fn from_first_wave_record(start: FirstWaveLanderSpawnRecord) -> Self {
         Self {
             position: Point::new((start.world_x >> 8) as i16, (start.world_y >> 8) as i16),
-            source: Some(LanderArcadeState {
+            arcade_state: Some(LanderArcadeState {
                 x_fraction: (start.world_x & 0x00FF) as u8,
                 y_fraction: (start.world_y & 0x00FF) as u8,
                 x_velocity: start.x_velocity,
@@ -475,7 +475,7 @@ impl ActorLanderSpawn {
 
         Self {
             position: Point::new(i16::from(x), i16::from(y)),
-            source: Some(LanderArcadeState {
+            arcade_state: Some(LanderArcadeState {
                 x_fraction,
                 y_fraction: 0,
                 x_velocity,
@@ -493,7 +493,7 @@ impl ActorBomberSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            source: None,
+            arcade_state: None,
         }
     }
 
@@ -505,7 +505,7 @@ impl ActorBomberSpawn {
         };
         Self {
             position,
-            source: Some(BomberArcadeState {
+            arcade_state: Some(BomberArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: actor_sign_extend_u8_to_u16(velocity_low),
@@ -544,7 +544,7 @@ impl ActorBomberSpawn {
                 let [x, x_fraction] = x16.to_be_bytes();
                 bombers.push(Self {
                     position: Point::new(i16::from(x), BOMBER_CRUISE_ALTITUDE),
-                    source: Some(BomberArcadeState {
+                    arcade_state: Some(BomberArcadeState {
                         x_fraction,
                         y_fraction: 0,
                         x_velocity,
@@ -568,7 +568,7 @@ impl ActorPodSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            source: None,
+            arcade_state: None,
         }
     }
 
@@ -580,7 +580,7 @@ impl ActorPodSpawn {
         };
         Self {
             position,
-            source: Some(PodArcadeState {
+            arcade_state: Some(PodArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: actor_sign_extend_u8_to_u16(velocity_low),
@@ -608,7 +608,7 @@ impl ActorPodSpawn {
 
         Self {
             position: Point::new(i16::from(x), i16::from(y)),
-            source: Some(PodArcadeState {
+            arcade_state: Some(PodArcadeState {
                 x_fraction,
                 y_fraction: 0,
                 x_velocity,
@@ -622,7 +622,7 @@ impl ActorSwarmerSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            source: None,
+            arcade_state: None,
         }
     }
 
@@ -642,7 +642,7 @@ impl ActorSwarmerSpawn {
 
         Self {
             position,
-            source: Some(SwarmerArcadeState {
+            arcade_state: Some(SwarmerArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity,
@@ -683,9 +683,9 @@ impl ActorSwarmerSpawn {
         (0..count)
             .map(|_| {
                 let mut spawn = Self::from_pod_release(arcade_rng, profile, position);
-                if let Some(source) = &mut spawn.source {
-                    source.x_fraction = x_fraction;
-                    source.y_fraction = y_fraction;
+                if let Some(arcade_state) = &mut spawn.arcade_state {
+                    arcade_state.x_fraction = x_fraction;
+                    arcade_state.y_fraction = y_fraction;
                 }
                 spawn
             })
@@ -697,7 +697,7 @@ impl ActorBaiterSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            source: None,
+            arcade_state: None,
         }
     }
 
@@ -736,7 +736,7 @@ impl ActorBaiterSpawn {
         );
         Self {
             position,
-            source: Some(arcade_state),
+            arcade_state: Some(arcade_state),
         }
     }
 }
@@ -745,7 +745,7 @@ impl ActorMutantSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            source: None,
+            arcade_state: None,
         }
     }
 
@@ -762,7 +762,7 @@ impl ActorMutantSpawn {
             arcade_rng.advance_rmax(profile.mutant_shot_time.min(u32::from(u8::MAX)) as u8);
         Self {
             position,
-            source: Some(MutantArcadeState {
+            arcade_state: Some(MutantArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -799,7 +799,7 @@ impl ActorMutantSpawn {
 
         Self {
             position: Point::new(i16::from(x), i16::from(y)),
-            source: Some(MutantArcadeState {
+            arcade_state: Some(MutantArcadeState {
                 x_fraction,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -869,7 +869,7 @@ fn push_arcade_target_list_restore_human_group(
         humans.push(ActorHumanSpawn {
             position: Point::new(i16::from(spawn_x), i16::from(ASTRONAUT_RESTORE_Y)),
             mode: HumanMode::Grounded,
-            source: Some(HumanArcadeState {
+            arcade_state: Some(HumanArcadeState {
                 x_fraction: state.lseed,
                 y_fraction: 0,
                 picture_frame,
@@ -885,7 +885,7 @@ fn select_next_lander_target_slot_index(
     cursor: &mut Option<usize>,
     humans: &[ActorHumanSpawn],
 ) -> Option<usize> {
-    if !humans.iter().any(|human| human.source.is_some()) {
+    if !humans.iter().any(|human| human.arcade_state.is_some()) {
         return None;
     }
 
@@ -897,8 +897,8 @@ fn select_next_lander_target_slot_index(
         probe = next_target_list_slot_index(probe);
         if humans.iter().any(|human| {
             human
-                .source
-                .is_some_and(|source| source.target_slot_index == probe)
+                .arcade_state
+                .is_some_and(|arcade_state| arcade_state.target_slot_index == probe)
         }) {
             *cursor = Some(probe);
             return Some(probe);
@@ -932,7 +932,7 @@ impl ActorHumanSpawn {
         Self {
             position,
             mode,
-            source: None,
+            arcade_state: None,
         }
     }
 
@@ -943,7 +943,7 @@ impl ActorHumanSpawn {
         Self {
             position: Point::new((start.world_x >> 8) as i16, (start.world_y >> 8) as i16),
             mode: HumanMode::Grounded,
-            source: Some(HumanArcadeState {
+            arcade_state: Some(HumanArcadeState {
                 x_fraction: (start.world_x & 0x00FF) as u8,
                 y_fraction: (start.world_y & 0x00FF) as u8,
                 picture_frame: start.picture_frame,

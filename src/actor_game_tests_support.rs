@@ -222,7 +222,7 @@
         };
         driver.spawn_lander_from_spawn(ActorLanderSpawn {
             position: Point::new(100, HUMAN_GROUND_Y),
-            source: Some(lander_runtime),
+            arcade_state: Some(lander_runtime),
         });
         driver.spawn_human_for_test(Point::new(100, HUMAN_GROUND_Y));
         driver.step(GameInput::NONE);
@@ -318,7 +318,7 @@
         let start = Point::new(100, 80);
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: start,
-            source: Some(arcade_state),
+            arcade_state: Some(arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -406,7 +406,7 @@
             actor,
             ActorMutantSpawn {
                 position: start,
-                source: Some(arcade_state),
+                arcade_state: Some(arcade_state),
             },
         );
         let reply = mutant.update(&prompt);
@@ -484,7 +484,7 @@
         };
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: Point::new(4, 0x50),
-            source: Some(arcade_state),
+            arcade_state: Some(arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -527,7 +527,7 @@
         };
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: Point::new(0x03, 0x33),
-            source: Some(arcade_state),
+            arcade_state: Some(arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -574,7 +574,7 @@
         };
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: Point::new(0x08, 0x51),
-            source: Some(arcade_state),
+            arcade_state: Some(arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -826,7 +826,7 @@
         let start = Point::new(70, 120);
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: start,
-            source: Some(arcade_state),
+            arcade_state: Some(arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -996,7 +996,7 @@
             swarmer_spawns[0],
             (
                 expected_first_swarmer.position,
-                expected_first_swarmer.source
+                expected_first_swarmer.arcade_state
             )
         );
         assert_eq!(driver.arcade_rng, expected_rng);
@@ -1191,7 +1191,7 @@
         spawn: ActorLanderSpawn,
     ) -> (u16, u16, u16, u16, u8, u8, u8, Option<usize>) {
         let arcade_state = spawn
-            .source
+            .arcade_state
             .expect("arcade lander spawn should carry state");
         let x16 = u16::from_be_bytes([spawn.position.x as u8, arcade_state.x_fraction]);
         let y16 = u16::from_be_bytes([spawn.position.y as u8, arcade_state.y_fraction]);
@@ -1551,7 +1551,7 @@
         ActorHumanSpawn {
             position,
             mode: HumanMode::Grounded,
-            source: Some(HumanArcadeState {
+            arcade_state: Some(HumanArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 picture_frame,

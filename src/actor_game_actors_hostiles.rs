@@ -16,10 +16,10 @@ impl Bomber {
             id,
             position: spawn.position,
             drift: spawn
-                .source
+                .arcade_state
                 .map(|arcade_state| arcade_drift_from_velocity(arcade_state.x_velocity))
                 .unwrap_or(-1),
-            arcade_state: spawn.source,
+            arcade_state: spawn.arcade_state,
         }
     }
 
@@ -365,10 +365,10 @@ impl Pod {
             id,
             position: spawn.position,
             drift: spawn
-                .source
+                .arcade_state
                 .map(|arcade_state| arcade_drift_from_velocity(arcade_state.x_velocity))
                 .unwrap_or(1),
-            arcade_state: spawn.source,
+            arcade_state: spawn.arcade_state,
         }
     }
 
@@ -471,7 +471,7 @@ impl Swarmer {
             id,
             position: spawn.position,
             drift: -1,
-            arcade_state: spawn.source,
+            arcade_state: spawn.arcade_state,
         }
     }
 
@@ -709,7 +709,7 @@ impl Baiter {
             id,
             position: spawn.position,
             drift: -1,
-            arcade_state: spawn.source,
+            arcade_state: spawn.arcade_state,
         }
     }
 

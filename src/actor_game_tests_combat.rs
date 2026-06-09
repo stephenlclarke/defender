@@ -768,8 +768,8 @@
         assert_eq!(profile.mutant_spawns.len(), 1);
         assert_eq!(profile.swarmer_spawns.len(), 1);
         assert_eq!(profile.enemy_reserve, EnemyReserveSnapshot::default());
-        assert!(profile.mutant_spawns[0].source.is_some());
-        assert!(profile.swarmer_spawns[0].source.is_some());
+        assert!(profile.mutant_spawns[0].arcade_state.is_some());
+        assert!(profile.swarmer_spawns[0].arcade_state.is_some());
 
         let mut driver = ActorGameDriver::with_wave_script(wave_script);
         driver.step(GameInput {
@@ -866,8 +866,8 @@
             assert_eq!(profile.mutant_spawns.len(), 1);
             assert_eq!(profile.swarmer_spawns.len(), 1);
             assert_eq!(profile.enemy_reserve, EnemyReserveSnapshot::default());
-            assert!(profile.mutant_spawns[0].source.is_some());
-            assert!(profile.swarmer_spawns[0].source.is_some());
+            assert!(profile.mutant_spawns[0].arcade_state.is_some());
+            assert!(profile.swarmer_spawns[0].arcade_state.is_some());
         }
 
         let second = wave_script.profile_for_wave(2);

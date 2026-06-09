@@ -389,7 +389,7 @@
         );
         let lander_id = driver.spawn_lander_from_spawn(ActorLanderSpawn {
             position: Point::new(100, 100),
-            source: Some(LanderArcadeState {
+            arcade_state: Some(LanderArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -404,7 +404,7 @@
         driver.spawn_human_from_spawn(ActorHumanSpawn {
             position: Point::new(160, 100),
             mode: HumanMode::Grounded,
-            source: Some(HumanArcadeState {
+            arcade_state: Some(HumanArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 picture_frame: 0,
@@ -597,7 +597,7 @@
         };
         let bomber = driver.spawn_bomber_from_spawn(ActorBomberSpawn {
             position: Point::new(100, 80),
-            source: Some(initial_source),
+            arcade_state: Some(initial_source),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -679,7 +679,7 @@
         );
         driver.spawn_bomber_from_spawn(ActorBomberSpawn {
             position: Point::new(100, 80),
-            source: Some(BomberArcadeState {
+            arcade_state: Some(BomberArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -723,7 +723,7 @@
         );
         driver.spawn_bomber_from_spawn(ActorBomberSpawn {
             position: Point::new(ENEMY_PROJECTILE_MAX_SCREEN_X, 80),
-            source: Some(BomberArcadeState {
+            arcade_state: Some(BomberArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -739,7 +739,7 @@
                 ENEMY_PROJECTILE_MAX_SCREEN_X - 1,
                 i16::from(PLAYFIELD_TOP_EDGE_Y),
             ),
-            source: Some(BomberArcadeState {
+            arcade_state: Some(BomberArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -799,7 +799,7 @@
         let bomber_position = Point::new(96, player_position.y - 8);
         let bomber = driver.spawn_bomber_from_spawn(ActorBomberSpawn {
             position: bomber_position,
-            source: Some(initial_source),
+            arcade_state: Some(initial_source),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -860,7 +860,7 @@
         let bomber_position = Point::new(100, 0);
         let bomber = driver.spawn_bomber_from_spawn(ActorBomberSpawn {
             position: bomber_position,
-            source: Some(initial_source),
+            arcade_state: Some(initial_source),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -1334,7 +1334,7 @@
         };
         let swarmer = driver.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
             position: start,
-            source: Some(arcade_state),
+            arcade_state: Some(arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -1428,7 +1428,7 @@
         };
         let swarmer = driver.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
             position: start,
-            source: Some(arcade_state),
+            arcade_state: Some(arcade_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -1500,7 +1500,7 @@
         }
         driver.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
             position: Point::new(25, 100),
-            source: Some(SwarmerArcadeState {
+            arcade_state: Some(SwarmerArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0x0020,
@@ -1537,7 +1537,7 @@
         driver.wave = 1;
         let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
             position: Point::new(70, 120),
-            source: Some(BaiterArcadeState {
+            arcade_state: Some(BaiterArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1641,7 +1641,7 @@
         }
         let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
             position: Point::new(70, 120),
-            source: Some(BaiterArcadeState {
+            arcade_state: Some(BaiterArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1760,7 +1760,7 @@
             };
             let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
                 position: Point::new(70, 120),
-                source: Some(BaiterArcadeState {
+                arcade_state: Some(BaiterArcadeState {
                     x_fraction: 0,
                     y_fraction: 0,
                     x_velocity: 0,
@@ -1832,7 +1832,7 @@
         driver.snapshots.insert(player_id, player);
         let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
             position: Point::new(70, 140),
-            source: Some(BaiterArcadeState {
+            arcade_state: Some(BaiterArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,

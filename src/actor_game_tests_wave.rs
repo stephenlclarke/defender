@@ -123,7 +123,7 @@
             ]
         );
         assert_eq!(
-            first.human_spawns[1].source,
+            first.human_spawns[1].arcade_state,
             Some(HumanArcadeState {
                 x_fraction: 0x81,
                 y_fraction: 0x00,
@@ -132,7 +132,7 @@
             })
         );
         assert_eq!(
-            first.lander_spawns[0].source,
+            first.lander_spawns[0].arcade_state,
             Some(LanderArcadeState {
                 x_fraction: 0x33,
                 y_fraction: 0xE0,
@@ -145,7 +145,7 @@
             })
         );
         assert_eq!(
-            first.lander_spawns[3].source,
+            first.lander_spawns[3].arcade_state,
             Some(LanderArcadeState {
                 x_fraction: 0x11,
                 y_fraction: 0x70,
@@ -181,7 +181,7 @@
             ]
         );
         assert_eq!(
-            second.lander_spawns[0].source,
+            second.lander_spawns[0].arcade_state,
             Some(LanderArcadeState {
                 x_fraction: 0xAD,
                 y_fraction: 0,
@@ -194,7 +194,7 @@
             })
         );
         assert_eq!(
-            second.lander_spawns[1].source,
+            second.lander_spawns[1].arcade_state,
             Some(LanderArcadeState {
                 x_fraction: 0x55,
                 y_fraction: 0,
@@ -207,7 +207,7 @@
             })
         );
         assert_eq!(
-            second.lander_spawns[2].source,
+            second.lander_spawns[2].arcade_state,
             Some(LanderArcadeState {
                 x_fraction: 0x4A,
                 y_fraction: 0,
@@ -222,7 +222,7 @@
         assert_eq!(second.bomber_spawns.len(), 1);
         assert_eq!(second.bomber_spawn_points(), vec![Point::new(228, 104)]);
         assert_eq!(
-            second.bomber_spawns[0].source,
+            second.bomber_spawns[0].arcade_state,
             Some(BomberArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
@@ -237,7 +237,7 @@
         assert_eq!(second.pod_spawns.len(), 1);
         assert_eq!(second.pod_spawn_points(), vec![Point::new(184, 72)]);
         assert_eq!(
-            second.pod_spawns[0].source,
+            second.pod_spawns[0].arcade_state,
             Some(PodArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
@@ -261,7 +261,7 @@
             ]
         );
         assert_eq!(
-            second.human_spawns[0].source,
+            second.human_spawns[0].arcade_state,
             Some(HumanArcadeState {
                 x_fraction: 0xAD,
                 y_fraction: 0,
@@ -270,7 +270,7 @@
             })
         );
         assert_eq!(
-            second.human_spawns[9].source,
+            second.human_spawns[9].arcade_state,
             Some(HumanArcadeState {
                 x_fraction: 0x69,
                 y_fraction: 0,
@@ -983,7 +983,7 @@
         for (snapshot, spawn) in arcade_mutants.iter().zip([first_spawn, second_spawn]) {
             let (expected_position, expected_arcade, _) = expected_mutant_arcade_after_motion(
                 spawn.position,
-                spawn.source.expect("mutant arcade restore state"),
+                spawn.arcade_state.expect("mutant arcade restore state"),
                 snapshot.id,
                 &prompt,
                 behavior,
@@ -1105,7 +1105,7 @@
         for (snapshot, spawn) in arcade_mutants.iter().zip([first_spawn, second_spawn]) {
             let (expected_position, expected_arcade, _) = expected_mutant_arcade_after_motion(
                 spawn.position,
-                spawn.source.expect("mutant arcade restore state"),
+                spawn.arcade_state.expect("mutant arcade restore state"),
                 snapshot.id,
                 &prompt,
                 behavior,
@@ -1138,20 +1138,20 @@
         };
         let mut expected_rng = driver.arcade_rng;
         let mut expected_pod = ActorPodSpawn::from_arcade_restore(&mut expected_rng);
-        if let Some(source) = &mut expected_pod.source {
+        if let Some(arcade_state) = &mut expected_pod.arcade_state {
             let (x, x_fraction) = arcade_axis_step(
                 expected_pod.position.x,
-                source.x_fraction,
-                source.x_velocity,
+                arcade_state.x_fraction,
+                arcade_state.x_velocity,
             );
             let (y, y_fraction) = arcade_active_object_y_step(
                 expected_pod.position.y,
-                source.y_fraction,
-                source.y_velocity,
+                arcade_state.y_fraction,
+                arcade_state.y_velocity,
             );
             expected_pod.position = Point::new(x, y);
-            source.x_fraction = x_fraction;
-            source.y_fraction = y_fraction;
+            arcade_state.x_fraction = x_fraction;
+            arcade_state.y_fraction = y_fraction;
         }
 
         let restored = driver.step(GameInput::NONE);
@@ -1205,7 +1205,7 @@
         assert!(restored.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Pod
                 && snapshot.position == expected_pod.position
-                && snapshot.pod_runtime == expected_pod.source
+                && snapshot.pod_runtime == expected_pod.arcade_state
         }));
         assert!(
             restored
@@ -1219,7 +1219,9 @@
                         1,
                     )[0];
                     let expected_arcade_state =
-                        expected_spawn.source.expect("expected bomber arcade state");
+                        expected_spawn
+                            .arcade_state
+                            .expect("expected bomber arcade state");
                     let (_, x_fraction) = arcade_axis_step(
                         expected_spawn.position.x,
                         expected_arcade_state.x_fraction,
@@ -1278,7 +1280,7 @@
         assert_eq!(arcade_swarmers.len(), 4);
         for (snapshot, spawn) in arcade_swarmers.iter().zip(expected_spawns) {
             let mut expected_arcade_state =
-                spawn.source.expect("swarmer arcade restore metadata");
+                spawn.arcade_state.expect("swarmer arcade restore metadata");
             expected_arcade_state.sleep_ticks =
                 expected_arcade_state.sleep_ticks.saturating_sub(1);
             assert_eq!(snapshot.position, spawn.position);
@@ -1298,7 +1300,7 @@
         driver.phase = Phase::Playing;
         let top = driver.spawn_pod_from_spawn(ActorPodSpawn {
             position: Point::new(0xD0, i16::from(PLAYFIELD_TOP_EDGE_Y)),
-            source: Some(PodArcadeState {
+            arcade_state: Some(PodArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1307,7 +1309,7 @@
         });
         let bottom = driver.spawn_pod_from_spawn(ActorPodSpawn {
             position: Point::new(0xE0, i16::from(PLAYFIELD_BOTTOM_EDGE_Y)),
-            source: Some(PodArcadeState {
+            arcade_state: Some(PodArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1356,7 +1358,7 @@
         );
         let lander = driver.spawn_lander_from_spawn(ActorLanderSpawn {
             position: Point::new(0x70, i16::from(PLAYFIELD_TOP_EDGE_Y)),
-            source: Some(LanderArcadeState {
+            arcade_state: Some(LanderArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1369,7 +1371,7 @@
         });
         let swarmer = driver.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
             position: Point::new(0x80, i16::from(PLAYFIELD_BOTTOM_EDGE_Y)),
-            source: Some(SwarmerArcadeState {
+            arcade_state: Some(SwarmerArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1382,7 +1384,7 @@
         });
         let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
             position: Point::new(0x90, i16::from(PLAYFIELD_TOP_EDGE_Y)),
-            source: Some(BaiterArcadeState {
+            arcade_state: Some(BaiterArcadeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,

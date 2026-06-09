@@ -923,7 +923,7 @@
 
     #[test]
     fn arcade_state_falling_human_rescue_uses_projected_world_position() {
-        let mut human = Human::with_source(
+        let mut human = Human::with_arcade_state(
             ActorId::new(7),
             Point::new(0x40, 100),
             HumanMode::Falling { velocity: 0 },

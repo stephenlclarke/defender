@@ -4,30 +4,30 @@ struct Human {
     position: Point,
     mode: HumanMode,
     safe_landing_awarded: bool,
-    source: Option<HumanArcadeState>,
+    arcade_state: Option<HumanArcadeState>,
 }
 
 impl Human {
     fn new(id: ActorId, position: Point, mode: HumanMode) -> Self {
-        Self::with_source(id, position, mode, None)
+        Self::with_arcade_state(id, position, mode, None)
     }
 
     fn from_spawn(id: ActorId, spawn: ActorHumanSpawn) -> Self {
-        Self::with_source(id, spawn.position, spawn.mode, spawn.source)
+        Self::with_arcade_state(id, spawn.position, spawn.mode, spawn.arcade_state)
     }
 
-    fn with_source(
+    fn with_arcade_state(
         id: ActorId,
         position: Point,
         mode: HumanMode,
-        source: Option<HumanArcadeState>,
+        arcade_state: Option<HumanArcadeState>,
     ) -> Self {
         Self {
             id,
             position,
             mode,
             safe_landing_awarded: false,
-            source,
+            arcade_state,
         }
     }
 
@@ -37,12 +37,12 @@ impl Human {
 
     fn screen_bounds(&self, background_left: u16) -> Option<Rect> {
         let bounds = self.bounds();
-        let Some(source) = self.source else {
+        let Some(arcade_state) = self.arcade_state else {
             return Some(bounds);
         };
         let position = actor_arcade_screen_position(
             self.position,
-            source.x_fraction,
+            arcade_state.x_fraction,
             background_left,
         )?;
         let delta = Velocity::new(position.x - self.position.x, position.y - self.position.y);
@@ -54,10 +54,10 @@ impl Human {
         arcade_rng: Option<ActorArcadeRngSnapshot>,
         human_walk_target_slot: Option<usize>,
     ) {
-        let Some(source) = self.source else {
+        let Some(arcade_state) = self.arcade_state else {
             return;
         };
-        if human_walk_target_slot != Some(source.target_slot_index) {
+        if human_walk_target_slot != Some(arcade_state.target_slot_index) {
             return;
         }
 
@@ -67,8 +67,8 @@ impl Human {
     }
 
     fn advance_arcade_walk(&mut self, arcade_seed: u8) {
-        if let Some(source) = &mut self.source {
-            let frame = source.picture_frame % 4;
+        if let Some(arcade_state) = &mut self.arcade_state {
+            let frame = arcade_state.picture_frame % 4;
             let (next_frame, target_y, velocity) = if frame <= 1 {
                 if arcade_seed <= HUMAN_TURN_SEED_MAX {
                     (2, None, HUMAN_RIGHT_X_VELOCITY)
@@ -92,10 +92,10 @@ impl Human {
                 self.position.y = actor_step_human_toward_walk_target_y(self.position.y, target_y);
             }
             let (x, x_fraction) =
-                arcade_axis_step(self.position.x, source.x_fraction, velocity);
+                arcade_axis_step(self.position.x, arcade_state.x_fraction, velocity);
             self.position.x = x;
-            source.x_fraction = x_fraction;
-            source.picture_frame = next_frame;
+            arcade_state.x_fraction = x_fraction;
+            arcade_state.picture_frame = next_frame;
         }
     }
 
@@ -223,7 +223,7 @@ impl AssetActor for Human {
                 swarmer_runtime: None,
                 baiter_runtime: None,
                 mutant_runtime: None,
-                human_runtime: self.source,
+                human_runtime: self.arcade_state,
                 enemy_projectile_runtime: None,
             },
             commands,
@@ -234,9 +234,9 @@ impl AssetActor for Human {
 
 impl Human {
     fn draw_effect(&self) -> VisualEffect {
-        self.source
-            .map(|source| VisualEffect::HumanSpriteFrame {
-                frame: source.picture_frame,
+        self.arcade_state
+            .map(|arcade_state| VisualEffect::HumanSpriteFrame {
+                frame: arcade_state.picture_frame,
             })
             .unwrap_or(VisualEffect::Static)
     }
