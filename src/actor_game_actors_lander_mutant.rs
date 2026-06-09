@@ -519,7 +519,7 @@ struct Mutant {
     id: ActorId,
     position: Point,
     drift: i16,
-    source: Option<MutantArcadeState>,
+    arcade_state: Option<MutantArcadeState>,
 }
 
 impl Mutant {
@@ -529,9 +529,9 @@ impl Mutant {
             position: spawn.position,
             drift: spawn
                 .source
-                .map(|source| arcade_drift_from_velocity(source.x_velocity))
+                .map(|arcade_state| arcade_drift_from_velocity(arcade_state.x_velocity))
                 .unwrap_or(-1),
-            source: spawn.source,
+            arcade_state: spawn.source,
         }
     }
 
@@ -540,11 +540,11 @@ impl Mutant {
     }
 
     fn scene_position(&self) -> Point {
-        target6_mutant_arcade_scene_position(self.position, self.source)
+        target6_mutant_arcade_scene_position(self.position, self.arcade_state)
     }
 
     fn collision_position(&self) -> Point {
-        target6_mutant_arcade_collision_position(self.position, self.source)
+        target6_mutant_arcade_collision_position(self.position, self.arcade_state)
     }
 
     fn advance_arcade_motion(
@@ -553,24 +553,24 @@ impl Mutant {
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) -> bool {
-        let Some(source) = &mut self.source else {
+        let Some(arcade_state) = &mut self.arcade_state else {
             return false;
         };
-        if source.sleep_ticks > 0 {
-            if let Some((position, velocity, projectile_source)) =
+        if arcade_state.sleep_ticks > 0 {
+            if let Some((position, velocity, projectile_arcade_state)) =
                 target6_mutant_arcade_fire2524_forced_shot(
                     self.position,
-                    *source,
+                    *arcade_state,
                     prompt,
                     behavior,
                 )
             {
-                source.target6_first_shot_deferred = true;
-                source.shot_timer = TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER;
+                arcade_state.target6_first_shot_deferred = true;
+                arcade_state.shot_timer = TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER;
                 push_arcade_enemy_projectile_command(
                     position,
                     velocity,
-                    projectile_source,
+                    projectile_arcade_state,
                     SoundCue::MutantShot,
                     commands,
                 );
@@ -578,24 +578,24 @@ impl Mutant {
             if let Some(player_position) = prompt.player_position()
                 && target6_mutant_arcade_fires_visible_entry_shot(
                     self.position,
-                    *source,
+                    *arcade_state,
                     player_position,
                 )
             {
-                source.target6_first_shot_deferred = true;
+                arcade_state.target6_first_shot_deferred = true;
                 let shot_rng = mutant_arcade_shot_rng(prompt, self.id, self.position);
                 let shot_position =
-                    target6_mutant_arcade_shot_position(self.position, *source);
+                    target6_mutant_arcade_shot_position(self.position, *arcade_state);
                 push_mutant_arcade_shot(
                     shot_position,
                     prompt,
                     behavior,
-                    *source,
+                    *arcade_state,
                     shot_rng,
                     commands,
                 );
             }
-            source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
+            arcade_state.sleep_ticks = arcade_state.sleep_ticks.saturating_sub(1);
             return true;
         }
 
@@ -604,13 +604,13 @@ impl Mutant {
         };
         let profile = prompt.arcade_wave;
         let player_absolute_x = arcade_absolute_x(player_position, 0);
-        let object_absolute_x = arcade_absolute_x(self.position, source.x_fraction);
-        source.x_velocity = mutant_arcade_x_velocity(
+        let object_absolute_x = arcade_absolute_x(self.position, arcade_state.x_fraction);
+        arcade_state.x_velocity = mutant_arcade_x_velocity(
             profile.mutant_x_velocity,
             player_absolute_x,
             object_absolute_x,
         );
-        source.y_velocity = mutant_arcade_y_velocity(
+        arcade_state.y_velocity = mutant_arcade_y_velocity(
             profile,
             player_position.y,
             player_absolute_x,
@@ -625,11 +625,11 @@ impl Mutant {
             self.position,
         ) {
             let target6_forced_dive_shot =
-                target6_mutant_arcade_fires_dive_shot(self.position, *source);
+                target6_mutant_arcade_fires_dive_shot(self.position, *arcade_state);
             let target6_forced_dive_shot_position = self.position;
-            let mut hop_rng = arcade_rng_from_snapshot(source.hop_rng);
+            let mut hop_rng = arcade_rng_from_snapshot(arcade_state.hop_rng);
             let hop_state = hop_rng.advance();
-            source.hop_rng = hop_state.snapshot();
+            arcade_state.hop_rng = hop_state.snapshot();
             self.position.y =
                 mutant_arcade_hop_y(self.position.y, profile.mutant_random_y, hop_state.seed);
 
@@ -637,63 +637,66 @@ impl Mutant {
                 let shot_rng = mutant_arcade_shot_rng(prompt, self.id, self.position);
                 let shot_position = target6_mutant_arcade_shot_position(
                     target6_forced_dive_shot_position,
-                    *source,
+                    *arcade_state,
                 );
                 push_mutant_arcade_shot(
                     shot_position,
                     prompt,
                     behavior,
-                    *source,
+                    *arcade_state,
                     shot_rng,
                     commands,
                 );
-                source.shot_timer = TARGET6_MUTANT_POST_SHOT_TIMER;
+                arcade_state.shot_timer = TARGET6_MUTANT_POST_SHOT_TIMER;
             } else {
-                source.shot_timer = source.shot_timer.wrapping_sub(1);
-                if source.shot_timer == 0 {
+                arcade_state.shot_timer = arcade_state.shot_timer.wrapping_sub(1);
+                if arcade_state.shot_timer == 0 {
                     if target6_mutant_arcade_suppresses_fire2524_regular_shot(
                         self.position,
-                        *source,
+                        *arcade_state,
                     ) {
-                        source.shot_timer = TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER;
-                    } else if target6_mutant_arcade_defers_first_shot(self.position, *source)
+                        arcade_state.shot_timer = TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER;
+                    } else if target6_mutant_arcade_defers_first_shot(self.position, *arcade_state)
                     {
-                        source.target6_first_shot_deferred = true;
-                        source.shot_timer = TARGET6_MUTANT_DEFERRED_SHOT_TIMER;
+                        arcade_state.target6_first_shot_deferred = true;
+                        arcade_state.shot_timer = TARGET6_MUTANT_DEFERRED_SHOT_TIMER;
                         next_sleep_ticks = 0;
                     } else {
                         let shot_rng = mutant_arcade_shot_rng(prompt, self.id, self.position);
                         let default_reset = mutant_arcade_shot_reset(profile, shot_rng.seed);
                         let shot_position =
-                            target6_mutant_arcade_shot_position(self.position, *source);
+                            target6_mutant_arcade_shot_position(self.position, *arcade_state);
                         let fired = push_mutant_arcade_shot(
                             shot_position,
                             prompt,
                             behavior,
-                            *source,
+                            *arcade_state,
                             shot_rng,
                             commands,
                         );
-                        source.shot_timer =
-                            target6_mutant_arcade_post_shot_timer(*source, fired)
+                        arcade_state.shot_timer =
+                            target6_mutant_arcade_post_shot_timer(*arcade_state, fired)
                                 .unwrap_or(default_reset);
                     }
                 }
             }
         }
 
-        let (x, x_fraction) =
-            arcade_axis_step(self.position.x, source.x_fraction, source.x_velocity);
+        let (x, x_fraction) = arcade_axis_step(
+            self.position.x,
+            arcade_state.x_fraction,
+            arcade_state.x_velocity,
+        );
         let (y, y_fraction) = arcade_active_object_y_step(
             self.position.y,
-            source.y_fraction,
-            source.y_velocity,
+            arcade_state.y_fraction,
+            arcade_state.y_velocity,
         );
         self.position = Point::new(x, y);
-        source.x_fraction = x_fraction;
-        source.y_fraction = y_fraction;
-        source.sleep_ticks = next_sleep_ticks;
-        self.drift = arcade_drift_from_velocity(source.x_velocity);
+        arcade_state.x_fraction = x_fraction;
+        arcade_state.y_fraction = y_fraction;
+        arcade_state.sleep_ticks = next_sleep_ticks;
+        self.drift = arcade_drift_from_velocity(arcade_state.x_velocity);
         true
     }
 }
@@ -746,7 +749,7 @@ impl AssetActor for Mutant {
                 pod_runtime: None,
                 swarmer_runtime: None,
                 baiter_runtime: None,
-                mutant_runtime: self.source,
+                mutant_runtime: self.arcade_state,
                 human_runtime: None,
                 enemy_projectile_runtime: None,
             },
