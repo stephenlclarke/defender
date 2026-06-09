@@ -341,27 +341,27 @@ impl ActorWaveScript {
 impl FromStr for ActorWaveScript {
     type Err = ActorWaveScriptParseError;
 
-    fn from_str(source: &str) -> Result<Self, Self::Err> {
+    fn from_str(script_text: &str) -> Result<Self, Self::Err> {
         let base_behavior = ActorBehaviorScript::from_arcade_profile();
-        Self::parse_text_with_base_behavior(source, &base_behavior)
+        Self::parse_text_with_base_behavior(script_text, &base_behavior)
     }
 }
 
 impl ActorWaveScript {
-    pub fn parse_text(source: &str) -> Result<Self, ActorWaveScriptParseError> {
-        source.parse()
+    pub fn parse_text(script_text: &str) -> Result<Self, ActorWaveScriptParseError> {
+        script_text.parse()
     }
 
     pub fn parse_text_with_base_behavior(
-        source: &str,
+        script_text: &str,
         base_behavior: &ActorBehaviorScript,
     ) -> Result<Self, ActorWaveScriptParseError> {
         let mut parser = ParsedActorWaveScript::with_base_behavior(base_behavior.clone());
-        for (line_index, raw_line) in source.lines().enumerate() {
+        for (line_index, input_line) in script_text.lines().enumerate() {
             let line_number = line_index + 1;
-            let line = raw_line
+            let line = input_line
                 .split_once('#')
-                .map_or(raw_line, |(before_comment, _)| before_comment)
+                .map_or(input_line, |(before_comment, _)| before_comment)
                 .trim();
             if line.is_empty() {
                 continue;

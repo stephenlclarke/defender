@@ -180,7 +180,7 @@ fn explosion_display_size(explosion: ExplosionSnapshot) -> u16 {
 }
 
 fn arcade_enemy_explosion_anchor(enemy: EnemySnapshot) -> Option<ScreenPosition> {
-    (arcade_enemy_uses_target6_dive_projection(enemy)
+    (arcade_enemy_uses_mutant_dive_projection(enemy)
         && matches!(
             enemy.position,
             ScreenPosition { x: 0x20, y: 0xA2 } | ScreenPosition { x: 0x20, y: 0xA3 }
@@ -728,17 +728,17 @@ fn arcade_enemy_screen_position(
         })
 }
 
-fn arcade_first_wave_target6_mutant_uses_dive_projection(
+fn arcade_first_wave_mutant_uses_dive_projection(
     mutant_runtime: MutantRuntimeSnapshot,
 ) -> bool {
-    mutant_runtime.render_x_correction == FIRST_WAVE_TARGET6_MUTANT_CONVERSION_X_CORRECTION
+    mutant_runtime.render_x_correction == FIRST_WAVE_MUTANT_DIVE_CONVERSION_X_CORRECTION
         && mutant_runtime.y_velocity == 0x0090
 }
 
-fn arcade_enemy_uses_target6_dive_projection(enemy: EnemySnapshot) -> bool {
+fn arcade_enemy_uses_mutant_dive_projection(enemy: EnemySnapshot) -> bool {
     enemy
         .mutant_runtime
-        .is_some_and(arcade_first_wave_target6_mutant_uses_dive_projection)
+        .is_some_and(arcade_first_wave_mutant_uses_dive_projection)
 }
 
 fn enemy_appearance_position(enemy: EnemySnapshot) -> ScreenPosition {

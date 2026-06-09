@@ -1,7 +1,7 @@
 fn actor_scripts_from_path(path: &Path) -> anyhow::Result<ActorDriverScripts> {
-    let source = fs::read_to_string(path)
+    let script_text = fs::read_to_string(path)
         .with_context(|| format!("reading actor driver script {}", path.display()))?;
-    source
+    script_text
         .parse::<ActorDriverScripts>()
         .with_context(|| format!("parsing actor driver script {}", path.display()))
 }
@@ -313,8 +313,8 @@ fn actor_script_check_hostile_projectile_matrix_sample_for(
     kind: ActorKind,
 ) -> anyhow::Result<ActorScriptCheckHostileProjectileSample> {
     let kind_label = actor_script_check_actor_kind_label(kind);
-    let source = actor_script_check_hostile_projectile_matrix_script(kind);
-    let scripts = ActorDriverScripts::parse_text(&source).with_context(|| {
+    let script_text = actor_script_check_hostile_projectile_matrix_script(kind);
+    let scripts = ActorDriverScripts::parse_text(&script_text).with_context(|| {
         format!("parsing built-in hostile projectile matrix script `{kind_label}`")
     })?;
     let mut runtime = ActorRuntimeAdapter::with_scripts(scripts);
@@ -527,8 +527,8 @@ fn actor_script_check_hostile_laser_hit_matrix_sample_for(
     kind: ActorKind,
 ) -> anyhow::Result<ActorScriptCheckHostileLaserHitSample> {
     let kind_label = actor_script_check_actor_kind_label(kind);
-    let source = actor_script_check_hostile_laser_hit_matrix_script(kind);
-    let scripts = ActorDriverScripts::parse_text(&source).with_context(|| {
+    let script_text = actor_script_check_hostile_laser_hit_matrix_script(kind);
+    let scripts = ActorDriverScripts::parse_text(&script_text).with_context(|| {
         format!("parsing built-in hostile laser-hit matrix script `{kind_label}`")
     })?;
     let mut runtime = ActorRuntimeAdapter::with_scripts(scripts);

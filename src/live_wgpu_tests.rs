@@ -1382,18 +1382,20 @@ mod tests {
 
     #[test]
     fn actor_live_uses_actor_derived_game_frame_handoff() {
-        let source = include_str!("live_wgpu_window.rs");
+        let window_text = include_str!("live_wgpu_window.rs");
 
-        assert!(source.contains("let actor_frame = self.runtime.step_clean_input(input, xyzzy);"));
-        assert!(source.contains("let frame = actor_frame.game_frame();"));
-        assert!(source.contains("self.audio.submit_game_frame(&frame);"));
+        assert!(
+            window_text.contains("let actor_frame = self.runtime.step_clean_input(input, xyzzy);")
+        );
+        assert!(window_text.contains("let frame = actor_frame.game_frame();"));
+        assert!(window_text.contains("self.audio.submit_game_frame(&frame);"));
         let old_batch_call = [
             "LiveAudioEventBatch::new(",
             "frame.report.step",
             ", frame.events.sounds())",
         ]
         .concat();
-        assert!(!source.contains(&old_batch_call));
+        assert!(!window_text.contains(&old_batch_call));
     }
 
     #[test]
@@ -1535,9 +1537,9 @@ mod tests {
         );
     }
 
-    fn write_actor_script_file(label: &str, source: &str) -> std::path::PathBuf {
+    fn write_actor_script_file(label: &str, script_text: &str) -> std::path::PathBuf {
         let path = unique_actor_script_path(label);
-        fs::write(&path, source).expect("write actor script");
+        fs::write(&path, script_text).expect("write actor script");
         path
     }
 

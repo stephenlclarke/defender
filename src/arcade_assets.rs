@@ -1,5 +1,5 @@
 // Typed arcade asset data generated from the retired table assets.
-// Keep this file data-only; runtime code should use semantic IDs, not raw source labels.
+// Keep this file data-only; runtime code should use semantic IDs, not raw legacy labels.
 
 // Some embedded frames are reference assets that are not drawn by the current runtime yet.
 #[allow(dead_code)]

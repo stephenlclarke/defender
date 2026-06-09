@@ -219,8 +219,8 @@ impl AttractScript {
         }
     }
 
-    pub fn parse_text(source: &str) -> Result<Self, AttractScriptParseError> {
-        source.parse()
+    pub fn parse_text(script_text: &str) -> Result<Self, AttractScriptParseError> {
+        script_text.parse()
     }
 
     pub fn arcade_title() -> Self {
@@ -363,14 +363,14 @@ impl AttractScript {
 impl FromStr for AttractScript {
     type Err = AttractScriptParseError;
 
-    fn from_str(source: &str) -> Result<Self, Self::Err> {
+    fn from_str(script_text: &str) -> Result<Self, Self::Err> {
         let mut events = Vec::new();
         let mut cycle_steps = None;
-        for (line_index, raw_line) in source.lines().enumerate() {
+        for (line_index, input_line) in script_text.lines().enumerate() {
             let line_number = line_index + 1;
-            let line = raw_line
+            let line = input_line
                 .split_once('#')
-                .map_or(raw_line, |(before_comment, _)| before_comment)
+                .map_or(input_line, |(before_comment, _)| before_comment)
                 .trim();
             if line.is_empty() {
                 continue;

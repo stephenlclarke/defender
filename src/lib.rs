@@ -2,7 +2,7 @@
 //!
 //! The accepted runtime is a clean Rust implementation backed by actor-owned
 //! simulation, `wgpu` rendering, and synthesized audio. The converted
-//! ROM/memory-oriented oracle has been retired from this crate.
+//! Memory-oriented oracle has been retired from this crate.
 
 pub mod actor_game;
 mod actor_smoke;
