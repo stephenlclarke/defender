@@ -7,22 +7,22 @@ use crate::{
 
 // Arcade-evidence-backed cabinet defaults from CMOS/high-score evidence.
 pub const HIGH_SCORE_TABLE_ENTRIES: usize = 8;
-const HALL_OF_FAME_STALL_FRAMES: u8 = 60;
+const HALL_OF_FAME_STALL_STEPS: u8 = 60;
 const FIRST_WAVE_MUTANT_DIVE_CONVERSION_X_CORRECTION: u16 = 0x0120; // original: SOURCE_FIRST_WAVE_TARGET6_MUTANT_CONVERSION_X_CORRECTION
 
-const ATTRACT_PRESENTS_START_FRAME: u16 = 236;
-const ATTRACT_HALL_OF_FAME_START_FRAME: u16 = 600;
-const ATTRACT_COPYRIGHT_START_FRAME: u16 = ATTRACT_HALL_OF_FAME_START_FRAME;
-const ATTRACT_HALL_OF_FAME_STALL_TICK_FRAMES: u16 = 10;
-pub(crate) const ATTRACT_SCORING_SEQUENCE_START_FRAME: u16 = ATTRACT_HALL_OF_FAME_START_FRAME
-    + (HALL_OF_FAME_STALL_FRAMES as u16 * ATTRACT_HALL_OF_FAME_STALL_TICK_FRAMES);
+const ATTRACT_PRESENTS_START_STEP: u16 = 236;
+const ATTRACT_HALL_OF_FAME_START_STEP: u16 = 600;
+const ATTRACT_COPYRIGHT_START_STEP: u16 = ATTRACT_HALL_OF_FAME_START_STEP;
+const ATTRACT_HALL_OF_FAME_STALL_INTERVAL_STEPS: u16 = 10;
+pub(crate) const ATTRACT_SCORING_SEQUENCE_START_STEP: u16 = ATTRACT_HALL_OF_FAME_START_STEP
+    + (HALL_OF_FAME_STALL_STEPS as u16 * ATTRACT_HALL_OF_FAME_STALL_INTERVAL_STEPS);
 const ATTRACT_LOGO_SLEEP_TICKS: u8 = 2;
 const ATTRACT_PRESENTS_SLEEP_TICKS: u8 = 5;
 const ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS: u8 = 0x30;
 const ATTRACT_COPYRIGHT_SLEEP_TICKS: u8 = 10;
 const ATTRACT_COPYRIGHT_STALL_TICKS: u8 = 60;
 const ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS: u8 = 0xE6;
-pub(crate) const ATTRACT_DEFENDER_WORDMARK_START_FRAME: u16 = 365;
+pub(crate) const ATTRACT_DEFENDER_WORDMARK_START_STEP: u16 = 365;
 const ATTRACT_SCORING_RESCUE_DESCENT_TICKS: u16 = 0xE6;
 const ATTRACT_SCORING_RESCUE_ASCENT_TICKS: u16 = 0xA0;
 const ATTRACT_SCORING_RESCUE_LASER_TICKS: u16 = 0x15;
@@ -48,8 +48,8 @@ const ATTRACT_SCORING_RESCUE_SEQUENCE_TICKS: u16 = ATTRACT_SCORING_RESCUE_DESCEN
 const ATTRACT_SCORING_DEMO_TOTAL_TICKS: u16 = ATTRACT_SCORING_RESCUE_SEQUENCE_TICKS
     + (ATTRACT_SCORING_LEGEND_ENTRY_TICKS * ATTRACT_SCORING_LEGEND_ENTRY_COUNT)
     + ATTRACT_SCORING_LEGEND_HOLD_TICKS;
-const ATTRACT_CYCLE_FRAME_COUNT: u16 =
-    ATTRACT_SCORING_SEQUENCE_START_FRAME + ATTRACT_SCORING_DEMO_TOTAL_TICKS;
+const ATTRACT_CYCLE_STEPS: u16 =
+    ATTRACT_SCORING_SEQUENCE_START_STEP + ATTRACT_SCORING_DEMO_TOTAL_TICKS;
 const COLTAB_COLOR_BYTES: [u8; 37] = [
     0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x37, 0x2F, 0x27, 0x1F, 0x17, 0x47, 0x47, 0x87,
     0x87, 0xC7, 0xC7, 0xC6, 0xC5, 0xCC, 0xCB, 0xCA, 0xDA, 0xE8, 0xF8, 0xF9, 0xFA, 0xFB, 0xFD, 0xFF,
@@ -57,15 +57,15 @@ const COLTAB_COLOR_BYTES: [u8; 37] = [
 ];
 const TIE_COLOR_BYTES: [u8; 9] = [0x81, 0x81, 0x2F, 0x81, 0x2F, 0x07, 0x2F, 0x81, 0x07]; // original: SOURCE_TIE_COLOR_BYTES
 const COLTAB_ACTIVE_BYTES: usize = COLTAB_COLOR_BYTES.len() - 1; // original: SOURCE_COLTAB_ACTIVE_BYTES
-const ATTRACT_TITLE_REFERENCE_SAMPLE_STEP_FRAMES: u16 = 8;
+const ATTRACT_TITLE_REFERENCE_SAMPLE_INTERVAL_STEPS: u16 = 8;
 const ATTRACT_TITLE_REFERENCE_LOGO_COLOR_BYTES: [u8; 59] = [
     0x00, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x2F, 0x07, 0x07, 0x07, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x2F,
     0x07, 0x07, 0x07, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x2F, 0x07, 0x07, 0x07, 0x07, 0x2F, 0x2F, 0x07,
     0x07, 0x07, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x07, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x07, 0x2F, 0x2F,
     0x07, 0x07, 0x07, 0x07, 0x2F, 0x07, 0x07, 0x07, 0x07, 0x07, 0x2F,
 ];
-const ATTRACT_WILLIAMS_TIE_COLOR_PRIME_FRAMES: u16 = 6; // original: SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_PRIME_FRAMES
-const ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_FRAMES: u16 = 6; // original: SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_FRAMES
+const ATTRACT_WILLIAMS_TIE_COLOR_PRIME_STEPS: u16 = 6; // original: SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_PRIME_FRAMES
+const ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_STEPS: u16 = 6; // original: SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_FRAMES
 const ATTRACT_WILLIAMS_TIE_COLOR_SLOT_OFFSET: usize = 2; // original: SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_SLOT_OFFSET
 const SCANNER_TERRAIN_PIXEL_SIZE: [f32; 2] = [1.0, 1.0]; // original: SOURCE_SCANNER_TERRAIN_PIXEL_SIZE
 const SCANNER_TERRAIN_TINT: Color = Color::from_rgba(174, 81, 0, 255); // original: SOURCE_SCANNER_TERRAIN_TINT
@@ -100,7 +100,7 @@ pub(crate) const SCORE_POPUP_LIFETIME_TICKS: u8 = 50; // original: SOURCE_SCORE_
 pub(crate) const EXPLOSION_INITIAL_SIZE: u16 = 0x0100; // original: SOURCE_EXPLOSION_INITIAL_SIZE
 pub(crate) const EXPLOSION_SIZE_DELTA: u16 = 0x00AA; // original: SOURCE_EXPLOSION_SIZE_DELTA
 pub(crate) const EXPLOSION_KILL_SIZE_HIGH: u8 = 0x30; // original: SOURCE_EXPLOSION_KILL_SIZE_HIGH
-pub(crate) const EXPLOSION_LIFETIME_FRAMES: u8 = 73; // original: SOURCE_EXPLOSION_LIFETIME_FRAMES
+pub(crate) const EXPLOSION_LIFETIME_STEPS: u8 = 73; // original: SOURCE_EXPLOSION_LIFETIME_FRAMES
 const APPEARANCE_INITIAL_SIZE: u16 = 0xAD00; // original: SOURCE_APPEARANCE_INITIAL_SIZE
 const APPEARANCE_FINAL_SIZE: u16 = 0x8000; // original: SOURCE_APPEARANCE_FINAL_SIZE
 pub(crate) const TERRAIN_BLOW_STATUS_BIT: u8 = 0x02; // original: SOURCE_TERRAIN_BLOW_STATUS_BIT
@@ -109,17 +109,17 @@ pub(crate) const TERRAIN_BLOW_EXPLOSIONS_PER_PASS: u8 = 2; // original: SOURCE_T
 pub(crate) const TERRAIN_BLOW_OVERLOAD_COUNTER: u8 = 8; // original: SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER
 pub(crate) const TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES: u16 = 0x98; // original: SOURCE_TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES
 pub(crate) const TERRAIN_BLOW_SCANNER_ERASE_ENTRIES: u16 = 0x40; // original: SOURCE_TERRAIN_BLOW_SCANNER_ERASE_ENTRIES
-pub(crate) const TERRAIN_BLOW_COMPLETE_FRAME: u16 = 111; // original: SOURCE_TERRAIN_BLOW_COMPLETE_FRAME
-pub(crate) const TERRAIN_EXPLOSION_LIFETIME_FRAMES: u8 = 81; // original: SOURCE_TERRAIN_EXPLOSION_LIFETIME_FRAMES
+pub(crate) const TERRAIN_BLOW_COMPLETE_STEP: u16 = 111; // original: SOURCE_TERRAIN_BLOW_COMPLETE_FRAME
+pub(crate) const TERRAIN_EXPLOSION_LIFETIME_STEPS: u8 = 81; // original: SOURCE_TERRAIN_EXPLOSION_LIFETIME_FRAMES
 const TERRAIN_EXPLOSION_GROWTH_STEPS: [u8;
-    TERRAIN_EXPLOSION_LIFETIME_FRAMES // original: SOURCE_TERRAIN_EXPLOSION_GROWTH_STEPS
+    TERRAIN_EXPLOSION_LIFETIME_STEPS // original: SOURCE_TERRAIN_EXPLOSION_GROWTH_STEPS
     as usize] = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 22, 23, 24,
     25, 26, 26, 27, 28, 29, 29, 30, 31, 31, 32, 32, 33, 34, 34, 35, 36, 36, 37, 37, 38, 39, 39, 40,
     41, 41, 42, 43, 43, 44, 44, 45, 45, 46, 47, 47, 48, 48, 49, 49, 50, 50, 51, 51, 52, 52, 52, 53,
     53, 54, 54, 55, 55, 56, 56,
 ];
-pub(crate) const TERRAIN_BLOW_START_SOUND_FRAMES: [u16; 16] =
+pub(crate) const TERRAIN_BLOW_START_SOUND_STEPS: [u16; 16] =
     [1, 4, 9, 13, 17, 21, 26, 32, 38, 44, 52, 61, 71, 82, 93, 101];
 const TERRAIN_BLOW_EXPLOSION_BIRTHS: [(u16, ScreenPosition); 17] = [
     (0, ScreenPosition::new(0x4C, 0xC2)),
@@ -206,7 +206,7 @@ pub enum AttractPresentationPage {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct AttractPresentationSnapshot {
-    pub page_frame: u16,
+    pub page_step: u16,
     pub page: AttractPresentationPage,
     pub stage_sleep_ticks: Option<u8>,
     pub stall_ticks: Option<u8>,
@@ -214,44 +214,44 @@ pub struct AttractPresentationSnapshot {
 
 impl AttractPresentationSnapshot {
     pub const INACTIVE: Self = Self {
-        page_frame: 0,
+        page_step: 0,
         page: AttractPresentationPage::Inactive,
         stage_sleep_ticks: None,
         stall_ticks: None,
     };
 
-    pub fn for_page_frame(page_frame: u16) -> Self {
-        let page_frame = if ATTRACT_CYCLE_FRAME_COUNT == 0 {
-            page_frame
+    pub fn for_page_step(page_step: u16) -> Self {
+        let page_step = if ATTRACT_CYCLE_STEPS == 0 {
+            page_step
         } else {
-            page_frame % ATTRACT_CYCLE_FRAME_COUNT
+            page_step % ATTRACT_CYCLE_STEPS
         };
         let (page, stage_sleep_ticks, stall_ticks) =
-            if page_frame >= ATTRACT_SCORING_SEQUENCE_START_FRAME {
+            if page_step >= ATTRACT_SCORING_SEQUENCE_START_STEP {
                 (
                     AttractPresentationPage::ScoringSequence,
                     Some(ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS),
                     None,
                 )
-            } else if page_frame >= ATTRACT_HALL_OF_FAME_START_FRAME {
+            } else if page_step >= ATTRACT_HALL_OF_FAME_START_STEP {
                 (
                     AttractPresentationPage::HallOfFame,
                     None,
-                    Some(HALL_OF_FAME_STALL_FRAMES),
+                    Some(HALL_OF_FAME_STALL_STEPS),
                 )
-            } else if page_frame >= ATTRACT_COPYRIGHT_START_FRAME {
+            } else if page_step >= ATTRACT_COPYRIGHT_START_STEP {
                 (
                     AttractPresentationPage::CopyrightWait,
                     Some(ATTRACT_COPYRIGHT_SLEEP_TICKS),
                     Some(ATTRACT_COPYRIGHT_STALL_TICKS),
                 )
-            } else if page_frame >= ATTRACT_DEFENDER_WORDMARK_START_FRAME {
+            } else if page_step >= ATTRACT_DEFENDER_WORDMARK_START_STEP {
                 (
                     AttractPresentationPage::DefenderWordmark,
                     Some(ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS),
                     None,
                 )
-            } else if page_frame >= ATTRACT_PRESENTS_START_FRAME {
+            } else if page_step >= ATTRACT_PRESENTS_START_STEP {
                 (
                     AttractPresentationPage::Presents,
                     Some(ATTRACT_PRESENTS_SLEEP_TICKS),
@@ -266,7 +266,7 @@ impl AttractPresentationSnapshot {
             };
 
         Self {
-            page_frame,
+            page_step,
             page,
             stage_sleep_ticks,
             stall_ticks,
@@ -318,11 +318,11 @@ impl AttractPresentationSnapshot {
         self.shows_scoring_sequence_text()
     }
 
-    pub const fn scoring_sequence_frame(self) -> Option<u16> {
+    pub const fn scoring_sequence_step(self) -> Option<u16> {
         if matches!(self.page, AttractPresentationPage::ScoringSequence) {
             Some(
-                self.page_frame
-                    .saturating_sub(ATTRACT_SCORING_SEQUENCE_START_FRAME),
+                self.page_step
+                    .saturating_sub(ATTRACT_SCORING_SEQUENCE_START_STEP),
             )
         } else {
             None
@@ -332,7 +332,7 @@ impl AttractPresentationSnapshot {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct PostGamePlayfieldSnapshot {
-    pub frame: u16,
+    pub step: u16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -374,17 +374,17 @@ impl ArcadeVisualStateSnapshot {
         video_word_tint(body_word)
     }
 
-    pub(crate) fn attract_williams_logo_tint_for_frame(self, page_frame: u16) -> Color {
+    pub(crate) fn attract_williams_logo_tint_for_step(self, page_step: u16) -> Color {
         if let Some(color_byte) = ATTRACT_TITLE_REFERENCE_LOGO_COLOR_BYTES
-            .get(attract_title_reference_sample_index(page_frame))
+            .get(attract_title_reference_sample_index(page_step))
             .copied()
             .filter(|color_byte| *color_byte != 0)
         {
             return williams_color_byte_tint(color_byte);
         }
 
-        let color_cycle_tick = page_frame.saturating_sub(ATTRACT_WILLIAMS_TIE_COLOR_PRIME_FRAMES)
-            / ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_FRAMES.max(1);
+        let color_cycle_tick = page_step.saturating_sub(ATTRACT_WILLIAMS_TIE_COLOR_PRIME_STEPS)
+            / ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_STEPS.max(1);
         let tie_triplet = usize::from(color_cycle_tick % 3) * 3;
         williams_color_byte_tint(
             TIE_COLOR_BYTES[tie_triplet + ATTRACT_WILLIAMS_TIE_COLOR_SLOT_OFFSET],

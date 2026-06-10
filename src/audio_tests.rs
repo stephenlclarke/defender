@@ -76,7 +76,7 @@ mod tests {
                     high_score: 0,
                     next_bonus: 10_000,
                 },
-                attract: crate::AttractPresentationSnapshot::for_page_frame(
+                attract: crate::AttractPresentationSnapshot::for_page_step(
                     u16::try_from(frame).unwrap_or(u16::MAX),
                 ),
                 post_game_playfield: None,

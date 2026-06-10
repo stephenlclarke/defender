@@ -1,8 +1,8 @@
 use crate::{
     MessageId, ScreenAddress, SoundCommand, SpriteFrameIndex, TimelineStep,
     game::{
-        ATTRACT_SCORING_SEQUENCE_START_FRAME, AttractPresentationSnapshot,
-        Direction as CleanDirection, EnemyKind as CleanEnemyKind,
+        ATTRACT_SCORING_SEQUENCE_START_STEP as GAME_ATTRACT_SCORING_SEQUENCE_START_STEP,
+        AttractPresentationSnapshot, Direction as CleanDirection, EnemyKind as CleanEnemyKind,
         EnemyProjectileSnapshot as CleanEnemyProjectileSnapshot, EnemyProjectileKind,
         EnemyReserveSnapshot, EnemySnapshot as CleanEnemySnapshot,
         ExplosionKind as CleanExplosionKind, ExplosionSnapshot as CleanExplosionSnapshot,
@@ -13,9 +13,9 @@ use crate::{
         ScorePopupKind as CleanScorePopupKind, ScorePopupSnapshot as CleanScorePopupSnapshot,
         ScoreSnapshot, SoundEvent, SpriteAssetImageSpec, BaiterRuntimeSnapshot, BomberRuntimeSnapshot,
         LanderRuntimeSnapshot, MutantRuntimeSnapshot, PodRuntimeSnapshot, ArcadeRngSnapshot,
-        SwarmerRuntimeSnapshot, TERRAIN_BLOW_COMPLETE_FRAME, TERRAIN_BLOW_FLASH_COLOR_BYTES,
-        TERRAIN_BLOW_OVERLOAD_COUNTER, TERRAIN_BLOW_START_SOUND_FRAMES,
-        TERRAIN_EXPLOSION_LIFETIME_FRAMES, TerrainBlowSnapshot, TerrainBlowStage, TerrainSegment,
+        SwarmerRuntimeSnapshot, TERRAIN_BLOW_COMPLETE_STEP, TERRAIN_BLOW_FLASH_COLOR_BYTES,
+        TERRAIN_BLOW_OVERLOAD_COUNTER, TERRAIN_BLOW_START_SOUND_STEPS,
+        TERRAIN_EXPLOSION_LIFETIME_STEPS, TerrainBlowSnapshot, TerrainBlowStage, TerrainSegment,
         VISUAL_STATE, WaveProfileSnapshot, WorldSnapshot, WorldVector, arcade_wave_landscape_tint,
         appearance_growth_size_for_age, explosion_growth_size_for_age, explosion_render_scale,
         push_appearance_cloud_pixels, push_background_terrain_sprites,
@@ -159,7 +159,8 @@ const SCORE_POPUP_LIFETIME: u16 = 50;
 const ATTRACT_PRESENTS_START_STEP: u64 = 236; // original: SOURCE_ATTRACT_PRESENTS_START_STEP
 const ATTRACT_DEFENDER_WORDMARK_START_STEP: u64 = 365; // original: SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP
 const ATTRACT_HALL_OF_FAME_START_STEP: u64 = 600; // original: SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
-const ATTRACT_SCORING_SEQUENCE_START_STEP: u64 = ATTRACT_SCORING_SEQUENCE_START_FRAME as u64; // original: SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP
+const ATTRACT_SCORING_SEQUENCE_START_STEP: u64 =
+    GAME_ATTRACT_SCORING_SEQUENCE_START_STEP as u64; // original: SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP
 const ATTRACT_CYCLE_STEPS: u64 =
     ATTRACT_SCORING_SEQUENCE_START_STEP + ATTRACT_SCORING_DEMO_TOTAL_STEPS as u64; // original: SOURCE_ATTRACT_CYCLE_STEPS
 const HIGH_SCORE_HALL_STALL_STEPS: u8 = 60; // original: SOURCE_HIGH_SCORE_HALL_STALL_STEPS

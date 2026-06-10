@@ -129,7 +129,7 @@
 
         let mut observed_sounds = Vec::new();
         let mut saw_completion = false;
-        for offset in 1..=TERRAIN_BLOW_COMPLETE_FRAME + 26 {
+        for offset in 1..=TERRAIN_BLOW_COMPLETE_STEP + 26 {
             let report = driver.step(GameInput::NONE);
             if !report.sounds.is_empty() {
                 observed_sounds.push((offset, report.sounds.clone()));
@@ -160,7 +160,7 @@
                 saw_completion = true;
                 assert_eq!(
                     terrain_blow.explosion_pass,
-                    TERRAIN_BLOW_START_SOUND_FRAMES.len() as u8
+                    TERRAIN_BLOW_START_SOUND_STEPS.len() as u8
                 );
                 assert_eq!(terrain_blow.sleep_ticks_remaining, None);
             }
@@ -1466,7 +1466,7 @@
     }
 
     fn terrain_blow_sound_board_cues() -> Vec<(u16, Vec<SoundCue>)> {
-        TERRAIN_BLOW_START_SOUND_FRAMES
+        TERRAIN_BLOW_START_SOUND_STEPS
             .iter()
             .copied()
             .map(|frame| {
@@ -1476,7 +1476,7 @@
                 )
             })
             .chain(std::iter::once((
-                TERRAIN_BLOW_COMPLETE_FRAME,
+                TERRAIN_BLOW_COMPLETE_STEP,
                 vec![SoundCue::SoundBoardCommand(TERRAIN_BLOW_SOUND_COMMAND)],
             )))
             .chain(
@@ -1485,7 +1485,7 @@
                     .copied()
                     .map(|(offset, command)| {
                         (
-                            TERRAIN_BLOW_COMPLETE_FRAME + u16::from(offset),
+                            TERRAIN_BLOW_COMPLETE_STEP + u16::from(offset),
                             vec![SoundCue::SoundBoardCommand(command)],
                         )
                     }),

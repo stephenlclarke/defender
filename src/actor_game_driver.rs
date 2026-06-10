@@ -1175,7 +1175,7 @@ impl ActorGameDriver {
         }
 
         let mut sounds = Vec::new();
-        if elapsed >= TERRAIN_BLOW_COMPLETE_FRAME {
+        if elapsed >= TERRAIN_BLOW_COMPLETE_STEP {
             if let Some(terrain_blow) = self.terrain_blow.as_mut() {
                 terrain_blow.stage = TerrainBlowStage::Completed;
                 terrain_blow.elapsed_ticks = elapsed;
@@ -1188,17 +1188,17 @@ impl ActorGameDriver {
             return sounds;
         }
 
-        let start_sound_index = TERRAIN_BLOW_START_SOUND_FRAMES
+        let start_sound_index = TERRAIN_BLOW_START_SOUND_STEPS
             .iter()
-            .position(|frame| *frame == elapsed);
-        let next_frame = TERRAIN_BLOW_START_SOUND_FRAMES
+            .position(|step| *step == elapsed);
+        let next_step = TERRAIN_BLOW_START_SOUND_STEPS
             .iter()
             .copied()
-            .find(|frame| *frame > elapsed)
-            .unwrap_or(TERRAIN_BLOW_COMPLETE_FRAME);
+            .find(|step| *step > elapsed)
+            .unwrap_or(TERRAIN_BLOW_COMPLETE_STEP);
         if let Some(terrain_blow) = self.terrain_blow.as_mut() {
             terrain_blow.elapsed_ticks = elapsed;
-            terrain_blow.sleep_ticks_remaining = u8::try_from(next_frame - elapsed).ok();
+            terrain_blow.sleep_ticks_remaining = u8::try_from(next_step - elapsed).ok();
             terrain_blow.overload_counter = TERRAIN_BLOW_OVERLOAD_COUNTER;
             if let Some(start_sound_index) = start_sound_index {
                 terrain_blow.stage = TerrainBlowStage::ExplosionPassSleeping;
@@ -1241,7 +1241,7 @@ impl ActorGameDriver {
         TERRAIN_BLOW_EXPLOSION_BIRTHS
             .iter()
             .copied()
-            .filter(|(birth_frame, _)| *birth_frame == elapsed)
+            .filter(|(birth_step, _)| *birth_step == elapsed)
             .map(|(_, position)| {
                 let id = self.spawn_explosion(position, ExplosionKind::Terrain);
                 DrawCommand::sprite_with_effect(
@@ -1384,20 +1384,20 @@ impl ActorGameDriver {
             return HighScoreEntryStep::default();
         }
 
-        let frame = HighScoreEntrySystem::enter_initial(
+        let entry_step = HighScoreEntrySystem::enter_initial(
             self.high_score_initials,
             input.high_score_initial,
             input.high_score_backspace,
         );
-        self.high_score_initials = frame.state;
-        if frame.submitted {
+        self.high_score_initials = entry_step.state;
+        if entry_step.submitted {
             self.phase = Phase::GameOver;
             self.player_death_sleep_remaining = None;
             self.game_over_hall_of_fame_stall_remaining = Some(HIGH_SCORE_HALL_STALL_STEPS);
         }
         HighScoreEntryStep {
-            accepted: frame.accepted,
-            submitted: frame.submitted,
+            accepted: entry_step.accepted,
+            submitted: entry_step.submitted,
         }
     }
 
@@ -2200,7 +2200,7 @@ impl ActorGameDriver {
     }
 
     fn award_points(&mut self, points: u32) -> bool {
-        let frame = ScoreSystem::award_points(
+        let score_step = ScoreSystem::award_points(
             ScoreSnapshot {
                 player_one: self.score,
                 player_two: self.player_two_score,
@@ -2211,11 +2211,11 @@ impl ActorGameDriver {
             self.current_player,
             points,
         );
-        self.score = frame.scores.player_one;
-        self.player_two_score = frame.scores.player_two;
-        self.set_active_stock(frame.stock);
-        self.next_bonus = frame.scores.next_bonus;
-        frame.bonus_awards > 0
+        self.score = score_step.scores.player_one;
+        self.player_two_score = score_step.scores.player_two;
+        self.set_active_stock(score_step.stock);
+        self.next_bonus = score_step.scores.next_bonus;
+        score_step.bonus_awards > 0
     }
 
     fn clear_enemy_projectiles_for_hyperspace(&mut self) {

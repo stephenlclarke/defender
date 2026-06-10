@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SmartBombFrame {
+pub struct SmartBombStep {
     pub destroyed_enemies: usize,
 }
 
@@ -7,8 +7,8 @@ pub struct SmartBombFrame {
 pub struct SmartBombSystem;
 
 impl SmartBombSystem {
-    pub const fn detonate(active_enemies: usize) -> SmartBombFrame {
-        SmartBombFrame {
+    pub const fn detonate(active_enemies: usize) -> SmartBombStep {
+        SmartBombStep {
             destroyed_enemies: active_enemies,
         }
     }

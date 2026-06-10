@@ -81,14 +81,14 @@
                     draw.effect,
                     VisualEffect::WilliamsReveal {
                         stroke_step: 1,
-                        color_frame: 0,
+                        color_step: 0,
                     }
                 )
         }));
         let williams_scene = ActorRenderSceneBridge::new().render_scene_for_report(&williams);
         assert!(williams_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL
-                && sprite.tint == VISUAL_STATE.attract_williams_logo_tint_for_frame(0)
+                && sprite.tint == VISUAL_STATE.attract_williams_logo_tint_for_step(0)
         }));
         assert!(
             williams

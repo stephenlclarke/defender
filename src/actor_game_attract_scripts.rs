@@ -38,7 +38,7 @@ pub enum VisualEffect {
     },
     WilliamsReveal {
         stroke_step: u16,
-        color_frame: u16,
+        color_step: u16,
     },
     DefenderCoalescence {
         slot: u8,
@@ -1053,14 +1053,14 @@ impl AttractScriptAction {
                 reveal_steps,
                 color_period: _,
             } => {
-                let color_frame = u16::try_from(age.saturating_sub(1)).unwrap_or(u16::MAX);
+                let color_step = u16::try_from(age.saturating_sub(1)).unwrap_or(u16::MAX);
                 vec![DrawCommand::sprite_with_effect(
                     actor,
                     SpriteKey::WilliamsLogo,
                     *position,
                     VisualEffect::WilliamsReveal {
                         stroke_step: (age as u16).min(*reveal_steps),
-                        color_frame,
+                        color_step,
                     },
                 )]
             }

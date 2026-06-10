@@ -735,7 +735,7 @@
     }
 
     #[test]
-    fn parsed_arcade_wave_overrides_drive_legacy_shaped_custom_wave() {
+    fn parsed_arcade_wave_overrides_drive_arcade_shaped_custom_wave() {
         let wave_script = concat!(
             "name custom arcade shape\n",
             "arcade_wave 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",

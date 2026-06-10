@@ -104,8 +104,8 @@ impl ActorRenderSceneBridge {
         match draw.effect {
             VisualEffect::WilliamsReveal {
                 stroke_step,
-                color_frame,
-            } => self.push_williams_reveal(scene, draw.position, stroke_step, color_frame),
+                color_step,
+            } => self.push_williams_reveal(scene, draw.position, stroke_step, color_step),
             VisualEffect::DefenderCoalescence { slot, row_pair } => {
                 self.push_defender_coalescence(scene, slot, row_pair)
             }
@@ -132,9 +132,9 @@ impl ActorRenderSceneBridge {
         scene: &mut RenderScene,
         position: Point,
         stroke_step: u16,
-        color_frame: u16,
+        color_step: u16,
     ) {
-        let tint = VISUAL_STATE.attract_williams_logo_tint_for_frame(color_frame);
+        let tint = VISUAL_STATE.attract_williams_logo_tint_for_step(color_step);
         let pixel_path = attract_williams_logo_pixel_path();
         let visible_pixel_count =
             williams_reveal_visible_pixel_count(stroke_step, pixel_path.len());
@@ -528,7 +528,7 @@ fn actor_explosion_render_scale(growth_size: u16) -> f32 {
 fn actor_explosion_growth_size_for_kind(kind: ExplosionKind, age: u16) -> u16 {
     if kind == ExplosionKind::Terrain {
         return terrain_explosion_growth_size_for_age(
-            u8::try_from(age).unwrap_or(TERRAIN_EXPLOSION_LIFETIME_FRAMES),
+            u8::try_from(age).unwrap_or(TERRAIN_EXPLOSION_LIFETIME_STEPS),
         );
     }
 

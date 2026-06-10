@@ -654,7 +654,7 @@ impl ScannerRadarSnapshot {
 
     pub(crate) fn for_world(
         phase: GamePhase,
-        frame: u64,
+        step: u64,
         scan_anchor: WorldVector,
         player_position: (WorldVector, WorldVector),
         object_evidence: &ObjectEvidenceSnapshot,
@@ -665,7 +665,7 @@ impl ScannerRadarSnapshot {
             return Self::DISABLED;
         }
 
-        let stage = scanner_radar_stage_for_frame(frame);
+        let stage = scanner_radar_stage_for_step(step);
         let scan_anchor_word = arcade_word_from_world_vector(scan_anchor);
         let scan_left = scan_anchor_word.wrapping_sub(SCANNER_SCAN_CENTER_OFFSET);
         let mut scanner = Self {
@@ -781,8 +781,8 @@ pub struct ExpandedObjectDetailSnapshot {
     pub object_address: Option<u16>,
     pub score_popup_lifetime_ticks: Option<u8>,
     pub score_popup_value: Option<u16>,
-    pub explosion_frame: Option<u8>,
-    pub explosion_lifetime_frames: Option<u8>,
+    pub explosion_step: Option<u8>,
+    pub explosion_lifetime_steps: Option<u8>,
 }
 
 impl ExpandedObjectDetailSnapshot {
@@ -800,8 +800,8 @@ impl ExpandedObjectDetailSnapshot {
         object_address: None,
         score_popup_lifetime_ticks: None,
         score_popup_value: None,
-        explosion_frame: None,
-        explosion_lifetime_frames: None,
+        explosion_step: None,
+        explosion_lifetime_steps: None,
     };
 }
 
@@ -839,7 +839,7 @@ impl ScorePopupKind {
 pub struct ScorePopupSnapshot {
     pub kind: ScorePopupKind,
     pub position: ScreenPosition,
-    pub frames_remaining: u8,
+    pub ticks_remaining: u8,
     pub lifetime_ticks: u8,
 }
 
@@ -848,7 +848,7 @@ impl ScorePopupSnapshot {
         Self {
             kind,
             position,
-            frames_remaining: SCORE_POPUP_LIFETIME_TICKS,
+            ticks_remaining: SCORE_POPUP_LIFETIME_TICKS,
             lifetime_ticks: SCORE_POPUP_LIFETIME_TICKS,
         }
     }

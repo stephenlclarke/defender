@@ -124,7 +124,7 @@ impl PlayerStock {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PlayerDamageFrame {
+pub struct PlayerDamageStep {
     pub stock: PlayerStock,
     pub game_over: bool,
 }
@@ -133,10 +133,10 @@ pub struct PlayerDamageFrame {
 pub struct PlayerDamageSystem;
 
 impl PlayerDamageSystem {
-    pub fn apply_hit(stock: PlayerStock) -> PlayerDamageFrame {
+    pub fn apply_hit(stock: PlayerStock) -> PlayerDamageStep {
         let lives = stock.lives.saturating_sub(1);
 
-        PlayerDamageFrame {
+        PlayerDamageStep {
             stock: PlayerStock::new(lives, stock.smart_bombs),
             game_over: lives == 0,
         }
@@ -144,7 +144,7 @@ impl PlayerDamageSystem {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ScoreFrame {
+pub struct ScoreStep {
     pub scores: ScoreSnapshot,
     pub stock: PlayerStock,
     pub bonus_awards: u8,
@@ -161,7 +161,7 @@ impl ScoreSystem {
         stock: PlayerStock,
         current_player: u8,
         points: u32,
-    ) -> ScoreFrame {
+    ) -> ScoreStep {
         let mut scores = scores;
         let mut stock = stock;
         let active_score = if current_player == 2 {
@@ -179,7 +179,7 @@ impl ScoreSystem {
             scores.next_bonus = advance_bonus_threshold(scores.next_bonus, bonus_awards);
         }
 
-        ScoreFrame {
+        ScoreStep {
             scores,
             stock,
             bonus_awards,
@@ -188,7 +188,7 @@ impl ScoreSystem {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct HighScoreEntryFrame {
+pub struct HighScoreEntryStep {
     pub qualifies: bool,
 }
 
@@ -213,8 +213,8 @@ impl HighScoreInitialsState {
 pub struct HighScoreEntrySystem;
 
 impl HighScoreEntrySystem {
-    pub const fn evaluate(score: u32, high_score: u32) -> HighScoreEntryFrame {
-        HighScoreEntryFrame {
+    pub const fn evaluate(score: u32, high_score: u32) -> HighScoreEntryStep {
+        HighScoreEntryStep {
             qualifies: score > 0 && score > high_score,
         }
     }
@@ -223,14 +223,14 @@ impl HighScoreEntrySystem {
         state: HighScoreInitialsState,
         initial: Option<char>,
         backspace: bool,
-    ) -> HighScoreInitialsFrame {
+    ) -> HighScoreInitialsStep {
         let mut state = state;
         let mut accepted = false;
 
         if backspace && state.cursor > 0 {
             state.cursor -= 1;
             state.initials[usize::from(state.cursor)] = None;
-            return HighScoreInitialsFrame {
+            return HighScoreInitialsStep {
                 state,
                 accepted,
                 submitted: false,
@@ -245,7 +245,7 @@ impl HighScoreEntrySystem {
             accepted = true;
         }
 
-        HighScoreInitialsFrame {
+        HighScoreInitialsStep {
             state,
             accepted,
             submitted: accepted && state.is_complete(),
@@ -254,7 +254,7 @@ impl HighScoreEntrySystem {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct HighScoreInitialsFrame {
+pub struct HighScoreInitialsStep {
     pub state: HighScoreInitialsState,
     pub accepted: bool,
     pub submitted: bool,

@@ -105,7 +105,7 @@ Important Makefile targets:
 
 The README media targets render the accepted actor runtime through the same
 sprite atlas path used by the native renderer. They do not depend on the
-retired legacy frame or ROM conversion code.
+retired conversion code.
 
 ## Play
 

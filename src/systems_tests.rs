@@ -80,7 +80,7 @@ mod tests {
     #[test]
     fn player_control_system_reports_all_playing_control_triggers() {
         let mut controls = PlayerControlSystem::new();
-        let frame = controls.step(GameInput {
+        let step = controls.step(GameInput {
             altitude_down: true,
             reverse: true,
             thrust: true,
@@ -91,7 +91,7 @@ mod tests {
         });
 
         assert_eq!(
-            frame.triggers,
+            step.triggers,
             PlayerActionTriggers {
                 fire: true,
                 thrust: true,
@@ -101,7 +101,7 @@ mod tests {
                 altitude_down: true,
             }
         );
-        assert!(frame.triggers.any());
+        assert!(step.triggers.any());
     }
 
     #[test]
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn player_motion_applies_thrust_damping_scroll_and_world_position() {
-        let frame = PlayerMotionSystem::step(
+        let step = PlayerMotionSystem::step(
             player_motion_state(0x2000, 0x8000, 0, 0, Direction::Right, 0),
             PlayerControlIntent {
                 thrust: true,
@@ -148,12 +148,12 @@ mod tests {
             },
         );
 
-        assert_eq!(word(frame.state.position.0), 0x2000);
-        assert_eq!(word(frame.state.velocity.0), 0x0300);
-        assert_eq!(word(frame.state.camera_left), 0x0003);
-        assert_eq!(word(frame.world_x), 0x0803);
-        assert_eq!(frame.screen_position, ScreenPosition::new(0x20, 0x80));
-        assert!(!frame.blocked_by_vertical_limit);
+        assert_eq!(word(step.state.position.0), 0x2000);
+        assert_eq!(word(step.state.velocity.0), 0x0300);
+        assert_eq!(word(step.state.camera_left), 0x0003);
+        assert_eq!(word(step.world_x), 0x0803);
+        assert_eq!(step.screen_position, ScreenPosition::new(0x20, 0x80));
+        assert!(!step.blocked_by_vertical_limit);
     }
 
     #[test]
@@ -437,13 +437,13 @@ mod tests {
             next_bonus: 10_000,
         };
 
-        let frame = ScoreSystem::award_points(scores, PlayerStock::new(3, 2), 1, 20_250);
+        let step = ScoreSystem::award_points(scores, PlayerStock::new(3, 2), 1, 20_250);
 
-        assert_eq!(frame.scores.player_one, 30_150);
-        assert_eq!(frame.scores.high_score, 30_150);
-        assert_eq!(frame.scores.next_bonus, 40_000);
-        assert_eq!(frame.stock, PlayerStock::new(6, 5));
-        assert_eq!(frame.bonus_awards, 3);
+        assert_eq!(step.scores.player_one, 30_150);
+        assert_eq!(step.scores.high_score, 30_150);
+        assert_eq!(step.scores.next_bonus, 40_000);
+        assert_eq!(step.stock, PlayerStock::new(6, 5));
+        assert_eq!(step.bonus_awards, 3);
     }
 
     #[test]
@@ -455,15 +455,15 @@ mod tests {
             next_bonus: u32::MAX - 1,
         };
 
-        let frame = ScoreSystem::award_points(scores, PlayerStock::new(u8::MAX, 254), 1, 50);
+        let step = ScoreSystem::award_points(scores, PlayerStock::new(u8::MAX, 254), 1, 50);
 
-        assert_eq!(frame.scores.player_one, u32::MAX);
-        assert_eq!(frame.scores.high_score, u32::MAX);
-        assert_eq!(frame.scores.next_bonus, u32::MAX);
-        assert_eq!(frame.stock, PlayerStock::new(u8::MAX, u8::MAX));
-        assert_eq!(frame.bonus_awards, 1);
+        assert_eq!(step.scores.player_one, u32::MAX);
+        assert_eq!(step.scores.high_score, u32::MAX);
+        assert_eq!(step.scores.next_bonus, u32::MAX);
+        assert_eq!(step.stock, PlayerStock::new(u8::MAX, u8::MAX));
+        assert_eq!(step.bonus_awards, 1);
 
-        let max_bonus = ScoreSystem::award_points(frame.scores, PlayerStock::new(3, 3), 1, 1_000);
+        let max_bonus = ScoreSystem::award_points(step.scores, PlayerStock::new(3, 3), 1, 1_000);
         assert_eq!(max_bonus.bonus_awards, 0);
         assert_eq!(max_bonus.stock, PlayerStock::new(3, 3));
     }

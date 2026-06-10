@@ -39,7 +39,7 @@ impl ScreenVelocity {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EnemyMotionFrame {
+pub struct EnemyMotionStep {
     pub position: ScreenPosition,
     pub velocity: ScreenVelocity,
 }
@@ -48,8 +48,8 @@ pub struct EnemyMotionFrame {
 pub struct EnemyMotionSystem;
 
 impl EnemyMotionSystem {
-    pub fn step(position: ScreenPosition, velocity: ScreenVelocity) -> EnemyMotionFrame {
-        EnemyMotionFrame {
+    pub fn step(position: ScreenPosition, velocity: ScreenVelocity) -> EnemyMotionStep {
+        EnemyMotionStep {
             position: ScreenPosition::new(
                 position.x.wrapping_add_signed(velocity.dx),
                 position.y.wrapping_add_signed(velocity.dy),
@@ -84,7 +84,7 @@ impl PlayerMotionState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PlayerMotionFrame {
+pub struct PlayerMotionStep {
     pub state: PlayerMotionState,
     pub camera_delta: WorldVector,
     pub world_x: WorldVector,
@@ -96,7 +96,7 @@ pub struct PlayerMotionFrame {
 pub struct PlayerMotionSystem;
 
 impl PlayerMotionSystem {
-    pub fn step(state: PlayerMotionState, intent: PlayerControlIntent) -> PlayerMotionFrame {
+    pub fn step(state: PlayerMotionState, intent: PlayerControlIntent) -> PlayerMotionStep {
         let mut x_velocity = Fixed24::from_world_vector(state.velocity.0).damped();
         if intent.thrust {
             x_velocity = x_velocity.add_signed_word(thrust_acceleration(state.direction));
@@ -134,7 +134,7 @@ impl PlayerMotionSystem {
             camera_left: unsigned_word_vector(camera_left),
         };
 
-        PlayerMotionFrame {
+        PlayerMotionStep {
             state: next_state,
             camera_delta: signed_word_vector(camera_delta),
             world_x: unsigned_word_vector(world_x),
@@ -198,7 +198,7 @@ impl ProjectileSystem {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ProjectileMotionFrame {
+pub struct ProjectileMotionStep {
     pub position: ScreenPosition,
     pub velocity: ScreenVelocity,
     pub active: bool,
@@ -219,9 +219,9 @@ impl ProjectileMotionSystem {
         }
     }
 
-    pub fn step(position: ScreenPosition, velocity: ScreenVelocity) -> ProjectileMotionFrame {
+    pub fn step(position: ScreenPosition, velocity: ScreenVelocity) -> ProjectileMotionStep {
         if player_laser_reached_screen_edge(position, velocity) {
-            return ProjectileMotionFrame {
+            return ProjectileMotionStep {
                 position,
                 velocity,
                 active: false,
@@ -233,7 +233,7 @@ impl ProjectileMotionSystem {
         let active = (0..=i16::from(u8::MAX)).contains(&next_x)
             && (0..=i16::from(u8::MAX)).contains(&next_y);
 
-        ProjectileMotionFrame {
+        ProjectileMotionStep {
             position: if active {
                 ScreenPosition::new(next_x as u8, next_y as u8)
             } else {

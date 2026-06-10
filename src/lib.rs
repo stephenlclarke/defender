@@ -47,14 +47,14 @@ pub use renderer::{
     WgpuViewportCommand, render_scene_to_rgba,
 };
 pub use systems::{
-    CollisionBox, CollisionSystem, EnemyMotionFrame, EnemyMotionSystem, FixedStepAccumulator,
-    FrameRate, HighScoreEntryFrame, HighScoreEntrySystem, HighScoreInitialsFrame,
-    HighScoreInitialsState, OperatorActionTriggers, OperatorControlFrame, OperatorControlSystem,
-    PlayerActionTriggers, PlayerControlFrame, PlayerControlIntent, PlayerControlSystem,
-    PlayerDamageFrame, PlayerDamageSystem, PlayerEnemyHit, PlayerMotionFrame, PlayerMotionState,
+    CollisionBox, CollisionSystem, EnemyMotionStep, EnemyMotionSystem, FixedStepAccumulator,
+    FrameRate, HighScoreEntryStep, HighScoreEntrySystem, HighScoreInitialsState,
+    HighScoreInitialsStep, OperatorActionTriggers, OperatorControlStep, OperatorControlSystem,
+    PlayerActionTriggers, PlayerControlIntent, PlayerControlStep, PlayerControlSystem,
+    PlayerDamageStep, PlayerDamageSystem, PlayerEnemyHit, PlayerMotionState, PlayerMotionStep,
     PlayerMotionSystem, PlayerStock, ProjectileEnemyHit, ProjectileLaunchOutcome,
-    ProjectileMotionFrame, ProjectileMotionSystem, ProjectileState, ProjectileSystem, ScoreFrame,
-    ScoreSystem, ScreenPosition, ScreenVelocity, SmartBombFrame, SmartBombSystem, VerticalControl,
+    ProjectileMotionStep, ProjectileMotionSystem, ProjectileState, ProjectileSystem, ScoreStep,
+    ScoreSystem, ScreenPosition, ScreenVelocity, SmartBombStep, SmartBombSystem, VerticalControl,
     WaveState, WaveStatus, WaveSystem,
 };
 
@@ -78,7 +78,7 @@ mod public_api_tests {
     }
 
     #[test]
-    fn retired_legacy_tree_is_removed() {
+    fn retired_conversion_tree_is_removed() {
         let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
 
         assert!(!manifest_dir.join("src_legacy").exists());

@@ -28,8 +28,8 @@ const APPEARANCE_GROWTH_ACTIVE_BIT: u16 = 0x8000;
 const TRANSPARENT_COLOR: Color = Color::from_rgba(0, 0, 0, 0);
 const SPRITE_GRAY_TINT: Color = Color::from_rgba(170, 170, 186, OPAQUE_ALPHA);
 
-fn attract_title_reference_sample_index(page_frame: u16) -> usize {
-    usize::from(page_frame / ATTRACT_TITLE_REFERENCE_SAMPLE_STEP_FRAMES).saturating_sub(1)
+fn attract_title_reference_sample_index(page_step: u16) -> usize {
+    usize::from(page_step / ATTRACT_TITLE_REFERENCE_SAMPLE_INTERVAL_STEPS).saturating_sub(1)
 }
 
 fn williams_color_byte_tint(value: u8) -> Color {
@@ -654,13 +654,13 @@ fn push_expanded_object_explosion_pixels(
     let Some(scale) = explosion_growth_scale(detail.size) else {
         return;
     };
-    let Some(explosion_frame) = detail.explosion_frame else {
+    let Some(explosion_step) = detail.explosion_step else {
         return;
     };
-    if explosion_frame < PIXEL_CLOUD_EXPLOSION_FIRST_VISIBLE_FRAME {
+    if explosion_step < PIXEL_CLOUD_EXPLOSION_FIRST_VISIBLE_STEP {
         return;
     }
-    let tick = u32::from(explosion_frame);
+    let tick = u32::from(explosion_step);
     push_expanded_object_pixel_cloud(
         scene,
         spec,
@@ -700,7 +700,7 @@ fn push_expanded_object_appearance_pixels(
     );
 }
 
-const PIXEL_CLOUD_EXPLOSION_FIRST_VISIBLE_FRAME: u8 = 2; // original: SOURCE_EXPANDED_OBJECT_EXPLOSION_VISIBLE_FRAME
+const PIXEL_CLOUD_EXPLOSION_FIRST_VISIBLE_STEP: u8 = 2; // original: SOURCE_EXPANDED_OBJECT_EXPLOSION_VISIBLE_FRAME
 
 fn push_expanded_object_pixel_cloud(
     scene: &mut RenderScene,
@@ -787,7 +787,7 @@ fn appearance_growth_tick(size: u16) -> u8 {
     start.saturating_sub(current)
 }
 
-pub(crate) fn explosion_frame_index(size: u16) -> Option<u8> {
+pub(crate) fn explosion_step_index(size: u16) -> Option<u8> {
     if explosion_growth_scale(size).is_none() || size < EXPLOSION_INITIAL_SIZE {
         return None;
     }

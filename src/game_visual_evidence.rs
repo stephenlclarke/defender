@@ -145,7 +145,7 @@ pub struct ExplosionSnapshot {
     pub position: ScreenPosition,
     pub explosion_anchor: Option<ScreenPosition>,
     pub growth_size: u16,
-    pub frames_remaining: u8,
+    pub steps_remaining: u8,
     pub object_bitmap_name: &'static str,
     pub(crate) sprite_asset_image: SpriteAssetImageSpec,
     pub object_bitmap_size: (u8, u8),
@@ -159,7 +159,7 @@ impl ExplosionSnapshot {
             position,
             explosion_anchor: None,
             growth_size: EXPLOSION_INITIAL_SIZE,
-            frames_remaining: explosion_lifetime_frames(kind),
+            steps_remaining: explosion_lifetime_steps(kind),
             object_bitmap_name: kind.object_bitmap_name(),
             sprite_asset_image: kind.sprite_asset_image(),
             object_bitmap_size: kind.object_bitmap_size(),
@@ -174,7 +174,7 @@ impl ExplosionSnapshot {
             position: enemy.position,
             explosion_anchor: arcade_enemy_explosion_anchor(enemy),
             growth_size: EXPLOSION_INITIAL_SIZE,
-            frames_remaining: EXPLOSION_LIFETIME_FRAMES,
+            steps_remaining: EXPLOSION_LIFETIME_STEPS,
             object_bitmap_name: descriptor.name,
             sprite_asset_image: descriptor.image,
             object_bitmap_size: descriptor.size,
@@ -196,18 +196,18 @@ impl ExplosionSnapshot {
                 self.position.y.wrapping_add(height / 2),
             ))),
             top_left: Some(self.position),
-            explosion_frame: explosion_frame_index(display_size),
-            explosion_lifetime_frames: Some(EXPLOSION_LIFETIME_FRAMES),
+            explosion_step: explosion_step_index(display_size),
+            explosion_lifetime_steps: Some(EXPLOSION_LIFETIME_STEPS),
             ..ExpandedObjectDetailSnapshot::EMPTY
         }
     }
 }
 
-fn explosion_lifetime_frames(kind: ExplosionKind) -> u8 {
+fn explosion_lifetime_steps(kind: ExplosionKind) -> u8 {
     if kind == ExplosionKind::Terrain {
-        TERRAIN_EXPLOSION_LIFETIME_FRAMES
+        TERRAIN_EXPLOSION_LIFETIME_STEPS
     } else {
-        EXPLOSION_LIFETIME_FRAMES
+        EXPLOSION_LIFETIME_STEPS
     }
 }
 
@@ -289,7 +289,7 @@ pub struct PlayerExplosionCloudSnapshot {
     pub cloud_color: u8,
     pub cloud_color_counter: u8,
     pub cloud_color_index: u8,
-    pub frame: u16,
+    pub step: u16,
     pub piece_count: u8,
     pub pieces: [PlayerExplosionPieceSnapshot; PLAYER_EXPLOSION_PIECE_LIMIT],
 }
@@ -299,7 +299,7 @@ impl PlayerExplosionCloudSnapshot {
         cloud_color: 0,
         cloud_color_counter: 0,
         cloud_color_index: 0,
-        frame: 0,
+        step: 0,
         piece_count: 0,
         pieces: [PlayerExplosionPieceSnapshot::EMPTY; PLAYER_EXPLOSION_PIECE_LIMIT],
     };
@@ -429,7 +429,7 @@ impl WorldSnapshot {
         for (_, position) in TERRAIN_BLOW_EXPLOSION_BIRTHS
             .iter()
             .copied()
-            .filter(|(frame, _)| *frame == 0)
+            .filter(|(step, _)| *step == 0)
         {
             self.spawn_explosion(ExplosionKind::Terrain, position);
         }
@@ -495,25 +495,25 @@ impl WorldSnapshot {
     pub(crate) fn sync_actor_presentation(
         &mut self,
         phase: GamePhase,
-        frame: u64,
+        step: u64,
         scan_anchor: WorldVector,
         player_position: (WorldVector, WorldVector),
     ) {
         self.refresh_object_evidence();
         self.sync_clean_lifecycle_evidence();
-        self.sync_scanner_radar(phase, frame, scan_anchor, player_position);
+        self.sync_scanner_radar(phase, step, scan_anchor, player_position);
     }
 
     fn sync_scanner_radar(
         &mut self,
         phase: GamePhase,
-        frame: u64,
+        step: u64,
         scan_anchor: WorldVector,
         player_position: (WorldVector, WorldVector),
     ) {
         self.scanner = ScannerRadarSnapshot::for_world(
             phase,
-            frame,
+            step,
             scan_anchor,
             player_position,
             &self.object_evidence,
@@ -541,7 +541,7 @@ fn push_expanded_object_detail(
 
 fn expanded_object_detail_is_clean_lifecycle(detail: &ExpandedObjectDetailSnapshot) -> bool {
     detail.score_popup_lifetime_ticks.is_some()
-        || detail.explosion_lifetime_frames.is_some()
+        || detail.explosion_lifetime_steps.is_some()
         || (detail.kind == ExpandedObjectKind::Appearance && detail.size >= APPEARANCE_FINAL_SIZE)
 }
 
@@ -691,8 +691,8 @@ impl ObjectEvidenceSnapshot {
     }
 }
 
-fn scanner_radar_stage_for_frame(frame: u64) -> ScannerRadarStage {
-    match frame % 8 {
+fn scanner_radar_stage_for_step(step: u64) -> ScannerRadarStage {
+    match step % 8 {
         0 | 1 => ScannerRadarStage::InactiveObjectScan,
         2 | 3 => ScannerRadarStage::ActiveAndShellScan,
         _ => ScannerRadarStage::RasterDisplay,
@@ -865,8 +865,8 @@ fn reserve_object_bitmap_descriptor(kind: EnemyKind) -> ObjectBitmapDescriptor {
     }
 }
 
-fn human_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
-    match frame % 4 {
+fn human_object_bitmap_descriptor(animation_frame: u8) -> ObjectBitmapDescriptor {
+    match animation_frame % 4 {
         1 => HUMAN_ASTP2_OBJECT_BITMAP_DESCRIPTOR,
         2 => HUMAN_ASTP3_OBJECT_BITMAP_DESCRIPTOR,
         3 => HUMAN_ASTP4_OBJECT_BITMAP_DESCRIPTOR,
@@ -996,8 +996,8 @@ const SWARMER_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDes
     mapped_sprite: SpriteId::ENEMY_SWARMER,
 };
 
-fn lander_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
-    match frame % LANDER_ANIMATION_FRAME_COUNT {
+fn lander_object_bitmap_descriptor(animation_frame: u8) -> ObjectBitmapDescriptor {
+    match animation_frame % LANDER_ANIMATION_FRAME_COUNT {
         1 => ObjectBitmapDescriptor {
             name: "LNDP2",
             image: SpriteAssetImageSpec::new(
@@ -1040,8 +1040,8 @@ fn lander_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
     }
 }
 
-fn bomber_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
-    match frame % BOMBER_ANIMATION_FRAME_COUNT {
+fn bomber_object_bitmap_descriptor(animation_frame: u8) -> ObjectBitmapDescriptor {
+    match animation_frame % BOMBER_ANIMATION_FRAME_COUNT {
         1 => ObjectBitmapDescriptor {
             name: "TIEP2",
             image: SpriteAssetImageSpec::new(
@@ -1097,8 +1097,8 @@ fn bomber_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
     }
 }
 
-fn baiter_object_bitmap_descriptor(frame: u8) -> ObjectBitmapDescriptor {
-    match frame % BAITER_ANIMATION_FRAME_COUNT {
+fn baiter_object_bitmap_descriptor(animation_frame: u8) -> ObjectBitmapDescriptor {
+    match animation_frame % BAITER_ANIMATION_FRAME_COUNT {
         1 => ObjectBitmapDescriptor {
             name: "UFOP2",
             image: SpriteAssetImageSpec::new(

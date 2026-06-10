@@ -96,7 +96,7 @@ impl PlayerActionTriggers {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct PlayerControlFrame {
+pub struct PlayerControlStep {
     pub intent: PlayerControlIntent,
     pub triggers: PlayerActionTriggers,
 }
@@ -115,15 +115,15 @@ impl PlayerControlSystem {
         }
     }
 
-    pub fn step(&mut self, input: GameInput) -> PlayerControlFrame {
+    pub fn step(&mut self, input: GameInput) -> PlayerControlStep {
         let current = PlayerActionTriggers::from_input(input);
-        let frame = PlayerControlFrame {
+        let step = PlayerControlStep {
             intent: PlayerControlIntent::from_input(input),
             triggers: current.newly_pressed_after_clear_samples(self.previous, self.older),
         };
         self.older = self.previous;
         self.previous = current;
-        frame
+        step
     }
 }
 
@@ -163,7 +163,7 @@ impl OperatorActionTriggers {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct OperatorControlFrame {
+pub struct OperatorControlStep {
     pub triggers: OperatorActionTriggers,
 }
 
@@ -179,12 +179,12 @@ impl OperatorControlSystem {
         }
     }
 
-    pub fn step(&mut self, input: GameInput) -> OperatorControlFrame {
+    pub fn step(&mut self, input: GameInput) -> OperatorControlStep {
         let current = OperatorActionTriggers::from_input(input);
-        let frame = OperatorControlFrame {
+        let step = OperatorControlStep {
             triggers: current.newly_pressed(self.previous),
         };
         self.previous = current;
-        frame
+        step
     }
 }

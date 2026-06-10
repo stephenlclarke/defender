@@ -69,7 +69,7 @@ impl Human {
     fn advance_arcade_walk(&mut self, arcade_seed: u8) {
         if let Some(arcade_state) = &mut self.arcade_state {
             let animation_frame = arcade_state.animation_frame.index() % 4;
-            let (next_frame, target_y, velocity) = if animation_frame <= 1 {
+            let (next_animation_frame, target_y, velocity) = if animation_frame <= 1 {
                 if arcade_seed <= HUMAN_TURN_SEED_MAX {
                     (2, None, HUMAN_RIGHT_X_VELOCITY)
                 } else {
@@ -95,7 +95,7 @@ impl Human {
                 arcade_axis_step(self.position.x, arcade_state.x_fraction, velocity);
             self.position.x = x;
             arcade_state.x_fraction = x_fraction;
-            arcade_state.animation_frame = SpriteFrameIndex::new(next_frame);
+            arcade_state.animation_frame = SpriteFrameIndex::new(next_animation_frame);
         }
     }
 
@@ -611,7 +611,7 @@ impl AssetActor for Explosion {
 
 fn explosion_lifetime_steps(kind: ExplosionKind, behavior: ActorBehaviorProfile) -> u16 {
     if kind == ExplosionKind::Terrain {
-        return u16::from(TERRAIN_EXPLOSION_LIFETIME_FRAMES);
+        return u16::from(TERRAIN_EXPLOSION_LIFETIME_STEPS);
     }
 
     behavior.explosion_lifetime_steps

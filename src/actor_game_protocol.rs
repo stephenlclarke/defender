@@ -534,7 +534,7 @@ fn actor_wave_profile_for_report(report: &StepReport) -> WaveProfileSnapshot {
 
 fn attract_snapshot_for_report(report: &StepReport) -> AttractPresentationSnapshot {
     if report.phase == Phase::Attract {
-        AttractPresentationSnapshot::for_page_frame(u16::try_from(report.step).unwrap_or(u16::MAX))
+        AttractPresentationSnapshot::for_page_step(u16::try_from(report.step).unwrap_or(u16::MAX))
     } else {
         AttractPresentationSnapshot::INACTIVE
     }
