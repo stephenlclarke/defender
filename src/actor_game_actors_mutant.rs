@@ -1,3 +1,5 @@
+const MUTANT_HOP_DIRECTION_SIGN_BIT: u8 = 0x80;
+
 #[derive(Debug)]
 struct Mutant {
     id: ActorId,
@@ -318,7 +320,7 @@ fn mutant_arcade_should_hop_and_shoot(
 }
 
 fn mutant_arcade_hop_y(position_y: i16, random_y: u8, seed: u8) -> i16 {
-    let step = if seed & 0x80 == 0 {
+    let step = if seed & MUTANT_HOP_DIRECTION_SIGN_BIT == 0 {
         0u8.wrapping_sub(random_y)
     } else {
         random_y

@@ -1,6 +1,13 @@
+const APPEARANCE_CENTER_X_MULTIPLIER: u16 = 0x00DA;
+const ACTIVE_OBJECT_SCREEN_SIGN_BIT: u16 = 0x8000;
+const FIRST_WAVE_MUTANT_DIVE_Y_VELOCITY: u16 = 0x0090;
+const MUTANT_DIVE_EXPLOSION_TOP_LEFT: ScreenPosition = ScreenPosition::new(0x20, 0xA2);
+const MUTANT_DIVE_EXPLOSION_LOWER_TOP_LEFT: ScreenPosition = ScreenPosition::new(0x20, 0xA3);
+const MUTANT_DIVE_EXPLOSION_ANCHOR: ScreenPosition = ScreenPosition::new(0x21, 0xA9);
+
 fn appearance_center(top_left: ScreenPosition, object_bitmap_size: (u8, u8)) -> ScreenPosition {
     let (width, height) = object_bitmap_size;
-    let first_product_high = ((u16::from(top_left.x) * 0x00DA) >> 8) as u8;
+    let first_product_high = ((u16::from(top_left.x) * APPEARANCE_CENTER_X_MULTIPLIER) >> 8) as u8;
     let doubled = first_product_high.wrapping_shl(1);
     let center_x_offset = ((u16::from(doubled) * u16::from(width)) >> 8) as u8;
     ScreenPosition::new(
@@ -226,9 +233,9 @@ fn explosion_display_size(explosion: ExplosionSnapshot) -> u16 {
     if explosion.kind == ExplosionKind::Mutant
         && matches!(
             explosion.position,
-            ScreenPosition { x: 0x20, y: 0xA2 } | ScreenPosition { x: 0x20, y: 0xA3 }
+            MUTANT_DIVE_EXPLOSION_TOP_LEFT | MUTANT_DIVE_EXPLOSION_LOWER_TOP_LEFT
         )
-        && explosion.explosion_anchor == Some(ScreenPosition::new(0x21, 0xA9))
+        && explosion.explosion_anchor == Some(MUTANT_DIVE_EXPLOSION_ANCHOR)
         && explosion.growth_size == EXPLOSION_INITIAL_SIZE
     {
         return EXPLOSION_INITIAL_SIZE.wrapping_add(EXPLOSION_SIZE_DELTA);
@@ -241,9 +248,9 @@ fn arcade_enemy_explosion_anchor(enemy: EnemySnapshot) -> Option<ScreenPosition>
     (arcade_enemy_uses_mutant_dive_projection(enemy)
         && matches!(
             enemy.position,
-            ScreenPosition { x: 0x20, y: 0xA2 } | ScreenPosition { x: 0x20, y: 0xA3 }
+            MUTANT_DIVE_EXPLOSION_TOP_LEFT | MUTANT_DIVE_EXPLOSION_LOWER_TOP_LEFT
         ))
-    .then_some(ScreenPosition::new(0x21, 0xA9))
+    .then_some(MUTANT_DIVE_EXPLOSION_ANCHOR)
 }
 
 fn arcade_enemy_explosion_object_bitmap_descriptor(
@@ -752,7 +759,7 @@ fn arcade_active_object_screen_position(
         return None;
     }
     let screen_word = world_x_word.wrapping_sub(background_left);
-    if screen_word & 0x8000 != 0 {
+    if screen_word & ACTIVE_OBJECT_SCREEN_SIGN_BIT != 0 {
         return None;
     }
     let screen_x = screen_word >> OBJECT_WORLD_TO_SCREEN_SHIFT;
@@ -795,7 +802,7 @@ fn arcade_first_wave_mutant_uses_dive_projection(
     mutant_runtime: MutantRuntimeSnapshot,
 ) -> bool {
     mutant_runtime.render_x_correction == FIRST_WAVE_MUTANT_DIVE_CONVERSION_X_CORRECTION
-        && mutant_runtime.y_velocity == 0x0090
+        && mutant_runtime.y_velocity == FIRST_WAVE_MUTANT_DIVE_Y_VELOCITY
 }
 
 fn arcade_enemy_uses_mutant_dive_projection(enemy: EnemySnapshot) -> bool {

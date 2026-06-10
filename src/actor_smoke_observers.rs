@@ -1,3 +1,7 @@
+const GAME_OVER_OBSERVER_SOUND_COMMAND: crate::SoundCommand = crate::SoundCommand::new(0xEC);
+const SCENE_SIGNATURE_INITIAL: u64 = 0xD1B5_4A32_D192_ED03;
+const SCENE_SIGNATURE_GOLDEN_RATIO_MIX: u64 = 0x9E37_79B9_7F4A_7C15;
+
 fn step_post_game(
     runtime: &mut ActorRuntimeAdapter,
     renderer: &NativeSceneRenderer,
@@ -204,7 +208,11 @@ fn observe_post_game_frame(
             .events
             .sounds()
             .iter()
-            .filter(|event| **event == SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEC) })
+            .filter(|event| {
+                **event == SoundEvent::UnmappedSoundCommand {
+                    command: GAME_OVER_OBSERVER_SOUND_COMMAND,
+                }
+            })
             .count(),
     );
 
@@ -385,7 +393,7 @@ fn surface_tuple(surface: crate::renderer::SurfaceSize) -> (u32, u32) {
 }
 
 fn scene_signature(frame: &ActorFrame, plan: &SceneDrawPlan) -> u64 {
-    let mut signature = 0xD1B5_4A32_D192_ED03_u64;
+    let mut signature = SCENE_SIGNATURE_INITIAL;
     signature = mix_signature(signature, frame.report.step);
     signature = mix_signature(signature, phase_code(frame.report.phase));
     signature = mix_signature(signature, u64::from(frame.report.credits));
@@ -402,7 +410,7 @@ fn scene_signature(frame: &ActorFrame, plan: &SceneDrawPlan) -> u64 {
 fn mix_signature(current: u64, value: u64) -> u64 {
     current
         ^ value
-            .wrapping_add(0x9E37_79B9_7F4A_7C15)
+            .wrapping_add(SCENE_SIGNATURE_GOLDEN_RATIO_MIX)
             .wrapping_add(current << 6)
             .wrapping_add(current >> 2)
 }

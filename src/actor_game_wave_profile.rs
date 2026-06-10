@@ -1,3 +1,9 @@
+const ADC8_RESULT_MASK: u16 = 0x00FF;
+const ADC8_CARRY_THRESHOLD: u16 = 0x00FF;
+const ACTOR_U8_SIGN_BIT: u8 = 0x80;
+const ACTOR_POSITIVE_SIGN_EXTENSION: u8 = 0x00;
+const ACTOR_NEGATIVE_SIGN_EXTENSION: u8 = 0xFF;
+
 impl ArcadeWaveProfile {
     pub fn for_wave(wave: u16) -> Self {
         let wave = u8::try_from(wave.min(u16::from(u8::MAX))).unwrap_or(u8::MAX);
@@ -373,7 +379,7 @@ fn speed_pixels_from_arcade_velocity(velocity: u8) -> i16 {
 
 fn adc8(lhs: u8, rhs: u8, carry: bool) -> (u8, bool) {
     let sum = u16::from(lhs) + u16::from(rhs) + u16::from(u8::from(carry));
-    ((sum & 0xFF) as u8, sum > 0xFF)
+    ((sum & ADC8_RESULT_MASK) as u8, sum > ADC8_CARRY_THRESHOLD)
 }
 
 fn arcade_rmax(max: u8, mut seed: u8) -> u8 {
@@ -384,7 +390,11 @@ fn arcade_rmax(max: u8, mut seed: u8) -> u8 {
 }
 
 const fn actor_sign_extend_u8_to_u16(value: u8) -> u16 {
-    let sign = if value & 0x80 == 0 { 0x00 } else { 0xFF };
+    let sign = if value & ACTOR_U8_SIGN_BIT == 0 {
+        ACTOR_POSITIVE_SIGN_EXTENSION
+    } else {
+        ACTOR_NEGATIVE_SIGN_EXTENSION
+    };
     u16::from_be_bytes([sign, value])
 }
 

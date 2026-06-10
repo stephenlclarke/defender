@@ -1903,7 +1903,7 @@ impl ActorGameDriver {
         for actor in self.actors.values() {
             actor.apply_driver_command(ActorDriverCommand::AdjustLanderFireTimer {
                 target_human_index: 2,
-                x_velocity: 0xFFEE,
+                x_velocity: FIRST_WAVE_EARLY_RESERVE_TARGET2_X_VELOCITY,
                 delta: FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY,
             });
         }

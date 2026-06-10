@@ -1,5 +1,7 @@
+const ARCADE_VELOCITY_SIGN_BIT: u16 = 0x8000;
+
 const fn arcade_drift_from_velocity(x_velocity: u16) -> i16 {
-    if x_velocity & 0x8000 != 0 {
+    if x_velocity & ARCADE_VELOCITY_SIGN_BIT != 0 {
         -1
     } else if x_velocity == 0 {
         0

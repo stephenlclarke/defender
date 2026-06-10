@@ -1,3 +1,23 @@
+const SPAWN_WORLD_FRACTION_MASK: u16 = 0x00FF;
+const BOMBER_RESTORE_SPACING_WORD: u16 = 0x0180;
+const WORLD_HALF_WRAP_OFFSET: u16 = 0x8000;
+const POD_RESTORE_X_SEED_MASK: u8 = 0x3F;
+const POD_RESTORE_X_BASE: u8 = 0x10;
+const POD_RESTORE_X_VELOCITY_CENTER: u8 = 0x20;
+const POD_RESTORE_Y_VELOCITY_MASK: u8 = 0x7F;
+const POD_RESTORE_Y_VELOCITY_CENTER: u8 = 0x40;
+const ARCADE_SPAWN_BYTE_SIGN_BIT: u8 = 0x80;
+const POD_RESTORE_Y_VELOCITY_MAGNITUDE_BIT: u8 = 0x20;
+const POD_RESTORE_Y_VELOCITY_CLEAR_MAGNITUDE_MASK: u8 = 0xDF;
+const SWARMER_RELEASE_X_VELOCITY_MASK: u8 = 0x3F;
+const SWARMER_RELEASE_X_VELOCITY_CENTER: u8 = 0x20;
+const SWARMER_RELEASE_SLEEP_MASK: u8 = 0x1F;
+const MINI_SWARMER_RESTORE_X_SEED_MASK: u8 = 0x3F;
+const MINI_SWARMER_RESTORE_X_BASE: u8 = 0x80;
+const HUMAN_RESTORE_QUADRANT_BANKS: [u8; 4] = [0x00, 0x40, 0x80, 0xC0];
+const HUMAN_RESTORE_X_OFFSET_MASK: u8 = 0x1F;
+const HUMAN_RESTORE_ANIMATION_SEED_BIT: u8 = 0x01;
+
 impl ActorLanderSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
@@ -10,8 +30,8 @@ impl ActorLanderSpawn {
         Self {
             position: Point::new((start.world_x >> 8) as i16, (start.world_y >> 8) as i16),
             arcade_state: Some(LanderArcadeState {
-                x_fraction: (start.world_x & 0x00FF) as u8,
-                y_fraction: (start.world_y & 0x00FF) as u8,
+                x_fraction: (start.world_x & SPAWN_WORLD_FRACTION_MASK) as u8,
+                y_fraction: (start.world_y & SPAWN_WORLD_FRACTION_MASK) as u8,
                 x_velocity: start.x_velocity,
                 y_velocity: start.y_velocity,
                 shot_timer: start.shot_timer,
@@ -108,8 +128,8 @@ impl ActorBomberSpawn {
 
             for squad_remaining in (1..=squad_count).rev() {
                 let world_x_word = player_absolute_x
-                    .wrapping_add((squad_remaining as u16).wrapping_mul(0x0180))
-                    .wrapping_add(0x8000);
+                    .wrapping_add((squad_remaining as u16).wrapping_mul(BOMBER_RESTORE_SPACING_WORD))
+                    .wrapping_add(WORLD_HALF_WRAP_OFFSET);
                 let [x, x_fraction] = world_x_word.to_be_bytes();
                 bombers.push(Self {
                     position: Point::new(i16::from(x), BOMBER_CRUISE_ALTITUDE),
@@ -161,18 +181,24 @@ impl ActorPodSpawn {
     fn from_arcade_restore(arcade_rng: &mut ActorArcadeRng) -> Self {
         let state = arcade_rng.advance();
         let [x, x_fraction] =
-            u16::from_be_bytes([(state.hseed & 0x3F).wrapping_add(0x10), state.lseed])
-                .to_be_bytes();
+            u16::from_be_bytes([
+                (state.hseed & POD_RESTORE_X_SEED_MASK).wrapping_add(POD_RESTORE_X_BASE),
+                state.lseed,
+            ])
+            .to_be_bytes();
         let y = state
             .lseed
             .wrapping_shr(1)
             .wrapping_add(PLAYFIELD_TOP_EDGE_Y);
-        let x_velocity = actor_sign_extend_u8_to_u16((state.seed & 0x3F).wrapping_sub(0x20));
-        let mut y_velocity_low = (state.lseed & 0x7F).wrapping_sub(0x40);
-        if y_velocity_low & 0x80 == 0 {
-            y_velocity_low |= 0x20;
+        let x_velocity = actor_sign_extend_u8_to_u16(
+            (state.seed & POD_RESTORE_X_SEED_MASK).wrapping_sub(POD_RESTORE_X_VELOCITY_CENTER),
+        );
+        let mut y_velocity_low =
+            (state.lseed & POD_RESTORE_Y_VELOCITY_MASK).wrapping_sub(POD_RESTORE_Y_VELOCITY_CENTER);
+        if y_velocity_low & ARCADE_SPAWN_BYTE_SIGN_BIT == 0 {
+            y_velocity_low |= POD_RESTORE_Y_VELOCITY_MAGNITUDE_BIT;
         } else {
-            y_velocity_low &= 0xDF;
+            y_velocity_low &= POD_RESTORE_Y_VELOCITY_CLEAR_MAGNITUDE_MASK;
         }
 
         Self {
@@ -202,10 +228,12 @@ impl ActorSwarmerSpawn {
     ) -> Self {
         let velocity_rand = arcade_rng.advance();
         let y_velocity = actor_sign_extend_u8_to_u16(velocity_rand.seed).wrapping_shl(1);
-        let x_velocity =
-            actor_sign_extend_u8_to_u16((velocity_rand.lseed & 0x3F).wrapping_sub(0x20));
+        let x_velocity = actor_sign_extend_u8_to_u16(
+            (velocity_rand.lseed & SWARMER_RELEASE_X_VELOCITY_MASK)
+                .wrapping_sub(SWARMER_RELEASE_X_VELOCITY_CENTER),
+        );
         let acceleration = velocity_rand.lseed & profile.swarmer_acceleration_mask;
-        let sleep_ticks = velocity_rand.hseed & 0x1F;
+        let sleep_ticks = velocity_rand.hseed & SWARMER_RELEASE_SLEEP_MASK;
         let shot_timer =
             arcade_rng.advance_rmax(profile.swarmer_shot_time.min(u32::from(u8::MAX)) as u8);
 
@@ -242,7 +270,8 @@ impl ActorSwarmerSpawn {
         ]);
         let placement_rand = arcade_rng.advance();
         let world_x_word = u16::from_be_bytes([
-            (placement_rand.seed & 0x3F).wrapping_add(0x80),
+            (placement_rand.seed & MINI_SWARMER_RESTORE_X_SEED_MASK)
+                .wrapping_add(MINI_SWARMER_RESTORE_X_BASE),
             MINI_SWARMER_RESTORE_X_LOW,
         ]);
         let [x, x_fraction] = world_x_word.to_be_bytes();
@@ -355,7 +384,7 @@ impl ActorMutantSpawn {
         let mut relative = u16::from_be_bytes([placement_state.hseed, placement_state.lseed])
             .wrapping_sub(avoid_left);
         if relative < MUTANT_RESTORE_AVOID_WIDTH {
-            relative = relative.wrapping_add(0x8000);
+            relative = relative.wrapping_add(WORLD_HALF_WRAP_OFFSET);
         }
         let world_x_word = relative.wrapping_add(avoid_left);
         let [x, x_fraction] = world_x_word.to_be_bytes();
@@ -398,7 +427,7 @@ fn arcade_target_list_restore_humans(
 
     if target_count > 7 {
         let quadrant_count = target_count >> 2;
-        for x_bank in [0x00, 0x40, 0x80, 0xC0] {
+        for x_bank in HUMAN_RESTORE_QUADRANT_BANKS {
             slot_index = push_arcade_target_list_restore_human_group(
                 &mut humans,
                 arcade_rng,
@@ -433,8 +462,12 @@ fn push_arcade_target_list_restore_human_group(
 ) -> usize {
     for _ in 0..count {
         let state = arcade_rng.advance();
-        let spawn_x = (state.hseed & 0x1F).wrapping_add(x_bank);
-        let animation_frame = SpriteFrameIndex::new(if state.lseed & 0x01 != 0 { 2 } else { 0 });
+        let spawn_x = (state.hseed & HUMAN_RESTORE_X_OFFSET_MASK).wrapping_add(x_bank);
+        let animation_frame = SpriteFrameIndex::new(if state.lseed & HUMAN_RESTORE_ANIMATION_SEED_BIT != 0 {
+            2
+        } else {
+            0
+        });
         humans.push(ActorHumanSpawn {
             position: Point::new(i16::from(spawn_x), i16::from(ASTRONAUT_RESTORE_Y)),
             mode: HumanMode::Grounded,
@@ -513,8 +546,8 @@ impl ActorHumanSpawn {
             position: Point::new((start.world_x >> 8) as i16, (start.world_y >> 8) as i16),
             mode: HumanMode::Grounded,
             arcade_state: Some(HumanArcadeState {
-                x_fraction: (start.world_x & 0x00FF) as u8,
-                y_fraction: (start.world_y & 0x00FF) as u8,
+                x_fraction: (start.world_x & SPAWN_WORLD_FRACTION_MASK) as u8,
+                y_fraction: (start.world_y & SPAWN_WORLD_FRACTION_MASK) as u8,
                 animation_frame: start.animation_frame,
                 target_slot_index,
             }),

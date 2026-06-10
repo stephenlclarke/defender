@@ -1,3 +1,64 @@
+const DEFAULT_RANDOM_HIGH_SEED: u8 = 0x3C;
+const MAX_SOUND_LEVEL: u8 = 0xFF;
+const TURBO_NOISE_CYCLE_COUNT: usize = 0x20;
+const PHANTOM_ORGAN_STEPS: [OrganStep; 3] = [
+    OrganStep {
+        oscillator_mask: 0x7F,
+        delay: 0x1D,
+        samples: QUARTER_NOTE_SAMPLES,
+    },
+    OrganStep {
+        oscillator_mask: 0x7F,
+        delay: 0x23,
+        samples: QUARTER_NOTE_SAMPLES,
+    },
+    OrganStep {
+        oscillator_mask: 0xFE,
+        delay: 0x08,
+        samples: WHOLE_NOTE_SAMPLES,
+    },
+];
+const SAW_VARI_VECTOR: VariVector = VariVector {
+    low_period: 0x40,
+    high_period: 0x01,
+    low_delta: 0,
+    high_delta: 0x10,
+    high_end: 0xE1,
+    sweep_period: 0x0080,
+    low_mod: MAX_SOUND_LEVEL,
+    amplitude: MAX_SOUND_LEVEL,
+};
+const FALLING_VARI_VECTOR: VariVector = VariVector {
+    low_period: 0x28,
+    high_period: 0x01,
+    low_delta: 0,
+    high_delta: 0x08,
+    high_end: 0x81,
+    sweep_period: 0x0200,
+    low_mod: MAX_SOUND_LEVEL,
+    amplitude: MAX_SOUND_LEVEL,
+};
+const QUASAR_VARI_VECTOR: VariVector = VariVector {
+    low_period: 0x28,
+    high_period: 0x81,
+    low_delta: 0,
+    high_delta: 0xFC,
+    high_end: 0x01,
+    sweep_period: 0x0200,
+    low_mod: 0xFC,
+    amplitude: MAX_SOUND_LEVEL,
+};
+const ORGAN_NOTE_CS2_OSCILLATOR_MASK: u8 = 0x7C;
+const VARI_LEVEL_SIGN_BIT: u8 = 0x80;
+const RADIO_INITIAL_FREQUENCY: u16 = 0x0100;
+const RADIO_WAVEFORM_INDEX_MASK: u16 = 0x0F;
+const HYPER_PHASE_MAX: u8 = 0x7F;
+const HYPER_COUNTER_MAX: u8 = 0x7F;
+const SCREAM_INITIAL_FREQUENCY: u8 = 0x40;
+const SCREAM_INITIAL_AMPLITUDE: u8 = 0x80;
+const SCREAM_CASCADE_TRIGGER_FREQUENCY: u8 = 0x37;
+const SCREAM_CASCADE_START_FREQUENCY: u8 = 0x41;
+
 #[derive(Debug, Clone)]
 pub(crate) struct SoundBoardSynth {
     background_1_active: u8,
@@ -17,7 +78,7 @@ impl Default for SoundBoardSynth {
             spinner_active: 0,
             bonus_active: 0,
             organ_active: 0,
-            random_hi: 0x3C,
+            random_hi: DEFAULT_RANDOM_HIGH_SEED,
             random_lo: 0,
         }
     }
@@ -66,13 +127,22 @@ impl SoundBoardSynth {
                 self.background_1_active = 0;
                 self.background_2_active = 0;
             }
-            SpecialSound::Turbo => self.render_white_noise(1, 0x20, 1, 0xFF, true, out),
+            SpecialSound::Turbo => self.render_white_noise(
+                1,
+                TURBO_NOISE_CYCLE_COUNT,
+                1,
+                MAX_SOUND_LEVEL,
+                true,
+                out,
+            ),
             SpecialSound::Materialize => self.render_materialize_noise(out),
             SpecialSound::Thrust => {
                 self.background_1_active = 1;
                 self.render_filtered_noise(false, false, 4, 900, out);
             }
-            SpecialSound::Cannon => self.render_filtered_noise(true, true, 0xFF, 16_000, out),
+            SpecialSound::Cannon => {
+                self.render_filtered_noise(true, true, MAX_SOUND_LEVEL, 16_000, out)
+            }
             SpecialSound::Radio => self.render_radio(out),
             SpecialSound::Hyper => self.render_hyper(out),
             SpecialSound::Scream => self.render_scream(out),
@@ -143,24 +213,7 @@ impl SoundBoardSynth {
         match tune {
             OrganTune::Phantom => {
                 self.organ_active = 1;
-                let steps = [
-                    OrganStep {
-                        oscillator_mask: 0x7F,
-                        delay: 0x1D,
-                        samples: QUARTER_NOTE_SAMPLES,
-                    },
-                    OrganStep {
-                        oscillator_mask: 0x7F,
-                        delay: 0x23,
-                        samples: QUARTER_NOTE_SAMPLES,
-                    },
-                    OrganStep {
-                        oscillator_mask: 0xFE,
-                        delay: 0x08,
-                        samples: WHOLE_NOTE_SAMPLES,
-                    },
-                ];
-                for step in steps {
+                for step in PHANTOM_ORGAN_STEPS {
                     self.append_organ_step(out, step);
                 }
             }
@@ -169,36 +222,9 @@ impl SoundBoardSynth {
 
     fn render_vari(&mut self, sound: VariSound, out: &mut Vec<f32>) {
         let vector = match sound {
-            VariSound::Saw => VariVector {
-                low_period: 0x40,
-                high_period: 0x01,
-                low_delta: 0,
-                high_delta: 0x10,
-                high_end: 0xE1,
-                sweep_period: 0x0080,
-                low_mod: 0xFF,
-                amplitude: 0xFF,
-            },
-            VariSound::Falling => VariVector {
-                low_period: 0x28,
-                high_period: 0x01,
-                low_delta: 0,
-                high_delta: 0x08,
-                high_end: 0x81,
-                sweep_period: 0x0200,
-                low_mod: 0xFF,
-                amplitude: 0xFF,
-            },
-            VariSound::Quasar => VariVector {
-                low_period: 0x28,
-                high_period: 0x81,
-                low_delta: 0,
-                high_delta: 0xFC,
-                high_end: 0x01,
-                sweep_period: 0x0200,
-                low_mod: 0xFC,
-                amplitude: 0xFF,
-            },
+            VariSound::Saw => SAW_VARI_VECTOR,
+            VariSound::Falling => FALLING_VARI_VECTOR,
+            VariSound::Quasar => QUASAR_VARI_VECTOR,
         };
         self.render_vari_vector(vector, out);
     }
@@ -210,7 +236,7 @@ impl SoundBoardSynth {
         self.append_organ_step(
             out,
             OrganStep {
-                oscillator_mask: 0x7C,
+                oscillator_mask: ORGAN_NOTE_CS2_OSCILLATOR_MASK,
                 delay: ORGAN_NOTE_DELAYS[note_index],
                 samples: QUARTER_NOTE_SAMPLES / 2,
             },
@@ -290,7 +316,7 @@ impl SoundBoardSynth {
         out: &mut Vec<f32>,
     ) {
         let repeat_divisor = usize::from(repeat_divisor.max(1));
-        let mut level = 0xFF;
+        let mut level = MAX_SOUND_LEVEL;
         while out.len() < LIGHTNING_MIN_SAMPLES {
             let mut frequency = initial_frequency.max(1);
             loop {
@@ -313,7 +339,7 @@ impl SoundBoardSynth {
     }
 
     fn render_materialize_noise(&mut self, out: &mut Vec<f32>) {
-        let mut level = 0xFF;
+        let mut level = MAX_SOUND_LEVEL;
         let mut frequency = APPEAR_INITIAL_FREQUENCY;
         append_level(out, level, materialize_repeat_count(frequency));
 
@@ -358,7 +384,11 @@ impl SoundBoardSynth {
                     sweep_counter = sweep_counter.saturating_sub(high_ticks);
                 }
 
-                level = if level & 0x80 == 0 { !level } else { level };
+                level = if level & VARI_LEVEL_SIGN_BIT == 0 {
+                    !level
+                } else {
+                    level
+                };
                 append_vari_level(out, level, LOOP_SCALE);
 
                 low_count = low_count.wrapping_add(vector.low_delta);
@@ -382,7 +412,7 @@ impl SoundBoardSynth {
     fn render_radio(&mut self, out: &mut Vec<f32>) {
         self.spinner_active = 1;
         let mut phase = 0u16;
-        let mut frequency = 0x0100u16;
+        let mut frequency = RADIO_INITIAL_FREQUENCY;
         loop {
             let (next_phase, carry) = phase.overflowing_add(frequency);
             phase = next_phase;
@@ -392,7 +422,7 @@ impl SoundBoardSynth {
                     break;
                 }
             }
-            let index = usize::from(((phase >> 8) & 0x0F) as u8);
+            let index = usize::from(((phase >> 8) & RADIO_WAVEFORM_INDEX_MASK) as u8);
             append_level(out, RADIO_WAVEFORM[index], LOOP_SCALE);
             if out.len() > SAMPLE_RATE_HZ as usize {
                 break;
@@ -402,8 +432,8 @@ impl SoundBoardSynth {
 
     fn render_hyper(&mut self, out: &mut Vec<f32>) {
         let mut sound = 0u8;
-        for phase in 0u8..=0x7F {
-            for counter in 0u8..=0x7F {
+        for phase in 0u8..=HYPER_PHASE_MAX {
+            for counter in 0u8..=HYPER_COUNTER_MAX {
                 if counter == phase {
                     sound = !sound;
                 }
@@ -416,10 +446,10 @@ impl SoundBoardSynth {
     fn render_scream(&mut self, out: &mut Vec<f32>) {
         self.background_2_active = 1;
         let mut table = [(0u8, 0u8); 4];
-        table[0].0 = 0x40;
+        table[0].0 = SCREAM_INITIAL_FREQUENCY;
         let mut timer = 0u8;
         loop {
-            let mut amplitude = 0x80u8;
+            let mut amplitude = SCREAM_INITIAL_AMPLITUDE;
             let mut output = 0u8;
             for entry in &mut table {
                 let (frequency, counter) = entry;
@@ -438,8 +468,8 @@ impl SoundBoardSynth {
                     if frequency == 0 {
                         continue;
                     }
-                    if frequency == 0x37 && index + 1 < table.len() {
-                        table[index + 1].0 = 0x41;
+                    if frequency == SCREAM_CASCADE_TRIGGER_FREQUENCY && index + 1 < table.len() {
+                        table[index + 1].0 = SCREAM_CASCADE_START_FREQUENCY;
                     }
                     frequency = frequency.wrapping_sub(1);
                     table[index].0 = frequency;

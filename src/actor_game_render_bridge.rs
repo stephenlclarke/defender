@@ -1,3 +1,14 @@
+const TOP_DISPLAY_LEFT_SCANNER_MARKER_CELL: u16 = 0x4C07;
+const TOP_DISPLAY_RIGHT_SCANNER_MARKER_CELL: u16 = 0x4C28;
+const ACTOR_RENDER_WILLIAMS_RED_GREEN_CHANNEL_MASK: u8 = 0x07;
+const ACTOR_RENDER_WILLIAMS_GREEN_CHANNEL_SHIFT: u8 = 3;
+const ACTOR_RENDER_WILLIAMS_BLUE_CHANNEL_SHIFT: u8 = 6;
+const ACTOR_RENDER_WILLIAMS_BLUE_CHANNEL_MASK: u8 = 0x03;
+const ACTOR_RENDER_OPAQUE_ALPHA: u8 = 0xFF;
+const ACTOR_RENDER_TRANSPARENT: Color = Color::from_rgba(0, 0, 0, 0);
+const ACTOR_RENDER_SCREEN_SIGN_BIT: u16 = 0x8000;
+const HUMAN_CARRIED_TINT: Color = Color::from_rgba(0xFF, 0xF8, 0x80, ACTOR_RENDER_OPAQUE_ALPHA);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorRenderSceneBridge {
     surface: SurfaceSize,
@@ -421,7 +432,10 @@ fn push_actor_playing_top_display_border(scene: &mut RenderScene, wave: u16) {
             layer: RenderLayer::Hud,
             position: screen_position_from_cell(screen_cell),
             size,
-            tint: if matches!(screen_cell.word(), 0x4C07 | 0x4C28) {
+            tint: if matches!(
+                screen_cell.word(),
+                TOP_DISPLAY_LEFT_SCANNER_MARKER_CELL | TOP_DISPLAY_RIGHT_SCANNER_MARKER_CELL
+            ) {
                 VISUAL_STATE.top_display_scanner_marker_tint()
             } else {
                 arcade_wave_landscape_tint(wave)
@@ -432,13 +446,21 @@ fn push_actor_playing_top_display_border(scene: &mut RenderScene, wave: u16) {
 
 fn williams_color_byte_tint(value: u8) -> Color {
     if value == 0 {
-        return Color::from_rgba(0, 0, 0, 0);
+        return ACTOR_RENDER_TRANSPARENT;
     }
     Color::from_rgba(
-        WILLIAMS_RED_GREEN_LEVELS[usize::from(value & 0x07)],
-        WILLIAMS_RED_GREEN_LEVELS[usize::from((value >> 3) & 0x07)],
-        WILLIAMS_BLUE_LEVELS[usize::from((value >> 6) & 0x03)],
-        0xFF,
+        WILLIAMS_RED_GREEN_LEVELS[usize::from(
+            value & ACTOR_RENDER_WILLIAMS_RED_GREEN_CHANNEL_MASK,
+        )],
+        WILLIAMS_RED_GREEN_LEVELS[usize::from(
+            (value >> ACTOR_RENDER_WILLIAMS_GREEN_CHANNEL_SHIFT)
+                & ACTOR_RENDER_WILLIAMS_RED_GREEN_CHANNEL_MASK,
+        )],
+        WILLIAMS_BLUE_LEVELS[usize::from(
+            (value >> ACTOR_RENDER_WILLIAMS_BLUE_CHANNEL_SHIFT)
+                & ACTOR_RENDER_WILLIAMS_BLUE_CHANNEL_MASK,
+        )],
+        ACTOR_RENDER_OPAQUE_ALPHA,
     )
 }
 
@@ -575,7 +597,7 @@ fn actor_arcade_screen_position(
         return None;
     }
     let screen_word = world_x_word.wrapping_sub(background_left);
-    if screen_word & 0x8000 != 0 {
+    if screen_word & ACTOR_RENDER_SCREEN_SIGN_BIT != 0 {
         return None;
     }
     let screen_x = screen_word >> OBJECT_WORLD_TO_SCREEN_SHIFT;
@@ -815,7 +837,7 @@ fn actor_scene_sprite(sprite: SpriteKey, position: Point) -> Option<SceneSprite>
             SpriteId::HUMAN,
             RenderLayer::Objects,
             HUMAN_SCENE_SIZE,
-            Color::from_rgba(0xFF, 0xF8, 0x80, 0xFF),
+            HUMAN_CARRIED_TINT,
         ),
         SpriteKey::Laser => (
             SpriteId::PLAYER_PROJECTILE,

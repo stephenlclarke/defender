@@ -1,3 +1,32 @@
+const ATTRACT_SCORING_HIGH_NIBBLE_MASK: u8 = 0xF0;
+const ATTRACT_SCORING_LOW_NIBBLE_MASK: u8 = 0x0F;
+const ATTRACT_SCORING_LANDER_DESCENT_WORLD_Y_STEP: i32 = 0x00A0;
+const ATTRACT_SCORING_RESCUE_ASCENT_WORLD_Y_STEP: i32 = 0x00B0;
+const ATTRACT_SCORING_LANDER_EXPLOSION_STEPS: u16 = 12;
+const ATTRACT_SCORING_RETURN_BONUS_STEP_DIVISOR: u16 = 2;
+const ATTRACT_SCORING_RETURN_BONUS_WORLD_Y_STEP: i32 = 0x0010;
+const ATTRACT_SCORING_OPAQUE_ALPHA: u8 = 0xFF;
+const ATTRACT_SCORING_COLOR_LOW_BYTE_MASK: u16 = 0x00FF;
+const ATTRACT_SCORING_TRANSPARENT_PALETTE_NIBBLE: u8 = 0x0;
+const ATTRACT_SCORING_WHITE_PALETTE_NIBBLES: [u8; 6] = [0x1, 0xA, 0xC, 0xD, 0xE, 0xF];
+const ATTRACT_SCORING_WILLIAMS_COLOR_NIBBLE_MIN: u8 = 0x2;
+const ATTRACT_SCORING_WILLIAMS_COLOR_NIBBLE_MAX: u8 = 0x9;
+const SCORE_POPUP_500_PRIMARY_CYCLE_NIBBLE: u8 = 0xD;
+const SCORE_POPUP_500_SECOND_CYCLE_NIBBLE: u8 = 0xE;
+const SCORE_POPUP_500_THIRD_CYCLE_NIBBLE: u8 = 0xF;
+const SCORE_POPUP_GRAY_NIBBLE: u8 = 0xB;
+const LASER_FIZZLE_LOW_BIT: u8 = 0x01;
+const LASER_FIZZLE_HIGH_BIT: u8 = 0x02;
+const LASER_FIZZLE_HIGH_BIT_SHIFT: u8 = 3;
+const ATTRACT_SCORING_NATIVE_X_ROUNDING_OFFSET: i32 = 0x10;
+const ATTRACT_SCORING_NATIVE_Y_ROUNDING_OFFSET: i32 = 0x80;
+const ATTRACT_SCORING_WORLD_X_TO_NATIVE_SHIFT: u8 = 5;
+const ATTRACT_SCORING_WORLD_Y_TO_NATIVE_SHIFT: u8 = 8;
+const ATTRACT_SCORING_NATIVE_X_MAX: i32 = 319;
+const ATTRACT_SCORING_NATIVE_Y_MAX: i32 = 255;
+const ATTRACT_SCORING_MATERIALIZE_FINAL_AGE: u32 = 0x2C;
+const ATTRACT_SCORING_GRAY_TINT: Color = Color::from_rgba(170, 170, 186, ATTRACT_SCORING_OPAQUE_ALPHA);
+
 fn push_attract_scoring_top_display_border(scene: &mut RenderScene) {
     for (screen_cell_word, size) in TOP_DISPLAY_BORDER_SEGMENTS {
         let screen_cell = crate::ScreenAddress::new(screen_cell_word);
@@ -22,7 +51,11 @@ fn push_attract_scoring_scanner_terrain(scene: &mut RenderScene) {
         );
         for (row, byte) in record.word.to_be_bytes().into_iter().enumerate() {
             for column in 0..2 {
-                let nibble = if column == 0 { byte >> 4 } else { byte & 0x0F };
+                let nibble = if column == 0 {
+                    byte >> 4
+                } else {
+                    byte & ATTRACT_SCORING_LOW_NIBBLE_MASK
+                };
                 if nibble == 0 {
                     continue;
                 }
@@ -358,7 +391,8 @@ fn actor_attract_scoring_objects_for_stage(
             objects.push(actor_attract_scoring_enemy_object(
                 ActorAttractScoringEnemyKind::Lander,
                 ATTRACT_SCORING_LANDER_WORLD_X,
-                ATTRACT_SCORING_LANDER_WORLD_Y + i32::from(local_step) * 0x00A0,
+                ATTRACT_SCORING_LANDER_WORLD_Y
+                    + i32::from(local_step) * ATTRACT_SCORING_LANDER_DESCENT_WORLD_Y_STEP,
             ));
             objects.push(actor_attract_scoring_object(
                 ActorAttractScoringObjectKind::Human,
@@ -384,10 +418,12 @@ fn actor_attract_scoring_objects_for_stage(
                 )
             } else {
                 ATTRACT_SCORING_LANDER_WORLD_Y
-                    + i32::from(ATTRACT_SCORING_RESCUE_DESCENT_STEPS) * 0x00A0
-                    - i32::from(rise_step) * 0x00B0
+                    + i32::from(ATTRACT_SCORING_RESCUE_DESCENT_STEPS)
+                        * ATTRACT_SCORING_LANDER_DESCENT_WORLD_Y_STEP
+                    - i32::from(rise_step) * ATTRACT_SCORING_RESCUE_ASCENT_WORLD_Y_STEP
             };
-            let human_y = ATTRACT_SCORING_HUMAN_WORLD_Y - i32::from(rise_step) * 0x00B0;
+            let human_y = ATTRACT_SCORING_HUMAN_WORLD_Y
+                - i32::from(rise_step) * ATTRACT_SCORING_RESCUE_ASCENT_WORLD_Y_STEP;
             objects.push(actor_attract_scoring_enemy_object(
                 ActorAttractScoringEnemyKind::Lander,
                 ATTRACT_SCORING_LANDER_WORLD_X,
@@ -418,7 +454,7 @@ fn actor_attract_scoring_objects_for_stage(
                 ship_x,
                 ship_y,
             ));
-            if local_step < 12 {
+            if local_step < ATTRACT_SCORING_LANDER_EXPLOSION_STEPS {
                 let lander_y = actor_attract_scoring_laser_aligned_enemy_world_y(
                     ActorAttractScoringEnemyKind::Lander,
                     ATTRACT_SCORING_PLAYER_WORLD_Y,
@@ -497,7 +533,7 @@ fn actor_attract_scoring_intercept_state(fall_step: u16) -> (i32, i32, i32) {
     let mut ship_y = ATTRACT_SCORING_PLAYER_WORLD_Y;
     let mut human_y = ATTRACT_SCORING_HUMAN_WORLD_Y
         - i32::from(ATTRACT_SCORING_RESCUE_ASCENT_STEPS + ATTRACT_SCORING_RESCUE_LASER_STEPS)
-            * 0x00B0;
+            * ATTRACT_SCORING_RESCUE_ASCENT_WORLD_Y_STEP;
     let mut elapsed = 0;
     let mut human_velocity = 0;
     for _ in 0..(ATTRACT_SCORING_RESCUE_FALL_STEPS / 2) {
@@ -709,7 +745,9 @@ fn actor_attract_scoring_bonus(
         ActorAttractScoringStage::RescueReturn => Some(ActorAttractScoringBonus {
             sprite: SpriteId::SCORE_POPUP_500,
             world_x: ATTRACT_SCORING_SCORE_500_DROP_WORLD_X,
-            world_y: ATTRACT_SCORING_SCORE_500_DROP_WORLD_Y + i32::from(local_step / 2) * 0x0010,
+            world_y: ATTRACT_SCORING_SCORE_500_DROP_WORLD_Y
+                + i32::from(local_step / ATTRACT_SCORING_RETURN_BONUS_STEP_DIVISOR)
+                    * ATTRACT_SCORING_RETURN_BONUS_WORLD_Y_STEP,
         }),
         ActorAttractScoringStage::LegendTransfer(index) if local_step == 0 => {
             let entry = ACTOR_ATTRACT_SCORING_LEGEND[index];
@@ -788,7 +826,7 @@ fn push_attract_scoring_scanner_object(scene: &mut RenderScene, object: ActorAtt
         layer: RenderLayer::Hud,
         position: actor_attract_scoring_scanner_position(object),
         size,
-        tint: williams_color_byte_tint((color_word & 0x00FF) as u8),
+        tint: williams_color_byte_tint((color_word & ATTRACT_SCORING_COLOR_LOW_BYTE_MASK) as u8),
     });
 }
 
@@ -871,7 +909,7 @@ fn push_actor_attract_scoring_score_500_pixels(
                     tint,
                 );
             }
-            if let Some(tint) = actor_score_500_nibble_tint(byte & 0x0F, phase) {
+            if let Some(tint) = actor_score_500_nibble_tint(byte & ATTRACT_SCORING_LOW_NIBBLE_MASK, phase) {
                 push_actor_fragment_pixel(
                     scene,
                     [
@@ -890,10 +928,16 @@ const SCORE_POPUP_500_PIXEL_BITMAP: crate::arcade_assets::ObjectBitmapId =
 
 fn actor_score_500_nibble_tint(nibble: u8, phase: usize) -> Option<Color> {
     match nibble {
-        0x0 => None,
-        0xD => Some(SCORE_POPUP_500_COLOR_CYCLE[phase % SCORE_POPUP_500_COLOR_CYCLE.len()]),
-        0xE => Some(SCORE_POPUP_500_COLOR_CYCLE[(phase + 1) % SCORE_POPUP_500_COLOR_CYCLE.len()]),
-        0xF => Some(SCORE_POPUP_500_COLOR_CYCLE[(phase + 2) % SCORE_POPUP_500_COLOR_CYCLE.len()]),
+        ATTRACT_SCORING_TRANSPARENT_PALETTE_NIBBLE => None,
+        SCORE_POPUP_500_PRIMARY_CYCLE_NIBBLE => {
+            Some(SCORE_POPUP_500_COLOR_CYCLE[phase % SCORE_POPUP_500_COLOR_CYCLE.len()])
+        }
+        SCORE_POPUP_500_SECOND_CYCLE_NIBBLE => {
+            Some(SCORE_POPUP_500_COLOR_CYCLE[(phase + 1) % SCORE_POPUP_500_COLOR_CYCLE.len()])
+        }
+        SCORE_POPUP_500_THIRD_CYCLE_NIBBLE => {
+            Some(SCORE_POPUP_500_COLOR_CYCLE[(phase + 2) % SCORE_POPUP_500_COLOR_CYCLE.len()])
+        }
         _ => actor_sprite_asset_nibble_tint(nibble),
     }
 }
@@ -934,7 +978,7 @@ fn push_actor_scoring_sparse_laser(
         .max(0);
         let (byte, tint) = if cells_from_head == 0 {
             let byte = if x >= right {
-                LASER_TIP_BYTE & 0xF0
+                LASER_TIP_BYTE & ATTRACT_SCORING_HIGH_NIBBLE_MASK
             } else {
                 LASER_TIP_BYTE
             };
@@ -965,10 +1009,10 @@ fn push_actor_scoring_laser_byte(
     visible_left: i32,
     visible_right: i32,
 ) {
-    if byte & 0xF0 != 0 {
+    if byte & ATTRACT_SCORING_HIGH_NIBBLE_MASK != 0 {
         push_actor_scoring_laser_pixel(scene, x, y, tint, visible_left, visible_right);
     }
-    if byte & 0x0F != 0 {
+    if byte & ATTRACT_SCORING_LOW_NIBBLE_MASK != 0 {
         push_actor_scoring_laser_pixel(scene, x + 1, y, tint, visible_left, visible_right);
     }
 }
@@ -1000,7 +1044,8 @@ fn push_actor_scoring_laser_pixel(
 }
 
 const fn actor_laser_fizzle_byte(seed: u8) -> u8 {
-    (seed & 0x01) | ((seed & 0x02) << 3)
+    (seed & LASER_FIZZLE_LOW_BIT)
+        | ((seed & LASER_FIZZLE_HIGH_BIT) << LASER_FIZZLE_HIGH_BIT_SHIFT)
 }
 
 fn push_actor_attract_scoring_fragment_pixels(
@@ -1167,14 +1212,14 @@ fn actor_attract_scoring_enemy_explosion_kind(
 }
 
 fn actor_attract_scoring_materialize_age(visual_step: u16) -> u16 {
-    let final_age = 0x2C_u32;
     let step = u32::from(visual_step.min(ATTRACT_SCORING_LEGEND_TRANSFER_STEPS.saturating_sub(1)));
     let denominator = u32::from(
         ATTRACT_SCORING_LEGEND_TRANSFER_STEPS
             .saturating_sub(1)
             .max(1),
     );
-    u16::try_from(step * final_age / denominator).expect("materialize age fits in u16")
+    u16::try_from(step * ATTRACT_SCORING_MATERIALIZE_FINAL_AGE / denominator)
+        .expect("materialize age fits in u16")
 }
 
 fn try_screen_position_from_scene_position(position: [f32; 2]) -> Option<ScreenPosition> {
@@ -1191,12 +1236,12 @@ fn try_screen_position_from_scene_position(position: [f32; 2]) -> Option<ScreenP
 
 fn actor_sprite_asset_nibble_tint(nibble: u8) -> Option<Color> {
     match nibble {
-        0x0 => None,
-        0x1 | 0xA | 0xC | 0xD | 0xE | 0xF => Some(Color::WHITE),
-        0x2..=0x9 => Some(williams_color_byte_tint(
+        ATTRACT_SCORING_TRANSPARENT_PALETTE_NIBBLE => None,
+        nibble if ATTRACT_SCORING_WHITE_PALETTE_NIBBLES.contains(&nibble) => Some(Color::WHITE),
+        ATTRACT_SCORING_WILLIAMS_COLOR_NIBBLE_MIN..=ATTRACT_SCORING_WILLIAMS_COLOR_NIBBLE_MAX => Some(williams_color_byte_tint(
             NORMAL_PALETTE_BYTES[usize::from(nibble)],
         )),
-        0xB => Some(Color::from_rgba(170, 170, 186, 0xFF)),
+        SCORE_POPUP_GRAY_NIBBLE => Some(ATTRACT_SCORING_GRAY_TINT),
         _ => None,
     }
 }
@@ -1245,7 +1290,11 @@ fn actor_attract_scoring_scanner_position(object: ActorAttractScoringObject) -> 
 
 fn actor_attract_scoring_native_position(world_x: i32, world_y: i32) -> [f32; 2] {
     [
-        ((world_x + 0x10) >> 5).clamp(0, 319) as f32,
-        ((world_y + 0x80) >> 8).clamp(0, 255) as f32,
+        ((world_x + ATTRACT_SCORING_NATIVE_X_ROUNDING_OFFSET)
+            >> ATTRACT_SCORING_WORLD_X_TO_NATIVE_SHIFT)
+            .clamp(0, ATTRACT_SCORING_NATIVE_X_MAX) as f32,
+        ((world_y + ATTRACT_SCORING_NATIVE_Y_ROUNDING_OFFSET)
+            >> ATTRACT_SCORING_WORLD_Y_TO_NATIVE_SHIFT)
+            .clamp(0, ATTRACT_SCORING_NATIVE_Y_MAX) as f32,
     ]
 }

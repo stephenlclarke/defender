@@ -1,3 +1,8 @@
+const HYPERSPACE_REENTRY_DIRECTION_BIT: u8 = 0x01;
+const HYPERSPACE_RIGHT_REENTRY_X: i16 = 0x20;
+const HYPERSPACE_LEFT_REENTRY_X: i16 = 0x70;
+const HYPERSPACE_REENTRY_Y_SEED_SHIFT: u8 = 1;
+
 #[derive(Debug)]
 struct AttractDirector {
     id: ActorId,
@@ -398,12 +403,13 @@ impl PlayerShip {
         behavior: ActorBehaviorProfile,
     ) -> (Point, Direction, Option<u16>) {
         if let Some(arcade_seed) = behavior.player_hyperspace_arcade_seed {
-            let (x, direction) = if arcade_seed.hseed & 1 != 0 {
-                (0x20, Direction::Right)
+            let (x, direction) = if arcade_seed.hseed & HYPERSPACE_REENTRY_DIRECTION_BIT != 0 {
+                (HYPERSPACE_RIGHT_REENTRY_X, Direction::Right)
             } else {
-                (0x70, Direction::Left)
+                (HYPERSPACE_LEFT_REENTRY_X, Direction::Left)
             };
-            let y = (arcade_seed.hseed >> 1).wrapping_add(PLAYFIELD_TOP_EDGE_Y);
+            let y = (arcade_seed.hseed >> HYPERSPACE_REENTRY_Y_SEED_SHIFT)
+                .wrapping_add(PLAYFIELD_TOP_EDGE_Y);
             return (
                 Point::new(x, i16::from(y)),
                 direction,

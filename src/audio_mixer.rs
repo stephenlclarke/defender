@@ -1,3 +1,7 @@
+const CREDIT_ADDED_SOUND_COMMAND: crate::SoundCommand = crate::SoundCommand::new(0xE6);
+const GAME_STARTED_SOUND_COMMAND: crate::SoundCommand = crate::SoundCommand::new(0xF5);
+const THRUST_STOPPED_SOUND_COMMAND: crate::SoundCommand = crate::SoundCommand::new(0xF0);
+
 #[derive(Debug)]
 struct SynthMixer {
     sample_rate_hz: u32,
@@ -170,10 +174,10 @@ impl SampleVoice {
 fn sound_actions_for_event(event: SoundEvent) -> Vec<SoundAction> {
     match event {
         SoundEvent::Startup => vec![SoundAction::OrganTune(OrganTune::Phantom)],
-        SoundEvent::CreditAdded => sound_board_command_actions(crate::SoundCommand::new(0xE6)),
-        SoundEvent::GameStarted => sound_board_command_actions(crate::SoundCommand::new(0xF5)),
+        SoundEvent::CreditAdded => sound_board_command_actions(CREDIT_ADDED_SOUND_COMMAND),
+        SoundEvent::GameStarted => sound_board_command_actions(GAME_STARTED_SOUND_COMMAND),
         SoundEvent::ThrustStarted => vec![SoundAction::Special(SpecialSound::Thrust)],
-        SoundEvent::ThrustStopped => sound_board_command_actions(crate::SoundCommand::new(0xF0)),
+        SoundEvent::ThrustStopped => sound_board_command_actions(THRUST_STOPPED_SOUND_COMMAND),
         SoundEvent::UnmappedSoundCommand { command } => sound_board_command_actions(command),
     }
 }

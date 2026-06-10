@@ -75,6 +75,23 @@ const TERRAIN_BLOW_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEB); // ori
 const ASTRONAUT_CATCH_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF7); // original: ACSND
 const ASTRONAUT_SHORT_CATCH_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE5); // original: ASCSND
 const APPEARANCE_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEA); // original: APPEAR
+const CREDIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE6);
+const START_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF5);
+const THRUST_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE9);
+const LASER_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEB);
+const EXPLOSION_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEE);
+const LANDER_HIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF9);
+const LANDER_PICKUP_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF4);
+const HUMAN_PULLED_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF1);
+const HUMAN_SAFE_LANDING_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE0);
+const MUTANT_HIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE8);
+const BOMBER_HIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xFE);
+const POD_HIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xFA);
+const SWARMER_OR_BAITER_HIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF8);
+const LANDER_OR_BAITER_SHOT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xFC);
+const MUTANT_SHOT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF6);
+const SWARMER_SHOT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF3);
+const GAME_OVER_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEC);
 const SMART_BOMB_SOUND_SEQUENCE: [(u8, SoundCommand); 7] = [
     // original: SOURCE_SMART_BOMB_SOUND_SEQUENCE
     (4, SMART_BOMB_SOUND_COMMAND),
@@ -118,6 +135,7 @@ const FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS: u16 = 449; // original: SOURCE_FIRST
 const FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT: usize = 10; // original: SOURCE_FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT
 const FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT: usize = 6; // original: SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT
 const FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY: u8 = 2; // original: SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY
+const FIRST_WAVE_EARLY_RESERVE_TARGET2_X_VELOCITY: u16 = 0xFFEE;
 const FIRST_WAVE_EARLY_RESERVE_RNG: ActorArcadeRng = ActorArcadeRng {
     // original: SOURCE_FIRST_WAVE_EARLY_RESERVE_RNG
     seed: 0x3A,
@@ -179,6 +197,11 @@ const ATTRACT_HALL_TODAYS_MESSAGE: MessageId = MessageId::HallTodays; // origina
 const ATTRACT_HALL_ALL_TIME_MESSAGE: MessageId = MessageId::HallAllTime; // original: HALLD_ALL_TIME
 const ATTRACT_HALL_GREATEST_MESSAGE: MessageId = MessageId::HallGreatest; // original: HALLD_GREATEST
 const ATTRACT_HALL_DEFENDER_LOGO_POSITION: Point = Point::new(85, 50); // original: SOURCE_ATTRACT_HALL_DEFENDER_LOGO_POSITION
+const ATTRACT_HALL_TITLE_MESSAGE_CELL: ScreenAddress = ScreenAddress::new(0x3854);
+const ATTRACT_HALL_TODAYS_MESSAGE_CELL: ScreenAddress = ScreenAddress::new(0x2268);
+const ATTRACT_HALL_ALL_TIME_MESSAGE_CELL: ScreenAddress = ScreenAddress::new(0x6068);
+const ATTRACT_HALL_GREATEST_LEFT_MESSAGE_CELL: ScreenAddress = ScreenAddress::new(0x1E72);
+const ATTRACT_HALL_GREATEST_RIGHT_MESSAGE_CELL: ScreenAddress = ScreenAddress::new(0x5F72);
 const ATTRACT_HALL_TODAYS_TABLE_CELL: ScreenAddress = ScreenAddress::new(0x1886); // original: SOURCE_ATTRACT_HALL_TODAYS_TABLE_CELL
 const ATTRACT_HALL_ALL_TIME_TABLE_CELL: ScreenAddress = ScreenAddress::new(0x5986); // original: SOURCE_ATTRACT_HALL_ALL_TIME_TABLE_CELL
 const ATTRACT_HALL_TABLE_ROW_STEP: u8 = 0x0A; // original: SOURCE_ATTRACT_HALL_TABLE_ROW_STEP
@@ -354,6 +377,11 @@ const ACTIVE_BOMBER_BOMB_LIMIT: usize = 10; // original: SOURCE_ACTIVE_BOMBER_BO
 const MAX_ACTIVE_WAVE_ENEMIES: usize = 5; // original: SOURCE_MAX_ACTIVE_WAVE_ENEMIES
 const START_HUMAN_COUNT: u8 = 10; // original: SOURCE_START_HUMAN_COUNT
 const TARGET_LIST_ENTRY_COUNT: usize = 32; // original: SOURCE_TARGET_LIST_ENTRY_COUNT
+const ACTOR_ARCADE_RNG_MULTIPLIER: u8 = 3;
+const ACTOR_ARCADE_RNG_INCREMENT: u8 = 17;
+const ACTOR_ARCADE_RNG_LSEED_MIX_SHIFT: u8 = 3;
+const ACTOR_ARCADE_RNG_CARRY_BIT: u8 = 0x01;
+const ACTOR_ARCADE_RNG_CARRY_SHIFT: u8 = 7;
 const STATUS_SCORE_POSITION: Point = Point::new(8, 6);
 const STATUS_HIGH_SCORE_POSITION: Point = Point::new(94, 6);
 const STATUS_PLAYER_TWO_SCORE_POSITION: Point = Point::new(208, 6);
@@ -540,7 +568,7 @@ const ACTOR_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
     ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
         world_x: 0x3F4A,
         world_y: 0x2CE0,
-        x_velocity: 0xFFEE,
+        x_velocity: FIRST_WAVE_EARLY_RESERVE_TARGET2_X_VELOCITY,
         y_velocity: 0x0070,
         shot_timer: 0x3B,
         sleep_ticks: 0x04,
@@ -1304,14 +1332,19 @@ struct ActorArcadeRng {
 
 impl ActorArcadeRng {
     fn advance(&mut self) -> Self {
-        let product_low = self.seed.wrapping_mul(3).wrapping_add(17);
-        let mut a = self.lseed >> 3;
+        let product_low = self
+            .seed
+            .wrapping_mul(ACTOR_ARCADE_RNG_MULTIPLIER)
+            .wrapping_add(ACTOR_ARCADE_RNG_INCREMENT);
+        let mut a = self.lseed >> ACTOR_ARCADE_RNG_LSEED_MIX_SHIFT;
         a ^= self.lseed;
-        let carry_into_hseed = (a & 0x01) != 0;
+        let carry_into_hseed = (a & ACTOR_ARCADE_RNG_CARRY_BIT) != 0;
         let old_hseed = self.hseed;
-        self.hseed = (u8::from(carry_into_hseed) << 7) | (self.hseed >> 1);
-        let carry_into_lseed = (old_hseed & 0x01) != 0;
-        self.lseed = (u8::from(carry_into_lseed) << 7) | (self.lseed >> 1);
+        self.hseed =
+            (u8::from(carry_into_hseed) << ACTOR_ARCADE_RNG_CARRY_SHIFT) | (self.hseed >> 1);
+        let carry_into_lseed = (old_hseed & ACTOR_ARCADE_RNG_CARRY_BIT) != 0;
+        self.lseed =
+            (u8::from(carry_into_lseed) << ACTOR_ARCADE_RNG_CARRY_SHIFT) | (self.lseed >> 1);
         let (with_lseed, carry) = adc8(product_low, self.lseed, false);
         let (new_seed, _) = adc8(with_lseed, self.hseed, carry);
         self.seed = new_seed;

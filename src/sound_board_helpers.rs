@@ -1,3 +1,8 @@
+const SOUND_COMMAND_NUMBER_MASK: u8 = 0x1F;
+const START_DISTORTO_PRE_DECAY: u8 = 0x1A;
+const BIG_BELL_PRE_DECAY: u8 = 0x11;
+const SPINNER_DRIP_DELTA_FREQUENCY_COUNT: u8 = 0x10;
+
 #[derive(Debug, Clone, Copy)]
 struct GWaveVector {
     echo_count: u8,
@@ -31,7 +36,7 @@ struct OrganStep {
 }
 
 pub(crate) fn sound_actions_for_command(command: crate::SoundCommand) -> Vec<SoundAction> {
-    let sound_number = (!command.byte()) & 0x1F;
+    let sound_number = (!command.byte()) & SOUND_COMMAND_NUMBER_MASK;
     let action = match sound_number {
         0 => return Vec::new(),
         1..=13 => SoundAction::GWave(GWaveSound::Vector(sound_number)),
@@ -77,7 +82,7 @@ fn gwave_vector(sound: GWaveSound) -> Option<GWaveVector> {
             cycle_count: 2,
             echo_decay: 0,
             waveform: RAMPED_SINE_WAVEFORM,
-            pre_decay: 0x1A,
+            pre_decay: START_DISTORTO_PRE_DECAY,
             delta_frequency_increment: -1,
             delta_frequency_count: 0,
             pattern: START_DISTORTO_PATTERN,
@@ -88,7 +93,7 @@ fn gwave_vector(sound: GWaveSound) -> Option<GWaveVector> {
             cycle_count: 1,
             echo_decay: 0,
             waveform: RAMPED_SINE_WAVEFORM,
-            pre_decay: 0x11,
+            pre_decay: BIG_BELL_PRE_DECAY,
             delta_frequency_increment: 1,
             delta_frequency_count: 15,
             pattern: &BIG_BELL_PATTERN[..1],
@@ -132,7 +137,7 @@ fn gwave_vector(sound: GWaveSound) -> Option<GWaveVector> {
             cycle_count: 1,
             echo_decay: 3,
             waveform: RAMPED_SINE_WAVEFORM,
-            pre_decay: 0x11,
+            pre_decay: BIG_BELL_PRE_DECAY,
             delta_frequency_increment: -1,
             delta_frequency_count: 0,
             pattern: SPINNER_PATTERN,
@@ -200,7 +205,7 @@ fn gwave_vector(sound: GWaveSound) -> Option<GWaveVector> {
             waveform: SIXTEEN_SAMPLE_SINE_WAVEFORM,
             pre_decay: 0,
             delta_frequency_increment: -1,
-            delta_frequency_count: 0x10,
+            delta_frequency_count: SPINNER_DRIP_DELTA_FREQUENCY_COUNT,
             pattern: SPINNER_DRIP_PATTERN,
             period_divisor: 8,
         }),

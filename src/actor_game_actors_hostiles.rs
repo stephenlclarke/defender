@@ -1,3 +1,18 @@
+const BOMBER_BOMB_RANDOM_DROP_MASK: u8 = 0x07;
+const BOMBER_RANDOM_STEP_MASK: u8 = 0x3F;
+const BOMBER_RANDOM_STEP_CENTER: u8 = 0x20;
+const ARCADE_BYTE_SIGN_BIT: u8 = 0x80;
+const BOMBER_CRUISE_RANDOM_NUDGE_SEED_MAX: u8 = 0x40;
+const BOMBER_CRUISE_NUDGE_MASK: u8 = 0x03;
+const BOMBER_CRUISE_NUDGE_CENTER: u8 = 2;
+const BOMBER_Y_VELOCITY_UP_CORRECTION: u16 = 0xFFF0;
+const BOMBER_Y_VELOCITY_DOWN_CORRECTION: u16 = 0x0010;
+const BOMBER_PLAYER_TRACKING_FAR_PIXELS: i16 = 0x20;
+const BOMBER_PLAYER_TRACKING_NEAR_PIXELS: i16 = 0x10;
+const MINI_SWARMER_RANDOM_STEP_MASK: u8 = 0x1F;
+const MINI_SWARMER_RANDOM_STEP_CENTER: u8 = 0x10;
+const MINI_SWARMER_DAMPING_SHIFT_STEPS: u8 = 2;
+
 #[derive(Debug)]
 struct Bomber {
     id: ActorId,
@@ -102,7 +117,7 @@ impl Bomber {
             if arcade_state.slot != arcade_tie_selected_slot(arcade_rng.seed)
                 || arcade_state.sleep_ticks > 0
                 || self.position.y == 0
-                || arcade_rng.lseed & 0x07 != 0
+                || arcade_rng.lseed & BOMBER_BOMB_RANDOM_DROP_MASK != 0
                 || actor_bomb_projectile_count(prompt) >= ACTIVE_BOMBER_BOMB_LIMIT
                 || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
                 || !enemy_projectile_spawn_in_bounds(self.position)
@@ -144,8 +159,8 @@ impl Bomber {
 }
 
 fn bomber_sprite_frame_after_arcade_seed(seed: u8, current: u8) -> u8 {
-    let step = (seed & 0x3F).wrapping_sub(0x20);
-    if step & 0x80 != 0 {
+    let step = (seed & BOMBER_RANDOM_STEP_MASK).wrapping_sub(BOMBER_RANDOM_STEP_CENTER);
+    if step & ARCADE_BYTE_SIGN_BIT != 0 {
         current
             .saturating_add(1)
             .min(BOMBER_ANIMATION_FRAME_COUNT - 1)
@@ -155,7 +170,9 @@ fn bomber_sprite_frame_after_arcade_seed(seed: u8, current: u8) -> u8 {
 }
 
 fn bomber_seeded_y_velocity(previous: u16, seed: u8) -> u16 {
-    let random_delta = actor_sign_extend_u8_to_u16((seed & 0x3F).wrapping_sub(0x20));
+    let random_delta = actor_sign_extend_u8_to_u16(
+        (seed & BOMBER_RANDOM_STEP_MASK).wrapping_sub(BOMBER_RANDOM_STEP_CENTER),
+    );
     let mut velocity = previous.wrapping_add(random_delta);
     let damping_byte = 0u8.wrapping_sub(velocity.wrapping_shl(3).to_be_bytes()[0]);
     velocity = velocity.wrapping_add(actor_sign_extend_u8_to_u16(damping_byte));
@@ -168,15 +185,21 @@ fn bomber_cruise_y_velocity(
     object_y: i16,
     seed: u8,
 ) -> u16 {
-    if seed <= 0x40 {
-        let nudge = i16::from((seed & 0x03).wrapping_sub(2) as i8);
+    if seed <= BOMBER_CRUISE_RANDOM_NUDGE_SEED_MAX {
+        let nudge = i16::from(
+            (seed & BOMBER_CRUISE_NUDGE_MASK).wrapping_sub(BOMBER_CRUISE_NUDGE_CENTER) as i8,
+        );
         *cruise_altitude = (*cruise_altitude + nudge)
             .clamp(BOMBER_MIN_CRUISE_ALTITUDE, BOMBER_MAX_CRUISE_ALTITUDE);
     }
 
     let distance = *cruise_altitude - object_y;
     if distance.abs() > BOMBER_CRUISE_WINDOW_HALF_PIXELS {
-        let correction = if distance >= 0 { 0xFFF0 } else { 0x0010 };
+        let correction = if distance >= 0 {
+            BOMBER_Y_VELOCITY_UP_CORRECTION
+        } else {
+            BOMBER_Y_VELOCITY_DOWN_CORRECTION
+        };
         velocity = velocity.wrapping_add(correction);
     }
     velocity
@@ -185,19 +208,19 @@ fn bomber_cruise_y_velocity(
 fn bomber_player_tracking_y_velocity_delta(object_y: i16, player_y: i16) -> Option<u16> {
     let delta = object_y - player_y;
     if delta >= 0 {
-        if delta >= 0x20 {
-            Some(0xFFF0)
-        } else if delta > 0x10 {
+        if delta >= BOMBER_PLAYER_TRACKING_FAR_PIXELS {
+            Some(BOMBER_Y_VELOCITY_UP_CORRECTION)
+        } else if delta > BOMBER_PLAYER_TRACKING_NEAR_PIXELS {
             None
         } else {
-            Some(0x0010)
+            Some(BOMBER_Y_VELOCITY_DOWN_CORRECTION)
         }
-    } else if delta <= -0x20 {
-        Some(0x0010)
-    } else if delta < -0x10 {
+    } else if delta <= -BOMBER_PLAYER_TRACKING_FAR_PIXELS {
+        Some(BOMBER_Y_VELOCITY_DOWN_CORRECTION)
+    } else if delta < -BOMBER_PLAYER_TRACKING_NEAR_PIXELS {
         None
     } else {
-        Some(0xFFF0)
+        Some(BOMBER_Y_VELOCITY_UP_CORRECTION)
     }
 }
 
@@ -665,8 +688,10 @@ fn mini_swarmer_fireball(
     let player = prompt.player_position()?;
     let player_delta = arcade_absolute_x(player, 0)
         .wrapping_sub(arcade_absolute_x(position, arcade_state.x_fraction));
-    if (player_delta.to_be_bytes()[0] ^ arcade_state.x_velocity.to_be_bytes()[0]) & 0x80 != 0
-        || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
+    if (player_delta.to_be_bytes()[0] ^ arcade_state.x_velocity.to_be_bytes()[0])
+        & ARCADE_BYTE_SIGN_BIT
+        != 0
+            || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
     {
         return None;
     }
@@ -1050,7 +1075,7 @@ fn mini_swarmer_y_velocity(
     }
     y_velocity = y_velocity.wrapping_add(mini_swarmer_damping_adjustment(y_velocity));
     y_velocity.wrapping_add(actor_sign_extend_u8_to_u16(
-        (seed & 0x1F).wrapping_sub(0x10),
+        (seed & MINI_SWARMER_RANDOM_STEP_MASK).wrapping_sub(MINI_SWARMER_RANDOM_STEP_CENTER),
     ))
 }
 
@@ -1058,8 +1083,8 @@ fn mini_swarmer_damping_adjustment(value: u16) -> u16 {
     let [mut a, mut b] = value.to_be_bytes();
     a = !a;
     b = !b;
-    for _ in 0..2 {
-        let carry = b & 0x80 != 0;
+    for _ in 0..MINI_SWARMER_DAMPING_SHIFT_STEPS {
+        let carry = b & ARCADE_BYTE_SIGN_BIT != 0;
         b = b.wrapping_shl(1);
         a = a.wrapping_shl(1) | u8::from(carry);
     }

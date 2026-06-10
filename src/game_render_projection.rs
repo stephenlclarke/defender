@@ -1,17 +1,50 @@
+const WILLIAMS_RED_GREEN_CHANNEL_MASK: u8 = 0x07;
+const WILLIAMS_GREEN_CHANNEL_SHIFT: u8 = 3;
+const WILLIAMS_BLUE_CHANNEL_SHIFT: u8 = 6;
+const WILLIAMS_BLUE_CHANNEL_MASK: u8 = 0x03;
+const OPAQUE_ALPHA: u8 = 0xFF;
+const LOW_NIBBLE_MASK: u8 = 0x0F;
+const VIDEO_WORD_PALETTE_INDEX_MASK: u16 = 0x000F;
+const SPRITE_TRANSPARENT_PALETTE_NIBBLE: u8 = 0x0;
+const SPRITE_WHITE_PALETTE_NIBBLES: [u8; 6] = [0x1, 0xA, 0xC, 0xD, 0xE, 0xF];
+const SPRITE_WILLIAMS_COLOR_NIBBLE_MIN: u8 = 0x2;
+const SPRITE_WILLIAMS_COLOR_NIBBLE_MAX: u8 = 0x9;
+const SPRITE_GRAY_PALETTE_NIBBLE: u8 = 0xB;
+const TERRAIN_FLAVOR_BANK_BIT: u8 = 0x20;
+const TERRAIN_SCREEN_ROW_START: u8 = 0x98;
+const BACKGROUND_TERRAIN_ALIGNMENT_MASK: u16 = 0xFFE0;
+const TERRAIN_GENERATION_LOOKAHEAD: u16 = 0x2610;
+const TERRAIN_INITIAL_ALTITUDE_OFFSET: u8 = 0xE0;
+const TERRAIN_SCAN_START_X: u16 = 0x0010;
+const TERRAIN_SCAN_ALIGNMENT_LIMIT: u16 = 0x0800;
+const TERRAIN_WORLD_STEP: u16 = 0x20;
+const TERRAIN_WRAP_SIGN_BIT: u16 = 0x8000;
+const TERRAIN_PATTERN_HIGH_BIT: u8 = 0x80;
+const TERRAIN_RIGHT_PRIME_STEPS: u16 = 0x0400;
+const TERRAIN_BIT_COUNTER_MAX: u8 = 7;
+const SCANNER_PLAYER_UPPER_CELL_DELTA: u16 = 0x00FF;
+const EXPANDED_OBJECT_SCALE_MASK: u8 = 0x7F;
+const APPEARANCE_GROWTH_ACTIVE_BIT: u16 = 0x8000;
+const TRANSPARENT_COLOR: Color = Color::from_rgba(0, 0, 0, 0);
+const SPRITE_GRAY_TINT: Color = Color::from_rgba(170, 170, 186, OPAQUE_ALPHA);
+
 fn attract_title_reference_sample_index(page_frame: u16) -> usize {
     usize::from(page_frame / ATTRACT_TITLE_REFERENCE_SAMPLE_STEP_FRAMES).saturating_sub(1)
 }
 
 fn williams_color_byte_tint(value: u8) -> Color {
     if value == 0 {
-        return Color::from_rgba(0, 0, 0, 0);
+        return TRANSPARENT_COLOR;
     }
 
     Color::from_rgba(
-        WILLIAMS_RED_GREEN_LEVELS[usize::from(value & 0x07)],
-        WILLIAMS_RED_GREEN_LEVELS[usize::from((value >> 3) & 0x07)],
-        WILLIAMS_BLUE_LEVELS[usize::from((value >> 6) & 0x03)],
-        0xFF,
+        WILLIAMS_RED_GREEN_LEVELS[usize::from(value & WILLIAMS_RED_GREEN_CHANNEL_MASK)],
+        WILLIAMS_RED_GREEN_LEVELS[usize::from(
+            (value >> WILLIAMS_GREEN_CHANNEL_SHIFT) & WILLIAMS_RED_GREEN_CHANNEL_MASK,
+        )],
+        WILLIAMS_BLUE_LEVELS
+            [usize::from((value >> WILLIAMS_BLUE_CHANNEL_SHIFT) & WILLIAMS_BLUE_CHANNEL_MASK)],
+        OPAQUE_ALPHA,
     )
 }
 
@@ -30,11 +63,11 @@ pub(crate) fn terrain_blow_flash_tint(elapsed: u16) -> Color {
 }
 
 fn video_palette_index_tint(index: u8) -> Color {
-    williams_color_byte_tint(NORMAL_PALETTE_BYTES[usize::from(index & 0x0F)])
+    williams_color_byte_tint(NORMAL_PALETTE_BYTES[usize::from(index & LOW_NIBBLE_MASK)])
 }
 
 fn video_word_tint(word: u16) -> Color {
-    video_palette_index_tint((word & 0x000F) as u8)
+    video_palette_index_tint((word & VIDEO_WORD_PALETTE_INDEX_MASK) as u8)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -140,12 +173,12 @@ fn generate_background_terrain_records(terrain_left: u16) -> [TerrainDrawRecord;
     let data = terrain_pattern_bytes();
     let terrain_left = background_terrain_left(terrain_left);
     let (flavor_0, flavor_1, state) = initialize_terrain_flavor_tables(data, terrain_left);
-    let selected_flavor = if state.terrain_left.to_be_bytes()[1] & 0x20 == 0 {
+    let selected_flavor = if state.terrain_left.to_be_bytes()[1] & TERRAIN_FLAVOR_BANK_BIT == 0 {
         &flavor_1
     } else {
         &flavor_0
     };
-    let selected_pointer = if state.terrain_left.to_be_bytes()[1] & 0x20 == 0 {
+    let selected_pointer = if state.terrain_left.to_be_bytes()[1] & TERRAIN_FLAVOR_BANK_BIT == 0 {
         state.flavor_1_pointer
     } else {
         state.flavor_0_pointer
@@ -157,7 +190,7 @@ fn generate_background_terrain_records(terrain_left: u16) -> [TerrainDrawRecord;
             selected_flavor[(selected_pointer + entry_index) % selected_flavor.len()];
         *record = TerrainDrawRecord {
             screen_cell: crate::ScreenAddress::from_bytes(
-                0x98u8.wrapping_sub(
+                TERRAIN_SCREEN_ROW_START.wrapping_sub(
                     u8::try_from(entry_index)
                         .expect("background terrain entry index fits in u8"),
                 ),
@@ -170,7 +203,7 @@ fn generate_background_terrain_records(terrain_left: u16) -> [TerrainDrawRecord;
 }
 
 const fn background_terrain_left(background_left: u16) -> u16 {
-    background_left & 0xFFE0
+    background_left & BACKGROUND_TERRAIN_ALIGNMENT_MASK
 }
 
 fn generate_scanner_mini_terrain_records(
@@ -206,24 +239,24 @@ fn initialize_terrain_flavor_tables(
     TerrainGenerationState,
 ) {
     let (right, right_offset) = initialize_right_terrain_state(data);
-    let mut generation_left = terrain_left.wrapping_add(0x2610);
+    let mut generation_left = terrain_left.wrapping_add(TERRAIN_GENERATION_LOOKAHEAD);
     let mut left = TerrainBitState {
         data_index: data.len() - 1,
         data_pointer: TERRAIN_PATTERN_STREAM_BASE.wrapping_sub(1),
         data_byte: 0,
         bit_counter: 0,
     };
-    let mut left_offset = 0xE0;
+    let mut left_offset = TERRAIN_INITIAL_ALTITUDE_OFFSET;
     advance_terrain_right_state(&mut left, data);
 
-    let mut scan_x = 0x0010u16;
-    for _ in 0..=0x0800 {
+    let mut scan_x = TERRAIN_SCAN_START_X;
+    for _ in 0..=TERRAIN_SCAN_ALIGNMENT_LIMIT {
         if scan_x == generation_left {
             break;
         }
         left_offset = terrain_altitude_step(left_offset, left.data_byte);
         advance_terrain_right_state(&mut left, data);
-        scan_x = scan_x.wrapping_add(0x20);
+        scan_x = scan_x.wrapping_add(TERRAIN_WORLD_STEP);
     }
     assert_eq!(
         scan_x, generation_left,
@@ -246,9 +279,9 @@ fn initialize_terrain_flavor_tables(
     };
 
     loop {
-        generation_left = generation_left.wrapping_sub(0x20);
+        generation_left = generation_left.wrapping_sub(TERRAIN_WORLD_STEP);
         state.background_left = generation_left;
-        if generation_left.wrapping_sub(state.terrain_left) & 0x8000 != 0 {
+        if generation_left.wrapping_sub(state.terrain_left) & TERRAIN_WRAP_SIGN_BIT != 0 {
             break;
         }
         add_left_terrain_pixel(&mut state, data, &mut flavor_0, &mut flavor_1);
@@ -266,13 +299,13 @@ fn add_left_terrain_pixel(
     flavor_1: &mut [TerrainFlavorRecord; TERRAIN_FLAVOR_RECORDS],
 ) {
     advance_terrain_left_state(&mut state.right, data);
-    state.right_offset = if state.right.data_byte & 0x80 == 0 {
+    state.right_offset = if state.right.data_byte & TERRAIN_PATTERN_HIGH_BIT == 0 {
         state.right_offset.wrapping_sub(1)
     } else {
         state.right_offset.wrapping_add(1)
     };
 
-    let flavor_0_selected = state.background_left.to_be_bytes()[1] & 0x20 != 0;
+    let flavor_0_selected = state.background_left.to_be_bytes()[1] & TERRAIN_FLAVOR_BANK_BIT != 0;
     let record_index = if flavor_0_selected {
         state.flavor_0_pointer
     } else {
@@ -280,7 +313,7 @@ fn add_left_terrain_pixel(
     };
 
     advance_terrain_left_state(&mut state.left, data);
-    let (offset, word) = if state.left.data_byte & 0x80 == 0 {
+    let (offset, word) = if state.left.data_byte & TERRAIN_PATTERN_HIGH_BIT == 0 {
         state.left_offset = state.left_offset.wrapping_sub(1);
         (state.left_offset, TERRAIN_WORD_7007)
     } else {
@@ -304,10 +337,10 @@ fn initialize_right_terrain_state(data: &[u8; TERRAIN_TDATA_BYTES]) -> (TerrainB
         data_index: 0,
         data_pointer: TERRAIN_PATTERN_STREAM_BASE,
         data_byte: data[0],
-        bit_counter: 7,
+        bit_counter: TERRAIN_BIT_COUNTER_MAX,
     };
-    let mut offset = 0xE0;
-    for _ in 0..0x0400 {
+    let mut offset = TERRAIN_INITIAL_ALTITUDE_OFFSET;
+    for _ in 0..TERRAIN_RIGHT_PRIME_STEPS {
         offset = terrain_altitude_step(offset, state.data_byte);
         advance_terrain_right_state(&mut state, data);
         offset = terrain_altitude_step(offset, state.data_byte);
@@ -317,7 +350,7 @@ fn initialize_right_terrain_state(data: &[u8; TERRAIN_TDATA_BYTES]) -> (TerrainB
 }
 
 fn terrain_altitude_step(offset: u8, data_byte: u8) -> u8 {
-    if data_byte & 0x80 != 0 {
+    if data_byte & TERRAIN_PATTERN_HIGH_BIT != 0 {
         offset.wrapping_sub(1)
     } else {
         offset.wrapping_add(1)
@@ -332,11 +365,11 @@ fn advance_terrain_right_state(
         state.data_index = (state.data_index + 1) % data.len();
         state.data_pointer = TERRAIN_PATTERN_STREAM_BASE
             .wrapping_add(u16::try_from(state.data_index).expect("TDATA index fits in u16"));
-        state.bit_counter = 7;
+        state.bit_counter = TERRAIN_BIT_COUNTER_MAX;
         state.data_byte = data[state.data_index];
     } else {
         state.bit_counter -= 1;
-        let carry = u8::from(state.data_byte & 0x80 != 0);
+        let carry = u8::from(state.data_byte & TERRAIN_PATTERN_HIGH_BIT != 0);
         state.data_byte = state.data_byte.wrapping_shl(1).wrapping_add(carry);
     }
 }
@@ -345,7 +378,7 @@ fn advance_terrain_left_state(
     state: &mut TerrainBitState,
     data: &[u8; TERRAIN_TDATA_BYTES],
 ) {
-    if state.bit_counter == 7 {
+    if state.bit_counter == TERRAIN_BIT_COUNTER_MAX {
         state.data_index = if state.data_index == 0 {
             data.len() - 1
         } else {
@@ -362,7 +395,11 @@ fn advance_terrain_left_state(
 }
 
 fn rotate_terrain_right_byte(data_byte: u8) -> u8 {
-    (data_byte >> 1).wrapping_add(if data_byte & 1 == 0 { 0 } else { 0x80 })
+    (data_byte >> 1).wrapping_add(if data_byte & 1 == 0 {
+        0
+    } else {
+        TERRAIN_PATTERN_HIGH_BIT
+    })
 }
 
 fn terrain_pattern_bytes() -> &'static [u8; TERRAIN_TDATA_BYTES] {
@@ -398,7 +435,7 @@ fn sprite_asset_pixels(spec: SpriteAssetImageSpec) -> Vec<SpriteAssetPixel> {
                     tint,
                 });
             }
-            if let Some(tint) = sprite_asset_nibble_tint(value & 0x0F) {
+            if let Some(tint) = sprite_asset_nibble_tint(value & LOW_NIBBLE_MASK) {
                 pixels.push(SpriteAssetPixel {
                     x: (column * 2 + 1) as u8,
                     y: row as u8,
@@ -412,12 +449,12 @@ fn sprite_asset_pixels(spec: SpriteAssetImageSpec) -> Vec<SpriteAssetPixel> {
 
 fn sprite_asset_nibble_tint(index: u8) -> Option<Color> {
     match index {
-        0x0 => None,
-        0x1 | 0xA | 0xC | 0xD | 0xE | 0xF => Some(Color::WHITE),
-        0x2..=0x9 => Some(williams_color_byte_tint(
+        SPRITE_TRANSPARENT_PALETTE_NIBBLE => None,
+        index if SPRITE_WHITE_PALETTE_NIBBLES.contains(&index) => Some(Color::WHITE),
+        SPRITE_WILLIAMS_COLOR_NIBBLE_MIN..=SPRITE_WILLIAMS_COLOR_NIBBLE_MAX => Some(williams_color_byte_tint(
             NORMAL_PALETTE_BYTES[usize::from(index)],
         )),
-        0xB => Some(Color::from_rgba(170, 170, 186, 0xFF)),
+        SPRITE_GRAY_PALETTE_NIBBLE => Some(SPRITE_GRAY_TINT),
         _ => None,
     }
 }
@@ -469,7 +506,9 @@ pub(crate) fn push_scanner_radar_sprites(scene: &mut RenderScene, scanner: &Scan
         push_scanner_byte_pixels(
             scene,
             SpriteId::SCANNER_PLAYER_BLIP,
-            player_blip.screen_cell.wrapping_sub(0x00FF),
+            player_blip
+                .screen_cell
+                .wrapping_sub(SCANNER_PLAYER_UPPER_CELL_DELTA),
             player_blip.upper_byte,
         );
     }
@@ -480,7 +519,11 @@ fn push_scanner_terrain_sprites(scene: &mut RenderScene, scan_left: u16) {
         let origin = screen_position_from_cell(record.screen_cell);
         for (row, byte) in record.word.to_be_bytes().into_iter().enumerate() {
             for column in 0..2 {
-                let nibble = if column == 0 { byte >> 4 } else { byte & 0x0F };
+                let nibble = if column == 0 {
+                    byte >> 4
+                } else {
+                    byte & LOW_NIBBLE_MASK
+                };
                 if nibble == 0 {
                     continue;
                 }
@@ -514,7 +557,7 @@ fn push_scanner_byte_pixels(
     byte: u8,
 ) {
     let base = screen_position_from_cell(screen_cell);
-    for (x_offset, palette_index) in [(0.0, byte >> 4), (1.0, byte & 0x0F)] {
+    for (x_offset, palette_index) in [(0.0, byte >> 4), (1.0, byte & LOW_NIBBLE_MASK)] {
         let tint = video_palette_index_tint(palette_index);
         if tint.rgba[3] == 0 {
             continue;
@@ -723,7 +766,7 @@ pub(crate) fn explosion_render_scale(size: u16) -> Option<u16> {
 }
 
 pub(crate) fn explosion_growth_scale(size: u16) -> Option<u8> {
-    let high = size.to_be_bytes()[0] & 0x7F;
+    let high = size.to_be_bytes()[0] & EXPANDED_OBJECT_SCALE_MASK;
     if high == 0 || high > EXPLOSION_KILL_SIZE_HIGH {
         return None;
     }
@@ -731,10 +774,10 @@ pub(crate) fn explosion_growth_scale(size: u16) -> Option<u8> {
 }
 
 fn appearance_growth_scale(size: u16) -> Option<u8> {
-    if size & 0x8000 == 0 {
+    if size & APPEARANCE_GROWTH_ACTIVE_BIT == 0 {
         return None;
     }
-    let scale = size.to_be_bytes()[0] & 0x7F;
+    let scale = size.to_be_bytes()[0] & EXPANDED_OBJECT_SCALE_MASK;
     (scale > 0).then_some(scale)
 }
 

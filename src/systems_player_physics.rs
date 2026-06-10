@@ -20,6 +20,21 @@ const PLAYER_RIGHT_ANCHOR_X: u8 = 0x20;
 const PLAYER_LEFT_ANCHOR_X: u8 = 0x70;
 const PLAYER_ACCELERATION: i16 = 0x0300;
 const HORIZONTAL_VELOCITY_LIMIT: u16 = 0x0100;
+const BYTE_MASK: u32 = 0xFF;
+const BYTE_SIGN_BIT: u8 = 0x80;
+const WORD_SIGN_BIT: u16 = 0x8000;
+const NEGATIVE_SIGN_EXTENSION_BYTE: u8 = 0xFF;
+const POSITIVE_SIGN_EXTENSION_BYTE: u8 = 0x00;
+const CAMERA_SCROLL_WORLD_STEP: u16 = 0x0100;
+const CAMERA_SCROLL_RIGHT_DELTA: u16 = 0x0040;
+const CAMERA_SCROLL_LEFT_DELTA: u16 = 0xFFC0;
+const CAMERA_LEFT_SCROLL_THRESHOLD: u16 = 0xFF00;
+const PLAYER_WORLD_X_ALIGNMENT_MASK: u16 = 0xFFE0;
+const PLAYER_UP_INITIAL_VELOCITY: u16 = 0xFF00;
+const PLAYER_UP_VELOCITY_LIMIT: u16 = 0xFE00;
+const PLAYER_DOWN_INITIAL_VELOCITY: u16 = 0x0100;
+const PLAYER_DOWN_VELOCITY_LIMIT: u16 = 0x0200;
+const PLAYER_VERTICAL_ACCELERATION_STEP: u16 = 8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Fixed24 {
@@ -53,9 +68,9 @@ impl Fixed24 {
     fn to_bytes(self) -> [u8; 3] {
         let raw = (self.value & Self::MASK) as u32;
         [
-            ((raw >> 16) & 0xFF) as u8,
-            ((raw >> 8) & 0xFF) as u8,
-            (raw & 0xFF) as u8,
+            ((raw >> 16) & BYTE_MASK) as u8,
+            ((raw >> 8) & BYTE_MASK) as u8,
+            (raw & BYTE_MASK) as u8,
         ]
     }
 
@@ -66,10 +81,10 @@ impl Fixed24 {
     fn damped(self) -> Self {
         let [high, middle, low] = self.to_bytes();
         let negated_high_word = (!u16::from_be_bytes([high, middle])).wrapping_add(1);
-        let sign_extension: u8 = if negated_high_word & 0x8000 == 0 {
-            0x00
+        let sign_extension: u8 = if negated_high_word & WORD_SIGN_BIT == 0 {
+            POSITIVE_SIGN_EXTENSION_BYTE
         } else {
-            0xFF
+            NEGATIVE_SIGN_EXTENSION_BYTE
         };
         let shifted = negated_high_word.wrapping_shl(2);
         let (middle_low, carry) = u16::from_be_bytes([middle, low]).overflowing_add(shifted);
@@ -99,12 +114,12 @@ impl Fixed24 {
         let [mut high, mut middle, _] = self.to_bytes();
         for _ in 0..2 {
             let carry = high & 1;
-            high = (high >> 1) | (high & 0x80);
+            high = (high >> 1) | (high & BYTE_SIGN_BIT);
             middle = (middle >> 1) | (carry << 7);
         }
 
         let carry = middle & 1;
-        middle = (middle >> 1) | (middle & 0x80);
+        middle = (middle >> 1) | (middle & BYTE_SIGN_BIT);
         let mut offset_high = middle;
         let mut offset_low = carry << 7;
         let anchor = match direction {
@@ -112,8 +127,8 @@ impl Fixed24 {
             Direction::Right => PLAYER_RIGHT_ANCHOR_X,
         };
         let moving_with_direction = match direction {
-            Direction::Left => offset_high & 0x80 != 0,
-            Direction::Right => offset_high & 0x80 == 0,
+            Direction::Left => offset_high & BYTE_SIGN_BIT != 0,
+            Direction::Right => offset_high & BYTE_SIGN_BIT == 0,
         };
         if !moving_with_direction {
             offset_high = 0;
@@ -154,15 +169,21 @@ fn scroll_adjusted_x(previous_x: u16, calculated_x: u16) -> (u16, u16) {
     }
 
     if calculated_x >= previous_x {
-        if delta <= 0x0100 {
+        if delta <= CAMERA_SCROLL_WORLD_STEP {
             (calculated_x, 0)
         } else {
-            (previous_x.wrapping_add(0x0100), 0x0040)
+            (
+                previous_x.wrapping_add(CAMERA_SCROLL_WORLD_STEP),
+                CAMERA_SCROLL_RIGHT_DELTA,
+            )
         }
-    } else if signed_word_greater_than(delta, 0xFF00) {
+    } else if signed_word_greater_than(delta, CAMERA_LEFT_SCROLL_THRESHOLD) {
         (calculated_x, 0)
     } else {
-        (previous_x.wrapping_sub(0x0100), 0xFFC0)
+        (
+            previous_x.wrapping_sub(CAMERA_SCROLL_WORLD_STEP),
+            CAMERA_SCROLL_LEFT_DELTA,
+        )
     }
 }
 
@@ -178,7 +199,7 @@ fn clamp_camera_velocity_word(value: u16) -> u16 {
 
 fn player_world_x(screen_x: u16, camera_left: u16) -> u16 {
     let mut shifted = screen_x >> 2;
-    shifted &= 0xFFE0;
+    shifted &= PLAYER_WORLD_X_ALIGNMENT_MASK;
     shifted.wrapping_add(camera_left)
 }
 
@@ -193,14 +214,14 @@ fn next_vertical_velocity(
             if screen_y <= PLAYER_MIN_SCREEN_Y + 1 {
                 return None;
             }
-            if current_velocity & 0x8000 == 0 {
-                Some(0xFF00)
+            if current_velocity & WORD_SIGN_BIT == 0 {
+                Some(PLAYER_UP_INITIAL_VELOCITY)
             } else {
-                let candidate = current_velocity.wrapping_sub(8);
-                if signed_word_greater_or_equal(candidate, 0xFE00) {
+                let candidate = current_velocity.wrapping_sub(PLAYER_VERTICAL_ACCELERATION_STEP);
+                if signed_word_greater_or_equal(candidate, PLAYER_UP_VELOCITY_LIMIT) {
                     Some(candidate)
                 } else {
-                    Some(0xFE00)
+                    Some(PLAYER_UP_VELOCITY_LIMIT)
                 }
             }
         }
@@ -209,13 +230,13 @@ fn next_vertical_velocity(
                 return None;
             }
             if signed_word_less_or_equal(current_velocity, 0) {
-                Some(0x0100)
+                Some(PLAYER_DOWN_INITIAL_VELOCITY)
             } else {
-                let candidate = current_velocity.wrapping_add(8);
-                if candidate <= 0x0200 {
+                let candidate = current_velocity.wrapping_add(PLAYER_VERTICAL_ACCELERATION_STEP);
+                if candidate <= PLAYER_DOWN_VELOCITY_LIMIT {
                     Some(candidate)
                 } else {
-                    Some(0x0200)
+                    Some(PLAYER_DOWN_VELOCITY_LIMIT)
                 }
             }
         }

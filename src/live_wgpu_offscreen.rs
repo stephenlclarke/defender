@@ -1,4 +1,13 @@
 #[cfg(all(not(test), not(coverage)))]
+const RGBA_BYTES_PER_PIXEL: usize = 4;
+#[cfg(all(not(test), not(coverage)))]
+const TRANSPARENT_BLACK_RGBA: [u8; RGBA_BYTES_PER_PIXEL] = [0; RGBA_BYTES_PER_PIXEL];
+#[cfg(all(not(test), not(coverage)))]
+const FNV1A_64_OFFSET_BASIS: u64 = 0xCBF2_9CE4_8422_2325;
+#[cfg(all(not(test), not(coverage)))]
+const FNV1A_64_PRIME: u64 = 0x0000_0100_0000_01B3;
+
+#[cfg(all(not(test), not(coverage)))]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct OffscreenWgpuSmokeReport {
     frames: u32,
@@ -222,7 +231,7 @@ impl OffscreenReadbackLayout {
     fn for_surface(surface: SurfaceSize) -> anyhow::Result<Self> {
         let unpadded_bytes_per_row = surface
             .width
-            .checked_mul(4)
+            .checked_mul(RGBA_BYTES_PER_PIXEL as u32)
             .context("clean offscreen readback row byte length overflow")?;
         let padded_bytes_per_row = align_copy_bytes_per_row(unpadded_bytes_per_row);
         let buffer_size = u64::from(padded_bytes_per_row)
@@ -259,17 +268,19 @@ fn align_copy_bytes_per_row(bytes_per_row: u32) -> u32 {
 
 #[cfg(all(not(test), not(coverage)))]
 fn rendered_rgba_is_non_blank(pixels: &[u8]) -> bool {
-    pixels.chunks_exact(4).any(|pixel| pixel != [0, 0, 0, 0])
+    pixels
+        .chunks_exact(RGBA_BYTES_PER_PIXEL)
+        .any(|pixel| pixel != TRANSPARENT_BLACK_RGBA)
 }
 
 #[cfg(all(not(test), not(coverage)))]
 fn rendered_rgba_signature(surface: SurfaceSize, pixels: &[u8]) -> u64 {
-    let mut signature = 0xCBF2_9CE4_8422_2325_u64;
+    let mut signature = FNV1A_64_OFFSET_BASIS;
     signature = fnv1a_mix_u64(signature, u64::from(surface.width));
     signature = fnv1a_mix_u64(signature, u64::from(surface.height));
     for byte in pixels {
         signature ^= u64::from(*byte);
-        signature = signature.wrapping_mul(0x0000_0100_0000_01B3);
+        signature = signature.wrapping_mul(FNV1A_64_PRIME);
     }
     signature
 }
@@ -278,7 +289,7 @@ fn rendered_rgba_signature(surface: SurfaceSize, pixels: &[u8]) -> u64 {
 fn fnv1a_mix_u64(mut signature: u64, value: u64) -> u64 {
     for byte in value.to_le_bytes() {
         signature ^= u64::from(byte);
-        signature = signature.wrapping_mul(0x0000_0100_0000_01B3);
+        signature = signature.wrapping_mul(FNV1A_64_PRIME);
     }
     signature
 }

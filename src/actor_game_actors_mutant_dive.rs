@@ -1,3 +1,41 @@
+const MUTANT_DIVE_PATH_Y_VELOCITY: u16 = 0x0090;
+const MUTANT_DIVE_ENTRY_SHOT_MAX_X: i16 = 0x04;
+const MUTANT_DIVE_ENTRY_SHOT_MAX_Y: i16 = 0x60;
+const MUTANT_DIVE_SUPPRESSED_FIRST_SHOT_WORLD_Y_MIN: u16 = 0x4000;
+const MUTANT_DIVE_SUPPRESSED_FIRST_SHOT_WORLD_Y_MAX: u16 = 0x4FFF;
+const MUTANT_DIVE_SUPPRESSED_SECOND_SHOT_WORLD_Y_MIN: u16 = 0x9000;
+const MUTANT_DIVE_SUPPRESSED_SECOND_SHOT_WORLD_Y_MAX: u16 = 0x9FFF;
+const MUTANT_DIVE_VISUAL_X_VELOCITY: u16 = 0x0030;
+const MUTANT_DIVE_PENDING_SHOT_TIMER_THRESHOLD: u8 = 0x80;
+const MUTANT_DIVE_COLLISION_PENDING_WORLD_Y_MIN: u16 = 0x9000;
+const MUTANT_DIVE_ENTRY_SHOT_SCREEN: Point = Point::new(0x13, 0x46);
+const MUTANT_DIVE_FIRST_PATH_SHOT_SCREEN: Point = Point::new(0x1E, 0x70);
+const MUTANT_DIVE_SECOND_PATH_SHOT_SCREEN: Point = Point::new(0x21, 0x87);
+const MUTANT_DIVE_FORCED_FIRST_PROJECTILE: MutantDiveExactProjectile = MutantDiveExactProjectile {
+    position: Point::new(0x1E, 0x54),
+    x_fraction: 0x33,
+    y_fraction: 0x56,
+    x_velocity: 0xFFE0,
+    y_velocity: 0x0138,
+};
+const MUTANT_DIVE_FORCED_SECOND_PROJECTILE: MutantDiveExactProjectile =
+    MutantDiveExactProjectile {
+        position: Point::new(0x21, 0x7F),
+        x_fraction: 0x6F,
+        y_fraction: 0xE1,
+        x_velocity: 0xFFF0,
+        y_velocity: 0x00C0,
+    };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct MutantDiveExactProjectile {
+    position: Point,
+    x_fraction: u8,
+    y_fraction: u8,
+    x_velocity: u16,
+    y_velocity: u16,
+}
+
 fn mutant_dive_arcade_conversion_x_correction(
     lander_runtime: LanderArcadeState,
 ) -> Option<u16> {
@@ -13,7 +51,7 @@ fn mutant_dive_has_conversion_correction(
 
 fn mutant_dive_uses_path_projection(arcade_state: MutantArcadeState) -> bool {
     mutant_dive_has_conversion_correction(arcade_state)
-        && arcade_state.y_velocity == 0x0090
+        && arcade_state.y_velocity == MUTANT_DIVE_PATH_Y_VELOCITY
 }
 
 fn mutant_dive_defers_first_shot(
@@ -22,8 +60,8 @@ fn mutant_dive_defers_first_shot(
 ) -> bool {
     mutant_dive_has_conversion_correction(arcade_state)
         && !arcade_state.dive_entry_shot_deferred
-        && position.x <= 0x04
-        && position.y <= 0x60
+        && position.x <= MUTANT_DIVE_ENTRY_SHOT_MAX_X
+        && position.y <= MUTANT_DIVE_ENTRY_SHOT_MAX_Y
 }
 
 fn mutant_dive_fires_visible_entry_shot(
@@ -35,8 +73,8 @@ fn mutant_dive_fires_visible_entry_shot(
         && !arcade_state.dive_entry_shot_deferred
         && arcade_state.shot_timer == MUTANT_DIVE_DEFERRED_SHOT_TIMER
         && arcade_state.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS
-        && position.x <= 0x04
-        && position.y <= 0x60
+        && position.x <= MUTANT_DIVE_ENTRY_SHOT_MAX_X
+        && position.y <= MUTANT_DIVE_ENTRY_SHOT_MAX_Y
         && player_position.y <= FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y
 }
 
@@ -50,7 +88,12 @@ fn mutant_dive_suppresses_regular_shot(
 
     let (_, world_y_word) =
         arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction);
-    (0x4000..=0x4FFF).contains(&world_y_word) || (0x9000..=0x9FFF).contains(&world_y_word)
+    (MUTANT_DIVE_SUPPRESSED_FIRST_SHOT_WORLD_Y_MIN
+        ..=MUTANT_DIVE_SUPPRESSED_FIRST_SHOT_WORLD_Y_MAX)
+        .contains(&world_y_word)
+        || (MUTANT_DIVE_SUPPRESSED_SECOND_SHOT_WORLD_Y_MIN
+            ..=MUTANT_DIVE_SUPPRESSED_SECOND_SHOT_WORLD_Y_MAX)
+            .contains(&world_y_word)
 }
 
 fn mutant_dive_fires_path_shot(
@@ -313,7 +356,7 @@ fn mutant_dive_visual_position(
     arcade_state: MutantArcadeState,
 ) -> Option<Point> {
     if !mutant_dive_has_conversion_correction(arcade_state)
-        || arcade_state.x_velocity != 0x0030
+        || arcade_state.x_velocity != MUTANT_DIVE_VISUAL_X_VELOCITY
     {
         return None;
     }
@@ -371,8 +414,9 @@ fn mutant_dive_collision_window_pending(
 
     let (_, world_y_word) =
         arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction);
-    arcade_state.shot_timer >= 0x80
-        && (0x9000..MUTANT_DIVE_COLLISION_WORLD_Y_MIN).contains(&world_y_word)
+    arcade_state.shot_timer >= MUTANT_DIVE_PENDING_SHOT_TIMER_THRESHOLD
+        && (MUTANT_DIVE_COLLISION_PENDING_WORLD_Y_MIN..MUTANT_DIVE_COLLISION_WORLD_Y_MIN)
+            .contains(&world_y_word)
 }
 
 fn mutant_dive_uses_collision_projection(
@@ -388,7 +432,7 @@ fn mutant_dive_uses_collision_projection(
 
     let (_, world_y_word) =
         arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction);
-    arcade_state.shot_timer >= 0x80
+    arcade_state.shot_timer >= MUTANT_DIVE_PENDING_SHOT_TIMER_THRESHOLD
         && (MUTANT_DIVE_COLLISION_WORLD_Y_MIN
             ..MUTANT_DIVE_COLLISION_WORLD_Y_MAX)
             .contains(&world_y_word)
@@ -428,9 +472,9 @@ fn mutant_dive_shot_position(
     }
 
     match arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction) {
-        MUTANT_DIVE_ENTRY_WORLD_WORDS => Point::new(0x13, 0x46),
-        MUTANT_DIVE_FIRST_SHOT_WORLD_WORDS => Point::new(0x1E, 0x70),
-        MUTANT_DIVE_SECOND_SHOT_WORLD_WORDS => Point::new(0x21, 0x87),
+        MUTANT_DIVE_ENTRY_WORLD_WORDS => MUTANT_DIVE_ENTRY_SHOT_SCREEN,
+        MUTANT_DIVE_FIRST_SHOT_WORLD_WORDS => MUTANT_DIVE_FIRST_PATH_SHOT_SCREEN,
+        MUTANT_DIVE_SECOND_SHOT_WORLD_WORDS => MUTANT_DIVE_SECOND_PATH_SHOT_SCREEN,
         _ => mutant_dive_path_position(position, arcade_state).unwrap_or(position),
     }
 }
@@ -452,11 +496,7 @@ fn mutant_dive_forced_shot(
             if arcade_state.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS =>
         {
             Some(mutant_dive_exact_projectile(
-                Point::new(0x1E, 0x54),
-                0x33,
-                0x56,
-                0xFFE0,
-                0x0138,
+                MUTANT_DIVE_FORCED_FIRST_PROJECTILE,
                 behavior,
             ))
         }
@@ -464,11 +504,7 @@ fn mutant_dive_forced_shot(
             if arcade_state.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS =>
         {
             Some(mutant_dive_exact_projectile(
-                Point::new(0x21, 0x7F),
-                0x6F,
-                0xE1,
-                0xFFF0,
-                0x00C0,
+                MUTANT_DIVE_FORCED_SECOND_PROJECTILE,
                 behavior,
             ))
         }
@@ -477,25 +513,20 @@ fn mutant_dive_forced_shot(
 }
 
 fn mutant_dive_exact_projectile(
-    position: Point,
-    x_fraction: u8,
-    y_fraction: u8,
-    x_velocity: u16,
-    y_velocity: u16,
+    projectile: MutantDiveExactProjectile,
     behavior: ActorBehaviorProfile,
 ) -> (Point, Velocity, EnemyProjectileArcadeState) {
     (
-        position,
-        arcade_screen_velocity(x_velocity, y_velocity),
+        projectile.position,
+        arcade_screen_velocity(projectile.x_velocity, projectile.y_velocity),
         EnemyProjectileArcadeState {
-            x_fraction,
-            y_fraction,
-            x_velocity,
-            y_velocity,
+            x_fraction: projectile.x_fraction,
+            y_fraction: projectile.y_fraction,
+            x_velocity: projectile.x_velocity,
+            y_velocity: projectile.y_velocity,
             lifetime_ticks: arcade_projectile_lifetime_ticks(
                 behavior.mutant_shot_lifetime_steps,
             ),
         },
     )
 }
-
