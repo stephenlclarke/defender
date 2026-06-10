@@ -23,7 +23,7 @@ mod tests {
     fn live_smoke_report_formats_current_cli_output() {
         let report = LiveSmokeReport {
             render_path: "actor_game",
-            legacy_presenter_used: false,
+            fallback_presenter_used: false,
             window_created: false,
             rendered_frames: 3,
             first_frame_size: Some((640, 480)),
@@ -59,7 +59,7 @@ mod tests {
             concat!(
                 "wgpu live smoke passed\n",
                 "  render_path: actor_game\n",
-                "  legacy_presenter_used: false\n",
+                "  fallback_presenter_used: false\n",
                 "  window_created: false\n",
                 "  rendered_frames: 3\n",
                 "  first_frame_size: 640x480\n",
@@ -91,7 +91,7 @@ mod tests {
         let report = run_smoke(super::LiveInputProfile::Test, None).expect("actor live smoke");
 
         assert_eq!(report.render_path, "actor_game");
-        assert!(!report.legacy_presenter_used);
+        assert!(!report.fallback_presenter_used);
         assert!(!report.window_created);
         assert_eq!(report.clean_game_frames, 0);
         assert_eq!(report.actor_frames, report.rendered_frames);
@@ -110,7 +110,7 @@ mod tests {
         let report = run_actor_wgpu_smoke().expect("actor wgpu smoke");
 
         assert_eq!(report.render_path, "actor_game");
-        assert!(!report.legacy_presenter_used);
+        assert!(!report.fallback_presenter_used);
         assert!(!report.window_created);
         assert_eq!(report.clean_game_frames, 0);
         assert_eq!(report.actor_frames, report.rendered_frames);
