@@ -207,9 +207,9 @@ pub struct ProjectileMotionStep {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ProjectileMotionSystem;
 
-const PLAYER_LASER_COLUMNS_PER_STEP: i8 = 4; // original: SOURCE_LASER_STEP_COLUMNS
-const SCREEN_RIGHT_EDGE_X: u8 = u8::MAX; // original: SOURCE_RIGHT_LASER_EDGE_X
-const SCREEN_LEFT_EDGE_X: u8 = 0x00; // original: SOURCE_LEFT_LASER_EDGE_X
+const PLAYER_LASER_COLUMNS_PER_STEP: i8 = 4;
+const SCREEN_RIGHT_EDGE_X: u8 = u8::MAX;
+const SCREEN_LEFT_EDGE_X: u8 = 0x00;
 
 impl ProjectileMotionSystem {
     pub const fn velocity_for_direction(direction: Direction) -> ScreenVelocity {

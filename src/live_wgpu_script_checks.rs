@@ -668,12 +668,12 @@ fn actor_script_check_actor_samples(
         .filter(|snapshot| snapshot.alive)
         .filter_map(|snapshot| {
             actor_script_check_actor_subpixels(snapshot).map(
-                |(x_subpixel, y_subpixel)| ActorScriptCheckActorSample {
+                |(reference_x_fraction, reference_y_fraction)| ActorScriptCheckActorSample {
                     kind: actor_script_check_actor_kind_label(snapshot.kind).to_string(),
                     x: snapshot.position.x,
                     y: snapshot.position.y,
-                    x_subpixel,
-                    y_subpixel,
+                    reference_x_fraction,
+                    reference_y_fraction,
                 },
             )
         })
@@ -685,27 +685,15 @@ fn actor_script_check_actor_subpixels(
     snapshot: &crate::actor_game::ActorSnapshot,
 ) -> Option<(u8, u8)> {
     match snapshot.kind {
-        ActorKind::Lander => snapshot
-            .runtime.as_lander()
-            .map(|runtime_state| (runtime_state.x_fraction, runtime_state.y_fraction)),
-        ActorKind::Mutant => snapshot
-            .runtime.as_mutant()
-            .map(|runtime_state| (runtime_state.x_fraction, runtime_state.y_fraction)),
-        ActorKind::Bomber => snapshot
-            .runtime.as_bomber()
-            .map(|runtime_state| (runtime_state.x_fraction, runtime_state.y_fraction)),
-        ActorKind::Pod => snapshot
-            .runtime.as_pod()
-            .map(|runtime_state| (runtime_state.x_fraction, runtime_state.y_fraction)),
-        ActorKind::Swarmer => snapshot
-            .runtime.as_swarmer()
-            .map(|runtime_state| (runtime_state.x_fraction, runtime_state.y_fraction)),
-        ActorKind::Baiter => snapshot
-            .runtime.as_baiter()
-            .map(|runtime_state| (runtime_state.x_fraction, runtime_state.y_fraction)),
-        ActorKind::Human => snapshot
-            .runtime.as_human()
-            .map(|runtime_state| (runtime_state.x_fraction, runtime_state.y_fraction)),
+        ActorKind::Lander
+        | ActorKind::Mutant
+        | ActorKind::Bomber
+        | ActorKind::Pod
+        | ActorKind::Swarmer
+        | ActorKind::Baiter
+        | ActorKind::Human => snapshot
+            .reference_subpixels()
+            .map(|subpixels| (subpixels.x, subpixels.y)),
         _ => None,
     }
 }
@@ -732,7 +720,7 @@ fn actor_script_check_enemy_projectile_samples(
         .iter()
         .filter(|snapshot| snapshot.alive)
         .filter_map(|snapshot| {
-            let runtime_state = snapshot.runtime.as_enemy_projectile()?;
+            let reference_state = snapshot.enemy_projectile_reference_state()?;
             let kind = match snapshot.kind {
                 ActorKind::EnemyLaser => "enemy_laser",
                 ActorKind::Bomb => "bomb",
@@ -742,11 +730,11 @@ fn actor_script_check_enemy_projectile_samples(
                 kind: kind.to_string(),
                 x: snapshot.position.x,
                 y: snapshot.position.y,
-                x_subpixel: runtime_state.x_fraction,
-                y_subpixel: runtime_state.y_fraction,
-                x_velocity_word: runtime_state.x_velocity,
-                y_velocity_word: runtime_state.y_velocity,
-                lifetime_ticks: runtime_state.lifetime_ticks,
+                reference_x_fraction: reference_state.x_fraction,
+                reference_y_fraction: reference_state.y_fraction,
+                reference_x_velocity: reference_state.x_velocity,
+                reference_y_velocity: reference_state.y_velocity,
+                lifetime_ticks: reference_state.lifetime_ticks,
             })
         })
         .take(ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_LIMIT)
@@ -764,29 +752,29 @@ fn actor_script_check_projectile_spawn_command_samples(
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position,
                 velocity,
-                runtime_state,
-            }) => Some(("enemy_laser", *position, *velocity, *runtime_state)),
-            GameCommand::Spawn(SpawnRequest::Bomb { position, runtime_state }) => Some((
+                reference_state,
+            }) => Some(("enemy_laser", *position, *velocity, *reference_state)),
+            GameCommand::Spawn(SpawnRequest::Bomb { position, reference_state }) => Some((
                 "bomb",
                 *position,
                 crate::actor_game::Velocity::default(),
-                *runtime_state,
+                *reference_state,
             )),
             _ => None,
         })
         .take(ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_LIMIT)
         .map(
-            |(kind, position, velocity, runtime_state)| ActorScriptCheckProjectileSpawnSample {
+            |(kind, position, velocity, reference_state)| ActorScriptCheckProjectileSpawnSample {
                 kind: kind.to_string(),
                 x: position.x,
                 y: position.y,
                 velocity_dx: velocity.dx,
                 velocity_dy: velocity.dy,
-                x_subpixel: runtime_state.map(|runtime_state| runtime_state.x_fraction),
-                y_subpixel: runtime_state.map(|runtime_state| runtime_state.y_fraction),
-                x_velocity_word: runtime_state.map(|runtime_state| runtime_state.x_velocity),
-                y_velocity_word: runtime_state.map(|runtime_state| runtime_state.y_velocity),
-                lifetime_ticks: runtime_state.map(|runtime_state| runtime_state.lifetime_ticks),
+                reference_x_fraction: reference_state.map(|reference_state| reference_state.x_fraction),
+                reference_y_fraction: reference_state.map(|reference_state| reference_state.y_fraction),
+                reference_x_velocity: reference_state.map(|reference_state| reference_state.x_velocity),
+                reference_y_velocity: reference_state.map(|reference_state| reference_state.y_velocity),
+                lifetime_ticks: reference_state.map(|reference_state| reference_state.lifetime_ticks),
             },
         )
         .collect()

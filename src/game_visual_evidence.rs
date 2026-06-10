@@ -776,9 +776,9 @@ fn reference_enemy_screen_position(
     enemy: EnemySnapshot,
     background_left: u16,
 ) -> Option<ScreenPosition> {
-    if let Some(mutant_runtime) = enemy.mutant_runtime {
-        let corrected_world_x_word = u16::from_be_bytes([enemy.position.x, mutant_runtime.x_fraction])
-            .wrapping_add(mutant_runtime.render_x_correction);
+    if let Some(mutant_reference_state) = enemy.mutant_reference_state {
+        let corrected_world_x_word = u16::from_be_bytes([enemy.position.x, mutant_reference_state.x_fraction])
+            .wrapping_add(mutant_reference_state.render_x_correction);
         let [x, x_fraction] = corrected_world_x_word.to_be_bytes();
         return reference_active_object_screen_position(
             ScreenPosition::new(x, enemy.position.y),
@@ -799,15 +799,15 @@ fn reference_enemy_screen_position(
 }
 
 fn reference_first_wave_mutant_uses_dive_projection(
-    mutant_runtime: MutantRuntimeSnapshot,
+    mutant_reference_state: MutantReferenceStateSnapshot,
 ) -> bool {
-    mutant_runtime.render_x_correction == FIRST_WAVE_MUTANT_DIVE_CONVERSION_X_CORRECTION
-        && mutant_runtime.y_velocity == FIRST_WAVE_MUTANT_DIVE_Y_VELOCITY
+    mutant_reference_state.render_x_correction == FIRST_WAVE_MUTANT_DIVE_CONVERSION_X_CORRECTION
+        && mutant_reference_state.y_velocity == FIRST_WAVE_MUTANT_DIVE_Y_VELOCITY
 }
 
 fn reference_enemy_uses_mutant_dive_projection(enemy: EnemySnapshot) -> bool {
     enemy
-        .mutant_runtime
+        .mutant_reference_state
         .is_some_and(reference_first_wave_mutant_uses_dive_projection)
 }
 
@@ -817,13 +817,13 @@ fn enemy_appearance_position(enemy: EnemySnapshot) -> ScreenPosition {
 
 fn enemy_reference_x_fraction(enemy: EnemySnapshot) -> Option<u8> {
     enemy
-        .lander_runtime
-        .map(|runtime_state| runtime_state.x_fraction)
-        .or_else(|| enemy.mutant_runtime.map(|runtime_state| runtime_state.x_fraction))
-        .or_else(|| enemy.bomber_runtime.map(|runtime_state| runtime_state.x_fraction))
-        .or_else(|| enemy.swarmer_runtime.map(|runtime_state| runtime_state.x_fraction))
-        .or_else(|| enemy.baiter_runtime.map(|runtime_state| runtime_state.x_fraction))
-        .or_else(|| enemy.pod_runtime.map(|runtime_state| runtime_state.x_fraction))
+        .lander_reference_state
+        .map(|reference_state| reference_state.x_fraction)
+        .or_else(|| enemy.mutant_reference_state.map(|reference_state| reference_state.x_fraction))
+        .or_else(|| enemy.bomber_reference_state.map(|reference_state| reference_state.x_fraction))
+        .or_else(|| enemy.swarmer_reference_state.map(|reference_state| reference_state.x_fraction))
+        .or_else(|| enemy.baiter_reference_state.map(|reference_state| reference_state.x_fraction))
+        .or_else(|| enemy.pod_reference_state.map(|reference_state| reference_state.x_fraction))
 }
 
 fn fixed_point_velocity_words(velocity: ScreenVelocity) -> (u16, u16) {

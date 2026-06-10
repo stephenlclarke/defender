@@ -206,11 +206,11 @@
     }
 
     #[test]
-    fn runtime_lander_abduction_spawns_mutant_runtime_state() {
+    fn runtime_lander_abduction_spawns_mutant_reference_state() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 1;
-        let lander_runtime = LanderRuntimeState {
+        let lander_reference_state = LanderReferenceState {
             x_fraction: 0x12,
             y_fraction: 0x34,
             x_velocity: 0,
@@ -222,22 +222,23 @@
         };
         driver.spawn_lander_from_spawn(ActorLanderSpawn {
             position: Point::new(100, HUMAN_GROUND_Y),
-            runtime_state: Some(lander_runtime),
+            reference_state: Some(lander_reference_state),
+            spawn_visibility: LanderSpawnVisibility::Normal,
         });
         driver.spawn_human_for_test(Point::new(100, HUMAN_GROUND_Y));
         driver.step(GameInput::NONE);
         driver.step(GameInput::NONE);
 
-        let (converted, mutant_runtime) = (0..120)
+        let (converted, mutant_reference_state) = (0..120)
             .filter_map(|_| {
                 let report = driver.step(GameInput::NONE);
                 report.commands.iter().find_map(|command| {
                     if let GameCommand::Spawn(SpawnRequest::Mutant {
-                        runtime_state: Some(mutant_runtime_state),
+                        reference_state: Some(mutant_reference_state),
                         ..
                     }) = command
                     {
-                        Some((report.clone(), *mutant_runtime_state))
+                        Some((report.clone(), *mutant_reference_state))
                     } else {
                         None
                     }
@@ -245,9 +246,9 @@
             })
             .next()
             .expect("runtime lander should spawn a mutant with runtime state");
-        let expected_runtime_state = MutantRuntimeState {
-            x_fraction: lander_runtime.x_fraction,
-            y_fraction: lander_runtime.y_fraction,
+        let expected_reference_state = MutantReferenceState {
+            x_fraction: lander_reference_state.x_fraction,
+            y_fraction: lander_reference_state.y_fraction,
             x_velocity: 0,
             y_velocity: 0,
             shot_timer: ActorWaveTuning::for_wave(converted.wave)
@@ -260,7 +261,7 @@
             render_x_correction: 0,
             dive_entry_shot_deferred: false,
         };
-        assert_eq!(mutant_runtime, expected_runtime_state);
+        assert_eq!(mutant_reference_state, expected_reference_state);
 
         let settled = driver.step(GameInput::NONE);
         let mutant = settled
@@ -268,7 +269,7 @@
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::Mutant)
             .expect("mutant with runtime state should become a live actor");
-        assert_eq!(mutant.runtime.as_mutant(), Some(expected_runtime_state));
+        assert_eq!(mutant.reference_state.as_mutant(), Some(expected_reference_state));
 
         let clean_state = settled.game_state();
         let clean_mutant = clean_state
@@ -278,17 +279,17 @@
             .find(|enemy| enemy.kind == CleanEnemyKind::Mutant)
             .expect("actor bridge should expose a clean mutant");
         assert_eq!(
-            clean_mutant.mutant_runtime,
-            Some(MutantRuntimeSnapshot {
-                x_fraction: expected_runtime_state.x_fraction,
-                y_fraction: expected_runtime_state.y_fraction,
-                x_velocity: expected_runtime_state.x_velocity,
-                y_velocity: expected_runtime_state.y_velocity,
-                shot_timer: expected_runtime_state.shot_timer,
-                sleep_ticks: expected_runtime_state.sleep_ticks,
-                hop_rng: clean_actor_rng(expected_runtime_state.hop_rng),
-                render_x_correction: expected_runtime_state.render_x_correction,
-                dive_entry_shot_deferred: expected_runtime_state.dive_entry_shot_deferred,
+            clean_mutant.mutant_reference_state,
+            Some(MutantReferenceStateSnapshot {
+                x_fraction: expected_reference_state.x_fraction,
+                y_fraction: expected_reference_state.y_fraction,
+                x_velocity: expected_reference_state.x_velocity,
+                y_velocity: expected_reference_state.y_velocity,
+                shot_timer: expected_reference_state.shot_timer,
+                sleep_ticks: expected_reference_state.sleep_ticks,
+                hop_rng: clean_actor_rng(expected_reference_state.hop_rng),
+                render_x_correction: expected_reference_state.render_x_correction,
+                dive_entry_shot_deferred: expected_reference_state.dive_entry_shot_deferred,
             })
         );
     }
@@ -300,7 +301,7 @@
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let runtime_state = MutantRuntimeState {
+        let reference_state = MutantReferenceState {
             x_fraction: 0x20,
             y_fraction: 0x40,
             x_velocity: 0,
@@ -318,11 +319,11 @@
         let start = Point::new(100, 80);
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: start,
-            runtime_state: Some(runtime_state),
+            reference_state: Some(reference_state),
         });
 
         let report = driver.step(GameInput::NONE);
-        let prompt = mutant_runtime_prompt_for_test(
+        let prompt = mutant_reference_state_prompt_for_test(
             report.step,
             report.wave,
             report
@@ -332,22 +333,22 @@
             Velocity::default(),
         );
         let behavior = ActorBehaviorProfile::default();
-        let (expected_position, expected_runtime_state, shot) =
-            expected_mutant_runtime_after_motion(start, runtime_state, mutant, &prompt, behavior);
+        let (expected_position, expected_reference_state, shot) =
+            expected_mutant_reference_state_after_motion(start, reference_state, mutant, &prompt, behavior);
 
         assert_eq!(shot, None);
         let snapshot = snapshot_for(&report, mutant);
         assert_eq!(snapshot.position, expected_position);
-        assert_eq!(snapshot.runtime.as_mutant(), Some(expected_runtime_state));
+        assert_eq!(snapshot.reference_state.as_mutant(), Some(expected_reference_state));
         assert_eq!(
-            expected_runtime_state.x_velocity,
+            expected_reference_state.x_velocity,
             mutant_x_velocity(
                 ActorWaveTuning::for_wave(1).mutant_x_velocity,
                 absolute_world_x(Point::new(42, 120), 0),
-                absolute_world_x(start, runtime_state.x_fraction),
+                absolute_world_x(start, reference_state.x_fraction),
             )
         );
-        assert_ne!(expected_runtime_state.hop_rng, runtime_state.hop_rng);
+        assert_ne!(expected_reference_state.hop_rng, reference_state.hop_rng);
     }
 
     #[test]
@@ -356,8 +357,7 @@
         let default_profile = ActorWaveTuning::for_wave(1);
         let mut custom_wave_tuning = default_profile;
         custom_wave_tuning.mutant_x_velocity = 0x48;
-        custom_wave_tuning.mutant_y_velocity_msb = 0x00;
-        custom_wave_tuning.mutant_y_velocity_lsb = 0x40;
+        custom_wave_tuning.mutant_y_velocity = 0x0040;
         custom_wave_tuning.mutant_random_y = 2;
         custom_wave_tuning.mutant_shot_time = 12;
         assert_ne!(
@@ -365,7 +365,7 @@
             default_profile.mutant_x_velocity
         );
 
-        let runtime_state = MutantRuntimeState {
+        let reference_state = MutantReferenceState {
             x_fraction: 0x20,
             y_fraction: 0x40,
             x_velocity: 0,
@@ -381,7 +381,7 @@
             dive_entry_shot_deferred: false,
         };
         let start = Point::new(100, 80);
-        let prompt = mutant_runtime_prompt_with_wave_tuning_for_test(
+        let prompt = mutant_reference_state_prompt_with_wave_tuning_for_test(
             12,
             1,
             custom_wave_tuning,
@@ -394,30 +394,30 @@
             Velocity::default(),
         );
         let behavior = ActorBehaviorProfile::default();
-        let (expected_position, expected_runtime_state, _shot) =
-            expected_mutant_runtime_after_motion(start, runtime_state, actor, &prompt, behavior);
+        let (expected_position, expected_reference_state, _shot) =
+            expected_mutant_reference_state_after_motion(start, reference_state, actor, &prompt, behavior);
         let default_x_velocity = mutant_x_velocity(
             default_profile.mutant_x_velocity,
             absolute_world_x(Point::new(42, 120), 0),
-            absolute_world_x(start, runtime_state.x_fraction),
+            absolute_world_x(start, reference_state.x_fraction),
         );
 
         let mut mutant = Mutant::from_spawn(
             actor,
             ActorMutantSpawn {
                 position: start,
-                runtime_state: Some(runtime_state),
+                reference_state: Some(reference_state),
             },
         );
         let reply = mutant.update(&prompt);
-        let updated_runtime_state = reply
+        let updated_reference_state = reply
             .snapshot
-            .runtime.as_mutant()
+            .reference_state.as_mutant()
             .expect("runtime mutant should keep runtime metadata");
 
-        assert_ne!(updated_runtime_state.x_velocity, default_x_velocity);
+        assert_ne!(updated_reference_state.x_velocity, default_x_velocity);
         assert_eq!(reply.snapshot.position, expected_position);
-        assert_eq!(updated_runtime_state, expected_runtime_state);
+        assert_eq!(updated_reference_state, expected_reference_state);
     }
 
     #[test]
@@ -428,7 +428,7 @@
             hseed: 0x44,
             lseed: 0x55,
         };
-        let lander_runtime = LanderRuntimeState {
+        let lander_reference_state = LanderReferenceState {
             x_fraction: 0x12,
             y_fraction: 0x34,
             x_velocity: 0,
@@ -439,22 +439,22 @@
             target_human_index: Some(6),
         };
 
-        let mutant_runtime =
-            MutantRuntimeState::from_lander_conversion(lander_runtime, profile, hop_rng);
+        let mutant_reference_state =
+            MutantReferenceState::from_lander_conversion(lander_reference_state, profile, hop_rng);
 
         assert_eq!(
-            mutant_runtime.render_x_correction,
+            mutant_reference_state.render_x_correction,
             MUTANT_DIVE_CONVERSION_X_CORRECTION
         );
-        assert_eq!(mutant_runtime.x_fraction, lander_runtime.x_fraction);
-        assert_eq!(mutant_runtime.y_fraction, lander_runtime.y_fraction);
+        assert_eq!(mutant_reference_state.x_fraction, lander_reference_state.x_fraction);
+        assert_eq!(mutant_reference_state.y_fraction, lander_reference_state.y_fraction);
 
-        let moving_lander = LanderRuntimeState {
+        let moving_lander = LanderReferenceState {
             x_velocity: 0x0030,
-            ..lander_runtime
+            ..lander_reference_state
         };
         assert_eq!(
-            MutantRuntimeState::from_lander_conversion(moving_lander, profile, hop_rng)
+            MutantReferenceState::from_lander_conversion(moving_lander, profile, hop_rng)
                 .render_x_correction,
             0
         );
@@ -467,7 +467,7 @@
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let runtime_state = MutantRuntimeState {
+        let reference_state = MutantReferenceState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -484,7 +484,7 @@
         };
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: Point::new(4, 0x50),
-            runtime_state: Some(runtime_state),
+            reference_state: Some(reference_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -492,15 +492,15 @@
         assert!(!report.sounds.contains(&SoundCue::MutantShot));
         assert!(first_enemy_laser_command(&report).is_none());
         let snapshot = snapshot_for(&report, mutant);
-        let updated_runtime_state = snapshot
-            .runtime.as_mutant()
+        let updated_reference_state = snapshot
+            .reference_state.as_mutant()
             .expect("mutant dive should keep runtime metadata");
-        assert!(updated_runtime_state.dive_entry_shot_deferred);
+        assert!(updated_reference_state.dive_entry_shot_deferred);
         assert_eq!(
-            updated_runtime_state.shot_timer,
+            updated_reference_state.shot_timer,
             MUTANT_DIVE_DEFERRED_SHOT_TIMER
         );
-        assert_eq!(updated_runtime_state.sleep_ticks, 0);
+        assert_eq!(updated_reference_state.sleep_ticks, 0);
     }
 
     #[test]
@@ -510,7 +510,7 @@
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let runtime_state = MutantRuntimeState {
+        let reference_state = MutantReferenceState {
             x_fraction: 0x7C,
             y_fraction: 0x80,
             x_velocity: 0x0030,
@@ -527,7 +527,7 @@
         };
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: Point::new(0x03, 0x33),
-            runtime_state: Some(runtime_state),
+            reference_state: Some(reference_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -536,18 +536,18 @@
 
         assert!(report.sounds.contains(&SoundCue::MutantShot));
         assert_eq!(shot.0, Point::new(0x13, 0x46));
-        assert_eq!(shot.2.x_fraction, runtime_state.x_fraction);
-        assert_eq!(shot.2.y_fraction, runtime_state.y_fraction);
+        assert_eq!(shot.2.x_fraction, reference_state.x_fraction);
+        assert_eq!(shot.2.y_fraction, reference_state.y_fraction);
         let snapshot = snapshot_for(&report, mutant);
-        let updated_runtime_state = snapshot
-            .runtime.as_mutant()
+        let updated_reference_state = snapshot
+            .reference_state.as_mutant()
             .expect("mutant dive should keep runtime metadata");
-        assert!(updated_runtime_state.dive_entry_shot_deferred);
+        assert!(updated_reference_state.dive_entry_shot_deferred);
         assert_eq!(
-            updated_runtime_state.shot_timer,
+            updated_reference_state.shot_timer,
             MUTANT_DIVE_DEFERRED_SHOT_TIMER
         );
-        assert_eq!(updated_runtime_state.sleep_ticks, MUTANT_LOOP_SLEEP_TICKS - 1);
+        assert_eq!(updated_reference_state.sleep_ticks, MUTANT_LOOP_SLEEP_TICKS - 1);
     }
 
     #[test]
@@ -557,7 +557,7 @@
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let runtime_state = MutantRuntimeState {
+        let reference_state = MutantReferenceState {
             x_fraction: 0x2C,
             y_fraction: 0x60,
             x_velocity: 0x0030,
@@ -574,7 +574,7 @@
         };
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: Point::new(0x08, 0x51),
-            runtime_state: Some(runtime_state),
+            reference_state: Some(reference_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -586,7 +586,7 @@
         assert_eq!(shot.1, screen_velocity_from_motion_words(0xFFE0, 0x0138));
         assert_eq!(
             shot.2,
-            EnemyProjectileRuntimeState {
+            EnemyProjectileReferenceState {
                 x_fraction: 0x33,
                 y_fraction: 0x56,
                 x_velocity: 0xFFE0,
@@ -595,20 +595,20 @@
             }
         );
         let snapshot = snapshot_for(&report, mutant);
-        let updated_runtime_state = snapshot
-            .runtime.as_mutant()
+        let updated_reference_state = snapshot
+            .reference_state.as_mutant()
             .expect("mutant dive should keep runtime metadata");
-        assert!(updated_runtime_state.dive_entry_shot_deferred);
+        assert!(updated_reference_state.dive_entry_shot_deferred);
         assert_eq!(
-            updated_runtime_state.shot_timer,
+            updated_reference_state.shot_timer,
             MUTANT_DIVE_COLLISION_PENDING_SHOT_TIMER
         );
-        assert_eq!(updated_runtime_state.sleep_ticks, MUTANT_LOOP_SLEEP_TICKS - 1);
+        assert_eq!(updated_reference_state.sleep_ticks, MUTANT_LOOP_SLEEP_TICKS - 1);
     }
 
     #[test]
     fn mutant_dive_reference_shot_position_uses_path_anchor_overrides() {
-        let runtime_state = MutantRuntimeState {
+        let reference_state = MutantReferenceState {
             x_fraction: 0x8C,
             y_fraction: 0xB0,
             x_velocity: 0,
@@ -625,16 +625,16 @@
         };
 
         assert_eq!(
-            mutant_dive_shot_position(Point::new(0x08, 0x61), runtime_state),
+            mutant_dive_shot_position(Point::new(0x08, 0x61), reference_state),
             Point::new(0x1E, 0x70)
         );
         assert_eq!(
             mutant_dive_shot_position(
                 Point::new(0x07, 0x78),
-                MutantRuntimeState {
+                MutantReferenceState {
                     x_fraction: 0xFC,
                     y_fraction: 0x00,
-                    ..runtime_state
+                    ..reference_state
                 },
             ),
             Point::new(0x21, 0x87)
@@ -642,10 +642,10 @@
         assert_eq!(
             mutant_dive_shot_position(
                 Point::new(0x03, 0x33),
-                MutantRuntimeState {
+                MutantReferenceState {
                     x_fraction: 0x7C,
                     y_fraction: 0x80,
-                    ..runtime_state
+                    ..reference_state
                 },
             ),
             Point::new(0x13, 0x46)
@@ -654,7 +654,7 @@
 
     #[test]
     fn mutant_dive_reference_collision_position_offsets_path_projection() {
-        let runtime_state = MutantRuntimeState {
+        let reference_state = MutantReferenceState {
             x_fraction: 0x8C,
             y_fraction: 0xB0,
             x_velocity: 0,
@@ -671,11 +671,11 @@
         };
 
         assert_eq!(
-            mutant_dive_scene_position(Point::new(0x08, 0x61), Some(runtime_state)),
+            mutant_dive_scene_position(Point::new(0x08, 0x61), Some(reference_state)),
             Point::new(0x1E, 0x71)
         );
         assert_eq!(
-            mutant_dive_collision_position(Point::new(0x08, 0x61), Some(runtime_state)),
+            mutant_dive_collision_position(Point::new(0x08, 0x61), Some(reference_state)),
             Point::new(0x1E, 0x72)
         );
     }
@@ -687,7 +687,7 @@
         let player_id = ActorId::new(100);
         let mutant_id = ActorId::new(101);
         let runtime_position = Point::new(0x08, 0x99);
-        let runtime_state = MutantRuntimeState {
+        let reference_state = MutantReferenceState {
             x_fraction: 0x5C,
             y_fraction: 0xE0,
             x_velocity: 0x0030,
@@ -703,7 +703,7 @@
             dive_entry_shot_deferred: true,
         };
         let collision_position =
-            mutant_dive_collision_position(runtime_position, Some(runtime_state));
+            mutant_dive_collision_position(runtime_position, Some(reference_state));
         driver.snapshots.insert(
             player_id,
             actor_snapshot_with_bounds(
@@ -715,10 +715,10 @@
         );
         driver.snapshots.insert(
             mutant_id,
-            mutant_runtime_snapshot_with_bounds(
+            mutant_reference_state_snapshot_with_bounds(
                 mutant_id,
                 runtime_position,
-                runtime_state,
+                reference_state,
                 Rect::from_center(collision_position, 14, 12),
             ),
         );
@@ -740,7 +740,7 @@
         let mutant_id = ActorId::new(101);
         let runtime_position = Point::new(0x08, 0xA5);
         let player_position = MUTANT_DIVE_COLLISION_EXPLOSION_ANCHOR;
-        let runtime_state = MutantRuntimeState {
+        let reference_state = MutantReferenceState {
             x_fraction: 0x00,
             y_fraction: 0x00,
             x_velocity: 0x0030,
@@ -766,10 +766,10 @@
         );
         driver.snapshots.insert(
             mutant_id,
-            mutant_runtime_snapshot_with_bounds(
+            mutant_reference_state_snapshot_with_bounds(
                 mutant_id,
                 runtime_position,
-                runtime_state,
+                reference_state,
                 Rect::from_center(player_position, 14, 12),
             ),
         );
@@ -802,13 +802,13 @@
     }
 
     #[test]
-    fn runtime_mutant_shot_timer_spawns_projectile_runtime() {
+    fn reference_mutant_shot_timer_spawns_projectile_reference_state() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let runtime_state = MutantRuntimeState {
+        let reference_state = MutantReferenceState {
             x_fraction: 0x12,
             y_fraction: 0x34,
             x_velocity: 0,
@@ -826,11 +826,11 @@
         let start = Point::new(70, 120);
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: start,
-            runtime_state: Some(runtime_state),
+            reference_state: Some(reference_state),
         });
 
         let report = driver.step(GameInput::NONE);
-        let prompt = mutant_runtime_prompt_for_test(
+        let prompt = mutant_reference_state_prompt_for_test(
             report.step,
             report.wave,
             report
@@ -840,8 +840,8 @@
             Velocity::default(),
         );
         let behavior = ActorBehaviorProfile::default();
-        let (expected_position, expected_runtime_state, expected_shot) =
-            expected_mutant_runtime_after_motion(start, runtime_state, mutant, &prompt, behavior);
+        let (expected_position, expected_reference_state, expected_shot) =
+            expected_mutant_reference_state_after_motion(start, reference_state, mutant, &prompt, behavior);
         let expected_shot = expected_shot.expect("shot timer should emit a mutant fireball");
 
         assert!(report.sounds.contains(&SoundCue::MutantShot));
@@ -852,9 +852,9 @@
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
                     position,
                     velocity,
-                    runtime_state: projectile_runtime_state,
-                }) => projectile_runtime_state
-                    .map(|runtime_state| (*position, *velocity, runtime_state)),
+                    reference_state: projectile_reference_state,
+                }) => projectile_reference_state
+                    .map(|reference_state| (*position, *velocity, reference_state)),
                 _ => None,
             })
             .expect("runtime mutant should emit a hostile shot command");
@@ -865,7 +865,7 @@
         );
         let snapshot = snapshot_for(&report, mutant);
         assert_eq!(snapshot.position, expected_position);
-        assert_eq!(snapshot.runtime.as_mutant(), Some(expected_runtime_state));
+        assert_eq!(snapshot.reference_state.as_mutant(), Some(expected_reference_state));
     }
 
     #[test]
@@ -986,8 +986,8 @@
             .filter_map(|command| match command {
                 GameCommand::Spawn(SpawnRequest::Swarmer {
                     position,
-                    runtime_state: swarmer_runtime_state,
-                }) => Some((*position, *swarmer_runtime_state)),
+                    reference_state: swarmer_reference_state,
+                }) => Some((*position, *swarmer_reference_state)),
                 _ => None,
             })
             .collect::<Vec<_>>();
@@ -996,7 +996,7 @@
             swarmer_spawns[0],
             (
                 expected_first_swarmer.position,
-                expected_first_swarmer.runtime_state
+                expected_first_swarmer.reference_state
             )
         );
         assert_eq!(driver.actor_rng, expected_rng);
@@ -1190,20 +1190,20 @@
     fn reference_lander_spawn_row_for_test(
         spawn: ActorLanderSpawn,
     ) -> (u16, u16, u16, u16, u8, u8, u8, Option<usize>) {
-        let runtime_state = spawn
-            .runtime_state
+        let reference_state = spawn
+            .reference_state
             .expect("runtime lander spawn should carry state");
-        let world_x_word = u16::from_be_bytes([spawn.position.x as u8, runtime_state.x_fraction]);
-        let world_y_word = u16::from_be_bytes([spawn.position.y as u8, runtime_state.y_fraction]);
+        let world_x_word = u16::from_be_bytes([spawn.position.x as u8, reference_state.x_fraction]);
+        let world_y_word = u16::from_be_bytes([spawn.position.y as u8, reference_state.y_fraction]);
         (
             world_x_word,
             world_y_word,
-            runtime_state.x_velocity,
-            runtime_state.y_velocity,
-            runtime_state.shot_timer,
-            runtime_state.sleep_ticks,
-            runtime_state.animation_frame.index(),
-            runtime_state.target_human_index,
+            reference_state.x_velocity,
+            reference_state.y_velocity,
+            reference_state.shot_timer,
+            reference_state.sleep_ticks,
+            reference_state.animation_frame.index(),
+            reference_state.target_human_index,
         )
     }
 
@@ -1551,7 +1551,7 @@
         ActorHumanSpawn {
             position,
             mode: HumanMode::Grounded,
-            runtime_state: Some(HumanRuntimeState {
+            reference_state: Some(HumanReferenceState {
                 x_fraction: 0,
                 y_fraction: 0,
                 animation_frame: crate::SpriteFrameIndex::new(animation_frame),
@@ -1562,30 +1562,30 @@
 
     fn expected_bomber_after_runtime_motion(
         position: Point,
-        mut runtime_state: BomberRuntimeState,
+        mut reference_state: BomberReferenceState,
         _step: u64,
         _id: ActorId,
         actor_rng: Option<ActorRngSnapshot>,
         player_position: Option<Point>,
-    ) -> (Point, BomberRuntimeState) {
+    ) -> (Point, BomberReferenceState) {
         if let Some(actor_rng) = actor_rng
-            && runtime_state.slot == bomber_tie_selected_slot(actor_rng.seed)
+            && reference_state.slot == bomber_tie_selected_slot(actor_rng.seed)
         {
-            if runtime_state.sleep_ticks > 0 {
-                runtime_state.sleep_ticks = runtime_state.sleep_ticks.saturating_sub(1);
+            if reference_state.sleep_ticks > 0 {
+                reference_state.sleep_ticks = reference_state.sleep_ticks.saturating_sub(1);
             } else {
-                runtime_state.animation_frame = crate::SpriteFrameIndex::new(
+                reference_state.animation_frame = crate::SpriteFrameIndex::new(
                     bomber_sprite_frame_after_tie_seed(
                         actor_rng.seed,
-                        runtime_state.animation_frame.index(),
+                        reference_state.animation_frame.index(),
                     ),
                 );
-                runtime_state.y_velocity =
-                    bomber_seeded_y_velocity(runtime_state.y_velocity, actor_rng.seed);
+                reference_state.y_velocity =
+                    bomber_seeded_y_velocity(reference_state.y_velocity, actor_rng.seed);
                 if position.y == 0 {
-                    runtime_state.y_velocity = bomber_cruise_y_velocity(
-                        runtime_state.y_velocity,
-                        &mut runtime_state.cruise_altitude,
+                    reference_state.y_velocity = bomber_cruise_y_velocity(
+                        reference_state.y_velocity,
+                        &mut reference_state.cruise_altitude,
                         position.y,
                         actor_rng.seed,
                     );
@@ -1593,19 +1593,19 @@
                     && let Some(delta) =
                         bomber_player_tracking_y_velocity_delta(position.y, player.y)
                 {
-                    runtime_state.y_velocity = runtime_state.y_velocity.wrapping_add(delta);
+                    reference_state.y_velocity = reference_state.y_velocity.wrapping_add(delta);
                 }
-                runtime_state.sleep_ticks = BOMBER_LOOP_SLEEP_TICKS;
+                reference_state.sleep_ticks = BOMBER_LOOP_SLEEP_TICKS;
             }
         }
 
         let (x, x_fraction) =
-            step_motion_axis(position.x, runtime_state.x_fraction, runtime_state.x_velocity);
+            step_motion_axis(position.x, reference_state.x_fraction, reference_state.x_velocity);
         let (y, y_fraction) =
-            step_wrapping_motion_y(position.y, runtime_state.y_fraction, runtime_state.y_velocity);
-        runtime_state.x_fraction = x_fraction;
-        runtime_state.y_fraction = y_fraction;
-        (Point::new(x, y), runtime_state)
+            step_wrapping_motion_y(position.y, reference_state.y_fraction, reference_state.y_velocity);
+        reference_state.x_fraction = x_fraction;
+        reference_state.y_fraction = y_fraction;
+        (Point::new(x, y), reference_state)
     }
 
     fn actor_snapshot(id: u64, kind: ActorKind, position: Point) -> ActorSnapshot {
@@ -1631,18 +1631,18 @@
             direction: None,
             bounds: Some(bounds),
             alive: true,
-            runtime: ActorRuntimeState::NONE,
+            reference_state: ActorReferenceState::NONE,
         }
     }
 
-    fn mutant_runtime_snapshot_with_bounds(
+    fn mutant_reference_state_snapshot_with_bounds(
         id: ActorId,
         position: Point,
-        runtime_state: MutantRuntimeState,
+        reference_state: MutantReferenceState,
         bounds: Rect,
     ) -> ActorSnapshot {
         let mut snapshot = actor_snapshot_with_bounds(id, ActorKind::Mutant, position, bounds);
-        snapshot.runtime = ActorRuntimeState::mutant(Some(runtime_state));
+        snapshot.reference_state = ActorReferenceState::mutant(Some(reference_state));
         snapshot
     }
 
@@ -1662,7 +1662,7 @@
         player.direction = Some(Direction::Right);
 
         let mut lander = actor_snapshot(2, ActorKind::Lander, Point::new(0x30, 80));
-        lander.runtime = ActorRuntimeState::lander(Some(LanderRuntimeState {
+        lander.reference_state = ActorReferenceState::lander(Some(LanderReferenceState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -1674,7 +1674,7 @@
         }));
 
         let mut enemy_laser = actor_snapshot(3, ActorKind::EnemyLaser, Point::new(0x31, 96));
-        enemy_laser.runtime = ActorRuntimeState::enemy_projectile(Some(EnemyProjectileRuntimeState {
+        enemy_laser.reference_state = ActorReferenceState::enemy_projectile(Some(EnemyProjectileReferenceState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -1683,7 +1683,7 @@
         }));
 
         let mut bomb = actor_snapshot(4, ActorKind::Bomb, Point::new(0x31, 104));
-        bomb.runtime = ActorRuntimeState::enemy_projectile(Some(EnemyProjectileRuntimeState {
+        bomb.reference_state = ActorReferenceState::enemy_projectile(Some(EnemyProjectileReferenceState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -1692,7 +1692,7 @@
         }));
 
         let mut human = actor_snapshot(5, ActorKind::Human, Point::new(0x2E, 220));
-        human.runtime = ActorRuntimeState::human(Some(HumanRuntimeState {
+        human.reference_state = ActorReferenceState::human(Some(HumanReferenceState {
             x_fraction: 0x80,
             y_fraction: 0,
             animation_frame: crate::SpriteFrameIndex::new(2),
@@ -1778,14 +1778,14 @@
             .collect()
     }
 
-    fn mutant_runtime_prompt_for_test(
+    fn mutant_reference_state_prompt_for_test(
         step: u64,
         wave: u16,
         actor_rng: ActorRngSnapshot,
         player_position: Point,
         player_velocity: Velocity,
     ) -> StepPrompt {
-        mutant_runtime_prompt_with_wave_tuning_for_test(
+        mutant_reference_state_prompt_with_wave_tuning_for_test(
             step,
             wave,
             ActorWaveTuning::for_wave(wave),
@@ -1826,7 +1826,7 @@
         }
     }
 
-    fn mutant_runtime_prompt_with_wave_tuning_for_test(
+    fn mutant_reference_state_prompt_with_wave_tuning_for_test(
         step: u64,
         wave: u16,
         wave_tuning: ActorWaveTuning,
@@ -1869,20 +1869,20 @@
         }
     }
 
-    fn expected_mutant_runtime_after_motion(
+    fn expected_mutant_reference_state_after_motion(
         mut position: Point,
-        mut runtime_state: MutantRuntimeState,
+        mut reference_state: MutantReferenceState,
         actor: ActorId,
         prompt: &StepPrompt,
         behavior: ActorBehaviorProfile,
     ) -> (
         Point,
-        MutantRuntimeState,
-        Option<(Point, Velocity, EnemyProjectileRuntimeState)>,
+        MutantReferenceState,
+        Option<(Point, Velocity, EnemyProjectileReferenceState)>,
     ) {
-        if runtime_state.sleep_ticks > 0 {
-            runtime_state.sleep_ticks = runtime_state.sleep_ticks.saturating_sub(1);
-            return (position, runtime_state, None);
+        if reference_state.sleep_ticks > 0 {
+            reference_state.sleep_ticks = reference_state.sleep_ticks.saturating_sub(1);
+            return (position, reference_state, None);
         }
 
         let player_position = prompt
@@ -1890,13 +1890,13 @@
             .expect("runtime mutant expected helper needs a player");
         let profile = prompt.wave_tuning;
         let player_absolute_x = absolute_world_x(player_position, 0);
-        let object_absolute_x = absolute_world_x(position, runtime_state.x_fraction);
-        runtime_state.x_velocity = mutant_x_velocity(
+        let object_absolute_x = absolute_world_x(position, reference_state.x_fraction);
+        reference_state.x_velocity = mutant_x_velocity(
             profile.mutant_x_velocity,
             player_absolute_x,
             object_absolute_x,
         );
-        runtime_state.y_velocity = mutant_y_velocity(
+        reference_state.y_velocity = mutant_y_velocity(
             profile,
             player_position.y,
             player_absolute_x,
@@ -1906,32 +1906,32 @@
 
         let mut shot = None;
         if mutant_should_hop_and_shoot(player_absolute_x, object_absolute_x, position) {
-            let mut hop_rng = actor_rng_from_snapshot(runtime_state.hop_rng);
+            let mut hop_rng = actor_rng_from_snapshot(reference_state.hop_rng);
             let hop_state = hop_rng.advance();
-            runtime_state.hop_rng = hop_state.snapshot();
+            reference_state.hop_rng = hop_state.snapshot();
             position.y = mutant_hop_y(position.y, profile.mutant_random_y, hop_state.seed);
-            runtime_state.shot_timer = runtime_state.shot_timer.wrapping_sub(1);
-            if runtime_state.shot_timer == 0 {
+            reference_state.shot_timer = reference_state.shot_timer.wrapping_sub(1);
+            if reference_state.shot_timer == 0 {
                 let shot_rng = mutant_shot_rng(prompt, actor, position);
-                runtime_state.shot_timer = mutant_shot_reset(profile, shot_rng.seed);
-                shot = mutant_fireball(position, prompt, behavior, runtime_state, shot_rng)
-                    .map(|(velocity, projectile_runtime_state)| {
-                        (position, velocity, projectile_runtime_state)
+                reference_state.shot_timer = mutant_shot_reset(profile, shot_rng.seed);
+                shot = mutant_fireball(position, prompt, behavior, reference_state, shot_rng)
+                    .map(|(velocity, projectile_reference_state)| {
+                        (position, velocity, projectile_reference_state)
                     });
             }
         }
 
         let (x, x_fraction) = step_motion_axis(
             position.x,
-            runtime_state.x_fraction,
-            runtime_state.x_velocity,
+            reference_state.x_fraction,
+            reference_state.x_velocity,
         );
         let (y, y_fraction) =
-            step_wrapping_motion_y(position.y, runtime_state.y_fraction, runtime_state.y_velocity);
-        runtime_state.x_fraction = x_fraction;
-        runtime_state.y_fraction = y_fraction;
-        runtime_state.sleep_ticks = MUTANT_LOOP_SLEEP_TICKS;
-        (Point::new(x, y), runtime_state, shot)
+            step_wrapping_motion_y(position.y, reference_state.y_fraction, reference_state.y_velocity);
+        reference_state.x_fraction = x_fraction;
+        reference_state.y_fraction = y_fraction;
+        reference_state.sleep_ticks = MUTANT_LOOP_SLEEP_TICKS;
+        (Point::new(x, y), reference_state, shot)
     }
 
     fn enemy_projectile_snapshot_count(report: &StepReport) -> usize {
@@ -1952,13 +1952,13 @@
 
     fn first_enemy_laser_command(
         report: &StepReport,
-    ) -> Option<(Point, Velocity, EnemyProjectileRuntimeState)> {
+    ) -> Option<(Point, Velocity, EnemyProjectileReferenceState)> {
         report.commands.iter().find_map(|command| match command {
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position,
                 velocity,
-                runtime_state: Some(projectile_runtime_state),
-            }) => Some((*position, *velocity, *projectile_runtime_state)),
+                reference_state: Some(projectile_reference_state),
+            }) => Some((*position, *velocity, *projectile_reference_state)),
             _ => None,
         })
     }

@@ -11,9 +11,9 @@ use crate::{
         HighScoreTablesSnapshot, HumanSnapshot as CleanHumanSnapshot, PlayerSnapshot,
         PlayerStockSnapshot, ProjectileSnapshot as CleanProjectileSnapshot,
         ScorePopupKind as CleanScorePopupKind, ScorePopupSnapshot as CleanScorePopupSnapshot,
-        ScoreSnapshot, SoundEvent, SpriteAssetImageSpec, BaiterRuntimeSnapshot, BomberRuntimeSnapshot,
-        LanderRuntimeSnapshot, MutantRuntimeSnapshot, PodRuntimeSnapshot, GameRngSnapshot,
-        SwarmerRuntimeSnapshot, TERRAIN_BLOW_COMPLETE_STEP, TERRAIN_BLOW_FLASH_COLOR_BYTES,
+        ScoreSnapshot, SoundEvent, SpriteAssetImageSpec, BaiterReferenceStateSnapshot, BomberReferenceStateSnapshot,
+        LanderReferenceStateSnapshot, MutantReferenceStateSnapshot, PodReferenceStateSnapshot, GameRngSnapshot,
+        SwarmerReferenceStateSnapshot, TERRAIN_BLOW_COMPLETE_STEP, TERRAIN_BLOW_FLASH_COLOR_BYTES,
         TERRAIN_BLOW_EXPLOSION_BIRTHS, TERRAIN_BLOW_OVERLOAD_COUNTER, TERRAIN_BLOW_START_SOUND_STEPS,
         TERRAIN_EXPLOSION_LIFETIME_STEPS, TerrainBlowSnapshot, TerrainBlowStage, TerrainSegment,
         VISUAL_STATE, WaveProfileSnapshot, WorldSnapshot, WorldVector, wave_tuning_landscape_tint,
@@ -59,25 +59,25 @@ const PLAYER_HYPERSPACE_HIDDEN_STEPS: u8 = 33;
 const PLAYER_HYPERSPACE_REMATERIALIZE_X: i16 = 128;
 const PLAYER_HYPERSPACE_REMATERIALIZE_Y: i16 = 120;
 const PLAYER_HYPERSPACE_DEATH_DELAY_STEPS: u8 = 39;
-const PLAYER_HYPERSPACE_DEATH_LOW_SEED: u8 = 0x0C; // original: PLAYER_HYPERSPACE_DEATH_LSEED
-const HYPERSPACE_DEATH_LOW_SEED_THRESHOLD: u8 = 0xC0; // original: SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD
-const PLAYFIELD_TOP_EDGE_Y: u8 = 42; // original: SOURCE_PLAYFIELD_Y_MIN
-const PLAYFIELD_BOTTOM_EDGE_Y: u8 = 240; // original: SOURCE_PLAYFIELD_Y_MAX
-const MUTANT_RESTORE_AVOID_HALF_WIDTH: u16 = 300 * 32; // original: SOURCE_MUTANT_RESTORE_AVOID_HALF_WIDTH
-const MUTANT_RESTORE_AVOID_WIDTH: u16 = 600 * 32; // original: SOURCE_MUTANT_RESTORE_AVOID_WIDTH
-const ENEMY_PROJECTILE_SCAN_INITIAL_DELAY_STEPS: u8 = 6; // original: SOURCE_SHELL_SCAN_INITIAL_DELAY_STEPS
-const ENEMY_PROJECTILE_SCAN_CADENCE_STEPS: u8 = 8; // original: SOURCE_SHELL_SCAN_CADENCE_STEPS
-const ENEMY_PROJECTILE_SLOT_LIMIT: usize = 20; // original: SOURCE_SHELL_LIMIT
-const ENEMY_PROJECTILE_LIFETIME_TICKS: u8 = 20; // original: SOURCE_SHELL_LIFETIME_TICKS
-const SMART_BOMB_DETONATION_DELAY_STEPS: u8 = 3; // original: SOURCE_SMART_BOMB_DETONATION_DELAY_STEPS
-const SMART_BOMB_FLASH_STEPS: u8 = 5; // original: SOURCE_SMART_BOMB_FLASH_STEPS
-const SMART_BOMB_RESERVE_DELAY_STEPS: u16 = 240; // original: SOURCE_SMART_BOMB_RESERVE_DELAY_STEPS
-const SMART_BOMB_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEE); // original: SBSND
-const CANNON_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE8); // original: CANNON
-const TERRAIN_BLOW_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEB); // original: TBSND
-const ASTRONAUT_CATCH_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF7); // original: ACSND
-const ASTRONAUT_SHORT_CATCH_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE5); // original: ASCSND
-const APPEARANCE_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEA); // original: APPEAR
+const PLAYER_HYPERSPACE_DEATH_LOW_SEED: u8 = 0x0C;
+const HYPERSPACE_DEATH_LOW_SEED_THRESHOLD: u8 = 0xC0;
+const PLAYFIELD_TOP_EDGE_Y: u8 = 42;
+const PLAYFIELD_BOTTOM_EDGE_Y: u8 = 240;
+const MUTANT_RESTORE_AVOID_HALF_WIDTH: u16 = 300 * 32;
+const MUTANT_RESTORE_AVOID_WIDTH: u16 = 600 * 32;
+const ENEMY_PROJECTILE_SCAN_INITIAL_DELAY_STEPS: u8 = 6;
+const ENEMY_PROJECTILE_SCAN_CADENCE_STEPS: u8 = 8;
+const ENEMY_PROJECTILE_SLOT_LIMIT: usize = 20;
+const ENEMY_PROJECTILE_LIFETIME_TICKS: u8 = 20;
+const SMART_BOMB_DETONATION_DELAY_STEPS: u8 = 3;
+const SMART_BOMB_FLASH_STEPS: u8 = 5;
+const SMART_BOMB_RESERVE_DELAY_STEPS: u16 = 240;
+const SMART_BOMB_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEE);
+const CANNON_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE8);
+const TERRAIN_BLOW_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEB);
+const ASTRONAUT_CATCH_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF7);
+const ASTRONAUT_SHORT_CATCH_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE5);
+const APPEARANCE_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEA);
 const CREDIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE6);
 const START_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF5);
 const THRUST_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE9);
@@ -96,7 +96,7 @@ const MUTANT_SHOT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF6);
 const SWARMER_SHOT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF3);
 const GAME_OVER_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEC);
 const SMART_BOMB_SOUND_SEQUENCE: [(u8, SoundCommand); 7] = [
-    // original: SOURCE_SMART_BOMB_SOUND_SEQUENCE
+
     (4, SMART_BOMB_SOUND_COMMAND),
     (8, SMART_BOMB_SOUND_COMMAND),
     (12, SMART_BOMB_SOUND_COMMAND),
@@ -106,48 +106,48 @@ const SMART_BOMB_SOUND_SEQUENCE: [(u8, SoundCommand); 7] = [
     (28, CANNON_SOUND_COMMAND),
 ];
 const TERRAIN_BLOW_SOUND_TAIL_SEQUENCE: [(u8, SoundCommand); 4] = [
-    // original: SOURCE_TERRAIN_BLOW_SOUND_TAIL_SEQUENCE
+
     (4, SMART_BOMB_SOUND_COMMAND),
     (10, SMART_BOMB_SOUND_COMMAND),
     (16, CANNON_SOUND_COMMAND),
     (26, CANNON_SOUND_COMMAND),
 ];
 const ASTRONAUT_CATCH_SOUND_TAIL_SEQUENCE: [(u8, SoundCommand); 2] = [
-    // original: SOURCE_ACSND_SOUND_TAIL_SEQUENCE
+
     (10, ASTRONAUT_CATCH_SOUND_COMMAND),
     (20, ASTRONAUT_CATCH_SOUND_COMMAND),
 ];
-const PLAYER_SWITCH_DELAY_STEPS: u8 = 0x60; // original: SOURCE_PLAYER_SWITCH_SLEEP_STEPS
-const FINAL_GAME_OVER_DELAY_STEPS: u8 = 40; // original: SOURCE_FINAL_GAME_OVER_SLEEP_STEPS
-const PLAYER_START_SOUND_DELAY_STEPS: u8 = 1; // original: SOURCE_START_SOUND_DELAY_STEPS
-const PLAYER_START_PLAYFIELD_DELAY_STEPS: u8 = 138; // original: SOURCE_START_PLAYFIELD_DELAY_STEPS
-const ENEMY_PROJECTILE_MAX_SCREEN_X: i16 = 0x98; // original: SOURCE_SHELL_X_MAX
+const PLAYER_SWITCH_DELAY_STEPS: u8 = 0x60;
+const FINAL_GAME_OVER_DELAY_STEPS: u8 = 40;
+const PLAYER_START_SOUND_DELAY_STEPS: u8 = 1;
+const PLAYER_START_PLAYFIELD_DELAY_STEPS: u8 = 138;
+const ENEMY_PROJECTILE_MAX_SCREEN_X: i16 = 0x98;
 const PLAYFIELD_START_RNG: ActorRng = ActorRng {
-    // original: SOURCE_PLAYFIELD_START_RNG
+
     seed: 0x52,
     hseed: 0x62,
     lseed: 0x0C,
 };
 const DEFAULT_RNG: ActorRng = ActorRng {
-    // original: SOURCE_DEFAULT_RNG
+
     seed: 0,
     hseed: 0xA5,
     lseed: 0x5A,
 };
-const FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS: u16 = 449; // original: SOURCE_FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS
-const FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT: usize = 10; // original: SOURCE_FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT
-const FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT: usize = 6; // original: SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT
-const FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY: u8 = 2; // original: SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY
+const FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS: u16 = 449;
+const FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT: usize = 10;
+const FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT: usize = 6;
+const FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY: u8 = 2;
 const FIRST_WAVE_EARLY_RESERVE_TARGET2_X_VELOCITY: u16 = 0xFFEE;
 const FIRST_WAVE_EARLY_RESERVE_RNG: ActorRng = ActorRng {
-    // original: SOURCE_FIRST_WAVE_EARLY_RESERVE_RNG
+
     seed: 0x3A,
     hseed: 0xDA,
     lseed: 0x1F,
 };
-const FIRST_WAVE_LANDER_REFILL_ACTIVE_THRESHOLD: usize = 8; // original: SOURCE_FIRST_WAVE_LANDER_REFILL_ACTIVE_THRESHOLD
-const FIRST_WAVE_LANDER_REFILL_DELAY_STEPS: u8 = 47; // original: SOURCE_FIRST_WAVE_LANDER_REFILL_DELAY_STEPS
-const FIRST_WAVE_LANDER_REFILL_APPEAR_SOUND_DELAY_STEPS: u8 = 1; // original: SOURCE_FIRST_WAVE_LANDER_REFILL_APPEAR_SOUND_DELAY_STEPS
+const FIRST_WAVE_LANDER_REFILL_ACTIVE_THRESHOLD: usize = 8;
+const FIRST_WAVE_LANDER_REFILL_DELAY_STEPS: u8 = 47;
+const FIRST_WAVE_LANDER_REFILL_APPEAR_SOUND_DELAY_STEPS: u8 = 1;
 const PLAYER_PLAYFIELD_TOP_Y: i16 = PLAYFIELD_TOP_EDGE_Y as i16;
 const PLAYER_BOUNDS_BOTTOM_Y: i16 = 220;
 const PLAYER_BOUNDS: Rect = Rect::new(
@@ -157,7 +157,7 @@ const PLAYER_BOUNDS: Rect = Rect::new(
     PLAYER_BOUNDS_BOTTOM_Y,
 );
 const PLAYER_SCROLL_CENTER_X: i16 = 128;
-const BACKGROUND_WORD_PER_PIXEL: u16 = 0x0100; // original: SOURCE_BACKGROUND_WORD_PER_PIXEL
+const BACKGROUND_WORD_PER_PIXEL: u16 = 0x0100;
 const LASER_SPEED: i16 = 8;
 const LASER_LIFETIME: u16 = 34;
 const LANDER_FIRE_PERIOD: u64 = 96;
@@ -165,78 +165,78 @@ const LANDER_SHOT_SPEED: i16 = 3;
 const LANDER_SHOT_LIFETIME: u16 = 90;
 const EXPLOSION_LIFETIME: u16 = 20;
 const SCORE_POPUP_LIFETIME: u16 = 50;
-const ATTRACT_PRESENTS_START_STEP: u64 = 236; // original: SOURCE_ATTRACT_PRESENTS_START_STEP
-const ATTRACT_DEFENDER_WORDMARK_START_STEP: u64 = 365; // original: SOURCE_ATTRACT_DEFENDER_WORDMARK_START_STEP
-const ATTRACT_HALL_OF_FAME_START_STEP: u64 = 600; // original: SOURCE_ATTRACT_HALL_OF_FAME_START_STEP
+const ATTRACT_PRESENTS_START_STEP: u64 = 236;
+const ATTRACT_DEFENDER_WORDMARK_START_STEP: u64 = 365;
+const ATTRACT_HALL_OF_FAME_START_STEP: u64 = 600;
 const ATTRACT_SCORING_SEQUENCE_START_STEP: u64 =
-    GAME_ATTRACT_SCORING_SEQUENCE_START_STEP as u64; // original: SOURCE_ATTRACT_SCORING_SEQUENCE_START_STEP
+    GAME_ATTRACT_SCORING_SEQUENCE_START_STEP as u64;
 const ATTRACT_CYCLE_STEPS: u64 =
-    ATTRACT_SCORING_SEQUENCE_START_STEP + ATTRACT_SCORING_DEMO_TOTAL_STEPS as u64; // original: SOURCE_ATTRACT_CYCLE_STEPS
-const HIGH_SCORE_HALL_STALL_STEPS: u8 = 60; // original: SOURCE_HIGH_SCORE_HALL_STALL_STEPS
-const ATTRACT_WILLIAMS_LOGO_DURATION_STEPS: u64 = ATTRACT_HALL_OF_FAME_START_STEP - 1; // original: SOURCE_ATTRACT_WILLIAMS_LOGO_DURATION_STEPS
+    ATTRACT_SCORING_SEQUENCE_START_STEP + ATTRACT_SCORING_DEMO_TOTAL_STEPS as u64;
+const HIGH_SCORE_HALL_STALL_STEPS: u8 = 60;
+const ATTRACT_WILLIAMS_LOGO_DURATION_STEPS: u64 = ATTRACT_HALL_OF_FAME_START_STEP - 1;
 const ATTRACT_PRESENTS_DURATION_STEPS: u64 =
-    ATTRACT_HALL_OF_FAME_START_STEP - ATTRACT_PRESENTS_START_STEP; // original: SOURCE_ATTRACT_PRESENTS_DURATION_STEPS
-const REPLAY_BONUS_SCORE: u32 = 10_000; // original: SOURCE_REPLAY_SCORE
+    ATTRACT_HALL_OF_FAME_START_STEP - ATTRACT_PRESENTS_START_STEP;
+const REPLAY_BONUS_SCORE: u32 = 10_000;
 const WAVE_COMPLETION_STATUS_LINES: &[(MessageId, ScreenAddress)] =
-    // original: SOURCE_WAVE_COMPLETION_STATUS_LINES
+
     &[
-        (MessageId::WaveCompletePrefix, ScreenAddress::new(0x3850)), // original: ATWV
-        (MessageId::Completed, ScreenAddress::new(0x3D60)),          // original: COMPV
-        (MessageId::BonusSurvivors, ScreenAddress::new(0x3C90)),     // original: BONSX
+        (MessageId::WaveCompletePrefix, ScreenAddress::new(0x3850)),
+        (MessageId::Completed, ScreenAddress::new(0x3D60)),
+        (MessageId::BonusSurvivors, ScreenAddress::new(0x3C90)),
     ];
-const WAVE_COMPLETION_WAVE_NUMBER_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x6550); // original: SOURCE_WAVE_COMPLETION_WAVE_NUMBER_SCREEN
-const WAVE_COMPLETION_MULTIPLIER_NUMBER_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x5890); // original: SOURCE_WAVE_COMPLETION_MULTIPLIER_NUMBER_SCREEN
-const SURVIVOR_BONUS_FIRST_HUMAN_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x3CA0); // original: SOURCE_SURVIVOR_BONUS_FIRST_HUMAN_SCREEN
-const SURVIVOR_BONUS_HUMAN_STEP: u8 = 0x04; // original: SOURCE_SURVIVOR_BONUS_HUMAN_STEP
-const SURVIVOR_BONUS_HUMAN_LIMIT: usize = 10; // original: SOURCE_SURVIVOR_BONUS_HUMAN_LIMIT
-const SURVIVOR_BONUS_HUMAN_SIZE: [f32; 2] = [4.0, 8.0]; // original: SOURCE_SURVIVOR_BONUS_HUMAN_SIZE
-const SURVIVOR_BONUS_ASTRONAUT_SLEEP_STEPS: u8 = 4; // original: SOURCE_SURVIVOR_BONUS_ASTRONAUT_SLEEP_STEPS
-const SURVIVOR_BONUS_WAVE_ADVANCE_SLEEP_STEPS: u8 = 0x80; // original: SOURCE_SURVIVOR_BONUS_WAVE_ADVANCE_SLEEP_STEPS
+const WAVE_COMPLETION_WAVE_NUMBER_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x6550);
+const WAVE_COMPLETION_MULTIPLIER_NUMBER_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x5890);
+const SURVIVOR_BONUS_FIRST_HUMAN_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x3CA0);
+const SURVIVOR_BONUS_HUMAN_STEP: u8 = 0x04;
+const SURVIVOR_BONUS_HUMAN_LIMIT: usize = 10;
+const SURVIVOR_BONUS_HUMAN_SIZE: [f32; 2] = [4.0, 8.0];
+const SURVIVOR_BONUS_ASTRONAUT_SLEEP_STEPS: u8 = 4;
+const SURVIVOR_BONUS_WAVE_ADVANCE_SLEEP_STEPS: u8 = 0x80;
 const SURVIVOR_BONUS_POINTS_PER_MULTIPLIER: u32 = 100;
 const ATTRACT_DEFENDER_WORDMARK_DURATION_STEPS: u64 =
-    ATTRACT_HALL_OF_FAME_START_STEP - ATTRACT_DEFENDER_WORDMARK_START_STEP; // original: SOURCE_ATTRACT_DEFENDER_WORDMARK_DURATION_STEPS
+    ATTRACT_HALL_OF_FAME_START_STEP - ATTRACT_DEFENDER_WORDMARK_START_STEP;
 const ATTRACT_HALL_OF_FAME_DURATION_STEPS: u64 =
-    ATTRACT_SCORING_SEQUENCE_START_STEP - ATTRACT_HALL_OF_FAME_START_STEP; // original: SOURCE_ATTRACT_HALL_OF_FAME_DURATION_STEPS
+    ATTRACT_SCORING_SEQUENCE_START_STEP - ATTRACT_HALL_OF_FAME_START_STEP;
 const WILLIAMS_REVEAL_STEPS: u16 = ATTRACT_PRESENTS_START_STEP as u16;
 const WILLIAMS_COLOR_PERIOD: u16 = 8;
-const ATTRACT_WILLIAMS_LOGO_POSITION: Point = Point::new(108, 60); // original: SOURCE_ATTRACT_WILLIAMS_LOGO_POSITION
-const ATTRACT_DEFENDER_WORDMARK_POSITION: Point = Point::new(96, 144); // original: SOURCE_ATTRACT_DEFENDER_WORDMARK_POSITION
-const ATTRACT_CREDIT_LABEL_POSITION: Point = Point::new(176, 226); // original: SOURCE_ATTRACT_CREDIT_LABEL_POSITION
-const ATTRACT_CREDIT_COUNT_POSITION: Point = Point::new(248, 226); // original: SOURCE_ATTRACT_CREDIT_COUNT_POSITION
-const ATTRACT_HALL_TITLE_MESSAGE: MessageId = MessageId::HallTitle; // original: HALLD_TITLE
-const ATTRACT_HALL_TODAYS_MESSAGE: MessageId = MessageId::HallTodays; // original: HALLD_TODAYS
-const ATTRACT_HALL_ALL_TIME_MESSAGE: MessageId = MessageId::HallAllTime; // original: HALLD_ALL_TIME
-const ATTRACT_HALL_GREATEST_MESSAGE: MessageId = MessageId::HallGreatest; // original: HALLD_GREATEST
-const ATTRACT_HALL_DEFENDER_LOGO_POSITION: Point = Point::new(85, 50); // original: SOURCE_ATTRACT_HALL_DEFENDER_LOGO_POSITION
+const ATTRACT_WILLIAMS_LOGO_POSITION: Point = Point::new(108, 60);
+const ATTRACT_DEFENDER_WORDMARK_POSITION: Point = Point::new(96, 144);
+const ATTRACT_CREDIT_LABEL_POSITION: Point = Point::new(176, 226);
+const ATTRACT_CREDIT_COUNT_POSITION: Point = Point::new(248, 226);
+const ATTRACT_HALL_TITLE_MESSAGE: MessageId = MessageId::HallTitle;
+const ATTRACT_HALL_TODAYS_MESSAGE: MessageId = MessageId::HallTodays;
+const ATTRACT_HALL_ALL_TIME_MESSAGE: MessageId = MessageId::HallAllTime;
+const ATTRACT_HALL_GREATEST_MESSAGE: MessageId = MessageId::HallGreatest;
+const ATTRACT_HALL_DEFENDER_LOGO_POSITION: Point = Point::new(85, 50);
 const ATTRACT_HALL_TITLE_MESSAGE_CELL: ScreenAddress = ScreenAddress::new(0x3854);
 const ATTRACT_HALL_TODAYS_MESSAGE_CELL: ScreenAddress = ScreenAddress::new(0x2268);
 const ATTRACT_HALL_ALL_TIME_MESSAGE_CELL: ScreenAddress = ScreenAddress::new(0x6068);
 const ATTRACT_HALL_GREATEST_LEFT_MESSAGE_CELL: ScreenAddress = ScreenAddress::new(0x1E72);
 const ATTRACT_HALL_GREATEST_RIGHT_MESSAGE_CELL: ScreenAddress = ScreenAddress::new(0x5F72);
-const ATTRACT_HALL_TODAYS_TABLE_CELL: ScreenAddress = ScreenAddress::new(0x1886); // original: SOURCE_ATTRACT_HALL_TODAYS_TABLE_CELL
-const ATTRACT_HALL_ALL_TIME_TABLE_CELL: ScreenAddress = ScreenAddress::new(0x5986); // original: SOURCE_ATTRACT_HALL_ALL_TIME_TABLE_CELL
-const ATTRACT_HALL_TABLE_ROW_STEP: u8 = 0x0A; // original: SOURCE_ATTRACT_HALL_TABLE_ROW_STEP
-const ATTRACT_HALL_TABLE_INITIALS_OFFSET: u8 = 0x05; // original: SOURCE_ATTRACT_HALL_TABLE_INITIALS_OFFSET
-const ATTRACT_HALL_TABLE_SCORE_OFFSET: u8 = 0x13; // original: SOURCE_ATTRACT_HALL_TABLE_SCORE_OFFSET
-const ATTRACT_HALL_TABLE_VISUAL_OFFSET: Point = Point::new(-11, -6); // original: SOURCE_ATTRACT_HALL_TABLE_VISUAL_OFFSET
-const ATTRACT_HALL_SCORE_TEXT_LEN: usize = 6; // original: SOURCE_ATTRACT_HALL_SCORE_TEXT_LEN
-const ATTRACT_SCORING_VISUAL_OFFSET: Point = Point::new(-11, -7); // original: SOURCE_ATTRACT_SCORING_VISUAL_OFFSET
+const ATTRACT_HALL_TODAYS_TABLE_CELL: ScreenAddress = ScreenAddress::new(0x1886);
+const ATTRACT_HALL_ALL_TIME_TABLE_CELL: ScreenAddress = ScreenAddress::new(0x5986);
+const ATTRACT_HALL_TABLE_ROW_STEP: u8 = 0x0A;
+const ATTRACT_HALL_TABLE_INITIALS_OFFSET: u8 = 0x05;
+const ATTRACT_HALL_TABLE_SCORE_OFFSET: u8 = 0x13;
+const ATTRACT_HALL_TABLE_VISUAL_OFFSET: Point = Point::new(-11, -6);
+const ATTRACT_HALL_SCORE_TEXT_LEN: usize = 6;
+const ATTRACT_SCORING_VISUAL_OFFSET: Point = Point::new(-11, -7);
 const ATTRACT_INSTRUCTION_TEXT_LINES: [(MessageId, ScreenAddress); 7] = [
-    // original: SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES
-    (MessageId::ScannerInstruction, ScreenAddress::new(0x4330)),       // original: SCANV
-    (MessageId::LanderInstruction, ScreenAddress::new(0x1C70)),        // original: LANDV
-    (MessageId::MutantInstruction, ScreenAddress::new(0x3C70)),        // original: MUTV
-    (MessageId::BaiterInstruction, ScreenAddress::new(0x5F70)),        // original: BAITV
-    (MessageId::BomberInstruction, ScreenAddress::new(0x1CA8)),        // original: BOMBV
-    (MessageId::SwarmerInstructionPrefix, ScreenAddress::new(0x40A8)), // original: SWRMPV
-    (MessageId::SwarmerInstruction, ScreenAddress::new(0x5CA8)),       // original: SWARMV
+
+    (MessageId::ScannerInstruction, ScreenAddress::new(0x4330)),
+    (MessageId::LanderInstruction, ScreenAddress::new(0x1C70)),
+    (MessageId::MutantInstruction, ScreenAddress::new(0x3C70)),
+    (MessageId::BaiterInstruction, ScreenAddress::new(0x5F70)),
+    (MessageId::BomberInstruction, ScreenAddress::new(0x1CA8)),
+    (MessageId::SwarmerInstructionPrefix, ScreenAddress::new(0x40A8)),
+    (MessageId::SwarmerInstruction, ScreenAddress::new(0x5CA8)),
 ];
-const FINAL_GAME_OVER_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x3E80); // original: SOURCE_FINAL_GAME_OVER_SCREEN
-const PLAYER_START_PROMPT_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x3C80); // original: SOURCE_PLAYER_START_PROMPT_SCREEN
-const PLAYER_SWITCH_LABEL_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x3C78); // original: SOURCE_PLAYER_SWITCH_LABEL_SCREEN
-const PLAYER_SWITCH_GAME_OVER_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x3E88); // original: SOURCE_PLAYER_SWITCH_GAME_OVER_SCREEN
+const FINAL_GAME_OVER_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x3E80);
+const PLAYER_START_PROMPT_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x3C80);
+const PLAYER_SWITCH_LABEL_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x3C78);
+const PLAYER_SWITCH_GAME_OVER_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x3E88);
 const TOP_DISPLAY_BORDER_SEGMENTS: [(u16, [f32; 2]); 6] = [
-    // original: SOURCE_TOP_DISPLAY_BORDER_SEGMENTS
+
     (0x0028, [312.0, 2.0]),
     (0x2F08, [2.0, 32.0]),
     (0x7008, [2.0, 32.0]),
@@ -301,30 +301,30 @@ const ATTRACT_SCORING_OBJECT_SCANNER_SIZE: [f32; 2] = [2.0, 2.0];
 const ATTRACT_SCORING_PLAYER_SCANNER_COLOR_WORD: u16 = 0x9099;
 const ATTRACT_SCORING_HUMAN_SCANNER_COLOR_WORD: u16 = 0x6666;
 const ATTRACT_SCORING_LANDER_SCANNER_COLOR_WORD: u16 = 0x4433;
-const ATTRACT_SCORING_LEGEND_ORIGIN_WORLD_X: i32 = 0x1F00; // original: ATTRACT_SCORING_LEGEND_SOURCE_X16
-const ATTRACT_SCORING_LEGEND_ORIGIN_START_WORLD_Y: i32 = 0xA000; // original: ATTRACT_SCORING_LEGEND_SOURCE_START_Y16
+const ATTRACT_SCORING_LEGEND_ORIGIN_WORLD_X: i32 = 0x1F00;
+const ATTRACT_SCORING_LEGEND_ORIGIN_START_WORLD_Y: i32 = 0xA000;
 const NORMAL_PALETTE_BYTES: [u8; 16] = [
-    // original: SOURCE_NORMAL_PALETTE_BYTES
+
     0x00, 0x00, 0x07, 0x28, 0x2F, 0x81, 0xA4, 0x15, 0xC7, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
-const LASER_BYTE_PIXELS: i32 = 2; // original: SOURCE_LASER_BYTE_PIXELS
-const LASER_BODY_BYTE: u8 = 0x11; // original: SOURCE_LASER_BODY_BYTE
-const LASER_TIP_BYTE: u8 = 0x99; // original: SOURCE_LASER_TIP_BYTE
-const LASER_BODY_CELLS: i32 = 4; // original: SOURCE_LASER_BODY_CELLS
-const LASER_BODY_TINT: Color = Color::from_rgba(0x00, 0xB8, 0xFF, 0xFF); // original: SOURCE_LASER_BODY_TINT
-const LASER_TIP_TINT: Color = Color::from_rgba(0x8F, 0xE8, 0xFF, 0xFF); // original: SOURCE_LASER_TIP_TINT
-const LASER_FIZZLE_TINT: Color = Color::from_rgba(0x00, 0x78, 0xD8, 0xFF); // original: SOURCE_LASER_FIZZLE_TINT
-const WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255]; // original: SOURCE_WILLIAMS_RED_GREEN_LEVELS
-const WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255]; // original: SOURCE_WILLIAMS_BLUE_LEVELS
-const MAIN_TERRAIN_RECORD_BYTE_COUNT: usize = 0x180; // original: SOURCE_TERRAIN_MTERR_BYTES
-const SCANNER_TERRAIN_RECORDS: usize = 0x40; // original: SOURCE_SCANNER_TERRAIN_RECORDS
-const SCANNER_MINI_TERRAIN_RECORDS: usize = MAIN_TERRAIN_RECORD_BYTE_COUNT / 3; // original: SOURCE_SCANNER_MINI_TERRAIN_RECORDS
-const SCANNER_OBJECT_BASE_SCREEN: u16 = 0x3008; // original: SOURCE_SCANNER_OBJECT_BASE_SCREEN
-const SCANNER_SCAN_CENTER_OFFSET: u16 = 0x6D40; // original: SOURCE_SCANNER_SCAN_CENTER_OFFSET
+const LASER_BYTE_PIXELS: i32 = 2;
+const LASER_BODY_BYTE: u8 = 0x11;
+const LASER_TIP_BYTE: u8 = 0x99;
+const LASER_BODY_CELLS: i32 = 4;
+const LASER_BODY_TINT: Color = Color::from_rgba(0x00, 0xB8, 0xFF, 0xFF);
+const LASER_TIP_TINT: Color = Color::from_rgba(0x8F, 0xE8, 0xFF, 0xFF);
+const LASER_FIZZLE_TINT: Color = Color::from_rgba(0x00, 0x78, 0xD8, 0xFF);
+const WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255];
+const WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255];
+const MAIN_TERRAIN_RECORD_BYTE_COUNT: usize = 0x180;
+const SCANNER_TERRAIN_RECORDS: usize = 0x40;
+const SCANNER_MINI_TERRAIN_RECORDS: usize = MAIN_TERRAIN_RECORD_BYTE_COUNT / 3;
+const SCANNER_OBJECT_BASE_SCREEN: u16 = 0x3008;
+const SCANNER_SCAN_CENTER_OFFSET: u16 = 0x6D40;
 const DEFENDER_WORDMARK_START_STEP: u64 = ATTRACT_DEFENDER_WORDMARK_START_STEP;
 const DEFENDER_WORDMARK_SLOTS: u16 = 15;
 const DEFENDER_WORDMARK_ROW_PAIRS: u16 = 6;
-const ATTRACT_DEFENDER_APPEARANCE_FINAL_TICK: u8 = 0x2E; // original: SOURCE_ATTRACT_DEFENDER_APPEARANCE_FINAL_TICK
+const ATTRACT_DEFENDER_APPEARANCE_FINAL_TICK: u8 = 0x2E;
 const WILLIAMS_LOGO_SCENE_SIZE: [f32; 2] = [92.0, 19.0];
 const DEFENDER_WORDMARK_SCENE_SIZE: [f32; 2] = [120.0, 24.0];
 const PLAYER_SHIP_SCENE_SIZE: [f32; 2] = [16.0, 6.0];
@@ -350,13 +350,13 @@ const HUMAN_FALL_ACCELERATION: i16 = 1;
 const HUMAN_MAX_FALL_SPEED: i16 = 8;
 const HUMAN_SAFE_LANDING_SPEED: i16 = 3;
 const HUMAN_CARRIED_OFFSET_Y: i16 = 8;
-const ASTRONAUT_RESTORE_Y: u8 = 0xE0; // original: SOURCE_ASTRO_RESTORE_Y
-const ASTRONAUT_TARGET_CURSOR_ENTRY_COUNT: usize = 16; // original: SOURCE_ASTRONAUT_TARGET_CURSOR_ENTRY_COUNT
-const ASTRONAUT_PROCESS_SLEEP_TICKS: u8 = 2; // original: SOURCE_ASTRONAUT_PROCESS_SLEEP_TICKS
-const HUMAN_TURN_SEED_MAX: u8 = 8; // original: SOURCE_HUMAN_TURN_SEED_MAX
-const HUMAN_LEFT_TARGET_Y_OFFSET: u8 = 4; // original: SOURCE_HUMAN_LEFT_TARGET_Y_OFFSET
-const HUMAN_RIGHT_TARGET_Y_OFFSET: u8 = 15; // original: SOURCE_HUMAN_RIGHT_TARGET_Y_OFFSET
-const HUMAN_MAX_TARGET_Y: u8 = 0xE8; // original: SOURCE_HUMAN_MAX_TARGET_Y
+const ASTRONAUT_RESTORE_Y: u8 = 0xE0;
+const ASTRONAUT_TARGET_CURSOR_ENTRY_COUNT: usize = 16;
+const ASTRONAUT_PROCESS_SLEEP_TICKS: u8 = 2;
+const HUMAN_TURN_SEED_MAX: u8 = 8;
+const HUMAN_LEFT_TARGET_Y_OFFSET: u8 = 4;
+const HUMAN_RIGHT_TARGET_Y_OFFSET: u8 = 15;
+const HUMAN_MAX_TARGET_Y: u8 = 0xE8;
 const PLAYFIELD_TERRAIN_SEGMENTS: [TerrainSegment; 5] = [
     TerrainSegment {
         position: ScreenPosition::new(0, 224),
@@ -379,37 +379,37 @@ const PLAYFIELD_TERRAIN_SEGMENTS: [TerrainSegment; 5] = [
         size: (44, 8),
     },
 ];
-const HUMAN_LEFT_X_VELOCITY: u16 = 0xFFE0; // original: SOURCE_HUMAN_LEFT_X_VELOCITY
-const HUMAN_RIGHT_X_VELOCITY: u16 = 0x0020; // original: SOURCE_HUMAN_RIGHT_X_VELOCITY
-const INITIAL_POD_X_SPEED: u8 = 0x20; // original: SOURCE_INITIAL_POD_X_SPEED
-const BOMBER_SQUAD_SIZE: usize = 4; // original: SOURCE_BOMBER_SQUAD_SIZE
-const POD_SWARMER_REQUEST_LIMIT: usize = 6; // original: SOURCE_POD_SWARMER_REQUEST_LIMIT
-const ACTIVE_SWARMER_LIMIT: usize = 20; // original: SOURCE_ACTIVE_SWARMER_LIMIT
-const ACTIVE_BAITER_LIMIT: usize = 12; // original: SOURCE_ACTIVE_BAITER_LIMIT
-const MINI_SWARMER_LOOP_SLEEP_TICKS: u8 = 3; // original: SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS
-const MINI_SWARMER_MAX_Y_VELOCITY: u16 = 0x0200; // original: SOURCE_MINI_SWARMER_MAX_Y_VELOCITY
-const MINI_SWARMER_MIN_Y_VELOCITY: u16 = 0xFE00; // original: SOURCE_MINI_SWARMER_MIN_Y_VELOCITY
-const MINI_SWARMER_TURN_WINDOW: u16 = 300 * 32; // original: SOURCE_MINI_SWARMER_TURN_WINDOW
-const MINI_SWARMER_TURN_WINDOW_HALF: u16 = 150 * 32; // original: SOURCE_MINI_SWARMER_TURN_WINDOW_HALF
-const MINI_SWARMER_RESTORE_X_LOW: u8 = 0x07; // original: SOURCE_MINI_SWARMER_RESTORE_X_LOW
-const BAITER_INITIAL_SHOT_TIMER: u8 = 8; // original: SOURCE_BAITER_INITIAL_SHOT_TIMER
-const BAITER_LOOP_SLEEP_TICKS: u8 = 6; // original: SOURCE_BAITER_LOOP_SLEEP_TICKS
-const BAITER_X_SEEK_SPEED: u8 = 0x40; // original: SOURCE_BAITER_X_SEEK_SPEED
-const BAITER_Y_SEEK_BYTE: u8 = 0x01; // original: SOURCE_BAITER_Y_SEEK_BYTE
-const BAITER_X_SEEK_WINDOW_HALF_PIXELS: i16 = 20; // original: SOURCE_BAITER_X_SEEK_WINDOW_HALF_PIXELS
-const BAITER_Y_SEEK_WINDOW_HALF_PIXELS: i16 = 10; // original: SOURCE_BAITER_Y_SEEK_WINDOW_HALF_PIXELS
-const BAITER_ANIMATION_FRAME_COUNT: u8 = 3; // original: SOURCE_BAITER_PICTURE_FRAME_COUNT
+const HUMAN_LEFT_X_VELOCITY: u16 = 0xFFE0;
+const HUMAN_RIGHT_X_VELOCITY: u16 = 0x0020;
+const INITIAL_POD_X_SPEED: u8 = 0x20;
+const BOMBER_SQUAD_SIZE: usize = 4;
+const POD_SWARMER_REQUEST_LIMIT: usize = 6;
+const ACTIVE_SWARMER_LIMIT: usize = 20;
+const ACTIVE_BAITER_LIMIT: usize = 12;
+const MINI_SWARMER_LOOP_SLEEP_TICKS: u8 = 3;
+const MINI_SWARMER_MAX_Y_VELOCITY: u16 = 0x0200;
+const MINI_SWARMER_MIN_Y_VELOCITY: u16 = 0xFE00;
+const MINI_SWARMER_TURN_WINDOW: u16 = 300 * 32;
+const MINI_SWARMER_TURN_WINDOW_HALF: u16 = 150 * 32;
+const MINI_SWARMER_RESTORE_X_LOW: u8 = 0x07;
+const BAITER_INITIAL_SHOT_TIMER: u8 = 8;
+const BAITER_LOOP_SLEEP_TICKS: u8 = 6;
+const BAITER_X_SEEK_SPEED: u8 = 0x40;
+const BAITER_Y_SEEK_BYTE: u8 = 0x01;
+const BAITER_X_SEEK_WINDOW_HALF_PIXELS: i16 = 20;
+const BAITER_Y_SEEK_WINDOW_HALF_PIXELS: i16 = 10;
+const BAITER_ANIMATION_FRAME_COUNT: u8 = 3;
 const ACTOR_BAITER_TIMER_PACING_STEPS: u8 = 15;
-const BOMBER_LOOP_SLEEP_TICKS: u8 = 1; // original: SOURCE_BOMBER_LOOP_SLEEP_TICKS
-const BOMBER_ANIMATION_FRAME_COUNT: u8 = 4; // original: SOURCE_BOMBER_PICTURE_FRAME_COUNT
-const BOMBER_CRUISE_ALTITUDE: i16 = 0x50; // original: SOURCE_BOMBER_CRUISE_ALTITUDE
-const BOMBER_MIN_CRUISE_ALTITUDE: i16 = 0x40; // original: SOURCE_BOMBER_MIN_CRUISE_ALTITUDE
-const BOMBER_MAX_CRUISE_ALTITUDE: i16 = 0x68; // original: SOURCE_BOMBER_MAX_CRUISE_ALTITUDE
-const BOMBER_CRUISE_WINDOW_HALF_PIXELS: i16 = 0x10; // original: SOURCE_BOMBER_CRUISE_WINDOW_HALF_PIXELS
-const ACTIVE_BOMBER_BOMB_LIMIT: usize = 10; // original: SOURCE_ACTIVE_BOMBER_BOMB_LIMIT
-const MAX_ACTIVE_WAVE_ENEMIES: usize = 5; // original: SOURCE_MAX_ACTIVE_WAVE_ENEMIES
-const START_HUMAN_COUNT: u8 = 10; // original: SOURCE_START_HUMAN_COUNT
-const TARGET_LIST_ENTRY_COUNT: usize = 32; // original: SOURCE_TARGET_LIST_ENTRY_COUNT
+const BOMBER_LOOP_SLEEP_TICKS: u8 = 1;
+const BOMBER_ANIMATION_FRAME_COUNT: u8 = 4;
+const BOMBER_CRUISE_ALTITUDE: i16 = 0x50;
+const BOMBER_MIN_CRUISE_ALTITUDE: i16 = 0x40;
+const BOMBER_MAX_CRUISE_ALTITUDE: i16 = 0x68;
+const BOMBER_CRUISE_WINDOW_HALF_PIXELS: i16 = 0x10;
+const ACTIVE_BOMBER_BOMB_LIMIT: usize = 10;
+const MAX_ACTIVE_WAVE_ENEMIES: usize = 5;
+const START_HUMAN_COUNT: u8 = 10;
+const TARGET_LIST_ENTRY_COUNT: usize = 32;
 const ACTOR_RNG_MULTIPLIER: u8 = 3;
 const ACTOR_RNG_INCREMENT: u8 = 17;
 const ACTOR_RNG_LSEED_MIX_SHIFT: u8 = 3;
@@ -420,9 +420,9 @@ const STATUS_HIGH_SCORE_POSITION: Point = Point::new(94, 6);
 const STATUS_PLAYER_TWO_SCORE_POSITION: Point = Point::new(208, 6);
 const STATUS_WAVE_POSITION: Point = Point::new(8, 32);
 const STATUS_CREDITS_POSITION: Point = Point::new(176, 226);
-const CREDITS_MESSAGE: MessageId = MessageId::CreditsPrompt; // original: CREDV
-const PRESENTS_MESSAGE: MessageId = MessageId::WilliamsElectronics; // original: ELECV
-const ATTRACT_PRESENTS_ELECTRONICS_CELL: ScreenAddress = ScreenAddress::new(0x3258); // original: SOURCE_ATTRACT_PRESENTS_ELECTRONICS_CELL
+const CREDITS_MESSAGE: MessageId = MessageId::CreditsPrompt;
+const PRESENTS_MESSAGE: MessageId = MessageId::WilliamsElectronics;
+const ATTRACT_PRESENTS_ELECTRONICS_CELL: ScreenAddress = ScreenAddress::new(0x3258);
 const ACTOR_HUD_SCORE_DIGIT_DISPLAY_COUNT: usize = 6;
 const ACTOR_HUD_SCORE_DISPLAY_MAX: u32 = 999_999;
 const ACTOR_HUD_PLAYER_ONE_SCORE_ORIGIN: [f32; 2] = [18.0, 21.0];
@@ -454,34 +454,34 @@ const LANDER_PICKUP_RADIUS_Y: i16 = 8;
 const LANDER_CONVERSION_Y: i16 = 24;
 const MUTANT_SEEK_SPEED: i16 = 1;
 const MUTANT_SHOT_LIFETIME: u16 = 90;
-const MUTANT_LOOP_SLEEP_TICKS: u8 = 2; // original: SOURCE_MUTANT_LOOP_SLEEP_TICKS
-const MUTANT_X_DISTANCE_OFFSET: u16 = 380; // original: SOURCE_MUTANT_X_DISTANCE_OFFSET
-const MUTANT_CLOSE_X_WINDOW: u16 = 0x0700; // original: SOURCE_MUTANT_CLOSE_X_WINDOW
-const MUTANT_VERTICAL_WINDOW: u8 = 8; // original: SOURCE_MUTANT_VERTICAL_WINDOW
-const FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y: i16 = 0xA0; // original: SOURCE_FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y
+const MUTANT_LOOP_SLEEP_TICKS: u8 = 2;
+const MUTANT_X_DISTANCE_OFFSET: u16 = 380;
+const MUTANT_CLOSE_X_WINDOW: u16 = 0x0700;
+const MUTANT_VERTICAL_WINDOW: u8 = 8;
+const FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y: i16 = 0xA0;
 
 #[cfg(test)]
 fn actor_message_text(message: MessageId) -> &'static str {
     crate::reference_assets::message_text(message)
 }
-const MUTANT_DIVE_CONVERSION_X_CORRECTION: u16 = 0x0120; // original: SOURCE_TARGET6_MUTANT_CONVERSION_X_CORRECTION
-const MUTANT_DIVE_DEFERRED_SHOT_TIMER: u8 = 5; // original: SOURCE_TARGET6_MUTANT_DEFERRED_SHOT_TIMER
-const MUTANT_DIVE_POST_SHOT_TIMER: u8 = 0x2C; // original: SOURCE_TARGET6_MUTANT_POST_SHOT_TIMER
-const MUTANT_DIVE_COLLISION_PENDING_SHOT_TIMER: u8 = 0xFE; // original: SOURCE_TARGET6_MUTANT_FIRE2524_PENDING_SHOT_TIMER
-const MUTANT_DIVE_ENTRY_WORLD_WORDS: (u16, u16) = (0x037C, 0x3380); // original: SOURCE_TARGET6_MUTANT_DIVE_ENTRY_RAW
-const MUTANT_DIVE_FIRST_SHOT_WORLD_WORDS: (u16, u16) = (0x088C, 0x61B0); // original: SOURCE_TARGET6_MUTANT_DIVE_FIRST_SHOT_RAW
-const MUTANT_DIVE_SECOND_SHOT_WORLD_WORDS: (u16, u16) = (0x07FC, 0x7800); // original: SOURCE_TARGET6_MUTANT_DIVE_SECOND_SHOT_RAW
-const MUTANT_DIVE_FORCED_FIRST_SHOT_WORLD_WORDS: (u16, u16) = (0x082C, 0x5160); // original: SOURCE_TARGET6_MUTANT_FIRE2524_FIRST_SHOT_RAW
-const MUTANT_DIVE_FORCED_SECOND_SHOT_WORLD_WORDS: (u16, u16) = (0x07FC, 0x8150); // original: SOURCE_TARGET6_MUTANT_FIRE2524_SECOND_SHOT_RAW
-const MUTANT_DIVE_COLLISION_WORLD_Y_MIN: u16 = 0xA400; // original: SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MIN
-const MUTANT_DIVE_COLLISION_WORLD_Y_MAX: u16 = 0xA600; // original: SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_RAW_Y_MAX
-const MUTANT_DIVE_COLLISION_EXPLOSION_TOP_LEFT: Point = Point::new(0x20, 0xA2); // original: SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_TOP_LEFT
-const MUTANT_DIVE_COLLISION_EXPLOSION_ANCHOR: Point = Point::new(0x21, 0xA9); // original: SOURCE_TARGET6_MUTANT_FIRE2524_COLLISION_EXPLOSION_CENTER
-const MUTANT_DIVE_VISUAL_X_CORRECTION: u16 = 0x0168; // original: SOURCE_TARGET6_MUTANT_VISUAL_X_CORRECTION
-const OBJECT_ACTIVE_LEFT_MARGIN: u16 = 100 * 32; // original: SOURCE_OBJECT_ACTIVE_LEFT_BUFFER
-const OBJECT_ACTIVE_WORLD_WIDTH: u16 = 500 * 32; // original: SOURCE_OBJECT_ACTIVE_WINDOW
-const OBJECT_WORLD_TO_SCREEN_SHIFT: u8 = 6; // original: SOURCE_OBJECT_SCREEN_X_SHIFT
-const OBJECT_VISIBLE_SCREEN_WIDTH: u16 = 292; // original: SOURCE_OBJECT_VISIBLE_WIDTH
+const MUTANT_DIVE_CONVERSION_X_CORRECTION: u16 = 0x0120;
+const MUTANT_DIVE_DEFERRED_SHOT_TIMER: u8 = 5;
+const MUTANT_DIVE_POST_SHOT_TIMER: u8 = 0x2C;
+const MUTANT_DIVE_COLLISION_PENDING_SHOT_TIMER: u8 = 0xFE;
+const MUTANT_DIVE_ENTRY_WORLD_WORDS: (u16, u16) = (0x037C, 0x3380);
+const MUTANT_DIVE_FIRST_SHOT_WORLD_WORDS: (u16, u16) = (0x088C, 0x61B0);
+const MUTANT_DIVE_SECOND_SHOT_WORLD_WORDS: (u16, u16) = (0x07FC, 0x7800);
+const MUTANT_DIVE_FORCED_FIRST_SHOT_WORLD_WORDS: (u16, u16) = (0x082C, 0x5160);
+const MUTANT_DIVE_FORCED_SECOND_SHOT_WORLD_WORDS: (u16, u16) = (0x07FC, 0x8150);
+const MUTANT_DIVE_COLLISION_WORLD_Y_MIN: u16 = 0xA400;
+const MUTANT_DIVE_COLLISION_WORLD_Y_MAX: u16 = 0xA600;
+const MUTANT_DIVE_COLLISION_EXPLOSION_TOP_LEFT: Point = Point::new(0x20, 0xA2);
+const MUTANT_DIVE_COLLISION_EXPLOSION_ANCHOR: Point = Point::new(0x21, 0xA9);
+const MUTANT_DIVE_VISUAL_X_CORRECTION: u16 = 0x0168;
+const OBJECT_ACTIVE_LEFT_MARGIN: u16 = 100 * 32;
+const OBJECT_ACTIVE_WORLD_WIDTH: u16 = 500 * 32;
+const OBJECT_WORLD_TO_SCREEN_SHIFT: u8 = 6;
+const OBJECT_VISIBLE_SCREEN_WIDTH: u16 = 292;
 const BOMBER_DRIFT_SPEED: i16 = 1;
 const BOMBER_BOMB_PERIOD: u64 = 64;
 const POD_DRIFT_SPEED: i16 = 1;
@@ -503,251 +503,9 @@ const HUMAN_SAFE_LANDING_SCORE: u32 = 250;
 const ACTOR_ATTRACT_SCRIPT: &str = include_str!("../assets/actor-scripts/actor-attract.script");
 const ACTOR_BEHAVIOR_SCRIPT: &str = include_str!("../assets/actor-scripts/actor-behavior.script");
 const ACTOR_WAVE_SCRIPT: &str = include_str!("../assets/actor-scripts/actor-waves.script");
-const ACTOR_DEFAULT_DIFFICULTY_INITIAL: u8 = 5; // original: ACTOR_SOURCE_DEFAULT_DIFFICULTY_INITIAL
-const ACTOR_DEFAULT_DIFFICULTY_CEILING: u8 = 15; // original: ACTOR_SOURCE_DEFAULT_DIFFICULTY_CEILING
-const ACTOR_DATA_BACKED_WAVES: u16 = 16; // original: ACTOR_SOURCE_BACKED_WAVES
-const ACTOR_FIRST_WAVE_HUMAN_SPAWNS: [ActorHumanSpawn; 10] = [
-    // original: ACTOR_SOURCE_FIRST_WAVE_HUMAN_SPAWNS
-    ActorHumanSpawn::from_first_wave_record(
-        0,
-        FirstWaveHumanSpawnRecord {
-            world_x: 0x18C3,
-            world_y: 0xE000,
-            animation_frame: SpriteFrameIndex::new(2),
-        },
-    ),
-    ActorHumanSpawn::from_first_wave_record(
-        1,
-        FirstWaveHumanSpawnRecord {
-            world_x: 0x1C81,
-            world_y: 0xE100,
-            animation_frame: SpriteFrameIndex::new(3),
-        },
-    ),
-    ActorHumanSpawn::from_first_wave_record(
-        2,
-        FirstWaveHumanSpawnRecord {
-            world_x: 0x4E30,
-            world_y: 0xE000,
-            animation_frame: SpriteFrameIndex::new(0),
-        },
-    ),
-    ActorHumanSpawn::from_first_wave_record(
-        3,
-        FirstWaveHumanSpawnRecord {
-            world_x: 0x5718,
-            world_y: 0xE000,
-            animation_frame: SpriteFrameIndex::new(0),
-        },
-    ),
-    ActorHumanSpawn::from_first_wave_record(
-        4,
-        FirstWaveHumanSpawnRecord {
-            world_x: 0x9B8C,
-            world_y: 0xE000,
-            animation_frame: SpriteFrameIndex::new(0),
-        },
-    ),
-    ActorHumanSpawn::from_first_wave_record(
-        5,
-        FirstWaveHumanSpawnRecord {
-            world_x: 0x9DC6,
-            world_y: 0xE000,
-            animation_frame: SpriteFrameIndex::new(0),
-        },
-    ),
-    ActorHumanSpawn::from_first_wave_record(
-        6,
-        FirstWaveHumanSpawnRecord {
-            world_x: 0xCEE3,
-            world_y: 0xE000,
-            animation_frame: SpriteFrameIndex::new(2),
-        },
-    ),
-    ActorHumanSpawn::from_first_wave_record(
-        7,
-        FirstWaveHumanSpawnRecord {
-            world_x: 0xD771,
-            world_y: 0xE000,
-            animation_frame: SpriteFrameIndex::new(2),
-        },
-    ),
-    ActorHumanSpawn::from_first_wave_record(
-        8,
-        FirstWaveHumanSpawnRecord {
-            world_x: 0xD2B8,
-            world_y: 0xE000,
-            animation_frame: SpriteFrameIndex::new(0),
-        },
-    ),
-    ActorHumanSpawn::from_first_wave_record(
-        9,
-        FirstWaveHumanSpawnRecord {
-            world_x: 0xE8DC,
-            world_y: 0xE000,
-            animation_frame: SpriteFrameIndex::new(0),
-        },
-    ),
-];
-const ACTOR_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
-    // original: ACTOR_SOURCE_FIRST_WAVE_LANDER_SPAWNS
-    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
-        world_x: 0xFB33,
-        world_y: 0x2CE0,
-        x_velocity: 0xFFDE,
-        y_velocity: 0x0070,
-        shot_timer: 0x27,
-        sleep_ticks: 0x04,
-        animation_frame: SpriteFrameIndex::new(1),
-        target_human_index: Some(1),
-    }),
-    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
-        world_x: 0x3F4A,
-        world_y: 0x2CE0,
-        x_velocity: FIRST_WAVE_EARLY_RESERVE_TARGET2_X_VELOCITY,
-        y_velocity: 0x0070,
-        shot_timer: 0x3B,
-        sleep_ticks: 0x04,
-        animation_frame: SpriteFrameIndex::new(1),
-        target_human_index: Some(2),
-    }),
-    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
-        world_x: 0x67FF,
-        world_y: 0x2C70,
-        x_velocity: 0x0012,
-        y_velocity: 0x0070,
-        shot_timer: 0x23,
-        sleep_ticks: 0x04,
-        animation_frame: SpriteFrameIndex::new(1),
-        target_human_index: Some(3),
-    }),
-    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
-        world_x: 0x0D11,
-        world_y: 0x2C70,
-        x_velocity: 0x0014,
-        y_velocity: 0x0070,
-        shot_timer: 0x3C,
-        sleep_ticks: 0x04,
-        animation_frame: SpriteFrameIndex::new(0),
-        target_human_index: Some(4),
-    }),
-    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
-        world_x: 0x41B9,
-        world_y: 0x2C70,
-        x_velocity: 0x001A,
-        y_velocity: 0x0070,
-        shot_timer: 0x25,
-        sleep_ticks: 0x04,
-        animation_frame: SpriteFrameIndex::new(1),
-        target_human_index: Some(5),
-    }),
-];
-const ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
-    // original: ACTOR_SOURCE_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS
-    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
-        world_x: 0x689A,
-        world_y: 0x2C70,
-        x_velocity: 0x001E,
-        y_velocity: 0x0070,
-        shot_timer: 0x10,
-        sleep_ticks: 0,
-        animation_frame: SpriteFrameIndex::new(1),
-        target_human_index: Some(7),
-    }),
-    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
-        world_x: 0x43D3,
-        world_y: 0x2C70,
-        x_velocity: 0xFFEC,
-        y_velocity: 0x0070,
-        shot_timer: 0x3A,
-        sleep_ticks: 0,
-        animation_frame: SpriteFrameIndex::new(1),
-        target_human_index: Some(9),
-    }),
-    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
-        world_x: 0x1F51,
-        world_y: 0x2C70,
-        x_velocity: 0x0014,
-        y_velocity: 0x0070,
-        shot_timer: 0x13,
-        sleep_ticks: 0,
-        animation_frame: SpriteFrameIndex::new(0),
-        target_human_index: Some(8),
-    }),
-    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
-        world_x: 0xFA03,
-        world_y: 0x2C70,
-        x_velocity: 0x0016,
-        y_velocity: 0x0070,
-        shot_timer: 0x26,
-        sleep_ticks: 0,
-        animation_frame: SpriteFrameIndex::new(1),
-        target_human_index: Some(7),
-    }),
-    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
-        world_x: 0xCF34,
-        world_y: 0x2CE0,
-        x_velocity: 0,
-        y_velocity: 0,
-        shot_timer: 0x34,
-        sleep_ticks: 1,
-        animation_frame: SpriteFrameIndex::new(0),
-        target_human_index: Some(6),
-    }),
-];
-const ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
-    // original: ACTOR_SOURCE_FIRST_WAVE_REFILL_LANDER_SPAWNS
-    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
-        world_x: 0xBC29,
-        world_y: 0x2CFD,
-        x_velocity: 0x001C,
-        y_velocity: 0x0090,
-        shot_timer: 0x36,
-        sleep_ticks: 6,
-        animation_frame: SpriteFrameIndex::new(1),
-        target_human_index: Some(7),
-    }),
-    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
-        world_x: 0xE14C,
-        world_y: 0x2CAE,
-        x_velocity: 0x000E,
-        y_velocity: 0x0090,
-        shot_timer: 0x2F,
-        sleep_ticks: 0,
-        animation_frame: SpriteFrameIndex::new(0),
-        target_human_index: Some(4),
-    }),
-    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
-        world_x: 0x0A63,
-        world_y: 0x2CF0,
-        x_velocity: 0xFFF4,
-        y_velocity: 0x0090,
-        shot_timer: 0x23,
-        sleep_ticks: 1,
-        animation_frame: SpriteFrameIndex::new(0),
-        target_human_index: Some(3),
-    }),
-    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
-        world_x: 0x531B,
-        world_y: 0x2CC0,
-        x_velocity: 0xFFF6,
-        y_velocity: 0x0090,
-        shot_timer: 0x30,
-        sleep_ticks: 1,
-        animation_frame: SpriteFrameIndex::new(0),
-        target_human_index: Some(2),
-    }),
-    ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
-        world_x: 0x98D9,
-        world_y: 0x2CB8,
-        x_velocity: 0x001A,
-        y_velocity: 0x0090,
-        shot_timer: 0x1F,
-        sleep_ticks: 1,
-        animation_frame: SpriteFrameIndex::new(0),
-        target_human_index: Some(1),
-    }),
-];
+const ACTOR_DEFAULT_DIFFICULTY_INITIAL: u8 = 5;
+const ACTOR_DEFAULT_DIFFICULTY_CEILING: u8 = 15;
+const ACTOR_DATA_BACKED_WAVES: u16 = 16;
 const ACTOR_WAVE_ACTIVE_SPAWN_SLOTS: [Point; MAX_ACTIVE_WAVE_ENEMIES] = [
     Point::new(0xE4, 0x2A),
     Point::new(228, 104),

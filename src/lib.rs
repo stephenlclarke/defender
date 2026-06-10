@@ -1,8 +1,7 @@
 //! Defender actor-runtime implementation.
 //!
 //! The accepted runtime is a clean Rust implementation backed by actor-owned
-//! simulation, `wgpu` rendering, and synthesized audio. The earlier oracle
-//! implementation has been retired from this crate.
+//! simulation, `wgpu` rendering, and synthesized audio.
 
 pub mod actor_game;
 mod actor_smoke;

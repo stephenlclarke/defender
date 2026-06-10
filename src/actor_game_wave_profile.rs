@@ -18,11 +18,8 @@ impl ActorWaveTuning {
                 crate::reference_assets::WaveMetric::LanderXVelocity,
                 wave,
             ),
-            lander_y_velocity_msb: actor_wave_tuning_u8(
+            lander_y_velocity: actor_wave_tuning_u16(
                 crate::reference_assets::WaveMetric::LanderYVelocityHigh,
-                wave,
-            ),
-            lander_y_velocity_lsb: actor_wave_tuning_u8(
                 crate::reference_assets::WaveMetric::LanderYVelocityLow,
                 wave,
             ),
@@ -62,11 +59,8 @@ impl ActorWaveTuning {
                 crate::reference_assets::WaveMetric::MutantRandomY,
                 wave,
             ),
-            mutant_y_velocity_msb: actor_wave_tuning_u8(
+            mutant_y_velocity: actor_wave_tuning_u16(
                 crate::reference_assets::WaveMetric::MutantYVelocityHigh,
-                wave,
-            ),
-            mutant_y_velocity_lsb: actor_wave_tuning_u8(
                 crate::reference_assets::WaveMetric::MutantYVelocityLow,
                 wave,
             ),
@@ -401,6 +395,17 @@ const fn actor_sign_extend_u8_to_u16(value: u8) -> u16 {
 fn actor_wave_tuning_u8(metric: crate::reference_assets::WaveMetric, wave: u8) -> u8 {
     u8::try_from(actor_wave_tuning_value(metric, wave))
         .unwrap_or_else(|_| panic!("actor wave metric should fit u8"))
+}
+
+fn actor_wave_tuning_u16(
+    high_metric: crate::reference_assets::WaveMetric,
+    low_metric: crate::reference_assets::WaveMetric,
+    wave: u8,
+) -> u16 {
+    u16::from_be_bytes([
+        actor_wave_tuning_u8(high_metric, wave),
+        actor_wave_tuning_u8(low_metric, wave),
+    ])
 }
 
 fn actor_wave_tuning_u32(metric: crate::reference_assets::WaveMetric, wave: u8) -> u32 {

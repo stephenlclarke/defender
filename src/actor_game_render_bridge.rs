@@ -552,15 +552,15 @@ fn actor_draw_screen_position(report: &StepReport, draw: &DrawCommand) -> Option
         return Some(draw.position);
     };
 
-    actor_project_runtime_state_draw(snapshot, draw.position, report.background_left)
+    actor_project_reference_state_draw(snapshot, draw.position, report.background_left)
 }
 
-fn actor_project_runtime_state_draw(
+fn actor_project_reference_state_draw(
     snapshot: &ActorSnapshot,
     draw_position: Point,
     background_left: u16,
 ) -> Option<Point> {
-    let Some(x_fraction) = actor_runtime_state_x_fraction(snapshot) else {
+    let Some(x_fraction) = actor_reference_state_x_fraction(snapshot) else {
         return Some(draw_position);
     };
     if draw_position != snapshot.position && snapshot.kind != ActorKind::Human {
@@ -569,21 +569,8 @@ fn actor_project_runtime_state_draw(
     actor_screen_position_from_world(draw_position, x_fraction, background_left)
 }
 
-fn actor_runtime_state_x_fraction(snapshot: &ActorSnapshot) -> Option<u8> {
-    snapshot
-        .runtime.as_lander()
-        .map(|runtime_state| runtime_state.x_fraction)
-        .or_else(|| snapshot.runtime.as_bomber().map(|runtime_state| runtime_state.x_fraction))
-        .or_else(|| snapshot.runtime.as_pod().map(|runtime_state| runtime_state.x_fraction))
-        .or_else(|| snapshot.runtime.as_swarmer().map(|runtime_state| runtime_state.x_fraction))
-        .or_else(|| snapshot.runtime.as_baiter().map(|runtime_state| runtime_state.x_fraction))
-        .or_else(|| snapshot.runtime.as_mutant().map(|runtime_state| runtime_state.x_fraction))
-        .or_else(|| snapshot.runtime.as_human().map(|runtime_state| runtime_state.x_fraction))
-        .or_else(|| {
-            snapshot
-                .runtime.as_enemy_projectile()
-                .map(|runtime_state| runtime_state.x_fraction)
-        })
+fn actor_reference_state_x_fraction(snapshot: &ActorSnapshot) -> Option<u8> {
+    snapshot.reference_x_fraction()
 }
 
 fn actor_screen_position_from_world(

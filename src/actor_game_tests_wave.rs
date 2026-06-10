@@ -83,8 +83,7 @@
         assert_eq!(first_wave_tuning.baiter_shot_time, 10);
         assert_eq!(first_wave_tuning.baiter_seek_probability, 200);
         assert_eq!(first_wave_tuning.mutant_random_y, 1);
-        assert_eq!(first_wave_tuning.mutant_y_velocity_msb, 0);
-        assert_eq!(first_wave_tuning.mutant_y_velocity_lsb, 128);
+        assert_eq!(first_wave_tuning.mutant_y_velocity, 0x0080);
         assert_eq!(first_wave_tuning.mutant_x_velocity, 32);
         assert_eq!(first_wave_tuning.mutant_shot_time, 32);
 
@@ -123,8 +122,8 @@
             ]
         );
         assert_eq!(
-            first.human_spawns[1].runtime_state,
-            Some(HumanRuntimeState {
+            first.human_spawns[1].reference_state,
+            Some(HumanReferenceState {
                 x_fraction: 0x81,
                 y_fraction: 0x00,
                 animation_frame: crate::SpriteFrameIndex::new(3),
@@ -132,8 +131,8 @@
             })
         );
         assert_eq!(
-            first.lander_spawns[0].runtime_state,
-            Some(LanderRuntimeState {
+            first.lander_spawns[0].reference_state,
+            Some(LanderReferenceState {
                 x_fraction: 0x33,
                 y_fraction: 0xE0,
                 x_velocity: 0xFFDE,
@@ -145,8 +144,8 @@
             })
         );
         assert_eq!(
-            first.lander_spawns[3].runtime_state,
-            Some(LanderRuntimeState {
+            first.lander_spawns[3].reference_state,
+            Some(LanderReferenceState {
                 x_fraction: 0x11,
                 y_fraction: 0x70,
                 x_velocity: 0x0014,
@@ -181,8 +180,8 @@
             ]
         );
         assert_eq!(
-            second.lander_spawns[0].runtime_state,
-            Some(LanderRuntimeState {
+            second.lander_spawns[0].reference_state,
+            Some(LanderReferenceState {
                 x_fraction: 0xAD,
                 y_fraction: 0,
                 x_velocity: 0x001E,
@@ -194,8 +193,8 @@
             })
         );
         assert_eq!(
-            second.lander_spawns[1].runtime_state,
-            Some(LanderRuntimeState {
+            second.lander_spawns[1].reference_state,
+            Some(LanderReferenceState {
                 x_fraction: 0x55,
                 y_fraction: 0,
                 x_velocity: 0xFFDE,
@@ -207,8 +206,8 @@
             })
         );
         assert_eq!(
-            second.lander_spawns[2].runtime_state,
-            Some(LanderRuntimeState {
+            second.lander_spawns[2].reference_state,
+            Some(LanderReferenceState {
                 x_fraction: 0x4A,
                 y_fraction: 0,
                 x_velocity: 0x0020,
@@ -222,8 +221,8 @@
         assert_eq!(second.bomber_spawns.len(), 1);
         assert_eq!(second.bomber_spawn_points(), vec![Point::new(228, 104)]);
         assert_eq!(
-            second.bomber_spawns[0].runtime_state,
-            Some(BomberRuntimeState {
+            second.bomber_spawns[0].reference_state,
+            Some(BomberReferenceState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0xFFD8,
@@ -237,8 +236,8 @@
         assert_eq!(second.pod_spawns.len(), 1);
         assert_eq!(second.pod_spawn_points(), vec![Point::new(184, 72)]);
         assert_eq!(
-            second.pod_spawns[0].runtime_state,
-            Some(PodRuntimeState {
+            second.pod_spawns[0].reference_state,
+            Some(PodReferenceState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0x0020,
@@ -261,8 +260,8 @@
             ]
         );
         assert_eq!(
-            second.human_spawns[0].runtime_state,
-            Some(HumanRuntimeState {
+            second.human_spawns[0].reference_state,
+            Some(HumanReferenceState {
                 x_fraction: 0xAD,
                 y_fraction: 0,
                 animation_frame: crate::SpriteFrameIndex::new(2),
@@ -270,8 +269,8 @@
             })
         );
         assert_eq!(
-            second.human_spawns[9].runtime_state,
-            Some(HumanRuntimeState {
+            second.human_spawns[9].reference_state,
+            Some(HumanReferenceState {
                 x_fraction: 0x69,
                 y_fraction: 0,
                 animation_frame: crate::SpriteFrameIndex::new(2),
@@ -404,10 +403,10 @@
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::Bomber)
             .expect("second wave should publish bomber runtime snapshot");
-        let (expected_bomber_position, expected_bomber_runtime_state) =
+        let (expected_bomber_position, expected_bomber_reference_state) =
             expected_bomber_after_runtime_motion(
                 Point::new(228, 104),
-                BomberRuntimeState {
+                BomberReferenceState {
                     x_fraction: 0,
                     y_fraction: 0,
                     x_velocity: 0xFFD8,
@@ -425,8 +424,8 @@
         assert!(live.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Lander
                 && snapshot.position == Point::new(0xD2, 0x2C)
-                && snapshot.runtime.as_lander()
-                    == Some(LanderRuntimeState {
+                && snapshot.reference_state.as_lander()
+                    == Some(LanderReferenceState {
                         x_fraction: 0xCB,
                         y_fraction: 0xB0,
                         x_velocity: 0x001E,
@@ -439,13 +438,13 @@
         }));
         assert_eq!(bomber_snapshot.position, expected_bomber_position);
         assert_eq!(
-            bomber_snapshot.runtime.as_bomber(),
-            Some(expected_bomber_runtime_state)
+            bomber_snapshot.reference_state.as_bomber(),
+            Some(expected_bomber_reference_state)
         );
         assert!(live.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Pod
-                && snapshot.runtime.as_pod()
-                    == Some(PodRuntimeState {
+                && snapshot.reference_state.as_pod()
+                    == Some(PodReferenceState {
                         x_fraction: 0x20,
                         y_fraction: 0,
                         x_velocity: 0x0020,
@@ -459,7 +458,7 @@
                     && matches!(
                         draw.effect,
                         VisualEffect::BomberSpriteFrame { animation_frame }
-                            if animation_frame == expected_bomber_runtime_state.animation_frame
+                            if animation_frame == expected_bomber_reference_state.animation_frame
                     ))
         );
         assert!(
@@ -523,12 +522,12 @@
         assert!(
             runtime_landers
                 .iter()
-                .all(|snapshot| snapshot.runtime.as_lander().is_some())
+                .all(|snapshot| snapshot.reference_state.as_lander().is_some())
         );
         assert!(runtime_landers.iter().any(|snapshot| {
             snapshot
-                .runtime.as_lander()
-                .is_some_and(|runtime_state| runtime_state.target_human_index == Some(4))
+                .reference_state.as_lander()
+                .is_some_and(|reference_state| reference_state.target_human_index == Some(4))
         }));
     }
 
@@ -625,10 +624,10 @@
         );
         assert!(report.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Lander
-                && snapshot.runtime.as_lander().is_some_and(|runtime_state| {
-                    runtime_state.target_human_index == Some(FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT)
-                        && runtime_state.x_velocity == 0
-                        && runtime_state.y_velocity == 0
+                && snapshot.reference_state.as_lander().is_some_and(|reference_state| {
+                    reference_state.target_human_index == Some(FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT)
+                        && reference_state.x_velocity == 0
+                        && reference_state.y_velocity == 0
                 })
         }));
     }
@@ -730,8 +729,8 @@
             .filter(|snapshot| {
                 snapshot.kind == ActorKind::Lander
                     && snapshot
-                        .runtime.as_lander()
-                        .is_some_and(|runtime_state| runtime_state.y_velocity == 0x0090)
+                        .reference_state.as_lander()
+                        .is_some_and(|reference_state| reference_state.y_velocity == 0x0090)
             })
             .collect::<Vec<_>>();
         assert_eq!(refill_landers.len(), 5);
@@ -747,8 +746,8 @@
             .find(|snapshot| snapshot.bounds.is_some())
             .expect("target-3 refill lane should be visible");
         assert_eq!(
-            visible_refill.runtime.as_lander(),
-            Some(LanderRuntimeState {
+            visible_refill.reference_state.as_lander(),
+            Some(LanderReferenceState {
                 x_fraction: 0x63,
                 y_fraction: 0xF0,
                 x_velocity: 0xFFF4,
@@ -768,8 +767,8 @@
                 .filter(|enemy| {
                     matches!(enemy.kind, CleanEnemyKind::Lander)
                         && enemy
-                            .lander_runtime
-                            .is_some_and(|runtime_state| runtime_state.y_velocity == 0x0090)
+                            .lander_reference_state
+                            .is_some_and(|reference_state| reference_state.y_velocity == 0x0090)
                 })
                 .count(),
             1
@@ -867,8 +866,8 @@
         assert!(cleared.game_state().world.enemies.iter().all(|enemy| {
             !matches!(enemy.kind, CleanEnemyKind::Lander)
                 || enemy
-                    .lander_runtime
-                    .is_none_or(|runtime_state| runtime_state.y_velocity != 0x0090)
+                    .lander_reference_state
+                    .is_none_or(|reference_state| reference_state.y_velocity != 0x0090)
         }));
 
         let next_wave = step_until_wave_started(&mut driver, 2);
@@ -967,7 +966,7 @@
             expected_rng.advance().snapshot()
         );
 
-        let prompt = mutant_runtime_prompt_for_test(
+        let prompt = mutant_reference_state_prompt_for_test(
             restored.step,
             restored.wave,
             restored
@@ -984,16 +983,16 @@
             .collect::<Vec<_>>();
         assert_eq!(runtime_mutants.len(), 2);
         for (snapshot, spawn) in runtime_mutants.iter().zip([first_spawn, second_spawn]) {
-            let (expected_position, expected_runtime_state, _) = expected_mutant_runtime_after_motion(
+            let (expected_position, expected_reference_state, _) = expected_mutant_reference_state_after_motion(
                 spawn.position,
-                spawn.runtime_state.expect("mutant wave restore state"),
+                spawn.reference_state.expect("mutant wave restore state"),
                 snapshot.id,
                 &prompt,
                 behavior,
             );
             assert_eq!(snapshot.position, expected_position);
-            assert_eq!(snapshot.runtime.as_mutant(), Some(expected_runtime_state));
-            assert!(snapshot.runtime.as_lander().is_none());
+            assert_eq!(snapshot.reference_state.as_mutant(), Some(expected_reference_state));
+            assert!(snapshot.reference_state.as_lander().is_none());
         }
 
         let followup = driver.step(GameInput::NONE);
@@ -1018,7 +1017,7 @@
                 .snapshots
                 .iter()
                 .filter(|snapshot| snapshot.kind == ActorKind::Mutant)
-                .all(|snapshot| snapshot.runtime.as_mutant().is_some())
+                .all(|snapshot| snapshot.reference_state.as_mutant().is_some())
         );
     }
 
@@ -1088,7 +1087,7 @@
             expected_rng.advance().snapshot()
         );
 
-        let prompt = mutant_runtime_prompt_for_test(
+        let prompt = mutant_reference_state_prompt_for_test(
             restored.step,
             restored.wave,
             restored
@@ -1106,16 +1105,16 @@
         runtime_mutants.sort_by_key(|snapshot| snapshot.id);
         assert_eq!(runtime_mutants.len(), 2);
         for (snapshot, spawn) in runtime_mutants.iter().zip([first_spawn, second_spawn]) {
-            let (expected_position, expected_runtime_state, _) = expected_mutant_runtime_after_motion(
+            let (expected_position, expected_reference_state, _) = expected_mutant_reference_state_after_motion(
                 spawn.position,
-                spawn.runtime_state.expect("mutant wave restore state"),
+                spawn.reference_state.expect("mutant wave restore state"),
                 snapshot.id,
                 &prompt,
                 behavior,
             );
             assert_eq!(snapshot.position, expected_position);
-            assert_eq!(snapshot.runtime.as_mutant(), Some(expected_runtime_state));
-            assert!(snapshot.runtime.as_lander().is_none());
+            assert_eq!(snapshot.reference_state.as_mutant(), Some(expected_reference_state));
+            assert!(snapshot.reference_state.as_lander().is_none());
         }
     }
 
@@ -1141,20 +1140,20 @@
         };
         let mut expected_rng = driver.actor_rng;
         let mut expected_pod = ActorPodSpawn::from_wave_restore(&mut expected_rng);
-        if let Some(runtime_state) = &mut expected_pod.runtime_state {
+        if let Some(reference_state) = &mut expected_pod.reference_state {
             let (x, x_fraction) = step_motion_axis(
                 expected_pod.position.x,
-                runtime_state.x_fraction,
-                runtime_state.x_velocity,
+                reference_state.x_fraction,
+                reference_state.x_velocity,
             );
             let (y, y_fraction) = step_wrapping_motion_y(
                 expected_pod.position.y,
-                runtime_state.y_fraction,
-                runtime_state.y_velocity,
+                reference_state.y_fraction,
+                reference_state.y_velocity,
             );
             expected_pod.position = Point::new(x, y);
-            runtime_state.x_fraction = x_fraction;
-            runtime_state.y_fraction = y_fraction;
+            reference_state.x_fraction = x_fraction;
+            reference_state.y_fraction = y_fraction;
         }
 
         let restored = driver.step(GameInput::NONE);
@@ -1195,42 +1194,42 @@
         assert!(
             bombers
                 .iter()
-                .all(|snapshot| snapshot.runtime.as_bomber().is_some())
+                .all(|snapshot| snapshot.reference_state.as_bomber().is_some())
         );
         assert!(bombers.iter().any(|snapshot| {
-            let runtime_state = snapshot.runtime.as_bomber().expect("bomber runtime state");
-            runtime_state.x_velocity
+            let reference_state = snapshot.reference_state.as_bomber().expect("bomber runtime state");
+            reference_state.x_velocity
                 == actor_sign_extend_u8_to_u16(
                     ActorWaveTuning::for_wave(2).bomber_x_velocity,
                 )
-                && runtime_state.slot == 0
+                && reference_state.slot == 0
         }));
         assert!(restored.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Pod
                 && snapshot.position == expected_pod.position
-                && snapshot.runtime.as_pod() == expected_pod.runtime_state
+                && snapshot.reference_state.as_pod() == expected_pod.reference_state
         }));
         assert!(
             restored
                 .snapshots
                 .iter()
-                .filter_map(|snapshot| snapshot.runtime.as_bomber())
-                .any(|runtime_state| {
+                .filter_map(|snapshot| snapshot.reference_state.as_bomber())
+                .any(|reference_state| {
                     let expected_spawn = ActorBomberSpawn::wave_restore_batch(
                         ActorWaveTuning::for_wave(2),
                         absolute_world_x(player_position, 0),
                         1,
                     )[0];
-                    let expected_runtime_state =
+                    let expected_reference_state =
                         expected_spawn
-                            .runtime_state
+                            .reference_state
                             .expect("expected bomber runtime state");
                     let (_, x_fraction) = step_motion_axis(
                         expected_spawn.position.x,
-                        expected_runtime_state.x_fraction,
-                        expected_runtime_state.x_velocity,
+                        expected_reference_state.x_fraction,
+                        expected_reference_state.x_velocity,
                     );
-                    runtime_state.x_fraction == x_fraction
+                    reference_state.x_fraction == x_fraction
                 })
         );
     }
@@ -1282,18 +1281,18 @@
         runtime_swarmers.sort_by_key(|snapshot| snapshot.id);
         assert_eq!(runtime_swarmers.len(), 4);
         for (snapshot, spawn) in runtime_swarmers.iter().zip(expected_spawns) {
-            let mut expected_runtime_state =
-                spawn.runtime_state.expect("swarmer wave restore metadata");
-            expected_runtime_state.sleep_ticks =
-                expected_runtime_state.sleep_ticks.saturating_sub(1);
+            let mut expected_reference_state =
+                spawn.reference_state.expect("swarmer wave restore metadata");
+            expected_reference_state.sleep_ticks =
+                expected_reference_state.sleep_ticks.saturating_sub(1);
             assert_eq!(snapshot.position, spawn.position);
-            assert_eq!(snapshot.runtime.as_swarmer(), Some(expected_runtime_state));
+            assert_eq!(snapshot.reference_state.as_swarmer(), Some(expected_reference_state));
         }
         assert!(runtime_swarmers.iter().all(|snapshot| {
-            let runtime_state = snapshot.runtime.as_swarmer().expect("swarmer runtime state");
+            let reference_state = snapshot.reference_state.as_swarmer().expect("swarmer runtime state");
             snapshot.position == runtime_swarmers[0].position
-                && runtime_state.x_fraction == MINI_SWARMER_RESTORE_X_LOW
-                && runtime_state.y_fraction == 0
+                && reference_state.x_fraction == MINI_SWARMER_RESTORE_X_LOW
+                && reference_state.y_fraction == 0
         }));
     }
 
@@ -1303,7 +1302,7 @@
         driver.phase = Phase::Playing;
         let top = driver.spawn_pod_from_spawn(ActorPodSpawn {
             position: Point::new(0xD0, i16::from(PLAYFIELD_TOP_EDGE_Y)),
-            runtime_state: Some(PodRuntimeState {
+            reference_state: Some(PodReferenceState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1312,7 +1311,7 @@
         });
         let bottom = driver.spawn_pod_from_spawn(ActorPodSpawn {
             position: Point::new(0xE0, i16::from(PLAYFIELD_BOTTOM_EDGE_Y)),
-            runtime_state: Some(PodRuntimeState {
+            reference_state: Some(PodReferenceState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1327,8 +1326,8 @@
             Point::new(0xD0, i16::from(PLAYFIELD_BOTTOM_EDGE_Y))
         );
         assert_eq!(
-            snapshot_for(&report, top).runtime.as_pod(),
-            Some(PodRuntimeState {
+            snapshot_for(&report, top).reference_state.as_pod(),
+            Some(PodReferenceState {
                 x_fraction: 0,
                 y_fraction: 0xFF,
                 x_velocity: 0,
@@ -1340,8 +1339,8 @@
             Point::new(0xE0, i16::from(PLAYFIELD_TOP_EDGE_Y))
         );
         assert_eq!(
-            snapshot_for(&report, bottom).runtime.as_pod(),
-            Some(PodRuntimeState {
+            snapshot_for(&report, bottom).reference_state.as_pod(),
+            Some(PodReferenceState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1361,7 +1360,7 @@
         );
         let lander = driver.spawn_lander_from_spawn(ActorLanderSpawn {
             position: Point::new(0x70, i16::from(PLAYFIELD_TOP_EDGE_Y)),
-            runtime_state: Some(LanderRuntimeState {
+            reference_state: Some(LanderReferenceState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1371,10 +1370,11 @@
                 animation_frame: crate::SpriteFrameIndex::new(0),
                 target_human_index: None,
             }),
+            spawn_visibility: LanderSpawnVisibility::Normal,
         });
         let swarmer = driver.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
             position: Point::new(0x80, i16::from(PLAYFIELD_BOTTOM_EDGE_Y)),
-            runtime_state: Some(SwarmerRuntimeState {
+            reference_state: Some(SwarmerReferenceState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1387,7 +1387,7 @@
         });
         let baiter = driver.spawn_baiter_from_spawn(ActorBaiterSpawn {
             position: Point::new(0x90, i16::from(PLAYFIELD_TOP_EDGE_Y)),
-            runtime_state: Some(BaiterRuntimeState {
+            reference_state: Some(BaiterReferenceState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -1405,8 +1405,8 @@
             Point::new(0x70, i16::from(PLAYFIELD_BOTTOM_EDGE_Y))
         );
         assert_eq!(
-            snapshot_for(&report, lander).runtime.as_lander(),
-            Some(LanderRuntimeState {
+            snapshot_for(&report, lander).reference_state.as_lander(),
+            Some(LanderReferenceState {
                 x_fraction: 0,
                 y_fraction: 0xFF,
                 x_velocity: 0,
@@ -1422,8 +1422,8 @@
             Point::new(0x7F, i16::from(PLAYFIELD_TOP_EDGE_Y))
         );
         assert_eq!(
-            snapshot_for(&report, swarmer).runtime.as_swarmer(),
-            Some(SwarmerRuntimeState {
+            snapshot_for(&report, swarmer).reference_state.as_swarmer(),
+            Some(SwarmerReferenceState {
                 x_fraction: 0xE0,
                 y_fraction: 0,
                 x_velocity: 0xFFE0,
@@ -1439,8 +1439,8 @@
             Point::new(0x90, i16::from(PLAYFIELD_BOTTOM_EDGE_Y))
         );
         assert_eq!(
-            snapshot_for(&report, baiter).runtime.as_baiter(),
-            Some(BaiterRuntimeState {
+            snapshot_for(&report, baiter).reference_state.as_baiter(),
+            Some(BaiterReferenceState {
                 x_fraction: 0,
                 y_fraction: 0xFF,
                 x_velocity: 0,
@@ -1453,7 +1453,7 @@
     }
 
     #[test]
-    fn first_wave_landers_publish_runtime_state_and_animation_frames() {
+    fn first_wave_landers_publish_reference_state_and_animation_frames() {
         let mut driver = ActorGameDriver::new();
         driver.step(GameInput {
             coin: true,
@@ -1471,11 +1471,11 @@
             .find(|snapshot| {
                 snapshot.kind == ActorKind::Lander && snapshot.position == Point::new(0xFB, 0x2C)
             })
-            .expect("runtime-state first-wave lander should publish its restore position");
+            .expect("reference-state first-wave lander should publish its restore position");
 
         assert_eq!(
-            lander.runtime.as_lander(),
-            Some(LanderRuntimeState {
+            lander.reference_state.as_lander(),
+            Some(LanderReferenceState {
                 x_fraction: 0x33,
                 y_fraction: 0xE0,
                 x_velocity: 0xFFDE,
@@ -1526,13 +1526,13 @@
                     };
                     snapshot.kind == ActorKind::Lander && matches_known_lander
                 })
-                .expect("sleeping runtime-state lander should stay visible");
+                .expect("sleeping reference-state lander should stay visible");
             lander_id = Some(lander.id);
             assert_eq!(lander.position, initial);
             assert_eq!(
                 lander
-                    .runtime.as_lander()
-                    .map(|runtime_state| runtime_state.sleep_ticks),
+                    .reference_state.as_lander()
+                    .map(|reference_state| reference_state.sleep_ticks),
                 Some(expected_sleep)
             );
         }
@@ -1540,19 +1540,19 @@
         let awake = driver.step(GameInput::NONE);
         let lander = snapshot_for(
             &awake,
-            lander_id.expect("runtime-state lander id should be known"),
+            lander_id.expect("reference-state lander id should be known"),
         );
         assert_eq!(lander.position, Point::new(0xFB, 0x2D));
         assert_eq!(
             lander
-                .runtime.as_lander()
-                .map(|runtime_state| (runtime_state.x_fraction, runtime_state.y_fraction)),
+                .reference_state.as_lander()
+                .map(|reference_state| (reference_state.x_fraction, reference_state.y_fraction)),
             Some((0x11, 0x50))
         );
         assert_eq!(
             lander
-                .runtime.as_lander()
-                .map(|runtime_state| runtime_state.sleep_ticks),
+                .reference_state.as_lander()
+                .map(|reference_state| reference_state.sleep_ticks),
             Some(0)
         );
     }
@@ -1632,31 +1632,31 @@
         let shot_report = shot_report.expect("runtime lander should spawn a hostile shot");
 
         assert!(shot_report.sounds.contains(&SoundCue::LanderShot));
-        let (shot_position, shot_velocity, shot_runtime_state) = shot_report
+        let (shot_position, shot_velocity, shot_reference_state) = shot_report
             .commands
             .iter()
             .find_map(|command| match command {
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
                     position,
                     velocity,
-                    runtime_state,
-                }) => Some((*position, *velocity, *runtime_state)),
+                    reference_state,
+                }) => Some((*position, *velocity, *reference_state)),
                 _ => None,
             })
             .expect("runtime lander should emit a hostile shot command");
-        let lander_runtime = shot_report
+        let lander_reference_state = shot_report
             .snapshots
             .iter()
             .find(|snapshot| {
                 snapshot.kind == ActorKind::Lander && snapshot.position == shot_position
             })
-            .and_then(|snapshot| snapshot.runtime.as_lander())
+            .and_then(|snapshot| snapshot.reference_state.as_lander())
             .expect("runtime lander snapshot should own shot fractions");
         assert_eq!(
-            shot_runtime_state,
-            Some(EnemyProjectileRuntimeState {
-                x_fraction: lander_runtime.x_fraction,
-                y_fraction: lander_runtime.y_fraction,
+            shot_reference_state,
+            Some(EnemyProjectileReferenceState {
+                x_fraction: lander_reference_state.x_fraction,
+                y_fraction: lander_reference_state.y_fraction,
                 x_velocity: projectile_velocity_word(shot_velocity.dx),
                 y_velocity: projectile_velocity_word(shot_velocity.dy),
                 lifetime_ticks: projectile_lifetime_ticks(LANDER_SHOT_LIFETIME),
@@ -1675,18 +1675,18 @@
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::EnemyLaser)
             .expect("spawned hostile shot should publish an actor snapshot");
-        let projectile_runtime = enemy_laser
-            .runtime.as_enemy_projectile()
+        let projectile_reference_state = enemy_laser
+            .reference_state.as_enemy_projectile()
             .expect("hostile shot should publish projectile runtime metadata");
         assert_eq!(
-            projectile_runtime.x_velocity,
+            projectile_reference_state.x_velocity,
             projectile_velocity_word(enemy_laser.velocity.dx)
         );
         assert_eq!(
-            projectile_runtime.y_velocity,
+            projectile_reference_state.y_velocity,
             projectile_velocity_word(enemy_laser.velocity.dy)
         );
-        assert!(projectile_runtime.lifetime_ticks > 0);
+        assert!(projectile_reference_state.lifetime_ticks > 0);
         assert!(
             settled
                 .draws
@@ -1736,16 +1736,16 @@
             Velocity::new(1, -1),
             None,
         );
-        shot.runtime_state.x_velocity = 0x0180;
-        shot.runtime_state.y_velocity = 0xFF80;
+        shot.reference_state.x_velocity = 0x0180;
+        shot.reference_state.y_velocity = 0xFF80;
 
         let first = shot.update(&prompt);
 
         assert_eq!(first.snapshot.position, Point::new(11, 79));
         assert_eq!(first.snapshot.velocity, Velocity::new(1, -1));
         assert_eq!(
-            first.snapshot.runtime.as_enemy_projectile(),
-            Some(EnemyProjectileRuntimeState {
+            first.snapshot.reference_state.as_enemy_projectile(),
+            Some(EnemyProjectileReferenceState {
                 x_fraction: 0x80,
                 y_fraction: 0x80,
                 x_velocity: 0x0180,
@@ -1761,8 +1761,8 @@
         assert_eq!(second.snapshot.position, Point::new(13, 79));
         assert_eq!(second.snapshot.velocity, Velocity::new(2, 0));
         assert_eq!(
-            second.snapshot.runtime.as_enemy_projectile(),
-            Some(EnemyProjectileRuntimeState {
+            second.snapshot.reference_state.as_enemy_projectile(),
+            Some(EnemyProjectileReferenceState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0x0180,
@@ -1790,7 +1790,7 @@
             .map(|_| {
                 let report = driver.step(GameInput::NONE);
                 snapshot_for(&report, shot)
-                    .runtime.as_enemy_projectile()
+                    .reference_state.as_enemy_projectile()
                     .expect("enemy laser should publish projectile runtime state")
                     .lifetime_ticks
             })

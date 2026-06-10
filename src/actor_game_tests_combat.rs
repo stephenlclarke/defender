@@ -299,12 +299,12 @@
                     .player_takes_enemy_collision_damage
             );
         }
-        let lander_runtime = manifest.waves[0]
+        let lander_reference_state = manifest.waves[0]
             .behavior_script
             .kind_profile(ActorKind::Lander)
             .expect("wave tuning should keep runtime lander behavior");
         assert_eq!(
-            lander_runtime.lander_fire_period_steps,
+            lander_reference_state.lander_fire_period_steps,
             ActorWaveTuning::for_wave(1)
                 .lander_behavior()
                 .lander_fire_period_steps
@@ -510,7 +510,7 @@
         assert!(settled.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Human
                 && snapshot.position == Point::new(32, HUMAN_GROUND_Y)
-                && snapshot.runtime.as_human().is_none()
+                && snapshot.reference_state.as_human().is_none()
         }));
     }
 
@@ -768,8 +768,8 @@
         assert_eq!(profile.mutant_spawns.len(), 1);
         assert_eq!(profile.swarmer_spawns.len(), 1);
         assert_eq!(profile.enemy_reserve, EnemyReserveSnapshot::default());
-        assert!(profile.mutant_spawns[0].runtime_state.is_some());
-        assert!(profile.swarmer_spawns[0].runtime_state.is_some());
+        assert!(profile.mutant_spawns[0].reference_state.is_some());
+        assert!(profile.swarmer_spawns[0].reference_state.is_some());
 
         let mut driver = ActorGameDriver::with_wave_script(wave_script);
         driver.step(GameInput {
@@ -788,10 +788,10 @@
         assert_eq!(driver.snapshot_count(ActorKind::Mutant), 1);
         assert_eq!(driver.snapshot_count(ActorKind::Swarmer), 1);
         assert!(report.snapshots.iter().any(|snapshot| {
-            snapshot.kind == ActorKind::Mutant && snapshot.runtime.as_mutant().is_some()
+            snapshot.kind == ActorKind::Mutant && snapshot.reference_state.as_mutant().is_some()
         }));
         assert!(report.snapshots.iter().any(|snapshot| {
-            snapshot.kind == ActorKind::Swarmer && snapshot.runtime.as_swarmer().is_some()
+            snapshot.kind == ActorKind::Swarmer && snapshot.reference_state.as_swarmer().is_some()
         }));
         assert_eq!(report.wave_tuning.wave_size, 5);
         assert_eq!(report.wave_tuning.mutant_x_velocity, 48);
@@ -866,8 +866,8 @@
             assert_eq!(profile.mutant_spawns.len(), 1);
             assert_eq!(profile.swarmer_spawns.len(), 1);
             assert_eq!(profile.enemy_reserve, EnemyReserveSnapshot::default());
-            assert!(profile.mutant_spawns[0].runtime_state.is_some());
-            assert!(profile.swarmer_spawns[0].runtime_state.is_some());
+            assert!(profile.mutant_spawns[0].reference_state.is_some());
+            assert!(profile.swarmer_spawns[0].reference_state.is_some());
         }
 
         let second = wave_script.profile_for_wave(2);
@@ -945,7 +945,7 @@
             vec![1, 2, 3]
         );
         for profile in manifest.waves.iter().take(2) {
-            let lander_runtime = ActorWaveTuning::for_wave(profile.wave).lander_behavior();
+            let lander_reference_state = ActorWaveTuning::for_wave(profile.wave).lander_behavior();
             let lander_behavior = profile
                 .behavior_script
                 .kind_profile(ActorKind::Lander)
@@ -954,7 +954,7 @@
             assert_eq!(lander_behavior.lander_seek_speed, 7);
             assert_eq!(
                 lander_behavior.lander_fire_period_steps,
-                lander_runtime.lander_fire_period_steps
+                lander_reference_state.lander_fire_period_steps
             );
         }
         let clean_wave_lander = manifest.waves[2]
@@ -1079,7 +1079,7 @@
             vec![1, 2, 3]
         );
         for profile in manifest.waves.iter().take(2) {
-            let lander_runtime = ActorWaveTuning::for_wave(profile.wave).lander_behavior();
+            let lander_reference_state = ActorWaveTuning::for_wave(profile.wave).lander_behavior();
             assert_eq!(profile.spawn_behavior_profiles.len(), 1);
             assert_eq!(profile.spawn_behavior_profiles[0].kind, ActorKind::Lander);
             assert_eq!(profile.spawn_behavior_profiles[0].spawn_index, 0);
@@ -1088,7 +1088,7 @@
             assert_eq!(spawn_profile.lander_seek_speed, 9);
             assert_eq!(
                 spawn_profile.lander_fire_period_steps,
-                lander_runtime.lander_fire_period_steps
+                lander_reference_state.lander_fire_period_steps
             );
         }
 

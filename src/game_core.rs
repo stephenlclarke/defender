@@ -8,7 +8,7 @@ use crate::{
 // Evidence-backed cabinet defaults from CMOS/high-score evidence.
 pub const HIGH_SCORE_TABLE_ENTRIES: usize = 8;
 const HALL_OF_FAME_STALL_STEPS: u8 = 60;
-const FIRST_WAVE_MUTANT_DIVE_CONVERSION_X_CORRECTION: u16 = 0x0120; // original: SOURCE_FIRST_WAVE_TARGET6_MUTANT_CONVERSION_X_CORRECTION
+const FIRST_WAVE_MUTANT_DIVE_CONVERSION_X_CORRECTION: u16 = 0x0120;
 
 const ATTRACT_PRESENTS_START_STEP: u16 = 236;
 const ATTRACT_HALL_OF_FAME_START_STEP: u16 = 600;
@@ -55,8 +55,8 @@ const COLTAB_COLOR_BYTES: [u8; 37] = [
     0x87, 0xC7, 0xC7, 0xC6, 0xC5, 0xCC, 0xCB, 0xCA, 0xDA, 0xE8, 0xF8, 0xF9, 0xFA, 0xFB, 0xFD, 0xFF,
     0xBF, 0x3F, 0x3E, 0x3C, 0x00,
 ];
-const TIE_COLOR_BYTES: [u8; 9] = [0x81, 0x81, 0x2F, 0x81, 0x2F, 0x07, 0x2F, 0x81, 0x07]; // original: SOURCE_TIE_COLOR_BYTES
-const COLTAB_ACTIVE_BYTES: usize = COLTAB_COLOR_BYTES.len() - 1; // original: SOURCE_COLTAB_ACTIVE_BYTES
+const TIE_COLOR_BYTES: [u8; 9] = [0x81, 0x81, 0x2F, 0x81, 0x2F, 0x07, 0x2F, 0x81, 0x07];
+const COLTAB_ACTIVE_BYTES: usize = COLTAB_COLOR_BYTES.len() - 1;
 const ATTRACT_TITLE_REFERENCE_SAMPLE_INTERVAL_STEPS: u16 = 8;
 const ATTRACT_TITLE_REFERENCE_LOGO_COLOR_BYTES: [u8; 59] = [
     0x00, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x2F, 0x07, 0x07, 0x07, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x2F,
@@ -64,55 +64,55 @@ const ATTRACT_TITLE_REFERENCE_LOGO_COLOR_BYTES: [u8; 59] = [
     0x07, 0x07, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x07, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x07, 0x2F, 0x2F,
     0x07, 0x07, 0x07, 0x07, 0x2F, 0x07, 0x07, 0x07, 0x07, 0x07, 0x2F,
 ];
-const ATTRACT_WILLIAMS_TIE_COLOR_PRIME_STEPS: u16 = 6; // original: SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_PRIME_FRAMES
-const ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_STEPS: u16 = 6; // original: SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_FRAMES
-const ATTRACT_WILLIAMS_TIE_COLOR_SLOT_OFFSET: usize = 2; // original: SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_SLOT_OFFSET
-const SCANNER_TERRAIN_PIXEL_SIZE: [f32; 2] = [1.0, 1.0]; // original: SOURCE_SCANNER_TERRAIN_PIXEL_SIZE
-const SCANNER_TERRAIN_TINT: Color = Color::from_rgba(174, 81, 0, 255); // original: SOURCE_SCANNER_TERRAIN_TINT
-const WAVE_LANDSCAPE_COLOR_BYTES: [u8; 8] = [0x81, 0x28, 0x07, 0x2F, 0x3F, 0x87, 0x15, 0x00]; // original: SOURCE_WAVE_LANDSCAPE_COLOR_BYTES
-const WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255]; // original: SOURCE_WILLIAMS_RED_GREEN_LEVELS
-const WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255]; // original: SOURCE_WILLIAMS_BLUE_LEVELS
+const ATTRACT_WILLIAMS_TIE_COLOR_PRIME_STEPS: u16 = 6;
+const ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_STEPS: u16 = 6;
+const ATTRACT_WILLIAMS_TIE_COLOR_SLOT_OFFSET: usize = 2;
+const SCANNER_TERRAIN_PIXEL_SIZE: [f32; 2] = [1.0, 1.0];
+const SCANNER_TERRAIN_TINT: Color = Color::from_rgba(174, 81, 0, 255);
+const WAVE_LANDSCAPE_COLOR_BYTES: [u8; 8] = [0x81, 0x28, 0x07, 0x2F, 0x3F, 0x87, 0x15, 0x00];
+const WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255];
+const WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255];
 const NORMAL_PALETTE_BYTES: [u8; 16] = [
     0x00, 0x00, 0x07, 0x28, 0x2F, 0x81, 0xA4, 0x15, 0xC7, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
-const TERRAIN_TDATA_BYTES: usize = 0x100; // original: SOURCE_TERRAIN_TDATA_BYTES
-const TERRAIN_PATTERN_STREAM_BASE: u16 = 0xC350; // original: TDATA
-const MAIN_TERRAIN_RECORD_BYTE_COUNT: usize = 0x180; // original: SOURCE_TERRAIN_MTERR_BYTES
-const TERRAIN_FLAVOR_RECORDS: usize = 0x98; // original: SOURCE_TERRAIN_FLAVOR_RECORDS
-const TERRAIN_SCREEN_WORDS: usize = 0x98; // original: SOURCE_TERRAIN_SCREEN_WORDS
-const SCANNER_TERRAIN_RECORDS: usize = 0x40; // original: SOURCE_SCANNER_TERRAIN_RECORDS
-const SCANNER_MINI_TERRAIN_RECORDS: usize = MAIN_TERRAIN_RECORD_BYTE_COUNT / 3; // original: SOURCE_SCANNER_MINI_TERRAIN_RECORDS
-const TERRAIN_WORD_7007: u16 = 0x7007; // original: SOURCE_TERRAIN_WORD_7007
-const TERRAIN_WORD_0770: u16 = 0x0770; // original: SOURCE_TERRAIN_WORD_0770
-const TERRAIN_WORD_SIZE: [f32; 2] = [2.0, 2.0]; // original: SOURCE_TERRAIN_WORD_SIZE
-const SCANNER_PROCESS_SLEEP_TICKS: [u8; 3] = [2, 2, 4]; // original: SOURCE_SCANNER_PROCESS_SLEEP_TICKS
-const SCANNER_SELECTED_MAP: u8 = 1; // original: SOURCE_SCANNER_SELECTED_MAP
-const SCANNER_OBJECT_BASE_SCREEN: u16 = 0x3008; // original: SOURCE_SCANNER_OBJECT_BASE_SCREEN
-const SCANNER_SCAN_CENTER_OFFSET: u16 = 0x6D40; // original: SOURCE_SCANNER_SCAN_CENTER_OFFSET
-const SCANNER_OBJECT_ERASE_START: u16 = 0xB05D; // original: SOURCE_SCANNER_OBJECT_ERASE_START
-const SCANNER_PLAYER_BASE_SCREEN: u16 = 0x4B07; // original: SOURCE_SCANNER_PLAYER_BASE_SCREEN
-const SCANNER_PLAYER_BODY_WORD: u16 = 0x9099; // original: SOURCE_SCANNER_PLAYER_BODY_WORD
-const SCANNER_PLAYER_TAIL_BYTE: u8 = 0x90; // original: SOURCE_SCANNER_PLAYER_TAIL_BYTE
-const SCANNER_PLAYER_UPPER_BYTE: u8 = 0x09; // original: SOURCE_SCANNER_PLAYER_UPPER_BYTE
-const SCANNER_LANDER_COLOR_WORD: u16 = 0x4433; // original: SOURCE_SCANNER_LANDER_COLOR_WORD
-const SCANNER_HUMAN_COLOR_WORD: u16 = 0x6666; // original: SOURCE_SCANNER_HUMAN_COLOR_WORD
-pub(crate) const SCORE_POPUP_LIFETIME_TICKS: u8 = 50; // original: SOURCE_SCORE_POPUP_LIFETIME_TICKS
-pub(crate) const EXPLOSION_INITIAL_SIZE: u16 = 0x0100; // original: SOURCE_EXPLOSION_INITIAL_SIZE
-pub(crate) const EXPLOSION_SIZE_DELTA: u16 = 0x00AA; // original: SOURCE_EXPLOSION_SIZE_DELTA
-pub(crate) const EXPLOSION_KILL_SIZE_HIGH: u8 = 0x30; // original: SOURCE_EXPLOSION_KILL_SIZE_HIGH
-pub(crate) const EXPLOSION_LIFETIME_STEPS: u8 = 73; // original: SOURCE_EXPLOSION_LIFETIME_FRAMES
-const APPEARANCE_INITIAL_SIZE: u16 = 0xAD00; // original: SOURCE_APPEARANCE_INITIAL_SIZE
-const APPEARANCE_FINAL_SIZE: u16 = 0x8000; // original: SOURCE_APPEARANCE_FINAL_SIZE
-pub(crate) const TERRAIN_BLOW_STATUS_BIT: u8 = 0x02; // original: SOURCE_TERRAIN_BLOW_STATUS_BIT
-pub(crate) const TERRAIN_BLOW_ITERATION_LIMIT: u8 = 16; // original: SOURCE_TERRAIN_BLOW_ITERATION_LIMIT
-pub(crate) const TERRAIN_BLOW_EXPLOSIONS_PER_PASS: u8 = 2; // original: SOURCE_TERRAIN_BLOW_EXPLOSIONS_PER_PASS
-pub(crate) const TERRAIN_BLOW_OVERLOAD_COUNTER: u8 = 8; // original: SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER
-pub(crate) const TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES: u16 = 0x98; // original: SOURCE_TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES
-pub(crate) const TERRAIN_BLOW_SCANNER_ERASE_ENTRIES: u16 = 0x40; // original: SOURCE_TERRAIN_BLOW_SCANNER_ERASE_ENTRIES
-pub(crate) const TERRAIN_BLOW_COMPLETE_STEP: u16 = 111; // original: SOURCE_TERRAIN_BLOW_COMPLETE_FRAME
-pub(crate) const TERRAIN_EXPLOSION_LIFETIME_STEPS: u8 = 81; // original: SOURCE_TERRAIN_EXPLOSION_LIFETIME_FRAMES
+const TERRAIN_TDATA_BYTES: usize = 0x100;
+const TERRAIN_PATTERN_STREAM_BASE: u16 = 0xC350;
+const MAIN_TERRAIN_RECORD_BYTE_COUNT: usize = 0x180;
+const TERRAIN_FLAVOR_RECORDS: usize = 0x98;
+const TERRAIN_SCREEN_WORDS: usize = 0x98;
+const SCANNER_TERRAIN_RECORDS: usize = 0x40;
+const SCANNER_MINI_TERRAIN_RECORDS: usize = MAIN_TERRAIN_RECORD_BYTE_COUNT / 3;
+const TERRAIN_WORD_7007: u16 = 0x7007;
+const TERRAIN_WORD_0770: u16 = 0x0770;
+const TERRAIN_WORD_SIZE: [f32; 2] = [2.0, 2.0];
+const SCANNER_PROCESS_SLEEP_TICKS: [u8; 3] = [2, 2, 4];
+const SCANNER_SELECTED_MAP: u8 = 1;
+const SCANNER_OBJECT_BASE_SCREEN: u16 = 0x3008;
+const SCANNER_SCAN_CENTER_OFFSET: u16 = 0x6D40;
+const SCANNER_OBJECT_ERASE_START: u16 = 0xB05D;
+const SCANNER_PLAYER_BASE_SCREEN: u16 = 0x4B07;
+const SCANNER_PLAYER_BODY_WORD: u16 = 0x9099;
+const SCANNER_PLAYER_TAIL_BYTE: u8 = 0x90;
+const SCANNER_PLAYER_UPPER_BYTE: u8 = 0x09;
+const SCANNER_LANDER_COLOR_WORD: u16 = 0x4433;
+const SCANNER_HUMAN_COLOR_WORD: u16 = 0x6666;
+pub(crate) const SCORE_POPUP_LIFETIME_TICKS: u8 = 50;
+pub(crate) const EXPLOSION_INITIAL_SIZE: u16 = 0x0100;
+pub(crate) const EXPLOSION_SIZE_DELTA: u16 = 0x00AA;
+pub(crate) const EXPLOSION_KILL_SIZE_HIGH: u8 = 0x30;
+pub(crate) const EXPLOSION_LIFETIME_STEPS: u8 = 73;
+const APPEARANCE_INITIAL_SIZE: u16 = 0xAD00;
+const APPEARANCE_FINAL_SIZE: u16 = 0x8000;
+pub(crate) const TERRAIN_BLOW_STATUS_BIT: u8 = 0x02;
+pub(crate) const TERRAIN_BLOW_ITERATION_LIMIT: u8 = 16;
+pub(crate) const TERRAIN_BLOW_EXPLOSIONS_PER_PASS: u8 = 2;
+pub(crate) const TERRAIN_BLOW_OVERLOAD_COUNTER: u8 = 8;
+pub(crate) const TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES: u16 = 0x98;
+pub(crate) const TERRAIN_BLOW_SCANNER_ERASE_ENTRIES: u16 = 0x40;
+pub(crate) const TERRAIN_BLOW_COMPLETE_STEP: u16 = 111;
+pub(crate) const TERRAIN_EXPLOSION_LIFETIME_STEPS: u8 = 81;
 const TERRAIN_EXPLOSION_GROWTH_STEPS: [u8;
-    TERRAIN_EXPLOSION_LIFETIME_STEPS // original: SOURCE_TERRAIN_EXPLOSION_GROWTH_STEPS
+    TERRAIN_EXPLOSION_LIFETIME_STEPS
     as usize] = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 22, 23, 24,
     25, 26, 26, 27, 28, 29, 29, 30, 31, 31, 32, 32, 33, 34, 34, 35, 36, 36, 37, 37, 38, 39, 39, 40,
@@ -452,11 +452,9 @@ pub struct WaveProfileSnapshot {
     pub mutants: u8,
     pub swarmers: u8,
     pub lander_x_velocity: u8,
-    pub lander_y_velocity_msb: u8,
-    pub lander_y_velocity_lsb: u8,
+    pub lander_y_velocity: u16,
     pub mutant_random_y: u8,
-    pub mutant_y_velocity_msb: u8,
-    pub mutant_y_velocity_lsb: u8,
+    pub mutant_y_velocity: u16,
     pub mutant_x_velocity: u8,
     pub swarmer_x_velocity: u8,
     pub wave_time: u32,
@@ -480,11 +478,17 @@ impl WaveProfileSnapshot {
             mutants: wave_table_u8(crate::reference_assets::WaveMetric::Mutants, wave),
             swarmers: wave_table_u8(crate::reference_assets::WaveMetric::Swarmers, wave),
             lander_x_velocity: wave_table_u8(crate::reference_assets::WaveMetric::LanderXVelocity, wave),
-            lander_y_velocity_msb: wave_table_u8(crate::reference_assets::WaveMetric::LanderYVelocityHigh, wave),
-            lander_y_velocity_lsb: wave_table_u8(crate::reference_assets::WaveMetric::LanderYVelocityLow, wave),
+            lander_y_velocity: wave_table_u16(
+                crate::reference_assets::WaveMetric::LanderYVelocityHigh,
+                crate::reference_assets::WaveMetric::LanderYVelocityLow,
+                wave,
+            ),
             mutant_random_y: wave_table_u8(crate::reference_assets::WaveMetric::MutantRandomY, wave),
-            mutant_y_velocity_msb: wave_table_u8(crate::reference_assets::WaveMetric::MutantYVelocityHigh, wave),
-            mutant_y_velocity_lsb: wave_table_u8(crate::reference_assets::WaveMetric::MutantYVelocityLow, wave),
+            mutant_y_velocity: wave_table_u16(
+                crate::reference_assets::WaveMetric::MutantYVelocityHigh,
+                crate::reference_assets::WaveMetric::MutantYVelocityLow,
+                wave,
+            ),
             mutant_x_velocity: wave_table_u8(crate::reference_assets::WaveMetric::MutantXVelocity, wave),
             swarmer_x_velocity: wave_table_u8(crate::reference_assets::WaveMetric::SwarmerXVelocity, wave),
             wave_time: wave_table_u32(crate::reference_assets::WaveMetric::WaveTime, wave),
@@ -507,11 +511,22 @@ impl WaveProfileSnapshot {
     }
 }
 
-const DEFAULT_DIFFICULTY_INITIAL: u8 = 5; // original: SOURCE_DEFAULT_DIFFICULTY_INITIAL
-const DEFAULT_DIFFICULTY_CEILING: u8 = 15; // original: SOURCE_DEFAULT_DIFFICULTY_CEILING
+const DEFAULT_DIFFICULTY_INITIAL: u8 = 5;
+const DEFAULT_DIFFICULTY_CEILING: u8 = 15;
 
 fn wave_table_u8(metric: crate::reference_assets::WaveMetric, wave: u8) -> u8 {
     u8::try_from(wave_table_value(metric, wave)).expect("wave profile value should fit u8")
+}
+
+fn wave_table_u16(
+    high_metric: crate::reference_assets::WaveMetric,
+    low_metric: crate::reference_assets::WaveMetric,
+    wave: u8,
+) -> u16 {
+    u16::from_be_bytes([
+        wave_table_u8(high_metric, wave),
+        wave_table_u8(low_metric, wave),
+    ])
 }
 
 fn wave_table_u32(metric: crate::reference_assets::WaveMetric, wave: u8) -> u32 {

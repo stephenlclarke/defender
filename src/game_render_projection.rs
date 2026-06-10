@@ -700,7 +700,7 @@ fn push_expanded_object_appearance_pixels(
     );
 }
 
-const PIXEL_CLOUD_EXPLOSION_FIRST_VISIBLE_STEP: u8 = 2; // original: SOURCE_EXPANDED_OBJECT_EXPLOSION_VISIBLE_FRAME
+const PIXEL_CLOUD_EXPLOSION_FIRST_VISIBLE_STEP: u8 = 2;
 
 fn push_expanded_object_pixel_cloud(
     scene: &mut RenderScene,
@@ -759,7 +759,7 @@ fn cycling_palette_tint(phase: usize) -> Color {
     williams_color_byte_tint(COLTAB_COLOR_BYTES[phase % COLTAB_ACTIVE_BYTES])
 }
 
-const EXPLOSION_RENDER_MAX_SCALE: u8 = 3; // original: SOURCE_EXPLOSION_RENDER_MAX_SCALE
+const EXPLOSION_RENDER_MAX_SCALE: u8 = 3;
 
 pub(crate) fn explosion_render_scale(size: u16) -> Option<u16> {
     explosion_growth_scale(size).map(|scale| u16::from(scale.min(EXPLOSION_RENDER_MAX_SCALE)))

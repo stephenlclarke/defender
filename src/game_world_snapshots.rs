@@ -26,12 +26,12 @@ pub struct EnemySnapshot {
     pub kind: EnemyKind,
     pub position: ScreenPosition,
     pub velocity: ScreenVelocity,
-    pub lander_runtime: Option<LanderRuntimeSnapshot>,
-    pub mutant_runtime: Option<MutantRuntimeSnapshot>,
-    pub bomber_runtime: Option<BomberRuntimeSnapshot>,
-    pub swarmer_runtime: Option<SwarmerRuntimeSnapshot>,
-    pub baiter_runtime: Option<BaiterRuntimeSnapshot>,
-    pub pod_runtime: Option<PodRuntimeSnapshot>,
+    pub lander_reference_state: Option<LanderReferenceStateSnapshot>,
+    pub mutant_reference_state: Option<MutantReferenceStateSnapshot>,
+    pub bomber_reference_state: Option<BomberReferenceStateSnapshot>,
+    pub swarmer_reference_state: Option<SwarmerReferenceStateSnapshot>,
+    pub baiter_reference_state: Option<BaiterReferenceStateSnapshot>,
+    pub pod_reference_state: Option<PodReferenceStateSnapshot>,
 }
 
 impl EnemySnapshot {
@@ -40,33 +40,33 @@ impl EnemySnapshot {
             kind,
             position,
             velocity,
-            lander_runtime: None,
-            mutant_runtime: None,
-            bomber_runtime: None,
-            swarmer_runtime: None,
-            baiter_runtime: None,
-            pod_runtime: None,
+            lander_reference_state: None,
+            mutant_reference_state: None,
+            bomber_reference_state: None,
+            swarmer_reference_state: None,
+            baiter_reference_state: None,
+            pod_reference_state: None,
         }
     }
 
     fn object_bitmap_descriptor(self) -> ObjectBitmapDescriptor {
         match self.kind {
             EnemyKind::Lander => lander_object_bitmap_descriptor(
-                self.lander_runtime
-                    .map(|runtime_state| runtime_state.animation_frame)
+                self.lander_reference_state
+                    .map(|reference_state| reference_state.animation_frame)
                     .unwrap_or_default(),
             ),
             EnemyKind::Mutant => MUTANT_OBJECT_BITMAP_DESCRIPTOR,
             EnemyKind::Bomber => bomber_object_bitmap_descriptor(
-                self.bomber_runtime
-                    .map(|runtime_state| runtime_state.animation_frame)
+                self.bomber_reference_state
+                    .map(|reference_state| reference_state.animation_frame)
                     .unwrap_or_default(),
             ),
             EnemyKind::Pod => POD_OBJECT_BITMAP_DESCRIPTOR,
             EnemyKind::Swarmer => SWARMER_OBJECT_BITMAP_DESCRIPTOR,
             EnemyKind::Baiter => baiter_object_bitmap_descriptor(
-                self.baiter_runtime
-                    .map(|runtime_state| runtime_state.animation_frame)
+                self.baiter_reference_state
+                    .map(|reference_state| reference_state.animation_frame)
                     .unwrap_or_default(),
             ),
         }
@@ -75,62 +75,62 @@ impl EnemySnapshot {
     fn world_position_words(self) -> (u16, u16) {
         match self.kind {
             EnemyKind::Lander => self
-                .lander_runtime
-                .map(|runtime_state| {
+                .lander_reference_state
+                .map(|reference_state| {
                     world_position_words(
                         self.position,
-                        runtime_state.x_fraction,
-                        runtime_state.y_fraction,
+                        reference_state.x_fraction,
+                        reference_state.y_fraction,
                     )
                 })
                 .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
             EnemyKind::Mutant => self
-                .mutant_runtime
-                .map(|runtime_state| {
+                .mutant_reference_state
+                .map(|reference_state| {
                     world_position_words(
                         self.position,
-                        runtime_state.x_fraction,
-                        runtime_state.y_fraction,
+                        reference_state.x_fraction,
+                        reference_state.y_fraction,
                     )
                 })
                 .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
             EnemyKind::Bomber => self
-                .bomber_runtime
-                .map(|runtime_state| {
+                .bomber_reference_state
+                .map(|reference_state| {
                     world_position_words(
                         self.position,
-                        runtime_state.x_fraction,
-                        runtime_state.y_fraction,
+                        reference_state.x_fraction,
+                        reference_state.y_fraction,
                     )
                 })
                 .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
             EnemyKind::Pod => self
-                .pod_runtime
-                .map(|runtime_state| {
+                .pod_reference_state
+                .map(|reference_state| {
                     world_position_words(
                         self.position,
-                        runtime_state.x_fraction,
-                        runtime_state.y_fraction,
+                        reference_state.x_fraction,
+                        reference_state.y_fraction,
                     )
                 })
                 .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
             EnemyKind::Swarmer => self
-                .swarmer_runtime
-                .map(|runtime_state| {
+                .swarmer_reference_state
+                .map(|reference_state| {
                     world_position_words(
                         self.position,
-                        runtime_state.x_fraction,
-                        runtime_state.y_fraction,
+                        reference_state.x_fraction,
+                        reference_state.y_fraction,
                     )
                 })
                 .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
             EnemyKind::Baiter => self
-                .baiter_runtime
-                .map(|runtime_state| {
+                .baiter_reference_state
+                .map(|reference_state| {
                     world_position_words(
                         self.position,
-                        runtime_state.x_fraction,
-                        runtime_state.y_fraction,
+                        reference_state.x_fraction,
+                        reference_state.y_fraction,
                     )
                 })
                 .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
@@ -140,31 +140,31 @@ impl EnemySnapshot {
     fn motion_velocity_words(self) -> (u16, u16) {
         match self.kind {
             EnemyKind::Lander => self
-                .lander_runtime
-                .map(|runtime_state| (runtime_state.x_velocity, runtime_state.y_velocity))
+                .lander_reference_state
+                .map(|reference_state| (reference_state.x_velocity, reference_state.y_velocity))
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Mutant => self
-                .mutant_runtime
-                .map(|runtime_state| (runtime_state.x_velocity, runtime_state.y_velocity))
+                .mutant_reference_state
+                .map(|reference_state| (reference_state.x_velocity, reference_state.y_velocity))
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Bomber => self
-                .bomber_runtime
-                .map(|runtime_state| (runtime_state.x_velocity, runtime_state.y_velocity))
+                .bomber_reference_state
+                .map(|reference_state| (reference_state.x_velocity, reference_state.y_velocity))
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Pod => self
-                .pod_runtime
-                .map(|runtime_state| (runtime_state.x_velocity, runtime_state.y_velocity))
+                .pod_reference_state
+                .map(|reference_state| (reference_state.x_velocity, reference_state.y_velocity))
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Swarmer => self
-                .swarmer_runtime
-                .map(|runtime_state| (runtime_state.x_velocity, runtime_state.y_velocity))
+                .swarmer_reference_state
+                .map(|reference_state| (reference_state.x_velocity, reference_state.y_velocity))
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Baiter => self
-                .baiter_runtime
-                .map(|runtime_state| {
+                .baiter_reference_state
+                .map(|reference_state| {
                     (
-                        baiter_screen_x_velocity(runtime_state.x_velocity),
-                        runtime_state.y_velocity,
+                        baiter_screen_x_velocity(reference_state.x_velocity),
+                        reference_state.y_velocity,
                     )
                 })
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
@@ -173,7 +173,7 @@ impl EnemySnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LanderRuntimeSnapshot {
+pub struct LanderReferenceStateSnapshot {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -185,7 +185,7 @@ pub struct LanderRuntimeSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MutantRuntimeSnapshot {
+pub struct MutantReferenceStateSnapshot {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -198,7 +198,7 @@ pub struct MutantRuntimeSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BomberRuntimeSnapshot {
+pub struct BomberReferenceStateSnapshot {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -210,7 +210,7 @@ pub struct BomberRuntimeSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SwarmerRuntimeSnapshot {
+pub struct SwarmerReferenceStateSnapshot {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -222,7 +222,7 @@ pub struct SwarmerRuntimeSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BaiterRuntimeSnapshot {
+pub struct BaiterReferenceStateSnapshot {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -233,7 +233,7 @@ pub struct BaiterRuntimeSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PodRuntimeSnapshot {
+pub struct PodReferenceStateSnapshot {
     pub x_fraction: u8,
     pub y_fraction: u8,
     pub x_velocity: u16,
@@ -282,10 +282,10 @@ pub struct EnemyProjectileSnapshot {
     pub position: ScreenPosition,
     pub velocity: ScreenVelocity,
     pub kind: EnemyProjectileKind,
-    pub x_subpixel: u8,
-    pub y_subpixel: u8,
-    pub x_velocity_word: u16,
-    pub y_velocity_word: u16,
+    pub reference_x_fraction: u8,
+    pub reference_y_fraction: u8,
+    pub reference_x_velocity: u16,
+    pub reference_y_velocity: u16,
     pub lifetime_ticks: u8,
 }
 
@@ -301,13 +301,13 @@ impl EnemyProjectileSnapshot {
     fn world_position_words(self) -> (u16, u16) {
         world_position_words(
             self.position,
-            self.x_subpixel,
-            self.y_subpixel,
+            self.reference_x_fraction,
+            self.reference_y_fraction,
         )
     }
 
     const fn motion_velocity_words(self) -> (u16, u16) {
-        (self.x_velocity_word, self.y_velocity_word)
+        (self.reference_x_velocity, self.reference_y_velocity)
     }
 }
 
@@ -345,11 +345,11 @@ pub struct HumanSnapshot {
     pub position: ScreenPosition,
     pub carried: bool,
     pub carried_by_player: bool,
-    pub x_subpixel: u8,
+    pub reference_x_fraction: u8,
     pub animation_frame: u8,
-    pub fall_velocity: u16,
-    pub fall_y_subpixel: u8,
-    pub target_slot_address: Option<u16>,
+    pub reference_fall_velocity: u16,
+    pub reference_fall_y_fraction: u8,
+    pub reference_target_slot_address: Option<u16>,
 }
 
 impl HumanSnapshot {
@@ -358,24 +358,24 @@ impl HumanSnapshot {
             position,
             carried: false,
             carried_by_player: false,
-            x_subpixel: 0,
+            reference_x_fraction: 0,
             animation_frame: 0,
-            fall_velocity: 0,
-            fall_y_subpixel: 0,
-            target_slot_address: None,
+            reference_fall_velocity: 0,
+            reference_fall_y_fraction: 0,
+            reference_target_slot_address: None,
         }
     }
 
     fn world_position_words(self) -> (u16, u16) {
         world_position_words(
             self.position,
-            self.x_subpixel,
-            self.fall_y_subpixel,
+            self.reference_x_fraction,
+            self.reference_fall_y_fraction,
         )
     }
 
     fn motion_velocity_words(self) -> (u16, u16) {
-        (0, self.fall_velocity)
+        (0, self.reference_fall_velocity)
     }
 }
 

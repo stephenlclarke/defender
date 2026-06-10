@@ -87,9 +87,9 @@ fn enemy_projectile_spawn_in_bounds(position: Point) -> bool {
 
 fn bomb_projectile_spawn_in_world_bounds(
     position: Point,
-    runtime_state: Option<EnemyProjectileRuntimeState>,
+    reference_state: Option<EnemyProjectileReferenceState>,
 ) -> bool {
-    runtime_state.is_none() || enemy_projectile_spawn_in_bounds(position)
+    reference_state.is_none() || enemy_projectile_spawn_in_bounds(position)
 }
 
 fn reserve_enemy_projectile_slot(active_enemy_projectiles: &mut usize) -> bool {
@@ -119,15 +119,15 @@ fn actor_collision_body_for_snapshot(
     background_left: u16,
 ) -> Option<CollisionBody> {
     let body = snapshot.collision_body()?;
-    actor_project_runtime_state_collision_body(snapshot, body, background_left)
+    actor_project_reference_state_collision_body(snapshot, body, background_left)
 }
 
-fn actor_project_runtime_state_collision_body(
+fn actor_project_reference_state_collision_body(
     snapshot: &ActorSnapshot,
     body: CollisionBody,
     background_left: u16,
 ) -> Option<CollisionBody> {
-    let Some(x_fraction) = actor_runtime_state_x_fraction(snapshot) else {
+    let Some(x_fraction) = actor_reference_state_x_fraction(snapshot) else {
         return Some(body);
     };
     if center_of(body.bounds) != snapshot.position && snapshot.kind != ActorKind::Human {

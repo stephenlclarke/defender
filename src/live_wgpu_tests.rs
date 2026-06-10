@@ -444,7 +444,7 @@ mod tests {
                 "  first_playing_enemy_counts: landers=15,bombers=0,pods=0,mutants=0,swarmers=0\n",
                 "  first_playing_world_counts: enemies=2,humans=2\n",
                 "  first_playing_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0\n",
-                "  first_playing_runtime_state: world_scroll_left=0x0000,rng=seed=0xbe,hseed=0xb1,lseed=0x06\n",
+                "  first_playing_reference_debug: world_scroll_left=0x0000,rng=seed=0xbe,hseed=0xb1,lseed=0x06\n",
                 "  first_playing_actor_samples: none\n",
                 "  first_playing_enemy_projectile_samples: none\n",
                 "  first_playing_sound_commands: 0xea\n",
@@ -464,10 +464,10 @@ mod tests {
                 "swarmer@2[score_delta=150,score=150,explosions=swarmer@62,120[explosion_anchor=none],sounds=0xf8,spawns=none];",
                 "baiter@2[score_delta=200,score=200,explosions=baiter@62,120[explosion_anchor=none],sounds=0xf8,spawns=none]\n",
                 "  hostile_projectile_matrix: ",
-                "lander@1[samples=enemy_laser@210,45[velocity=-3/3,runtime_state=frac=0xe9/0x60,vel=0xfd00/0x0300,life=90],sounds=0xfc];",
-                "mutant@454[samples=enemy_laser@0,222[velocity=1/-1,runtime_state=frac=0x50/0x00,vel=0x009c/0xfe5c,life=90],sounds=0xf6];",
-                "swarmer@0[samples=enemy_laser@62,120[velocity=3/0,runtime_state=none],sounds=0xf3];",
-                "baiter@79[samples=enemy_laser@28,120[velocity=1/-1,runtime_state=frac=0x00/0x00,vel=0x002c/0xffc4,life=20],sounds=0xfc]\n",
+                "lander@1[samples=enemy_laser@210,45[velocity=-3/3,reference_debug=frac=0xe9/0x60,vel=0xfd00/0x0300,life=90],sounds=0xfc];",
+                "mutant@454[samples=enemy_laser@0,222[velocity=1/-1,reference_debug=frac=0x50/0x00,vel=0x009c/0xfe5c,life=90],sounds=0xf6];",
+                "swarmer@0[samples=enemy_laser@62,120[velocity=3/0,reference_debug=none],sounds=0xf3];",
+                "baiter@79[samples=enemy_laser@28,120[velocity=1/-1,reference_debug=frac=0x00/0x00,vel=0x002c/0xffc4,life=20],sounds=0xfc]\n",
                 "  first_enemy_projectile: unavailable,reason=enemy_projectile_not_observed_after_512_steps\n",
                 "  wave_clear_assist_steps: 4\n",
                 "  wave_clear_next_wave: 2\n",
@@ -487,7 +487,7 @@ mod tests {
                 "  next_playing_enemy_counts: landers=20,bombers=3,pods=1,mutants=0,swarmers=0\n",
                 "  next_playing_world_counts: enemies=2,humans=2\n",
                 "  next_playing_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0\n",
-                "  next_playing_runtime_state: world_scroll_left=0x0000,rng=seed=0x82,hseed=0x35,lseed=0x88\n",
+                "  next_playing_reference_debug: world_scroll_left=0x0000,rng=seed=0x82,hseed=0x35,lseed=0x88\n",
                 "  next_playing_actor_samples: none\n",
                 "  next_playing_enemy_projectile_samples: none\n",
                 "  next_playing_sound_commands: none\n",
@@ -830,10 +830,10 @@ mod tests {
                 kind: "enemy_laser".to_string(),
                 x: 0,
                 y: 220,
-                x_subpixel: 0xec,
-                y_subpixel: 0x5c,
-                x_velocity_word: 0x009c,
-                y_velocity_word: 0xfe5c,
+                reference_x_fraction: 0xec,
+                reference_y_fraction: 0x5c,
+                reference_x_velocity: 0x009c,
+                reference_y_velocity: 0xfe5c,
                 lifetime_ticks: 90,
             }]
         );
@@ -890,57 +890,57 @@ mod tests {
                     kind: "lander".to_string(),
                     x: 251,
                     y: 44,
-                    x_subpixel: 0x33,
-                    y_subpixel: 0xe0,
+                    reference_x_fraction: 0x33,
+                    reference_y_fraction: 0xe0,
                 },
                 ActorScriptCheckActorSample {
                     kind: "bomber".to_string(),
                     x: 227,
                     y: 104,
-                    x_subpixel: 0xe0,
-                    y_subpixel: 0x00,
+                    reference_x_fraction: 0xe0,
+                    reference_y_fraction: 0x00,
                 },
                 ActorScriptCheckActorSample {
                     kind: "pod".to_string(),
                     x: 184,
                     y: 72,
-                    x_subpixel: 0x20,
-                    y_subpixel: 0x00,
+                    reference_x_fraction: 0x20,
+                    reference_y_fraction: 0x00,
                 },
                 ActorScriptCheckActorSample {
                     kind: "mutant".to_string(),
                     x: 148,
                     y: 96,
-                    x_subpixel: 0x00,
-                    y_subpixel: 0x00,
+                    reference_x_fraction: 0x00,
+                    reference_y_fraction: 0x00,
                 },
                 ActorScriptCheckActorSample {
                     kind: "swarmer".to_string(),
                     x: 236,
                     y: 66,
-                    x_subpixel: 0x00,
-                    y_subpixel: 0x00,
+                    reference_x_fraction: 0x00,
+                    reference_y_fraction: 0x00,
                 },
                 ActorScriptCheckActorSample {
                     kind: "human".to_string(),
                     x: 24,
                     y: 224,
-                    x_subpixel: 0xc3,
-                    y_subpixel: 0x00,
+                    reference_x_fraction: 0xc3,
+                    reference_y_fraction: 0x00,
                 },
                 ActorScriptCheckActorSample {
                     kind: "human".to_string(),
                     x: 28,
                     y: 225,
-                    x_subpixel: 0x81,
-                    y_subpixel: 0x00,
+                    reference_x_fraction: 0x81,
+                    reference_y_fraction: 0x00,
                 },
                 ActorScriptCheckActorSample {
                     kind: "human".to_string(),
                     x: 78,
                     y: 224,
-                    x_subpixel: 0x30,
-                    y_subpixel: 0x00,
+                    reference_x_fraction: 0x30,
+                    reference_y_fraction: 0x00,
                 },
             ]
         );
@@ -958,7 +958,7 @@ mod tests {
     }
 
     #[test]
-    fn actor_script_check_reports_reserve_and_runtime_state_at_play_start() {
+    fn actor_script_check_reports_reserve_and_reference_state_at_play_start() {
         let path = write_actor_script_file(
             "actor-script-reserve-check",
             concat!(
@@ -990,7 +990,7 @@ mod tests {
         assert!(
             report
                 .to_text()
-                .contains("first_playing_runtime_state: world_scroll_left=0x0000,rng=seed=")
+                .contains("first_playing_reference_debug: world_scroll_left=0x0000,rng=seed=")
         );
     }
 

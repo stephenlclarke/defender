@@ -568,7 +568,6 @@ fn actor_gameplay_events_for_report(report: &StepReport) -> Vec<GameEvent> {
             GameCommand::AdvanceWave { .. } => {
                 push_unique_game_event(&mut events, GameEvent::WaveStarted);
             }
-            GameCommand::EnterGameOver => push_unique_game_event(&mut events, GameEvent::GameOver),
             GameCommand::Spawn(_)
             | GameCommand::Destroy(_)
             | GameCommand::SetWorldScrollLeft(_)

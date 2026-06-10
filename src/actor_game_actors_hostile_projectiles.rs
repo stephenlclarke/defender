@@ -33,14 +33,14 @@ fn bomber_tie_selected_slot(seed: u8) -> u8 {
 fn push_enemy_projectile_command(
     position: Point,
     velocity: Velocity,
-    projectile_runtime_state: EnemyProjectileRuntimeState,
+    projectile_reference_state: EnemyProjectileReferenceState,
     sound: SoundCue,
     commands: &mut Vec<GameCommand>,
 ) {
     commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
         position,
         velocity,
-        runtime_state: Some(projectile_runtime_state),
+        reference_state: Some(projectile_reference_state),
     }));
     commands.push(GameCommand::PlaySound(sound));
 }
@@ -52,7 +52,7 @@ fn enemy_fireball_projectile(
     prompt: &StepPrompt,
     shot_rng: ActorRngSnapshot,
     lifetime_ticks: u8,
-) -> Option<(Velocity, EnemyProjectileRuntimeState)> {
+) -> Option<(Velocity, EnemyProjectileReferenceState)> {
     if !enemy_projectile_spawn_in_bounds(position)
         || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
     {
@@ -80,7 +80,7 @@ fn enemy_fireball_projectile(
     let velocity = screen_velocity_from_motion_words(x_velocity, y_velocity);
     Some((
         velocity,
-        EnemyProjectileRuntimeState {
+        EnemyProjectileReferenceState {
             x_fraction,
             y_fraction,
             x_velocity,

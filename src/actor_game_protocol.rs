@@ -1,10 +1,10 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CollisionBody {
-    pub owner: ActorId,
-    pub kind: ActorKind,
-    pub position: Point,
-    pub bounds: Rect,
-    pub runtime: ActorRuntimeState,
+struct CollisionBody {
+    owner: ActorId,
+    kind: ActorKind,
+    position: Point,
+    bounds: Rect,
+    reference_state: ActorReferenceState,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,17 +16,31 @@ pub struct ActorSnapshot {
     pub direction: Option<Direction>,
     pub bounds: Option<Rect>,
     pub alive: bool,
-    pub runtime: ActorRuntimeState,
+    reference_state: ActorReferenceState,
 }
 
 impl ActorSnapshot {
+    pub(crate) fn reference_subpixels(&self) -> Option<ActorReferenceSubpixels> {
+        self.reference_state.subpixels()
+    }
+
+    pub(crate) fn reference_x_fraction(&self) -> Option<u8> {
+        self.reference_subpixels().map(|subpixels| subpixels.x)
+    }
+
+    pub(crate) fn enemy_projectile_reference_state(
+        &self,
+    ) -> Option<EnemyProjectileReferenceState> {
+        self.reference_state.as_enemy_projectile()
+    }
+
     fn collision_body(&self) -> Option<CollisionBody> {
         Some(CollisionBody {
             owner: self.id,
             kind: self.kind,
             position: self.position,
             bounds: self.bounds?,
-            runtime: self.runtime,
+            reference_state: self.reference_state,
         })
     }
 }
@@ -115,7 +129,7 @@ impl DrawCommand {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SpawnRequest {
+pub(crate) enum SpawnRequest {
     Laser {
         position: Point,
         direction: Direction,
@@ -124,36 +138,32 @@ pub enum SpawnRequest {
     EnemyLaser {
         position: Point,
         velocity: Velocity,
-        runtime_state: Option<EnemyProjectileRuntimeState>,
+        reference_state: Option<EnemyProjectileReferenceState>,
     },
     Lander {
         position: Point,
     },
     Mutant {
         position: Point,
-        runtime_state: Option<MutantRuntimeState>,
+        reference_state: Option<MutantReferenceState>,
     },
     Bomber {
         position: Point,
     },
     Bomb {
         position: Point,
-        runtime_state: Option<EnemyProjectileRuntimeState>,
+        reference_state: Option<EnemyProjectileReferenceState>,
     },
     Pod {
         position: Point,
     },
     Swarmer {
         position: Point,
-        runtime_state: Option<SwarmerRuntimeState>,
+        reference_state: Option<SwarmerReferenceState>,
     },
     Baiter {
         position: Point,
-        runtime_state: Option<BaiterRuntimeState>,
-    },
-    Human {
-        position: Point,
-        mode: HumanMode,
+        reference_state: Option<BaiterReferenceState>,
     },
     Explosion {
         position: Point,
@@ -167,7 +177,7 @@ pub enum SpawnRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GameCommand {
+pub(crate) enum GameCommand {
     Credit,
     StartOnePlayer,
     StartTwoPlayer,
@@ -193,7 +203,6 @@ pub enum GameCommand {
     AdvanceWave {
         wave: u16,
     },
-    EnterGameOver,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -264,21 +273,21 @@ impl StepPrompt {
                 && snapshot.alive
                 && snapshot.bounds.is_some()
                 && snapshot
-                    .runtime
+                    .reference_state
                     .as_human()
-                    .is_some_and(|runtime_state| {
-                        runtime_state.target_slot_index == target_slot_index
+                    .is_some_and(|reference_state| {
+                        reference_state.target_slot_index == target_slot_index
                     })
         })
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ActorReply {
-    pub id: ActorId,
-    pub snapshot: ActorSnapshot,
-    pub commands: Vec<GameCommand>,
-    pub draws: Vec<DrawCommand>,
+struct ActorReply {
+    id: ActorId,
+    snapshot: ActorSnapshot,
+    commands: Vec<GameCommand>,
+    draws: Vec<DrawCommand>,
 }
 
 trait AssetActor: Send + 'static {
@@ -397,7 +406,7 @@ pub struct StepReport {
     pub snapshots: Vec<ActorSnapshot>,
     pub draws: Vec<DrawCommand>,
     pub sounds: Vec<SoundCue>,
-    pub commands: Vec<GameCommand>,
+    pub(crate) commands: Vec<GameCommand>,
 }
 
 impl StepReport {
@@ -507,11 +516,9 @@ fn actor_wave_profile_for_report(report: &StepReport) -> WaveProfileSnapshot {
     profile.mutants = wave_tuning.mutants;
     profile.swarmers = wave_tuning.swarmers;
     profile.lander_x_velocity = wave_tuning.lander_x_velocity;
-    profile.lander_y_velocity_msb = wave_tuning.lander_y_velocity_msb;
-    profile.lander_y_velocity_lsb = wave_tuning.lander_y_velocity_lsb;
+    profile.lander_y_velocity = wave_tuning.lander_y_velocity;
     profile.mutant_random_y = wave_tuning.mutant_random_y;
-    profile.mutant_y_velocity_msb = wave_tuning.mutant_y_velocity_msb;
-    profile.mutant_y_velocity_lsb = wave_tuning.mutant_y_velocity_lsb;
+    profile.mutant_y_velocity = wave_tuning.mutant_y_velocity;
     profile.mutant_x_velocity = wave_tuning.mutant_x_velocity;
     profile.swarmer_x_velocity = wave_tuning.swarmer_x_velocity;
     profile.wave_size = wave_tuning.wave_size;
@@ -720,86 +727,86 @@ fn clean_enemy_snapshot(snapshot: &ActorSnapshot) -> Option<CleanEnemySnapshot> 
         screen_position(snapshot.position),
         screen_velocity(snapshot.velocity),
     );
-    enemy.lander_runtime = snapshot.runtime.as_lander().map(clean_lander_runtime);
-    enemy.bomber_runtime = snapshot.runtime.as_bomber().map(clean_bomber_runtime);
-    enemy.pod_runtime = snapshot.runtime.as_pod().map(clean_pod_runtime);
-    enemy.swarmer_runtime = snapshot.runtime.as_swarmer().map(clean_swarmer_runtime);
-    enemy.baiter_runtime = snapshot.runtime.as_baiter().map(clean_baiter_runtime);
-    enemy.mutant_runtime = snapshot.runtime.as_mutant().map(clean_mutant_runtime);
+    enemy.lander_reference_state = snapshot.reference_state.as_lander().map(clean_lander_reference_state);
+    enemy.bomber_reference_state = snapshot.reference_state.as_bomber().map(clean_bomber_reference_state);
+    enemy.pod_reference_state = snapshot.reference_state.as_pod().map(clean_pod_reference_state);
+    enemy.swarmer_reference_state = snapshot.reference_state.as_swarmer().map(clean_swarmer_reference_state);
+    enemy.baiter_reference_state = snapshot.reference_state.as_baiter().map(clean_baiter_reference_state);
+    enemy.mutant_reference_state = snapshot.reference_state.as_mutant().map(clean_mutant_reference_state);
     Some(enemy)
 }
 
-fn clean_lander_runtime(runtime_state: LanderRuntimeState) -> LanderRuntimeSnapshot {
-    LanderRuntimeSnapshot {
-        x_fraction: runtime_state.x_fraction,
-        y_fraction: runtime_state.y_fraction,
-        x_velocity: runtime_state.x_velocity,
-        y_velocity: runtime_state.y_velocity,
-        shot_timer: runtime_state.shot_timer,
-        sleep_ticks: runtime_state.sleep_ticks,
-        animation_frame: runtime_state.animation_frame.index(),
-        target_human_index: runtime_state.target_human_index,
+fn clean_lander_reference_state(reference_state: LanderReferenceState) -> LanderReferenceStateSnapshot {
+    LanderReferenceStateSnapshot {
+        x_fraction: reference_state.x_fraction,
+        y_fraction: reference_state.y_fraction,
+        x_velocity: reference_state.x_velocity,
+        y_velocity: reference_state.y_velocity,
+        shot_timer: reference_state.shot_timer,
+        sleep_ticks: reference_state.sleep_ticks,
+        animation_frame: reference_state.animation_frame.index(),
+        target_human_index: reference_state.target_human_index,
     }
 }
 
-fn clean_bomber_runtime(runtime_state: BomberRuntimeState) -> BomberRuntimeSnapshot {
-    BomberRuntimeSnapshot {
-        x_fraction: runtime_state.x_fraction,
-        y_fraction: runtime_state.y_fraction,
-        x_velocity: runtime_state.x_velocity,
-        y_velocity: runtime_state.y_velocity,
-        animation_frame: runtime_state.animation_frame.index(),
-        cruise_altitude: screen_coordinate(runtime_state.cruise_altitude),
-        sleep_ticks: runtime_state.sleep_ticks,
-        slot: runtime_state.slot,
+fn clean_bomber_reference_state(reference_state: BomberReferenceState) -> BomberReferenceStateSnapshot {
+    BomberReferenceStateSnapshot {
+        x_fraction: reference_state.x_fraction,
+        y_fraction: reference_state.y_fraction,
+        x_velocity: reference_state.x_velocity,
+        y_velocity: reference_state.y_velocity,
+        animation_frame: reference_state.animation_frame.index(),
+        cruise_altitude: screen_coordinate(reference_state.cruise_altitude),
+        sleep_ticks: reference_state.sleep_ticks,
+        slot: reference_state.slot,
     }
 }
 
-fn clean_pod_runtime(runtime_state: PodRuntimeState) -> PodRuntimeSnapshot {
-    PodRuntimeSnapshot {
-        x_fraction: runtime_state.x_fraction,
-        y_fraction: runtime_state.y_fraction,
-        x_velocity: runtime_state.x_velocity,
-        y_velocity: runtime_state.y_velocity,
+fn clean_pod_reference_state(reference_state: PodReferenceState) -> PodReferenceStateSnapshot {
+    PodReferenceStateSnapshot {
+        x_fraction: reference_state.x_fraction,
+        y_fraction: reference_state.y_fraction,
+        x_velocity: reference_state.x_velocity,
+        y_velocity: reference_state.y_velocity,
     }
 }
 
-fn clean_swarmer_runtime(runtime_state: SwarmerRuntimeState) -> SwarmerRuntimeSnapshot {
-    SwarmerRuntimeSnapshot {
-        x_fraction: runtime_state.x_fraction,
-        y_fraction: runtime_state.y_fraction,
-        x_velocity: runtime_state.x_velocity,
-        y_velocity: runtime_state.y_velocity,
-        acceleration: runtime_state.acceleration,
-        shot_timer: runtime_state.shot_timer,
-        sleep_ticks: runtime_state.sleep_ticks,
-        horizontal_seek_pending: runtime_state.horizontal_seek_pending,
+fn clean_swarmer_reference_state(reference_state: SwarmerReferenceState) -> SwarmerReferenceStateSnapshot {
+    SwarmerReferenceStateSnapshot {
+        x_fraction: reference_state.x_fraction,
+        y_fraction: reference_state.y_fraction,
+        x_velocity: reference_state.x_velocity,
+        y_velocity: reference_state.y_velocity,
+        acceleration: reference_state.acceleration,
+        shot_timer: reference_state.shot_timer,
+        sleep_ticks: reference_state.sleep_ticks,
+        horizontal_seek_pending: reference_state.horizontal_seek_pending,
     }
 }
 
-fn clean_baiter_runtime(runtime_state: BaiterRuntimeState) -> BaiterRuntimeSnapshot {
-    BaiterRuntimeSnapshot {
-        x_fraction: runtime_state.x_fraction,
-        y_fraction: runtime_state.y_fraction,
-        x_velocity: runtime_state.x_velocity,
-        y_velocity: runtime_state.y_velocity,
-        shot_timer: runtime_state.shot_timer,
-        sleep_ticks: runtime_state.sleep_ticks,
-        animation_frame: runtime_state.animation_frame.index(),
+fn clean_baiter_reference_state(reference_state: BaiterReferenceState) -> BaiterReferenceStateSnapshot {
+    BaiterReferenceStateSnapshot {
+        x_fraction: reference_state.x_fraction,
+        y_fraction: reference_state.y_fraction,
+        x_velocity: reference_state.x_velocity,
+        y_velocity: reference_state.y_velocity,
+        shot_timer: reference_state.shot_timer,
+        sleep_ticks: reference_state.sleep_ticks,
+        animation_frame: reference_state.animation_frame.index(),
     }
 }
 
-fn clean_mutant_runtime(runtime_state: MutantRuntimeState) -> MutantRuntimeSnapshot {
-    MutantRuntimeSnapshot {
-        x_fraction: runtime_state.x_fraction,
-        y_fraction: runtime_state.y_fraction,
-        x_velocity: runtime_state.x_velocity,
-        y_velocity: runtime_state.y_velocity,
-        shot_timer: runtime_state.shot_timer,
-        sleep_ticks: runtime_state.sleep_ticks,
-        hop_rng: clean_actor_rng(runtime_state.hop_rng),
-        render_x_correction: runtime_state.render_x_correction,
-        dive_entry_shot_deferred: runtime_state.dive_entry_shot_deferred,
+fn clean_mutant_reference_state(reference_state: MutantReferenceState) -> MutantReferenceStateSnapshot {
+    MutantReferenceStateSnapshot {
+        x_fraction: reference_state.x_fraction,
+        y_fraction: reference_state.y_fraction,
+        x_velocity: reference_state.x_velocity,
+        y_velocity: reference_state.y_velocity,
+        shot_timer: reference_state.shot_timer,
+        sleep_ticks: reference_state.sleep_ticks,
+        hop_rng: clean_actor_rng(reference_state.hop_rng),
+        render_x_correction: reference_state.render_x_correction,
+        dive_entry_shot_deferred: reference_state.dive_entry_shot_deferred,
     }
 }
 
@@ -821,9 +828,9 @@ fn actor_humans_for_report(report: &StepReport) -> Vec<CleanHumanSnapshot> {
             human.carried = report.draws.iter().any(|draw| {
                 draw.actor == snapshot.id && matches!(draw.sprite, SpriteKey::HumanCarried)
             });
-            if let Some(runtime_state) = snapshot.runtime.as_human() {
-                human.x_subpixel = runtime_state.x_fraction;
-                human.animation_frame = runtime_state.animation_frame.index();
+            if let Some(reference_state) = snapshot.reference_state.as_human() {
+                human.reference_x_fraction = reference_state.x_fraction;
+                human.animation_frame = reference_state.animation_frame.index();
             }
             human
         })
@@ -861,21 +868,21 @@ fn actor_enemy_projectiles_for_report(report: &StepReport) -> Vec<CleanEnemyProj
             } else {
                 EnemyProjectileKind::Fireball
             },
-            x_subpixel: snapshot
-                .runtime.as_enemy_projectile()
-                .map_or(0, |runtime_state| runtime_state.x_fraction),
-            y_subpixel: snapshot
-                .runtime.as_enemy_projectile()
-                .map_or(0, |runtime_state| runtime_state.y_fraction),
-            x_velocity_word: snapshot
-                .runtime.as_enemy_projectile()
-                .map_or(0, |runtime_state| runtime_state.x_velocity),
-            y_velocity_word: snapshot
-                .runtime.as_enemy_projectile()
-                .map_or(0, |runtime_state| runtime_state.y_velocity),
+            reference_x_fraction: snapshot
+                .reference_state.as_enemy_projectile()
+                .map_or(0, |reference_state| reference_state.x_fraction),
+            reference_y_fraction: snapshot
+                .reference_state.as_enemy_projectile()
+                .map_or(0, |reference_state| reference_state.y_fraction),
+            reference_x_velocity: snapshot
+                .reference_state.as_enemy_projectile()
+                .map_or(0, |reference_state| reference_state.x_velocity),
+            reference_y_velocity: snapshot
+                .reference_state.as_enemy_projectile()
+                .map_or(0, |reference_state| reference_state.y_velocity),
             lifetime_ticks: snapshot
-                .runtime.as_enemy_projectile()
-                .map_or(0, |runtime_state| runtime_state.lifetime_ticks),
+                .reference_state.as_enemy_projectile()
+                .map_or(0, |reference_state| reference_state.lifetime_ticks),
         })
         .collect()
 }
@@ -992,13 +999,13 @@ fn projectile_lifetime_ticks(remaining_steps: u16) -> u8 {
     remaining_steps.min(u16::from(u8::MAX)) as u8
 }
 
-fn enemy_projectile_runtime_state(
+fn enemy_projectile_reference_state(
     x_fraction: u8,
     y_fraction: u8,
     velocity: Velocity,
     lifetime_steps: u16,
-) -> EnemyProjectileRuntimeState {
-    EnemyProjectileRuntimeState {
+) -> EnemyProjectileReferenceState {
+    EnemyProjectileReferenceState {
         x_fraction,
         y_fraction,
         x_velocity: projectile_velocity_word(velocity.dx),

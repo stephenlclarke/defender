@@ -1219,11 +1219,8 @@ fn apply_wave_tuning_profile_field(
         "lander_x_velocity" => {
             wave_tuning.lander_x_velocity = parse_wave_u8(line_number, Some(value), field)?
         }
-        "lander_y_velocity_msb" => {
-            wave_tuning.lander_y_velocity_msb = parse_wave_u8(line_number, Some(value), field)?
-        }
-        "lander_y_velocity_lsb" => {
-            wave_tuning.lander_y_velocity_lsb = parse_wave_u8(line_number, Some(value), field)?
+        "lander_y_velocity" => {
+            wave_tuning.lander_y_velocity = parse_wave_u16(line_number, Some(value), field)?
         }
         "bomber_x_velocity" => {
             wave_tuning.bomber_x_velocity = parse_wave_u8(line_number, Some(value), field)?
@@ -1253,11 +1250,8 @@ fn apply_wave_tuning_profile_field(
         "mutant_random_y" => {
             wave_tuning.mutant_random_y = parse_wave_u8(line_number, Some(value), field)?
         }
-        "mutant_y_velocity_msb" => {
-            wave_tuning.mutant_y_velocity_msb = parse_wave_u8(line_number, Some(value), field)?
-        }
-        "mutant_y_velocity_lsb" => {
-            wave_tuning.mutant_y_velocity_lsb = parse_wave_u8(line_number, Some(value), field)?
+        "mutant_y_velocity" => {
+            wave_tuning.mutant_y_velocity = parse_wave_u16(line_number, Some(value), field)?
         }
         "mutant_x_velocity" => {
             wave_tuning.mutant_x_velocity = parse_wave_u8(line_number, Some(value), field)?

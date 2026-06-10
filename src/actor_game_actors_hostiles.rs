@@ -18,7 +18,7 @@ struct Bomber {
     id: ActorId,
     position: Point,
     drift: i16,
-    runtime_state: Option<BomberRuntimeState>,
+    reference_state: Option<BomberReferenceState>,
 }
 
 impl Bomber {
@@ -31,10 +31,10 @@ impl Bomber {
             id,
             position: spawn.position,
             drift: spawn
-                .runtime_state
-                .map(|runtime_state| drift_from_motion_word(runtime_state.x_velocity))
+                .reference_state
+                .map(|reference_state| drift_from_motion_word(reference_state.x_velocity))
                 .unwrap_or(-1),
-            runtime_state: spawn.runtime_state,
+            reference_state: spawn.reference_state,
         }
     }
 
@@ -43,46 +43,46 @@ impl Bomber {
     }
 
     fn advance_runtime_motion(&mut self) -> bool {
-        let Some(runtime_state) = &mut self.runtime_state else {
+        let Some(reference_state) = &mut self.reference_state else {
             return false;
         };
 
         let (x, x_fraction) =
-            step_motion_axis(self.position.x, runtime_state.x_fraction, runtime_state.x_velocity);
+            step_motion_axis(self.position.x, reference_state.x_fraction, reference_state.x_velocity);
         let (y, y_fraction) = step_wrapping_motion_y(
             self.position.y,
-            runtime_state.y_fraction,
-            runtime_state.y_velocity,
+            reference_state.y_fraction,
+            reference_state.y_velocity,
         );
         self.position = Point::new(x, y);
-        runtime_state.x_fraction = x_fraction;
-        runtime_state.y_fraction = y_fraction;
-        self.drift = drift_from_motion_word(runtime_state.x_velocity);
+        reference_state.x_fraction = x_fraction;
+        reference_state.y_fraction = y_fraction;
+        self.drift = drift_from_motion_word(reference_state.x_velocity);
         true
     }
 
     fn advance_tie_step(&mut self, prompt: &StepPrompt, actor_rng: ActorRngSnapshot) {
-        let Some(runtime_state) = &mut self.runtime_state else {
+        let Some(reference_state) = &mut self.reference_state else {
             return;
         };
-        if runtime_state.slot != bomber_tie_selected_slot(actor_rng.seed) {
+        if reference_state.slot != bomber_tie_selected_slot(actor_rng.seed) {
             return;
         }
-        if runtime_state.sleep_ticks > 0 {
-            runtime_state.sleep_ticks = runtime_state.sleep_ticks.saturating_sub(1);
+        if reference_state.sleep_ticks > 0 {
+            reference_state.sleep_ticks = reference_state.sleep_ticks.saturating_sub(1);
             return;
         }
 
-        runtime_state.animation_frame = SpriteFrameIndex::new(bomber_sprite_frame_after_tie_seed(
+        reference_state.animation_frame = SpriteFrameIndex::new(bomber_sprite_frame_after_tie_seed(
             actor_rng.seed,
-            runtime_state.animation_frame.index(),
+            reference_state.animation_frame.index(),
         ));
-        runtime_state.y_velocity =
-            bomber_seeded_y_velocity(runtime_state.y_velocity, actor_rng.seed);
+        reference_state.y_velocity =
+            bomber_seeded_y_velocity(reference_state.y_velocity, actor_rng.seed);
         if self.position.y == 0 {
-            runtime_state.y_velocity = bomber_cruise_y_velocity(
-                runtime_state.y_velocity,
-                &mut runtime_state.cruise_altitude,
+            reference_state.y_velocity = bomber_cruise_y_velocity(
+                reference_state.y_velocity,
+                &mut reference_state.cruise_altitude,
                 self.position.y,
                 actor_rng.seed,
             );
@@ -90,16 +90,16 @@ impl Bomber {
             && let Some(delta) =
                 bomber_player_tracking_y_velocity_delta(self.position.y, player.y)
         {
-            runtime_state.y_velocity = runtime_state.y_velocity.wrapping_add(delta);
+            reference_state.y_velocity = reference_state.y_velocity.wrapping_add(delta);
         }
 
-        runtime_state.sleep_ticks = BOMBER_LOOP_SLEEP_TICKS;
+        reference_state.sleep_ticks = BOMBER_LOOP_SLEEP_TICKS;
     }
 
     fn draw_effect(&self) -> VisualEffect {
-        self.runtime_state
-            .map(|runtime_state| VisualEffect::BomberSpriteFrame {
-                animation_frame: runtime_state.animation_frame,
+        self.reference_state
+            .map(|reference_state| VisualEffect::BomberSpriteFrame {
+                animation_frame: reference_state.animation_frame,
             })
             .unwrap_or(VisualEffect::Static)
     }
@@ -110,12 +110,12 @@ impl Bomber {
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) {
-        if let Some(runtime_state) = self.runtime_state {
+        if let Some(reference_state) = self.reference_state {
             let Some(actor_rng) = prompt.actor_rng else {
                 return;
             };
-            if runtime_state.slot != bomber_tie_selected_slot(actor_rng.seed)
-                || runtime_state.sleep_ticks > 0
+            if reference_state.slot != bomber_tie_selected_slot(actor_rng.seed)
+                || reference_state.sleep_ticks > 0
                 || self.position.y == 0
                 || actor_rng.lseed & BOMBER_BOMB_RANDOM_DROP_MASK != 0
                 || actor_bomb_projectile_count(prompt) >= ACTIVE_BOMBER_BOMB_LIMIT
@@ -127,9 +127,9 @@ impl Bomber {
 
             commands.push(GameCommand::Spawn(SpawnRequest::Bomb {
                 position: self.position,
-                runtime_state: Some(EnemyProjectileRuntimeState {
-                    x_fraction: runtime_state.x_fraction,
-                    y_fraction: runtime_state.y_fraction,
+                reference_state: Some(EnemyProjectileReferenceState {
+                    x_fraction: reference_state.x_fraction,
+                    y_fraction: reference_state.y_fraction,
                     x_velocity: 0,
                     y_velocity: 0,
                     lifetime_ticks: bomber_bomb_lifetime_ticks(actor_rng),
@@ -152,7 +152,7 @@ impl Bomber {
         if prompt.step % bomb_period == phase % bomb_period {
             commands.push(GameCommand::Spawn(SpawnRequest::Bomb {
                 position: self.position,
-                runtime_state: None,
+                reference_state: None,
             }));
         }
     }
@@ -235,7 +235,7 @@ impl AssetActor for Bomber {
         let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Bomber);
-            if self.runtime_state.is_some() {
+            if self.reference_state.is_some() {
                 self.maybe_spawn_bomb(prompt, behavior, &mut commands);
                 if let Some(actor_rng) = prompt.actor_rng {
                     self.advance_tie_step(prompt, actor_rng);
@@ -273,7 +273,7 @@ impl AssetActor for Bomber {
                 )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                runtime: ActorRuntimeState::bomber(self.runtime_state),
+                reference_state: ActorReferenceState::bomber(self.reference_state),
             },
             commands,
             draws,
@@ -286,7 +286,7 @@ struct Bomb {
     id: ActorId,
     position: Point,
     lifetime_steps: u16,
-    runtime_state: EnemyProjectileRuntimeState,
+    reference_state: EnemyProjectileReferenceState,
 }
 
 impl Bomb {
@@ -294,26 +294,26 @@ impl Bomb {
         id: ActorId,
         position: Point,
         lifetime_steps: u16,
-        runtime_state: Option<EnemyProjectileRuntimeState>,
+        reference_state: Option<EnemyProjectileReferenceState>,
     ) -> Self {
-        let mut runtime_state = runtime_state.unwrap_or(EnemyProjectileRuntimeState {
+        let mut reference_state = reference_state.unwrap_or(EnemyProjectileReferenceState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
             y_velocity: 0,
             lifetime_ticks: 0,
         });
-        let lifetime_steps = if runtime_state.lifetime_ticks == 0 {
+        let lifetime_steps = if reference_state.lifetime_ticks == 0 {
             lifetime_steps
         } else {
-            u16::from(runtime_state.lifetime_ticks)
+            u16::from(reference_state.lifetime_ticks)
         };
-        runtime_state.lifetime_ticks = projectile_lifetime_ticks(lifetime_steps);
+        reference_state.lifetime_ticks = projectile_lifetime_ticks(lifetime_steps);
         Self {
             id,
             position,
             lifetime_steps,
-            runtime_state,
+            reference_state,
         }
     }
 
@@ -332,7 +332,7 @@ impl AssetActor for Bomb {
         if prompt.phase == Phase::Playing && self.lifetime_steps > 0 {
             if prompt.projectile_scan_tick {
                 self.lifetime_steps = self.lifetime_steps.saturating_sub(1);
-                self.runtime_state.lifetime_ticks =
+                self.reference_state.lifetime_ticks =
                     projectile_lifetime_ticks(self.lifetime_steps);
             }
             if self.lifetime_steps > 0 {
@@ -350,7 +350,7 @@ impl AssetActor for Bomb {
                 direction: None,
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing && self.lifetime_steps > 0,
-                runtime: ActorRuntimeState::enemy_projectile(Some(self.runtime_state)),
+                reference_state: ActorReferenceState::enemy_projectile(Some(self.reference_state)),
             },
             commands: Vec::new(),
             draws,
@@ -363,7 +363,7 @@ struct Pod {
     id: ActorId,
     position: Point,
     drift: i16,
-    runtime_state: Option<PodRuntimeState>,
+    reference_state: Option<PodReferenceState>,
 }
 
 impl Pod {
@@ -376,10 +376,10 @@ impl Pod {
             id,
             position: spawn.position,
             drift: spawn
-                .runtime_state
-                .map(|runtime_state| drift_from_motion_word(runtime_state.x_velocity))
+                .reference_state
+                .map(|reference_state| drift_from_motion_word(reference_state.x_velocity))
                 .unwrap_or(1),
-            runtime_state: spawn.runtime_state,
+            reference_state: spawn.reference_state,
         }
     }
 
@@ -388,20 +388,20 @@ impl Pod {
     }
 
     fn advance_runtime_motion(&mut self) -> bool {
-        let Some(runtime_state) = &mut self.runtime_state else {
+        let Some(reference_state) = &mut self.reference_state else {
             return false;
         };
         let (x, x_fraction) =
-            step_motion_axis(self.position.x, runtime_state.x_fraction, runtime_state.x_velocity);
+            step_motion_axis(self.position.x, reference_state.x_fraction, reference_state.x_velocity);
         let (y, y_fraction) = step_wrapping_motion_y(
             self.position.y,
-            runtime_state.y_fraction,
-            runtime_state.y_velocity,
+            reference_state.y_fraction,
+            reference_state.y_velocity,
         );
         self.position = Point::new(x, y);
-        runtime_state.x_fraction = x_fraction;
-        runtime_state.y_fraction = y_fraction;
-        self.drift = drift_from_motion_word(runtime_state.x_velocity);
+        reference_state.x_fraction = x_fraction;
+        reference_state.y_fraction = y_fraction;
+        self.drift = drift_from_motion_word(reference_state.x_velocity);
         true
     }
 }
@@ -449,7 +449,7 @@ impl AssetActor for Pod {
                 )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                runtime: ActorRuntimeState::pod(self.runtime_state),
+                reference_state: ActorReferenceState::pod(self.reference_state),
             },
             commands: Vec::new(),
             draws,
@@ -462,7 +462,7 @@ struct Swarmer {
     id: ActorId,
     position: Point,
     drift: i16,
-    runtime_state: Option<SwarmerRuntimeState>,
+    reference_state: Option<SwarmerReferenceState>,
 }
 
 impl Swarmer {
@@ -475,7 +475,7 @@ impl Swarmer {
             id,
             position: spawn.position,
             drift: -1,
-            runtime_state: spawn.runtime_state,
+            reference_state: spawn.reference_state,
         }
     }
 
@@ -489,11 +489,11 @@ impl Swarmer {
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) -> bool {
-        let Some(runtime_state) = &mut self.runtime_state else {
+        let Some(reference_state) = &mut self.reference_state else {
             return false;
         };
-        if runtime_state.sleep_ticks > 0 {
-            runtime_state.sleep_ticks = runtime_state.sleep_ticks.saturating_sub(1);
+        if reference_state.sleep_ticks > 0 {
+            reference_state.sleep_ticks = reference_state.sleep_ticks.saturating_sub(1);
             return true;
         }
 
@@ -502,35 +502,35 @@ impl Swarmer {
         };
         let profile = prompt.wave_tuning;
         let mut horizontal_seek_only = false;
-        if runtime_state.horizontal_seek_pending {
-            runtime_state.x_velocity = mini_swarmer_seek_velocity(
+        if reference_state.horizontal_seek_pending {
+            reference_state.x_velocity = mini_swarmer_seek_velocity(
                 profile.swarmer_x_velocity,
                 player.x,
                 self.position.x,
             );
-            runtime_state.horizontal_seek_pending = false;
-            runtime_state.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
+            reference_state.horizontal_seek_pending = false;
+            reference_state.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
             horizontal_seek_only = true;
         }
 
         let in_shot_window = if horizontal_seek_only {
             false
         } else {
-            runtime_state.y_velocity = mini_swarmer_y_velocity(
-                runtime_state.y_velocity,
-                runtime_state.acceleration,
+            reference_state.y_velocity = mini_swarmer_y_velocity(
+                reference_state.y_velocity,
+                reference_state.acceleration,
                 player.y,
                 self.position.y,
                 prompt.actor_rng.map(|rng| rng.seed).unwrap_or(0),
             );
             let player_absolute_x = absolute_world_x(player, 0);
-            let object_absolute_x = absolute_world_x(self.position, runtime_state.x_fraction);
+            let object_absolute_x = absolute_world_x(self.position, reference_state.x_fraction);
             let past_window = player_absolute_x
                 .wrapping_sub(object_absolute_x)
                 .wrapping_add(MINI_SWARMER_TURN_WINDOW_HALF);
             let in_shot_window = past_window <= MINI_SWARMER_TURN_WINDOW;
             if !in_shot_window {
-                runtime_state.x_velocity = mini_swarmer_seek_velocity(
+                reference_state.x_velocity = mini_swarmer_seek_velocity(
                     profile.swarmer_x_velocity,
                     player.x,
                     self.position.x,
@@ -540,26 +540,26 @@ impl Swarmer {
         };
 
         let (x, x_fraction) =
-            step_motion_axis(self.position.x, runtime_state.x_fraction, runtime_state.x_velocity);
+            step_motion_axis(self.position.x, reference_state.x_fraction, reference_state.x_velocity);
         let (y, y_fraction) = step_wrapping_motion_y(
             self.position.y,
-            runtime_state.y_fraction,
-            runtime_state.y_velocity,
+            reference_state.y_fraction,
+            reference_state.y_velocity,
         );
         self.position = Point::new(x, y);
-        runtime_state.x_fraction = x_fraction;
-        runtime_state.y_fraction = y_fraction;
+        reference_state.x_fraction = x_fraction;
+        reference_state.y_fraction = y_fraction;
         if in_shot_window {
-            runtime_state.shot_timer = runtime_state.shot_timer.wrapping_sub(1);
-            if runtime_state.shot_timer == 0 {
-                runtime_state.shot_timer = prompt
+            reference_state.shot_timer = reference_state.shot_timer.wrapping_sub(1);
+            if reference_state.shot_timer == 0 {
+                reference_state.shot_timer = prompt
                     .actor_rng
                     .map(|rng| bounded_actor_rng_value(clamped_swarmer_shot_reset(profile), rng.seed))
                     .unwrap_or_else(|| clamped_swarmer_shot_reset(profile));
-                push_swarmer_shot(self.position, prompt, behavior, Some(*runtime_state), commands);
+                push_swarmer_shot(self.position, prompt, behavior, Some(*reference_state), commands);
             }
         }
-        runtime_state.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
+        reference_state.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
         true
     }
 }
@@ -613,7 +613,7 @@ impl AssetActor for Swarmer {
                 )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                runtime: ActorRuntimeState::swarmer(self.runtime_state),
+                reference_state: ActorReferenceState::swarmer(self.reference_state),
             },
             commands,
             draws,
@@ -625,17 +625,17 @@ fn push_swarmer_shot(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
-    runtime_state: Option<SwarmerRuntimeState>,
+    reference_state: Option<SwarmerReferenceState>,
     commands: &mut Vec<GameCommand>,
 ) {
-    if let Some(runtime_state) = runtime_state {
-        if let Some((velocity, projectile_runtime_state)) =
-            mini_swarmer_fireball(position, prompt, runtime_state)
+    if let Some(reference_state) = reference_state {
+        if let Some((velocity, projectile_reference_state)) =
+            mini_swarmer_fireball(position, prompt, reference_state)
         {
             push_enemy_projectile_command(
                 position,
                 velocity,
-                projectile_runtime_state,
+                projectile_reference_state,
                 SoundCue::SwarmerShot,
                 commands,
             );
@@ -647,7 +647,7 @@ fn push_swarmer_shot(
     commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
         position,
         velocity,
-        runtime_state: None,
+        reference_state: None,
     }));
     commands.push(GameCommand::PlaySound(SoundCue::SwarmerShot));
 }
@@ -655,12 +655,12 @@ fn push_swarmer_shot(
 fn mini_swarmer_fireball(
     position: Point,
     prompt: &StepPrompt,
-    runtime_state: SwarmerRuntimeState,
-) -> Option<(Velocity, EnemyProjectileRuntimeState)> {
+    reference_state: SwarmerReferenceState,
+) -> Option<(Velocity, EnemyProjectileReferenceState)> {
     let player = prompt.player_position()?;
     let player_delta = absolute_world_x(player, 0)
-        .wrapping_sub(absolute_world_x(position, runtime_state.x_fraction));
-    if (player_delta.to_be_bytes()[0] ^ runtime_state.x_velocity.to_be_bytes()[0])
+        .wrapping_sub(absolute_world_x(position, reference_state.x_fraction));
+    if (player_delta.to_be_bytes()[0] ^ reference_state.x_velocity.to_be_bytes()[0])
         & MOTION_BYTE_SIGN_BIT
         != 0
             || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
@@ -668,7 +668,7 @@ fn mini_swarmer_fireball(
         return None;
     }
 
-    let x_velocity = runtime_state.x_velocity.wrapping_shl(3);
+    let x_velocity = reference_state.x_velocity.wrapping_shl(3);
     let y_velocity = actor_arithmetic_shift_right_word(
         u16::from_be_bytes([(player.y as u8).wrapping_sub(position.y as u8), 0]),
         5,
@@ -676,7 +676,7 @@ fn mini_swarmer_fireball(
     let velocity = screen_velocity_from_motion_words(x_velocity, y_velocity);
     Some((
         velocity,
-        EnemyProjectileRuntimeState {
+        EnemyProjectileReferenceState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity,
@@ -695,7 +695,7 @@ struct Baiter {
     id: ActorId,
     position: Point,
     drift: i16,
-    runtime_state: Option<BaiterRuntimeState>,
+    reference_state: Option<BaiterReferenceState>,
 }
 
 impl Baiter {
@@ -708,7 +708,7 @@ impl Baiter {
             id,
             position: spawn.position,
             drift: -1,
-            runtime_state: spawn.runtime_state,
+            reference_state: spawn.reference_state,
         }
     }
 
@@ -722,33 +722,33 @@ impl Baiter {
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) -> bool {
-        let Some(runtime_state) = &mut self.runtime_state else {
+        let Some(reference_state) = &mut self.reference_state else {
             return false;
         };
 
-        if runtime_state.sleep_ticks > 0 {
-            runtime_state.sleep_ticks = runtime_state.sleep_ticks.saturating_sub(1);
+        if reference_state.sleep_ticks > 0 {
+            reference_state.sleep_ticks = reference_state.sleep_ticks.saturating_sub(1);
         } else {
-            runtime_state.shot_timer = runtime_state.shot_timer.wrapping_sub(1);
-            if runtime_state.shot_timer == 0 {
+            reference_state.shot_timer = reference_state.shot_timer.wrapping_sub(1);
+            if reference_state.shot_timer == 0 {
                 let profile = prompt.wave_tuning;
                 let shot_rng = baiter_shot_actor_rng(prompt, self.id, self.position);
-                runtime_state.shot_timer = baiter_shot_timer_reset(profile, shot_rng.seed);
+                reference_state.shot_timer = baiter_shot_timer_reset(profile, shot_rng.seed);
                 push_baiter_shot(
                     self.id,
                     self.position,
                     prompt,
                     behavior,
-                    Some(*runtime_state),
+                    Some(*reference_state),
                     Some(shot_rng),
                     commands,
                 );
             }
 
-            runtime_state.animation_frame = SpriteFrameIndex::new(
-                (runtime_state.animation_frame.index() + 1) % BAITER_ANIMATION_FRAME_COUNT,
+            reference_state.animation_frame = SpriteFrameIndex::new(
+                (reference_state.animation_frame.index() + 1) % BAITER_ANIMATION_FRAME_COUNT,
             );
-            if runtime_state.animation_frame.index() == 0
+            if reference_state.animation_frame.index() == 0
                 && let Some(player) = prompt.player_position()
             {
                 let profile = prompt.wave_tuning;
@@ -757,7 +757,7 @@ impl Baiter {
                     .map(|actor_rng| actor_rng.seed)
                     .unwrap_or_else(|| motion_seed(prompt.step, self.id));
                 update_baiter_velocity(
-                    runtime_state,
+                    reference_state,
                     self.position,
                     profile,
                     player,
@@ -766,29 +766,29 @@ impl Baiter {
                     seed,
                 );
             }
-            runtime_state.sleep_ticks = BAITER_LOOP_SLEEP_TICKS;
+            reference_state.sleep_ticks = BAITER_LOOP_SLEEP_TICKS;
         }
 
         let (x, x_fraction) = step_motion_axis(
             self.position.x,
-            runtime_state.x_fraction,
-            baiter_screen_x_velocity(runtime_state.x_velocity),
+            reference_state.x_fraction,
+            baiter_screen_x_velocity(reference_state.x_velocity),
         );
         let (y, y_fraction) = step_wrapping_motion_y(
             self.position.y,
-            runtime_state.y_fraction,
-            runtime_state.y_velocity,
+            reference_state.y_fraction,
+            reference_state.y_velocity,
         );
         self.position = Point::new(x, y);
-        runtime_state.x_fraction = x_fraction;
-        runtime_state.y_fraction = y_fraction;
+        reference_state.x_fraction = x_fraction;
+        reference_state.y_fraction = y_fraction;
         true
     }
 
     fn draw_effect(&self) -> VisualEffect {
-        self.runtime_state
-            .map(|runtime_state| VisualEffect::BaiterSpriteFrame {
-                animation_frame: runtime_state.animation_frame,
+        self.reference_state
+            .map(|reference_state| VisualEffect::BaiterSpriteFrame {
+                animation_frame: reference_state.animation_frame,
             })
             .unwrap_or(VisualEffect::Static)
     }
@@ -799,20 +799,20 @@ fn push_baiter_shot(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
-    runtime_state: Option<BaiterRuntimeState>,
+    reference_state: Option<BaiterReferenceState>,
     shot_rng: Option<ActorRngSnapshot>,
     commands: &mut Vec<GameCommand>,
 ) {
-    if let Some(runtime_state) = runtime_state {
+    if let Some(reference_state) = reference_state {
         let shot_rng =
             shot_rng.unwrap_or_else(|| baiter_shot_actor_rng(prompt, actor, position));
-        if let Some((velocity, projectile_runtime_state)) =
-            baiter_fireball(position, prompt, runtime_state, shot_rng)
+        if let Some((velocity, projectile_reference_state)) =
+            baiter_fireball(position, prompt, reference_state, shot_rng)
         {
             push_enemy_projectile_command(
                 position,
                 velocity,
-                projectile_runtime_state,
+                projectile_reference_state,
                 SoundCue::BaiterShot,
                 commands,
             );
@@ -824,7 +824,7 @@ fn push_baiter_shot(
     commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
         position,
         velocity,
-        runtime_state: None,
+        reference_state: None,
     }));
     commands.push(GameCommand::PlaySound(SoundCue::BaiterShot));
 }
@@ -848,13 +848,13 @@ fn baiter_shot_timer_reset(profile: ActorWaveTuning, seed: u8) -> u8 {
 fn baiter_fireball(
     position: Point,
     prompt: &StepPrompt,
-    runtime_state: BaiterRuntimeState,
+    reference_state: BaiterReferenceState,
     shot_rng: ActorRngSnapshot,
-) -> Option<(Velocity, EnemyProjectileRuntimeState)> {
+) -> Option<(Velocity, EnemyProjectileReferenceState)> {
     enemy_fireball_projectile(
         position,
-        runtime_state.x_fraction,
-        runtime_state.y_fraction,
+        reference_state.x_fraction,
+        reference_state.y_fraction,
         prompt,
         shot_rng,
         ENEMY_PROJECTILE_LIFETIME_TICKS,
@@ -939,7 +939,7 @@ impl AssetActor for Baiter {
                 )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                runtime: ActorRuntimeState::baiter(self.runtime_state),
+                reference_state: ActorReferenceState::baiter(self.reference_state),
             },
             commands,
             draws,
@@ -951,12 +951,12 @@ fn clamped_baiter_shot_timer_reset(profile: ActorWaveTuning) -> u8 {
     profile.baiter_shot_time.max(1).min(u32::from(u8::MAX)) as u8
 }
 
-fn baiter_screen_x_velocity(x_velocity_word: u16) -> u16 {
-    x_velocity_word.wrapping_shl(2)
+fn baiter_screen_x_velocity(reference_x_velocity: u16) -> u16 {
+    reference_x_velocity.wrapping_shl(2)
 }
 
 fn update_baiter_velocity(
-    runtime_state: &mut BaiterRuntimeState,
+    reference_state: &mut BaiterReferenceState,
     position: Point,
     profile: ActorWaveTuning,
     player_position: Point,
@@ -977,7 +977,7 @@ fn update_baiter_velocity(
         };
         let player_x_velocity =
             actor_arithmetic_shift_right_word(motion_velocity_word(player_velocity.dx), 2);
-        runtime_state.x_velocity =
+        reference_state.x_velocity =
             actor_sign_extend_u8_to_u16(x_seek_byte).wrapping_add(player_x_velocity);
     }
 
@@ -988,7 +988,7 @@ fn update_baiter_velocity(
         } else {
             BAITER_Y_SEEK_BYTE
         };
-        runtime_state.y_velocity = actor_arithmetic_shift_right_word(
+        reference_state.y_velocity = actor_arithmetic_shift_right_word(
             u16::from_be_bytes([y_seek_byte, 0])
                 .wrapping_add(motion_velocity_word(player_velocity.dy)),
             1,
@@ -1010,11 +1010,11 @@ fn motion_seed(step: u64, id: ActorId) -> u8 {
     (step as u8).wrapping_mul(17).wrapping_add(id.value() as u8)
 }
 
-fn mini_swarmer_seek_velocity(x_velocity_word: u8, player_x: i16, swarmer_x: i16) -> u16 {
+fn mini_swarmer_seek_velocity(x_velocity_magnitude: u8, player_x: i16, swarmer_x: i16) -> u16 {
     if player_x >= swarmer_x {
-        actor_sign_extend_u8_to_u16(x_velocity_word)
+        actor_sign_extend_u8_to_u16(x_velocity_magnitude)
     } else {
-        actor_sign_extend_u8_to_u16(0u8.wrapping_sub(x_velocity_word))
+        actor_sign_extend_u8_to_u16(0u8.wrapping_sub(x_velocity_magnitude))
     }
 }
 

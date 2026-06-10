@@ -924,7 +924,7 @@ fn push_actor_attract_scoring_score_500_pixels(
 }
 
 const SCORE_POPUP_500_PIXEL_BITMAP: crate::reference_assets::ObjectBitmapId =
-    crate::reference_assets::ObjectBitmapId::Score500Primary; // original: C5D10
+    crate::reference_assets::ObjectBitmapId::Score500Primary;
 
 fn actor_score_500_nibble_tint(nibble: u8, phase: usize) -> Option<Color> {
     match nibble {
