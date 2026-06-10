@@ -800,12 +800,12 @@ pub(crate) const MESSAGE_GLYPH_ASSETS: &[MessageGlyphAsset] = &[
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MessageId {
-    OperatorWrom,
+    OperatorProgramMemory,
     OperatorWram,
-    OperatorRomfl,
+    OperatorProgramMemoryFailure,
     OperatorRamfl,
     GameOver,
-    OperatorAlrom,
+    OperatorAllProgramMemoryOk,
     OperatorRamts,
     OperatorNoram,
     OperatorCmsfl,
@@ -882,12 +882,12 @@ pub enum MessageId {
 
 pub(crate) fn message_text(id: MessageId) -> &'static str {
     match id {
-        MessageId::OperatorWrom => "ROM",
+        MessageId::OperatorProgramMemory => "ROM",
         MessageId::OperatorWram => "RAM",
-        MessageId::OperatorRomfl => "ROM FAILURE",
+        MessageId::OperatorProgramMemoryFailure => "ROM FAILURE",
         MessageId::OperatorRamfl => "RAM FAILURE",
         MessageId::GameOver => "GAME OVER",
-        MessageId::OperatorAlrom => "ALL ROMS OK",
+        MessageId::OperatorAllProgramMemoryOk => "ALL ROMS OK",
         MessageId::OperatorRamts => "RAM TEST",
         MessageId::OperatorNoram => "NO RAM ERRORS DETECTED",
         MessageId::OperatorCmsfl => {
@@ -971,12 +971,12 @@ pub(crate) fn message_text(id: MessageId) -> &'static str {
 
 pub(crate) fn message_id_from_arcade_name(name: &str) -> Option<MessageId> {
     Some(match name {
-        "VWROM" => MessageId::OperatorWrom,
+        "VWROM" => MessageId::OperatorProgramMemory,
         "VWRAM" => MessageId::OperatorWram,
-        "VROMFL" => MessageId::OperatorRomfl,
+        "VROMFL" => MessageId::OperatorProgramMemoryFailure,
         "VRAMFL" => MessageId::OperatorRamfl,
         "GO" => MessageId::GameOver,
-        "VALROM" => MessageId::OperatorAlrom,
+        "VALROM" => MessageId::OperatorAllProgramMemoryOk,
         "VRAMTS" => MessageId::OperatorRamts,
         "VNORAM" => MessageId::OperatorNoram,
         "VCMSFL" => MessageId::OperatorCmsfl,

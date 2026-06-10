@@ -521,8 +521,10 @@ mod tests {
             CliClassification::Error(CleanCliError::RemovedRendererSelection)
         );
         assert_eq!(
-            RuntimeCliClassifier::classify(args(&["--rom-report"])),
-            CliClassification::Error(CleanCliError::UnknownArgument(String::from("--rom-report")))
+            RuntimeCliClassifier::classify(args(&["--memory-report"])),
+            CliClassification::Error(CleanCliError::UnknownArgument(String::from(
+                "--memory-report"
+            )))
         );
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--fidelity-trace"])),
@@ -543,8 +545,8 @@ mod tests {
             "renderer selection was removed; live play is wgpu-only"
         );
         assert_eq!(
-            CleanCliError::UnknownArgument(String::from("--rom-report")).to_string(),
-            "unknown argument: --rom-report"
+            CleanCliError::UnknownArgument(String::from("--memory-report")).to_string(),
+            "unknown argument: --memory-report"
         );
     }
 }

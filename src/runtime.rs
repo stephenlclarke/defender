@@ -369,7 +369,7 @@ mod tests {
         assert!(text.contains("--actor-post-game-smoke"));
         assert!(text.contains("--actor-wgpu-smoke"));
         assert!(text.contains("--mute"));
-        assert!(!text.contains("--rom-report"));
+        assert!(!text.contains("--memory-report"));
         assert!(!text.contains("--fidelity"));
         assert!(text.contains("copy-only deployment"));
         assert!(text.contains("uses the windowed wgpu"));
