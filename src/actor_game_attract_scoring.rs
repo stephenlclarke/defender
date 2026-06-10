@@ -39,15 +39,15 @@ fn push_attract_scoring_scanner_terrain(scene: &mut RenderScene) {
 }
 
 fn push_attract_scoring_demo_scene(scene: &mut RenderScene, scoring_tick: TimelineStep) {
-    let frame = actor_attract_scoring_frame(scoring_tick);
-    for object in frame.scanner_objects.iter().copied() {
+    let snapshot = actor_attract_scoring_snapshot(scoring_tick);
+    for object in snapshot.scanner_objects.iter().copied() {
         push_attract_scoring_scanner_object(scene, object);
     }
 
     let mut player_ship = None;
     let mut laser_target = None;
     let mut laser_active = false;
-    for object in frame.scene_objects.iter().copied() {
+    for object in snapshot.scene_objects.iter().copied() {
         match object.kind {
             ActorAttractScoringObjectKind::PlayerShip
                 if object.visual == ActorAttractScoringVisual::Sprite =>
@@ -73,17 +73,17 @@ fn push_attract_scoring_demo_scene(scene: &mut RenderScene, scoring_tick: Timeli
             scene,
             player_ship,
             laser_target,
-            frame.display_step.step(),
+            snapshot.display_step.step(),
         );
     }
 
-    if let Some(bonus) = frame.bonus {
-        push_actor_attract_scoring_bonus(scene, bonus, frame.display_step.step());
+    if let Some(bonus) = snapshot.bonus {
+        push_actor_attract_scoring_bonus(scene, bonus, snapshot.display_step.step());
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ActorAttractScoringFrame {
+struct ActorAttractScoringSnapshot {
     display_step: TimelineStep,
     scene_objects: Vec<ActorAttractScoringObject>,
     scanner_objects: Vec<ActorAttractScoringObject>,
@@ -93,48 +93,48 @@ struct ActorAttractScoringFrame {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ActorAttractScoringLegendEntry {
     enemy: ActorAttractScoringEnemyKind,
-    table_world_x: i32,
-    table_world_y: i32,
-    scanner_color_word: u16,
+    legend_world_x: i32,
+    legend_world_y: i32,
+    scanner_tint_word: u16,
 }
 
 const ACTOR_ATTRACT_SCORING_LEGEND: [ActorAttractScoringLegendEntry;
     ATTRACT_SCORING_LEGEND_ENTRIES as usize] = [
     ActorAttractScoringLegendEntry {
         enemy: ActorAttractScoringEnemyKind::Lander,
-        table_world_x: 0x07A0,
-        table_world_y: 0x5900,
-        scanner_color_word: 0x4433,
+        legend_world_x: 0x07A0,
+        legend_world_y: 0x5900,
+        scanner_tint_word: 0x4433,
     },
     ActorAttractScoringLegendEntry {
         enemy: ActorAttractScoringEnemyKind::Mutant,
-        table_world_x: 0x0FA0,
-        table_world_y: 0x5900,
-        scanner_color_word: 0xCC33,
+        legend_world_x: 0x0FA0,
+        legend_world_y: 0x5900,
+        scanner_tint_word: 0xCC33,
     },
     ActorAttractScoringLegendEntry {
         enemy: ActorAttractScoringEnemyKind::Baiter,
-        table_world_x: 0x1820,
-        table_world_y: 0x5B00,
-        scanner_color_word: 0x3333,
+        legend_world_x: 0x1820,
+        legend_world_y: 0x5B00,
+        scanner_tint_word: 0x3333,
     },
     ActorAttractScoringLegendEntry {
         enemy: ActorAttractScoringEnemyKind::Bomber,
-        table_world_x: 0x0800,
-        table_world_y: 0x9100,
-        scanner_color_word: 0x8888,
+        legend_world_x: 0x0800,
+        legend_world_y: 0x9100,
+        scanner_tint_word: 0x8888,
     },
     ActorAttractScoringLegendEntry {
         enemy: ActorAttractScoringEnemyKind::Pod,
-        table_world_x: 0x1000,
-        table_world_y: 0x9100,
-        scanner_color_word: 0xCCCC,
+        legend_world_x: 0x1000,
+        legend_world_y: 0x9100,
+        scanner_tint_word: 0xCCCC,
     },
     ActorAttractScoringLegendEntry {
         enemy: ActorAttractScoringEnemyKind::Swarmer,
-        table_world_x: 0x1880,
-        table_world_y: 0x9300,
-        scanner_color_word: 0x2424,
+        legend_world_x: 0x1880,
+        legend_world_y: 0x9300,
+        scanner_tint_word: 0x2424,
     },
 ];
 
@@ -194,13 +194,13 @@ enum ActorAttractScoringStage {
     LegendHold,
 }
 
-fn actor_attract_scoring_frame(scoring_tick: TimelineStep) -> ActorAttractScoringFrame {
+fn actor_attract_scoring_snapshot(scoring_tick: TimelineStep) -> ActorAttractScoringSnapshot {
     let display_step = actor_attract_scoring_display_step(scoring_tick);
     let (stage, local_step) = actor_attract_scoring_stage_for_step(display_step);
     let scanner_display_step = TimelineStep::new(display_step.step() - (display_step.step() % 4));
     let (scanner_stage, scanner_local_step) =
         actor_attract_scoring_stage_for_step(scanner_display_step);
-    ActorAttractScoringFrame {
+    ActorAttractScoringSnapshot {
         display_step,
         scene_objects: actor_attract_scoring_objects_for_stage(stage, local_step),
         scanner_objects: actor_attract_scoring_objects_for_stage(scanner_stage, scanner_local_step),
@@ -548,8 +548,8 @@ fn append_actor_attract_scoring_legend_objects(
     {
         objects.push(actor_attract_scoring_enemy_object(
             entry.enemy,
-            entry.table_world_x,
-            entry.table_world_y,
+            entry.legend_world_x,
+            entry.legend_world_y,
         ));
     }
 
@@ -603,8 +603,8 @@ fn append_actor_attract_scoring_legend_objects(
             ));
             objects.push(actor_attract_scoring_visual_enemy_object(
                 entry.enemy,
-                entry.table_world_x,
-                entry.table_world_y,
+                entry.legend_world_x,
+                entry.legend_world_y,
                 ActorAttractScoringVisual::Materialize,
                 local_step,
             ));
@@ -612,8 +612,8 @@ fn append_actor_attract_scoring_legend_objects(
         ActorAttractScoringStage::LegendReveal(_) => {
             objects.push(actor_attract_scoring_enemy_object(
                 entry.enemy,
-                entry.table_world_x,
-                entry.table_world_y,
+                entry.legend_world_x,
+                entry.legend_world_y,
             ));
         }
         ActorAttractScoringStage::LegendHold => {}
@@ -715,8 +715,8 @@ fn actor_attract_scoring_bonus(
             let entry = ACTOR_ATTRACT_SCORING_LEGEND[index];
             Some(ActorAttractScoringBonus {
                 sprite: SpriteId::SCORE_POPUP_250,
-                world_x: entry.table_world_x,
-                world_y: entry.table_world_y,
+                world_x: entry.legend_world_x,
+                world_y: entry.legend_world_y,
             })
         }
         _ => None,
@@ -774,7 +774,7 @@ fn push_attract_scoring_scanner_object(scene: &mut RenderScene, object: ActorAtt
                 .iter()
                 .find(|entry| entry.enemy == enemy)
                 .map_or(ATTRACT_SCORING_LANDER_SCANNER_COLOR_WORD, |entry| {
-                    entry.scanner_color_word
+                    entry.scanner_tint_word
                 });
             (
                 SpriteId::SCANNER_OBJECT_BLIP,
