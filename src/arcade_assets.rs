@@ -862,7 +862,7 @@ pub enum MessageId {
     BomberInstruction,
     SwarmerInstruction,
     BaiterInstruction,
-    CreditsLabel,
+    CreditsPrompt,
     ScannerInstruction,
     WilliamsElectronics,
     PlayerOne,
@@ -950,7 +950,7 @@ pub(crate) fn message_text(id: MessageId) -> &'static str {
         MessageId::BomberInstruction => "BOMBER [RLF] [HMC:0x06] 250",
         MessageId::SwarmerInstruction => "SWARMER [RLF] [HMC:0x08] 150",
         MessageId::BaiterInstruction => "BAITER [RLF] [HMC:0x06] 200",
-        MessageId::CreditsLabel => "CREDITS:",
+        MessageId::CreditsPrompt => "CREDITS:",
         MessageId::ScannerInstruction => "SCANNER",
         MessageId::WilliamsElectronics => "ELECTRONICS INC. [RLF] [RLF] [HMC:0x0C] PRESENTS",
         MessageId::PlayerOne => "PLAYER ONE",
@@ -969,8 +969,8 @@ pub(crate) fn message_text(id: MessageId) -> &'static str {
     }
 }
 
-pub(crate) fn message_id_from_legacy_label(label: &str) -> Option<MessageId> {
-    Some(match label {
+pub(crate) fn message_id_from_arcade_name(name: &str) -> Option<MessageId> {
+    Some(match name {
         "VWROM" => MessageId::OperatorWrom,
         "VWRAM" => MessageId::OperatorWram,
         "VROMFL" => MessageId::OperatorRomfl,
@@ -1033,7 +1033,7 @@ pub(crate) fn message_id_from_legacy_label(label: &str) -> Option<MessageId> {
         "BOMBV" => MessageId::BomberInstruction,
         "SWARMV" => MessageId::SwarmerInstruction,
         "BAITV" => MessageId::BaiterInstruction,
-        "CREDV" => MessageId::CreditsLabel,
+        "CREDV" => MessageId::CreditsPrompt,
         "SCANV" => MessageId::ScannerInstruction,
         "ELECV" => MessageId::WilliamsElectronics,
         "PLYR1" => MessageId::PlayerOne,
@@ -1056,7 +1056,7 @@ pub(crate) fn message_id_from_legacy_label(label: &str) -> Option<MessageId> {
 pub(crate) fn message_id_from_script_key(key: &str) -> Option<MessageId> {
     let normalized = key.trim().to_ascii_lowercase().replace(['-', ' '], "_");
     Some(match normalized.as_str() {
-        "credits" | "credits_label" => MessageId::CreditsLabel,
+        "credits" | "credits_prompt" => MessageId::CreditsPrompt,
         "scanner" | "scanner_instruction" => MessageId::ScannerInstruction,
         "williams_electronics" | "presents" => MessageId::WilliamsElectronics,
         "lander" | "lander_instruction" => MessageId::LanderInstruction,
@@ -1075,7 +1075,7 @@ pub(crate) fn message_id_from_script_key(key: &str) -> Option<MessageId> {
         "wave_complete_prefix" | "attack_wave" => MessageId::WaveCompletePrefix,
         "completed" => MessageId::Completed,
         "bonus_survivors" | "bonus_x" => MessageId::BonusSurvivors,
-        _ => return message_id_from_legacy_label(key),
+        _ => return message_id_from_arcade_name(key),
     })
 }
 

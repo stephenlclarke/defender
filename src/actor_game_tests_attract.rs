@@ -20,7 +20,7 @@
             credited
                 .draws
                 .iter()
-                .any(|draw| draw.text.as_deref() == Some(credits_label_text()))
+                .any(|draw| draw.text.as_deref() == Some(credits_prompt_text()))
         );
         assert!(
             credited
@@ -106,7 +106,7 @@
             williams
                 .draws
                 .iter()
-                .all(|draw| draw.text.as_deref() != Some(credits_label_text()))
+                .all(|draw| draw.text.as_deref() != Some(credits_prompt_text()))
         );
         assert!(
             williams
@@ -208,7 +208,7 @@
         assert!(
             hall.draws
                 .iter()
-                .any(|draw| draw.text.as_deref() == Some(credits_label_text()))
+                .any(|draw| draw.text.as_deref() == Some(credits_prompt_text()))
         );
         assert!(
             hall.draws
@@ -1281,12 +1281,12 @@
             .parse::<AttractScript>()
             .expect("credit script action should parse");
         let mut driver = ActorGameDriver::with_attract_script(script);
-        let credits_label = actor_message_text(CREDITS_MESSAGE);
+        let credits_prompt = actor_message_text(CREDITS_MESSAGE);
 
         let first = driver.step(GameInput::NONE);
         assert!(first.draws.iter().any(|draw| {
             draw.position == Point::new(12, 228)
-                && draw.text.as_deref() == Some(credits_label)
+                && draw.text.as_deref() == Some(credits_prompt)
         }));
         assert!(first.draws.iter().any(|draw| {
             draw.position == Point::new(82, 228) && draw.text.as_deref() == Some("00")
@@ -1342,6 +1342,18 @@
                 && sprite.position == [124.0, 108.0]
                 && sprite.layer == RenderLayer::Overlay
         }));
+
+        let prompt_script = "message 1 forever credits_prompt 0x3C80"
+            .parse::<AttractScript>()
+            .expect("credits prompt message key should parse");
+        assert_eq!(
+            prompt_script.manifest().events[0].action,
+            AttractScriptActionManifest::ArcadeMessage {
+                message: "CreditsPrompt".to_string(),
+                screen_cell: crate::ScreenAddress::new(0x3C80),
+                visual_offset: Point::new(0, 0),
+            }
+        );
     }
 
     #[test]

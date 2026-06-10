@@ -1152,7 +1152,7 @@ impl AttractScriptAction {
                     Vec::new()
                 } else {
                     vec![
-                        DrawCommand::text(actor, *label_position, credits_label_text()),
+                        DrawCommand::text(actor, *label_position, credits_prompt_text()),
                         DrawCommand::text(
                             actor,
                             *count_position,
@@ -1233,7 +1233,7 @@ impl AttractScriptAction {
     }
 }
 
-fn credits_label_text() -> &'static str {
+fn credits_prompt_text() -> &'static str {
     crate::arcade_assets::message_text(CREDITS_MESSAGE)
 }
 
