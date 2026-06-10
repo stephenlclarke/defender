@@ -85,11 +85,11 @@ fn enemy_projectile_spawn_in_bounds(position: Point) -> bool {
     position.x < ENEMY_PROJECTILE_MAX_SCREEN_X && position.y > i16::from(PLAYFIELD_TOP_EDGE_Y)
 }
 
-fn bomb_projectile_spawn_in_arcade_bounds(
+fn bomb_projectile_spawn_in_world_bounds(
     position: Point,
-    arcade_state: Option<EnemyProjectileArcadeState>,
+    runtime_state: Option<EnemyProjectileRuntimeState>,
 ) -> bool {
-    arcade_state.is_none() || enemy_projectile_spawn_in_bounds(position)
+    runtime_state.is_none() || enemy_projectile_spawn_in_bounds(position)
 }
 
 fn reserve_enemy_projectile_slot(active_enemy_projectiles: &mut usize) -> bool {
@@ -119,22 +119,22 @@ fn actor_collision_body_for_snapshot(
     background_left: u16,
 ) -> Option<CollisionBody> {
     let body = snapshot.collision_body()?;
-    actor_project_arcade_state_collision_body(snapshot, body, background_left)
+    actor_project_runtime_state_collision_body(snapshot, body, background_left)
 }
 
-fn actor_project_arcade_state_collision_body(
+fn actor_project_runtime_state_collision_body(
     snapshot: &ActorSnapshot,
     body: CollisionBody,
     background_left: u16,
 ) -> Option<CollisionBody> {
-    let Some(x_fraction) = actor_arcade_state_x_fraction(snapshot) else {
+    let Some(x_fraction) = actor_runtime_state_x_fraction(snapshot) else {
         return Some(body);
     };
     if center_of(body.bounds) != snapshot.position && snapshot.kind != ActorKind::Human {
         return Some(body);
     }
     let position =
-        actor_arcade_screen_position(snapshot.position, x_fraction, background_left)?;
+        actor_screen_position_from_world(snapshot.position, x_fraction, background_left)?;
     let delta = Velocity::new(
         position.x - snapshot.position.x,
         position.y - snapshot.position.y,
@@ -241,7 +241,7 @@ fn player_hazard_explosion_kind(kind: ActorKind) -> ExplosionKind {
 
 fn accelerated_baiter_timer_steps(
     current_steps: u32,
-    profile: ArcadeWaveProfile,
+    profile: ActorWaveTuning,
     enemy_total: usize,
 ) -> u32 {
     if enemy_total > 8 {
@@ -256,7 +256,7 @@ fn accelerated_baiter_timer_steps(
     current_steps.min(target_steps)
 }
 
-fn baiter_timer_reset_steps(profile: ArcadeWaveProfile, enemy_total: usize) -> u32 {
+fn baiter_timer_reset_steps(profile: ActorWaveTuning, enemy_total: usize) -> u32 {
     if enemy_total < 4 {
         (profile.baiter_delay / 4).max(1)
     } else {

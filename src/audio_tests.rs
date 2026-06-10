@@ -247,7 +247,7 @@ mod tests {
     }
 
     #[test]
-    fn synth_mixer_interrupts_foreground_commands_like_the_arcade_sound_board() {
+    fn synth_mixer_interrupts_foreground_commands_like_the_reference_sound_board() {
         let mut mixer = SynthMixer::new(LIVE_AUDIO_TEST_SAMPLE_RATE_HZ);
 
         mixer.queue_event(SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEA) });

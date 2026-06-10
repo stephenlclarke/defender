@@ -4,30 +4,30 @@ struct Human {
     position: Point,
     mode: HumanMode,
     safe_landing_awarded: bool,
-    arcade_state: Option<HumanArcadeState>,
+    runtime_state: Option<HumanRuntimeState>,
 }
 
 impl Human {
     fn new(id: ActorId, position: Point, mode: HumanMode) -> Self {
-        Self::with_arcade_state(id, position, mode, None)
+        Self::with_runtime_state(id, position, mode, None)
     }
 
     fn from_spawn(id: ActorId, spawn: ActorHumanSpawn) -> Self {
-        Self::with_arcade_state(id, spawn.position, spawn.mode, spawn.arcade_state)
+        Self::with_runtime_state(id, spawn.position, spawn.mode, spawn.runtime_state)
     }
 
-    fn with_arcade_state(
+    fn with_runtime_state(
         id: ActorId,
         position: Point,
         mode: HumanMode,
-        arcade_state: Option<HumanArcadeState>,
+        runtime_state: Option<HumanRuntimeState>,
     ) -> Self {
         Self {
             id,
             position,
             mode,
             safe_landing_awarded: false,
-            arcade_state,
+            runtime_state,
         }
     }
 
@@ -37,12 +37,12 @@ impl Human {
 
     fn screen_bounds(&self, background_left: u16) -> Option<Rect> {
         let bounds = self.bounds();
-        let Some(arcade_state) = self.arcade_state else {
+        let Some(runtime_state) = self.runtime_state else {
             return Some(bounds);
         };
-        let position = actor_arcade_screen_position(
+        let position = actor_screen_position_from_world(
             self.position,
-            arcade_state.x_fraction,
+            runtime_state.x_fraction,
             background_left,
         )?;
         let delta = Velocity::new(position.x - self.position.x, position.y - self.position.y);
@@ -51,26 +51,26 @@ impl Human {
 
     fn update_grounded(
         &mut self,
-        arcade_rng: Option<ActorArcadeRngSnapshot>,
+        actor_rng: Option<ActorRngSnapshot>,
         human_walk_target_slot: Option<usize>,
     ) {
-        let Some(arcade_state) = self.arcade_state else {
+        let Some(runtime_state) = self.runtime_state else {
             return;
         };
-        if human_walk_target_slot != Some(arcade_state.target_slot_index) {
+        if human_walk_target_slot != Some(runtime_state.target_slot_index) {
             return;
         }
 
-        if let Some(arcade_rng) = arcade_rng {
-            self.advance_arcade_walk(arcade_rng.seed);
+        if let Some(actor_rng) = actor_rng {
+            self.advance_seeded_walk(actor_rng.seed);
         }
     }
 
-    fn advance_arcade_walk(&mut self, arcade_seed: u8) {
-        if let Some(arcade_state) = &mut self.arcade_state {
-            let animation_frame = arcade_state.animation_frame.index() % 4;
+    fn advance_seeded_walk(&mut self, walk_seed: u8) {
+        if let Some(runtime_state) = &mut self.runtime_state {
+            let animation_frame = runtime_state.animation_frame.index() % 4;
             let (next_animation_frame, target_y, velocity) = if animation_frame <= 1 {
-                if arcade_seed <= HUMAN_TURN_SEED_MAX {
+                if walk_seed <= HUMAN_TURN_SEED_MAX {
                     (2, None, HUMAN_RIGHT_X_VELOCITY)
                 } else {
                     (
@@ -79,7 +79,7 @@ impl Human {
                         HUMAN_LEFT_X_VELOCITY,
                     )
                 }
-            } else if arcade_seed <= HUMAN_TURN_SEED_MAX {
+            } else if walk_seed <= HUMAN_TURN_SEED_MAX {
                 (0, None, HUMAN_LEFT_X_VELOCITY)
             } else {
                 (
@@ -92,10 +92,10 @@ impl Human {
                 self.position.y = actor_step_human_toward_walk_target_y(self.position.y, target_y);
             }
             let (x, x_fraction) =
-                arcade_axis_step(self.position.x, arcade_state.x_fraction, velocity);
+                step_motion_axis(self.position.x, runtime_state.x_fraction, velocity);
             self.position.x = x;
-            arcade_state.x_fraction = x_fraction;
-            arcade_state.animation_frame = SpriteFrameIndex::new(next_animation_frame);
+            runtime_state.x_fraction = x_fraction;
+            runtime_state.animation_frame = SpriteFrameIndex::new(next_animation_frame);
         }
     }
 
@@ -192,7 +192,7 @@ impl AssetActor for Human {
             let behavior = prompt.behavior_for(self.id, ActorKind::Human);
             commands.extend(match self.mode {
                 HumanMode::Grounded => {
-                    self.update_grounded(prompt.arcade_rng, prompt.human_walk_target_slot);
+                    self.update_grounded(prompt.actor_rng, prompt.human_walk_target_slot);
                     Vec::new()
                 }
                 HumanMode::Falling { velocity } => self.update_falling(velocity, prompt, behavior),
@@ -217,14 +217,7 @@ impl AssetActor for Human {
                 direction: None,
                 bounds: human_collision_bounds(self.mode, self.position),
                 alive: prompt.phase == Phase::Playing,
-                lander_runtime: None,
-                bomber_runtime: None,
-                pod_runtime: None,
-                swarmer_runtime: None,
-                baiter_runtime: None,
-                mutant_runtime: None,
-                human_runtime: self.arcade_state,
-                enemy_projectile_runtime: None,
+                runtime: ActorRuntimeState::human(self.runtime_state),
             },
             commands,
             draws,
@@ -234,9 +227,9 @@ impl AssetActor for Human {
 
 impl Human {
     fn draw_effect(&self) -> VisualEffect {
-        self.arcade_state
-            .map(|arcade_state| VisualEffect::HumanSpriteFrame {
-                animation_frame: arcade_state.animation_frame,
+        self.runtime_state
+            .map(|runtime_state| VisualEffect::HumanSpriteFrame {
+                animation_frame: runtime_state.animation_frame,
             })
             .unwrap_or(VisualEffect::Static)
     }
@@ -259,8 +252,8 @@ fn actor_human_walk_targetable(human_count: usize, snapshot: &ActorSnapshot) -> 
     snapshot.kind == ActorKind::Human
         && snapshot.alive
         && snapshot.bounds.is_some()
-        && snapshot.human_runtime.is_some_and(|arcade_state| {
-            human_count != usize::from(START_HUMAN_COUNT) || arcade_state.target_slot_index < 2
+        && snapshot.runtime.as_human().is_some_and(|runtime_state| {
+            human_count != usize::from(START_HUMAN_COUNT) || runtime_state.target_slot_index < 2
         })
 }
 
@@ -315,14 +308,7 @@ impl AssetActor for ScorePopup {
                 direction: None,
                 bounds: None,
                 alive: self.age < behavior.score_popup_lifetime_steps,
-                lander_runtime: None,
-                bomber_runtime: None,
-                pod_runtime: None,
-                swarmer_runtime: None,
-                baiter_runtime: None,
-                mutant_runtime: None,
-                human_runtime: None,
-                enemy_projectile_runtime: None,
+                runtime: ActorRuntimeState::NONE,
             },
             commands,
             draws,
@@ -373,7 +359,9 @@ impl AssetActor for LaserShot {
                 self.position,
             ));
         }
-        if self.age >= behavior.laser_lifetime_steps || self.position.x < 0 || self.position.x > 255
+        if self.age >= behavior.laser_lifetime_steps
+            || self.position.x < SCREEN_MIN_COORDINATE
+            || self.position.x > SCREEN_MAX_COORDINATE
         {
             commands.push(GameCommand::Destroy(self.id));
         }
@@ -387,14 +375,7 @@ impl AssetActor for LaserShot {
                 direction: Some(self.direction),
                 bounds: Some(self.bounds()),
                 alive: self.age < behavior.laser_lifetime_steps,
-                lander_runtime: None,
-                bomber_runtime: None,
-                pod_runtime: None,
-                swarmer_runtime: None,
-                baiter_runtime: None,
-                mutant_runtime: None,
-                human_runtime: None,
-                enemy_projectile_runtime: None,
+                runtime: ActorRuntimeState::NONE,
             },
             commands,
             draws,
@@ -406,7 +387,7 @@ impl AssetActor for LaserShot {
 struct EnemyLaserShot {
     id: ActorId,
     position: Point,
-    arcade_state: EnemyProjectileArcadeState,
+    runtime_state: EnemyProjectileRuntimeState,
     lifetime_steps: Option<u16>,
 }
 
@@ -415,24 +396,24 @@ impl EnemyLaserShot {
         id: ActorId,
         position: Point,
         velocity: Velocity,
-        arcade_state: Option<EnemyProjectileArcadeState>,
+        runtime_state: Option<EnemyProjectileRuntimeState>,
     ) -> Self {
-        let arcade_state = arcade_state.unwrap_or(EnemyProjectileArcadeState {
+        let runtime_state = runtime_state.unwrap_or(EnemyProjectileRuntimeState {
             x_fraction: 0,
             y_fraction: 0,
-            x_velocity: arcade_projectile_velocity_component(velocity.dx),
-            y_velocity: arcade_projectile_velocity_component(velocity.dy),
+            x_velocity: projectile_velocity_word(velocity.dx),
+            y_velocity: projectile_velocity_word(velocity.dy),
             lifetime_ticks: 0,
         });
-        let lifetime_steps = if arcade_state.lifetime_ticks == 0 {
+        let lifetime_steps = if runtime_state.lifetime_ticks == 0 {
             None
         } else {
-            Some(u16::from(arcade_state.lifetime_ticks))
+            Some(u16::from(runtime_state.lifetime_ticks))
         };
         Self {
             id,
             position,
-            arcade_state,
+            runtime_state,
             lifetime_steps,
         }
     }
@@ -442,34 +423,34 @@ impl EnemyLaserShot {
     }
 
     fn in_playfield(&self) -> bool {
-        self.position.x >= 0
-            && self.position.x <= 255
-            && self.position.y >= 0
-            && self.position.y <= 255
+        self.position.x >= SCREEN_MIN_COORDINATE
+            && self.position.x <= SCREEN_MAX_COORDINATE
+            && self.position.y >= SCREEN_MIN_COORDINATE
+            && self.position.y <= SCREEN_MAX_COORDINATE
     }
 
     fn initialize_lifetime(&mut self, behavior: ActorBehaviorProfile) {
         let lifetime_steps = self
             .lifetime_steps
             .get_or_insert(behavior.lander_shot_lifetime_steps);
-        self.arcade_state.lifetime_ticks = arcade_projectile_lifetime_ticks(*lifetime_steps);
+        self.runtime_state.lifetime_ticks = projectile_lifetime_ticks(*lifetime_steps);
     }
 
-    fn advance_arcade_projectile(&mut self) -> Velocity {
+    fn advance_projectile_motion(&mut self) -> Velocity {
         let previous_position = self.position;
-        let (x, x_fraction) = arcade_projectile_axis_step(
+        let (x, x_fraction) = step_projectile_axis(
             self.position.x,
-            self.arcade_state.x_fraction,
-            self.arcade_state.x_velocity,
+            self.runtime_state.x_fraction,
+            self.runtime_state.x_velocity,
         );
-        let (y, y_fraction) = arcade_projectile_axis_step(
+        let (y, y_fraction) = step_projectile_axis(
             self.position.y,
-            self.arcade_state.y_fraction,
-            self.arcade_state.y_velocity,
+            self.runtime_state.y_fraction,
+            self.runtime_state.y_velocity,
         );
         self.position = Point::new(x, y);
-        self.arcade_state.x_fraction = x_fraction;
-        self.arcade_state.y_fraction = y_fraction;
+        self.runtime_state.x_fraction = x_fraction;
+        self.runtime_state.y_fraction = y_fraction;
         observed_velocity(previous_position, self.position)
     }
 }
@@ -490,11 +471,11 @@ impl AssetActor for EnemyLaserShot {
                 && let Some(lifetime_steps) = &mut self.lifetime_steps
             {
                 *lifetime_steps = lifetime_steps.saturating_sub(1);
-                self.arcade_state.lifetime_ticks =
-                    arcade_projectile_lifetime_ticks(*lifetime_steps);
+                self.runtime_state.lifetime_ticks =
+                    projectile_lifetime_ticks(*lifetime_steps);
             }
             if self.lifetime_steps.is_some_and(|steps| steps > 0) {
-                movement_velocity = self.advance_arcade_projectile();
+                movement_velocity = self.advance_projectile_motion();
                 draws.push(DrawCommand::sprite(
                     self.id,
                     SpriteKey::EnemyLaser,
@@ -517,14 +498,7 @@ impl AssetActor for EnemyLaserShot {
                 direction: Some(direction_for_velocity(movement_velocity, Direction::Right)),
                 bounds: Some(self.bounds()),
                 alive,
-                lander_runtime: None,
-                bomber_runtime: None,
-                pod_runtime: None,
-                swarmer_runtime: None,
-                baiter_runtime: None,
-                mutant_runtime: None,
-                human_runtime: None,
-                enemy_projectile_runtime: Some(self.arcade_state),
+                runtime: ActorRuntimeState::enemy_projectile(Some(self.runtime_state)),
             },
             commands,
             draws,
@@ -594,14 +568,7 @@ impl AssetActor for Explosion {
                 direction: None,
                 bounds: None,
                 alive: self.age < lifetime_steps,
-                lander_runtime: None,
-                bomber_runtime: None,
-                pod_runtime: None,
-                swarmer_runtime: None,
-                baiter_runtime: None,
-                mutant_runtime: None,
-                human_runtime: None,
-                enemy_projectile_runtime: None,
+                runtime: ActorRuntimeState::NONE,
             },
             commands,
             draws,

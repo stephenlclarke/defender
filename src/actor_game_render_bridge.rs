@@ -52,7 +52,7 @@ impl ActorRenderSceneBridge {
             push_background_terrain_sprites(
                 &mut scene,
                 report.background_left,
-                arcade_wave_landscape_tint(report.wave),
+                wave_tuning_landscape_tint(report.wave),
             );
         }
         if let Some(state) = &state {
@@ -78,12 +78,12 @@ impl ActorRenderSceneBridge {
             } else {
                 RenderLayer::Hud
             };
-            if let VisualEffect::ArcadeMessage {
+            if let VisualEffect::MessageText {
                 screen_cell,
                 visual_offset,
             } = draw.effect
             {
-                push_arcade_controlled_message_sprites_with_offset(
+                push_controlled_message_sprites_with_offset(
                     scene,
                     text,
                     screen_cell,
@@ -118,7 +118,7 @@ impl ActorRenderSceneBridge {
                 explosion_anchor,
             } => self.push_explosion_sprite(scene, draw.position, kind, age, explosion_anchor),
             VisualEffect::Static
-            | VisualEffect::ArcadeMessage { .. }
+            | VisualEffect::MessageText { .. }
             | VisualEffect::LanderSpriteFrame { .. }
             | VisualEffect::BomberSpriteFrame { .. }
             | VisualEffect::PodSprite
@@ -193,7 +193,7 @@ impl ActorRenderSceneBridge {
     }
 
     fn push_attract_scoring_surface(&self, scene: &mut RenderScene, scoring_tick: TimelineStep) {
-        push_background_terrain_sprites(scene, 0, arcade_wave_landscape_tint(1));
+        push_background_terrain_sprites(scene, 0, wave_tuning_landscape_tint(1));
         push_attract_scoring_top_display_border(scene);
         push_attract_scoring_scanner_terrain(scene);
         push_attract_scoring_demo_scene(scene, scoring_tick);
@@ -274,7 +274,7 @@ fn push_actor_wave_completion_status_sprites(scene: &mut RenderScene, report: &S
     }
 
     for (message, screen_cell) in WAVE_COMPLETION_STATUS_LINES {
-        let text = crate::arcade_assets::message_text(*message);
+        let text = crate::reference_assets::message_text(*message);
         push_message_text_bytes_sprites(
             scene,
             text.as_bytes(),
@@ -388,9 +388,9 @@ fn push_actor_message_sprites(
     screen_cell: ScreenAddress,
     layer: RenderLayer,
 ) {
-    push_arcade_controlled_message_sprites(
+    push_controlled_message_sprites(
         scene,
-        crate::arcade_assets::message_text(message),
+        crate::reference_assets::message_text(message),
         screen_cell,
         layer,
     );
@@ -412,7 +412,7 @@ fn actor_visible_decimal_digits(value: u8) -> ([u8; 2], usize) {
     }
 }
 
-fn push_arcade_controlled_message_sprites_with_offset(
+fn push_controlled_message_sprites_with_offset(
     scene: &mut RenderScene,
     text: &str,
     screen_cell: ScreenAddress,
@@ -420,7 +420,7 @@ fn push_arcade_controlled_message_sprites_with_offset(
     visual_offset: Point,
 ) {
     let first_sprite = scene.sprites.len();
-    push_arcade_controlled_message_sprites(scene, text, screen_cell, layer);
+    push_controlled_message_sprites(scene, text, screen_cell, layer);
     offset_new_sprites(scene, first_sprite, point_position(visual_offset));
 }
 
@@ -438,7 +438,7 @@ fn push_actor_playing_top_display_border(scene: &mut RenderScene, wave: u16) {
             ) {
                 VISUAL_STATE.top_display_scanner_marker_tint()
             } else {
-                arcade_wave_landscape_tint(wave)
+                wave_tuning_landscape_tint(wave)
             },
         });
     }
@@ -503,7 +503,7 @@ fn generate_scanner_mini_terrain_records(
 }
 
 fn main_terrain_record_bytes() -> &'static [u8; MAIN_TERRAIN_RECORD_BYTE_COUNT] {
-    crate::arcade_assets::MAIN_TERRAIN_BYTES
+    crate::reference_assets::MAIN_TERRAIN_BYTES
 }
 
 fn offset_new_sprites(scene: &mut RenderScene, first_sprite: usize, offset: [f32; 2]) {
@@ -552,46 +552,46 @@ fn actor_draw_screen_position(report: &StepReport, draw: &DrawCommand) -> Option
         return Some(draw.position);
     };
 
-    actor_project_arcade_state_draw(snapshot, draw.position, report.background_left)
+    actor_project_runtime_state_draw(snapshot, draw.position, report.background_left)
 }
 
-fn actor_project_arcade_state_draw(
+fn actor_project_runtime_state_draw(
     snapshot: &ActorSnapshot,
     draw_position: Point,
     background_left: u16,
 ) -> Option<Point> {
-    let Some(x_fraction) = actor_arcade_state_x_fraction(snapshot) else {
+    let Some(x_fraction) = actor_runtime_state_x_fraction(snapshot) else {
         return Some(draw_position);
     };
     if draw_position != snapshot.position && snapshot.kind != ActorKind::Human {
         return Some(draw_position);
     }
-    actor_arcade_screen_position(draw_position, x_fraction, background_left)
+    actor_screen_position_from_world(draw_position, x_fraction, background_left)
 }
 
-fn actor_arcade_state_x_fraction(snapshot: &ActorSnapshot) -> Option<u8> {
+fn actor_runtime_state_x_fraction(snapshot: &ActorSnapshot) -> Option<u8> {
     snapshot
-        .lander_runtime
-        .map(|arcade| arcade.x_fraction)
-        .or_else(|| snapshot.bomber_runtime.map(|arcade| arcade.x_fraction))
-        .or_else(|| snapshot.pod_runtime.map(|arcade| arcade.x_fraction))
-        .or_else(|| snapshot.swarmer_runtime.map(|arcade| arcade.x_fraction))
-        .or_else(|| snapshot.baiter_runtime.map(|arcade| arcade.x_fraction))
-        .or_else(|| snapshot.mutant_runtime.map(|arcade| arcade.x_fraction))
-        .or_else(|| snapshot.human_runtime.map(|arcade| arcade.x_fraction))
+        .runtime.as_lander()
+        .map(|runtime_state| runtime_state.x_fraction)
+        .or_else(|| snapshot.runtime.as_bomber().map(|runtime_state| runtime_state.x_fraction))
+        .or_else(|| snapshot.runtime.as_pod().map(|runtime_state| runtime_state.x_fraction))
+        .or_else(|| snapshot.runtime.as_swarmer().map(|runtime_state| runtime_state.x_fraction))
+        .or_else(|| snapshot.runtime.as_baiter().map(|runtime_state| runtime_state.x_fraction))
+        .or_else(|| snapshot.runtime.as_mutant().map(|runtime_state| runtime_state.x_fraction))
+        .or_else(|| snapshot.runtime.as_human().map(|runtime_state| runtime_state.x_fraction))
         .or_else(|| {
             snapshot
-                .enemy_projectile_runtime
-                .map(|arcade| arcade.x_fraction)
+                .runtime.as_enemy_projectile()
+                .map(|runtime_state| runtime_state.x_fraction)
         })
 }
 
-fn actor_arcade_screen_position(
+fn actor_screen_position_from_world(
     position: Point,
     x_fraction: u8,
     background_left: u16,
 ) -> Option<Point> {
-    let world_x_word = arcade_absolute_x(position, x_fraction);
+    let world_x_word = absolute_world_x(position, x_fraction);
     let active_left = background_left.wrapping_sub(OBJECT_ACTIVE_LEFT_MARGIN);
     if world_x_word.wrapping_sub(active_left) >= OBJECT_ACTIVE_WORLD_WIDTH {
         return None;

@@ -6,19 +6,17 @@
 
 pub mod actor_game;
 mod actor_smoke;
-mod arcade_assets;
-pub mod arcade_types;
 pub mod audio;
 mod game;
 mod live_wgpu;
 pub mod platform;
+mod reference_assets;
 pub mod renderer;
 mod runtime;
 mod sound_board;
 pub mod systems;
+pub mod typed_values;
 
-pub use arcade_assets::MessageId;
-pub use arcade_types::{ScreenAddress, SoundCommand, SpriteFrameIndex, TimelineStep};
 pub use game::{
     AttractPresentationPage, AttractPresentationSnapshot, Direction, EnemyKind,
     EnemyReserveSnapshot, EnemySnapshot, GameEvent, GameEvents, GameFrame, GameInput,
@@ -29,6 +27,7 @@ pub use game::{
     TerrainBlowStage, TerrainSegment, WaveProfileSnapshot, WorldSnapshot, WorldVector,
 };
 pub use platform::{AudioOutput, ControlProfile, RunMode, RuntimeConfig};
+pub use reference_assets::MessageId;
 pub use renderer::{
     AtlasRegion, Color, FontAtlas, GpuRendererSettings, NativeRenderPipeline,
     NativeRendererResources, NativeSceneRenderer, PaletteResource, RenderLayer, RenderLayerCounts,
@@ -57,6 +56,7 @@ pub use systems::{
     ScoreSystem, ScreenPosition, ScreenVelocity, SmartBombStep, SmartBombSystem, VerticalControl,
     WaveState, WaveStatus, WaveSystem,
 };
+pub use typed_values::{ScreenAddress, SoundCommand, SpriteFrameIndex, TimelineStep};
 
 #[cfg(test)]
 mod public_api_tests {

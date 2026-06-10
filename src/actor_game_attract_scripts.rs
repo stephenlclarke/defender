@@ -29,7 +29,7 @@ pub enum SpriteKey {
 pub enum VisualEffect {
     #[default]
     Static,
-    ArcadeMessage {
+    MessageText {
         screen_cell: ScreenAddress,
         visual_offset: Point,
     },
@@ -223,19 +223,19 @@ impl AttractScript {
         script_text.parse()
     }
 
-    pub fn arcade_title() -> Self {
+    pub fn default_title() -> Self {
         Self::parse_text(ACTOR_ATTRACT_SCRIPT)
             .unwrap_or_else(|error| panic!("embedded actor attract script is invalid: {error}"))
     }
 
-    pub fn arcade_title_from_events() -> Self {
+    pub fn default_title_from_events() -> Self {
         let mut events = vec![
             AttractScriptEvent::williams_logo(
                 1,
                 Some(ATTRACT_WILLIAMS_LOGO_DURATION_STEPS),
                 ATTRACT_WILLIAMS_LOGO_POSITION,
             ),
-            AttractScriptEvent::arcade_message(
+            AttractScriptEvent::message_text(
                 ATTRACT_PRESENTS_START_STEP,
                 Some(ATTRACT_PRESENTS_DURATION_STEPS),
                 PRESENTS_MESSAGE,
@@ -258,35 +258,35 @@ impl AttractScript {
                 ATTRACT_CREDIT_LABEL_POSITION,
                 ATTRACT_CREDIT_COUNT_POSITION,
             ),
-            AttractScriptEvent::arcade_message_with_offset(
+            AttractScriptEvent::message_text_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 ATTRACT_HALL_TITLE_MESSAGE,
                 ATTRACT_HALL_TITLE_MESSAGE_CELL,
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
-            AttractScriptEvent::arcade_message_with_offset(
+            AttractScriptEvent::message_text_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 ATTRACT_HALL_TODAYS_MESSAGE,
                 ATTRACT_HALL_TODAYS_MESSAGE_CELL,
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
-            AttractScriptEvent::arcade_message_with_offset(
+            AttractScriptEvent::message_text_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 ATTRACT_HALL_ALL_TIME_MESSAGE,
                 ATTRACT_HALL_ALL_TIME_MESSAGE_CELL,
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
-            AttractScriptEvent::arcade_message_with_offset(
+            AttractScriptEvent::message_text_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 ATTRACT_HALL_GREATEST_MESSAGE,
                 ATTRACT_HALL_GREATEST_LEFT_MESSAGE_CELL,
                 ATTRACT_HALL_TABLE_VISUAL_OFFSET,
             ),
-            AttractScriptEvent::arcade_message_with_offset(
+            AttractScriptEvent::message_text_with_offset(
                 ATTRACT_HALL_OF_FAME_START_STEP,
                 Some(ATTRACT_HALL_OF_FAME_DURATION_STEPS),
                 ATTRACT_HALL_GREATEST_MESSAGE,
@@ -314,7 +314,7 @@ impl AttractScript {
         for (line_index, (message, screen_cell)) in
             ATTRACT_INSTRUCTION_TEXT_LINES.iter().copied().enumerate()
         {
-            events.push(AttractScriptEvent::arcade_message_with_offset(
+            events.push(AttractScriptEvent::message_text_with_offset(
                 actor_attract_scoring_instruction_text_start_step(line_index),
                 None,
                 message,
@@ -479,7 +479,7 @@ fn parse_attract_script_event(
                 "top-left screen cell",
             )?);
             let visual_offset = parse_optional_attract_point(line_number, &mut parts)?;
-            Ok(AttractScriptEvent::arcade_message_with_offset(
+            Ok(AttractScriptEvent::message_text_with_offset(
                 start_after_steps,
                 duration_steps,
                 message,
@@ -702,7 +702,7 @@ fn parse_attract_message_id(
     let token = token.ok_or_else(|| {
         AttractScriptParseError::new(line_number, "message action needs a message key")
     })?;
-    crate::arcade_assets::message_id_from_script_key(token).ok_or_else(|| {
+    crate::reference_assets::message_id_from_script_key(token).ok_or_else(|| {
         AttractScriptParseError::new(line_number, format!("unknown message key `{token}`"))
     })
 }
@@ -761,7 +761,7 @@ fn normalize_script_token(token: &str) -> String {
 
 impl Default for AttractScript {
     fn default() -> Self {
-        Self::arcade_title()
+        Self::default_title()
     }
 }
 
@@ -789,13 +789,13 @@ impl AttractScriptEvent {
         }
     }
 
-    pub fn arcade_message(
+    pub fn message_text(
         start_after_steps: u64,
         duration_steps: Option<u64>,
         message: MessageId,
         screen_cell: ScreenAddress,
     ) -> Self {
-        Self::arcade_message_with_offset(
+        Self::message_text_with_offset(
             start_after_steps,
             duration_steps,
             message,
@@ -804,7 +804,7 @@ impl AttractScriptEvent {
         )
     }
 
-    pub fn arcade_message_with_offset(
+    pub fn message_text_with_offset(
         start_after_steps: u64,
         duration_steps: Option<u64>,
         message: MessageId,
@@ -814,7 +814,7 @@ impl AttractScriptEvent {
         Self {
             start_after_steps,
             duration_steps,
-            action: AttractScriptAction::ArcadeMessage {
+            action: AttractScriptAction::MessageText {
                 message,
                 screen_cell,
                 visual_offset,
@@ -986,7 +986,7 @@ pub enum AttractScriptAction {
         position: Point,
         value: String,
     },
-    ArcadeMessage {
+    MessageText {
         message: MessageId,
         screen_cell: ScreenAddress,
         visual_offset: Point,
@@ -1035,13 +1035,13 @@ impl AttractScriptAction {
             Self::Text { position, value } => {
                 vec![DrawCommand::text(actor, *position, value.clone())]
             }
-            Self::ArcadeMessage {
+            Self::MessageText {
                 message,
                 screen_cell,
                 visual_offset,
-            } => vec![DrawCommand::arcade_message_with_offset(
+            } => vec![DrawCommand::message_text_with_offset(
                 actor,
-                crate::arcade_assets::message_text(*message),
+                crate::reference_assets::message_text(*message),
                 *screen_cell,
                 *visual_offset,
             )],
@@ -1170,11 +1170,11 @@ impl AttractScriptAction {
                 position: *position,
                 value: value.clone(),
             },
-            Self::ArcadeMessage {
+            Self::MessageText {
                 message,
                 screen_cell,
                 visual_offset,
-            } => AttractScriptActionManifest::ArcadeMessage {
+            } => AttractScriptActionManifest::MessageText {
                 message: format!("{message:?}"),
                 screen_cell: *screen_cell,
                 visual_offset: *visual_offset,
@@ -1234,7 +1234,7 @@ impl AttractScriptAction {
 }
 
 fn credits_prompt_text() -> &'static str {
-    crate::arcade_assets::message_text(CREDITS_MESSAGE)
+    crate::reference_assets::message_text(CREDITS_MESSAGE)
 }
 
 fn hall_score_seed_entries() -> [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] {
@@ -1255,7 +1255,7 @@ fn hall_score_entries(
 }
 
 fn high_score_seed_entry(index: usize) -> HighScoreTableEntrySnapshot {
-    let seed = crate::arcade_assets::HIGH_SCORE_SEEDS
+    let seed = crate::reference_assets::HIGH_SCORE_SEEDS
         .get(index)
         .unwrap_or_else(|| panic!("missing embedded high-score seed row {index}"));
     HighScoreTableEntrySnapshot {
@@ -1371,7 +1371,7 @@ pub enum AttractScriptActionManifest {
         position: Point,
         value: String,
     },
-    ArcadeMessage {
+    MessageText {
         message: String,
         screen_cell: ScreenAddress,
         visual_offset: Point,

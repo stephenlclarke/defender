@@ -1,13 +1,13 @@
-    fn arcade_projectile_at_screen(
+    fn projectile_runtime_at_screen(
         position: Point,
         background_left: u16,
-    ) -> (Point, EnemyProjectileArcadeState) {
+    ) -> (Point, EnemyProjectileRuntimeState) {
         let screen_x = u16::try_from(position.x).expect("test screen x should be non-negative");
         let absolute_x = background_left.wrapping_add(screen_x << OBJECT_WORLD_TO_SCREEN_SHIFT);
         let [x, x_fraction] = absolute_x.to_be_bytes();
         (
             Point::new(i16::from(x), position.y),
-            EnemyProjectileArcadeState {
+            EnemyProjectileRuntimeState {
                 x_fraction,
                 y_fraction: 0,
                 x_velocity: 0,
@@ -18,19 +18,19 @@
     }
 
     fn spawn_enemy_laser_at_screen(driver: &mut ActorGameDriver, position: Point) -> ActorId {
-        let (arcade_position, arcade_state) =
-            arcade_projectile_at_screen(position, driver.background_left);
+        let (runtime_position, runtime_state) =
+            projectile_runtime_at_screen(position, driver.background_left);
         driver.spawn_enemy_laser_from_spawn(
-            arcade_position,
+            runtime_position,
             Velocity::new(0, 0),
-            Some(arcade_state),
+            Some(runtime_state),
         )
     }
 
     fn spawn_bomb_at_screen(driver: &mut ActorGameDriver, position: Point) -> ActorId {
-        let (arcade_position, arcade_state) =
-            arcade_projectile_at_screen(position, driver.background_left);
-        driver.spawn_bomb(arcade_position, Some(arcade_state))
+        let (runtime_position, runtime_state) =
+            projectile_runtime_at_screen(position, driver.background_left);
+        driver.spawn_bomb(runtime_position, Some(runtime_state))
     }
 
     #[test]
@@ -578,7 +578,7 @@
     }
 
     #[test]
-    fn actor_survivor_bonus_uses_arcade_wave_multiplier_and_replay_stock() {
+    fn actor_survivor_bonus_uses_wave_tuning_multiplier_and_replay_stock() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 3;
@@ -662,7 +662,7 @@
             player_switch: None,
             player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
-            arcade_wave: ArcadeWaveProfile::for_wave(1),
+            wave_tuning: ActorWaveTuning::for_wave(1),
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,
@@ -671,7 +671,7 @@
             behavior_script: ActorBehaviorScript::default().manifest(),
             enemy_reserve: EnemyReserveSnapshot::default(),
             background_left: 0,
-            arcade_rng: None,
+            actor_rng: None,
             terrain_blow: None,
             snapshots: Vec::new(),
             draws: vec![
@@ -832,9 +832,9 @@
     }
 
     #[test]
-    fn actor_render_projects_arcade_world_objects_against_scrolling_background() {
-        let still = arcade_world_projection_report_for_test(0).render_scene();
-        let scrolled = arcade_world_projection_report_for_test(0x0100).render_scene();
+    fn actor_render_projects_world_objects_against_scrolling_background() {
+        let still = world_projection_report_for_test(0).render_scene();
+        let scrolled = world_projection_report_for_test(0x0100).render_scene();
 
         assert_eq!(
             sprite_position_for_test(&still, SpriteId::PLAYER_SHIP, RenderLayer::Objects),
@@ -864,9 +864,9 @@
     }
 
     #[test]
-    fn actor_render_projects_arcade_world_humans_against_scrolling_background() {
-        let still_report = arcade_world_projection_report_for_test(0);
-        let scrolled_report = arcade_world_projection_report_for_test(0x0100);
+    fn actor_render_projects_world_humans_against_scrolling_background() {
+        let still_report = world_projection_report_for_test(0);
+        let scrolled_report = world_projection_report_for_test(0x0100);
 
         let still_state = still_report.game_state();
         let scrolled_state = scrolled_report.game_state();
@@ -896,17 +896,17 @@
             .snapshots
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::Human)
-            .expect("arcade-state-backed human snapshot should be present");
+            .expect("runtime-state-backed human snapshot should be present");
         let projected = actor_collision_body_for_snapshot(human_runtime, 0)
-            .expect("arcade-state-backed human should be projected while visible");
+            .expect("runtime-state-backed human should be projected while visible");
         assert_eq!(projected.position, Point::new(186, 220));
     }
 
     #[test]
-    fn actor_collisions_project_arcade_world_hostiles_against_background() {
+    fn actor_collisions_project_world_hostiles_against_background() {
         let mut lander = actor_snapshot(2, ActorKind::Lander, Point::new(0x30, 80));
         lander.bounds = Some(Rect::from_center(lander.position, 8, 8));
-        lander.lander_runtime = Some(LanderArcadeState {
+        lander.runtime = ActorRuntimeState::lander(Some(LanderRuntimeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -915,10 +915,10 @@
             sleep_ticks: 0,
             animation_frame: crate::SpriteFrameIndex::new(0),
             target_human_index: None,
-        });
+        }));
 
         let projected = actor_collision_body_for_snapshot(&lander, 0)
-            .expect("arcade-state-backed lander should be projected while visible");
+            .expect("runtime-state-backed lander should be projected while visible");
         assert_eq!(projected.position, Point::new(192, 80));
         assert!(
             projected
@@ -927,17 +927,17 @@
         );
         assert!(
             actor_collision_body_for_snapshot(&lander, 0x4000).is_none(),
-            "offscreen arcade-state-backed hostiles should not collide with screen-space player/laser bodies"
+            "offscreen runtime-state-backed hostiles should not collide with screen-space player/laser bodies"
         );
     }
 
     #[test]
-    fn arcade_state_falling_human_rescue_uses_projected_world_position() {
-        let mut human = Human::with_arcade_state(
+    fn runtime_state_falling_human_rescue_uses_projected_world_position() {
+        let mut human = Human::with_runtime_state(
             ActorId::new(7),
             Point::new(0x40, 100),
             HumanMode::Falling { velocity: 0 },
-            Some(HumanArcadeState {
+            Some(HumanRuntimeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 animation_frame: crate::SpriteFrameIndex::new(0),
@@ -955,8 +955,8 @@
         assert_eq!(
             reply
                 .snapshot
-                .human_runtime
-                .map(|arcade_state| arcade_state.x_fraction),
+                .runtime.as_human()
+                .map(|runtime_state| runtime_state.x_fraction),
             Some(0)
         );
         assert!(
@@ -1019,7 +1019,7 @@
             player_switch: None,
             player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
-            arcade_wave: ArcadeWaveProfile::for_wave(1),
+            wave_tuning: ActorWaveTuning::for_wave(1),
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,
@@ -1028,7 +1028,7 @@
             behavior_script: ActorBehaviorScript::default().manifest(),
             enemy_reserve: EnemyReserveSnapshot::default(),
             background_left: 0,
-            arcade_rng: None,
+            actor_rng: None,
             terrain_blow: None,
             snapshots: Vec::new(),
             draws: vec![DrawCommand::sprite_with_effect(
@@ -1087,7 +1087,7 @@
         player.direction = Some(Direction::Right);
         let mut lander = actor_snapshot(12, ActorKind::Lander, Point::new(0x3F, 0x2C));
         lander.velocity = Velocity::new(-2, 1);
-        lander.lander_runtime = Some(LanderArcadeState {
+        lander.runtime = ActorRuntimeState::lander(Some(LanderRuntimeState {
             x_fraction: 0x4A,
             y_fraction: 0xE0,
             x_velocity: 0xFFEE,
@@ -1096,34 +1096,34 @@
             sleep_ticks: 0x04,
             animation_frame: crate::SpriteFrameIndex::new(1),
             target_human_index: Some(2),
-        });
+        }));
         let mut human = actor_snapshot(13, ActorKind::Human, Point::new(0x1C, 0xE1));
-        human.human_runtime = Some(HumanArcadeState {
+        human.runtime = ActorRuntimeState::human(Some(HumanRuntimeState {
             x_fraction: 0x81,
             y_fraction: 0,
             animation_frame: crate::SpriteFrameIndex::new(3),
             target_slot_index: 1,
-        });
+        }));
         let mut laser = actor_snapshot(14, ActorKind::Laser, Point::new(80, 72));
         laser.velocity = Velocity::new(8, 0);
         laser.direction = Some(Direction::Right);
         let mut enemy_laser = actor_snapshot(15, ActorKind::EnemyLaser, Point::new(90, 80));
         enemy_laser.velocity = Velocity::new(-3, 2);
-        enemy_laser.enemy_projectile_runtime = Some(EnemyProjectileArcadeState {
+        enemy_laser.runtime = ActorRuntimeState::enemy_projectile(Some(EnemyProjectileRuntimeState {
             x_fraction: 0x22,
             y_fraction: 0x77,
             x_velocity: 0xFD00,
             y_velocity: 0x0200,
             lifetime_ticks: 17,
-        });
+        }));
         let mut bomb = actor_snapshot(16, ActorKind::Bomb, Point::new(100, 84));
-        bomb.enemy_projectile_runtime = Some(EnemyProjectileArcadeState {
+        bomb.runtime = ActorRuntimeState::enemy_projectile(Some(EnemyProjectileRuntimeState {
             x_fraction: 0x44,
             y_fraction: 0x55,
             x_velocity: 0,
             y_velocity: 0,
             lifetime_ticks: 9,
-        });
+        }));
 
         let report = StepReport {
             step: 77,
@@ -1147,7 +1147,7 @@
             player_switch: None,
             player_start: None,
             high_scores: [12_000, 10_000, 7_500, 5_000, 2_500],
-            arcade_wave: ArcadeWaveProfile::for_wave(2),
+            wave_tuning: ActorWaveTuning::for_wave(2),
             high_score_initials: HighScoreInitialsState {
                 initials: [Some('R'), None, None],
                 cursor: 1,
@@ -1159,7 +1159,7 @@
             behavior_script: ActorBehaviorScript::default().manifest(),
             enemy_reserve: EnemyReserveSnapshot::default(),
             background_left: 0,
-            arcade_rng: None,
+            actor_rng: None,
             terrain_blow: None,
             snapshots: vec![player, lander, human, laser, enemy_laser, bomb],
             draws: vec![
@@ -1316,7 +1316,7 @@
             player_switch: None,
             player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
-            arcade_wave: ArcadeWaveProfile::for_wave(3),
+            wave_tuning: ActorWaveTuning::for_wave(3),
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,
@@ -1325,7 +1325,7 @@
             behavior_script: ActorBehaviorScript::default().manifest(),
             enemy_reserve: EnemyReserveSnapshot::default(),
             background_left: 0,
-            arcade_rng: None,
+            actor_rng: None,
             terrain_blow: None,
             snapshots: Vec::new(),
             draws,
@@ -1443,7 +1443,7 @@
             })
         );
         assert!(started.state.world.enemies.is_empty());
-        assert_no_arcade_message(&started.report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
+        assert_no_message_text(&started.report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
         assert!(started.events.sounds().is_empty());
 
         let start_sound = runtime.step(GameInput::NONE);

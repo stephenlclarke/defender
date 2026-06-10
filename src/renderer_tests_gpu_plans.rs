@@ -399,7 +399,7 @@
     }
 
     #[test]
-    fn default_sprite_atlas_decodes_arcade_terrain_word_patterns() {
+    fn default_sprite_atlas_decodes_reference_terrain_word_patterns() {
         let atlas = TextureAtlas::default_sprites();
         let terrain_7007 = atlas_region_pixels(&atlas, SpriteId::TERRAIN_TILE);
         let terrain_0770 = atlas_region_pixels(&atlas, SpriteId::TERRAIN_TILE_ALT);
@@ -457,7 +457,7 @@
     }
 
     #[test]
-    fn object_bitmaps_decode_arcade_bytes_and_palettes() {
+    fn object_bitmaps_decode_reference_bytes_and_palettes() {
         let ship = decode_object_bitmap_asset_rgba(
             ObjectBitmapId::PlayerShipRightPrimary,
             6,
@@ -861,11 +861,11 @@
     }
 
     #[test]
-    fn arcade_controlled_message_sprites_apply_cursor_controls() {
+    fn message_control_sprites_apply_cursor_controls() {
         let mut scene = RenderScene::empty(0, SurfaceSize::new(292, 240));
         let text = message_text(MessageId::WilliamsElectronics);
 
-        push_arcade_controlled_message_sprites(
+        push_controlled_message_sprites(
             &mut scene,
             text,
             crate::ScreenAddress::new(0x3258),

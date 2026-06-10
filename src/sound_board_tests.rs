@@ -26,7 +26,7 @@ mod tests {
     }
 
     #[test]
-    fn quasar_vari_uses_arcade_restart_tail() {
+    fn quasar_vari_uses_reference_restart_tail() {
         let mut board = SoundBoardSynth::default();
         let rendered = board.render_actions(&[SoundAction::Vari(VariSound::Quasar)]);
 
@@ -55,7 +55,7 @@ mod tests {
     }
 
     #[test]
-    fn tonal_hit_gwave_vectors_use_arcade_reference_period_density() {
+    fn tonal_hit_gwave_vectors_use_reference_period_density() {
         let bomber_hit = gwave_vector(GWaveSound::Vector(1)).expect("bomber hit GWAVE vector");
         let pod_hit = gwave_vector(GWaveSound::Vector(5)).expect("pod hit GWAVE vector");
 
@@ -82,7 +82,7 @@ mod tests {
     }
 
     #[test]
-    fn materialize_uses_arcade_appear_sweep_cadence() {
+    fn materialize_uses_reference_appear_sweep_cadence() {
         let mut board = SoundBoardSynth::default();
         let rendered = board.render_actions(&[SoundAction::Special(SpecialSound::Materialize)]);
 

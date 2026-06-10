@@ -7,7 +7,7 @@ use crate::{
         ActorFrame, ActorKind, ActorRuntimeAdapter, AttractScript, GameInput, Phase, Point,
         SpriteKey, VisualEffect,
     },
-    arcade_assets::{MessageId, message_text},
+    reference_assets::{MessageId, message_text},
     game::{GameEvent, GameOverSnapshot, SoundEvent},
     renderer::{
         NativeRenderPipeline, NativeSceneRenderer, RenderLayer, SceneDrawPlan, SpriteId,
@@ -434,7 +434,7 @@ impl ActorPostGameSmokeReport {
             bail!("actor post-game smoke did not render pod sprites");
         }
         if !self.saw_explosion_pixels {
-            bail!("actor post-game smoke did not render arcade explosion pixels");
+            bail!("actor post-game smoke did not render accepted explosion pixels");
         }
         if !self.saw_hall_of_fame {
             bail!("actor post-game smoke did not render Hall of Fame after submission");

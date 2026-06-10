@@ -34,7 +34,7 @@ impl AssetActor for AttractDirector {
         if prompt.phase == Phase::HighScoreEntry {
             draws.push(DrawCommand::text(
                 self.id,
-                Point::new(66, 120),
+                STATUS_HIGH_SCORE_ENTRY_PROMPT_POSITION,
                 "ENTER INITIALS",
             ));
         }
@@ -48,14 +48,7 @@ impl AssetActor for AttractDirector {
                 direction: None,
                 bounds: None,
                 alive: true,
-                lander_runtime: None,
-                bomber_runtime: None,
-                pod_runtime: None,
-                swarmer_runtime: None,
-                baiter_runtime: None,
-                mutant_runtime: None,
-                human_runtime: None,
-                enemy_projectile_runtime: None,
+                runtime: ActorRuntimeState::NONE,
             },
             commands,
             draws,
@@ -133,14 +126,7 @@ impl AssetActor for ScriptedAttractProgram {
                 direction: None,
                 bounds: None,
                 alive: true,
-                lander_runtime: None,
-                bomber_runtime: None,
-                pod_runtime: None,
-                swarmer_runtime: None,
-                baiter_runtime: None,
-                mutant_runtime: None,
-                human_runtime: None,
-                enemy_projectile_runtime: None,
+                runtime: ActorRuntimeState::NONE,
             },
             commands: Vec::new(),
             draws,
@@ -187,7 +173,7 @@ impl StatusDisplay {
             ),
             DrawCommand::text(
                 self.id,
-                Point::new(66, 104),
+                STATUS_HIGH_SCORE_ENTRY_INITIALS_POSITION,
                 format!(
                     "INITIALS {}",
                     format_high_score_initials(prompt.high_score_initials)
@@ -199,7 +185,7 @@ impl StatusDisplay {
             draws.push(DrawCommand::text(
                 self.id,
                 Point::new(
-                    82,
+                    STATUS_HIGH_SCORE_TABLE_SCORE_X,
                     STATUS_HIGH_SCORE_TABLE_START_Y
                         + i16::try_from(index).unwrap_or(0) * STATUS_HIGH_SCORE_TABLE_ROW_HEIGHT,
                 ),
@@ -247,14 +233,7 @@ impl StatusDisplay {
             direction: None,
             bounds: None,
             alive: true,
-            lander_runtime: None,
-            bomber_runtime: None,
-            pod_runtime: None,
-            swarmer_runtime: None,
-            baiter_runtime: None,
-            mutant_runtime: None,
-            human_runtime: None,
-            enemy_projectile_runtime: None,
+                runtime: ActorRuntimeState::NONE,
         }
     }
 }
@@ -342,9 +321,9 @@ impl PlayerShip {
 
     fn hyperspace_death_lseed(behavior: ActorBehaviorProfile) -> u8 {
         behavior
-            .player_hyperspace_arcade_seed
-            .map_or(behavior.player_hyperspace_death_lseed, |arcade_seed| {
-                arcade_seed.lseed
+            .player_hyperspace_seed
+            .map_or(behavior.player_hyperspace_death_lseed, |hyperspace_seed| {
+                hyperspace_seed.lseed
             })
     }
 
@@ -402,18 +381,18 @@ impl PlayerShip {
         &self,
         behavior: ActorBehaviorProfile,
     ) -> (Point, Direction, Option<u16>) {
-        if let Some(arcade_seed) = behavior.player_hyperspace_arcade_seed {
-            let (x, direction) = if arcade_seed.hseed & HYPERSPACE_REENTRY_DIRECTION_BIT != 0 {
+        if let Some(hyperspace_seed) = behavior.player_hyperspace_seed {
+            let (x, direction) = if hyperspace_seed.hseed & HYPERSPACE_REENTRY_DIRECTION_BIT != 0 {
                 (HYPERSPACE_RIGHT_REENTRY_X, Direction::Right)
             } else {
                 (HYPERSPACE_LEFT_REENTRY_X, Direction::Left)
             };
-            let y = (arcade_seed.hseed >> HYPERSPACE_REENTRY_Y_SEED_SHIFT)
+            let y = (hyperspace_seed.hseed >> HYPERSPACE_REENTRY_Y_SEED_SHIFT)
                 .wrapping_add(PLAYFIELD_TOP_EDGE_Y);
             return (
                 Point::new(x, i16::from(y)),
                 direction,
-                Some(arcade_hyperspace_background_left(arcade_seed)),
+                Some(hyperspace_background_left(hyperspace_seed)),
             );
         }
 
@@ -596,14 +575,7 @@ impl AssetActor for PlayerShip {
                     None
                 },
                 alive: prompt.phase == Phase::Playing,
-                lander_runtime: None,
-                bomber_runtime: None,
-                pod_runtime: None,
-                swarmer_runtime: None,
-                baiter_runtime: None,
-                mutant_runtime: None,
-                human_runtime: None,
-                enemy_projectile_runtime: None,
+                runtime: ActorRuntimeState::NONE,
             },
             commands,
             draws,

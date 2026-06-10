@@ -49,122 +49,122 @@ impl EnemySnapshot {
         }
     }
 
-    fn arcade_object_bitmap_descriptor(self) -> ObjectBitmapDescriptor {
+    fn object_bitmap_descriptor(self) -> ObjectBitmapDescriptor {
         match self.kind {
             EnemyKind::Lander => lander_object_bitmap_descriptor(
                 self.lander_runtime
-                    .map(|arcade_state| arcade_state.animation_frame)
+                    .map(|runtime_state| runtime_state.animation_frame)
                     .unwrap_or_default(),
             ),
             EnemyKind::Mutant => MUTANT_OBJECT_BITMAP_DESCRIPTOR,
             EnemyKind::Bomber => bomber_object_bitmap_descriptor(
                 self.bomber_runtime
-                    .map(|arcade_state| arcade_state.animation_frame)
+                    .map(|runtime_state| runtime_state.animation_frame)
                     .unwrap_or_default(),
             ),
             EnemyKind::Pod => POD_OBJECT_BITMAP_DESCRIPTOR,
             EnemyKind::Swarmer => SWARMER_OBJECT_BITMAP_DESCRIPTOR,
             EnemyKind::Baiter => baiter_object_bitmap_descriptor(
                 self.baiter_runtime
-                    .map(|arcade_state| arcade_state.animation_frame)
+                    .map(|runtime_state| runtime_state.animation_frame)
                     .unwrap_or_default(),
             ),
         }
     }
 
-    fn arcade_world_position(self) -> (u16, u16) {
+    fn world_position_words(self) -> (u16, u16) {
         match self.kind {
             EnemyKind::Lander => self
                 .lander_runtime
-                .map(|arcade_state| {
-                    arcade_world_position(
+                .map(|runtime_state| {
+                    world_position_words(
                         self.position,
-                        arcade_state.x_fraction,
-                        arcade_state.y_fraction,
+                        runtime_state.x_fraction,
+                        runtime_state.y_fraction,
                     )
                 })
-                .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
+                .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
             EnemyKind::Mutant => self
                 .mutant_runtime
-                .map(|arcade_state| {
-                    arcade_world_position(
+                .map(|runtime_state| {
+                    world_position_words(
                         self.position,
-                        arcade_state.x_fraction,
-                        arcade_state.y_fraction,
+                        runtime_state.x_fraction,
+                        runtime_state.y_fraction,
                     )
                 })
-                .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
+                .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
             EnemyKind::Bomber => self
                 .bomber_runtime
-                .map(|arcade_state| {
-                    arcade_world_position(
+                .map(|runtime_state| {
+                    world_position_words(
                         self.position,
-                        arcade_state.x_fraction,
-                        arcade_state.y_fraction,
+                        runtime_state.x_fraction,
+                        runtime_state.y_fraction,
                     )
                 })
-                .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
+                .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
             EnemyKind::Pod => self
                 .pod_runtime
-                .map(|arcade_state| {
-                    arcade_world_position(
+                .map(|runtime_state| {
+                    world_position_words(
                         self.position,
-                        arcade_state.x_fraction,
-                        arcade_state.y_fraction,
+                        runtime_state.x_fraction,
+                        runtime_state.y_fraction,
                     )
                 })
-                .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
+                .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
             EnemyKind::Swarmer => self
                 .swarmer_runtime
-                .map(|arcade_state| {
-                    arcade_world_position(
+                .map(|runtime_state| {
+                    world_position_words(
                         self.position,
-                        arcade_state.x_fraction,
-                        arcade_state.y_fraction,
+                        runtime_state.x_fraction,
+                        runtime_state.y_fraction,
                     )
                 })
-                .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
+                .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
             EnemyKind::Baiter => self
                 .baiter_runtime
-                .map(|arcade_state| {
-                    arcade_world_position(
+                .map(|runtime_state| {
+                    world_position_words(
                         self.position,
-                        arcade_state.x_fraction,
-                        arcade_state.y_fraction,
+                        runtime_state.x_fraction,
+                        runtime_state.y_fraction,
                     )
                 })
-                .unwrap_or_else(|| arcade_world_position(self.position, 0, 0)),
+                .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
         }
     }
 
-    fn arcade_velocity_words(self) -> (u16, u16) {
+    fn motion_velocity_words(self) -> (u16, u16) {
         match self.kind {
             EnemyKind::Lander => self
                 .lander_runtime
-                .map(|arcade_state| (arcade_state.x_velocity, arcade_state.y_velocity))
+                .map(|runtime_state| (runtime_state.x_velocity, runtime_state.y_velocity))
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Mutant => self
                 .mutant_runtime
-                .map(|arcade_state| (arcade_state.x_velocity, arcade_state.y_velocity))
+                .map(|runtime_state| (runtime_state.x_velocity, runtime_state.y_velocity))
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Bomber => self
                 .bomber_runtime
-                .map(|arcade_state| (arcade_state.x_velocity, arcade_state.y_velocity))
+                .map(|runtime_state| (runtime_state.x_velocity, runtime_state.y_velocity))
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Pod => self
                 .pod_runtime
-                .map(|arcade_state| (arcade_state.x_velocity, arcade_state.y_velocity))
+                .map(|runtime_state| (runtime_state.x_velocity, runtime_state.y_velocity))
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Swarmer => self
                 .swarmer_runtime
-                .map(|arcade_state| (arcade_state.x_velocity, arcade_state.y_velocity))
+                .map(|runtime_state| (runtime_state.x_velocity, runtime_state.y_velocity))
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Baiter => self
                 .baiter_runtime
-                .map(|arcade_state| {
+                .map(|runtime_state| {
                     (
-                        baiter_screen_x_velocity(arcade_state.x_velocity),
-                        arcade_state.y_velocity,
+                        baiter_screen_x_velocity(runtime_state.x_velocity),
+                        runtime_state.y_velocity,
                     )
                 })
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
@@ -192,7 +192,7 @@ pub struct MutantRuntimeSnapshot {
     pub y_velocity: u16,
     pub shot_timer: u8,
     pub sleep_ticks: u8,
-    pub hop_rng: ArcadeRngSnapshot,
+    pub hop_rng: GameRngSnapshot,
     pub render_x_correction: u16,
     pub dive_entry_shot_deferred: bool,
 }
@@ -241,23 +241,26 @@ pub struct PodRuntimeSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ArcadeRngSnapshot {
+pub struct GameRngSnapshot {
     pub seed: u8,
     pub hseed: u8,
     pub lseed: u8,
 }
 
-impl Default for ArcadeRngSnapshot {
+const GAME_RNG_DEFAULT_HSEED: u8 = 0xA5;
+const GAME_RNG_DEFAULT_LSEED: u8 = 0x5A;
+
+impl Default for GameRngSnapshot {
     fn default() -> Self {
         Self {
             seed: 0,
-            hseed: 0xA5,
-            lseed: 0x5A,
+            hseed: GAME_RNG_DEFAULT_HSEED,
+            lseed: GAME_RNG_DEFAULT_LSEED,
         }
     }
 }
 
-impl ArcadeRngSnapshot {}
+impl GameRngSnapshot {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnemyProjectileKind {
@@ -268,8 +271,8 @@ pub enum EnemyProjectileKind {
 impl EnemyProjectileKind {
     pub const fn output_routine_address(self) -> u16 {
         match self {
-            Self::Fireball => FIREBALL_ARCADE_ROUTINE_ADDRESS,
-            Self::BomberBombShell => ENEMY_BOMB_ARCADE_ROUTINE_ADDRESS,
+            Self::Fireball => FIREBALL_OUTPUT_ROUTINE_ADDRESS,
+            Self::BomberBombShell => ENEMY_BOMB_OUTPUT_ROUTINE_ADDRESS,
         }
     }
 }
@@ -295,15 +298,15 @@ impl EnemyProjectileSnapshot {
         ENEMY_BOMB_OBJECT_BITMAP_NAME
     }
 
-    fn arcade_world_position(self) -> (u16, u16) {
-        arcade_world_position(
+    fn world_position_words(self) -> (u16, u16) {
+        world_position_words(
             self.position,
             self.x_subpixel,
             self.y_subpixel,
         )
     }
 
-    const fn arcade_velocity_words(self) -> (u16, u16) {
+    const fn motion_velocity_words(self) -> (u16, u16) {
         (self.x_velocity_word, self.y_velocity_word)
     }
 }
@@ -363,15 +366,15 @@ impl HumanSnapshot {
         }
     }
 
-    fn arcade_world_position(self) -> (u16, u16) {
-        arcade_world_position(
+    fn world_position_words(self) -> (u16, u16) {
+        world_position_words(
             self.position,
             self.x_subpixel,
             self.fall_y_subpixel,
         )
     }
 
-    fn arcade_velocity_words(self) -> (u16, u16) {
+    fn motion_velocity_words(self) -> (u16, u16) {
         (0, self.fall_velocity)
     }
 }
@@ -384,11 +387,11 @@ pub struct ProjectileSnapshot {
 }
 
 impl ProjectileSnapshot {
-    fn arcade_world_position(self) -> (u16, u16) {
-        arcade_world_position(self.position, 0, 0)
+    fn world_position_words(self) -> (u16, u16) {
+        world_position_words(self.position, 0, 0)
     }
 
-    fn arcade_velocity_words(self) -> (u16, u16) {
+    fn motion_velocity_words(self) -> (u16, u16) {
         fixed_point_velocity_words(self.velocity)
     }
 }
@@ -666,7 +669,7 @@ impl ScannerRadarSnapshot {
         }
 
         let stage = scanner_radar_stage_for_step(step);
-        let scan_anchor_word = arcade_word_from_world_vector(scan_anchor);
+        let scan_anchor_word = world_vector_word(scan_anchor);
         let scan_left = scan_anchor_word.wrapping_sub(SCANNER_SCAN_CENTER_OFFSET);
         let mut scanner = Self {
             enabled: true,
@@ -731,7 +734,7 @@ impl Default for ScannerRadarSnapshot {
     }
 }
 
-fn arcade_word_from_world_vector(vector: WorldVector) -> u16 {
+fn world_vector_word(vector: WorldVector) -> u16 {
     (vector.subpixels() >> 8) as u16
 }
 
@@ -739,14 +742,14 @@ pub const EXPANDED_OBJECT_DETAIL_LIMIT: usize = 16;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct SpriteAssetImageSpec {
-    pub(crate) bitmap: crate::arcade_assets::ObjectBitmapId,
+    pub(crate) bitmap: crate::reference_assets::ObjectBitmapId,
     pub(crate) rows: u8,
     pub(crate) byte_columns: u8,
 }
 
 impl SpriteAssetImageSpec {
     pub(crate) const fn new(
-        bitmap: crate::arcade_assets::ObjectBitmapId,
+        bitmap: crate::reference_assets::ObjectBitmapId,
         rows: u8,
         byte_columns: u8,
     ) -> Self {
@@ -819,11 +822,14 @@ pub enum ScorePopupKind {
     Points500,
 }
 
+const SCORE_POPUP_250_POINTS: u16 = 250;
+const SCORE_POPUP_500_POINTS: u16 = 500;
+
 impl ScorePopupKind {
     const fn value(self) -> u16 {
         match self {
-            Self::Points250 => 250,
-            Self::Points500 => 500,
+            Self::Points250 => SCORE_POPUP_250_POINTS,
+            Self::Points500 => SCORE_POPUP_500_POINTS,
         }
     }
 
@@ -878,7 +884,7 @@ pub struct EnemyAppearanceSnapshot {
 impl EnemyAppearanceSnapshot {
     fn matches_enemy(self, enemy: EnemySnapshot) -> bool {
         self.position == enemy_appearance_position(enemy)
-            && self.mapped_sprite == enemy.arcade_object_bitmap_descriptor().mapped_sprite
+            && self.mapped_sprite == enemy.object_bitmap_descriptor().mapped_sprite
     }
 
     fn expanded_object_detail(self) -> ExpandedObjectDetailSnapshot {

@@ -4,7 +4,7 @@ pub struct CollisionBody {
     pub kind: ActorKind,
     pub position: Point,
     pub bounds: Rect,
-    pub mutant_runtime: Option<MutantArcadeState>,
+    pub runtime: ActorRuntimeState,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,14 +16,7 @@ pub struct ActorSnapshot {
     pub direction: Option<Direction>,
     pub bounds: Option<Rect>,
     pub alive: bool,
-    pub lander_runtime: Option<LanderArcadeState>,
-    pub bomber_runtime: Option<BomberArcadeState>,
-    pub pod_runtime: Option<PodArcadeState>,
-    pub swarmer_runtime: Option<SwarmerArcadeState>,
-    pub baiter_runtime: Option<BaiterArcadeState>,
-    pub mutant_runtime: Option<MutantArcadeState>,
-    pub human_runtime: Option<HumanArcadeState>,
-    pub enemy_projectile_runtime: Option<EnemyProjectileArcadeState>,
+    pub runtime: ActorRuntimeState,
 }
 
 impl ActorSnapshot {
@@ -33,7 +26,7 @@ impl ActorSnapshot {
             kind: self.kind,
             position: self.position,
             bounds: self.bounds?,
-            mutant_runtime: self.mutant_runtime,
+            runtime: self.runtime,
         })
     }
 }
@@ -94,15 +87,15 @@ impl DrawCommand {
         }
     }
 
-    pub fn arcade_message(
+    pub fn message_text(
         actor: ActorId,
         value: impl Into<String>,
         screen_cell: ScreenAddress,
     ) -> Self {
-        Self::arcade_message_with_offset(actor, value, screen_cell, Point::new(0, 0))
+        Self::message_text_with_offset(actor, value, screen_cell, Point::new(0, 0))
     }
 
-    pub fn arcade_message_with_offset(
+    pub fn message_text_with_offset(
         actor: ActorId,
         value: impl Into<String>,
         screen_cell: ScreenAddress,
@@ -112,7 +105,7 @@ impl DrawCommand {
             actor,
             sprite: SpriteKey::Text,
             position: Point::new(0, 0),
-            effect: VisualEffect::ArcadeMessage {
+            effect: VisualEffect::MessageText {
                 screen_cell,
                 visual_offset,
             },
@@ -131,32 +124,32 @@ pub enum SpawnRequest {
     EnemyLaser {
         position: Point,
         velocity: Velocity,
-        arcade_state: Option<EnemyProjectileArcadeState>,
+        runtime_state: Option<EnemyProjectileRuntimeState>,
     },
     Lander {
         position: Point,
     },
     Mutant {
         position: Point,
-        arcade_state: Option<MutantArcadeState>,
+        runtime_state: Option<MutantRuntimeState>,
     },
     Bomber {
         position: Point,
     },
     Bomb {
         position: Point,
-        arcade_state: Option<EnemyProjectileArcadeState>,
+        runtime_state: Option<EnemyProjectileRuntimeState>,
     },
     Pod {
         position: Point,
     },
     Swarmer {
         position: Point,
-        arcade_state: Option<SwarmerArcadeState>,
+        runtime_state: Option<SwarmerRuntimeState>,
     },
     Baiter {
         position: Point,
-        arcade_state: Option<BaiterArcadeState>,
+        runtime_state: Option<BaiterRuntimeState>,
     },
     Human {
         position: Point,
@@ -209,7 +202,7 @@ pub struct StepPrompt {
     pub phase: Phase,
     pub input: GameInput,
     pub wave: u16,
-    pub arcade_wave: ArcadeWaveProfile,
+    pub wave_tuning: ActorWaveTuning,
     pub current_player: u8,
     pub player_count: u8,
     pub score: u32,
@@ -228,7 +221,7 @@ pub struct StepPrompt {
     pub snapshots: Vec<ActorSnapshot>,
     pub behavior_script: ActorBehaviorScript,
     pub background_left: u16,
-    pub arcade_rng: Option<ActorArcadeRngSnapshot>,
+    pub actor_rng: Option<ActorRngSnapshot>,
     pub human_walk_target_slot: Option<usize>,
     pub projectile_scan_tick: bool,
 }
@@ -271,9 +264,10 @@ impl StepPrompt {
                 && snapshot.alive
                 && snapshot.bounds.is_some()
                 && snapshot
-                    .human_runtime
-                    .is_some_and(|arcade_state| {
-                        arcade_state.target_slot_index == target_slot_index
+                    .runtime
+                    .as_human()
+                    .is_some_and(|runtime_state| {
+                        runtime_state.target_slot_index == target_slot_index
                     })
         })
     }
@@ -389,7 +383,7 @@ pub struct StepReport {
     pub player_switch: Option<PlayerSwitchReport>,
     pub player_start: Option<PlayerStartReport>,
     pub high_scores: [u32; 5],
-    pub arcade_wave: ArcadeWaveProfile,
+    pub wave_tuning: ActorWaveTuning,
     pub high_score_initials: HighScoreInitialsState,
     pub high_score_initial_accepted: bool,
     pub high_score_submitted: bool,
@@ -398,7 +392,7 @@ pub struct StepReport {
     pub behavior_script: ActorBehaviorScriptManifest,
     pub enemy_reserve: EnemyReserveSnapshot,
     pub background_left: u16,
-    pub arcade_rng: Option<ActorArcadeRngSnapshot>,
+    pub actor_rng: Option<ActorRngSnapshot>,
     pub terrain_blow: Option<TerrainBlowSnapshot>,
     pub snapshots: Vec<ActorSnapshot>,
     pub draws: Vec<DrawCommand>,
@@ -506,29 +500,29 @@ fn clean_wave(wave: u16) -> u8 {
 
 fn actor_wave_profile_for_report(report: &StepReport) -> WaveProfileSnapshot {
     let mut profile = WaveProfileSnapshot::for_wave(clean_wave(report.wave));
-    let arcade_wave = report.arcade_wave;
-    profile.landers = arcade_wave.landers;
-    profile.bombers = arcade_wave.bombers;
-    profile.pods = arcade_wave.pods;
-    profile.mutants = arcade_wave.mutants;
-    profile.swarmers = arcade_wave.swarmers;
-    profile.lander_x_velocity = arcade_wave.lander_x_velocity;
-    profile.lander_y_velocity_msb = arcade_wave.lander_y_velocity_msb;
-    profile.lander_y_velocity_lsb = arcade_wave.lander_y_velocity_lsb;
-    profile.mutant_random_y = arcade_wave.mutant_random_y;
-    profile.mutant_y_velocity_msb = arcade_wave.mutant_y_velocity_msb;
-    profile.mutant_y_velocity_lsb = arcade_wave.mutant_y_velocity_lsb;
-    profile.mutant_x_velocity = arcade_wave.mutant_x_velocity;
-    profile.swarmer_x_velocity = arcade_wave.swarmer_x_velocity;
-    profile.wave_size = arcade_wave.wave_size;
-    profile.lander_shot_time = arcade_wave.lander_shot_time;
-    profile.bomber_x_velocity = arcade_wave.bomber_x_velocity;
-    profile.mutant_shot_time = arcade_wave.mutant_shot_time;
-    profile.swarmer_shot_time = arcade_wave.swarmer_shot_time;
-    profile.swarmer_acceleration_mask = arcade_wave.swarmer_acceleration_mask;
-    profile.baiter_delay = arcade_wave.baiter_delay;
-    profile.baiter_shot_time = arcade_wave.baiter_shot_time;
-    profile.baiter_seek_probability = arcade_wave.baiter_seek_probability;
+    let wave_tuning = report.wave_tuning;
+    profile.landers = wave_tuning.landers;
+    profile.bombers = wave_tuning.bombers;
+    profile.pods = wave_tuning.pods;
+    profile.mutants = wave_tuning.mutants;
+    profile.swarmers = wave_tuning.swarmers;
+    profile.lander_x_velocity = wave_tuning.lander_x_velocity;
+    profile.lander_y_velocity_msb = wave_tuning.lander_y_velocity_msb;
+    profile.lander_y_velocity_lsb = wave_tuning.lander_y_velocity_lsb;
+    profile.mutant_random_y = wave_tuning.mutant_random_y;
+    profile.mutant_y_velocity_msb = wave_tuning.mutant_y_velocity_msb;
+    profile.mutant_y_velocity_lsb = wave_tuning.mutant_y_velocity_lsb;
+    profile.mutant_x_velocity = wave_tuning.mutant_x_velocity;
+    profile.swarmer_x_velocity = wave_tuning.swarmer_x_velocity;
+    profile.wave_size = wave_tuning.wave_size;
+    profile.lander_shot_time = wave_tuning.lander_shot_time;
+    profile.bomber_x_velocity = wave_tuning.bomber_x_velocity;
+    profile.mutant_shot_time = wave_tuning.mutant_shot_time;
+    profile.swarmer_shot_time = wave_tuning.swarmer_shot_time;
+    profile.swarmer_acceleration_mask = wave_tuning.swarmer_acceleration_mask;
+    profile.baiter_delay = wave_tuning.baiter_delay;
+    profile.baiter_shot_time = wave_tuning.baiter_shot_time;
+    profile.baiter_seek_probability = wave_tuning.baiter_seek_probability;
     profile
 }
 
@@ -650,7 +644,7 @@ fn world_snapshot_for_report(report: &StepReport) -> WorldSnapshot {
         explosions: actor_explosions_for_report(report),
         score_popups: actor_score_popups_for_report(report),
         enemy_reserve: report.enemy_reserve,
-        arcade_rng: report.arcade_rng.map(clean_arcade_rng).unwrap_or_default(),
+        actor_rng: report.actor_rng.map(clean_actor_rng).unwrap_or_default(),
         ..WorldSnapshot::default()
     };
     world.sync_actor_presentation(
@@ -671,28 +665,7 @@ fn actor_playfield_terrain_segments(report: &StepReport) -> Vec<TerrainSegment> 
 }
 
 fn playfield_terrain_segments() -> Vec<TerrainSegment> {
-    vec![
-        TerrainSegment {
-            position: ScreenPosition::new(0, 224),
-            size: (64, 8),
-        },
-        TerrainSegment {
-            position: ScreenPosition::new(64, 222),
-            size: (64, 8),
-        },
-        TerrainSegment {
-            position: ScreenPosition::new(128, 226),
-            size: (64, 8),
-        },
-        TerrainSegment {
-            position: ScreenPosition::new(192, 220),
-            size: (56, 8),
-        },
-        TerrainSegment {
-            position: ScreenPosition::new(248, 224),
-            size: (44, 8),
-        },
-    ]
+    PLAYFIELD_TERRAIN_SEGMENTS.to_vec()
 }
 
 fn actor_human_walk_target_y(position_x: i16, offset: u8) -> Option<i16> {
@@ -747,94 +720,94 @@ fn clean_enemy_snapshot(snapshot: &ActorSnapshot) -> Option<CleanEnemySnapshot> 
         screen_position(snapshot.position),
         screen_velocity(snapshot.velocity),
     );
-    enemy.lander_runtime = snapshot.lander_runtime.map(clean_lander_runtime);
-    enemy.bomber_runtime = snapshot.bomber_runtime.map(clean_bomber_runtime);
-    enemy.pod_runtime = snapshot.pod_runtime.map(clean_pod_runtime);
-    enemy.swarmer_runtime = snapshot.swarmer_runtime.map(clean_swarmer_runtime);
-    enemy.baiter_runtime = snapshot.baiter_runtime.map(clean_baiter_runtime);
-    enemy.mutant_runtime = snapshot.mutant_runtime.map(clean_mutant_runtime);
+    enemy.lander_runtime = snapshot.runtime.as_lander().map(clean_lander_runtime);
+    enemy.bomber_runtime = snapshot.runtime.as_bomber().map(clean_bomber_runtime);
+    enemy.pod_runtime = snapshot.runtime.as_pod().map(clean_pod_runtime);
+    enemy.swarmer_runtime = snapshot.runtime.as_swarmer().map(clean_swarmer_runtime);
+    enemy.baiter_runtime = snapshot.runtime.as_baiter().map(clean_baiter_runtime);
+    enemy.mutant_runtime = snapshot.runtime.as_mutant().map(clean_mutant_runtime);
     Some(enemy)
 }
 
-fn clean_lander_runtime(arcade_state: LanderArcadeState) -> LanderRuntimeSnapshot {
+fn clean_lander_runtime(runtime_state: LanderRuntimeState) -> LanderRuntimeSnapshot {
     LanderRuntimeSnapshot {
-        x_fraction: arcade_state.x_fraction,
-        y_fraction: arcade_state.y_fraction,
-        x_velocity: arcade_state.x_velocity,
-        y_velocity: arcade_state.y_velocity,
-        shot_timer: arcade_state.shot_timer,
-        sleep_ticks: arcade_state.sleep_ticks,
-        animation_frame: arcade_state.animation_frame.index(),
-        target_human_index: arcade_state.target_human_index,
+        x_fraction: runtime_state.x_fraction,
+        y_fraction: runtime_state.y_fraction,
+        x_velocity: runtime_state.x_velocity,
+        y_velocity: runtime_state.y_velocity,
+        shot_timer: runtime_state.shot_timer,
+        sleep_ticks: runtime_state.sleep_ticks,
+        animation_frame: runtime_state.animation_frame.index(),
+        target_human_index: runtime_state.target_human_index,
     }
 }
 
-fn clean_bomber_runtime(arcade_state: BomberArcadeState) -> BomberRuntimeSnapshot {
+fn clean_bomber_runtime(runtime_state: BomberRuntimeState) -> BomberRuntimeSnapshot {
     BomberRuntimeSnapshot {
-        x_fraction: arcade_state.x_fraction,
-        y_fraction: arcade_state.y_fraction,
-        x_velocity: arcade_state.x_velocity,
-        y_velocity: arcade_state.y_velocity,
-        animation_frame: arcade_state.animation_frame.index(),
-        cruise_altitude: screen_coordinate(arcade_state.cruise_altitude),
-        sleep_ticks: arcade_state.sleep_ticks,
-        slot: arcade_state.slot,
+        x_fraction: runtime_state.x_fraction,
+        y_fraction: runtime_state.y_fraction,
+        x_velocity: runtime_state.x_velocity,
+        y_velocity: runtime_state.y_velocity,
+        animation_frame: runtime_state.animation_frame.index(),
+        cruise_altitude: screen_coordinate(runtime_state.cruise_altitude),
+        sleep_ticks: runtime_state.sleep_ticks,
+        slot: runtime_state.slot,
     }
 }
 
-fn clean_pod_runtime(arcade_state: PodArcadeState) -> PodRuntimeSnapshot {
+fn clean_pod_runtime(runtime_state: PodRuntimeState) -> PodRuntimeSnapshot {
     PodRuntimeSnapshot {
-        x_fraction: arcade_state.x_fraction,
-        y_fraction: arcade_state.y_fraction,
-        x_velocity: arcade_state.x_velocity,
-        y_velocity: arcade_state.y_velocity,
+        x_fraction: runtime_state.x_fraction,
+        y_fraction: runtime_state.y_fraction,
+        x_velocity: runtime_state.x_velocity,
+        y_velocity: runtime_state.y_velocity,
     }
 }
 
-fn clean_swarmer_runtime(arcade_state: SwarmerArcadeState) -> SwarmerRuntimeSnapshot {
+fn clean_swarmer_runtime(runtime_state: SwarmerRuntimeState) -> SwarmerRuntimeSnapshot {
     SwarmerRuntimeSnapshot {
-        x_fraction: arcade_state.x_fraction,
-        y_fraction: arcade_state.y_fraction,
-        x_velocity: arcade_state.x_velocity,
-        y_velocity: arcade_state.y_velocity,
-        acceleration: arcade_state.acceleration,
-        shot_timer: arcade_state.shot_timer,
-        sleep_ticks: arcade_state.sleep_ticks,
-        horizontal_seek_pending: arcade_state.horizontal_seek_pending,
+        x_fraction: runtime_state.x_fraction,
+        y_fraction: runtime_state.y_fraction,
+        x_velocity: runtime_state.x_velocity,
+        y_velocity: runtime_state.y_velocity,
+        acceleration: runtime_state.acceleration,
+        shot_timer: runtime_state.shot_timer,
+        sleep_ticks: runtime_state.sleep_ticks,
+        horizontal_seek_pending: runtime_state.horizontal_seek_pending,
     }
 }
 
-fn clean_baiter_runtime(arcade_state: BaiterArcadeState) -> BaiterRuntimeSnapshot {
+fn clean_baiter_runtime(runtime_state: BaiterRuntimeState) -> BaiterRuntimeSnapshot {
     BaiterRuntimeSnapshot {
-        x_fraction: arcade_state.x_fraction,
-        y_fraction: arcade_state.y_fraction,
-        x_velocity: arcade_state.x_velocity,
-        y_velocity: arcade_state.y_velocity,
-        shot_timer: arcade_state.shot_timer,
-        sleep_ticks: arcade_state.sleep_ticks,
-        animation_frame: arcade_state.animation_frame.index(),
+        x_fraction: runtime_state.x_fraction,
+        y_fraction: runtime_state.y_fraction,
+        x_velocity: runtime_state.x_velocity,
+        y_velocity: runtime_state.y_velocity,
+        shot_timer: runtime_state.shot_timer,
+        sleep_ticks: runtime_state.sleep_ticks,
+        animation_frame: runtime_state.animation_frame.index(),
     }
 }
 
-fn clean_mutant_runtime(arcade_state: MutantArcadeState) -> MutantRuntimeSnapshot {
+fn clean_mutant_runtime(runtime_state: MutantRuntimeState) -> MutantRuntimeSnapshot {
     MutantRuntimeSnapshot {
-        x_fraction: arcade_state.x_fraction,
-        y_fraction: arcade_state.y_fraction,
-        x_velocity: arcade_state.x_velocity,
-        y_velocity: arcade_state.y_velocity,
-        shot_timer: arcade_state.shot_timer,
-        sleep_ticks: arcade_state.sleep_ticks,
-        hop_rng: clean_arcade_rng(arcade_state.hop_rng),
-        render_x_correction: arcade_state.render_x_correction,
-        dive_entry_shot_deferred: arcade_state.dive_entry_shot_deferred,
+        x_fraction: runtime_state.x_fraction,
+        y_fraction: runtime_state.y_fraction,
+        x_velocity: runtime_state.x_velocity,
+        y_velocity: runtime_state.y_velocity,
+        shot_timer: runtime_state.shot_timer,
+        sleep_ticks: runtime_state.sleep_ticks,
+        hop_rng: clean_actor_rng(runtime_state.hop_rng),
+        render_x_correction: runtime_state.render_x_correction,
+        dive_entry_shot_deferred: runtime_state.dive_entry_shot_deferred,
     }
 }
 
-const fn clean_arcade_rng(arcade_rng: ActorArcadeRngSnapshot) -> ArcadeRngSnapshot {
-    ArcadeRngSnapshot {
-        seed: arcade_rng.seed,
-        hseed: arcade_rng.hseed,
-        lseed: arcade_rng.lseed,
+const fn clean_actor_rng(actor_rng: ActorRngSnapshot) -> GameRngSnapshot {
+    GameRngSnapshot {
+        seed: actor_rng.seed,
+        hseed: actor_rng.hseed,
+        lseed: actor_rng.lseed,
     }
 }
 
@@ -848,9 +821,9 @@ fn actor_humans_for_report(report: &StepReport) -> Vec<CleanHumanSnapshot> {
             human.carried = report.draws.iter().any(|draw| {
                 draw.actor == snapshot.id && matches!(draw.sprite, SpriteKey::HumanCarried)
             });
-            if let Some(arcade_state) = snapshot.human_runtime {
-                human.x_subpixel = arcade_state.x_fraction;
-                human.animation_frame = arcade_state.animation_frame.index();
+            if let Some(runtime_state) = snapshot.runtime.as_human() {
+                human.x_subpixel = runtime_state.x_fraction;
+                human.animation_frame = runtime_state.animation_frame.index();
             }
             human
         })
@@ -889,20 +862,20 @@ fn actor_enemy_projectiles_for_report(report: &StepReport) -> Vec<CleanEnemyProj
                 EnemyProjectileKind::Fireball
             },
             x_subpixel: snapshot
-                .enemy_projectile_runtime
-                .map_or(0, |arcade_state| arcade_state.x_fraction),
+                .runtime.as_enemy_projectile()
+                .map_or(0, |runtime_state| runtime_state.x_fraction),
             y_subpixel: snapshot
-                .enemy_projectile_runtime
-                .map_or(0, |arcade_state| arcade_state.y_fraction),
+                .runtime.as_enemy_projectile()
+                .map_or(0, |runtime_state| runtime_state.y_fraction),
             x_velocity_word: snapshot
-                .enemy_projectile_runtime
-                .map_or(0, |arcade_state| arcade_state.x_velocity),
+                .runtime.as_enemy_projectile()
+                .map_or(0, |runtime_state| runtime_state.x_velocity),
             y_velocity_word: snapshot
-                .enemy_projectile_runtime
-                .map_or(0, |arcade_state| arcade_state.y_velocity),
+                .runtime.as_enemy_projectile()
+                .map_or(0, |runtime_state| runtime_state.y_velocity),
             lifetime_ticks: snapshot
-                .enemy_projectile_runtime
-                .map_or(0, |arcade_state| arcade_state.lifetime_ticks),
+                .runtime.as_enemy_projectile()
+                .map_or(0, |runtime_state| runtime_state.lifetime_ticks),
         })
         .collect()
 }
@@ -1006,37 +979,41 @@ fn screen_velocity_component(value: i16) -> i8 {
 }
 
 fn screen_coordinate(value: i16) -> u8 {
-    u8::try_from(value.clamp(0, 255)).expect("screen coordinate should be clamped to u8")
+    u8::try_from(value.clamp(SCREEN_MIN_COORDINATE, SCREEN_MAX_COORDINATE))
+        .expect("screen coordinate should be clamped to u8")
 }
 
-fn arcade_projectile_velocity_component(value: i16) -> u16 {
+fn projectile_velocity_word(value: i16) -> u16 {
     let clamped = value.clamp(i16::from(i8::MIN), i16::from(i8::MAX)) as i8;
     ((i16::from(clamped)) << 8) as u16
 }
 
-fn arcade_projectile_lifetime_ticks(remaining_steps: u16) -> u8 {
+fn projectile_lifetime_ticks(remaining_steps: u16) -> u8 {
     remaining_steps.min(u16::from(u8::MAX)) as u8
 }
 
-fn arcade_enemy_projectile_state(
+fn enemy_projectile_runtime_state(
     x_fraction: u8,
     y_fraction: u8,
     velocity: Velocity,
     lifetime_steps: u16,
-) -> EnemyProjectileArcadeState {
-    EnemyProjectileArcadeState {
+) -> EnemyProjectileRuntimeState {
+    EnemyProjectileRuntimeState {
         x_fraction,
         y_fraction,
-        x_velocity: arcade_projectile_velocity_component(velocity.dx),
-        y_velocity: arcade_projectile_velocity_component(velocity.dy),
-        lifetime_ticks: arcade_projectile_lifetime_ticks(lifetime_steps),
+        x_velocity: projectile_velocity_word(velocity.dx),
+        y_velocity: projectile_velocity_word(velocity.dy),
+        lifetime_ticks: projectile_lifetime_ticks(lifetime_steps),
     }
 }
 
-fn arcade_projectile_axis_step(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
-    let raw = i32::from(position) * 256 + i32::from(fraction) + i32::from(velocity as i16);
-    let next_position = raw.div_euclid(256);
-    let next_fraction = raw.rem_euclid(256);
+fn step_projectile_axis(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
+    let fraction_scale = i32::from(MOTION_WORD_FRACTION_SCALE);
+    let raw = i32::from(position) * fraction_scale
+        + i32::from(fraction)
+        + i32::from(velocity as i16);
+    let next_position = raw.div_euclid(fraction_scale);
+    let next_fraction = raw.rem_euclid(fraction_scale);
     (
         next_position.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16,
         next_fraction as u8,

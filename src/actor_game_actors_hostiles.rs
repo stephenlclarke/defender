@@ -1,7 +1,7 @@
 const BOMBER_BOMB_RANDOM_DROP_MASK: u8 = 0x07;
 const BOMBER_RANDOM_STEP_MASK: u8 = 0x3F;
 const BOMBER_RANDOM_STEP_CENTER: u8 = 0x20;
-const ARCADE_BYTE_SIGN_BIT: u8 = 0x80;
+const MOTION_BYTE_SIGN_BIT: u8 = 0x80;
 const BOMBER_CRUISE_RANDOM_NUDGE_SEED_MAX: u8 = 0x40;
 const BOMBER_CRUISE_NUDGE_MASK: u8 = 0x03;
 const BOMBER_CRUISE_NUDGE_CENTER: u8 = 2;
@@ -18,7 +18,7 @@ struct Bomber {
     id: ActorId,
     position: Point,
     drift: i16,
-    arcade_state: Option<BomberArcadeState>,
+    runtime_state: Option<BomberRuntimeState>,
 }
 
 impl Bomber {
@@ -31,10 +31,10 @@ impl Bomber {
             id,
             position: spawn.position,
             drift: spawn
-                .arcade_state
-                .map(|arcade_state| arcade_drift_from_velocity(arcade_state.x_velocity))
+                .runtime_state
+                .map(|runtime_state| drift_from_motion_word(runtime_state.x_velocity))
                 .unwrap_or(-1),
-            arcade_state: spawn.arcade_state,
+            runtime_state: spawn.runtime_state,
         }
     }
 
@@ -42,64 +42,64 @@ impl Bomber {
         Rect::from_center(self.position, 8, 8)
     }
 
-    fn advance_arcade_motion(&mut self) -> bool {
-        let Some(arcade_state) = &mut self.arcade_state else {
+    fn advance_runtime_motion(&mut self) -> bool {
+        let Some(runtime_state) = &mut self.runtime_state else {
             return false;
         };
 
         let (x, x_fraction) =
-            arcade_axis_step(self.position.x, arcade_state.x_fraction, arcade_state.x_velocity);
-        let (y, y_fraction) = arcade_active_object_y_step(
+            step_motion_axis(self.position.x, runtime_state.x_fraction, runtime_state.x_velocity);
+        let (y, y_fraction) = step_wrapping_motion_y(
             self.position.y,
-            arcade_state.y_fraction,
-            arcade_state.y_velocity,
+            runtime_state.y_fraction,
+            runtime_state.y_velocity,
         );
         self.position = Point::new(x, y);
-        arcade_state.x_fraction = x_fraction;
-        arcade_state.y_fraction = y_fraction;
-        self.drift = arcade_drift_from_velocity(arcade_state.x_velocity);
+        runtime_state.x_fraction = x_fraction;
+        runtime_state.y_fraction = y_fraction;
+        self.drift = drift_from_motion_word(runtime_state.x_velocity);
         true
     }
 
-    fn advance_arcade_tie_step(&mut self, prompt: &StepPrompt, arcade_rng: ActorArcadeRngSnapshot) {
-        let Some(arcade_state) = &mut self.arcade_state else {
+    fn advance_tie_step(&mut self, prompt: &StepPrompt, actor_rng: ActorRngSnapshot) {
+        let Some(runtime_state) = &mut self.runtime_state else {
             return;
         };
-        if arcade_state.slot != arcade_tie_selected_slot(arcade_rng.seed) {
+        if runtime_state.slot != bomber_tie_selected_slot(actor_rng.seed) {
             return;
         }
-        if arcade_state.sleep_ticks > 0 {
-            arcade_state.sleep_ticks = arcade_state.sleep_ticks.saturating_sub(1);
+        if runtime_state.sleep_ticks > 0 {
+            runtime_state.sleep_ticks = runtime_state.sleep_ticks.saturating_sub(1);
             return;
         }
 
-        arcade_state.animation_frame = SpriteFrameIndex::new(bomber_sprite_frame_after_arcade_seed(
-            arcade_rng.seed,
-            arcade_state.animation_frame.index(),
+        runtime_state.animation_frame = SpriteFrameIndex::new(bomber_sprite_frame_after_tie_seed(
+            actor_rng.seed,
+            runtime_state.animation_frame.index(),
         ));
-        arcade_state.y_velocity =
-            bomber_seeded_y_velocity(arcade_state.y_velocity, arcade_rng.seed);
+        runtime_state.y_velocity =
+            bomber_seeded_y_velocity(runtime_state.y_velocity, actor_rng.seed);
         if self.position.y == 0 {
-            arcade_state.y_velocity = bomber_cruise_y_velocity(
-                arcade_state.y_velocity,
-                &mut arcade_state.cruise_altitude,
+            runtime_state.y_velocity = bomber_cruise_y_velocity(
+                runtime_state.y_velocity,
+                &mut runtime_state.cruise_altitude,
                 self.position.y,
-                arcade_rng.seed,
+                actor_rng.seed,
             );
         } else if let Some(player) = prompt.player_position()
             && let Some(delta) =
                 bomber_player_tracking_y_velocity_delta(self.position.y, player.y)
         {
-            arcade_state.y_velocity = arcade_state.y_velocity.wrapping_add(delta);
+            runtime_state.y_velocity = runtime_state.y_velocity.wrapping_add(delta);
         }
 
-        arcade_state.sleep_ticks = BOMBER_LOOP_SLEEP_TICKS;
+        runtime_state.sleep_ticks = BOMBER_LOOP_SLEEP_TICKS;
     }
 
     fn draw_effect(&self) -> VisualEffect {
-        self.arcade_state
-            .map(|arcade_state| VisualEffect::BomberSpriteFrame {
-                animation_frame: arcade_state.animation_frame,
+        self.runtime_state
+            .map(|runtime_state| VisualEffect::BomberSpriteFrame {
+                animation_frame: runtime_state.animation_frame,
             })
             .unwrap_or(VisualEffect::Static)
     }
@@ -110,14 +110,14 @@ impl Bomber {
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) {
-        if let Some(arcade_state) = self.arcade_state {
-            let Some(arcade_rng) = prompt.arcade_rng else {
+        if let Some(runtime_state) = self.runtime_state {
+            let Some(actor_rng) = prompt.actor_rng else {
                 return;
             };
-            if arcade_state.slot != arcade_tie_selected_slot(arcade_rng.seed)
-                || arcade_state.sleep_ticks > 0
+            if runtime_state.slot != bomber_tie_selected_slot(actor_rng.seed)
+                || runtime_state.sleep_ticks > 0
                 || self.position.y == 0
-                || arcade_rng.lseed & BOMBER_BOMB_RANDOM_DROP_MASK != 0
+                || actor_rng.lseed & BOMBER_BOMB_RANDOM_DROP_MASK != 0
                 || actor_bomb_projectile_count(prompt) >= ACTIVE_BOMBER_BOMB_LIMIT
                 || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
                 || !enemy_projectile_spawn_in_bounds(self.position)
@@ -127,12 +127,12 @@ impl Bomber {
 
             commands.push(GameCommand::Spawn(SpawnRequest::Bomb {
                 position: self.position,
-                arcade_state: Some(EnemyProjectileArcadeState {
-                    x_fraction: arcade_state.x_fraction,
-                    y_fraction: arcade_state.y_fraction,
+                runtime_state: Some(EnemyProjectileRuntimeState {
+                    x_fraction: runtime_state.x_fraction,
+                    y_fraction: runtime_state.y_fraction,
                     x_velocity: 0,
                     y_velocity: 0,
-                    lifetime_ticks: bomber_bomb_lifetime_ticks(arcade_rng),
+                    lifetime_ticks: bomber_bomb_lifetime_ticks(actor_rng),
                 }),
             }));
             return;
@@ -152,15 +152,15 @@ impl Bomber {
         if prompt.step % bomb_period == phase % bomb_period {
             commands.push(GameCommand::Spawn(SpawnRequest::Bomb {
                 position: self.position,
-                arcade_state: None,
+                runtime_state: None,
             }));
         }
     }
 }
 
-fn bomber_sprite_frame_after_arcade_seed(seed: u8, current: u8) -> u8 {
+fn bomber_sprite_frame_after_tie_seed(seed: u8, current: u8) -> u8 {
     let step = (seed & BOMBER_RANDOM_STEP_MASK).wrapping_sub(BOMBER_RANDOM_STEP_CENTER);
-    if step & ARCADE_BYTE_SIGN_BIT != 0 {
+    if step & MOTION_BYTE_SIGN_BIT != 0 {
         current
             .saturating_add(1)
             .min(BOMBER_ANIMATION_FRAME_COUNT - 1)
@@ -235,12 +235,12 @@ impl AssetActor for Bomber {
         let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Bomber);
-            if self.arcade_state.is_some() {
+            if self.runtime_state.is_some() {
                 self.maybe_spawn_bomb(prompt, behavior, &mut commands);
-                if let Some(arcade_rng) = prompt.arcade_rng {
-                    self.advance_arcade_tie_step(prompt, arcade_rng);
+                if let Some(actor_rng) = prompt.actor_rng {
+                    self.advance_tie_step(prompt, actor_rng);
                 }
-                self.advance_arcade_motion();
+                self.advance_runtime_motion();
             } else if let Some(position) = move_by_hostile_mode(
                 self.position,
                 behavior.bomber_mode,
@@ -273,14 +273,7 @@ impl AssetActor for Bomber {
                 )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                lander_runtime: None,
-                bomber_runtime: self.arcade_state,
-                pod_runtime: None,
-                swarmer_runtime: None,
-                baiter_runtime: None,
-                mutant_runtime: None,
-                human_runtime: None,
-                enemy_projectile_runtime: None,
+                runtime: ActorRuntimeState::bomber(self.runtime_state),
             },
             commands,
             draws,
@@ -293,7 +286,7 @@ struct Bomb {
     id: ActorId,
     position: Point,
     lifetime_steps: u16,
-    arcade_state: EnemyProjectileArcadeState,
+    runtime_state: EnemyProjectileRuntimeState,
 }
 
 impl Bomb {
@@ -301,26 +294,26 @@ impl Bomb {
         id: ActorId,
         position: Point,
         lifetime_steps: u16,
-        arcade_state: Option<EnemyProjectileArcadeState>,
+        runtime_state: Option<EnemyProjectileRuntimeState>,
     ) -> Self {
-        let mut arcade_state = arcade_state.unwrap_or(EnemyProjectileArcadeState {
+        let mut runtime_state = runtime_state.unwrap_or(EnemyProjectileRuntimeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
             y_velocity: 0,
             lifetime_ticks: 0,
         });
-        let lifetime_steps = if arcade_state.lifetime_ticks == 0 {
+        let lifetime_steps = if runtime_state.lifetime_ticks == 0 {
             lifetime_steps
         } else {
-            u16::from(arcade_state.lifetime_ticks)
+            u16::from(runtime_state.lifetime_ticks)
         };
-        arcade_state.lifetime_ticks = arcade_projectile_lifetime_ticks(lifetime_steps);
+        runtime_state.lifetime_ticks = projectile_lifetime_ticks(lifetime_steps);
         Self {
             id,
             position,
             lifetime_steps,
-            arcade_state,
+            runtime_state,
         }
     }
 
@@ -339,8 +332,8 @@ impl AssetActor for Bomb {
         if prompt.phase == Phase::Playing && self.lifetime_steps > 0 {
             if prompt.projectile_scan_tick {
                 self.lifetime_steps = self.lifetime_steps.saturating_sub(1);
-                self.arcade_state.lifetime_ticks =
-                    arcade_projectile_lifetime_ticks(self.lifetime_steps);
+                self.runtime_state.lifetime_ticks =
+                    projectile_lifetime_ticks(self.lifetime_steps);
             }
             if self.lifetime_steps > 0 {
                 draws.push(DrawCommand::sprite(self.id, SpriteKey::Bomb, self.position));
@@ -357,14 +350,7 @@ impl AssetActor for Bomb {
                 direction: None,
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing && self.lifetime_steps > 0,
-                lander_runtime: None,
-                bomber_runtime: None,
-                pod_runtime: None,
-                swarmer_runtime: None,
-                baiter_runtime: None,
-                mutant_runtime: None,
-                human_runtime: None,
-                enemy_projectile_runtime: Some(self.arcade_state),
+                runtime: ActorRuntimeState::enemy_projectile(Some(self.runtime_state)),
             },
             commands: Vec::new(),
             draws,
@@ -377,7 +363,7 @@ struct Pod {
     id: ActorId,
     position: Point,
     drift: i16,
-    arcade_state: Option<PodArcadeState>,
+    runtime_state: Option<PodRuntimeState>,
 }
 
 impl Pod {
@@ -390,10 +376,10 @@ impl Pod {
             id,
             position: spawn.position,
             drift: spawn
-                .arcade_state
-                .map(|arcade_state| arcade_drift_from_velocity(arcade_state.x_velocity))
+                .runtime_state
+                .map(|runtime_state| drift_from_motion_word(runtime_state.x_velocity))
                 .unwrap_or(1),
-            arcade_state: spawn.arcade_state,
+            runtime_state: spawn.runtime_state,
         }
     }
 
@@ -401,21 +387,21 @@ impl Pod {
         Rect::from_center(self.position, 8, 8)
     }
 
-    fn advance_arcade_motion(&mut self) -> bool {
-        let Some(arcade_state) = &mut self.arcade_state else {
+    fn advance_runtime_motion(&mut self) -> bool {
+        let Some(runtime_state) = &mut self.runtime_state else {
             return false;
         };
         let (x, x_fraction) =
-            arcade_axis_step(self.position.x, arcade_state.x_fraction, arcade_state.x_velocity);
-        let (y, y_fraction) = arcade_active_object_y_step(
+            step_motion_axis(self.position.x, runtime_state.x_fraction, runtime_state.x_velocity);
+        let (y, y_fraction) = step_wrapping_motion_y(
             self.position.y,
-            arcade_state.y_fraction,
-            arcade_state.y_velocity,
+            runtime_state.y_fraction,
+            runtime_state.y_velocity,
         );
         self.position = Point::new(x, y);
-        arcade_state.x_fraction = x_fraction;
-        arcade_state.y_fraction = y_fraction;
-        self.drift = arcade_drift_from_velocity(arcade_state.x_velocity);
+        runtime_state.x_fraction = x_fraction;
+        runtime_state.y_fraction = y_fraction;
+        self.drift = drift_from_motion_word(runtime_state.x_velocity);
         true
     }
 }
@@ -430,7 +416,7 @@ impl AssetActor for Pod {
         let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Pod);
-            if !self.advance_arcade_motion()
+            if !self.advance_runtime_motion()
                 && let Some(position) = move_by_hostile_mode(
                     self.position,
                     behavior.pod_mode,
@@ -463,14 +449,7 @@ impl AssetActor for Pod {
                 )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                lander_runtime: None,
-                bomber_runtime: None,
-                pod_runtime: self.arcade_state,
-                swarmer_runtime: None,
-                baiter_runtime: None,
-                mutant_runtime: None,
-                human_runtime: None,
-                enemy_projectile_runtime: None,
+                runtime: ActorRuntimeState::pod(self.runtime_state),
             },
             commands: Vec::new(),
             draws,
@@ -483,7 +462,7 @@ struct Swarmer {
     id: ActorId,
     position: Point,
     drift: i16,
-    arcade_state: Option<SwarmerArcadeState>,
+    runtime_state: Option<SwarmerRuntimeState>,
 }
 
 impl Swarmer {
@@ -496,7 +475,7 @@ impl Swarmer {
             id,
             position: spawn.position,
             drift: -1,
-            arcade_state: spawn.arcade_state,
+            runtime_state: spawn.runtime_state,
         }
     }
 
@@ -504,54 +483,54 @@ impl Swarmer {
         Rect::from_center(self.position, 6, 4)
     }
 
-    fn advance_arcade_motion(
+    fn advance_runtime_motion(
         &mut self,
         prompt: &StepPrompt,
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) -> bool {
-        let Some(arcade_state) = &mut self.arcade_state else {
+        let Some(runtime_state) = &mut self.runtime_state else {
             return false;
         };
-        if arcade_state.sleep_ticks > 0 {
-            arcade_state.sleep_ticks = arcade_state.sleep_ticks.saturating_sub(1);
+        if runtime_state.sleep_ticks > 0 {
+            runtime_state.sleep_ticks = runtime_state.sleep_ticks.saturating_sub(1);
             return true;
         }
 
         let Some(player) = prompt.player_position() else {
             return false;
         };
-        let profile = prompt.arcade_wave;
+        let profile = prompt.wave_tuning;
         let mut horizontal_seek_only = false;
-        if arcade_state.horizontal_seek_pending {
-            arcade_state.x_velocity = mini_swarmer_seek_velocity(
+        if runtime_state.horizontal_seek_pending {
+            runtime_state.x_velocity = mini_swarmer_seek_velocity(
                 profile.swarmer_x_velocity,
                 player.x,
                 self.position.x,
             );
-            arcade_state.horizontal_seek_pending = false;
-            arcade_state.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
+            runtime_state.horizontal_seek_pending = false;
+            runtime_state.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
             horizontal_seek_only = true;
         }
 
         let in_shot_window = if horizontal_seek_only {
             false
         } else {
-            arcade_state.y_velocity = mini_swarmer_y_velocity(
-                arcade_state.y_velocity,
-                arcade_state.acceleration,
+            runtime_state.y_velocity = mini_swarmer_y_velocity(
+                runtime_state.y_velocity,
+                runtime_state.acceleration,
                 player.y,
                 self.position.y,
-                prompt.arcade_rng.map(|rng| rng.seed).unwrap_or(0),
+                prompt.actor_rng.map(|rng| rng.seed).unwrap_or(0),
             );
-            let player_absolute_x = arcade_absolute_x(player, 0);
-            let object_absolute_x = arcade_absolute_x(self.position, arcade_state.x_fraction);
+            let player_absolute_x = absolute_world_x(player, 0);
+            let object_absolute_x = absolute_world_x(self.position, runtime_state.x_fraction);
             let past_window = player_absolute_x
                 .wrapping_sub(object_absolute_x)
                 .wrapping_add(MINI_SWARMER_TURN_WINDOW_HALF);
             let in_shot_window = past_window <= MINI_SWARMER_TURN_WINDOW;
             if !in_shot_window {
-                arcade_state.x_velocity = mini_swarmer_seek_velocity(
+                runtime_state.x_velocity = mini_swarmer_seek_velocity(
                     profile.swarmer_x_velocity,
                     player.x,
                     self.position.x,
@@ -561,26 +540,26 @@ impl Swarmer {
         };
 
         let (x, x_fraction) =
-            arcade_axis_step(self.position.x, arcade_state.x_fraction, arcade_state.x_velocity);
-        let (y, y_fraction) = arcade_active_object_y_step(
+            step_motion_axis(self.position.x, runtime_state.x_fraction, runtime_state.x_velocity);
+        let (y, y_fraction) = step_wrapping_motion_y(
             self.position.y,
-            arcade_state.y_fraction,
-            arcade_state.y_velocity,
+            runtime_state.y_fraction,
+            runtime_state.y_velocity,
         );
         self.position = Point::new(x, y);
-        arcade_state.x_fraction = x_fraction;
-        arcade_state.y_fraction = y_fraction;
+        runtime_state.x_fraction = x_fraction;
+        runtime_state.y_fraction = y_fraction;
         if in_shot_window {
-            arcade_state.shot_timer = arcade_state.shot_timer.wrapping_sub(1);
-            if arcade_state.shot_timer == 0 {
-                arcade_state.shot_timer = prompt
-                    .arcade_rng
-                    .map(|rng| arcade_rmax(clamped_swarmer_shot_reset(profile), rng.seed))
+            runtime_state.shot_timer = runtime_state.shot_timer.wrapping_sub(1);
+            if runtime_state.shot_timer == 0 {
+                runtime_state.shot_timer = prompt
+                    .actor_rng
+                    .map(|rng| bounded_actor_rng_value(clamped_swarmer_shot_reset(profile), rng.seed))
                     .unwrap_or_else(|| clamped_swarmer_shot_reset(profile));
-                push_swarmer_shot(self.position, prompt, behavior, Some(*arcade_state), commands);
+                push_swarmer_shot(self.position, prompt, behavior, Some(*runtime_state), commands);
             }
         }
-        arcade_state.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
+        runtime_state.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
         true
     }
 }
@@ -596,7 +575,7 @@ impl AssetActor for Swarmer {
         let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Swarmer);
-            if !self.advance_arcade_motion(prompt, behavior, &mut commands) {
+            if !self.advance_runtime_motion(prompt, behavior, &mut commands) {
                 if let Some(position) = move_by_hostile_mode(
                     self.position,
                     behavior.swarmer_mode,
@@ -634,14 +613,7 @@ impl AssetActor for Swarmer {
                 )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                lander_runtime: None,
-                bomber_runtime: None,
-                pod_runtime: None,
-                swarmer_runtime: self.arcade_state,
-                baiter_runtime: None,
-                mutant_runtime: None,
-                human_runtime: None,
-                enemy_projectile_runtime: None,
+                runtime: ActorRuntimeState::swarmer(self.runtime_state),
             },
             commands,
             draws,
@@ -653,17 +625,17 @@ fn push_swarmer_shot(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
-    arcade_state: Option<SwarmerArcadeState>,
+    runtime_state: Option<SwarmerRuntimeState>,
     commands: &mut Vec<GameCommand>,
 ) {
-    if let Some(arcade_state) = arcade_state {
-        if let Some((velocity, projectile_arcade_state)) =
-            mini_swarmer_fireball(position, prompt, arcade_state)
+    if let Some(runtime_state) = runtime_state {
+        if let Some((velocity, projectile_runtime_state)) =
+            mini_swarmer_fireball(position, prompt, runtime_state)
         {
-            push_arcade_enemy_projectile_command(
+            push_enemy_projectile_command(
                 position,
                 velocity,
-                projectile_arcade_state,
+                projectile_runtime_state,
                 SoundCue::SwarmerShot,
                 commands,
             );
@@ -675,7 +647,7 @@ fn push_swarmer_shot(
     commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
         position,
         velocity,
-        arcade_state: None,
+        runtime_state: None,
     }));
     commands.push(GameCommand::PlaySound(SoundCue::SwarmerShot));
 }
@@ -683,28 +655,28 @@ fn push_swarmer_shot(
 fn mini_swarmer_fireball(
     position: Point,
     prompt: &StepPrompt,
-    arcade_state: SwarmerArcadeState,
-) -> Option<(Velocity, EnemyProjectileArcadeState)> {
+    runtime_state: SwarmerRuntimeState,
+) -> Option<(Velocity, EnemyProjectileRuntimeState)> {
     let player = prompt.player_position()?;
-    let player_delta = arcade_absolute_x(player, 0)
-        .wrapping_sub(arcade_absolute_x(position, arcade_state.x_fraction));
-    if (player_delta.to_be_bytes()[0] ^ arcade_state.x_velocity.to_be_bytes()[0])
-        & ARCADE_BYTE_SIGN_BIT
+    let player_delta = absolute_world_x(player, 0)
+        .wrapping_sub(absolute_world_x(position, runtime_state.x_fraction));
+    if (player_delta.to_be_bytes()[0] ^ runtime_state.x_velocity.to_be_bytes()[0])
+        & MOTION_BYTE_SIGN_BIT
         != 0
             || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
     {
         return None;
     }
 
-    let x_velocity = arcade_state.x_velocity.wrapping_shl(3);
+    let x_velocity = runtime_state.x_velocity.wrapping_shl(3);
     let y_velocity = actor_arithmetic_shift_right_word(
         u16::from_be_bytes([(player.y as u8).wrapping_sub(position.y as u8), 0]),
         5,
     );
-    let velocity = arcade_screen_velocity(x_velocity, y_velocity);
+    let velocity = screen_velocity_from_motion_words(x_velocity, y_velocity);
     Some((
         velocity,
-        EnemyProjectileArcadeState {
+        EnemyProjectileRuntimeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity,
@@ -714,7 +686,7 @@ fn mini_swarmer_fireball(
     ))
 }
 
-fn clamped_swarmer_shot_reset(profile: ArcadeWaveProfile) -> u8 {
+fn clamped_swarmer_shot_reset(profile: ActorWaveTuning) -> u8 {
     profile.swarmer_shot_time.max(1).min(u32::from(u8::MAX)) as u8
 }
 
@@ -723,7 +695,7 @@ struct Baiter {
     id: ActorId,
     position: Point,
     drift: i16,
-    arcade_state: Option<BaiterArcadeState>,
+    runtime_state: Option<BaiterRuntimeState>,
 }
 
 impl Baiter {
@@ -736,7 +708,7 @@ impl Baiter {
             id,
             position: spawn.position,
             drift: -1,
-            arcade_state: spawn.arcade_state,
+            runtime_state: spawn.runtime_state,
         }
     }
 
@@ -744,48 +716,48 @@ impl Baiter {
         Rect::from_center(self.position, 12, 4)
     }
 
-    fn advance_arcade_motion(
+    fn advance_runtime_motion(
         &mut self,
         prompt: &StepPrompt,
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) -> bool {
-        let Some(arcade_state) = &mut self.arcade_state else {
+        let Some(runtime_state) = &mut self.runtime_state else {
             return false;
         };
 
-        if arcade_state.sleep_ticks > 0 {
-            arcade_state.sleep_ticks = arcade_state.sleep_ticks.saturating_sub(1);
+        if runtime_state.sleep_ticks > 0 {
+            runtime_state.sleep_ticks = runtime_state.sleep_ticks.saturating_sub(1);
         } else {
-            arcade_state.shot_timer = arcade_state.shot_timer.wrapping_sub(1);
-            if arcade_state.shot_timer == 0 {
-                let profile = prompt.arcade_wave;
-                let shot_rng = baiter_shot_arcade_rng(prompt, self.id, self.position);
-                arcade_state.shot_timer = baiter_shot_timer_reset(profile, shot_rng.seed);
+            runtime_state.shot_timer = runtime_state.shot_timer.wrapping_sub(1);
+            if runtime_state.shot_timer == 0 {
+                let profile = prompt.wave_tuning;
+                let shot_rng = baiter_shot_actor_rng(prompt, self.id, self.position);
+                runtime_state.shot_timer = baiter_shot_timer_reset(profile, shot_rng.seed);
                 push_baiter_shot(
                     self.id,
                     self.position,
                     prompt,
                     behavior,
-                    Some(*arcade_state),
+                    Some(*runtime_state),
                     Some(shot_rng),
                     commands,
                 );
             }
 
-            arcade_state.animation_frame = SpriteFrameIndex::new(
-                (arcade_state.animation_frame.index() + 1) % BAITER_ANIMATION_FRAME_COUNT,
+            runtime_state.animation_frame = SpriteFrameIndex::new(
+                (runtime_state.animation_frame.index() + 1) % BAITER_ANIMATION_FRAME_COUNT,
             );
-            if arcade_state.animation_frame.index() == 0
+            if runtime_state.animation_frame.index() == 0
                 && let Some(player) = prompt.player_position()
             {
-                let profile = prompt.arcade_wave;
+                let profile = prompt.wave_tuning;
                 let seed = prompt
-                    .arcade_rng
-                    .map(|arcade_rng| arcade_rng.seed)
-                    .unwrap_or_else(|| arcade_motion_seed(prompt.step, self.id));
-                update_baiter_arcade_velocity(
-                    arcade_state,
+                    .actor_rng
+                    .map(|actor_rng| actor_rng.seed)
+                    .unwrap_or_else(|| motion_seed(prompt.step, self.id));
+                update_baiter_velocity(
+                    runtime_state,
                     self.position,
                     profile,
                     player,
@@ -794,29 +766,29 @@ impl Baiter {
                     seed,
                 );
             }
-            arcade_state.sleep_ticks = BAITER_LOOP_SLEEP_TICKS;
+            runtime_state.sleep_ticks = BAITER_LOOP_SLEEP_TICKS;
         }
 
-        let (x, x_fraction) = arcade_axis_step(
+        let (x, x_fraction) = step_motion_axis(
             self.position.x,
-            arcade_state.x_fraction,
-            baiter_screen_x_velocity(arcade_state.x_velocity),
+            runtime_state.x_fraction,
+            baiter_screen_x_velocity(runtime_state.x_velocity),
         );
-        let (y, y_fraction) = arcade_active_object_y_step(
+        let (y, y_fraction) = step_wrapping_motion_y(
             self.position.y,
-            arcade_state.y_fraction,
-            arcade_state.y_velocity,
+            runtime_state.y_fraction,
+            runtime_state.y_velocity,
         );
         self.position = Point::new(x, y);
-        arcade_state.x_fraction = x_fraction;
-        arcade_state.y_fraction = y_fraction;
+        runtime_state.x_fraction = x_fraction;
+        runtime_state.y_fraction = y_fraction;
         true
     }
 
     fn draw_effect(&self) -> VisualEffect {
-        self.arcade_state
-            .map(|arcade_state| VisualEffect::BaiterSpriteFrame {
-                animation_frame: arcade_state.animation_frame,
+        self.runtime_state
+            .map(|runtime_state| VisualEffect::BaiterSpriteFrame {
+                animation_frame: runtime_state.animation_frame,
             })
             .unwrap_or(VisualEffect::Static)
     }
@@ -827,20 +799,20 @@ fn push_baiter_shot(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
-    arcade_state: Option<BaiterArcadeState>,
-    shot_rng: Option<ActorArcadeRngSnapshot>,
+    runtime_state: Option<BaiterRuntimeState>,
+    shot_rng: Option<ActorRngSnapshot>,
     commands: &mut Vec<GameCommand>,
 ) {
-    if let Some(arcade_state) = arcade_state {
+    if let Some(runtime_state) = runtime_state {
         let shot_rng =
-            shot_rng.unwrap_or_else(|| baiter_shot_arcade_rng(prompt, actor, position));
-        if let Some((velocity, projectile_arcade_state)) =
-            baiter_fireball(position, prompt, arcade_state, shot_rng)
+            shot_rng.unwrap_or_else(|| baiter_shot_actor_rng(prompt, actor, position));
+        if let Some((velocity, projectile_runtime_state)) =
+            baiter_fireball(position, prompt, runtime_state, shot_rng)
         {
-            push_arcade_enemy_projectile_command(
+            push_enemy_projectile_command(
                 position,
                 velocity,
-                projectile_arcade_state,
+                projectile_runtime_state,
                 SoundCue::BaiterShot,
                 commands,
             );
@@ -852,37 +824,37 @@ fn push_baiter_shot(
     commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
         position,
         velocity,
-        arcade_state: None,
+        runtime_state: None,
     }));
     commands.push(GameCommand::PlaySound(SoundCue::BaiterShot));
 }
 
-fn baiter_shot_arcade_rng(
+fn baiter_shot_actor_rng(
     prompt: &StepPrompt,
     actor: ActorId,
     position: Point,
-) -> ActorArcadeRngSnapshot {
-    prompt.arcade_rng.unwrap_or(ActorArcadeRngSnapshot {
-        seed: arcade_motion_seed(prompt.step, actor),
+) -> ActorRngSnapshot {
+    prompt.actor_rng.unwrap_or(ActorRngSnapshot {
+        seed: motion_seed(prompt.step, actor),
         hseed: position.x as u8,
         lseed: position.y as u8,
     })
 }
 
-fn baiter_shot_timer_reset(profile: ArcadeWaveProfile, seed: u8) -> u8 {
-    arcade_rmax(clamped_baiter_shot_timer_reset(profile), seed)
+fn baiter_shot_timer_reset(profile: ActorWaveTuning, seed: u8) -> u8 {
+    bounded_actor_rng_value(clamped_baiter_shot_timer_reset(profile), seed)
 }
 
 fn baiter_fireball(
     position: Point,
     prompt: &StepPrompt,
-    arcade_state: BaiterArcadeState,
-    shot_rng: ActorArcadeRngSnapshot,
-) -> Option<(Velocity, EnemyProjectileArcadeState)> {
-    arcade_enemy_fireball(
+    runtime_state: BaiterRuntimeState,
+    shot_rng: ActorRngSnapshot,
+) -> Option<(Velocity, EnemyProjectileRuntimeState)> {
+    enemy_fireball_projectile(
         position,
-        arcade_state.x_fraction,
-        arcade_state.y_fraction,
+        runtime_state.x_fraction,
+        runtime_state.y_fraction,
         prompt,
         shot_rng,
         ENEMY_PROJECTILE_LIFETIME_TICKS,
@@ -920,7 +892,7 @@ impl AssetActor for Baiter {
         let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Baiter);
-            if !self.advance_arcade_motion(prompt, behavior, &mut commands) {
+            if !self.advance_runtime_motion(prompt, behavior, &mut commands) {
                 if let Some(position) = move_by_hostile_mode(
                     self.position,
                     behavior.baiter_mode,
@@ -967,14 +939,7 @@ impl AssetActor for Baiter {
                 )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                lander_runtime: None,
-                bomber_runtime: None,
-                pod_runtime: None,
-                swarmer_runtime: None,
-                baiter_runtime: self.arcade_state,
-                mutant_runtime: None,
-                human_runtime: None,
-                enemy_projectile_runtime: None,
+                runtime: ActorRuntimeState::baiter(self.runtime_state),
             },
             commands,
             draws,
@@ -982,7 +947,7 @@ impl AssetActor for Baiter {
     }
 }
 
-fn clamped_baiter_shot_timer_reset(profile: ArcadeWaveProfile) -> u8 {
+fn clamped_baiter_shot_timer_reset(profile: ActorWaveTuning) -> u8 {
     profile.baiter_shot_time.max(1).min(u32::from(u8::MAX)) as u8
 }
 
@@ -990,10 +955,10 @@ fn baiter_screen_x_velocity(x_velocity_word: u16) -> u16 {
     x_velocity_word.wrapping_shl(2)
 }
 
-fn update_baiter_arcade_velocity(
-    arcade_state: &mut BaiterArcadeState,
+fn update_baiter_velocity(
+    runtime_state: &mut BaiterRuntimeState,
     position: Point,
-    profile: ArcadeWaveProfile,
+    profile: ActorWaveTuning,
     player_position: Point,
     player_velocity: Velocity,
     honor_seek_probability: bool,
@@ -1011,8 +976,8 @@ fn update_baiter_arcade_velocity(
             BAITER_X_SEEK_SPEED
         };
         let player_x_velocity =
-            actor_arithmetic_shift_right_word(arcade_velocity_word(player_velocity.dx), 2);
-        arcade_state.x_velocity =
+            actor_arithmetic_shift_right_word(motion_velocity_word(player_velocity.dx), 2);
+        runtime_state.x_velocity =
             actor_sign_extend_u8_to_u16(x_seek_byte).wrapping_add(player_x_velocity);
     }
 
@@ -1023,9 +988,9 @@ fn update_baiter_arcade_velocity(
         } else {
             BAITER_Y_SEEK_BYTE
         };
-        arcade_state.y_velocity = actor_arithmetic_shift_right_word(
+        runtime_state.y_velocity = actor_arithmetic_shift_right_word(
             u16::from_be_bytes([y_seek_byte, 0])
-                .wrapping_add(arcade_velocity_word(player_velocity.dy)),
+                .wrapping_add(motion_velocity_word(player_velocity.dy)),
             1,
         );
     }
@@ -1037,11 +1002,11 @@ fn actor_arithmetic_shift_right_word(value: u16, shift: u8) -> u16 {
     ((value as i16) >> shift.min(15)) as u16
 }
 
-fn arcade_velocity_word(value: i16) -> u16 {
+fn motion_velocity_word(value: i16) -> u16 {
     value as u16
 }
 
-fn arcade_motion_seed(step: u64, id: ActorId) -> u8 {
+fn motion_seed(step: u64, id: ActorId) -> u8 {
     (step as u8).wrapping_mul(17).wrapping_add(id.value() as u8)
 }
 
@@ -1084,7 +1049,7 @@ fn mini_swarmer_damping_adjustment(value: u16) -> u16 {
     a = !a;
     b = !b;
     for _ in 0..MINI_SWARMER_DAMPING_SHIFT_STEPS {
-        let carry = b & ARCADE_BYTE_SIGN_BIT != 0;
+        let carry = b & MOTION_BYTE_SIGN_BIT != 0;
         b = b.wrapping_shl(1);
         a = a.wrapping_shl(1) | u8::from(carry);
     }

@@ -64,9 +64,9 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         first_playing_reserve_mutants: first_playing.reserve_mutants,
         first_playing_reserve_swarmers: first_playing.reserve_swarmers,
         first_playing_world_scroll_left: first_playing.world_scroll_left,
-        first_playing_arcade_rng_seed: first_playing.arcade_rng_seed,
-        first_playing_arcade_rng_hseed: first_playing.arcade_rng_hseed,
-        first_playing_arcade_rng_lseed: first_playing.arcade_rng_lseed,
+        first_playing_actor_rng_seed: first_playing.actor_rng_seed,
+        first_playing_actor_rng_hseed: first_playing.actor_rng_hseed,
+        first_playing_actor_rng_lseed: first_playing.actor_rng_lseed,
         first_playing_actor_samples: first_playing.actor_samples,
         first_playing_enemy_projectile_samples: first_playing.enemy_projectile_samples,
         first_playing_sound_commands: first_playing.sound_commands,
@@ -358,22 +358,22 @@ fn actor_script_check_hostile_projectile_matrix_input(kind: ActorKind) -> ActorG
 }
 
 fn actor_script_check_hostile_projectile_matrix_script(kind: ActorKind) -> String {
-    let arcade_wave = match kind {
+    let wave_tuning = match kind {
         ActorKind::Lander => {
-            "arcade_wave 2 wave_size 1 landers 1 bombers 0 pods 0 mutants 0 swarmers 0 lander_shot_time 1\n"
+            "wave_tuning 2 wave_size 1 landers 1 bombers 0 pods 0 mutants 0 swarmers 0 lander_shot_time 1\n"
         }
         ActorKind::Mutant => {
-            "arcade_wave 1 wave_size 1 landers 0 bombers 0 pods 0 mutants 1 swarmers 0 mutant_shot_time 1 mutant_x_velocity 48 mutant_random_y 2\n"
+            "wave_tuning 1 wave_size 1 landers 0 bombers 0 pods 0 mutants 1 swarmers 0 mutant_shot_time 1 mutant_x_velocity 48 mutant_random_y 2\n"
         }
         ActorKind::Swarmer => {
             concat!(
-                "arcade_wave 1 wave_size 0 landers 0 bombers 0 pods 0 mutants 0 swarmers 0\n",
+                "wave_tuning 1 wave_size 0 landers 0 bombers 0 pods 0 mutants 0 swarmers 0\n",
                 "swarmer 62 120\n",
             )
         }
         ActorKind::Baiter => {
             concat!(
-                "arcade_wave 1 wave_size 0 landers 0 bombers 0 pods 0 mutants 0 swarmers 0 ",
+                "wave_tuning 1 wave_size 0 landers 0 bombers 0 pods 0 mutants 0 swarmers 0 ",
                 "baiter_time 1 baiter_shot_time 1 lander_shot_time 255\n",
                 "lander 220 120\n",
             )
@@ -395,11 +395,11 @@ fn actor_script_check_hostile_projectile_matrix_script(kind: ActorKind) -> Strin
             "kind swarmer swarmer_fire_period_steps 1\n",
             "[wave]\n",
             "name hostile projectile matrix {kind_label}\n",
-            "{arcade_wave}",
+            "{wave_tuning}",
             "human 100 214\n",
         ),
         kind_label = actor_script_check_actor_kind_label(kind),
-        arcade_wave = arcade_wave
+        wave_tuning = wave_tuning
     )
 }
 
@@ -608,10 +608,10 @@ fn actor_script_check_hostile_laser_hit_matrix_script(kind: ActorKind) -> String
 }
 
 fn actor_script_check_playing_summary(frame: &ActorFrame) -> ActorScriptCheckPlayingSummary {
-    let profile = frame.report.arcade_wave;
+    let profile = frame.report.wave_tuning;
     let reserve = frame.state.world.enemy_reserve;
     debug_assert_eq!(reserve, frame.report.enemy_reserve);
-    let arcade_rng = frame.report.arcade_rng;
+    let actor_rng = frame.report.actor_rng;
     let player_behavior = first_playing_behavior_for(frame, ActorKind::Player);
     let lander_behavior = first_playing_behavior_for(frame, ActorKind::Lander);
     let mutant_behavior = first_playing_behavior_for(frame, ActorKind::Mutant);
@@ -636,9 +636,9 @@ fn actor_script_check_playing_summary(frame: &ActorFrame) -> ActorScriptCheckPla
         reserve_mutants: reserve.mutants,
         reserve_swarmers: reserve.swarmers,
         world_scroll_left: frame.report.background_left,
-        arcade_rng_seed: arcade_rng.map(|arcade_rng| arcade_rng.seed),
-        arcade_rng_hseed: arcade_rng.map(|arcade_rng| arcade_rng.hseed),
-        arcade_rng_lseed: arcade_rng.map(|arcade_rng| arcade_rng.lseed),
+        actor_rng_seed: actor_rng.map(|actor_rng| actor_rng.seed),
+        actor_rng_hseed: actor_rng.map(|actor_rng| actor_rng.hseed),
+        actor_rng_lseed: actor_rng.map(|actor_rng| actor_rng.lseed),
         player_takes_enemy_collision_damage: player_behavior.player_takes_enemy_collision_damage,
         player_laser_cooldown_steps: player_behavior.player_laser_cooldown_steps,
         lander_mode: lander_behavior_mode_label(lander_behavior.lander_mode).to_string(),
@@ -686,26 +686,26 @@ fn actor_script_check_actor_subpixels(
 ) -> Option<(u8, u8)> {
     match snapshot.kind {
         ActorKind::Lander => snapshot
-            .lander_runtime
-            .map(|arcade_state| (arcade_state.x_fraction, arcade_state.y_fraction)),
+            .runtime.as_lander()
+            .map(|runtime_state| (runtime_state.x_fraction, runtime_state.y_fraction)),
         ActorKind::Mutant => snapshot
-            .mutant_runtime
-            .map(|arcade_state| (arcade_state.x_fraction, arcade_state.y_fraction)),
+            .runtime.as_mutant()
+            .map(|runtime_state| (runtime_state.x_fraction, runtime_state.y_fraction)),
         ActorKind::Bomber => snapshot
-            .bomber_runtime
-            .map(|arcade_state| (arcade_state.x_fraction, arcade_state.y_fraction)),
+            .runtime.as_bomber()
+            .map(|runtime_state| (runtime_state.x_fraction, runtime_state.y_fraction)),
         ActorKind::Pod => snapshot
-            .pod_runtime
-            .map(|arcade_state| (arcade_state.x_fraction, arcade_state.y_fraction)),
+            .runtime.as_pod()
+            .map(|runtime_state| (runtime_state.x_fraction, runtime_state.y_fraction)),
         ActorKind::Swarmer => snapshot
-            .swarmer_runtime
-            .map(|arcade_state| (arcade_state.x_fraction, arcade_state.y_fraction)),
+            .runtime.as_swarmer()
+            .map(|runtime_state| (runtime_state.x_fraction, runtime_state.y_fraction)),
         ActorKind::Baiter => snapshot
-            .baiter_runtime
-            .map(|arcade_state| (arcade_state.x_fraction, arcade_state.y_fraction)),
+            .runtime.as_baiter()
+            .map(|runtime_state| (runtime_state.x_fraction, runtime_state.y_fraction)),
         ActorKind::Human => snapshot
-            .human_runtime
-            .map(|arcade_state| (arcade_state.x_fraction, arcade_state.y_fraction)),
+            .runtime.as_human()
+            .map(|runtime_state| (runtime_state.x_fraction, runtime_state.y_fraction)),
         _ => None,
     }
 }
@@ -732,7 +732,7 @@ fn actor_script_check_enemy_projectile_samples(
         .iter()
         .filter(|snapshot| snapshot.alive)
         .filter_map(|snapshot| {
-            let arcade_state = snapshot.enemy_projectile_runtime?;
+            let runtime_state = snapshot.runtime.as_enemy_projectile()?;
             let kind = match snapshot.kind {
                 ActorKind::EnemyLaser => "enemy_laser",
                 ActorKind::Bomb => "bomb",
@@ -742,11 +742,11 @@ fn actor_script_check_enemy_projectile_samples(
                 kind: kind.to_string(),
                 x: snapshot.position.x,
                 y: snapshot.position.y,
-                x_subpixel: arcade_state.x_fraction,
-                y_subpixel: arcade_state.y_fraction,
-                x_velocity_word: arcade_state.x_velocity,
-                y_velocity_word: arcade_state.y_velocity,
-                lifetime_ticks: arcade_state.lifetime_ticks,
+                x_subpixel: runtime_state.x_fraction,
+                y_subpixel: runtime_state.y_fraction,
+                x_velocity_word: runtime_state.x_velocity,
+                y_velocity_word: runtime_state.y_velocity,
+                lifetime_ticks: runtime_state.lifetime_ticks,
             })
         })
         .take(ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_LIMIT)
@@ -764,29 +764,29 @@ fn actor_script_check_projectile_spawn_command_samples(
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position,
                 velocity,
-                arcade_state,
-            }) => Some(("enemy_laser", *position, *velocity, *arcade_state)),
-            GameCommand::Spawn(SpawnRequest::Bomb { position, arcade_state }) => Some((
+                runtime_state,
+            }) => Some(("enemy_laser", *position, *velocity, *runtime_state)),
+            GameCommand::Spawn(SpawnRequest::Bomb { position, runtime_state }) => Some((
                 "bomb",
                 *position,
                 crate::actor_game::Velocity::default(),
-                *arcade_state,
+                *runtime_state,
             )),
             _ => None,
         })
         .take(ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_LIMIT)
         .map(
-            |(kind, position, velocity, arcade_state)| ActorScriptCheckProjectileSpawnSample {
+            |(kind, position, velocity, runtime_state)| ActorScriptCheckProjectileSpawnSample {
                 kind: kind.to_string(),
                 x: position.x,
                 y: position.y,
                 velocity_dx: velocity.dx,
                 velocity_dy: velocity.dy,
-                x_subpixel: arcade_state.map(|arcade_state| arcade_state.x_fraction),
-                y_subpixel: arcade_state.map(|arcade_state| arcade_state.y_fraction),
-                x_velocity_word: arcade_state.map(|arcade_state| arcade_state.x_velocity),
-                y_velocity_word: arcade_state.map(|arcade_state| arcade_state.y_velocity),
-                lifetime_ticks: arcade_state.map(|arcade_state| arcade_state.lifetime_ticks),
+                x_subpixel: runtime_state.map(|runtime_state| runtime_state.x_fraction),
+                y_subpixel: runtime_state.map(|runtime_state| runtime_state.y_fraction),
+                x_velocity_word: runtime_state.map(|runtime_state| runtime_state.x_velocity),
+                y_velocity_word: runtime_state.map(|runtime_state| runtime_state.y_velocity),
+                lifetime_ticks: runtime_state.map(|runtime_state| runtime_state.lifetime_ticks),
             },
         )
         .collect()
@@ -920,7 +920,7 @@ fn explosion_kind_label(kind: ExplosionKind) -> &'static str {
     }
 }
 
-fn arcade_rng_summary(seed: Option<u8>, hseed: Option<u8>, lseed: Option<u8>) -> String {
+fn actor_rng_summary(seed: Option<u8>, hseed: Option<u8>, lseed: Option<u8>) -> String {
     match (seed, hseed, lseed) {
         (Some(seed), Some(hseed), Some(lseed)) => {
             format!("seed=0x{seed:02x},hseed=0x{hseed:02x},lseed=0x{lseed:02x}")

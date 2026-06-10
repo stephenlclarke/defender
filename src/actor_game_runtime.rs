@@ -150,7 +150,7 @@ impl PendingSurvivorBonus {
     }
 
     fn bonus_points(&self) -> u32 {
-        u32::from(self.multiplier) * 100
+        u32::from(self.multiplier) * SURVIVOR_BONUS_POINTS_PER_MULTIPLIER
     }
 
     fn award_next_survivor(&mut self) -> Option<u32> {
@@ -319,11 +319,11 @@ impl FromStr for ActorDriverScripts {
 
 impl Default for ActorDriverScripts {
     fn default() -> Self {
-        let behavior_script = ActorBehaviorScript::arcade_default();
+        let behavior_script = ActorBehaviorScript::default_script();
         let wave_script =
             ActorWaveScript::parse_text_with_base_behavior(ACTOR_WAVE_SCRIPT, &behavior_script)
                 .unwrap_or_else(|error| panic!("embedded actor wave script is invalid: {error}"));
-        Self::new(AttractScript::arcade_title(), behavior_script, wave_script)
+        Self::new(AttractScript::default_title(), behavior_script, wave_script)
     }
 }
 

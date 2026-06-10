@@ -48,7 +48,7 @@ fn williams_color_byte_tint(value: u8) -> Color {
     )
 }
 
-pub(crate) fn arcade_wave_landscape_tint(wave: u16) -> Color {
+pub(crate) fn wave_tuning_landscape_tint(wave: u16) -> Color {
     let wave = wave.max(1);
     let index = usize::from((wave - 1) % WAVE_LANDSCAPE_COLOR_BYTES.len() as u16);
     williams_color_byte_tint(WAVE_LANDSCAPE_COLOR_BYTES[index])
@@ -403,11 +403,11 @@ fn rotate_terrain_right_byte(data_byte: u8) -> u8 {
 }
 
 fn terrain_pattern_bytes() -> &'static [u8; TERRAIN_TDATA_BYTES] {
-    crate::arcade_assets::TERRAIN_PATTERN_BYTES
+    crate::reference_assets::TERRAIN_PATTERN_BYTES
 }
 
 fn main_terrain_record_bytes() -> &'static [u8; MAIN_TERRAIN_RECORD_BYTE_COUNT] {
-    crate::arcade_assets::MAIN_TERRAIN_BYTES
+    crate::reference_assets::MAIN_TERRAIN_BYTES
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -418,7 +418,7 @@ struct SpriteAssetPixel {
 }
 
 fn sprite_asset_pixels(spec: SpriteAssetImageSpec) -> Vec<SpriteAssetPixel> {
-    let bytes = crate::arcade_assets::object_bitmap_bytes(spec.bitmap);
+    let bytes = crate::reference_assets::object_bitmap_bytes(spec.bitmap);
     let expected_byte_count = usize::from(spec.rows) * usize::from(spec.byte_columns);
     if bytes.len() != expected_byte_count {
         return Vec::new();

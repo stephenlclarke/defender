@@ -12,11 +12,11 @@ use crate::{
         PlayerStockSnapshot, ProjectileSnapshot as CleanProjectileSnapshot,
         ScorePopupKind as CleanScorePopupKind, ScorePopupSnapshot as CleanScorePopupSnapshot,
         ScoreSnapshot, SoundEvent, SpriteAssetImageSpec, BaiterRuntimeSnapshot, BomberRuntimeSnapshot,
-        LanderRuntimeSnapshot, MutantRuntimeSnapshot, PodRuntimeSnapshot, ArcadeRngSnapshot,
+        LanderRuntimeSnapshot, MutantRuntimeSnapshot, PodRuntimeSnapshot, GameRngSnapshot,
         SwarmerRuntimeSnapshot, TERRAIN_BLOW_COMPLETE_STEP, TERRAIN_BLOW_FLASH_COLOR_BYTES,
-        TERRAIN_BLOW_OVERLOAD_COUNTER, TERRAIN_BLOW_START_SOUND_STEPS,
+        TERRAIN_BLOW_EXPLOSION_BIRTHS, TERRAIN_BLOW_OVERLOAD_COUNTER, TERRAIN_BLOW_START_SOUND_STEPS,
         TERRAIN_EXPLOSION_LIFETIME_STEPS, TerrainBlowSnapshot, TerrainBlowStage, TerrainSegment,
-        VISUAL_STATE, WaveProfileSnapshot, WorldSnapshot, WorldVector, arcade_wave_landscape_tint,
+        VISUAL_STATE, WaveProfileSnapshot, WorldSnapshot, WorldVector, wave_tuning_landscape_tint,
         appearance_growth_size_for_age, explosion_growth_size_for_age, explosion_render_scale,
         push_appearance_cloud_pixels, push_background_terrain_sprites,
         push_explosion_cloud_pixels, push_scanner_radar_sprites, terrain_blow_flash_tint,
@@ -24,7 +24,7 @@ use crate::{
     },
     renderer::{
         Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
-        push_arcade_controlled_message_sprites, push_message_text_bytes_sprites,
+        push_controlled_message_sprites, push_message_text_bytes_sprites,
         attract_defender_appearance_pixels, attract_williams_logo_operation_pixel_counts,
         attract_williams_logo_pixel_path, screen_position_from_cell,
         screen_position_from_cell_with_offset,
@@ -49,6 +49,9 @@ use std::{
 
 const PLAYER_SPEED: i16 = 1;
 const ACTOR_RENDER_SURFACE: SurfaceSize = SurfaceSize::new(292, 240);
+const SCREEN_MIN_COORDINATE: i16 = 0;
+const SCREEN_MAX_COORDINATE: i16 = u8::MAX as i16;
+const MOTION_WORD_FRACTION_SCALE: i16 = 0x0100;
 const INITIAL_PLAYER_LIVES: u8 = 3;
 const INITIAL_SMART_BOMBS: u8 = 3;
 const PLAYER_LASER_COOLDOWN_STEPS: u8 = 8;
@@ -119,13 +122,13 @@ const FINAL_GAME_OVER_DELAY_STEPS: u8 = 40; // original: SOURCE_FINAL_GAME_OVER_
 const PLAYER_START_SOUND_DELAY_STEPS: u8 = 1; // original: SOURCE_START_SOUND_DELAY_STEPS
 const PLAYER_START_PLAYFIELD_DELAY_STEPS: u8 = 138; // original: SOURCE_START_PLAYFIELD_DELAY_STEPS
 const ENEMY_PROJECTILE_MAX_SCREEN_X: i16 = 0x98; // original: SOURCE_SHELL_X_MAX
-const PLAYFIELD_START_RNG: ActorArcadeRng = ActorArcadeRng {
+const PLAYFIELD_START_RNG: ActorRng = ActorRng {
     // original: SOURCE_PLAYFIELD_START_RNG
     seed: 0x52,
     hseed: 0x62,
     lseed: 0x0C,
 };
-const DEFAULT_RNG: ActorArcadeRng = ActorArcadeRng {
+const DEFAULT_RNG: ActorRng = ActorRng {
     // original: SOURCE_DEFAULT_RNG
     seed: 0,
     hseed: 0xA5,
@@ -136,7 +139,7 @@ const FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT: usize = 10; // original: SOURCE_FIR
 const FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT: usize = 6; // original: SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT
 const FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY: u8 = 2; // original: SOURCE_FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY
 const FIRST_WAVE_EARLY_RESERVE_TARGET2_X_VELOCITY: u16 = 0xFFEE;
-const FIRST_WAVE_EARLY_RESERVE_RNG: ActorArcadeRng = ActorArcadeRng {
+const FIRST_WAVE_EARLY_RESERVE_RNG: ActorRng = ActorRng {
     // original: SOURCE_FIRST_WAVE_EARLY_RESERVE_RNG
     seed: 0x3A,
     hseed: 0xDA,
@@ -146,7 +149,13 @@ const FIRST_WAVE_LANDER_REFILL_ACTIVE_THRESHOLD: usize = 8; // original: SOURCE_
 const FIRST_WAVE_LANDER_REFILL_DELAY_STEPS: u8 = 47; // original: SOURCE_FIRST_WAVE_LANDER_REFILL_DELAY_STEPS
 const FIRST_WAVE_LANDER_REFILL_APPEAR_SOUND_DELAY_STEPS: u8 = 1; // original: SOURCE_FIRST_WAVE_LANDER_REFILL_APPEAR_SOUND_DELAY_STEPS
 const PLAYER_PLAYFIELD_TOP_Y: i16 = PLAYFIELD_TOP_EDGE_Y as i16;
-const PLAYER_BOUNDS: Rect = Rect::new(0, PLAYER_PLAYFIELD_TOP_Y, 255, 220);
+const PLAYER_BOUNDS_BOTTOM_Y: i16 = 220;
+const PLAYER_BOUNDS: Rect = Rect::new(
+    SCREEN_MIN_COORDINATE,
+    PLAYER_PLAYFIELD_TOP_Y,
+    SCREEN_MAX_COORDINATE,
+    PLAYER_BOUNDS_BOTTOM_Y,
+);
 const PLAYER_SCROLL_CENTER_X: i16 = 128;
 const BACKGROUND_WORD_PER_PIXEL: u16 = 0x0100; // original: SOURCE_BACKGROUND_WORD_PER_PIXEL
 const LASER_SPEED: i16 = 8;
@@ -183,6 +192,7 @@ const SURVIVOR_BONUS_HUMAN_LIMIT: usize = 10; // original: SOURCE_SURVIVOR_BONUS
 const SURVIVOR_BONUS_HUMAN_SIZE: [f32; 2] = [4.0, 8.0]; // original: SOURCE_SURVIVOR_BONUS_HUMAN_SIZE
 const SURVIVOR_BONUS_ASTRONAUT_SLEEP_STEPS: u8 = 4; // original: SOURCE_SURVIVOR_BONUS_ASTRONAUT_SLEEP_STEPS
 const SURVIVOR_BONUS_WAVE_ADVANCE_SLEEP_STEPS: u8 = 0x80; // original: SOURCE_SURVIVOR_BONUS_WAVE_ADVANCE_SLEEP_STEPS
+const SURVIVOR_BONUS_POINTS_PER_MULTIPLIER: u32 = 100;
 const ATTRACT_DEFENDER_WORDMARK_DURATION_STEPS: u64 =
     ATTRACT_HALL_OF_FAME_START_STEP - ATTRACT_DEFENDER_WORDMARK_START_STEP; // original: SOURCE_ATTRACT_DEFENDER_WORDMARK_DURATION_STEPS
 const ATTRACT_HALL_OF_FAME_DURATION_STEPS: u64 =
@@ -347,6 +357,28 @@ const HUMAN_TURN_SEED_MAX: u8 = 8; // original: SOURCE_HUMAN_TURN_SEED_MAX
 const HUMAN_LEFT_TARGET_Y_OFFSET: u8 = 4; // original: SOURCE_HUMAN_LEFT_TARGET_Y_OFFSET
 const HUMAN_RIGHT_TARGET_Y_OFFSET: u8 = 15; // original: SOURCE_HUMAN_RIGHT_TARGET_Y_OFFSET
 const HUMAN_MAX_TARGET_Y: u8 = 0xE8; // original: SOURCE_HUMAN_MAX_TARGET_Y
+const PLAYFIELD_TERRAIN_SEGMENTS: [TerrainSegment; 5] = [
+    TerrainSegment {
+        position: ScreenPosition::new(0, 224),
+        size: (64, 8),
+    },
+    TerrainSegment {
+        position: ScreenPosition::new(64, 222),
+        size: (64, 8),
+    },
+    TerrainSegment {
+        position: ScreenPosition::new(128, 226),
+        size: (64, 8),
+    },
+    TerrainSegment {
+        position: ScreenPosition::new(192, 220),
+        size: (56, 8),
+    },
+    TerrainSegment {
+        position: ScreenPosition::new(248, 224),
+        size: (44, 8),
+    },
+];
 const HUMAN_LEFT_X_VELOCITY: u16 = 0xFFE0; // original: SOURCE_HUMAN_LEFT_X_VELOCITY
 const HUMAN_RIGHT_X_VELOCITY: u16 = 0x0020; // original: SOURCE_HUMAN_RIGHT_X_VELOCITY
 const INITIAL_POD_X_SPEED: u8 = 0x20; // original: SOURCE_INITIAL_POD_X_SPEED
@@ -378,11 +410,11 @@ const ACTIVE_BOMBER_BOMB_LIMIT: usize = 10; // original: SOURCE_ACTIVE_BOMBER_BO
 const MAX_ACTIVE_WAVE_ENEMIES: usize = 5; // original: SOURCE_MAX_ACTIVE_WAVE_ENEMIES
 const START_HUMAN_COUNT: u8 = 10; // original: SOURCE_START_HUMAN_COUNT
 const TARGET_LIST_ENTRY_COUNT: usize = 32; // original: SOURCE_TARGET_LIST_ENTRY_COUNT
-const ACTOR_ARCADE_RNG_MULTIPLIER: u8 = 3;
-const ACTOR_ARCADE_RNG_INCREMENT: u8 = 17;
-const ACTOR_ARCADE_RNG_LSEED_MIX_SHIFT: u8 = 3;
-const ACTOR_ARCADE_RNG_CARRY_BIT: u8 = 0x01;
-const ACTOR_ARCADE_RNG_CARRY_SHIFT: u8 = 7;
+const ACTOR_RNG_MULTIPLIER: u8 = 3;
+const ACTOR_RNG_INCREMENT: u8 = 17;
+const ACTOR_RNG_LSEED_MIX_SHIFT: u8 = 3;
+const ACTOR_RNG_CARRY_BIT: u8 = 0x01;
+const ACTOR_RNG_CARRY_SHIFT: u8 = 7;
 const STATUS_SCORE_POSITION: Point = Point::new(8, 6);
 const STATUS_HIGH_SCORE_POSITION: Point = Point::new(94, 6);
 const STATUS_PLAYER_TWO_SCORE_POSITION: Point = Point::new(208, 6);
@@ -408,7 +440,10 @@ const ACTOR_HUD_PLAYER_TWO_SMART_BOMB_STOCK_ORIGIN: [f32; 2] = [266.0, 20.0];
 const ACTOR_HUD_SMART_BOMB_STOCK_STEP: [f32; 2] = [0.0, 4.0];
 const ACTOR_HUD_SMART_BOMB_STOCK_SIZE: [f32; 2] = [6.0, 3.0];
 const STATUS_FINAL_SCORE_POSITION: Point = Point::new(56, 92);
+const STATUS_HIGH_SCORE_ENTRY_PROMPT_POSITION: Point = Point::new(66, 120);
+const STATUS_HIGH_SCORE_ENTRY_INITIALS_POSITION: Point = Point::new(66, 104);
 const STATUS_HIGH_SCORE_TABLE_TITLE_POSITION: Point = Point::new(78, 112);
+const STATUS_HIGH_SCORE_TABLE_SCORE_X: i16 = 82;
 const STATUS_HIGH_SCORE_TABLE_START_Y: i16 = 128;
 const STATUS_HIGH_SCORE_TABLE_ROW_HEIGHT: i16 = 12;
 const LANDER_SEEK_SPEED: i16 = 1;
@@ -427,7 +462,7 @@ const FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y: i16 = 0xA0; // original: SOURCE_FIRST_
 
 #[cfg(test)]
 fn actor_message_text(message: MessageId) -> &'static str {
-    crate::arcade_assets::message_text(message)
+    crate::reference_assets::message_text(message)
 }
 const MUTANT_DIVE_CONVERSION_X_CORRECTION: u16 = 0x0120; // original: SOURCE_TARGET6_MUTANT_CONVERSION_X_CORRECTION
 const MUTANT_DIVE_DEFERRED_SHOT_TIMER: u8 = 5; // original: SOURCE_TARGET6_MUTANT_DEFERRED_SHOT_TIMER
@@ -465,9 +500,9 @@ const SWARMER_SCORE: u32 = 150;
 const BAITER_SCORE: u32 = 200;
 const HUMAN_RESCUE_SCORE: u32 = 500;
 const HUMAN_SAFE_LANDING_SCORE: u32 = 250;
-const ACTOR_ATTRACT_SCRIPT: &str = include_str!("../assets/arcade-scripts/actor-attract.script"); // original: ACTOR_RED_LABEL_ATTRACT_SCRIPT
-const ACTOR_BEHAVIOR_SCRIPT: &str = include_str!("../assets/arcade-scripts/actor-behavior.script"); // original: ACTOR_RED_LABEL_BEHAVIOR_SCRIPT
-const ACTOR_WAVE_SCRIPT: &str = include_str!("../assets/arcade-scripts/actor-waves.script"); // original: ACTOR_RED_LABEL_WAVE_SCRIPT
+const ACTOR_ATTRACT_SCRIPT: &str = include_str!("../assets/actor-scripts/actor-attract.script");
+const ACTOR_BEHAVIOR_SCRIPT: &str = include_str!("../assets/actor-scripts/actor-behavior.script");
+const ACTOR_WAVE_SCRIPT: &str = include_str!("../assets/actor-scripts/actor-waves.script");
 const ACTOR_DEFAULT_DIFFICULTY_INITIAL: u8 = 5; // original: ACTOR_SOURCE_DEFAULT_DIFFICULTY_INITIAL
 const ACTOR_DEFAULT_DIFFICULTY_CEILING: u8 = 15; // original: ACTOR_SOURCE_DEFAULT_DIFFICULTY_CEILING
 const ACTOR_DATA_BACKED_WAVES: u16 = 16; // original: ACTOR_SOURCE_BACKED_WAVES
@@ -1301,22 +1336,22 @@ pub enum HostileMovementMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ActorHyperspaceArcadeSeed {
+pub struct ActorHyperspaceSeed {
     pub seed: u8,
     pub hseed: u8,
     pub lseed: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ActorArcadeRngSnapshot {
+pub struct ActorRngSnapshot {
     pub seed: u8,
     pub hseed: u8,
     pub lseed: u8,
 }
 
-impl ActorArcadeRngSnapshot {
-    const fn hyperspace_arcade_seed(self) -> ActorHyperspaceArcadeSeed {
-        ActorHyperspaceArcadeSeed {
+impl ActorRngSnapshot {
+    const fn hyperspace_seed(self) -> ActorHyperspaceSeed {
+        ActorHyperspaceSeed {
             seed: self.seed,
             hseed: self.hseed,
             lseed: self.lseed,
@@ -1325,27 +1360,27 @@ impl ActorArcadeRngSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ActorArcadeRng {
+struct ActorRng {
     seed: u8,
     hseed: u8,
     lseed: u8,
 }
 
-impl ActorArcadeRng {
+impl ActorRng {
     fn advance(&mut self) -> Self {
         let product_low = self
             .seed
-            .wrapping_mul(ACTOR_ARCADE_RNG_MULTIPLIER)
-            .wrapping_add(ACTOR_ARCADE_RNG_INCREMENT);
-        let mut a = self.lseed >> ACTOR_ARCADE_RNG_LSEED_MIX_SHIFT;
+            .wrapping_mul(ACTOR_RNG_MULTIPLIER)
+            .wrapping_add(ACTOR_RNG_INCREMENT);
+        let mut a = self.lseed >> ACTOR_RNG_LSEED_MIX_SHIFT;
         a ^= self.lseed;
-        let carry_into_hseed = (a & ACTOR_ARCADE_RNG_CARRY_BIT) != 0;
+        let carry_into_hseed = (a & ACTOR_RNG_CARRY_BIT) != 0;
         let old_hseed = self.hseed;
         self.hseed =
-            (u8::from(carry_into_hseed) << ACTOR_ARCADE_RNG_CARRY_SHIFT) | (self.hseed >> 1);
-        let carry_into_lseed = (old_hseed & ACTOR_ARCADE_RNG_CARRY_BIT) != 0;
+            (u8::from(carry_into_hseed) << ACTOR_RNG_CARRY_SHIFT) | (self.hseed >> 1);
+        let carry_into_lseed = (old_hseed & ACTOR_RNG_CARRY_BIT) != 0;
         self.lseed =
-            (u8::from(carry_into_lseed) << ACTOR_ARCADE_RNG_CARRY_SHIFT) | (self.lseed >> 1);
+            (u8::from(carry_into_lseed) << ACTOR_RNG_CARRY_SHIFT) | (self.lseed >> 1);
         let (with_lseed, carry) = adc8(product_low, self.lseed, false);
         let (new_seed, _) = adc8(with_lseed, self.hseed, carry);
         self.seed = new_seed;
@@ -1354,11 +1389,11 @@ impl ActorArcadeRng {
 
     fn advance_rmax(&mut self, max: u8) -> u8 {
         let state = self.advance();
-        arcade_rmax(max, state.seed)
+        bounded_actor_rng_value(max, state.seed)
     }
 
-    const fn snapshot(self) -> ActorArcadeRngSnapshot {
-        ActorArcadeRngSnapshot {
+    const fn snapshot(self) -> ActorRngSnapshot {
+        ActorRngSnapshot {
             seed: self.seed,
             hseed: self.hseed,
             lseed: self.lseed,
@@ -1373,7 +1408,7 @@ pub struct ActorBehaviorProfile {
     pub player_hyperspace_hidden_steps: u8,
     pub player_hyperspace_rematerialize_x: i16,
     pub player_hyperspace_rematerialize_y: i16,
-    pub player_hyperspace_arcade_seed: Option<ActorHyperspaceArcadeSeed>,
+    pub player_hyperspace_seed: Option<ActorHyperspaceSeed>,
     pub player_hyperspace_death_delay_steps: u8,
     pub player_hyperspace_death_lseed: u8,
     pub player_takes_enemy_collision_damage: bool,
@@ -1422,7 +1457,7 @@ impl ActorBehaviorProfile {
         player_hyperspace_hidden_steps: PLAYER_HYPERSPACE_HIDDEN_STEPS,
         player_hyperspace_rematerialize_x: PLAYER_HYPERSPACE_REMATERIALIZE_X,
         player_hyperspace_rematerialize_y: PLAYER_HYPERSPACE_REMATERIALIZE_Y,
-        player_hyperspace_arcade_seed: None,
+        player_hyperspace_seed: None,
         player_hyperspace_death_delay_steps: PLAYER_HYPERSPACE_DEATH_DELAY_STEPS,
         player_hyperspace_death_lseed: PLAYER_HYPERSPACE_DEATH_LOW_SEED,
         player_takes_enemy_collision_damage: true,
@@ -1464,7 +1499,7 @@ impl ActorBehaviorProfile {
         score_popup_lifetime_steps: SCORE_POPUP_LIFETIME,
     };
 
-    pub const fn arcade_default() -> Self {
+    pub const fn default_profile() -> Self {
         Self::DEFAULT
     }
 }
@@ -1532,11 +1567,11 @@ impl ActorBehaviorScript {
         }
     }
 
-    pub fn from_arcade_profile() -> Self {
+    pub fn from_default_profile() -> Self {
         Self::new(ActorBehaviorProfile::DEFAULT)
     }
 
-    pub fn arcade_default() -> Self {
+    pub fn default_script() -> Self {
         Self::parse_text(ACTOR_BEHAVIOR_SCRIPT)
             .unwrap_or_else(|error| panic!("embedded actor behavior script is invalid: {error}"))
     }
@@ -1601,18 +1636,18 @@ impl ActorBehaviorScript {
         }
     }
 
-    fn with_hyperspace_arcade_seed(&self, seed: ActorHyperspaceArcadeSeed) -> Self {
+    fn with_hyperspace_seed(&self, seed: ActorHyperspaceSeed) -> Self {
         let mut script = self.clone();
         if script
             .default_profile
-            .player_hyperspace_arcade_seed
+            .player_hyperspace_seed
             .is_none()
         {
-            script.default_profile.player_hyperspace_arcade_seed = Some(seed);
+            script.default_profile.player_hyperspace_seed = Some(seed);
         }
         for profile in script.kind_profiles.values_mut() {
-            if profile.player_hyperspace_arcade_seed.is_none() {
-                profile.player_hyperspace_arcade_seed = Some(seed);
+            if profile.player_hyperspace_seed.is_none() {
+                profile.player_hyperspace_seed = Some(seed);
             }
         }
         script
@@ -1652,7 +1687,7 @@ impl FromStr for ActorBehaviorScript {
     type Err = ActorBehaviorScriptParseError;
 
     fn from_str(script_text: &str) -> Result<Self, Self::Err> {
-        let mut script = Self::from_arcade_profile();
+        let mut script = Self::from_default_profile();
         for (line_index, input_line) in script_text.lines().enumerate() {
             let line_number = line_index + 1;
             let line = input_line
@@ -1774,9 +1809,9 @@ fn apply_behavior_profile_field(
             profile.player_hyperspace_rematerialize_y =
                 parse_behavior_i16_value(line_number, values, field.as_str())?;
         }
-        "player_hyperspace_arcade_seed" => {
-            profile.player_hyperspace_arcade_seed =
-                parse_behavior_hyperspace_arcade_seed_value(line_number, values, field.as_str())?;
+        "player_hyperspace_seed" => {
+            profile.player_hyperspace_seed =
+                parse_behavior_hyperspace_seed_value(line_number, values, field.as_str())?;
         }
         "player_hyperspace_death_delay_steps" => {
             profile.player_hyperspace_death_delay_steps =

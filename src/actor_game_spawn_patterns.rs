@@ -6,7 +6,7 @@ const POD_RESTORE_X_BASE: u8 = 0x10;
 const POD_RESTORE_X_VELOCITY_CENTER: u8 = 0x20;
 const POD_RESTORE_Y_VELOCITY_MASK: u8 = 0x7F;
 const POD_RESTORE_Y_VELOCITY_CENTER: u8 = 0x40;
-const ARCADE_SPAWN_BYTE_SIGN_BIT: u8 = 0x80;
+const SPAWN_BYTE_SIGN_BIT: u8 = 0x80;
 const POD_RESTORE_Y_VELOCITY_MAGNITUDE_BIT: u8 = 0x20;
 const POD_RESTORE_Y_VELOCITY_CLEAR_MAGNITUDE_MASK: u8 = 0xDF;
 const SWARMER_RELEASE_X_VELOCITY_MASK: u8 = 0x3F;
@@ -17,19 +17,25 @@ const MINI_SWARMER_RESTORE_X_BASE: u8 = 0x80;
 const HUMAN_RESTORE_QUADRANT_BANKS: [u8; 4] = [0x00, 0x40, 0x80, 0xC0];
 const HUMAN_RESTORE_X_OFFSET_MASK: u8 = 0x1F;
 const HUMAN_RESTORE_ANIMATION_SEED_BIT: u8 = 0x01;
+const BAITER_RIGHT_SPAWN_PARITY_X_THRESHOLD: i16 = 128;
+const BAITER_RIGHT_SPAWN_X: i16 = 228;
+const BAITER_LEFT_SPAWN_X: i16 = 28;
+const BAITER_VERTICAL_SPACING: i16 = 24;
+const BAITER_VERTICAL_SPAWN_PHASES: usize = 3;
+const BAITER_PLAYER_BOUNDS_TOP_CLEARANCE: i16 = 8;
 
 impl ActorLanderSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            arcade_state: None,
+            runtime_state: None,
         }
     }
 
     const fn from_first_wave_record(start: FirstWaveLanderSpawnRecord) -> Self {
         Self {
             position: Point::new((start.world_x >> 8) as i16, (start.world_y >> 8) as i16),
-            arcade_state: Some(LanderArcadeState {
+            runtime_state: Some(LanderRuntimeState {
                 x_fraction: (start.world_x & SPAWN_WORLD_FRACTION_MASK) as u8,
                 y_fraction: (start.world_y & SPAWN_WORLD_FRACTION_MASK) as u8,
                 x_velocity: start.x_velocity,
@@ -42,20 +48,20 @@ impl ActorLanderSpawn {
         }
     }
 
-    fn from_arcade_restore(
-        arcade_rng: &mut ActorArcadeRng,
-        profile: ArcadeWaveProfile,
+    fn from_wave_restore(
+        actor_rng: &mut ActorRng,
+        profile: ActorWaveTuning,
         target_human_index: Option<usize>,
     ) -> Self {
-        let placement_state = arcade_rng.advance();
+        let placement_state = actor_rng.advance();
         let x = placement_state.hseed;
         let x_fraction = placement_state.lseed;
         let y = PLAYFIELD_TOP_EDGE_Y.wrapping_add(2);
         let y_velocity =
             u16::from_be_bytes([profile.lander_y_velocity_msb, profile.lander_y_velocity_lsb]);
         let shot_timer =
-            arcade_rng.advance_rmax(profile.lander_shot_time.min(u32::from(u8::MAX)) as u8);
-        let x_velocity_byte = arcade_rng.advance_rmax(profile.lander_x_velocity);
+            actor_rng.advance_rmax(profile.lander_shot_time.min(u32::from(u8::MAX)) as u8);
+        let x_velocity_byte = actor_rng.advance_rmax(profile.lander_x_velocity);
         let x_velocity = if x_velocity_byte & 1 == 0 {
             u16::from(x_velocity_byte)
         } else {
@@ -64,7 +70,7 @@ impl ActorLanderSpawn {
 
         Self {
             position: Point::new(i16::from(x), i16::from(y)),
-            arcade_state: Some(LanderArcadeState {
+            runtime_state: Some(LanderRuntimeState {
                 x_fraction,
                 y_fraction: 0,
                 x_velocity,
@@ -82,7 +88,7 @@ impl ActorBomberSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            arcade_state: None,
+            runtime_state: None,
         }
     }
 
@@ -94,7 +100,7 @@ impl ActorBomberSpawn {
         };
         Self {
             position,
-            arcade_state: Some(BomberArcadeState {
+            runtime_state: Some(BomberRuntimeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: actor_sign_extend_u8_to_u16(velocity_low),
@@ -107,8 +113,8 @@ impl ActorBomberSpawn {
         }
     }
 
-    fn arcade_restore_batch(
-        profile: ArcadeWaveProfile,
+    fn wave_restore_batch(
+        profile: ActorWaveTuning,
         player_absolute_x: u16,
         count: usize,
     ) -> Vec<Self> {
@@ -133,7 +139,7 @@ impl ActorBomberSpawn {
                 let [x, x_fraction] = world_x_word.to_be_bytes();
                 bombers.push(Self {
                     position: Point::new(i16::from(x), BOMBER_CRUISE_ALTITUDE),
-                    arcade_state: Some(BomberArcadeState {
+                    runtime_state: Some(BomberRuntimeState {
                         x_fraction,
                         y_fraction: 0,
                         x_velocity,
@@ -157,7 +163,7 @@ impl ActorPodSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            arcade_state: None,
+            runtime_state: None,
         }
     }
 
@@ -169,7 +175,7 @@ impl ActorPodSpawn {
         };
         Self {
             position,
-            arcade_state: Some(PodArcadeState {
+            runtime_state: Some(PodRuntimeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: actor_sign_extend_u8_to_u16(velocity_low),
@@ -178,8 +184,8 @@ impl ActorPodSpawn {
         }
     }
 
-    fn from_arcade_restore(arcade_rng: &mut ActorArcadeRng) -> Self {
-        let state = arcade_rng.advance();
+    fn from_wave_restore(actor_rng: &mut ActorRng) -> Self {
+        let state = actor_rng.advance();
         let [x, x_fraction] =
             u16::from_be_bytes([
                 (state.hseed & POD_RESTORE_X_SEED_MASK).wrapping_add(POD_RESTORE_X_BASE),
@@ -195,7 +201,7 @@ impl ActorPodSpawn {
         );
         let mut y_velocity_low =
             (state.lseed & POD_RESTORE_Y_VELOCITY_MASK).wrapping_sub(POD_RESTORE_Y_VELOCITY_CENTER);
-        if y_velocity_low & ARCADE_SPAWN_BYTE_SIGN_BIT == 0 {
+        if y_velocity_low & SPAWN_BYTE_SIGN_BIT == 0 {
             y_velocity_low |= POD_RESTORE_Y_VELOCITY_MAGNITUDE_BIT;
         } else {
             y_velocity_low &= POD_RESTORE_Y_VELOCITY_CLEAR_MAGNITUDE_MASK;
@@ -203,7 +209,7 @@ impl ActorPodSpawn {
 
         Self {
             position: Point::new(i16::from(x), i16::from(y)),
-            arcade_state: Some(PodArcadeState {
+            runtime_state: Some(PodRuntimeState {
                 x_fraction,
                 y_fraction: 0,
                 x_velocity,
@@ -217,16 +223,16 @@ impl ActorSwarmerSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            arcade_state: None,
+            runtime_state: None,
         }
     }
 
     fn from_pod_release(
-        arcade_rng: &mut ActorArcadeRng,
-        profile: ArcadeWaveProfile,
+        actor_rng: &mut ActorRng,
+        profile: ActorWaveTuning,
         position: Point,
     ) -> Self {
-        let velocity_rand = arcade_rng.advance();
+        let velocity_rand = actor_rng.advance();
         let y_velocity = actor_sign_extend_u8_to_u16(velocity_rand.seed).wrapping_shl(1);
         let x_velocity = actor_sign_extend_u8_to_u16(
             (velocity_rand.lseed & SWARMER_RELEASE_X_VELOCITY_MASK)
@@ -235,11 +241,11 @@ impl ActorSwarmerSpawn {
         let acceleration = velocity_rand.lseed & profile.swarmer_acceleration_mask;
         let sleep_ticks = velocity_rand.hseed & SWARMER_RELEASE_SLEEP_MASK;
         let shot_timer =
-            arcade_rng.advance_rmax(profile.swarmer_shot_time.min(u32::from(u8::MAX)) as u8);
+            actor_rng.advance_rmax(profile.swarmer_shot_time.min(u32::from(u8::MAX)) as u8);
 
         Self {
             position,
-            arcade_state: Some(SwarmerArcadeState {
+            runtime_state: Some(SwarmerRuntimeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity,
@@ -252,9 +258,9 @@ impl ActorSwarmerSpawn {
         }
     }
 
-    fn arcade_restore_batch(
-        arcade_rng: &mut ActorArcadeRng,
-        profile: ArcadeWaveProfile,
+    fn wave_restore_batch(
+        actor_rng: &mut ActorRng,
+        profile: ActorWaveTuning,
         count: usize,
     ) -> Vec<Self> {
         if count == 0 {
@@ -262,13 +268,13 @@ impl ActorSwarmerSpawn {
         }
 
         let world_y_word = u16::from_be_bytes([
-            arcade_rng
+            actor_rng
                 .seed
                 .wrapping_shr(1)
                 .wrapping_add(PLAYFIELD_TOP_EDGE_Y),
             0,
         ]);
-        let placement_rand = arcade_rng.advance();
+        let placement_rand = actor_rng.advance();
         let world_x_word = u16::from_be_bytes([
             (placement_rand.seed & MINI_SWARMER_RESTORE_X_SEED_MASK)
                 .wrapping_add(MINI_SWARMER_RESTORE_X_BASE),
@@ -280,10 +286,10 @@ impl ActorSwarmerSpawn {
 
         (0..count)
             .map(|_| {
-                let mut spawn = Self::from_pod_release(arcade_rng, profile, position);
-                if let Some(arcade_state) = &mut spawn.arcade_state {
-                    arcade_state.x_fraction = x_fraction;
-                    arcade_state.y_fraction = y_fraction;
+                let mut spawn = Self::from_pod_release(actor_rng, profile, position);
+                if let Some(runtime_state) = &mut spawn.runtime_state {
+                    runtime_state.x_fraction = x_fraction;
+                    runtime_state.y_fraction = y_fraction;
                 }
                 spawn
             })
@@ -295,26 +301,32 @@ impl ActorBaiterSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            arcade_state: None,
+            runtime_state: None,
         }
     }
 
     fn from_player_position(
-        profile: ArcadeWaveProfile,
+        profile: ActorWaveTuning,
         player_position: Point,
         active_baiters: usize,
     ) -> Self {
-        let spawn_x = if (active_baiters + usize::from(player_position.x >= 128)).is_multiple_of(2)
+        let spawn_x = if (active_baiters
+            + usize::from(player_position.x >= BAITER_RIGHT_SPAWN_PARITY_X_THRESHOLD))
+        .is_multiple_of(2)
         {
-            228
+            BAITER_RIGHT_SPAWN_X
         } else {
-            28
+            BAITER_LEFT_SPAWN_X
         };
-        let spawn_y = (player_position.y + 24
-            - (i16::try_from(active_baiters % 3).unwrap_or(0) * 24))
-            .clamp(PLAYER_BOUNDS.top + 8, HUMAN_GROUND_Y - 24);
+        let spawn_y = (player_position.y + BAITER_VERTICAL_SPACING
+            - (i16::try_from(active_baiters % BAITER_VERTICAL_SPAWN_PHASES).unwrap_or(0)
+                * BAITER_VERTICAL_SPACING))
+        .clamp(
+            PLAYER_BOUNDS.top + BAITER_PLAYER_BOUNDS_TOP_CLEARANCE,
+            HUMAN_GROUND_Y - BAITER_VERTICAL_SPACING,
+        );
         let position = Point::new(spawn_x, spawn_y);
-        let mut arcade_state = BaiterArcadeState {
+        let mut runtime_state = BaiterRuntimeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -323,8 +335,8 @@ impl ActorBaiterSpawn {
             sleep_ticks: 0,
             animation_frame: SpriteFrameIndex::new(0),
         };
-        update_baiter_arcade_velocity(
-            &mut arcade_state,
+        update_baiter_velocity(
+            &mut runtime_state,
             position,
             profile,
             player_position,
@@ -334,7 +346,7 @@ impl ActorBaiterSpawn {
         );
         Self {
             position,
-            arcade_state: Some(arcade_state),
+            runtime_state: Some(runtime_state),
         }
     }
 }
@@ -343,43 +355,43 @@ impl ActorMutantSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            arcade_state: None,
+            runtime_state: None,
         }
     }
 
     fn from_wave_slot(
         position: Point,
-        profile: ArcadeWaveProfile,
+        profile: ActorWaveTuning,
         spawn_index: usize,
     ) -> Self {
-        let mut arcade_rng = DEFAULT_RNG;
+        let mut actor_rng = DEFAULT_RNG;
         for _ in 0..=spawn_index {
-            arcade_rng.advance();
+            actor_rng.advance();
         }
         let shot_timer =
-            arcade_rng.advance_rmax(profile.mutant_shot_time.min(u32::from(u8::MAX)) as u8);
+            actor_rng.advance_rmax(profile.mutant_shot_time.min(u32::from(u8::MAX)) as u8);
         Self {
             position,
-            arcade_state: Some(MutantArcadeState {
+            runtime_state: Some(MutantRuntimeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 x_velocity: 0,
                 y_velocity: 0,
                 shot_timer,
                 sleep_ticks: 0,
-                hop_rng: arcade_rng.snapshot(),
+                hop_rng: actor_rng.snapshot(),
                 render_x_correction: 0,
                 dive_entry_shot_deferred: false,
             }),
         }
     }
 
-    fn from_arcade_restore(
-        arcade_rng: &mut ActorArcadeRng,
-        profile: ArcadeWaveProfile,
+    fn from_wave_restore(
+        actor_rng: &mut ActorRng,
+        profile: ActorWaveTuning,
         background_absolute_x: u16,
     ) -> Self {
-        let placement_state = arcade_rng.advance();
+        let placement_state = actor_rng.advance();
         let avoid_left = background_absolute_x.wrapping_sub(MUTANT_RESTORE_AVOID_HALF_WIDTH);
         let mut relative = u16::from_be_bytes([placement_state.hseed, placement_state.lseed])
             .wrapping_sub(avoid_left);
@@ -393,18 +405,18 @@ impl ActorMutantSpawn {
             .wrapping_shr(1)
             .wrapping_add(PLAYFIELD_TOP_EDGE_Y);
         let shot_timer =
-            arcade_rng.advance_rmax(profile.mutant_shot_time.min(u32::from(u8::MAX)) as u8);
+            actor_rng.advance_rmax(profile.mutant_shot_time.min(u32::from(u8::MAX)) as u8);
 
         Self {
             position: Point::new(i16::from(x), i16::from(y)),
-            arcade_state: Some(MutantArcadeState {
+            runtime_state: Some(MutantRuntimeState {
                 x_fraction,
                 y_fraction: 0,
                 x_velocity: 0,
                 y_velocity: 0,
                 shot_timer,
                 sleep_ticks: 0,
-                hop_rng: arcade_rng.snapshot(),
+                hop_rng: actor_rng.snapshot(),
                 render_x_correction: 0,
                 dive_entry_shot_deferred: false,
             }),
@@ -413,12 +425,12 @@ impl ActorMutantSpawn {
 }
 
 fn initial_target_list_humans() -> Vec<ActorHumanSpawn> {
-    let mut arcade_rng = DEFAULT_RNG;
-    arcade_target_list_restore_humans(&mut arcade_rng, START_HUMAN_COUNT)
+    let mut actor_rng = DEFAULT_RNG;
+    restore_target_list_humans(&mut actor_rng, START_HUMAN_COUNT)
 }
 
-fn arcade_target_list_restore_humans(
-    arcade_rng: &mut ActorArcadeRng,
+fn restore_target_list_humans(
+    actor_rng: &mut ActorRng,
     target_count: u8,
 ) -> Vec<ActorHumanSpawn> {
     let mut humans = Vec::with_capacity(usize::from(target_count));
@@ -428,9 +440,9 @@ fn arcade_target_list_restore_humans(
     if target_count > 7 {
         let quadrant_count = target_count >> 2;
         for x_bank in HUMAN_RESTORE_QUADRANT_BANKS {
-            slot_index = push_arcade_target_list_restore_human_group(
+            slot_index = push_target_list_restore_human_group(
                 &mut humans,
-                arcade_rng,
+                actor_rng,
                 quadrant_count,
                 x_bank,
                 slot_index,
@@ -440,10 +452,10 @@ fn arcade_target_list_restore_humans(
     }
 
     for _ in 0..remainder {
-        let x_bank = arcade_rng.hseed;
-        slot_index = push_arcade_target_list_restore_human_group(
+        let x_bank = actor_rng.hseed;
+        slot_index = push_target_list_restore_human_group(
             &mut humans,
-            arcade_rng,
+            actor_rng,
             1,
             x_bank,
             slot_index,
@@ -453,15 +465,15 @@ fn arcade_target_list_restore_humans(
     humans
 }
 
-fn push_arcade_target_list_restore_human_group(
+fn push_target_list_restore_human_group(
     humans: &mut Vec<ActorHumanSpawn>,
-    arcade_rng: &mut ActorArcadeRng,
+    actor_rng: &mut ActorRng,
     count: u8,
     x_bank: u8,
     mut slot_index: usize,
 ) -> usize {
     for _ in 0..count {
-        let state = arcade_rng.advance();
+        let state = actor_rng.advance();
         let spawn_x = (state.hseed & HUMAN_RESTORE_X_OFFSET_MASK).wrapping_add(x_bank);
         let animation_frame = SpriteFrameIndex::new(if state.lseed & HUMAN_RESTORE_ANIMATION_SEED_BIT != 0 {
             2
@@ -471,7 +483,7 @@ fn push_arcade_target_list_restore_human_group(
         humans.push(ActorHumanSpawn {
             position: Point::new(i16::from(spawn_x), i16::from(ASTRONAUT_RESTORE_Y)),
             mode: HumanMode::Grounded,
-            arcade_state: Some(HumanArcadeState {
+            runtime_state: Some(HumanRuntimeState {
                 x_fraction: state.lseed,
                 y_fraction: 0,
                 animation_frame,
@@ -487,7 +499,7 @@ fn select_next_lander_target_slot_index(
     cursor: &mut Option<usize>,
     humans: &[ActorHumanSpawn],
 ) -> Option<usize> {
-    if !humans.iter().any(|human| human.arcade_state.is_some()) {
+    if !humans.iter().any(|human| human.runtime_state.is_some()) {
         return None;
     }
 
@@ -499,8 +511,8 @@ fn select_next_lander_target_slot_index(
         probe = next_target_list_slot_index(probe);
         if humans.iter().any(|human| {
             human
-                .arcade_state
-                .is_some_and(|arcade_state| arcade_state.target_slot_index == probe)
+                .runtime_state
+                .is_some_and(|runtime_state| runtime_state.target_slot_index == probe)
         }) {
             *cursor = Some(probe);
             return Some(probe);
@@ -534,7 +546,7 @@ impl ActorHumanSpawn {
         Self {
             position,
             mode,
-            arcade_state: None,
+            runtime_state: None,
         }
     }
 
@@ -545,7 +557,7 @@ impl ActorHumanSpawn {
         Self {
             position: Point::new((start.world_x >> 8) as i16, (start.world_y >> 8) as i16),
             mode: HumanMode::Grounded,
-            arcade_state: Some(HumanArcadeState {
+            runtime_state: Some(HumanRuntimeState {
                 x_fraction: (start.world_x & SPAWN_WORLD_FRACTION_MASK) as u8,
                 y_fraction: (start.world_y & SPAWN_WORLD_FRACTION_MASK) as u8,
                 animation_frame: start.animation_frame,

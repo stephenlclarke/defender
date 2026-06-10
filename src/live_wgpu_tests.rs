@@ -302,9 +302,9 @@ mod tests {
         assert_eq!(report.first_playing_reserve_mutants, 0);
         assert_eq!(report.first_playing_reserve_swarmers, 0);
         assert_eq!(report.first_playing_world_scroll_left, 0);
-        assert_eq!(report.first_playing_arcade_rng_seed, Some(0xbe));
-        assert_eq!(report.first_playing_arcade_rng_hseed, Some(0xb1));
-        assert_eq!(report.first_playing_arcade_rng_lseed, Some(0x06));
+        assert_eq!(report.first_playing_actor_rng_seed, Some(0xbe));
+        assert_eq!(report.first_playing_actor_rng_hseed, Some(0xb1));
+        assert_eq!(report.first_playing_actor_rng_lseed, Some(0x06));
         assert!(report.first_playing_actor_samples.is_empty());
         assert!(report.first_playing_enemy_projectile_samples.is_empty());
         assert_eq!(report.first_playing_sound_commands, [0xea]);
@@ -444,7 +444,7 @@ mod tests {
                 "  first_playing_enemy_counts: landers=15,bombers=0,pods=0,mutants=0,swarmers=0\n",
                 "  first_playing_world_counts: enemies=2,humans=2\n",
                 "  first_playing_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0\n",
-                "  first_playing_arcade_state: world_scroll_left=0x0000,rng=seed=0xbe,hseed=0xb1,lseed=0x06\n",
+                "  first_playing_runtime_state: world_scroll_left=0x0000,rng=seed=0xbe,hseed=0xb1,lseed=0x06\n",
                 "  first_playing_actor_samples: none\n",
                 "  first_playing_enemy_projectile_samples: none\n",
                 "  first_playing_sound_commands: 0xea\n",
@@ -464,10 +464,10 @@ mod tests {
                 "swarmer@2[score_delta=150,score=150,explosions=swarmer@62,120[explosion_anchor=none],sounds=0xf8,spawns=none];",
                 "baiter@2[score_delta=200,score=200,explosions=baiter@62,120[explosion_anchor=none],sounds=0xf8,spawns=none]\n",
                 "  hostile_projectile_matrix: ",
-                "lander@1[samples=enemy_laser@210,45[velocity=-3/3,arcade_state=frac=0xe9/0x60,vel=0xfd00/0x0300,life=90],sounds=0xfc];",
-                "mutant@454[samples=enemy_laser@0,222[velocity=1/-1,arcade_state=frac=0x50/0x00,vel=0x009c/0xfe5c,life=90],sounds=0xf6];",
-                "swarmer@0[samples=enemy_laser@62,120[velocity=3/0,arcade_state=none],sounds=0xf3];",
-                "baiter@79[samples=enemy_laser@28,120[velocity=1/-1,arcade_state=frac=0x00/0x00,vel=0x002c/0xffc4,life=20],sounds=0xfc]\n",
+                "lander@1[samples=enemy_laser@210,45[velocity=-3/3,runtime_state=frac=0xe9/0x60,vel=0xfd00/0x0300,life=90],sounds=0xfc];",
+                "mutant@454[samples=enemy_laser@0,222[velocity=1/-1,runtime_state=frac=0x50/0x00,vel=0x009c/0xfe5c,life=90],sounds=0xf6];",
+                "swarmer@0[samples=enemy_laser@62,120[velocity=3/0,runtime_state=none],sounds=0xf3];",
+                "baiter@79[samples=enemy_laser@28,120[velocity=1/-1,runtime_state=frac=0x00/0x00,vel=0x002c/0xffc4,life=20],sounds=0xfc]\n",
                 "  first_enemy_projectile: unavailable,reason=enemy_projectile_not_observed_after_512_steps\n",
                 "  wave_clear_assist_steps: 4\n",
                 "  wave_clear_next_wave: 2\n",
@@ -487,7 +487,7 @@ mod tests {
                 "  next_playing_enemy_counts: landers=20,bombers=3,pods=1,mutants=0,swarmers=0\n",
                 "  next_playing_world_counts: enemies=2,humans=2\n",
                 "  next_playing_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0\n",
-                "  next_playing_arcade_state: world_scroll_left=0x0000,rng=seed=0x82,hseed=0x35,lseed=0x88\n",
+                "  next_playing_runtime_state: world_scroll_left=0x0000,rng=seed=0x82,hseed=0x35,lseed=0x88\n",
                 "  next_playing_actor_samples: none\n",
                 "  next_playing_enemy_projectile_samples: none\n",
                 "  next_playing_sound_commands: none\n",
@@ -802,7 +802,7 @@ mod tests {
     #[test]
     fn actor_script_check_reports_enemy_projectile_and_sound_samples() {
         let path = write_actor_script_file(
-            "actor-script-arcade-projectile-check",
+            "actor-script-reference-projectile-check",
             concat!(
                 "[attract]\n",
                 "text 1 forever 12 20 PROJECTILE CHECK\n",
@@ -810,7 +810,7 @@ mod tests {
                 "kind lander lander_mode drift\n",
                 "[wave]\n",
                 "name projectile check waves\n",
-                "arcade_wave 1 wave_size 1 landers 0 bombers 0 pods 0 mutants 1 swarmers 0 ",
+                "wave_tuning 1 wave_size 1 landers 0 bombers 0 pods 0 mutants 1 swarmers 0 ",
                 "mutant_shot_time 1 mutant_x_velocity 48 mutant_random_y 2\n",
                 "behavior kind mutant mutant_mode drift\n",
             ),
@@ -851,23 +851,23 @@ mod tests {
     }
 
     #[test]
-    fn actor_script_check_reports_arcade_wave_overrides_at_play_start() {
+    fn actor_script_check_reports_wave_tuning_overrides_at_play_start() {
         let path = write_actor_script_file(
-            "actor-script-arcade-wave-check",
+            "actor-script-reference-wave-check",
             concat!(
                 "[attract]\n",
                 "text 1 forever 12 20 ARCADE CHECK\n",
                 "[behavior]\n",
                 "kind lander lander_mode drift\n",
                 "[wave]\n",
-                "name arcade check waves\n",
-                "arcade_wave 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
+                "name reference check waves\n",
+                "wave_tuning 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
                 "swarmer_x_velocity 64 swarmer_shot_time 11 baiter_time 24 ",
                 "mutant_x_velocity 48 mutant_random_y 2 mutant_shot_time 12\n",
             ),
         );
 
-        let report = run_actor_script_check(&path).expect("arcade wave script should check");
+        let report = run_actor_script_check(&path).expect("wave tuning script should check");
 
         assert_eq!(report.first_playing_wave, 1);
         assert_eq!(report.first_playing_wave_size, 5);
@@ -958,7 +958,7 @@ mod tests {
     }
 
     #[test]
-    fn actor_script_check_reports_reserve_and_arcade_state_at_play_start() {
+    fn actor_script_check_reports_reserve_and_runtime_state_at_play_start() {
         let path = write_actor_script_file(
             "actor-script-reserve-check",
             concat!(
@@ -968,7 +968,7 @@ mod tests {
                 "kind lander lander_mode drift\n",
                 "[wave]\n",
                 "name reserve check waves\n",
-                "arcade_wave 1 wave_size 2 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
+                "wave_tuning 1 wave_size 2 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
                 "reserve_full 3 2 1 1 1\n",
             ),
         );
@@ -983,14 +983,14 @@ mod tests {
         assert_eq!(report.first_playing_reserve_mutants, 1);
         assert_eq!(report.first_playing_reserve_swarmers, 1);
         assert_eq!(report.first_playing_world_scroll_left, 0);
-        assert!(report.first_playing_arcade_rng_seed.is_some());
+        assert!(report.first_playing_actor_rng_seed.is_some());
         assert!(report.to_text().contains(
             "first_playing_reserve_counts: landers=3,bombers=2,pods=1,mutants=1,swarmers=1"
         ));
         assert!(
             report
                 .to_text()
-                .contains("first_playing_arcade_state: world_scroll_left=0x0000,rng=seed=")
+                .contains("first_playing_runtime_state: world_scroll_left=0x0000,rng=seed=")
         );
     }
 
@@ -1005,10 +1005,10 @@ mod tests {
                 "kind lander lander_mode drift\n",
                 "[wave]\n",
                 "name next wave check waves\n",
-                "arcade_wave 1 wave_size 1 landers 1 bombers 0 pods 0 mutants 0 swarmers 0\n",
+                "wave_tuning 1 wave_size 1 landers 1 bombers 0 pods 0 mutants 0 swarmers 0\n",
                 "behavior kind lander lander_mode drift\n",
                 "behavior kind lander lander_drift_speed 2\n",
-                "arcade_wave 2 wave_size 3 landers 1 bombers 1 pods 1 mutants 0 swarmers 0\n",
+                "wave_tuning 2 wave_size 3 landers 1 bombers 1 pods 1 mutants 0 swarmers 0\n",
                 "reserve_full 2 1 1 1 1\n",
                 "behavior kind lander lander_mode chase_player\n",
                 "behavior kind lander lander_seek_speed 7\n",
@@ -1029,7 +1029,7 @@ mod tests {
         let wave_sleep = report
             .wave_clear_advance_sleep
             .as_ref()
-            .expect("checker should report the arcade wave advance sleep");
+            .expect("checker should report the wave tuning advance sleep");
         let post_reserve_wave_clear = report
             .post_reserve_wave_clear
             .as_ref()
@@ -1340,7 +1340,7 @@ mod tests {
                 "kind player player_laser_cooldown_steps 5\n",
                 "[wave]\n",
                 "name behavior check waves\n",
-                "arcade_wave 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1\n",
+                "wave_tuning 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1\n",
                 "behavior kind lander lander_mode chase_player\n",
                 "behavior kind lander lander_seek_speed 4\n",
                 "behavior kind mutant mutant_mode drift\n",

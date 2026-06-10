@@ -43,7 +43,7 @@
                 player: 1,
             })
         );
-        assert_no_arcade_message(&started, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
+        assert_no_message_text(&started, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
         assert_eq!(driver.snapshot_count(ActorKind::Player), 0);
 
         let start_sound = driver.step(GameInput::NONE);
@@ -138,7 +138,7 @@
             draw.text.as_deref() == Some(presents_text)
                 && matches!(
                     draw.effect,
-                    VisualEffect::ArcadeMessage {
+                    VisualEffect::MessageText {
                         screen_cell: ATTRACT_PRESENTS_ELECTRONICS_CELL,
                         visual_offset: Point { x: 0, y: 0 },
                     }
@@ -221,7 +221,7 @@
             draw.text.as_deref() == Some(hall_title_text)
                 && matches!(
                     draw.effect,
-                    VisualEffect::ArcadeMessage {
+                    VisualEffect::MessageText {
                         screen_cell,
                         visual_offset: ATTRACT_HALL_TABLE_VISUAL_OFFSET,
                     } if screen_cell == crate::ScreenAddress::new(0x3854)
@@ -306,7 +306,7 @@
             draw.text.as_deref() == Some(scan_text)
                 && matches!(
                     draw.effect,
-                    VisualEffect::ArcadeMessage {
+                    VisualEffect::MessageText {
                         screen_cell,
                         visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
                     } if screen_cell == crate::ScreenAddress::new(0x4330)
@@ -366,7 +366,7 @@
         assert!(scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::TERRAIN_TILE
                 && sprite.layer == RenderLayer::Terrain
-                && sprite.tint == arcade_wave_landscape_tint(1)
+                && sprite.tint == wave_tuning_landscape_tint(1)
         }));
         assert!(scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::PLAYER_SHIP
@@ -434,7 +434,7 @@
         let score_pixels = score_popup_500_pixels(&rescue_score_scene, score_position);
         assert!(
             score_pixels.len() > 20,
-            "rescued-human 500 bonus should render from coloured arcade pixels"
+            "rescued-human 500 bonus should render from coloured accepted pixels"
         );
         for tint in SCORE_POPUP_500_COLOR_CYCLE {
             assert!(
@@ -473,7 +473,7 @@
             draw.text.as_deref() == Some(lander_text)
                 && matches!(
                     draw.effect,
-                    VisualEffect::ArcadeMessage {
+                    VisualEffect::MessageText {
                         screen_cell,
                         visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
                     } if screen_cell == crate::ScreenAddress::new(0x1C70)
@@ -507,7 +507,7 @@
                 draw.text.as_deref() == Some(text)
                     && matches!(
                         draw.effect,
-                        VisualEffect::ArcadeMessage {
+                        VisualEffect::MessageText {
                             screen_cell: actual_cell,
                             visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
                         } if actual_cell == screen_cell
@@ -554,7 +554,7 @@
                     && sprite.position == target_position
                     && sprite.size == target_size
             }),
-            "scoring laser test must use the visible arcade target"
+            "scoring laser test must use the visible reference target"
         );
         let target_front_edge = target_position[0];
         let target_center_y =
@@ -751,17 +751,17 @@
     }
 
     #[test]
-    fn embedded_actor_attract_script_matches_arcade_constructor_fallback() {
+    fn embedded_actor_attract_script_matches_default_constructor_fallback() {
         let parsed = AttractScript::parse_text(ACTOR_ATTRACT_SCRIPT)
             .expect("embedded actor attract script should parse");
 
         assert_eq!(parsed.manifest().cycle_steps, Some(ATTRACT_CYCLE_STEPS));
         assert_eq!(
-            AttractScript::arcade_title().manifest(),
+            AttractScript::default_title().manifest(),
             parsed.manifest()
         );
         assert_eq!(
-            AttractScript::arcade_title_from_events().manifest(),
+            AttractScript::default_title_from_events().manifest(),
             parsed.manifest()
         );
         assert!(parsed.manifest().events.iter().any(|event| matches!(
@@ -771,7 +771,7 @@
             && event.duration_steps == Some(ATTRACT_WILLIAMS_LOGO_DURATION_STEPS)));
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
-            AttractScriptActionManifest::ArcadeMessage {
+            AttractScriptActionManifest::MessageText {
                 ref message,
                 screen_cell: ATTRACT_PRESENTS_ELECTRONICS_CELL,
                 visual_offset: Point { x: 0, y: 0 },
@@ -815,7 +815,7 @@
         )));
         assert!(parsed.manifest().events.iter().any(|event| matches!(
             event.action,
-            AttractScriptActionManifest::ArcadeMessage {
+            AttractScriptActionManifest::MessageText {
                 ref message,
                 screen_cell,
                 visual_offset: ATTRACT_HALL_TABLE_VISUAL_OFFSET,
@@ -831,7 +831,7 @@
                 .iter()
                 .filter(|event| matches!(
                     event.action,
-                    AttractScriptActionManifest::ArcadeMessage {
+                    AttractScriptActionManifest::MessageText {
                         ref message,
                         screen_cell,
                         visual_offset: ATTRACT_HALL_TABLE_VISUAL_OFFSET,
@@ -862,7 +862,7 @@
         {
             assert!(parsed.manifest().events.iter().any(|event| matches!(
                 event.action,
-                AttractScriptActionManifest::ArcadeMessage {
+                AttractScriptActionManifest::MessageText {
                     message: ref event_message,
                     screen_cell: actual_cell,
                     visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
@@ -876,7 +876,7 @@
     }
 
     #[test]
-    fn actor_attract_scoring_instruction_labels_follow_arcade_reveal_cadence() {
+    fn actor_attract_scoring_instruction_labels_follow_reference_reveal_cadence() {
         assert_eq!(
             ATTRACT_INSTRUCTION_TEXT_LINES
                 .iter()
@@ -892,7 +892,7 @@
         {
             assert!(parsed.manifest().events.iter().any(|event| matches!(
                 event.action,
-                AttractScriptActionManifest::ArcadeMessage {
+                AttractScriptActionManifest::MessageText {
                     message: ref event_message,
                     ..
                 } if event_message == &format!("{message:?}")
@@ -904,8 +904,8 @@
     }
 
     #[test]
-    fn default_actor_attract_script_loops_after_arcade_scoring_cycle() {
-        let script = AttractScript::arcade_title();
+    fn default_actor_attract_script_loops_after_reference_scoring_cycle() {
+        let script = AttractScript::default_title();
         let high_scores = HighScoreTable::default().entries;
 
         assert_eq!(script.manifest().cycle_steps, Some(ATTRACT_CYCLE_STEPS));
@@ -947,7 +947,7 @@
     }
 
     #[test]
-    fn actor_scanner_mini_terrain_records_match_arcade_reference_slice() {
+    fn actor_scanner_mini_terrain_records_match_reference_slice() {
         let records = scanner_mini_terrain_records();
 
         assert_eq!(records.len(), SCANNER_TERRAIN_RECORDS);
@@ -1303,13 +1303,13 @@
     }
 
     #[test]
-    fn parsed_attract_script_draws_arcade_message_with_controls() {
+    fn parsed_attract_script_draws_message_text_with_controls() {
         let script = "message 1 forever ELECV 0x3258"
             .parse::<AttractScript>()
-            .expect("arcade message script action should parse");
+            .expect("message text script action should parse");
         assert_eq!(
             script.manifest().events[0].action,
-            AttractScriptActionManifest::ArcadeMessage {
+            AttractScriptActionManifest::MessageText {
                 message: "WilliamsElectronics".to_string(),
                 screen_cell: crate::ScreenAddress::new(0x3258),
                 visual_offset: Point::new(0, 0),
@@ -1323,7 +1323,7 @@
             draw.text.as_deref() == Some(message_text)
                 && matches!(
                     draw.effect,
-                    VisualEffect::ArcadeMessage {
+                    VisualEffect::MessageText {
                         screen_cell,
                         visual_offset: Point { x: 0, y: 0 },
                     } if screen_cell == crate::ScreenAddress::new(0x3258)
@@ -1348,7 +1348,7 @@
             .expect("credits prompt message key should parse");
         assert_eq!(
             prompt_script.manifest().events[0].action,
-            AttractScriptActionManifest::ArcadeMessage {
+            AttractScriptActionManifest::MessageText {
                 message: "CreditsPrompt".to_string(),
                 screen_cell: crate::ScreenAddress::new(0x3C80),
                 visual_offset: Point::new(0, 0),
@@ -1357,13 +1357,13 @@
     }
 
     #[test]
-    fn parsed_attract_script_draws_arcade_message_with_visual_offset() {
+    fn parsed_attract_script_draws_message_text_with_visual_offset() {
         let script = "message 1 forever ELECV 0x3258 -11 -7"
             .parse::<AttractScript>()
-            .expect("arcade message script action should parse with offset");
+            .expect("message text script action should parse with offset");
         assert_eq!(
             script.manifest().events[0].action,
-            AttractScriptActionManifest::ArcadeMessage {
+            AttractScriptActionManifest::MessageText {
                 message: "WilliamsElectronics".to_string(),
                 screen_cell: crate::ScreenAddress::new(0x3258),
                 visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
@@ -1377,7 +1377,7 @@
             draw.text.as_deref() == Some(message_text)
                 && matches!(
                     draw.effect,
-                    VisualEffect::ArcadeMessage {
+                    VisualEffect::MessageText {
                         screen_cell,
                         visual_offset: ATTRACT_SCORING_VISUAL_OFFSET,
                     } if screen_cell == crate::ScreenAddress::new(0x3258)

@@ -206,11 +206,11 @@
     }
 
     #[test]
-    fn arcade_lander_abduction_spawns_mutant_arcade_state() {
+    fn runtime_lander_abduction_spawns_mutant_runtime_state() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = 1;
-        let lander_runtime = LanderArcadeState {
+        let lander_runtime = LanderRuntimeState {
             x_fraction: 0x12,
             y_fraction: 0x34,
             x_velocity: 0,
@@ -222,7 +222,7 @@
         };
         driver.spawn_lander_from_spawn(ActorLanderSpawn {
             position: Point::new(100, HUMAN_GROUND_Y),
-            arcade_state: Some(lander_runtime),
+            runtime_state: Some(lander_runtime),
         });
         driver.spawn_human_for_test(Point::new(100, HUMAN_GROUND_Y));
         driver.step(GameInput::NONE);
@@ -233,42 +233,42 @@
                 let report = driver.step(GameInput::NONE);
                 report.commands.iter().find_map(|command| {
                     if let GameCommand::Spawn(SpawnRequest::Mutant {
-                        arcade_state: Some(mutant_arcade_state),
+                        runtime_state: Some(mutant_runtime_state),
                         ..
                     }) = command
                     {
-                        Some((report.clone(), *mutant_arcade_state))
+                        Some((report.clone(), *mutant_runtime_state))
                     } else {
                         None
                     }
                 })
             })
             .next()
-            .expect("arcade lander should spawn a mutant with arcade state");
-        let expected_arcade = MutantArcadeState {
+            .expect("runtime lander should spawn a mutant with runtime state");
+        let expected_runtime_state = MutantRuntimeState {
             x_fraction: lander_runtime.x_fraction,
             y_fraction: lander_runtime.y_fraction,
             x_velocity: 0,
             y_velocity: 0,
-            shot_timer: ArcadeWaveProfile::for_wave(converted.wave)
+            shot_timer: ActorWaveTuning::for_wave(converted.wave)
                 .mutant_shot_time
                 .min(u32::from(u8::MAX)) as u8,
             sleep_ticks: 0,
             hop_rng: converted
-                .arcade_rng
-                .expect("playing report should expose arcade rng"),
+                .actor_rng
+                .expect("playing report should expose actor rng"),
             render_x_correction: 0,
             dive_entry_shot_deferred: false,
         };
-        assert_eq!(mutant_runtime, expected_arcade);
+        assert_eq!(mutant_runtime, expected_runtime_state);
 
         let settled = driver.step(GameInput::NONE);
         let mutant = settled
             .snapshots
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::Mutant)
-            .expect("mutant with arcade state should become a live actor");
-        assert_eq!(mutant.mutant_runtime, Some(expected_arcade));
+            .expect("mutant with runtime state should become a live actor");
+        assert_eq!(mutant.runtime.as_mutant(), Some(expected_runtime_state));
 
         let clean_state = settled.game_state();
         let clean_mutant = clean_state
@@ -280,34 +280,34 @@
         assert_eq!(
             clean_mutant.mutant_runtime,
             Some(MutantRuntimeSnapshot {
-                x_fraction: expected_arcade.x_fraction,
-                y_fraction: expected_arcade.y_fraction,
-                x_velocity: expected_arcade.x_velocity,
-                y_velocity: expected_arcade.y_velocity,
-                shot_timer: expected_arcade.shot_timer,
-                sleep_ticks: expected_arcade.sleep_ticks,
-                hop_rng: clean_arcade_rng(expected_arcade.hop_rng),
-                render_x_correction: expected_arcade.render_x_correction,
-                dive_entry_shot_deferred: expected_arcade.dive_entry_shot_deferred,
+                x_fraction: expected_runtime_state.x_fraction,
+                y_fraction: expected_runtime_state.y_fraction,
+                x_velocity: expected_runtime_state.x_velocity,
+                y_velocity: expected_runtime_state.y_velocity,
+                shot_timer: expected_runtime_state.shot_timer,
+                sleep_ticks: expected_runtime_state.sleep_ticks,
+                hop_rng: clean_actor_rng(expected_runtime_state.hop_rng),
+                render_x_correction: expected_runtime_state.render_x_correction,
+                dive_entry_shot_deferred: expected_runtime_state.dive_entry_shot_deferred,
             })
         );
     }
 
     #[test]
-    fn arcade_mutant_actor_advances_wave_velocity_and_hop_rng() {
+    fn runtime_mutant_actor_advances_wave_velocity_and_hop_rng() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let arcade_state = MutantArcadeState {
+        let runtime_state = MutantRuntimeState {
             x_fraction: 0x20,
             y_fraction: 0x40,
             x_velocity: 0,
             y_velocity: 0,
             shot_timer: 9,
             sleep_ticks: 0,
-            hop_rng: ActorArcadeRngSnapshot {
+            hop_rng: ActorRngSnapshot {
                 seed: 0x81,
                 hseed: 0x22,
                 lseed: 0x44,
@@ -318,61 +318,61 @@
         let start = Point::new(100, 80);
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: start,
-            arcade_state: Some(arcade_state),
+            runtime_state: Some(runtime_state),
         });
 
         let report = driver.step(GameInput::NONE);
-        let prompt = mutant_arcade_prompt_for_test(
+        let prompt = mutant_runtime_prompt_for_test(
             report.step,
             report.wave,
             report
-                .arcade_rng
-                .expect("playing report should carry arcade rng"),
+                .actor_rng
+                .expect("playing report should carry actor rng"),
             Point::new(42, 120),
             Velocity::default(),
         );
         let behavior = ActorBehaviorProfile::default();
-        let (expected_position, expected_arcade_state, shot) =
-            expected_mutant_arcade_after_motion(start, arcade_state, mutant, &prompt, behavior);
+        let (expected_position, expected_runtime_state, shot) =
+            expected_mutant_runtime_after_motion(start, runtime_state, mutant, &prompt, behavior);
 
         assert_eq!(shot, None);
         let snapshot = snapshot_for(&report, mutant);
         assert_eq!(snapshot.position, expected_position);
-        assert_eq!(snapshot.mutant_runtime, Some(expected_arcade_state));
+        assert_eq!(snapshot.runtime.as_mutant(), Some(expected_runtime_state));
         assert_eq!(
-            expected_arcade_state.x_velocity,
-            mutant_arcade_x_velocity(
-                ArcadeWaveProfile::for_wave(1).mutant_x_velocity,
-                arcade_absolute_x(Point::new(42, 120), 0),
-                arcade_absolute_x(start, arcade_state.x_fraction),
+            expected_runtime_state.x_velocity,
+            mutant_x_velocity(
+                ActorWaveTuning::for_wave(1).mutant_x_velocity,
+                absolute_world_x(Point::new(42, 120), 0),
+                absolute_world_x(start, runtime_state.x_fraction),
             )
         );
-        assert_ne!(expected_arcade_state.hop_rng, arcade_state.hop_rng);
+        assert_ne!(expected_runtime_state.hop_rng, runtime_state.hop_rng);
     }
 
     #[test]
-    fn arcade_mutant_actor_uses_prompt_arcade_wave_profile() {
+    fn runtime_mutant_actor_uses_prompt_wave_tuning_profile() {
         let actor = ActorId::new(1001);
-        let default_profile = ArcadeWaveProfile::for_wave(1);
-        let mut custom_arcade_profile = default_profile;
-        custom_arcade_profile.mutant_x_velocity = 0x48;
-        custom_arcade_profile.mutant_y_velocity_msb = 0x00;
-        custom_arcade_profile.mutant_y_velocity_lsb = 0x40;
-        custom_arcade_profile.mutant_random_y = 2;
-        custom_arcade_profile.mutant_shot_time = 12;
+        let default_profile = ActorWaveTuning::for_wave(1);
+        let mut custom_wave_tuning = default_profile;
+        custom_wave_tuning.mutant_x_velocity = 0x48;
+        custom_wave_tuning.mutant_y_velocity_msb = 0x00;
+        custom_wave_tuning.mutant_y_velocity_lsb = 0x40;
+        custom_wave_tuning.mutant_random_y = 2;
+        custom_wave_tuning.mutant_shot_time = 12;
         assert_ne!(
-            custom_arcade_profile.mutant_x_velocity,
+            custom_wave_tuning.mutant_x_velocity,
             default_profile.mutant_x_velocity
         );
 
-        let arcade_state = MutantArcadeState {
+        let runtime_state = MutantRuntimeState {
             x_fraction: 0x20,
             y_fraction: 0x40,
             x_velocity: 0,
             y_velocity: 0,
             shot_timer: 9,
             sleep_ticks: 0,
-            hop_rng: ActorArcadeRngSnapshot {
+            hop_rng: ActorRngSnapshot {
                 seed: 0x81,
                 hseed: 0x22,
                 lseed: 0x44,
@@ -381,11 +381,11 @@
             dive_entry_shot_deferred: false,
         };
         let start = Point::new(100, 80);
-        let prompt = mutant_arcade_prompt_with_arcade_wave_for_test(
+        let prompt = mutant_runtime_prompt_with_wave_tuning_for_test(
             12,
             1,
-            custom_arcade_profile,
-            ActorArcadeRngSnapshot {
+            custom_wave_tuning,
+            ActorRngSnapshot {
                 seed: 0x52,
                 hseed: 0x34,
                 lseed: 0x12,
@@ -394,41 +394,41 @@
             Velocity::default(),
         );
         let behavior = ActorBehaviorProfile::default();
-        let (expected_position, expected_arcade_state, _shot) =
-            expected_mutant_arcade_after_motion(start, arcade_state, actor, &prompt, behavior);
-        let default_x_velocity = mutant_arcade_x_velocity(
+        let (expected_position, expected_runtime_state, _shot) =
+            expected_mutant_runtime_after_motion(start, runtime_state, actor, &prompt, behavior);
+        let default_x_velocity = mutant_x_velocity(
             default_profile.mutant_x_velocity,
-            arcade_absolute_x(Point::new(42, 120), 0),
-            arcade_absolute_x(start, arcade_state.x_fraction),
+            absolute_world_x(Point::new(42, 120), 0),
+            absolute_world_x(start, runtime_state.x_fraction),
         );
 
         let mut mutant = Mutant::from_spawn(
             actor,
             ActorMutantSpawn {
                 position: start,
-                arcade_state: Some(arcade_state),
+                runtime_state: Some(runtime_state),
             },
         );
         let reply = mutant.update(&prompt);
-        let updated_arcade_state = reply
+        let updated_runtime_state = reply
             .snapshot
-            .mutant_runtime
-            .expect("arcade mutant should keep arcade metadata");
+            .runtime.as_mutant()
+            .expect("runtime mutant should keep runtime metadata");
 
-        assert_ne!(updated_arcade_state.x_velocity, default_x_velocity);
+        assert_ne!(updated_runtime_state.x_velocity, default_x_velocity);
         assert_eq!(reply.snapshot.position, expected_position);
-        assert_eq!(updated_arcade_state, expected_arcade_state);
+        assert_eq!(updated_runtime_state, expected_runtime_state);
     }
 
     #[test]
-    fn mutant_dive_arcade_lander_conversion_sets_render_correction() {
-        let profile = ArcadeWaveProfile::for_wave(1);
-        let hop_rng = ActorArcadeRngSnapshot {
+    fn mutant_dive_reference_lander_conversion_sets_render_correction() {
+        let profile = ActorWaveTuning::for_wave(1);
+        let hop_rng = ActorRngSnapshot {
             seed: 0x33,
             hseed: 0x44,
             lseed: 0x55,
         };
-        let lander_runtime = LanderArcadeState {
+        let lander_runtime = LanderRuntimeState {
             x_fraction: 0x12,
             y_fraction: 0x34,
             x_velocity: 0,
@@ -440,7 +440,7 @@
         };
 
         let mutant_runtime =
-            MutantArcadeState::from_lander_conversion(lander_runtime, profile, hop_rng);
+            MutantRuntimeState::from_lander_conversion(lander_runtime, profile, hop_rng);
 
         assert_eq!(
             mutant_runtime.render_x_correction,
@@ -449,32 +449,32 @@
         assert_eq!(mutant_runtime.x_fraction, lander_runtime.x_fraction);
         assert_eq!(mutant_runtime.y_fraction, lander_runtime.y_fraction);
 
-        let moving_lander = LanderArcadeState {
+        let moving_lander = LanderRuntimeState {
             x_velocity: 0x0030,
             ..lander_runtime
         };
         assert_eq!(
-            MutantArcadeState::from_lander_conversion(moving_lander, profile, hop_rng)
+            MutantRuntimeState::from_lander_conversion(moving_lander, profile, hop_rng)
                 .render_x_correction,
             0
         );
     }
 
     #[test]
-    fn mutant_dive_arcade_defers_first_entry_shot() {
+    fn mutant_dive_reference_defers_first_entry_shot() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let arcade_state = MutantArcadeState {
+        let runtime_state = MutantRuntimeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
             y_velocity: 0,
             shot_timer: 1,
             sleep_ticks: 0,
-            hop_rng: ActorArcadeRngSnapshot {
+            hop_rng: ActorRngSnapshot {
                 seed: 0x81,
                 hseed: 0x22,
                 lseed: 0x44,
@@ -484,7 +484,7 @@
         };
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: Point::new(4, 0x50),
-            arcade_state: Some(arcade_state),
+            runtime_state: Some(runtime_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -492,32 +492,32 @@
         assert!(!report.sounds.contains(&SoundCue::MutantShot));
         assert!(first_enemy_laser_command(&report).is_none());
         let snapshot = snapshot_for(&report, mutant);
-        let updated_arcade_state = snapshot
-            .mutant_runtime
-            .expect("mutant dive should keep arcade metadata");
-        assert!(updated_arcade_state.dive_entry_shot_deferred);
+        let updated_runtime_state = snapshot
+            .runtime.as_mutant()
+            .expect("mutant dive should keep runtime metadata");
+        assert!(updated_runtime_state.dive_entry_shot_deferred);
         assert_eq!(
-            updated_arcade_state.shot_timer,
+            updated_runtime_state.shot_timer,
             MUTANT_DIVE_DEFERRED_SHOT_TIMER
         );
-        assert_eq!(updated_arcade_state.sleep_ticks, 0);
+        assert_eq!(updated_runtime_state.sleep_ticks, 0);
     }
 
     #[test]
-    fn mutant_dive_arcade_visible_entry_shot_uses_projected_position() {
+    fn mutant_dive_reference_visible_entry_shot_uses_projected_position() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let arcade_state = MutantArcadeState {
+        let runtime_state = MutantRuntimeState {
             x_fraction: 0x7C,
             y_fraction: 0x80,
             x_velocity: 0x0030,
             y_velocity: 0x0090,
             shot_timer: MUTANT_DIVE_DEFERRED_SHOT_TIMER,
             sleep_ticks: MUTANT_LOOP_SLEEP_TICKS,
-            hop_rng: ActorArcadeRngSnapshot {
+            hop_rng: ActorRngSnapshot {
                 seed: 0x44,
                 hseed: 0x55,
                 lseed: 0x66,
@@ -527,7 +527,7 @@
         };
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: Point::new(0x03, 0x33),
-            arcade_state: Some(arcade_state),
+            runtime_state: Some(runtime_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -536,35 +536,35 @@
 
         assert!(report.sounds.contains(&SoundCue::MutantShot));
         assert_eq!(shot.0, Point::new(0x13, 0x46));
-        assert_eq!(shot.2.x_fraction, arcade_state.x_fraction);
-        assert_eq!(shot.2.y_fraction, arcade_state.y_fraction);
+        assert_eq!(shot.2.x_fraction, runtime_state.x_fraction);
+        assert_eq!(shot.2.y_fraction, runtime_state.y_fraction);
         let snapshot = snapshot_for(&report, mutant);
-        let updated_arcade_state = snapshot
-            .mutant_runtime
-            .expect("mutant dive should keep arcade metadata");
-        assert!(updated_arcade_state.dive_entry_shot_deferred);
+        let updated_runtime_state = snapshot
+            .runtime.as_mutant()
+            .expect("mutant dive should keep runtime metadata");
+        assert!(updated_runtime_state.dive_entry_shot_deferred);
         assert_eq!(
-            updated_arcade_state.shot_timer,
+            updated_runtime_state.shot_timer,
             MUTANT_DIVE_DEFERRED_SHOT_TIMER
         );
-        assert_eq!(updated_arcade_state.sleep_ticks, MUTANT_LOOP_SLEEP_TICKS - 1);
+        assert_eq!(updated_runtime_state.sleep_ticks, MUTANT_LOOP_SLEEP_TICKS - 1);
     }
 
     #[test]
-    fn mutant_dive_arcade_pending_sleep_shot_uses_exact_projectile() {
+    fn mutant_dive_reference_pending_sleep_shot_uses_exact_projectile() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let arcade_state = MutantArcadeState {
+        let runtime_state = MutantRuntimeState {
             x_fraction: 0x2C,
             y_fraction: 0x60,
             x_velocity: 0x0030,
             y_velocity: 0x0090,
             shot_timer: 0x80,
             sleep_ticks: MUTANT_LOOP_SLEEP_TICKS,
-            hop_rng: ActorArcadeRngSnapshot {
+            hop_rng: ActorRngSnapshot {
                 seed: 0x11,
                 hseed: 0x22,
                 lseed: 0x33,
@@ -574,7 +574,7 @@
         };
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: Point::new(0x08, 0x51),
-            arcade_state: Some(arcade_state),
+            runtime_state: Some(runtime_state),
         });
 
         let report = driver.step(GameInput::NONE);
@@ -583,39 +583,39 @@
 
         assert!(report.sounds.contains(&SoundCue::MutantShot));
         assert_eq!(shot.0, Point::new(0x1E, 0x54));
-        assert_eq!(shot.1, arcade_screen_velocity(0xFFE0, 0x0138));
+        assert_eq!(shot.1, screen_velocity_from_motion_words(0xFFE0, 0x0138));
         assert_eq!(
             shot.2,
-            EnemyProjectileArcadeState {
+            EnemyProjectileRuntimeState {
                 x_fraction: 0x33,
                 y_fraction: 0x56,
                 x_velocity: 0xFFE0,
                 y_velocity: 0x0138,
-                lifetime_ticks: arcade_projectile_lifetime_ticks(MUTANT_SHOT_LIFETIME),
+                lifetime_ticks: projectile_lifetime_ticks(MUTANT_SHOT_LIFETIME),
             }
         );
         let snapshot = snapshot_for(&report, mutant);
-        let updated_arcade_state = snapshot
-            .mutant_runtime
-            .expect("mutant dive should keep arcade metadata");
-        assert!(updated_arcade_state.dive_entry_shot_deferred);
+        let updated_runtime_state = snapshot
+            .runtime.as_mutant()
+            .expect("mutant dive should keep runtime metadata");
+        assert!(updated_runtime_state.dive_entry_shot_deferred);
         assert_eq!(
-            updated_arcade_state.shot_timer,
+            updated_runtime_state.shot_timer,
             MUTANT_DIVE_COLLISION_PENDING_SHOT_TIMER
         );
-        assert_eq!(updated_arcade_state.sleep_ticks, MUTANT_LOOP_SLEEP_TICKS - 1);
+        assert_eq!(updated_runtime_state.sleep_ticks, MUTANT_LOOP_SLEEP_TICKS - 1);
     }
 
     #[test]
-    fn mutant_dive_arcade_shot_position_uses_path_anchor_overrides() {
-        let arcade_state = MutantArcadeState {
+    fn mutant_dive_reference_shot_position_uses_path_anchor_overrides() {
+        let runtime_state = MutantRuntimeState {
             x_fraction: 0x8C,
             y_fraction: 0xB0,
             x_velocity: 0,
             y_velocity: 0x0090,
             shot_timer: 0,
             sleep_ticks: 0,
-            hop_rng: ActorArcadeRngSnapshot {
+            hop_rng: ActorRngSnapshot {
                 seed: 0,
                 hseed: 0,
                 lseed: 0,
@@ -625,16 +625,16 @@
         };
 
         assert_eq!(
-            mutant_dive_shot_position(Point::new(0x08, 0x61), arcade_state),
+            mutant_dive_shot_position(Point::new(0x08, 0x61), runtime_state),
             Point::new(0x1E, 0x70)
         );
         assert_eq!(
             mutant_dive_shot_position(
                 Point::new(0x07, 0x78),
-                MutantArcadeState {
+                MutantRuntimeState {
                     x_fraction: 0xFC,
                     y_fraction: 0x00,
-                    ..arcade_state
+                    ..runtime_state
                 },
             ),
             Point::new(0x21, 0x87)
@@ -642,10 +642,10 @@
         assert_eq!(
             mutant_dive_shot_position(
                 Point::new(0x03, 0x33),
-                MutantArcadeState {
+                MutantRuntimeState {
                     x_fraction: 0x7C,
                     y_fraction: 0x80,
-                    ..arcade_state
+                    ..runtime_state
                 },
             ),
             Point::new(0x13, 0x46)
@@ -653,15 +653,15 @@
     }
 
     #[test]
-    fn mutant_dive_arcade_collision_position_offsets_path_projection() {
-        let arcade_state = MutantArcadeState {
+    fn mutant_dive_reference_collision_position_offsets_path_projection() {
+        let runtime_state = MutantRuntimeState {
             x_fraction: 0x8C,
             y_fraction: 0xB0,
             x_velocity: 0,
             y_velocity: 0x0090,
             shot_timer: 0,
             sleep_ticks: 0,
-            hop_rng: ActorArcadeRngSnapshot {
+            hop_rng: ActorRngSnapshot {
                 seed: 0,
                 hseed: 0,
                 lseed: 0,
@@ -671,30 +671,30 @@
         };
 
         assert_eq!(
-            mutant_dive_scene_position(Point::new(0x08, 0x61), Some(arcade_state)),
+            mutant_dive_scene_position(Point::new(0x08, 0x61), Some(runtime_state)),
             Point::new(0x1E, 0x71)
         );
         assert_eq!(
-            mutant_dive_collision_position(Point::new(0x08, 0x61), Some(arcade_state)),
+            mutant_dive_collision_position(Point::new(0x08, 0x61), Some(runtime_state)),
             Point::new(0x1E, 0x72)
         );
     }
 
     #[test]
-    fn mutant_dive_arcade_waits_for_collision_window() {
+    fn mutant_dive_reference_waits_for_collision_window() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         let player_id = ActorId::new(100);
         let mutant_id = ActorId::new(101);
-        let arcade_position = Point::new(0x08, 0x99);
-        let arcade_state = MutantArcadeState {
+        let runtime_position = Point::new(0x08, 0x99);
+        let runtime_state = MutantRuntimeState {
             x_fraction: 0x5C,
             y_fraction: 0xE0,
             x_velocity: 0x0030,
             y_velocity: 0x0090,
             shot_timer: 0x80,
             sleep_ticks: 0,
-            hop_rng: ActorArcadeRngSnapshot {
+            hop_rng: ActorRngSnapshot {
                 seed: 0,
                 hseed: 0,
                 lseed: 0,
@@ -703,7 +703,7 @@
             dive_entry_shot_deferred: true,
         };
         let collision_position =
-            mutant_dive_collision_position(arcade_position, Some(arcade_state));
+            mutant_dive_collision_position(runtime_position, Some(runtime_state));
         driver.snapshots.insert(
             player_id,
             actor_snapshot_with_bounds(
@@ -715,10 +715,10 @@
         );
         driver.snapshots.insert(
             mutant_id,
-            mutant_arcade_snapshot_with_bounds(
+            mutant_runtime_snapshot_with_bounds(
                 mutant_id,
-                arcade_position,
-                arcade_state,
+                runtime_position,
+                runtime_state,
                 Rect::from_center(collision_position, 14, 12),
             ),
         );
@@ -733,21 +733,21 @@
     }
 
     #[test]
-    fn mutant_dive_arcade_collision_projects_enemy_explosion() {
+    fn mutant_dive_reference_collision_projects_enemy_explosion() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         let player_id = ActorId::new(100);
         let mutant_id = ActorId::new(101);
-        let arcade_position = Point::new(0x08, 0xA5);
+        let runtime_position = Point::new(0x08, 0xA5);
         let player_position = MUTANT_DIVE_COLLISION_EXPLOSION_ANCHOR;
-        let arcade_state = MutantArcadeState {
+        let runtime_state = MutantRuntimeState {
             x_fraction: 0x00,
             y_fraction: 0x00,
             x_velocity: 0x0030,
             y_velocity: 0x0090,
             shot_timer: 0x80,
             sleep_ticks: 0,
-            hop_rng: ActorArcadeRngSnapshot {
+            hop_rng: ActorRngSnapshot {
                 seed: 0,
                 hseed: 0,
                 lseed: 0,
@@ -766,10 +766,10 @@
         );
         driver.snapshots.insert(
             mutant_id,
-            mutant_arcade_snapshot_with_bounds(
+            mutant_runtime_snapshot_with_bounds(
                 mutant_id,
-                arcade_position,
-                arcade_state,
+                runtime_position,
+                runtime_state,
                 Rect::from_center(player_position, 14, 12),
             ),
         );
@@ -802,20 +802,20 @@
     }
 
     #[test]
-    fn arcade_mutant_shot_timer_spawns_arcade_projectile() {
+    fn runtime_mutant_shot_timer_spawns_projectile_runtime() {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.spawn_player();
         driver.step(GameInput::NONE);
         driver.wave = 1;
-        let arcade_state = MutantArcadeState {
+        let runtime_state = MutantRuntimeState {
             x_fraction: 0x12,
             y_fraction: 0x34,
             x_velocity: 0,
             y_velocity: 0,
             shot_timer: 1,
             sleep_ticks: 0,
-            hop_rng: ActorArcadeRngSnapshot {
+            hop_rng: ActorRngSnapshot {
                 seed: 0x71,
                 hseed: 0x44,
                 lseed: 0x88,
@@ -826,22 +826,22 @@
         let start = Point::new(70, 120);
         let mutant = driver.spawn_mutant_from_spawn(ActorMutantSpawn {
             position: start,
-            arcade_state: Some(arcade_state),
+            runtime_state: Some(runtime_state),
         });
 
         let report = driver.step(GameInput::NONE);
-        let prompt = mutant_arcade_prompt_for_test(
+        let prompt = mutant_runtime_prompt_for_test(
             report.step,
             report.wave,
             report
-                .arcade_rng
-                .expect("playing report should carry arcade rng"),
+                .actor_rng
+                .expect("playing report should carry actor rng"),
             Point::new(42, 120),
             Velocity::default(),
         );
         let behavior = ActorBehaviorProfile::default();
-        let (expected_position, expected_arcade_state, expected_shot) =
-            expected_mutant_arcade_after_motion(start, arcade_state, mutant, &prompt, behavior);
+        let (expected_position, expected_runtime_state, expected_shot) =
+            expected_mutant_runtime_after_motion(start, runtime_state, mutant, &prompt, behavior);
         let expected_shot = expected_shot.expect("shot timer should emit a mutant fireball");
 
         assert!(report.sounds.contains(&SoundCue::MutantShot));
@@ -852,20 +852,20 @@
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
                     position,
                     velocity,
-                    arcade_state: projectile_arcade_state,
-                }) => projectile_arcade_state
-                    .map(|arcade_state| (*position, *velocity, arcade_state)),
+                    runtime_state: projectile_runtime_state,
+                }) => projectile_runtime_state
+                    .map(|runtime_state| (*position, *velocity, runtime_state)),
                 _ => None,
             })
-            .expect("arcade mutant should emit a hostile shot command");
+            .expect("runtime mutant should emit a hostile shot command");
         assert_eq!(mutant_shot, expected_shot);
         assert_eq!(
             mutant_shot.2.lifetime_ticks,
-            arcade_projectile_lifetime_ticks(MUTANT_SHOT_LIFETIME)
+            projectile_lifetime_ticks(MUTANT_SHOT_LIFETIME)
         );
         let snapshot = snapshot_for(&report, mutant);
         assert_eq!(snapshot.position, expected_position);
-        assert_eq!(snapshot.mutant_runtime, Some(expected_arcade_state));
+        assert_eq!(snapshot.runtime.as_mutant(), Some(expected_runtime_state));
     }
 
     #[test]
@@ -956,17 +956,17 @@
             fire: true,
             ..GameInput::NONE
         });
-        let mut expected_rng = driver.arcade_rng;
+        let mut expected_rng = driver.actor_rng;
         expected_rng.advance();
         let expected_first_swarmer = ActorSwarmerSpawn::from_pod_release(
             &mut expected_rng,
-            ArcadeWaveProfile::for_wave(2),
+            ActorWaveTuning::for_wave(2),
             Point::new(64, 120),
         );
         for _ in 1..POD_SWARMER_REQUEST_LIMIT {
             ActorSwarmerSpawn::from_pod_release(
                 &mut expected_rng,
-                ArcadeWaveProfile::for_wave(2),
+                ActorWaveTuning::for_wave(2),
                 Point::new(64, 120),
             );
         }
@@ -986,8 +986,8 @@
             .filter_map(|command| match command {
                 GameCommand::Spawn(SpawnRequest::Swarmer {
                     position,
-                    arcade_state: swarmer_arcade_state,
-                }) => Some((*position, *swarmer_arcade_state)),
+                    runtime_state: swarmer_runtime_state,
+                }) => Some((*position, *swarmer_runtime_state)),
                 _ => None,
             })
             .collect::<Vec<_>>();
@@ -996,10 +996,10 @@
             swarmer_spawns[0],
             (
                 expected_first_swarmer.position,
-                expected_first_swarmer.arcade_state
+                expected_first_swarmer.runtime_state
             )
         );
-        assert_eq!(driver.arcade_rng, expected_rng);
+        assert_eq!(driver.actor_rng, expected_rng);
 
         let live = driver.step(GameInput::NONE);
         assert_eq!(
@@ -1173,11 +1173,11 @@
         driver
     }
 
-    fn started_arcade_wave_driver(wave: u16) -> (ActorGameDriver, StepReport) {
+    fn started_wave_tuning_driver(wave: u16) -> (ActorGameDriver, StepReport) {
         let mut driver = ActorGameDriver::new();
         driver.phase = Phase::Playing;
         driver.wave = wave.max(1);
-        driver.arcade_rng = PLAYFIELD_START_RNG;
+        driver.actor_rng = PLAYFIELD_START_RNG;
         driver.apply_wave_profile();
         driver.spawn_player();
         driver.spawn_wave_hostiles();
@@ -1187,23 +1187,23 @@
         (driver, report)
     }
 
-    fn arcade_lander_spawn_row_for_test(
+    fn reference_lander_spawn_row_for_test(
         spawn: ActorLanderSpawn,
     ) -> (u16, u16, u16, u16, u8, u8, u8, Option<usize>) {
-        let arcade_state = spawn
-            .arcade_state
-            .expect("arcade lander spawn should carry state");
-        let world_x_word = u16::from_be_bytes([spawn.position.x as u8, arcade_state.x_fraction]);
-        let world_y_word = u16::from_be_bytes([spawn.position.y as u8, arcade_state.y_fraction]);
+        let runtime_state = spawn
+            .runtime_state
+            .expect("runtime lander spawn should carry state");
+        let world_x_word = u16::from_be_bytes([spawn.position.x as u8, runtime_state.x_fraction]);
+        let world_y_word = u16::from_be_bytes([spawn.position.y as u8, runtime_state.y_fraction]);
         (
             world_x_word,
             world_y_word,
-            arcade_state.x_velocity,
-            arcade_state.y_velocity,
-            arcade_state.shot_timer,
-            arcade_state.sleep_ticks,
-            arcade_state.animation_frame.index(),
-            arcade_state.target_human_index,
+            runtime_state.x_velocity,
+            runtime_state.y_velocity,
+            runtime_state.shot_timer,
+            runtime_state.sleep_ticks,
+            runtime_state.animation_frame.index(),
+            runtime_state.target_human_index,
         )
     }
 
@@ -1254,7 +1254,7 @@
                         .commands
                         .contains(&GameCommand::AdvanceWave { wave: 1 })
                 );
-                assert_no_arcade_message(&report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
+                assert_no_message_text(&report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
                 continue;
             }
 
@@ -1269,7 +1269,7 @@
             return report;
         }
 
-        panic!("player {player} start should complete after arcade delay");
+        panic!("player {player} start should complete after reference delay");
     }
 
     fn step_until_driver_smart_bomb_detonates(driver: &mut ActorGameDriver) -> StepReport {
@@ -1280,7 +1280,7 @@
             }
         }
 
-        panic!("arcade smart bomb should detonate after the arcade delay");
+        panic!("smart bomb should detonate after the reference delay");
     }
 
     fn step_until_final_game_over_sleep_returns_to_attract(
@@ -1297,8 +1297,8 @@
                 waiting.state.game_over.player_death_sleep_remaining,
                 Some(expected_sleep)
             );
-            assert_arcade_message(&waiting.report, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_CELL);
-            assert_arcade_message_scene(&waiting.scene, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_CELL);
+            assert_message_text(&waiting.report, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_CELL);
+            assert_message_text_scene(&waiting.scene, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_CELL);
             assert!(
                 !waiting
                     .report
@@ -1309,7 +1309,7 @@
         }
 
         let returned = runtime.step(GameInput::NONE);
-        assert_no_arcade_message(&returned.report, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_CELL);
+        assert_no_message_text(&returned.report, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_CELL);
         returned
     }
 
@@ -1335,27 +1335,27 @@
             );
             assert!(!waiting.events.gameplay().contains(&GameEvent::GameOver));
             assert!(!waiting.report.sounds.contains(&SoundCue::GameOver));
-            assert_arcade_message(
+            assert_message_text(
                 &waiting.report,
                 player_message(from_player),
                 PLAYER_SWITCH_LABEL_SCREEN_CELL,
             );
-            assert_arcade_message(
+            assert_message_text(
                 &waiting.report,
                 MessageId::GameOver,
                 PLAYER_SWITCH_GAME_OVER_SCREEN_CELL,
             );
-            assert_arcade_message_scene(
+            assert_message_text_scene(
                 &waiting.scene,
                 player_message(from_player),
                 PLAYER_SWITCH_LABEL_SCREEN_CELL,
             );
-            assert_arcade_message_scene(
+            assert_message_text_scene(
                 &waiting.scene,
                 MessageId::GameOver,
                 PLAYER_SWITCH_GAME_OVER_SCREEN_CELL,
             );
-            assert_no_arcade_message(
+            assert_no_message_text(
                 &waiting.report,
                 player_message(to_player),
                 PLAYER_START_PROMPT_SCREEN_CELL,
@@ -1370,22 +1370,22 @@
         }
 
         let switched = runtime.step(GameInput::NONE);
-        assert_no_arcade_message(
+        assert_no_message_text(
             &switched.report,
             player_message(from_player),
             PLAYER_SWITCH_LABEL_SCREEN_CELL,
         );
-        assert_no_arcade_message(
+        assert_no_message_text(
             &switched.report,
             MessageId::GameOver,
             PLAYER_SWITCH_GAME_OVER_SCREEN_CELL,
         );
-        assert_arcade_message(
+        assert_message_text(
             &switched.report,
             player_message(to_player),
             PLAYER_START_PROMPT_SCREEN_CELL,
         );
-        assert_arcade_message_scene(
+        assert_message_text_scene(
             &switched.scene,
             player_message(to_player),
             PLAYER_START_PROMPT_SCREEN_CELL,
@@ -1407,18 +1407,18 @@
                 assert!(!frame.events.gameplay().contains(&GameEvent::WaveStarted));
                 assert!(frame.state.world.enemies.is_empty());
                 if frame.report.player_count > 1 {
-                    assert_arcade_message(
+                    assert_message_text(
                         &frame.report,
                         player_message(player),
                         PLAYER_START_PROMPT_SCREEN_CELL,
                     );
-                    assert_no_arcade_message(
+                    assert_no_message_text(
                         &frame.report,
                         MessageId::GameOver,
                         PLAYER_SWITCH_GAME_OVER_SCREEN_CELL,
                     );
                 } else {
-                    assert_no_arcade_message(
+                    assert_no_message_text(
                         &frame.report,
                         player_message(player),
                         PLAYER_START_PROMPT_SCREEN_CELL,
@@ -1429,12 +1429,12 @@
 
             assert_eq!(frame.report.phase, Phase::Playing);
             assert_eq!(frame.report.current_player, player);
-            assert_no_arcade_message(
+            assert_no_message_text(
                 &frame.report,
                 player_message(player),
                 PLAYER_START_PROMPT_SCREEN_CELL,
             );
-            assert_no_arcade_message(&frame.report, MessageId::GameOver, PLAYER_SWITCH_GAME_OVER_SCREEN_CELL);
+            assert_no_message_text(&frame.report, MessageId::GameOver, PLAYER_SWITCH_GAME_OVER_SCREEN_CELL);
             assert!(frame.events.gameplay().contains(&GameEvent::WaveStarted));
             assert_eq!(
                 frame.events.sounds(),
@@ -1444,7 +1444,7 @@
             return frame;
         }
 
-        panic!("player {player} start should complete after arcade delay");
+        panic!("player {player} start should complete after reference delay");
     }
 
     fn step_until_smart_bomb_detonates(runtime: &mut ActorRuntimeAdapter) -> ActorFrame {
@@ -1455,7 +1455,7 @@
             }
         }
 
-        panic!("arcade smart bomb should detonate after the arcade delay");
+        panic!("smart bomb should detonate after the reference delay");
     }
 
     fn smart_bomb_sound_board_cues() -> Vec<SoundCue> {
@@ -1532,7 +1532,7 @@
             }
         }
 
-        panic!("first-wave early reserve should materialize on arcade cadence");
+        panic!("first-wave early reserve should materialize on reference cadence");
     }
 
     fn snapshot_for(report: &StepReport, id: ActorId) -> &ActorSnapshot {
@@ -1543,7 +1543,7 @@
             .expect("actor snapshot should be present")
     }
 
-    fn arcade_human_spawn_for_test(
+    fn runtime_human_spawn_for_test(
         position: Point,
         target_slot_index: usize,
         animation_frame: u8,
@@ -1551,7 +1551,7 @@
         ActorHumanSpawn {
             position,
             mode: HumanMode::Grounded,
-            arcade_state: Some(HumanArcadeState {
+            runtime_state: Some(HumanRuntimeState {
                 x_fraction: 0,
                 y_fraction: 0,
                 animation_frame: crate::SpriteFrameIndex::new(animation_frame),
@@ -1560,52 +1560,52 @@
         }
     }
 
-    fn expected_bomber_after_arcade_motion(
+    fn expected_bomber_after_runtime_motion(
         position: Point,
-        mut arcade_state: BomberArcadeState,
+        mut runtime_state: BomberRuntimeState,
         _step: u64,
         _id: ActorId,
-        arcade_rng: Option<ActorArcadeRngSnapshot>,
+        actor_rng: Option<ActorRngSnapshot>,
         player_position: Option<Point>,
-    ) -> (Point, BomberArcadeState) {
-        if let Some(arcade_rng) = arcade_rng
-            && arcade_state.slot == arcade_tie_selected_slot(arcade_rng.seed)
+    ) -> (Point, BomberRuntimeState) {
+        if let Some(actor_rng) = actor_rng
+            && runtime_state.slot == bomber_tie_selected_slot(actor_rng.seed)
         {
-            if arcade_state.sleep_ticks > 0 {
-                arcade_state.sleep_ticks = arcade_state.sleep_ticks.saturating_sub(1);
+            if runtime_state.sleep_ticks > 0 {
+                runtime_state.sleep_ticks = runtime_state.sleep_ticks.saturating_sub(1);
             } else {
-                arcade_state.animation_frame = crate::SpriteFrameIndex::new(
-                    bomber_sprite_frame_after_arcade_seed(
-                        arcade_rng.seed,
-                        arcade_state.animation_frame.index(),
+                runtime_state.animation_frame = crate::SpriteFrameIndex::new(
+                    bomber_sprite_frame_after_tie_seed(
+                        actor_rng.seed,
+                        runtime_state.animation_frame.index(),
                     ),
                 );
-                arcade_state.y_velocity =
-                    bomber_seeded_y_velocity(arcade_state.y_velocity, arcade_rng.seed);
+                runtime_state.y_velocity =
+                    bomber_seeded_y_velocity(runtime_state.y_velocity, actor_rng.seed);
                 if position.y == 0 {
-                    arcade_state.y_velocity = bomber_cruise_y_velocity(
-                        arcade_state.y_velocity,
-                        &mut arcade_state.cruise_altitude,
+                    runtime_state.y_velocity = bomber_cruise_y_velocity(
+                        runtime_state.y_velocity,
+                        &mut runtime_state.cruise_altitude,
                         position.y,
-                        arcade_rng.seed,
+                        actor_rng.seed,
                     );
                 } else if let Some(player) = player_position
                     && let Some(delta) =
                         bomber_player_tracking_y_velocity_delta(position.y, player.y)
                 {
-                    arcade_state.y_velocity = arcade_state.y_velocity.wrapping_add(delta);
+                    runtime_state.y_velocity = runtime_state.y_velocity.wrapping_add(delta);
                 }
-                arcade_state.sleep_ticks = BOMBER_LOOP_SLEEP_TICKS;
+                runtime_state.sleep_ticks = BOMBER_LOOP_SLEEP_TICKS;
             }
         }
 
         let (x, x_fraction) =
-            arcade_axis_step(position.x, arcade_state.x_fraction, arcade_state.x_velocity);
+            step_motion_axis(position.x, runtime_state.x_fraction, runtime_state.x_velocity);
         let (y, y_fraction) =
-            arcade_active_object_y_step(position.y, arcade_state.y_fraction, arcade_state.y_velocity);
-        arcade_state.x_fraction = x_fraction;
-        arcade_state.y_fraction = y_fraction;
-        (Point::new(x, y), arcade_state)
+            step_wrapping_motion_y(position.y, runtime_state.y_fraction, runtime_state.y_velocity);
+        runtime_state.x_fraction = x_fraction;
+        runtime_state.y_fraction = y_fraction;
+        (Point::new(x, y), runtime_state)
     }
 
     fn actor_snapshot(id: u64, kind: ActorKind, position: Point) -> ActorSnapshot {
@@ -1631,25 +1631,18 @@
             direction: None,
             bounds: Some(bounds),
             alive: true,
-            lander_runtime: None,
-            bomber_runtime: None,
-            pod_runtime: None,
-            swarmer_runtime: None,
-            baiter_runtime: None,
-            mutant_runtime: None,
-            human_runtime: None,
-            enemy_projectile_runtime: None,
+            runtime: ActorRuntimeState::NONE,
         }
     }
 
-    fn mutant_arcade_snapshot_with_bounds(
+    fn mutant_runtime_snapshot_with_bounds(
         id: ActorId,
         position: Point,
-        arcade_state: MutantArcadeState,
+        runtime_state: MutantRuntimeState,
         bounds: Rect,
     ) -> ActorSnapshot {
         let mut snapshot = actor_snapshot_with_bounds(id, ActorKind::Mutant, position, bounds);
-        snapshot.mutant_runtime = Some(arcade_state);
+        snapshot.runtime = ActorRuntimeState::mutant(Some(runtime_state));
         snapshot
     }
 
@@ -1664,12 +1657,12 @@
         snapshot
     }
 
-    fn arcade_world_projection_report_for_test(background_left: u16) -> StepReport {
+    fn world_projection_report_for_test(background_left: u16) -> StepReport {
         let mut player = actor_snapshot(1, ActorKind::Player, Point::new(128, 100));
         player.direction = Some(Direction::Right);
 
         let mut lander = actor_snapshot(2, ActorKind::Lander, Point::new(0x30, 80));
-        lander.lander_runtime = Some(LanderArcadeState {
+        lander.runtime = ActorRuntimeState::lander(Some(LanderRuntimeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
@@ -1678,33 +1671,33 @@
             sleep_ticks: 0,
             animation_frame: crate::SpriteFrameIndex::new(0),
             target_human_index: None,
-        });
+        }));
 
         let mut enemy_laser = actor_snapshot(3, ActorKind::EnemyLaser, Point::new(0x31, 96));
-        enemy_laser.enemy_projectile_runtime = Some(EnemyProjectileArcadeState {
+        enemy_laser.runtime = ActorRuntimeState::enemy_projectile(Some(EnemyProjectileRuntimeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
             y_velocity: 0,
             lifetime_ticks: 12,
-        });
+        }));
 
         let mut bomb = actor_snapshot(4, ActorKind::Bomb, Point::new(0x31, 104));
-        bomb.enemy_projectile_runtime = Some(EnemyProjectileArcadeState {
+        bomb.runtime = ActorRuntimeState::enemy_projectile(Some(EnemyProjectileRuntimeState {
             x_fraction: 0,
             y_fraction: 0,
             x_velocity: 0,
             y_velocity: 0,
             lifetime_ticks: 12,
-        });
+        }));
 
         let mut human = actor_snapshot(5, ActorKind::Human, Point::new(0x2E, 220));
-        human.human_runtime = Some(HumanArcadeState {
+        human.runtime = ActorRuntimeState::human(Some(HumanRuntimeState {
             x_fraction: 0x80,
             y_fraction: 0,
             animation_frame: crate::SpriteFrameIndex::new(2),
             target_slot_index: 4,
-        });
+        }));
 
         StepReport {
             step: 123,
@@ -1725,7 +1718,7 @@
             player_switch: None,
             player_start: None,
             high_scores: [10_000, 7_500, 5_000, 2_500, 1_000],
-            arcade_wave: ArcadeWaveProfile::for_wave(1),
+            wave_tuning: ActorWaveTuning::for_wave(1),
             high_score_initials: HighScoreInitialsState::EMPTY,
             high_score_initial_accepted: false,
             high_score_submitted: false,
@@ -1734,7 +1727,7 @@
             behavior_script: ActorBehaviorScript::default().manifest(),
             enemy_reserve: EnemyReserveSnapshot::default(),
             background_left,
-            arcade_rng: None,
+            actor_rng: None,
             terrain_blow: None,
             snapshots: vec![player, lander, enemy_laser, bomb, human],
             draws: vec![
@@ -1785,18 +1778,18 @@
             .collect()
     }
 
-    fn mutant_arcade_prompt_for_test(
+    fn mutant_runtime_prompt_for_test(
         step: u64,
         wave: u16,
-        arcade_rng: ActorArcadeRngSnapshot,
+        actor_rng: ActorRngSnapshot,
         player_position: Point,
         player_velocity: Velocity,
     ) -> StepPrompt {
-        mutant_arcade_prompt_with_arcade_wave_for_test(
+        mutant_runtime_prompt_with_wave_tuning_for_test(
             step,
             wave,
-            ArcadeWaveProfile::for_wave(wave),
-            arcade_rng,
+            ActorWaveTuning::for_wave(wave),
+            actor_rng,
             player_position,
             player_velocity,
         )
@@ -1808,7 +1801,7 @@
             phase: Phase::Playing,
             input,
             wave: 1,
-            arcade_wave: ArcadeWaveProfile::for_wave(1),
+            wave_tuning: ActorWaveTuning::for_wave(1),
             current_player: 1,
             player_count: 1,
             score: 0,
@@ -1827,17 +1820,17 @@
             snapshots: Vec::new(),
             behavior_script: ActorBehaviorScript::default(),
             background_left,
-            arcade_rng: None,
+            actor_rng: None,
             human_walk_target_slot: None,
             projectile_scan_tick: false,
         }
     }
 
-    fn mutant_arcade_prompt_with_arcade_wave_for_test(
+    fn mutant_runtime_prompt_with_wave_tuning_for_test(
         step: u64,
         wave: u16,
-        arcade_wave: ArcadeWaveProfile,
-        arcade_rng: ActorArcadeRngSnapshot,
+        wave_tuning: ActorWaveTuning,
+        actor_rng: ActorRngSnapshot,
         player_position: Point,
         player_velocity: Velocity,
     ) -> StepPrompt {
@@ -1846,7 +1839,7 @@
             phase: Phase::Playing,
             input: GameInput::NONE,
             wave,
-            arcade_wave,
+            wave_tuning,
             current_player: 1,
             player_count: 1,
             score: 0,
@@ -1870,40 +1863,40 @@
             )],
             behavior_script: ActorBehaviorScript::default(),
             background_left: 0,
-            arcade_rng: Some(arcade_rng),
+            actor_rng: Some(actor_rng),
             human_walk_target_slot: None,
             projectile_scan_tick: false,
         }
     }
 
-    fn expected_mutant_arcade_after_motion(
+    fn expected_mutant_runtime_after_motion(
         mut position: Point,
-        mut arcade_state: MutantArcadeState,
+        mut runtime_state: MutantRuntimeState,
         actor: ActorId,
         prompt: &StepPrompt,
         behavior: ActorBehaviorProfile,
     ) -> (
         Point,
-        MutantArcadeState,
-        Option<(Point, Velocity, EnemyProjectileArcadeState)>,
+        MutantRuntimeState,
+        Option<(Point, Velocity, EnemyProjectileRuntimeState)>,
     ) {
-        if arcade_state.sleep_ticks > 0 {
-            arcade_state.sleep_ticks = arcade_state.sleep_ticks.saturating_sub(1);
-            return (position, arcade_state, None);
+        if runtime_state.sleep_ticks > 0 {
+            runtime_state.sleep_ticks = runtime_state.sleep_ticks.saturating_sub(1);
+            return (position, runtime_state, None);
         }
 
         let player_position = prompt
             .player_position()
-            .expect("arcade mutant expected helper needs a player");
-        let profile = prompt.arcade_wave;
-        let player_absolute_x = arcade_absolute_x(player_position, 0);
-        let object_absolute_x = arcade_absolute_x(position, arcade_state.x_fraction);
-        arcade_state.x_velocity = mutant_arcade_x_velocity(
+            .expect("runtime mutant expected helper needs a player");
+        let profile = prompt.wave_tuning;
+        let player_absolute_x = absolute_world_x(player_position, 0);
+        let object_absolute_x = absolute_world_x(position, runtime_state.x_fraction);
+        runtime_state.x_velocity = mutant_x_velocity(
             profile.mutant_x_velocity,
             player_absolute_x,
             object_absolute_x,
         );
-        arcade_state.y_velocity = mutant_arcade_y_velocity(
+        runtime_state.y_velocity = mutant_y_velocity(
             profile,
             player_position.y,
             player_absolute_x,
@@ -1912,33 +1905,33 @@
         );
 
         let mut shot = None;
-        if mutant_arcade_should_hop_and_shoot(player_absolute_x, object_absolute_x, position) {
-            let mut hop_rng = arcade_rng_from_snapshot(arcade_state.hop_rng);
+        if mutant_should_hop_and_shoot(player_absolute_x, object_absolute_x, position) {
+            let mut hop_rng = actor_rng_from_snapshot(runtime_state.hop_rng);
             let hop_state = hop_rng.advance();
-            arcade_state.hop_rng = hop_state.snapshot();
-            position.y = mutant_arcade_hop_y(position.y, profile.mutant_random_y, hop_state.seed);
-            arcade_state.shot_timer = arcade_state.shot_timer.wrapping_sub(1);
-            if arcade_state.shot_timer == 0 {
-                let shot_rng = mutant_arcade_shot_rng(prompt, actor, position);
-                arcade_state.shot_timer = mutant_arcade_shot_reset(profile, shot_rng.seed);
-                shot = mutant_arcade_fireball(position, prompt, behavior, arcade_state, shot_rng)
-                    .map(|(velocity, projectile_arcade_state)| {
-                        (position, velocity, projectile_arcade_state)
+            runtime_state.hop_rng = hop_state.snapshot();
+            position.y = mutant_hop_y(position.y, profile.mutant_random_y, hop_state.seed);
+            runtime_state.shot_timer = runtime_state.shot_timer.wrapping_sub(1);
+            if runtime_state.shot_timer == 0 {
+                let shot_rng = mutant_shot_rng(prompt, actor, position);
+                runtime_state.shot_timer = mutant_shot_reset(profile, shot_rng.seed);
+                shot = mutant_fireball(position, prompt, behavior, runtime_state, shot_rng)
+                    .map(|(velocity, projectile_runtime_state)| {
+                        (position, velocity, projectile_runtime_state)
                     });
             }
         }
 
-        let (x, x_fraction) = arcade_axis_step(
+        let (x, x_fraction) = step_motion_axis(
             position.x,
-            arcade_state.x_fraction,
-            arcade_state.x_velocity,
+            runtime_state.x_fraction,
+            runtime_state.x_velocity,
         );
         let (y, y_fraction) =
-            arcade_active_object_y_step(position.y, arcade_state.y_fraction, arcade_state.y_velocity);
-        arcade_state.x_fraction = x_fraction;
-        arcade_state.y_fraction = y_fraction;
-        arcade_state.sleep_ticks = MUTANT_LOOP_SLEEP_TICKS;
-        (Point::new(x, y), arcade_state, shot)
+            step_wrapping_motion_y(position.y, runtime_state.y_fraction, runtime_state.y_velocity);
+        runtime_state.x_fraction = x_fraction;
+        runtime_state.y_fraction = y_fraction;
+        runtime_state.sleep_ticks = MUTANT_LOOP_SLEEP_TICKS;
+        (Point::new(x, y), runtime_state, shot)
     }
 
     fn enemy_projectile_snapshot_count(report: &StepReport) -> usize {
@@ -1959,13 +1952,13 @@
 
     fn first_enemy_laser_command(
         report: &StepReport,
-    ) -> Option<(Point, Velocity, EnemyProjectileArcadeState)> {
+    ) -> Option<(Point, Velocity, EnemyProjectileRuntimeState)> {
         report.commands.iter().find_map(|command| match command {
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position,
                 velocity,
-                arcade_state: Some(projectile_arcade_state),
-            }) => Some((*position, *velocity, *projectile_arcade_state)),
+                runtime_state: Some(projectile_runtime_state),
+            }) => Some((*position, *velocity, *projectile_runtime_state)),
             _ => None,
         })
     }
@@ -1998,21 +1991,21 @@
         );
     }
 
-    fn assert_arcade_message(
+    fn assert_message_text(
         report: &StepReport,
         message: MessageId,
         screen_cell: ScreenAddress,
     ) {
         let scene = report.render_scene();
-        assert_arcade_message_scene(&scene, message, screen_cell);
+        assert_message_text_scene(&scene, message, screen_cell);
     }
 
-    fn assert_arcade_message_scene(
+    fn assert_message_text_scene(
         scene: &RenderScene,
         message: MessageId,
         screen_cell: ScreenAddress,
     ) {
-        for (sprite_id, position, size) in expected_plain_arcade_message_sprites(message, screen_cell)
+        for (sprite_id, position, size) in expected_plain_message_text_sprites(message, screen_cell)
         {
             assert!(
                 scene.sprites.iter().any(|sprite| {
@@ -2022,22 +2015,22 @@
                         && sprite.size == size
                         && sprite.tint == Color::WHITE
                 }),
-                "expected full arcade message {message:?} glyph {sprite_id:?} at {:#06x}",
+                "expected full message text {message:?} glyph {sprite_id:?} at {:#06x}",
                 screen_cell.word()
             );
         }
     }
 
-    fn expected_plain_arcade_message_sprites(
+    fn expected_plain_message_text_sprites(
         message: MessageId,
         screen_cell: ScreenAddress,
     ) -> Vec<(SpriteId, [f32; 2], [f32; 2])> {
-        let text = crate::arcade_assets::message_text(message);
+        let text = crate::reference_assets::message_text(message);
         let mut cursor = screen_cell;
         let mut expected = Vec::new();
         for character in text.chars() {
             let size = SpriteId::message_glyph_size(character)
-                .expect("test arcade prompt should use clean message glyphs");
+                .expect("test message-text prompt should use clean message glyphs");
             if character != ' ' {
                 let sprite =
                     SpriteId::message_glyph(character).expect("visible prompt glyph should exist");
@@ -2047,32 +2040,32 @@
                     [size[0] as f32, size[1] as f32],
                 ));
             }
-            cursor = arcade_test_text_cursor_after_glyph(cursor, size[0]);
+            cursor = message_text_cursor_after_glyph(cursor, size[0]);
         }
         assert!(
             !expected.is_empty(),
-            "arcade message {message:?} should contain visible glyphs"
+            "message text {message:?} should contain visible glyphs"
         );
         expected
     }
 
-    fn arcade_test_text_cursor_after_glyph(cursor: ScreenAddress, width_pixels: u32) -> ScreenAddress {
+    fn message_text_cursor_after_glyph(cursor: ScreenAddress, width_pixels: u32) -> ScreenAddress {
         let [column, row] = cursor.word().to_be_bytes();
         let width_columns =
-            u8::try_from(width_pixels / 2).expect("arcade glyph width should fit in u8");
+            u8::try_from(width_pixels / 2).expect("message glyph width should fit in u8");
         ScreenAddress::from_bytes(column.wrapping_add(width_columns).wrapping_add(1), row)
     }
 
-    fn assert_no_arcade_message(
+    fn assert_no_message_text(
         report: &StepReport,
         message: MessageId,
         screen_cell: ScreenAddress,
     ) {
-        let text = crate::arcade_assets::message_text(message);
+        let text = crate::reference_assets::message_text(message);
         let first_glyph = text
             .chars()
             .find_map(SpriteId::message_glyph)
-            .expect("arcade message should contain a visible glyph");
+            .expect("message text should contain a visible glyph");
         let position = screen_position_from_cell(screen_cell);
         let scene = report.render_scene();
         assert!(
@@ -2081,7 +2074,7 @@
                     || sprite.layer != RenderLayer::Overlay
                     || sprite.position != position
             }),
-            "unexpected arcade message {message:?} at {:#06x}",
+            "unexpected message text {message:?} at {:#06x}",
             screen_cell.word()
         );
     }

@@ -32,7 +32,7 @@ pub struct ActorGameDriver {
     background_left: u16,
     baiter_timer_steps: Option<u32>,
     baiter_pacing_steps_remaining: u8,
-    arcade_rng: ActorArcadeRng,
+    actor_rng: ActorRng,
     projectile_scan_steps_remaining: u8,
     pending_smart_bomb_detonation_steps: Option<u8>,
     smart_bomb_flash_steps_remaining: u8,
@@ -57,7 +57,7 @@ impl ActorGameDriver {
     }
 
     pub fn with_wave_script(wave_script: ActorWaveScript) -> Self {
-        Self::with_attract_and_wave_scripts(AttractScript::arcade_title(), wave_script)
+        Self::with_attract_and_wave_scripts(AttractScript::default_title(), wave_script)
     }
 
     pub fn with_attract_and_wave_scripts(
@@ -118,7 +118,7 @@ impl ActorGameDriver {
             background_left: 0,
             baiter_timer_steps: None,
             baiter_pacing_steps_remaining: ACTOR_BAITER_TIMER_PACING_STEPS,
-            arcade_rng: PLAYFIELD_START_RNG,
+            actor_rng: PLAYFIELD_START_RNG,
             projectile_scan_steps_remaining: ENEMY_PROJECTILE_SCAN_INITIAL_DELAY_STEPS,
             pending_smart_bomb_detonation_steps: None,
             smart_bomb_flash_steps_remaining: 0,
@@ -205,20 +205,20 @@ impl ActorGameDriver {
         let mut behavior_script = self
             .behavior_script
             .with_input_overrides(effective_input, self.snapshots.values().cloned());
-        let arcade_rng = if self.phase == Phase::Playing
+        let actor_rng = if self.phase == Phase::Playing
             && !survivor_bonus_interstitial
             && !player_switch_interstitial
             && !player_start_interstitial
         {
-            Some(self.arcade_rng.advance().snapshot())
+            Some(self.actor_rng.advance().snapshot())
         } else {
             None
         };
-        if let Some(arcade_rng) = arcade_rng {
+        if let Some(actor_rng) = actor_rng {
             behavior_script =
-                behavior_script.with_hyperspace_arcade_seed(arcade_rng.hyperspace_arcade_seed());
+                behavior_script.with_hyperspace_seed(actor_rng.hyperspace_seed());
         }
-        let human_walk_target_slot = self.advance_human_walk_process(arcade_rng);
+        let human_walk_target_slot = self.advance_human_walk_process(actor_rng);
         let projectile_scan_tick = if self.phase == Phase::Playing
             && !survivor_bonus_interstitial
             && !player_switch_interstitial
@@ -236,7 +236,7 @@ impl ActorGameDriver {
             phase: self.phase,
             input: effective_input,
             wave: self.wave,
-            arcade_wave: self.current_arcade_wave_profile(),
+            wave_tuning: self.current_wave_tuning_profile(),
             current_player: self.current_player,
             player_count: self.player_count,
             score: self.active_score(),
@@ -255,7 +255,7 @@ impl ActorGameDriver {
             snapshots: self.snapshots.values().cloned().collect(),
             behavior_script: behavior_script.clone(),
             background_left: self.background_left,
-            arcade_rng,
+            actor_rng,
             human_walk_target_slot,
             projectile_scan_tick,
         };
@@ -333,7 +333,7 @@ impl ActorGameDriver {
             player_switch,
             player_start,
             high_scores: self.high_scores.entries(),
-            arcade_wave: self.current_arcade_wave_profile(),
+            wave_tuning: self.current_wave_tuning_profile(),
             high_score_initials: self.high_score_initials,
             high_score_initial_accepted: high_score_entry_step.accepted,
             high_score_submitted: high_score_entry_step.submitted,
@@ -342,7 +342,7 @@ impl ActorGameDriver {
             behavior_script: behavior_script.manifest(),
             enemy_reserve: self.enemy_reserve,
             background_left: self.background_left,
-            arcade_rng,
+            actor_rng,
             terrain_blow: self.terrain_blow,
             snapshots: self.snapshots.values().cloned().collect(),
             draws,
@@ -508,14 +508,14 @@ impl ActorGameDriver {
     fn spawn_bomb(
         &mut self,
         position: Point,
-        arcade_state: Option<EnemyProjectileArcadeState>,
+        runtime_state: Option<EnemyProjectileRuntimeState>,
     ) -> ActorId {
         let id = self.allocate_actor_id();
         let lifetime = self
             .behavior_script
             .behavior_for(id, ActorKind::Bomb)
             .bomb_lifetime_steps;
-        self.spawn_actor(Bomb::new(id, position, lifetime, arcade_state));
+        self.spawn_actor(Bomb::new(id, position, lifetime, runtime_state));
         id
     }
 
@@ -577,10 +577,10 @@ impl ActorGameDriver {
         &mut self,
         position: Point,
         velocity: Velocity,
-        arcade_state: Option<EnemyProjectileArcadeState>,
+        runtime_state: Option<EnemyProjectileRuntimeState>,
     ) -> ActorId {
         let id = self.allocate_actor_id();
-        self.spawn_actor(EnemyLaserShot::new(id, position, velocity, arcade_state));
+        self.spawn_actor(EnemyLaserShot::new(id, position, velocity, runtime_state));
         id
     }
 
@@ -668,7 +668,7 @@ impl ActorGameDriver {
             }
             if mutant_dive_collision_window_pending(
                 enemy.position,
-                enemy.mutant_runtime,
+                enemy.runtime.as_mutant(),
             ) {
                 continue;
             }
@@ -736,12 +736,12 @@ impl ActorGameDriver {
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
                     position,
                     velocity,
-                    arcade_state,
+                    runtime_state,
                 }) => {
                     if enemy_projectile_spawn_in_bounds(position)
                         && reserve_enemy_projectile_slot(&mut active_enemy_projectiles)
                     {
-                        self.spawn_enemy_laser_from_spawn(position, velocity, arcade_state);
+                        self.spawn_enemy_laser_from_spawn(position, velocity, runtime_state);
                     }
                 }
                 GameCommand::Spawn(SpawnRequest::Lander { position }) => {
@@ -750,11 +750,11 @@ impl ActorGameDriver {
                 }
                 GameCommand::Spawn(SpawnRequest::Mutant {
                     position,
-                    arcade_state,
+                    runtime_state,
                 }) => {
                     let actor = self.spawn_mutant_from_spawn(ActorMutantSpawn {
                         position,
-                        arcade_state,
+                        runtime_state,
                     });
                     self.apply_next_wave_spawn_behavior(ActorKind::Mutant, actor);
                 }
@@ -764,15 +764,15 @@ impl ActorGameDriver {
                 }
                 GameCommand::Spawn(SpawnRequest::Bomb {
                     position,
-                    arcade_state,
+                    runtime_state,
                 }) => {
-                    if bomb_projectile_spawn_in_arcade_bounds(position, arcade_state)
+                    if bomb_projectile_spawn_in_world_bounds(position, runtime_state)
                         && enemy_projectile_slot_available(active_enemy_projectiles)
                         && bomb_projectile_slot_available(active_bomb_projectiles)
                     {
                         active_enemy_projectiles += 1;
                         active_bomb_projectiles += 1;
-                        self.spawn_bomb(position, arcade_state);
+                        self.spawn_bomb(position, runtime_state);
                     }
                 }
                 GameCommand::Spawn(SpawnRequest::Pod { position }) => {
@@ -781,21 +781,21 @@ impl ActorGameDriver {
                 }
                 GameCommand::Spawn(SpawnRequest::Swarmer {
                     position,
-                    arcade_state,
+                    runtime_state,
                 }) => {
                     let actor = self.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
                         position,
-                        arcade_state,
+                        runtime_state,
                     });
                     self.apply_next_wave_spawn_behavior(ActorKind::Swarmer, actor);
                 }
                 GameCommand::Spawn(SpawnRequest::Baiter {
                     position,
-                    arcade_state,
+                    runtime_state,
                 }) => {
                     let actor = self.spawn_baiter_from_spawn(ActorBaiterSpawn {
                         position,
-                        arcade_state,
+                        runtime_state,
                     });
                     self.apply_next_wave_spawn_behavior(ActorKind::Baiter, actor);
                 }
@@ -840,17 +840,17 @@ impl ActorGameDriver {
                     human,
                     position,
                 } => {
-                    let arcade_state = self
+                    let runtime_state = self
                         .snapshots
                         .get(&human)
-                        .and_then(|snapshot| snapshot.human_runtime);
+                        .and_then(|snapshot| snapshot.runtime.as_human());
                     self.snapshots.remove(&human);
                     self.actors.remove(&human);
-                    self.spawn_actor(Human::with_arcade_state(
+                    self.spawn_actor(Human::with_runtime_state(
                         human,
                         position,
                         HumanMode::CarriedBy(lander),
-                        arcade_state,
+                        runtime_state,
                     ));
                 }
                 GameCommand::SmartBomb { consume_stock } => {
@@ -1054,7 +1054,7 @@ impl ActorGameDriver {
         self.clear_terrain_blow();
         self.clear_pending_astronaut_rescue();
         self.clear_first_wave_lander_refill();
-        self.arcade_rng = PLAYFIELD_START_RNG;
+        self.actor_rng = PLAYFIELD_START_RNG;
         self.background_left = 0;
         self.reserve_activation_cooldown_steps = 0;
         self.first_wave_early_reserve_steps_remaining = None;
@@ -1217,32 +1217,12 @@ impl ActorGameDriver {
     }
 
     fn spawn_terrain_blow_explosion_births(&mut self, elapsed: u16) -> Vec<DrawCommand> {
-        const TERRAIN_BLOW_EXPLOSION_BIRTHS: [(u16, Point); 17] = [
-            // original: SOURCE_TERRAIN_BLOW_EXPLOSION_BIRTHS
-            (0, Point::new(0x4C, 0xC2)),
-            (4, Point::new(0x14, 0xE2)),
-            (4, Point::new(0x5C, 0xDE)),
-            (8, Point::new(0x80, 0xDE)),
-            (12, Point::new(0x00, 0xE0)),
-            (16, Point::new(0x68, 0xDC)),
-            (21, Point::new(0x30, 0xE0)),
-            (26, Point::new(0x80, 0xDE)),
-            (31, Point::new(0x44, 0xD2)),
-            (31, Point::new(0x50, 0xC6)),
-            (51, Point::new(0x20, 0xE2)),
-            (52, Point::new(0x70, 0xD8)),
-            (60, Point::new(0x6C, 0xD4)),
-            (60, Point::new(0x28, 0xE0)),
-            (70, Point::new(0x94, 0xDC)),
-            (70, Point::new(0x00, 0xE0)),
-            (81, Point::new(0x0C, 0xE2)),
-        ];
-
         TERRAIN_BLOW_EXPLOSION_BIRTHS
             .iter()
             .copied()
             .filter(|(birth_step, _)| *birth_step == elapsed)
-            .map(|(_, position)| {
+            .map(|(_, screen)| {
+                let position = Point::new(i16::from(screen.x), i16::from(screen.y));
                 let id = self.spawn_explosion(position, ExplosionKind::Terrain);
                 DrawCommand::sprite_with_effect(
                     id,
@@ -1349,7 +1329,7 @@ impl ActorGameDriver {
         let active_score = self.active_score();
         self.set_active_stock(PlayerStock::new(0, 0));
         self.wave = 0;
-        self.arcade_rng = PLAYFIELD_START_RNG;
+        self.actor_rng = PLAYFIELD_START_RNG;
         self.background_left = 0;
         self.reset_enemy_projectile_scan();
         self.high_score_initials = HighScoreInitialsState::EMPTY;
@@ -1430,7 +1410,7 @@ impl ActorGameDriver {
         self.reserve_activation_ready = false;
         self.reserve_activation_cooldown_steps = 0;
         self.first_wave_early_reserve_steps_remaining = None;
-        self.arcade_rng = PLAYFIELD_START_RNG;
+        self.actor_rng = PLAYFIELD_START_RNG;
         self.background_left = 0;
         self.reset_enemy_projectile_scan();
         self.clear_turn_playfield_actors();
@@ -1518,9 +1498,9 @@ impl ActorGameDriver {
 
     fn advance_human_walk_process(
         &mut self,
-        arcade_rng: Option<ActorArcadeRngSnapshot>,
+        actor_rng: Option<ActorRngSnapshot>,
     ) -> Option<usize> {
-        if arcade_rng.is_none() || !self.has_targetable_human_snapshots() {
+        if actor_rng.is_none() || !self.has_targetable_human_snapshots() {
             return None;
         }
         if self.human_walk_sleep_ticks > 0 {
@@ -1538,8 +1518,8 @@ impl ActorGameDriver {
 
         let human_count = self.human_snapshot_count();
         self.snapshots.values().find_map(|snapshot| {
-            let arcade_state = snapshot.human_runtime?;
-            (arcade_state.target_slot_index == next_cursor
+            let runtime_state = snapshot.runtime.as_human()?;
+            (runtime_state.target_slot_index == next_cursor
                 && actor_human_walk_targetable(human_count, snapshot))
             .then_some(next_cursor)
         })
@@ -1608,16 +1588,16 @@ impl ActorGameDriver {
         }
     }
 
-    fn current_arcade_wave_profile(&self) -> ArcadeWaveProfile {
+    fn current_wave_tuning_profile(&self) -> ActorWaveTuning {
         self.wave_script
             .profile_for_wave(self.wave)
-            .arcade_wave
-            .unwrap_or_else(|| ArcadeWaveProfile::for_wave(self.wave.max(1)))
+            .wave_tuning
+            .unwrap_or_else(|| ActorWaveTuning::for_wave(self.wave.max(1)))
     }
 
     fn reset_baiter_timer(&mut self) {
-        let arcade_wave_profile = self.current_arcade_wave_profile();
-        self.baiter_timer_steps = Some(arcade_wave_profile.baiter_delay.max(1));
+        let wave_tuning_profile = self.current_wave_tuning_profile();
+        self.baiter_timer_steps = Some(wave_tuning_profile.baiter_delay.max(1));
         self.baiter_pacing_steps_remaining = ACTOR_BAITER_TIMER_PACING_STEPS;
     }
 
@@ -1646,18 +1626,18 @@ impl ActorGameDriver {
 
         self.first_wave_early_reserve_steps_remaining = None;
         self.clear_first_wave_lander_refill();
-        let arcade_wave_profile = self.current_arcade_wave_profile();
+        let wave_tuning_profile = self.current_wave_tuning_profile();
         let reserve_kinds =
-            reserve_wave_enemy_kinds(&mut self.enemy_reserve, arcade_wave_profile);
+            reserve_wave_enemy_kinds(&mut self.enemy_reserve, wave_tuning_profile);
         let mut index = 0;
         while index < reserve_kinds.len() {
             match reserve_kinds[index] {
                 WaveEnemyKind::Lander => {
                     let target_index = self.select_next_lander_target_human_slot();
                     if let Some(target_index) = target_index {
-                        let spawn = ActorLanderSpawn::from_arcade_restore(
-                            &mut self.arcade_rng,
-                            arcade_wave_profile,
+                        let spawn = ActorLanderSpawn::from_wave_restore(
+                            &mut self.actor_rng,
+                            wave_tuning_profile,
                             Some(target_index),
                         );
                         commands.push(GameCommand::Spawn(SpawnRequest::Lander {
@@ -1672,14 +1652,14 @@ impl ActorGameDriver {
                             .take_while(|&&kind| kind == WaveEnemyKind::Lander)
                             .count();
                         for _ in 0..lander_count {
-                            let spawn = ActorMutantSpawn::from_arcade_restore(
-                                &mut self.arcade_rng,
-                                arcade_wave_profile,
+                            let spawn = ActorMutantSpawn::from_wave_restore(
+                                &mut self.actor_rng,
+                                wave_tuning_profile,
                                 self.background_left,
                             );
                             commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
                                 position: spawn.position,
-                                arcade_state: spawn.arcade_state,
+                                runtime_state: spawn.runtime_state,
                             }));
                             let actor = self.spawn_mutant_from_spawn(spawn);
                             self.apply_next_wave_spawn_behavior(ActorKind::Mutant, actor);
@@ -1694,9 +1674,9 @@ impl ActorGameDriver {
                         .count();
                     let player_absolute_x = self
                         .active_player_position()
-                        .map_or(0, |position| arcade_absolute_x(position, 0));
-                    for spawn in ActorBomberSpawn::arcade_restore_batch(
-                        arcade_wave_profile,
+                        .map_or(0, |position| absolute_world_x(position, 0));
+                    for spawn in ActorBomberSpawn::wave_restore_batch(
+                        wave_tuning_profile,
                         player_absolute_x,
                         bomber_count,
                     ) {
@@ -1709,7 +1689,7 @@ impl ActorGameDriver {
                     index += bomber_count;
                 }
                 WaveEnemyKind::Pod => {
-                    let spawn = ActorPodSpawn::from_arcade_restore(&mut self.arcade_rng);
+                    let spawn = ActorPodSpawn::from_wave_restore(&mut self.actor_rng);
                     commands.push(GameCommand::Spawn(SpawnRequest::Pod {
                         position: spawn.position,
                     }));
@@ -1718,14 +1698,14 @@ impl ActorGameDriver {
                     index += 1;
                 }
                 WaveEnemyKind::Mutant => {
-                    let spawn = ActorMutantSpawn::from_arcade_restore(
-                        &mut self.arcade_rng,
-                        arcade_wave_profile,
+                    let spawn = ActorMutantSpawn::from_wave_restore(
+                        &mut self.actor_rng,
+                        wave_tuning_profile,
                         self.background_left,
                     );
                     commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
                         position: spawn.position,
-                        arcade_state: spawn.arcade_state,
+                        runtime_state: spawn.runtime_state,
                     }));
                     let actor = self.spawn_mutant_from_spawn(spawn);
                     self.apply_next_wave_spawn_behavior(ActorKind::Mutant, actor);
@@ -1736,14 +1716,14 @@ impl ActorGameDriver {
                         .iter()
                         .take_while(|&&kind| kind == WaveEnemyKind::Swarmer)
                         .count();
-                    for spawn in ActorSwarmerSpawn::arcade_restore_batch(
-                        &mut self.arcade_rng,
-                        arcade_wave_profile,
+                    for spawn in ActorSwarmerSpawn::wave_restore_batch(
+                        &mut self.actor_rng,
+                        wave_tuning_profile,
                         swarmer_count,
                     ) {
                         commands.push(GameCommand::Spawn(SpawnRequest::Swarmer {
                             position: spawn.position,
-                            arcade_state: spawn.arcade_state,
+                            runtime_state: spawn.runtime_state,
                         }));
                         let actor = self.spawn_swarmer_from_spawn(spawn);
                         self.apply_next_wave_spawn_behavior(ActorKind::Swarmer, actor);
@@ -1859,7 +1839,7 @@ impl ActorGameDriver {
             .enemy_reserve
             .landers
             .saturating_sub(u8::try_from(reserve_count).expect("early reserve count fits u8"));
-        self.arcade_rng = FIRST_WAVE_EARLY_RESERVE_RNG;
+        self.actor_rng = FIRST_WAVE_EARLY_RESERVE_RNG;
         self.target_human_cursor = Some(FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT);
         true
     }
@@ -1882,7 +1862,7 @@ impl ActorGameDriver {
             .copied()
             .take(reserve_count)
         {
-            materialized |= spawn.arcade_state.is_some_and(lander_spawn_is_visible);
+            materialized |= spawn.runtime_state.is_some_and(lander_spawn_is_visible);
             commands.push(GameCommand::Spawn(SpawnRequest::Lander {
                 position: spawn.position,
             }));
@@ -1914,8 +1894,8 @@ impl ActorGameDriver {
         for spawn in wave_profile.lander_spawns.iter().copied() {
             let actor = self.spawn_lander_from_spawn(spawn);
             if let Some(target_index) = spawn
-                .arcade_state
-                .and_then(|arcade_state| arcade_state.target_human_index)
+                .runtime_state
+                .and_then(|runtime_state| runtime_state.target_human_index)
             {
                 self.target_human_cursor = Some(target_index);
             }
@@ -1952,7 +1932,7 @@ impl ActorGameDriver {
 
     fn has_targetable_human_snapshots(&self) -> bool {
         self.snapshots.values().any(|snapshot| {
-            snapshot.kind == ActorKind::Human && snapshot.alive && snapshot.human_runtime.is_some()
+            snapshot.kind == ActorKind::Human && snapshot.alive && snapshot.runtime.as_human().is_some()
         })
     }
 
@@ -1993,8 +1973,8 @@ impl ActorGameDriver {
                 snapshot.kind == ActorKind::Human
                     && snapshot.alive
                     && snapshot
-                        .human_runtime
-                        .is_some_and(|arcade_state| arcade_state.target_slot_index == probe)
+                        .runtime.as_human()
+                        .is_some_and(|runtime_state| runtime_state.target_slot_index == probe)
             }) {
                 self.target_human_cursor = Some(probe);
                 return Some(probe);
@@ -2090,18 +2070,18 @@ impl ActorGameDriver {
             .count();
         let spawn_count =
             POD_SWARMER_REQUEST_LIMIT.min(ACTIVE_SWARMER_LIMIT.saturating_sub(active_swarmers));
-        let arcade_wave_profile = self.current_arcade_wave_profile();
+        let wave_tuning_profile = self.current_wave_tuning_profile();
 
         (0..spawn_count)
             .map(|_| {
                 let spawn = ActorSwarmerSpawn::from_pod_release(
-                    &mut self.arcade_rng,
-                    arcade_wave_profile,
+                    &mut self.actor_rng,
+                    wave_tuning_profile,
                     position,
                 );
                 GameCommand::Spawn(SpawnRequest::Swarmer {
                     position: spawn.position,
-                    arcade_state: spawn.arcade_state,
+                    runtime_state: spawn.runtime_state,
                 })
             })
             .collect()
@@ -2111,7 +2091,7 @@ impl ActorGameDriver {
         if self.phase != Phase::Playing || self.wave == 0 {
             return;
         }
-        let enemy_total = self.arcade_wave_enemy_total();
+        let enemy_total = self.wave_tuning_enemy_total();
         if enemy_total == 0 {
             return;
         }
@@ -2126,7 +2106,7 @@ impl ActorGameDriver {
         }
         self.baiter_pacing_steps_remaining = ACTOR_BAITER_TIMER_PACING_STEPS;
 
-        let profile = self.current_arcade_wave_profile();
+        let profile = self.current_wave_tuning_profile();
         let timer_steps = accelerated_baiter_timer_steps(timer_steps, profile, enemy_total);
         let decremented_steps = timer_steps.saturating_sub(1);
         if decremented_steps > 0 {
@@ -2150,11 +2130,11 @@ impl ActorGameDriver {
         let spawn = ActorBaiterSpawn::from_player_position(profile, player_position, active_baiters);
         commands.push(GameCommand::Spawn(SpawnRequest::Baiter {
             position: spawn.position,
-            arcade_state: spawn.arcade_state,
+            runtime_state: spawn.runtime_state,
         }));
     }
 
-    fn arcade_wave_enemy_total(&self) -> usize {
+    fn wave_tuning_enemy_total(&self) -> usize {
         self.snapshots
             .values()
             .filter(|snapshot| snapshot_blocks_wave_clear(snapshot))

@@ -1,16 +1,16 @@
     #[test]
-    fn embedded_actor_behavior_script_matches_arcade_profile_defaults() {
+    fn embedded_actor_behavior_script_matches_wave_tuning_defaults() {
         let parsed = ActorBehaviorScript::parse_text(ACTOR_BEHAVIOR_SCRIPT)
             .expect("embedded actor behavior script should parse");
 
         assert_eq!(ActorBehaviorScript::default().manifest(), parsed.manifest());
         assert_eq!(
-            ActorBehaviorScript::from_arcade_profile().manifest(),
+            ActorBehaviorScript::from_default_profile().manifest(),
             parsed.manifest()
         );
         assert_eq!(
             parsed.manifest().default_profile,
-            ActorBehaviorProfile::arcade_default()
+            ActorBehaviorProfile::default_profile()
         );
         assert_eq!(parsed.manifest().default_profile.player_speed, 1);
         assert!(parsed.manifest().kind_profiles.is_empty());
@@ -282,7 +282,7 @@
         let wave_script = ActorWaveScript::parse_text_with_base_behavior(
             "\
             name inherited wave behavior\n\
-            arcade_wave 1 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n\
+            wave_tuning 1 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n\
             wave 2\n\
             lander 80 214\n",
             &behavior_script,
@@ -302,10 +302,10 @@
         let lander_runtime = manifest.waves[0]
             .behavior_script
             .kind_profile(ActorKind::Lander)
-            .expect("arcade wave should keep arcade lander behavior");
+            .expect("wave tuning should keep runtime lander behavior");
         assert_eq!(
             lander_runtime.lander_fire_period_steps,
-            ArcadeWaveProfile::for_wave(1)
+            ActorWaveTuning::for_wave(1)
                 .lander_behavior()
                 .lander_fire_period_steps
         );
@@ -366,7 +366,7 @@
                 .spawn_behavior_presets
                 .is_empty()
         );
-        assert_eq!(attract_manifest.current_wave_profile.arcade_wave, None);
+        assert_eq!(attract_manifest.current_wave_profile.wave_tuning, None);
         assert_eq!(
             attract_manifest.current_wave_profile.lander_spawns[0].position,
             Point::new(80, 96)
@@ -510,7 +510,7 @@
         assert!(settled.snapshots.iter().any(|snapshot| {
             snapshot.kind == ActorKind::Human
                 && snapshot.position == Point::new(32, HUMAN_GROUND_Y)
-                && snapshot.human_runtime.is_none()
+                && snapshot.runtime.as_human().is_none()
         }));
     }
 
@@ -735,41 +735,41 @@
     }
 
     #[test]
-    fn parsed_arcade_wave_overrides_drive_arcade_shaped_custom_wave() {
+    fn parsed_wave_tuning_overrides_drive_reference_shaped_custom_wave() {
         let wave_script = concat!(
-            "name custom arcade shape\n",
-            "arcade_wave 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
+            "name custom reference shape\n",
+            "wave_tuning 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
             "swarmer_x_velocity 64 swarmer_shot_time 11 baiter_time 24 ",
             "mutant_x_velocity 48 mutant_random_y 2 mutant_shot_time 12\n",
         )
         .parse::<ActorWaveScript>()
-        .expect("arcade wave overrides should parse");
+        .expect("wave tuning overrides should parse");
         let manifest = wave_script.manifest();
         let profile = &manifest.waves[0];
-        let arcade_wave = profile
-            .arcade_wave
-            .expect("arcade_wave override should preserve arcade metadata");
+        let wave_tuning = profile
+            .wave_tuning
+            .expect("wave_tuning override should preserve runtime metadata");
 
-        assert_eq!(arcade_wave.wave_size, 5);
-        assert_eq!(arcade_wave.landers, 1);
-        assert_eq!(arcade_wave.bombers, 1);
-        assert_eq!(arcade_wave.pods, 1);
-        assert_eq!(arcade_wave.mutants, 1);
-        assert_eq!(arcade_wave.swarmers, 1);
-        assert_eq!(arcade_wave.swarmer_x_velocity, 64);
-        assert_eq!(arcade_wave.swarmer_shot_time, 11);
-        assert_eq!(arcade_wave.baiter_delay, 24);
-        assert_eq!(arcade_wave.mutant_x_velocity, 48);
-        assert_eq!(arcade_wave.mutant_random_y, 2);
-        assert_eq!(arcade_wave.mutant_shot_time, 12);
+        assert_eq!(wave_tuning.wave_size, 5);
+        assert_eq!(wave_tuning.landers, 1);
+        assert_eq!(wave_tuning.bombers, 1);
+        assert_eq!(wave_tuning.pods, 1);
+        assert_eq!(wave_tuning.mutants, 1);
+        assert_eq!(wave_tuning.swarmers, 1);
+        assert_eq!(wave_tuning.swarmer_x_velocity, 64);
+        assert_eq!(wave_tuning.swarmer_shot_time, 11);
+        assert_eq!(wave_tuning.baiter_delay, 24);
+        assert_eq!(wave_tuning.mutant_x_velocity, 48);
+        assert_eq!(wave_tuning.mutant_random_y, 2);
+        assert_eq!(wave_tuning.mutant_shot_time, 12);
         assert_eq!(profile.lander_spawns.len(), 1);
         assert_eq!(profile.bomber_spawns.len(), 1);
         assert_eq!(profile.pod_spawns.len(), 1);
         assert_eq!(profile.mutant_spawns.len(), 1);
         assert_eq!(profile.swarmer_spawns.len(), 1);
         assert_eq!(profile.enemy_reserve, EnemyReserveSnapshot::default());
-        assert!(profile.mutant_spawns[0].arcade_state.is_some());
-        assert!(profile.swarmer_spawns[0].arcade_state.is_some());
+        assert!(profile.mutant_spawns[0].runtime_state.is_some());
+        assert!(profile.swarmer_spawns[0].runtime_state.is_some());
 
         let mut driver = ActorGameDriver::with_wave_script(wave_script);
         driver.step(GameInput {
@@ -788,14 +788,14 @@
         assert_eq!(driver.snapshot_count(ActorKind::Mutant), 1);
         assert_eq!(driver.snapshot_count(ActorKind::Swarmer), 1);
         assert!(report.snapshots.iter().any(|snapshot| {
-            snapshot.kind == ActorKind::Mutant && snapshot.mutant_runtime.is_some()
+            snapshot.kind == ActorKind::Mutant && snapshot.runtime.as_mutant().is_some()
         }));
         assert!(report.snapshots.iter().any(|snapshot| {
-            snapshot.kind == ActorKind::Swarmer && snapshot.swarmer_runtime.is_some()
+            snapshot.kind == ActorKind::Swarmer && snapshot.runtime.as_swarmer().is_some()
         }));
-        assert_eq!(report.arcade_wave.wave_size, 5);
-        assert_eq!(report.arcade_wave.mutant_x_velocity, 48);
-        assert_eq!(report.arcade_wave.swarmer_shot_time, 11);
+        assert_eq!(report.wave_tuning.wave_size, 5);
+        assert_eq!(report.wave_tuning.mutant_x_velocity, 48);
+        assert_eq!(report.wave_tuning.swarmer_shot_time, 11);
         let state_profile = report.game_state().wave_profile;
         assert_eq!(state_profile.wave_size, 5);
         assert_eq!(state_profile.landers, 1);
@@ -817,23 +817,23 @@
             driver
                 .script_manifest()
                 .current_wave_profile
-                .arcade_wave
-                .expect("current wave manifest should expose arcade override")
+                .wave_tuning
+                .expect("current wave manifest should expose wave tuning override")
                 .mutants,
             1
         );
     }
 
     #[test]
-    fn parsed_arcade_wave_range_overrides_apply_to_each_expanded_profile() {
+    fn parsed_wave_tuning_range_overrides_apply_to_each_expanded_profile() {
         let wave_script = concat!(
-            "name ranged arcade shape\n",
-            "arcade_waves 1 2 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
+            "name ranged reference shape\n",
+            "wave_tunings 1 2 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
             "swarmer_x_velocity 64 swarmer_shot_time 11 baiter_time 24 ",
             "mutant_x_velocity 48 mutant_random_y 2 mutant_shot_time 12\n",
         )
         .parse::<ActorWaveScript>()
-        .expect("arcade wave range overrides should parse");
+        .expect("wave tuning range overrides should parse");
         let manifest = wave_script.manifest();
 
         assert_eq!(
@@ -845,35 +845,35 @@
             vec![1, 2]
         );
         for profile in &manifest.waves {
-            let arcade_wave = profile
-                .arcade_wave
-                .expect("range override should preserve arcade metadata");
-            assert_eq!(arcade_wave.wave_size, 5);
-            assert_eq!(arcade_wave.landers, 1);
-            assert_eq!(arcade_wave.bombers, 1);
-            assert_eq!(arcade_wave.pods, 1);
-            assert_eq!(arcade_wave.mutants, 1);
-            assert_eq!(arcade_wave.swarmers, 1);
-            assert_eq!(arcade_wave.swarmer_x_velocity, 64);
-            assert_eq!(arcade_wave.swarmer_shot_time, 11);
-            assert_eq!(arcade_wave.baiter_delay, 24);
-            assert_eq!(arcade_wave.mutant_x_velocity, 48);
-            assert_eq!(arcade_wave.mutant_random_y, 2);
-            assert_eq!(arcade_wave.mutant_shot_time, 12);
+            let wave_tuning = profile
+                .wave_tuning
+                .expect("range override should preserve runtime metadata");
+            assert_eq!(wave_tuning.wave_size, 5);
+            assert_eq!(wave_tuning.landers, 1);
+            assert_eq!(wave_tuning.bombers, 1);
+            assert_eq!(wave_tuning.pods, 1);
+            assert_eq!(wave_tuning.mutants, 1);
+            assert_eq!(wave_tuning.swarmers, 1);
+            assert_eq!(wave_tuning.swarmer_x_velocity, 64);
+            assert_eq!(wave_tuning.swarmer_shot_time, 11);
+            assert_eq!(wave_tuning.baiter_delay, 24);
+            assert_eq!(wave_tuning.mutant_x_velocity, 48);
+            assert_eq!(wave_tuning.mutant_random_y, 2);
+            assert_eq!(wave_tuning.mutant_shot_time, 12);
             assert_eq!(profile.lander_spawns.len(), 1);
             assert_eq!(profile.bomber_spawns.len(), 1);
             assert_eq!(profile.pod_spawns.len(), 1);
             assert_eq!(profile.mutant_spawns.len(), 1);
             assert_eq!(profile.swarmer_spawns.len(), 1);
             assert_eq!(profile.enemy_reserve, EnemyReserveSnapshot::default());
-            assert!(profile.mutant_spawns[0].arcade_state.is_some());
-            assert!(profile.swarmer_spawns[0].arcade_state.is_some());
+            assert!(profile.mutant_spawns[0].runtime_state.is_some());
+            assert!(profile.swarmer_spawns[0].runtime_state.is_some());
         }
 
         let second = wave_script.profile_for_wave(2);
         assert_eq!(
             second
-                .arcade_wave
+                .wave_tuning
                 .expect("wave 2 should use the effective range override")
                 .mutants,
             1
@@ -886,7 +886,7 @@
     fn parsed_wave_script_applies_behavior_ranges_to_existing_profiles() {
         let wave_script = concat!(
             "name ranged behavior\n",
-            "arcade_waves 1 2 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
+            "wave_tunings 1 2 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
             "behavior_waves 1 2 kind lander lander_mode chase_player\n",
             "behavior_waves 1 2 kind lander lander_seek_speed 7\n",
             "spawn_behavior_waves 1 2 lander 0 lander_seek_speed 9\n",
@@ -926,7 +926,7 @@
             "name preset behavior\n",
             "behavior_preset hard_lander kind lander lander_mode chase_player\n",
             "behavior_preset hard_lander kind lander lander_seek_speed 7\n",
-            "arcade_waves 1 2 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
+            "wave_tunings 1 2 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
             "use_behavior_waves 1 2 hard_lander\n",
             "wave 3\n",
             "use_behavior hard_lander\n",
@@ -945,7 +945,7 @@
             vec![1, 2, 3]
         );
         for profile in manifest.waves.iter().take(2) {
-            let lander_runtime = ArcadeWaveProfile::for_wave(profile.wave).lander_behavior();
+            let lander_runtime = ActorWaveTuning::for_wave(profile.wave).lander_behavior();
             let lander_behavior = profile
                 .behavior_script
                 .kind_profile(ActorKind::Lander)
@@ -966,7 +966,7 @@
             LanderBehaviorMode::ChasePlayer
         );
         assert_eq!(clean_wave_lander.lander_seek_speed, 7);
-        assert_eq!(manifest.waves[2].arcade_wave, None);
+        assert_eq!(manifest.waves[2].wave_tuning, None);
     }
 
     #[test]
@@ -977,7 +977,7 @@
             "behavior_preset Hard-Lander kind lander lander_seek_speed 7\n",
             "spawn_behavior_preset Fast-Slot lander_mode chase_player\n",
             "spawn_behavior_preset Fast-Slot lander_seek_speed 9\n",
-            "arcade_wave 1 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
+            "wave_tuning 1 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
             "use_behavior hard_lander\n",
             "use_spawn_behavior lander 0 fast_slot\n",
         )
@@ -1029,7 +1029,7 @@
     fn parsed_wave_script_reports_missing_behavior_range_profiles() {
         let error = "\
             name missing behavior range\n\
-            arcade_wave 1\n\
+            wave_tuning 1\n\
             behavior_waves 1 2 kind lander lander_seek_speed 7\n"
             .parse::<ActorWaveScript>()
             .expect_err("range behavior should require existing profiles");
@@ -1042,7 +1042,7 @@
     fn parsed_wave_script_reports_unknown_behavior_presets() {
         let error = "\
             name missing preset\n\
-            arcade_wave 1\n\
+            wave_tuning 1\n\
             use_behavior missing\n"
             .parse::<ActorWaveScript>()
             .expect_err("preset use should require a definition");
@@ -1057,7 +1057,7 @@
             "name spawn preset behavior\n",
             "spawn_behavior_preset fast_slot lander_mode chase_player\n",
             "spawn_behavior_preset fast_slot lander_seek_speed 9\n",
-            "arcade_waves 1 2 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
+            "wave_tunings 1 2 wave_size 5 landers 2 bombers 0 pods 0 mutants 0 swarmers 0\n",
             "use_spawn_behavior_waves 1 2 lander 0 fast_slot\n",
             "wave 3\n",
             "behavior kind lander lander_mode drift\n",
@@ -1079,7 +1079,7 @@
             vec![1, 2, 3]
         );
         for profile in manifest.waves.iter().take(2) {
-            let lander_runtime = ArcadeWaveProfile::for_wave(profile.wave).lander_behavior();
+            let lander_runtime = ActorWaveTuning::for_wave(profile.wave).lander_behavior();
             assert_eq!(profile.spawn_behavior_profiles.len(), 1);
             assert_eq!(profile.spawn_behavior_profiles[0].kind, ActorKind::Lander);
             assert_eq!(profile.spawn_behavior_profiles[0].spawn_index, 0);
@@ -1158,7 +1158,7 @@
     fn parsed_wave_script_reports_unknown_spawn_behavior_presets() {
         let error = "\
             name missing spawn preset\n\
-            arcade_wave 1\n\
+            wave_tuning 1\n\
             use_spawn_behavior lander 0 missing\n"
             .parse::<ActorWaveScript>()
             .expect_err("spawn preset use should require a definition");
@@ -1221,7 +1221,7 @@
     fn parsed_wave_script_applies_spawn_index_behavior_to_reserve_allocations() {
         let wave_script = "\
             name reserve spawn behavior\n\
-            arcade_wave 2\n\
+            wave_tuning 2\n\
             spawn_behavior lander 3 lander_mode chase_player\n\
             spawn_behavior lander 3 lander_seek_speed 5\n"
             .parse::<ActorWaveScript>()
@@ -1229,7 +1229,7 @@
         let mut driver = ActorGameDriver::with_wave_script(wave_script);
         driver.phase = Phase::Playing;
         driver.wave = 2;
-        driver.arcade_rng = PLAYFIELD_START_RNG;
+        driver.actor_rng = PLAYFIELD_START_RNG;
         driver.apply_wave_profile();
         driver.spawn_player();
         driver.spawn_wave_hostiles();

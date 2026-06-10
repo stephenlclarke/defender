@@ -103,7 +103,7 @@
                 player: 1,
             })
         );
-        assert_arcade_message(
+        assert_message_text(
             &two_started.report,
             MessageId::PlayerOne,
             PLAYER_START_PROMPT_SCREEN_CELL,
@@ -143,7 +143,7 @@
     }
 
     #[test]
-    fn actor_one_player_start_uses_arcade_playfield_delay_without_start_prompt() {
+    fn actor_one_player_start_uses_reference_playfield_delay_without_start_prompt() {
         let mut driver = ActorGameDriver::new();
         driver.credits = 1;
         let mut runtime = ActorRuntimeAdapter::with_driver(driver);
@@ -177,7 +177,7 @@
         )));
         assert!(started.state.world.enemies.is_empty());
         assert!(started.state.world.humans.is_empty());
-        assert_no_arcade_message(&started.report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
+        assert_no_message_text(&started.report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
 
         let start_sound = runtime.step(GameInput::NONE);
         assert_eq!(start_sound.events.sounds(), &[SoundEvent::GameStarted]);
@@ -189,7 +189,7 @@
             })
         );
         assert!(start_sound.state.world.enemies.is_empty());
-        assert_no_arcade_message(
+        assert_no_message_text(
             &start_sound.report,
             MessageId::PlayerOne,
             PLAYER_START_PROMPT_SCREEN_CELL,
@@ -245,7 +245,7 @@
                 player: 1,
             })
         );
-        assert_arcade_message(&started.report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
+        assert_message_text(&started.report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
 
         let active = step_until_player_start_completes(&mut runtime, 1);
         assert_eq!(active.report.phase, Phase::Playing);
@@ -296,8 +296,8 @@
             })
         );
         assert!(started.state.world.enemies.is_empty());
-        assert_arcade_message(&started.report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
-        assert_arcade_message_scene(&started.scene, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
+        assert_message_text(&started.report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
+        assert_message_text_scene(&started.scene, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
 
         let status = runtime.step(GameInput::NONE);
         assert_text(&status.report, "WAVE 01");
@@ -311,8 +311,8 @@
                 player: 1,
             })
         );
-        assert_arcade_message(&status.report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
-        assert_arcade_message_scene(&status.scene, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
+        assert_message_text(&status.report, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
+        assert_message_text_scene(&status.scene, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
 
         let active = step_until_player_start_completes(&mut runtime, 1);
         assert_eq!(active.report.phase, Phase::Playing);
@@ -505,12 +505,12 @@
             })
         );
         assert!(switched.state.world.enemies.is_empty());
-        assert_arcade_message(
+        assert_message_text(
             &switched.report,
             MessageId::PlayerTwo,
             PLAYER_START_PROMPT_SCREEN_CELL,
         );
-        assert_arcade_message_scene(&switched.scene, MessageId::PlayerTwo, PLAYER_START_PROMPT_SCREEN_CELL);
+        assert_message_text_scene(&switched.scene, MessageId::PlayerTwo, PLAYER_START_PROMPT_SCREEN_CELL);
 
         let active = step_until_player_start_completes(&mut runtime, 2);
         assert_eq!(active.report.phase, Phase::Playing);
@@ -581,12 +581,12 @@
                 player: 2,
             })
         );
-        assert_arcade_message(
+        assert_message_text(
             &switched.report,
             MessageId::PlayerTwo,
             PLAYER_START_PROMPT_SCREEN_CELL,
         );
-        assert_arcade_message_scene(&switched.scene, MessageId::PlayerTwo, PLAYER_START_PROMPT_SCREEN_CELL);
+        assert_message_text_scene(&switched.scene, MessageId::PlayerTwo, PLAYER_START_PROMPT_SCREEN_CELL);
 
         let active = step_until_player_start_completes(&mut runtime, 2);
         assert_eq!(active.report.current_player, 2);
@@ -624,8 +624,8 @@
                 ..GameOverSnapshot::NONE
             }
         );
-        assert_arcade_message(&killed.report, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_CELL);
-        assert_arcade_message_scene(&killed.scene, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_CELL);
+        assert_message_text(&killed.report, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_CELL);
+        assert_message_text_scene(&killed.scene, MessageId::GameOver, FINAL_GAME_OVER_SCREEN_CELL);
         assert!(
             !killed
                 .report
@@ -706,12 +706,12 @@
                 player: 1,
             })
         );
-        assert_arcade_message(
+        assert_message_text(
             &switched.report,
             MessageId::PlayerOne,
             PLAYER_START_PROMPT_SCREEN_CELL,
         );
-        assert_arcade_message_scene(&switched.scene, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
+        assert_message_text_scene(&switched.scene, MessageId::PlayerOne, PLAYER_START_PROMPT_SCREEN_CELL);
 
         let active = step_until_player_start_completes(&mut runtime, 1);
         assert_eq!(active.report.current_player, 1);

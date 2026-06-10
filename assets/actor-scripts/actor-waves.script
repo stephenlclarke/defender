@@ -1,0 +1,5 @@
+# Actor runtime reference wave progression.
+# `wave_tunings` expands from the embedded reference wave table.
+
+name actor-reference-wave-table
+wave_tunings 1 16

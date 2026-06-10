@@ -1,4 +1,4 @@
-//! Typed arcade value wrappers shared across actor and renderer boundaries.
+//! Typed value wrappers shared across actor and renderer boundaries.
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ScreenAddress(u16);

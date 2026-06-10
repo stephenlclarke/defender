@@ -36,43 +36,43 @@ struct MutantDiveExactProjectile {
     y_velocity: u16,
 }
 
-fn mutant_dive_arcade_conversion_x_correction(
-    lander_runtime: LanderArcadeState,
+fn mutant_dive_conversion_x_correction(
+    lander_runtime: LanderRuntimeState,
 ) -> Option<u16> {
     (lander_runtime.target_human_index == Some(6) && lander_runtime.x_velocity == 0)
         .then_some(MUTANT_DIVE_CONVERSION_X_CORRECTION)
 }
 
 fn mutant_dive_has_conversion_correction(
-    arcade_state: MutantArcadeState,
+    runtime_state: MutantRuntimeState,
 ) -> bool {
-    arcade_state.render_x_correction == MUTANT_DIVE_CONVERSION_X_CORRECTION
+    runtime_state.render_x_correction == MUTANT_DIVE_CONVERSION_X_CORRECTION
 }
 
-fn mutant_dive_uses_path_projection(arcade_state: MutantArcadeState) -> bool {
-    mutant_dive_has_conversion_correction(arcade_state)
-        && arcade_state.y_velocity == MUTANT_DIVE_PATH_Y_VELOCITY
+fn mutant_dive_uses_path_projection(runtime_state: MutantRuntimeState) -> bool {
+    mutant_dive_has_conversion_correction(runtime_state)
+        && runtime_state.y_velocity == MUTANT_DIVE_PATH_Y_VELOCITY
 }
 
 fn mutant_dive_defers_first_shot(
     position: Point,
-    arcade_state: MutantArcadeState,
+    runtime_state: MutantRuntimeState,
 ) -> bool {
-    mutant_dive_has_conversion_correction(arcade_state)
-        && !arcade_state.dive_entry_shot_deferred
+    mutant_dive_has_conversion_correction(runtime_state)
+        && !runtime_state.dive_entry_shot_deferred
         && position.x <= MUTANT_DIVE_ENTRY_SHOT_MAX_X
         && position.y <= MUTANT_DIVE_ENTRY_SHOT_MAX_Y
 }
 
 fn mutant_dive_fires_visible_entry_shot(
     position: Point,
-    arcade_state: MutantArcadeState,
+    runtime_state: MutantRuntimeState,
     player_position: Point,
 ) -> bool {
-    mutant_dive_has_conversion_correction(arcade_state)
-        && !arcade_state.dive_entry_shot_deferred
-        && arcade_state.shot_timer == MUTANT_DIVE_DEFERRED_SHOT_TIMER
-        && arcade_state.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS
+    mutant_dive_has_conversion_correction(runtime_state)
+        && !runtime_state.dive_entry_shot_deferred
+        && runtime_state.shot_timer == MUTANT_DIVE_DEFERRED_SHOT_TIMER
+        && runtime_state.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS
         && position.x <= MUTANT_DIVE_ENTRY_SHOT_MAX_X
         && position.y <= MUTANT_DIVE_ENTRY_SHOT_MAX_Y
         && player_position.y <= FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y
@@ -80,14 +80,14 @@ fn mutant_dive_fires_visible_entry_shot(
 
 fn mutant_dive_suppresses_regular_shot(
     position: Point,
-    arcade_state: MutantArcadeState,
+    runtime_state: MutantRuntimeState,
 ) -> bool {
-    if !mutant_dive_uses_path_projection(arcade_state) {
+    if !mutant_dive_uses_path_projection(runtime_state) {
         return false;
     }
 
     let (_, world_y_word) =
-        arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction);
+        world_position_words(position, runtime_state.x_fraction, runtime_state.y_fraction);
     (MUTANT_DIVE_SUPPRESSED_FIRST_SHOT_WORLD_Y_MIN
         ..=MUTANT_DIVE_SUPPRESSED_FIRST_SHOT_WORLD_Y_MAX)
         .contains(&world_y_word)
@@ -98,26 +98,26 @@ fn mutant_dive_suppresses_regular_shot(
 
 fn mutant_dive_fires_path_shot(
     position: Point,
-    arcade_state: MutantArcadeState,
+    runtime_state: MutantRuntimeState,
 ) -> bool {
-    if !mutant_dive_uses_path_projection(arcade_state)
-        || !arcade_state.dive_entry_shot_deferred
-        || arcade_state.sleep_ticks != 0
+    if !mutant_dive_uses_path_projection(runtime_state)
+        || !runtime_state.dive_entry_shot_deferred
+        || runtime_state.sleep_ticks != 0
     {
         return false;
     }
 
     matches!(
-        arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction),
+        world_position_words(position, runtime_state.x_fraction, runtime_state.y_fraction),
         MUTANT_DIVE_FIRST_SHOT_WORLD_WORDS | MUTANT_DIVE_SECOND_SHOT_WORLD_WORDS
     )
 }
 
 fn mutant_dive_post_shot_timer(
-    arcade_state: MutantArcadeState,
+    runtime_state: MutantRuntimeState,
     fired: bool,
 ) -> Option<u8> {
-    (fired && mutant_dive_has_conversion_correction(arcade_state))
+    (fired && mutant_dive_has_conversion_correction(runtime_state))
         .then_some(MUTANT_DIVE_POST_SHOT_TIMER)
 }
 
@@ -283,14 +283,14 @@ const MUTANT_DIVE_VISUAL_ROWS: &[(u16, i16)] = &[
 
 fn mutant_dive_path_position(
     position: Point,
-    arcade_state: MutantArcadeState,
+    runtime_state: MutantRuntimeState,
 ) -> Option<Point> {
-    if !mutant_dive_uses_path_projection(arcade_state) {
+    if !mutant_dive_uses_path_projection(runtime_state) {
         return None;
     }
 
     let (world_x_word, world_y_word) =
-        arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction);
+        world_position_words(position, runtime_state.x_fraction, runtime_state.y_fraction);
     if let Some(anchor) = MUTANT_DIVE_PATH_ANCHORS
         .iter()
         .find(|anchor| anchor.world_x_word == world_x_word && anchor.world_y_word == world_y_word)
@@ -318,14 +318,14 @@ fn mutant_dive_interpolated_path_position(world_y_word: u16) -> Option<Point> {
             }
 
             Some(Point::new(
-                arcade_lerp_i16(
+                lerp_i16(
                     start.screen.x,
                     end.screen.x,
                     world_y_word,
                     start.world_y_word,
                     end.world_y_word,
                 ),
-                arcade_lerp_i16(
+                lerp_i16(
                     start.screen.y,
                     end.screen.y,
                     world_y_word,
@@ -336,7 +336,7 @@ fn mutant_dive_interpolated_path_position(world_y_word: u16) -> Option<Point> {
         })
 }
 
-fn arcade_lerp_i16(
+fn lerp_i16(
     start: i16,
     end: i16,
     value: u16,
@@ -353,15 +353,15 @@ fn arcade_lerp_i16(
 
 fn mutant_dive_visual_position(
     position: Point,
-    arcade_state: MutantArcadeState,
+    runtime_state: MutantRuntimeState,
 ) -> Option<Point> {
-    if !mutant_dive_has_conversion_correction(arcade_state)
-        || arcade_state.x_velocity != MUTANT_DIVE_VISUAL_X_VELOCITY
+    if !mutant_dive_has_conversion_correction(runtime_state)
+        || runtime_state.x_velocity != MUTANT_DIVE_VISUAL_X_VELOCITY
     {
         return None;
     }
 
-    let world_x_word = arcade_absolute_x(position, arcade_state.x_fraction)
+    let world_x_word = absolute_world_x(position, runtime_state.x_fraction)
         .wrapping_add(MUTANT_DIVE_VISUAL_X_CORRECTION);
     if (world_x_word as i16) < 0 {
         return None;
@@ -378,61 +378,61 @@ fn mutant_dive_visual_position(
 
 fn mutant_dive_scene_position(
     position: Point,
-    arcade_state: Option<MutantArcadeState>,
+    runtime_state: Option<MutantRuntimeState>,
 ) -> Point {
-    let Some(arcade_state) = arcade_state else {
+    let Some(runtime_state) = runtime_state else {
         return position;
     };
-    mutant_dive_path_position(position, arcade_state)
-        .or_else(|| mutant_dive_visual_position(position, arcade_state))
+    mutant_dive_path_position(position, runtime_state)
+        .or_else(|| mutant_dive_visual_position(position, runtime_state))
         .unwrap_or(position)
 }
 
 fn mutant_dive_collision_position(
     position: Point,
-    arcade_state: Option<MutantArcadeState>,
+    runtime_state: Option<MutantRuntimeState>,
 ) -> Point {
-    let Some(arcade_state) = arcade_state else {
+    let Some(runtime_state) = runtime_state else {
         return position;
     };
-    if let Some(position) = mutant_dive_path_position(position, arcade_state) {
+    if let Some(position) = mutant_dive_path_position(position, runtime_state) {
         return position.offset(Velocity::new(0, 1));
     }
-    mutant_dive_visual_position(position, arcade_state).unwrap_or(position)
+    mutant_dive_visual_position(position, runtime_state).unwrap_or(position)
 }
 
 fn mutant_dive_collision_window_pending(
     position: Point,
-    arcade_state: Option<MutantArcadeState>,
+    runtime_state: Option<MutantRuntimeState>,
 ) -> bool {
-    let Some(arcade_state) = arcade_state else {
+    let Some(runtime_state) = runtime_state else {
         return false;
     };
-    if !mutant_dive_uses_path_projection(arcade_state) {
+    if !mutant_dive_uses_path_projection(runtime_state) {
         return false;
     }
 
     let (_, world_y_word) =
-        arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction);
-    arcade_state.shot_timer >= MUTANT_DIVE_PENDING_SHOT_TIMER_THRESHOLD
+        world_position_words(position, runtime_state.x_fraction, runtime_state.y_fraction);
+    runtime_state.shot_timer >= MUTANT_DIVE_PENDING_SHOT_TIMER_THRESHOLD
         && (MUTANT_DIVE_COLLISION_PENDING_WORLD_Y_MIN..MUTANT_DIVE_COLLISION_WORLD_Y_MIN)
             .contains(&world_y_word)
 }
 
 fn mutant_dive_uses_collision_projection(
     position: Point,
-    arcade_state: Option<MutantArcadeState>,
+    runtime_state: Option<MutantRuntimeState>,
 ) -> bool {
-    let Some(arcade_state) = arcade_state else {
+    let Some(runtime_state) = runtime_state else {
         return false;
     };
-    if !mutant_dive_uses_path_projection(arcade_state) {
+    if !mutant_dive_uses_path_projection(runtime_state) {
         return false;
     }
 
     let (_, world_y_word) =
-        arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction);
-    arcade_state.shot_timer >= MUTANT_DIVE_PENDING_SHOT_TIMER_THRESHOLD
+        world_position_words(position, runtime_state.x_fraction, runtime_state.y_fraction);
+    runtime_state.shot_timer >= MUTANT_DIVE_PENDING_SHOT_TIMER_THRESHOLD
         && (MUTANT_DIVE_COLLISION_WORLD_Y_MIN
             ..MUTANT_DIVE_COLLISION_WORLD_Y_MAX)
             .contains(&world_y_word)
@@ -449,7 +449,7 @@ fn actor_player_enemy_collision_explosion_placement(
 ) -> ActorExplosionPlacement {
     if mutant_dive_uses_collision_projection(
         enemy.position,
-        enemy.mutant_runtime,
+        enemy.runtime.as_mutant(),
     ) {
         ActorExplosionPlacement {
             position: MUTANT_DIVE_COLLISION_EXPLOSION_TOP_LEFT,
@@ -465,35 +465,35 @@ fn actor_player_enemy_collision_explosion_placement(
 
 fn mutant_dive_shot_position(
     position: Point,
-    arcade_state: MutantArcadeState,
+    runtime_state: MutantRuntimeState,
 ) -> Point {
-    if !mutant_dive_uses_path_projection(arcade_state) {
+    if !mutant_dive_uses_path_projection(runtime_state) {
         return position;
     }
 
-    match arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction) {
+    match world_position_words(position, runtime_state.x_fraction, runtime_state.y_fraction) {
         MUTANT_DIVE_ENTRY_WORLD_WORDS => MUTANT_DIVE_ENTRY_SHOT_SCREEN,
         MUTANT_DIVE_FIRST_SHOT_WORLD_WORDS => MUTANT_DIVE_FIRST_PATH_SHOT_SCREEN,
         MUTANT_DIVE_SECOND_SHOT_WORLD_WORDS => MUTANT_DIVE_SECOND_PATH_SHOT_SCREEN,
-        _ => mutant_dive_path_position(position, arcade_state).unwrap_or(position),
+        _ => mutant_dive_path_position(position, runtime_state).unwrap_or(position),
     }
 }
 
 fn mutant_dive_forced_shot(
     position: Point,
-    arcade_state: MutantArcadeState,
+    runtime_state: MutantRuntimeState,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
-) -> Option<(Point, Velocity, EnemyProjectileArcadeState)> {
-    if !mutant_dive_uses_path_projection(arcade_state)
+) -> Option<(Point, Velocity, EnemyProjectileRuntimeState)> {
+    if !mutant_dive_uses_path_projection(runtime_state)
         || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
     {
         return None;
     }
 
-    match arcade_world_position(position, arcade_state.x_fraction, arcade_state.y_fraction) {
+    match world_position_words(position, runtime_state.x_fraction, runtime_state.y_fraction) {
         MUTANT_DIVE_FORCED_FIRST_SHOT_WORLD_WORDS
-            if arcade_state.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS =>
+            if runtime_state.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS =>
         {
             Some(mutant_dive_exact_projectile(
                 MUTANT_DIVE_FORCED_FIRST_PROJECTILE,
@@ -501,7 +501,7 @@ fn mutant_dive_forced_shot(
             ))
         }
         MUTANT_DIVE_FORCED_SECOND_SHOT_WORLD_WORDS
-            if arcade_state.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS =>
+            if runtime_state.sleep_ticks == MUTANT_LOOP_SLEEP_TICKS =>
         {
             Some(mutant_dive_exact_projectile(
                 MUTANT_DIVE_FORCED_SECOND_PROJECTILE,
@@ -515,16 +515,16 @@ fn mutant_dive_forced_shot(
 fn mutant_dive_exact_projectile(
     projectile: MutantDiveExactProjectile,
     behavior: ActorBehaviorProfile,
-) -> (Point, Velocity, EnemyProjectileArcadeState) {
+) -> (Point, Velocity, EnemyProjectileRuntimeState) {
     (
         projectile.position,
-        arcade_screen_velocity(projectile.x_velocity, projectile.y_velocity),
-        EnemyProjectileArcadeState {
+        screen_velocity_from_motion_words(projectile.x_velocity, projectile.y_velocity),
+        EnemyProjectileRuntimeState {
             x_fraction: projectile.x_fraction,
             y_fraction: projectile.y_fraction,
             x_velocity: projectile.x_velocity,
             y_velocity: projectile.y_velocity,
-            lifetime_ticks: arcade_projectile_lifetime_ticks(
+            lifetime_ticks: projectile_lifetime_ticks(
                 behavior.mutant_shot_lifetime_steps,
             ),
         },

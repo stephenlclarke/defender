@@ -1,7 +1,7 @@
-const ARCADE_VELOCITY_SIGN_BIT: u16 = 0x8000;
+const MOTION_WORD_SIGN_BIT: u16 = 0x8000;
 
-const fn arcade_drift_from_velocity(x_velocity: u16) -> i16 {
-    if x_velocity & ARCADE_VELOCITY_SIGN_BIT != 0 {
+const fn drift_from_motion_word(x_velocity: u16) -> i16 {
+    if x_velocity & MOTION_WORD_SIGN_BIT != 0 {
         -1
     } else if x_velocity == 0 {
         0
@@ -10,25 +10,25 @@ const fn arcade_drift_from_velocity(x_velocity: u16) -> i16 {
     }
 }
 
-fn arcade_absolute_x(position: Point, x_fraction: u8) -> u16 {
+fn absolute_world_x(position: Point, x_fraction: u8) -> u16 {
     u16::from_be_bytes([position.x as u8, x_fraction])
 }
 
-fn arcade_world_position(position: Point, x_fraction: u8, y_fraction: u8) -> (u16, u16) {
+fn world_position_words(position: Point, x_fraction: u8, y_fraction: u8) -> (u16, u16) {
     (
         u16::from_be_bytes([position.x as u8, x_fraction]),
         u16::from_be_bytes([position.y as u8, y_fraction]),
     )
 }
 
-fn arcade_axis_step(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
+fn step_motion_axis(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
     let [position, fraction] = u16::from_be_bytes([position as u8, fraction])
         .wrapping_add(velocity)
         .to_be_bytes();
     (i16::from(position), fraction)
 }
 
-fn arcade_active_object_y_step(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
+fn step_wrapping_motion_y(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
     let [mut position, fraction] = u16::from_be_bytes([position as u8, fraction])
         .wrapping_add(velocity)
         .to_be_bytes();
@@ -40,20 +40,20 @@ fn arcade_active_object_y_step(position: i16, fraction: u8, velocity: u16) -> (i
     (i16::from(position), fraction)
 }
 
-fn arcade_screen_velocity(x_velocity: u16, y_velocity: u16) -> Velocity {
+fn screen_velocity_from_motion_words(x_velocity: u16, y_velocity: u16) -> Velocity {
     Velocity::new(
-        arcade_screen_velocity_component(x_velocity),
-        arcade_screen_velocity_component(y_velocity),
+        screen_velocity_component_from_motion_word(x_velocity),
+        screen_velocity_component_from_motion_word(y_velocity),
     )
 }
 
-fn arcade_screen_velocity_component(velocity: u16) -> i16 {
+fn screen_velocity_component_from_motion_word(velocity: u16) -> i16 {
     let signed = velocity as i16;
     if signed == 0 {
         return 0;
     }
 
-    let pixels = signed / 256;
+    let pixels = signed / MOTION_WORD_FRACTION_SCALE;
     if pixels == 0 {
         if signed > 0 { 1 } else { -1 }
     } else {

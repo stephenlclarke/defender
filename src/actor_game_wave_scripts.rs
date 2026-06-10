@@ -1,7 +1,7 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorWaveProfile {
     pub wave: u16,
-    pub arcade_wave: Option<ArcadeWaveProfile>,
+    pub wave_tuning: Option<ActorWaveTuning>,
     pub behavior_script: ActorBehaviorScript,
     pub lander_spawns: Vec<ActorLanderSpawn>,
     pub bomber_spawns: Vec<ActorBomberSpawn>,
@@ -65,7 +65,7 @@ impl ActorWaveProfile {
     ) -> Self {
         Self {
             wave: wave.max(1),
-            arcade_wave: None,
+            wave_tuning: None,
             behavior_script,
             lander_spawns,
             bomber_spawns,
@@ -84,13 +84,13 @@ impl ActorWaveProfile {
         self
     }
 
-    pub fn with_arcade_wave(mut self, arcade_wave: ArcadeWaveProfile) -> Self {
-        self.arcade_wave = Some(arcade_wave);
+    pub fn with_wave_tuning(mut self, wave_tuning: ActorWaveTuning) -> Self {
+        self.wave_tuning = Some(wave_tuning);
         self
     }
 
-    fn with_optional_arcade_wave(mut self, arcade_wave: Option<ArcadeWaveProfile>) -> Self {
-        self.arcade_wave = arcade_wave;
+    fn with_optional_wave_tuning(mut self, wave_tuning: Option<ActorWaveTuning>) -> Self {
+        self.wave_tuning = wave_tuning;
         self
     }
 
@@ -177,7 +177,7 @@ impl ActorWaveProfile {
     pub fn manifest(&self) -> ActorWaveProfileManifest {
         ActorWaveProfileManifest {
             wave: self.wave,
-            arcade_wave: self.arcade_wave,
+            wave_tuning: self.wave_tuning,
             behavior_script: self.behavior_script.manifest(),
             lander_spawns: self.lander_spawns.clone(),
             bomber_spawns: self.bomber_spawns.clone(),
@@ -202,7 +202,7 @@ pub struct ActorWaveSpawnBehaviorProfile {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorWaveProfileManifest {
     pub wave: u16,
-    pub arcade_wave: Option<ArcadeWaveProfile>,
+    pub wave_tuning: Option<ActorWaveTuning>,
     pub behavior_script: ActorBehaviorScriptManifest,
     pub lander_spawns: Vec<ActorLanderSpawn>,
     pub bomber_spawns: Vec<ActorBomberSpawn>,
@@ -235,7 +235,7 @@ impl ActorWaveScript {
         spawn_behavior_presets: Vec<ActorWaveSpawnBehaviorPresetManifest>,
     ) -> Self {
         if waves.is_empty() {
-            waves.push(Self::arcade_backed_profile(1));
+            waves.push(Self::reference_tuned_profile(1));
         }
         waves.sort_by_key(|profile| profile.wave);
         Self {
@@ -262,58 +262,58 @@ impl ActorWaveScript {
             .unwrap_or_else(|error| panic!("embedded actor wave script is invalid: {error}"))
     }
 
-    pub fn arcade_table_progression() -> Self {
+    pub fn reference_table_progression() -> Self {
         let waves = (1..=ACTOR_DATA_BACKED_WAVES)
-            .map(Self::arcade_backed_profile)
+            .map(Self::reference_tuned_profile)
             .collect::<Vec<_>>();
-        Self::new("actor-arcade-wave-table", waves)
+        Self::new("actor-reference-wave-table", waves)
     }
 
-    fn arcade_backed_profile(wave: u16) -> ActorWaveProfile {
-        let arcade_profile = ArcadeWaveProfile::for_wave(wave);
-        Self::arcade_backed_profile_from_profile(wave, arcade_profile)
+    fn reference_tuned_profile(wave: u16) -> ActorWaveProfile {
+        let wave_tuning = ActorWaveTuning::for_wave(wave);
+        Self::reference_tuned_profile_from_tuning(wave, wave_tuning)
     }
 
-    fn arcade_backed_profile_from_profile(
+    fn reference_tuned_profile_from_tuning(
         wave: u16,
-        arcade_profile: ArcadeWaveProfile,
+        wave_tuning: ActorWaveTuning,
     ) -> ActorWaveProfile {
-        Self::arcade_backed_profile_from_profile_with_behavior(
+        Self::reference_tuned_profile_from_tuning_with_behavior(
             wave,
-            arcade_profile,
-            &ActorBehaviorScript::from_arcade_profile(),
+            wave_tuning,
+            &ActorBehaviorScript::from_default_profile(),
         )
     }
 
-    fn arcade_backed_profile_from_profile_with_behavior(
+    fn reference_tuned_profile_from_tuning_with_behavior(
         wave: u16,
-        arcade_profile: ArcadeWaveProfile,
+        wave_tuning: ActorWaveTuning,
         base_behavior: &ActorBehaviorScript,
     ) -> ActorWaveProfile {
-        let human_spawns = arcade_profile.human_spawns(wave);
+        let human_spawns = wave_tuning.human_spawns(wave);
         ActorWaveProfile::with_family_spawns(
             wave,
             base_behavior
                 .clone()
-                .with_kind_behavior(ActorKind::Lander, arcade_profile.lander_behavior())
+                .with_kind_behavior(ActorKind::Lander, wave_tuning.lander_behavior())
                 .with_kind_behavior(
                     ActorKind::Bomber,
                     ActorBehaviorProfile {
-                        bomber_drift_speed: speed_pixels_from_arcade_velocity(
-                            arcade_profile.bomber_x_velocity,
+                        bomber_drift_speed: speed_pixels_from_velocity_byte(
+                            wave_tuning.bomber_x_velocity,
                         ),
                         ..ActorBehaviorProfile::default()
                     },
                 ),
-            arcade_profile.lander_spawns(wave, &human_spawns),
-            arcade_profile.bomber_spawns(),
-            arcade_profile.pod_spawns(),
+            wave_tuning.lander_spawns(wave, &human_spawns),
+            wave_tuning.bomber_spawns(),
+            wave_tuning.pod_spawns(),
             human_spawns,
         )
-        .with_arcade_wave(arcade_profile)
-        .with_mutant_spawns(arcade_profile.mutant_spawns())
-        .with_swarmer_spawns(arcade_profile.swarmer_spawns())
-        .with_enemy_reserve(arcade_profile.enemy_reserve_after_active_batch())
+        .with_wave_tuning(wave_tuning)
+        .with_mutant_spawns(wave_tuning.mutant_spawns())
+        .with_swarmer_spawns(wave_tuning.swarmer_spawns())
+        .with_enemy_reserve(wave_tuning.enemy_reserve_after_active_batch())
     }
 
     pub fn name(&self) -> &str {
@@ -342,7 +342,7 @@ impl FromStr for ActorWaveScript {
     type Err = ActorWaveScriptParseError;
 
     fn from_str(script_text: &str) -> Result<Self, Self::Err> {
-        let base_behavior = ActorBehaviorScript::from_arcade_profile();
+        let base_behavior = ActorBehaviorScript::from_default_profile();
         Self::parse_text_with_base_behavior(script_text, &base_behavior)
     }
 }
@@ -467,41 +467,41 @@ impl ParsedActorWaveScript {
                     ParsedActorWaveProfile::new_with_behavior(wave, self.base_behavior.clone()),
                 )
             }
-            "arcade_wave" => {
+            "wave_tuning" => {
                 let wave = parse_wave_u16(line_number, parts.next(), "wave")?;
-                let mut arcade_profile = ArcadeWaveProfile::for_wave(wave);
-                parse_arcade_wave_profile_updates(line_number, &mut arcade_profile, parts)?;
+                let mut wave_tuning = ActorWaveTuning::for_wave(wave);
+                parse_wave_tuning_profile_updates(line_number, &mut wave_tuning, parts)?;
                 self.push_profile(
                     line_number,
-                    ParsedActorWaveProfile::arcade_backed_from_profile_with_behavior(
+                    ParsedActorWaveProfile::reference_tuned_from_tuning_with_behavior(
                         wave,
-                        arcade_profile,
+                        wave_tuning,
                         &self.base_behavior,
                     ),
                 )
             }
-            "arcade_waves" => {
+            "wave_tunings" => {
                 let first = parse_wave_u16(line_number, parts.next(), "first wave")?.max(1);
                 let last = parse_wave_u16(line_number, parts.next(), "last wave")?.max(1);
-                let arcade_profile_update_tokens = parts.collect::<Vec<_>>();
+                let wave_tuning_update_tokens = parts.collect::<Vec<_>>();
                 if last < first {
                     return Err(ActorWaveScriptParseError::new(
                         line_number,
-                        format!("arcade wave range `{first}..{last}` is invalid"),
+                        format!("wave tuning range `{first}..{last}` is invalid"),
                     ));
                 }
                 for wave in first..=last {
-                    let mut arcade_profile = ArcadeWaveProfile::for_wave(wave);
-                    parse_arcade_wave_profile_updates(
+                    let mut wave_tuning = ActorWaveTuning::for_wave(wave);
+                    parse_wave_tuning_profile_updates(
                         line_number,
-                        &mut arcade_profile,
-                        arcade_profile_update_tokens.iter().copied(),
+                        &mut wave_tuning,
+                        wave_tuning_update_tokens.iter().copied(),
                     )?;
                     self.push_profile(
                         line_number,
-                        ParsedActorWaveProfile::arcade_backed_from_profile_with_behavior(
+                        ParsedActorWaveProfile::reference_tuned_from_tuning_with_behavior(
                             wave,
-                            arcade_profile,
+                            wave_tuning,
                             &self.base_behavior,
                         ),
                     )?;
@@ -749,7 +749,7 @@ impl ParsedActorWaveScript {
         name: String,
         behavior_line: String,
     ) -> Result<(), ActorWaveScriptParseError> {
-        let mut validation = ActorBehaviorScript::from_arcade_profile();
+        let mut validation = ActorBehaviorScript::from_default_profile();
         parse_behavior_script_line(line_number, &behavior_line, &mut validation)
             .map_err(|error| ActorWaveScriptParseError::new(error.line, error.message))?;
         self.behavior_presets
@@ -1009,7 +1009,7 @@ struct ParsedWaveSpawnBehaviorUpdate<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ParsedActorWaveProfile {
     wave: u16,
-    arcade_wave: Option<ArcadeWaveProfile>,
+    wave_tuning: Option<ActorWaveTuning>,
     behavior_script: ActorBehaviorScript,
     lander_spawns: Vec<ActorLanderSpawn>,
     bomber_spawns: Vec<ActorBomberSpawn>,
@@ -1026,7 +1026,7 @@ impl ParsedActorWaveProfile {
     fn new_with_behavior(wave: u16, behavior_script: ActorBehaviorScript) -> Self {
         Self {
             wave: wave.max(1),
-            arcade_wave: None,
+            wave_tuning: None,
             behavior_script,
             lander_spawns: Vec::new(),
             bomber_spawns: Vec::new(),
@@ -1040,19 +1040,19 @@ impl ParsedActorWaveProfile {
         }
     }
 
-    fn arcade_backed_from_profile_with_behavior(
+    fn reference_tuned_from_tuning_with_behavior(
         wave: u16,
-        arcade_profile: ArcadeWaveProfile,
+        wave_tuning: ActorWaveTuning,
         base_behavior: &ActorBehaviorScript,
     ) -> Self {
-        let profile = ActorWaveScript::arcade_backed_profile_from_profile_with_behavior(
+        let profile = ActorWaveScript::reference_tuned_profile_from_tuning_with_behavior(
             wave,
-            arcade_profile,
+            wave_tuning,
             base_behavior,
         );
         Self {
             wave: profile.wave,
-            arcade_wave: profile.arcade_wave,
+            wave_tuning: profile.wave_tuning,
             behavior_script: profile.behavior_script,
             lander_spawns: profile.lander_spawns,
             bomber_spawns: profile.bomber_spawns,
@@ -1099,7 +1099,7 @@ impl ParsedActorWaveProfile {
             self.pod_spawns,
             self.human_spawns,
         )
-        .with_optional_arcade_wave(self.arcade_wave)
+        .with_optional_wave_tuning(self.wave_tuning)
         .with_mutant_spawns(self.mutant_spawns)
         .with_swarmer_spawns(self.swarmer_spawns)
         .with_baiter_spawns(self.baiter_spawns)
@@ -1186,89 +1186,89 @@ fn parse_wave_behavior_preset_name(
     Ok(name)
 }
 
-fn parse_arcade_wave_profile_updates<'a>(
+fn parse_wave_tuning_profile_updates<'a>(
     line_number: usize,
-    arcade_profile: &mut ArcadeWaveProfile,
+    wave_tuning: &mut ActorWaveTuning,
     mut parts: impl Iterator<Item = &'a str>,
 ) -> Result<(), ActorWaveScriptParseError> {
     while let Some(field) = parts.next() {
         let value = parts.next().ok_or_else(|| {
             ActorWaveScriptParseError::new(
                 line_number,
-                format!("arcade wave field `{field}` needs a value"),
+                format!("wave tuning field `{field}` needs a value"),
             )
         })?;
-        apply_arcade_wave_profile_field(line_number, arcade_profile, field, value)?;
+        apply_wave_tuning_profile_field(line_number, wave_tuning, field, value)?;
     }
     Ok(())
 }
 
-fn apply_arcade_wave_profile_field(
+fn apply_wave_tuning_profile_field(
     line_number: usize,
-    arcade_profile: &mut ArcadeWaveProfile,
+    wave_tuning: &mut ActorWaveTuning,
     field: &str,
     value: &str,
 ) -> Result<(), ActorWaveScriptParseError> {
     match normalize_script_token(field).as_str() {
-        "landers" => arcade_profile.landers = parse_wave_u8(line_number, Some(value), field)?,
-        "bombers" => arcade_profile.bombers = parse_wave_u8(line_number, Some(value), field)?,
-        "pods" => arcade_profile.pods = parse_wave_u8(line_number, Some(value), field)?,
-        "mutants" => arcade_profile.mutants = parse_wave_u8(line_number, Some(value), field)?,
-        "swarmers" => arcade_profile.swarmers = parse_wave_u8(line_number, Some(value), field)?,
-        "wave_size" => arcade_profile.wave_size = parse_wave_u8(line_number, Some(value), field)?,
+        "landers" => wave_tuning.landers = parse_wave_u8(line_number, Some(value), field)?,
+        "bombers" => wave_tuning.bombers = parse_wave_u8(line_number, Some(value), field)?,
+        "pods" => wave_tuning.pods = parse_wave_u8(line_number, Some(value), field)?,
+        "mutants" => wave_tuning.mutants = parse_wave_u8(line_number, Some(value), field)?,
+        "swarmers" => wave_tuning.swarmers = parse_wave_u8(line_number, Some(value), field)?,
+        "wave_size" => wave_tuning.wave_size = parse_wave_u8(line_number, Some(value), field)?,
         "lander_x_velocity" => {
-            arcade_profile.lander_x_velocity = parse_wave_u8(line_number, Some(value), field)?
+            wave_tuning.lander_x_velocity = parse_wave_u8(line_number, Some(value), field)?
         }
         "lander_y_velocity_msb" => {
-            arcade_profile.lander_y_velocity_msb = parse_wave_u8(line_number, Some(value), field)?
+            wave_tuning.lander_y_velocity_msb = parse_wave_u8(line_number, Some(value), field)?
         }
         "lander_y_velocity_lsb" => {
-            arcade_profile.lander_y_velocity_lsb = parse_wave_u8(line_number, Some(value), field)?
+            wave_tuning.lander_y_velocity_lsb = parse_wave_u8(line_number, Some(value), field)?
         }
         "bomber_x_velocity" => {
-            arcade_profile.bomber_x_velocity = parse_wave_u8(line_number, Some(value), field)?
+            wave_tuning.bomber_x_velocity = parse_wave_u8(line_number, Some(value), field)?
         }
         "swarmer_x_velocity" => {
-            arcade_profile.swarmer_x_velocity = parse_wave_u8(line_number, Some(value), field)?
+            wave_tuning.swarmer_x_velocity = parse_wave_u8(line_number, Some(value), field)?
         }
         "swarmer_shot_time" => {
-            arcade_profile.swarmer_shot_time = parse_wave_u32(line_number, Some(value), field)?
+            wave_tuning.swarmer_shot_time = parse_wave_u32(line_number, Some(value), field)?
         }
         "swarmer_acceleration_mask" => {
-            arcade_profile.swarmer_acceleration_mask =
+            wave_tuning.swarmer_acceleration_mask =
                 parse_wave_u8(line_number, Some(value), field)?
         }
         "baiter_time" | "baiter_delay" => {
-            arcade_profile.baiter_delay = parse_wave_u32(line_number, Some(value), field)?
+            wave_tuning.baiter_delay = parse_wave_u32(line_number, Some(value), field)?
         }
         "baiter_shot_time" => {
-            arcade_profile.baiter_shot_time = parse_wave_u32(line_number, Some(value), field)?
+            wave_tuning.baiter_shot_time = parse_wave_u32(line_number, Some(value), field)?
         }
         "baiter_seek_probability" => {
-            arcade_profile.baiter_seek_probability = parse_wave_u8(line_number, Some(value), field)?
+            wave_tuning.baiter_seek_probability = parse_wave_u8(line_number, Some(value), field)?
         }
         "lander_shot_time" => {
-            arcade_profile.lander_shot_time = parse_wave_u32(line_number, Some(value), field)?
+            wave_tuning.lander_shot_time = parse_wave_u32(line_number, Some(value), field)?
         }
         "mutant_random_y" => {
-            arcade_profile.mutant_random_y = parse_wave_u8(line_number, Some(value), field)?
+            wave_tuning.mutant_random_y = parse_wave_u8(line_number, Some(value), field)?
         }
         "mutant_y_velocity_msb" => {
-            arcade_profile.mutant_y_velocity_msb = parse_wave_u8(line_number, Some(value), field)?
+            wave_tuning.mutant_y_velocity_msb = parse_wave_u8(line_number, Some(value), field)?
         }
         "mutant_y_velocity_lsb" => {
-            arcade_profile.mutant_y_velocity_lsb = parse_wave_u8(line_number, Some(value), field)?
+            wave_tuning.mutant_y_velocity_lsb = parse_wave_u8(line_number, Some(value), field)?
         }
         "mutant_x_velocity" => {
-            arcade_profile.mutant_x_velocity = parse_wave_u8(line_number, Some(value), field)?
+            wave_tuning.mutant_x_velocity = parse_wave_u8(line_number, Some(value), field)?
         }
         "mutant_shot_time" => {
-            arcade_profile.mutant_shot_time = parse_wave_u32(line_number, Some(value), field)?
+            wave_tuning.mutant_shot_time = parse_wave_u32(line_number, Some(value), field)?
         }
         _ => {
             return Err(ActorWaveScriptParseError::new(
                 line_number,
-                format!("unknown arcade wave field `{field}`"),
+                format!("unknown wave tuning field `{field}`"),
             ));
         }
     }

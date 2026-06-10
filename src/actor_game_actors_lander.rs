@@ -4,7 +4,7 @@ struct Lander {
     position: Point,
     drift: i16,
     mode: LanderMode,
-    arcade_state: Option<LanderArcadeState>,
+    runtime_state: Option<LanderRuntimeState>,
     spawn_visibility: LanderSpawnVisibility,
 }
 
@@ -34,14 +34,14 @@ impl Lander {
             id,
             position: spawn.position,
             drift: spawn
-                .arcade_state
-                .map(|arcade_state| {
-                    lander_drift_from_arcade_velocity(arcade_state.x_velocity)
+                .runtime_state
+                .map(|runtime_state| {
+                    lander_drift_from_motion_word(runtime_state.x_velocity)
                 })
                 .unwrap_or(-1),
             mode: LanderMode::Seeking,
-            spawn_visibility: lander_spawn_visibility(spawn.arcade_state),
-            arcade_state: spawn.arcade_state,
+            spawn_visibility: lander_spawn_visibility(spawn.runtime_state),
+            runtime_state: spawn.runtime_state,
         }
     }
 
@@ -61,11 +61,11 @@ impl AssetActor for Lander {
             x_velocity,
             delta,
         } = command;
-        if let Some(arcade_state) = &mut self.arcade_state
-            && arcade_state.target_human_index == Some(target_human_index)
-            && arcade_state.x_velocity == x_velocity
+        if let Some(runtime_state) = &mut self.runtime_state
+            && runtime_state.target_human_index == Some(target_human_index)
+            && runtime_state.x_velocity == x_velocity
         {
-            arcade_state.shot_timer = arcade_state.shot_timer.wrapping_add(delta);
+            runtime_state.shot_timer = runtime_state.shot_timer.wrapping_add(delta);
         }
     }
 
@@ -76,7 +76,7 @@ impl AssetActor for Lander {
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Lander);
             if self.spawn_visibility != LanderSpawnVisibility::HiddenFirstWaveRefill
-                && !self.tick_arcade_sleep()
+                && !self.tick_runtime_sleep()
             {
                 match self.mode {
                     LanderMode::Seeking => self.update_seeking(prompt, behavior, &mut commands),
@@ -118,14 +118,7 @@ impl AssetActor for Lander {
                 )),
                 bounds: self.output_visible().then_some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                lander_runtime: self.arcade_state,
-                bomber_runtime: None,
-                pod_runtime: None,
-                swarmer_runtime: None,
-                baiter_runtime: None,
-                mutant_runtime: None,
-                human_runtime: None,
-                enemy_projectile_runtime: None,
+                runtime: ActorRuntimeState::lander(self.runtime_state),
             },
             commands,
             draws,
@@ -156,7 +149,7 @@ impl Lander {
                 }
             }
             LanderBehaviorMode::Drift => {
-                if !self.advance_arcade_fixed_point_motion() {
+                if !self.advance_fixed_point_motion() {
                     self.drift(behavior);
                 }
             }
@@ -187,7 +180,7 @@ impl Lander {
                 commands.push(GameCommand::PlaySound(SoundCue::LanderPickup));
                 return;
             }
-            if self.advance_arcade_fixed_point_motion() {
+            if self.advance_fixed_point_motion() {
                 return;
             }
             self.position = step_toward(self.position, target.position, behavior.lander_seek_speed);
@@ -197,14 +190,14 @@ impl Lander {
         if let Some(player) = prompt.player_position() {
             self.drift = if player.x < self.position.x { -1 } else { 1 };
         }
-        if !self.advance_arcade_fixed_point_motion() {
+        if !self.advance_fixed_point_motion() {
             self.drift(behavior);
         }
     }
 
     fn target_human<'a>(&self, prompt: &'a StepPrompt) -> Option<&'a ActorSnapshot> {
-        self.arcade_state
-            .and_then(|arcade_state| arcade_state.target_human_index)
+        self.runtime_state
+            .and_then(|runtime_state| runtime_state.target_human_index)
             .and_then(|target_slot_index| prompt.target_human(target_slot_index))
     }
 
@@ -215,28 +208,28 @@ impl Lander {
         ));
     }
 
-    fn advance_arcade_fixed_point_motion(&mut self) -> bool {
-        let Some(arcade_state) = &mut self.arcade_state else {
+    fn advance_fixed_point_motion(&mut self) -> bool {
+        let Some(runtime_state) = &mut self.runtime_state else {
             return false;
         };
-        if arcade_state.x_velocity == 0 && arcade_state.y_velocity == 0 {
+        if runtime_state.x_velocity == 0 && runtime_state.y_velocity == 0 {
             return false;
         }
 
-        let (x, x_fraction) = arcade_axis_step(
+        let (x, x_fraction) = step_motion_axis(
             self.position.x,
-            arcade_state.x_fraction,
-            arcade_state.x_velocity,
+            runtime_state.x_fraction,
+            runtime_state.x_velocity,
         );
-        let (y, y_fraction) = arcade_active_object_y_step(
+        let (y, y_fraction) = step_wrapping_motion_y(
             self.position.y,
-            arcade_state.y_fraction,
-            arcade_state.y_velocity,
+            runtime_state.y_fraction,
+            runtime_state.y_velocity,
         );
         self.position = Point::new(x, y);
-        arcade_state.x_fraction = x_fraction;
-        arcade_state.y_fraction = y_fraction;
-        self.drift = lander_drift_from_arcade_velocity(arcade_state.x_velocity);
+        runtime_state.x_fraction = x_fraction;
+        runtime_state.y_fraction = y_fraction;
+        self.drift = lander_drift_from_motion_word(runtime_state.x_velocity);
         true
     }
 
@@ -263,27 +256,27 @@ impl Lander {
             commands.push(GameCommand::Destroy(human_id));
             commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
                 position: self.position,
-                arcade_state: self.mutant_arcade_conversion(prompt),
+                runtime_state: self.mutant_runtime_conversion(prompt),
             }));
             commands.push(GameCommand::PlaySound(SoundCue::MutantSpawn));
         }
     }
 
-    fn mutant_arcade_conversion(&self, prompt: &StepPrompt) -> Option<MutantArcadeState> {
-        let arcade_state = self.arcade_state?;
-        let hop_rng = prompt.arcade_rng?;
-        Some(MutantArcadeState::from_lander_conversion(
-            arcade_state,
-            prompt.arcade_wave,
+    fn mutant_runtime_conversion(&self, prompt: &StepPrompt) -> Option<MutantRuntimeState> {
+        let runtime_state = self.runtime_state?;
+        let hop_rng = prompt.actor_rng?;
+        Some(MutantRuntimeState::from_lander_conversion(
+            runtime_state,
+            prompt.wave_tuning,
             hop_rng,
         ))
     }
 
-    fn tick_arcade_sleep(&mut self) -> bool {
-        if let Some(arcade_state) = &mut self.arcade_state
-            && arcade_state.sleep_ticks > 0
+    fn tick_runtime_sleep(&mut self) -> bool {
+        if let Some(runtime_state) = &mut self.runtime_state
+            && runtime_state.sleep_ticks > 0
         {
-            arcade_state.sleep_ticks = arcade_state.sleep_ticks.saturating_sub(1);
+            runtime_state.sleep_ticks = runtime_state.sleep_ticks.saturating_sub(1);
             return true;
         }
         false
@@ -295,21 +288,21 @@ impl Lander {
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) {
-        let mut arcade_shot_fired = false;
-        if let Some(arcade_state) = &mut self.arcade_state {
-            if arcade_state.shot_timer > 0 {
-                arcade_state.shot_timer = arcade_state.shot_timer.saturating_sub(1);
+        let mut runtime_shot_fired = false;
+        if let Some(runtime_state) = &mut self.runtime_state {
+            if runtime_state.shot_timer > 0 {
+                runtime_state.shot_timer = runtime_state.shot_timer.saturating_sub(1);
             }
-            if arcade_state.shot_timer == 0 {
-                arcade_state.shot_timer = clamped_lander_fire_timer_reset(behavior);
-                arcade_shot_fired = true;
+            if runtime_state.shot_timer == 0 {
+                runtime_state.shot_timer = clamped_lander_fire_timer_reset(behavior);
+                runtime_shot_fired = true;
             }
         }
-        if arcade_shot_fired {
+        if runtime_shot_fired {
             self.fire_lander_shot(prompt, behavior, commands);
             return;
         }
-        if self.arcade_state.is_some() {
+        if self.runtime_state.is_some() {
             return;
         }
 
@@ -326,10 +319,10 @@ impl Lander {
         commands: &mut Vec<GameCommand>,
     ) {
         let velocity = self.lander_shot_velocity(prompt, behavior);
-        let projectile_arcade_state = self.arcade_state.map(|arcade_state| {
-            arcade_enemy_projectile_state(
-                arcade_state.x_fraction,
-                arcade_state.y_fraction,
+        let projectile_runtime_state = self.runtime_state.map(|runtime_state| {
+            enemy_projectile_runtime_state(
+                runtime_state.x_fraction,
+                runtime_state.y_fraction,
                 velocity,
                 behavior.lander_shot_lifetime_steps,
             )
@@ -337,7 +330,7 @@ impl Lander {
         commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
             position: self.position,
             velocity,
-            arcade_state: projectile_arcade_state,
+            runtime_state: projectile_runtime_state,
         }));
         commands.push(GameCommand::PlaySound(SoundCue::LanderShot));
     }
@@ -359,41 +352,41 @@ impl Lander {
     }
 
     fn draw_effect(&self) -> VisualEffect {
-        self.arcade_state
-            .map(|arcade_state| VisualEffect::LanderSpriteFrame {
-                animation_frame: arcade_state.animation_frame,
+        self.runtime_state
+            .map(|runtime_state| VisualEffect::LanderSpriteFrame {
+                animation_frame: runtime_state.animation_frame,
             })
             .unwrap_or(VisualEffect::Static)
     }
 }
 
-const fn lander_drift_from_arcade_velocity(x_velocity: u16) -> i16 {
-    arcade_drift_from_velocity(x_velocity)
+const fn lander_drift_from_motion_word(x_velocity: u16) -> i16 {
+    drift_from_motion_word(x_velocity)
 }
 
-fn lander_spawn_visibility(arcade_state: Option<LanderArcadeState>) -> LanderSpawnVisibility {
-    let Some(arcade_state) = arcade_state else {
+fn lander_spawn_visibility(runtime_state: Option<LanderRuntimeState>) -> LanderSpawnVisibility {
+    let Some(runtime_state) = runtime_state else {
         return LanderSpawnVisibility::Normal;
     };
-    first_wave_refill_lander_spawn_visibility(arcade_state)
+    first_wave_refill_lander_spawn_visibility(runtime_state)
         .unwrap_or(LanderSpawnVisibility::Normal)
 }
 
-fn lander_spawn_is_visible(arcade_state: LanderArcadeState) -> bool {
-    first_wave_refill_lander_spawn_visibility(arcade_state)
+fn lander_spawn_is_visible(runtime_state: LanderRuntimeState) -> bool {
+    first_wave_refill_lander_spawn_visibility(runtime_state)
         == Some(LanderSpawnVisibility::VisibleFirstWaveRefill)
 }
 
 fn first_wave_refill_lander_spawn_visibility(
-    arcade_state: LanderArcadeState,
+    runtime_state: LanderRuntimeState,
 ) -> Option<LanderSpawnVisibility> {
     ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS
         .iter()
         .copied()
-        .filter_map(|spawn| spawn.arcade_state)
+        .filter_map(|spawn| spawn.runtime_state)
         .enumerate()
-        .find_map(|(index, refill_arcade_state)| {
-            lander_arcade_state_matches_refill_row(arcade_state, refill_arcade_state).then_some(
+        .find_map(|(index, refill_runtime_state)| {
+            lander_runtime_state_matches_refill_row(runtime_state, refill_runtime_state).then_some(
                 if index == 2 {
                     LanderSpawnVisibility::VisibleFirstWaveRefill
                 } else {
@@ -403,18 +396,18 @@ fn first_wave_refill_lander_spawn_visibility(
         })
 }
 
-fn lander_arcade_state_matches_refill_row(
-    arcade_state: LanderArcadeState,
-    refill_arcade_state: LanderArcadeState,
+fn lander_runtime_state_matches_refill_row(
+    runtime_state: LanderRuntimeState,
+    refill_runtime_state: LanderRuntimeState,
 ) -> bool {
-    arcade_state.x_fraction == refill_arcade_state.x_fraction
-        && arcade_state.y_fraction == refill_arcade_state.y_fraction
-        && arcade_state.x_velocity == refill_arcade_state.x_velocity
-        && arcade_state.y_velocity == refill_arcade_state.y_velocity
-        && arcade_state.shot_timer == refill_arcade_state.shot_timer
-        && arcade_state.sleep_ticks == refill_arcade_state.sleep_ticks
-        && arcade_state.animation_frame == refill_arcade_state.animation_frame
-        && arcade_state.target_human_index == refill_arcade_state.target_human_index
+    runtime_state.x_fraction == refill_runtime_state.x_fraction
+        && runtime_state.y_fraction == refill_runtime_state.y_fraction
+        && runtime_state.x_velocity == refill_runtime_state.x_velocity
+        && runtime_state.y_velocity == refill_runtime_state.y_velocity
+        && runtime_state.shot_timer == refill_runtime_state.shot_timer
+        && runtime_state.sleep_ticks == refill_runtime_state.sleep_ticks
+        && runtime_state.animation_frame == refill_runtime_state.animation_frame
+        && runtime_state.target_human_index == refill_runtime_state.target_human_index
 }
 
 fn clamped_lander_fire_timer_reset(behavior: ActorBehaviorProfile) -> u8 {

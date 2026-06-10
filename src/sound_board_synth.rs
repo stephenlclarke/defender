@@ -345,7 +345,7 @@ impl SoundBoardSynth {
 
         loop {
             for _ in 0..APPEAR_CYCLE_COUNT {
-                if self.next_arcade_random_carry_bit() {
+                if self.next_noise_random_carry_bit() {
                     level = !level;
                 }
                 append_level(out, level, materialize_repeat_count(frequency));
@@ -520,7 +520,7 @@ impl SoundBoardSynth {
         (self.random_lo & 1) != 0
     }
 
-    fn next_arcade_random_carry_bit(&mut self) -> bool {
+    fn next_noise_random_carry_bit(&mut self) -> bool {
         let feedback = ((self.random_lo >> 3) ^ self.random_lo) & 1;
         let high_carry = self.random_hi & 1;
         let low_carry = self.random_lo & 1;

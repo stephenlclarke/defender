@@ -1,4 +1,4 @@
-// Typed arcade asset data generated from the retired table assets.
+// Typed reference asset data generated from the retired table assets.
 // Keep this file data-only; runtime code should use semantic IDs, not raw original labels.
 
 // Some embedded frames are reference assets that are not drawn by the current runtime yet.
@@ -969,7 +969,7 @@ pub(crate) fn message_text(id: MessageId) -> &'static str {
     }
 }
 
-pub(crate) fn message_id_from_arcade_name(name: &str) -> Option<MessageId> {
+pub(crate) fn message_id_from_reference_name(name: &str) -> Option<MessageId> {
     Some(match name {
         "VWROM" => MessageId::OperatorProgramMemory,
         "VWRAM" => MessageId::OperatorWram,
@@ -1075,7 +1075,7 @@ pub(crate) fn message_id_from_script_key(key: &str) -> Option<MessageId> {
         "wave_complete_prefix" | "attack_wave" => MessageId::WaveCompletePrefix,
         "completed" => MessageId::Completed,
         "bonus_survivors" | "bonus_x" => MessageId::BonusSurvivors,
-        _ => return message_id_from_arcade_name(key),
+        _ => return message_id_from_reference_name(key),
     })
 }
 

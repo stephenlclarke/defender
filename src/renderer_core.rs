@@ -827,24 +827,24 @@ pub fn push_message_text_bytes_sprites(
     }
 }
 
-pub fn push_arcade_controlled_message_sprites(
+pub fn push_controlled_message_sprites(
     scene: &mut RenderScene,
     text: &str,
     top_left_screen_cell: ScreenAddress,
     layer: RenderLayer,
 ) {
-    let mut layout = ArcadeMessageTextLayout {
+    let mut layout = MessageTextLayout {
         top_left: top_left_screen_cell,
         cursor: top_left_screen_cell,
         line_spacing: MESSAGE_LINE_SPACING_ROWS,
     };
 
     for word in text.split_whitespace() {
-        if let Some(control) = arcade_message_control(word) {
+        if let Some(control) = message_text_control(word) {
             layout.apply(control);
             continue;
         }
-        if arcade_message_control_body(word).is_some() {
+        if message_text_control_body(word).is_some() {
             continue;
         }
 
@@ -887,38 +887,38 @@ fn message_text_cursor_advance(cursor: ScreenAddress, width_pixels: u32) -> Scre
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ArcadeMessageTextLayout {
+struct MessageTextLayout {
     top_left: ScreenAddress,
     cursor: ScreenAddress,
     line_spacing: u8,
 }
 
-impl ArcadeMessageTextLayout {
-    fn apply(&mut self, control: ArcadeMessageControl) {
+impl MessageTextLayout {
+    fn apply(&mut self, control: MessageTextControl) {
         match control {
-            ArcadeMessageControl::HorizontalFromTopLeft(delta) => {
+            MessageTextControl::HorizontalFromTopLeft(delta) => {
                 let [top_x, cursor_y] =
                     [self.top_left.word().to_be_bytes()[0], self.cursor.word().to_be_bytes()[1]];
                 self.cursor = ScreenAddress::from_bytes(top_x.wrapping_add(delta), cursor_y);
             }
-            ArcadeMessageControl::HorizontalFromCursor(delta) => {
+            MessageTextControl::HorizontalFromCursor(delta) => {
                 let [cursor_x, cursor_y] = self.cursor.word().to_be_bytes();
                 self.cursor = ScreenAddress::from_bytes(cursor_x.wrapping_add(delta), cursor_y);
             }
-            ArcadeMessageControl::VerticalFromTopLeft(delta) => {
+            MessageTextControl::VerticalFromTopLeft(delta) => {
                 let [cursor_x, _cursor_y] = self.cursor.word().to_be_bytes();
                 let top_y = self.top_left.word().to_be_bytes()[1];
                 self.cursor = ScreenAddress::from_bytes(cursor_x, top_y.wrapping_add(delta));
             }
-            ArcadeMessageControl::VerticalFromCursor(delta) => {
+            MessageTextControl::VerticalFromCursor(delta) => {
                 let [cursor_x, cursor_y] = self.cursor.word().to_be_bytes();
                 self.cursor = ScreenAddress::from_bytes(cursor_x, cursor_y.wrapping_add(delta));
             }
-            ArcadeMessageControl::ResetTopLeftAndCursor(screen_cell) => {
+            MessageTextControl::ResetTopLeftAndCursor(screen_cell) => {
                 self.top_left = screen_cell;
                 self.cursor = screen_cell;
             }
-            ArcadeMessageControl::ReturnLineFeed => {
+            MessageTextControl::ReturnLineFeed => {
                 let [top_x, _top_y] = self.top_left.word().to_be_bytes();
                 let cursor_y = self.cursor.word().to_be_bytes()[1];
                 self.cursor = ScreenAddress::from_bytes(top_x, cursor_y.wrapping_add(self.line_spacing));
@@ -928,7 +928,7 @@ impl ArcadeMessageTextLayout {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ArcadeMessageControl {
+enum MessageTextControl {
     HorizontalFromTopLeft(u8),
     HorizontalFromCursor(u8),
     VerticalFromTopLeft(u8),
@@ -937,42 +937,42 @@ enum ArcadeMessageControl {
     ReturnLineFeed,
 }
 
-fn arcade_message_control(word: &str) -> Option<ArcadeMessageControl> {
-    let body = arcade_message_control_body(word)?;
+fn message_text_control(word: &str) -> Option<MessageTextControl> {
+    let body = message_text_control_body(word)?;
     let (name, arguments) = body.split_once(':').unwrap_or((body, ""));
     match name {
-        "HMT" => Some(ArcadeMessageControl::HorizontalFromTopLeft(
-            arcade_message_control_byte(arguments)?,
+        "HMT" => Some(MessageTextControl::HorizontalFromTopLeft(
+            message_text_control_byte(arguments)?,
         )),
-        "HMC" => Some(ArcadeMessageControl::HorizontalFromCursor(
-            arcade_message_control_byte(arguments)?,
+        "HMC" => Some(MessageTextControl::HorizontalFromCursor(
+            message_text_control_byte(arguments)?,
         )),
-        "VMT" => Some(ArcadeMessageControl::VerticalFromTopLeft(
-            arcade_message_control_byte(arguments)?,
+        "VMT" => Some(MessageTextControl::VerticalFromTopLeft(
+            message_text_control_byte(arguments)?,
         )),
-        "VMC" => Some(ArcadeMessageControl::VerticalFromCursor(
-            arcade_message_control_byte(arguments)?,
+        "VMC" => Some(MessageTextControl::VerticalFromCursor(
+            message_text_control_byte(arguments)?,
         )),
         "RTC" => {
             let (x, y) = arguments.split_once(',')?;
-            Some(ArcadeMessageControl::ResetTopLeftAndCursor(
+            Some(MessageTextControl::ResetTopLeftAndCursor(
                 ScreenAddress::from_bytes(
-                    arcade_message_control_byte(x)?,
-                    arcade_message_control_byte(y)?,
+                    message_text_control_byte(x)?,
+                    message_text_control_byte(y)?,
                 ),
             ))
         }
-        "RLF" if arguments.is_empty() => Some(ArcadeMessageControl::ReturnLineFeed),
+        "RLF" if arguments.is_empty() => Some(MessageTextControl::ReturnLineFeed),
         _ => None,
     }
 }
 
-fn arcade_message_control_body(word: &str) -> Option<&str> {
+fn message_text_control_body(word: &str) -> Option<&str> {
     word.strip_prefix('[')
         .and_then(|value| value.strip_suffix(']'))
 }
 
-fn arcade_message_control_byte(value: &str) -> Option<u8> {
+fn message_text_control_byte(value: &str) -> Option<u8> {
     let hex = value.strip_prefix("0x")?;
     u8::from_str_radix(hex, 16).ok()
 }

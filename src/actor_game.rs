@@ -6,7 +6,7 @@
 
 include!("actor_game_core.rs");
 include!("actor_game_behavior_scripts.rs");
-include!("actor_game_arcade_state.rs");
+include!("actor_game_runtime_state.rs");
 include!("actor_game_spawn_patterns.rs");
 include!("actor_game_wave_profile.rs");
 include!("actor_game_wave_scripts.rs");
@@ -17,7 +17,7 @@ include!("actor_game_attract_scoring.rs");
 include!("actor_game_runtime.rs");
 include!("actor_game_driver.rs");
 include!("actor_game_actor_helpers.rs");
-include!("actor_game_arcade_motion.rs");
+include!("actor_game_fixed_point_motion.rs");
 include!("actor_game_actors_hostile_motion.rs");
 include!("actor_game_actors_hostile_projectiles.rs");
 include!("actor_game_actors_player.rs");

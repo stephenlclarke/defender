@@ -1,4 +1,4 @@
-# Actor runtime arcade attract title script.
+# Actor runtime attract title script.
 # Format: <action> <start-step> <duration|forever> <x> <y> [text]
 # message uses: <message-key> <top-left-screen-address> [offset-x offset-y]
 # high_scores adds: <row-height> <rows>
