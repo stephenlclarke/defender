@@ -1,9 +1,8 @@
 //! Actor-oriented Defender rewrite prototype.
 //!
-//! This module is intentionally independent from the current MAME-shaped
-//! `Game` implementation. It models the game as driver-owned actor threads:
-//! the driver prompts every asset once per step, gathers commands, resolves
-//! world rules in a stable order, and publishes a step description.
+//! This module models the game as driver-owned actor threads: the driver
+//! prompts every asset once per step, gathers commands, resolves world rules in
+//! a stable order, and publishes a step description.
 
 include!("actor_game_core.rs");
 include!("actor_game_behavior_scripts.rs");

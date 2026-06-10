@@ -55,7 +55,7 @@ mod tests {
     }
 
     #[test]
-    fn tonal_hit_gwave_vectors_use_mame_calibrated_period_density() {
+    fn tonal_hit_gwave_vectors_use_arcade_reference_period_density() {
         let bomber_hit = gwave_vector(GWaveSound::Vector(1)).expect("bomber hit GWAVE vector");
         let pod_hit = gwave_vector(GWaveSound::Vector(5)).expect("pod hit GWAVE vector");
 

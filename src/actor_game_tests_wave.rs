@@ -301,7 +301,7 @@
     }
 
     #[test]
-    fn first_wave_early_reserve_lander_spawns_match_mame_rows() {
+    fn first_wave_early_reserve_lander_spawns_match_arcade_reference_rows() {
         let rows = ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS
             .iter()
             .copied()
@@ -322,7 +322,7 @@
     }
 
     #[test]
-    fn first_wave_refill_lander_spawns_match_mame_rows() {
+    fn first_wave_refill_lander_spawns_match_arcade_reference_rows() {
         let rows = ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS
             .iter()
             .copied()
