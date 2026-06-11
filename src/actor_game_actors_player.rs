@@ -48,7 +48,7 @@ impl AssetActor for AttractDirector {
                 direction: None,
                 bounds: None,
                 alive: true,
-                reference_state: ActorReferenceState::NONE,
+                actor_state: ActorInternalState::NONE,
             },
             commands,
             draws,
@@ -126,7 +126,7 @@ impl AssetActor for ScriptedAttractProgram {
                 direction: None,
                 bounds: None,
                 alive: true,
-                reference_state: ActorReferenceState::NONE,
+                actor_state: ActorInternalState::NONE,
             },
             commands: Vec::new(),
             draws,
@@ -233,7 +233,7 @@ impl StatusDisplay {
             direction: None,
             bounds: None,
             alive: true,
-                reference_state: ActorReferenceState::NONE,
+                actor_state: ActorInternalState::NONE,
         }
     }
 }
@@ -575,7 +575,7 @@ impl AssetActor for PlayerShip {
                     None
                 },
                 alive: prompt.phase == Phase::Playing,
-                reference_state: ActorReferenceState::NONE,
+                actor_state: ActorInternalState::NONE,
             },
             commands,
             draws,

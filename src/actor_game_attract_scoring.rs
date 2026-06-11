@@ -890,7 +890,7 @@ fn push_actor_attract_scoring_score_500_pixels(
     position: [f32; 2],
     display_step: u16,
 ) {
-    let bytes = crate::reference_assets::object_bitmap_bytes(SCORE_POPUP_500_PIXEL_BITMAP);
+    let bytes = crate::arcade_assets::object_bitmap_bytes(SCORE_POPUP_500_PIXEL_BITMAP);
     let rows = 6_usize;
     let byte_columns = 6_usize;
     if bytes.len() != rows * byte_columns {
@@ -923,8 +923,8 @@ fn push_actor_attract_scoring_score_500_pixels(
     }
 }
 
-const SCORE_POPUP_500_PIXEL_BITMAP: crate::reference_assets::ObjectBitmapId =
-    crate::reference_assets::ObjectBitmapId::Score500Primary;
+const SCORE_POPUP_500_PIXEL_BITMAP: crate::arcade_assets::ObjectBitmapId =
+    crate::arcade_assets::ObjectBitmapId::Score500Primary;
 
 fn actor_score_500_nibble_tint(nibble: u8, phase: usize) -> Option<Color> {
     match nibble {
@@ -1143,7 +1143,7 @@ fn actor_attract_scoring_enemy_sprite_frame_descriptor(
     match enemy {
         ActorAttractScoringEnemyKind::Lander => ActorAttractScoringSpriteFrameDescriptor {
             sprite_asset_image: SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::LanderFrame1Primary,
+                crate::arcade_assets::ObjectBitmapId::LanderFrame1Primary,
                 8,
                 5,
             ),
@@ -1152,7 +1152,7 @@ fn actor_attract_scoring_enemy_sprite_frame_descriptor(
         },
         ActorAttractScoringEnemyKind::Mutant => ActorAttractScoringSpriteFrameDescriptor {
             sprite_asset_image: SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::MutantPrimary,
+                crate::arcade_assets::ObjectBitmapId::MutantPrimary,
                 8,
                 5,
             ),
@@ -1161,7 +1161,7 @@ fn actor_attract_scoring_enemy_sprite_frame_descriptor(
         },
         ActorAttractScoringEnemyKind::Baiter => ActorAttractScoringSpriteFrameDescriptor {
             sprite_asset_image: SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::BaiterFrame1Primary,
+                crate::arcade_assets::ObjectBitmapId::BaiterFrame1Primary,
                 4,
                 6,
             ),
@@ -1170,7 +1170,7 @@ fn actor_attract_scoring_enemy_sprite_frame_descriptor(
         },
         ActorAttractScoringEnemyKind::Bomber => ActorAttractScoringSpriteFrameDescriptor {
             sprite_asset_image: SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::BomberFrame1Primary,
+                crate::arcade_assets::ObjectBitmapId::BomberFrame1Primary,
                 8,
                 4,
             ),
@@ -1179,7 +1179,7 @@ fn actor_attract_scoring_enemy_sprite_frame_descriptor(
         },
         ActorAttractScoringEnemyKind::Pod => ActorAttractScoringSpriteFrameDescriptor {
             sprite_asset_image: SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::PodPrimary,
+                crate::arcade_assets::ObjectBitmapId::PodPrimary,
                 8,
                 4,
             ),
@@ -1188,7 +1188,7 @@ fn actor_attract_scoring_enemy_sprite_frame_descriptor(
         },
         ActorAttractScoringEnemyKind::Swarmer => ActorAttractScoringSpriteFrameDescriptor {
             sprite_asset_image: SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::SwarmerPrimary,
+                crate::arcade_assets::ObjectBitmapId::SwarmerPrimary,
                 4,
                 3,
             ),

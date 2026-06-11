@@ -668,12 +668,12 @@ fn actor_script_check_actor_samples(
         .filter(|snapshot| snapshot.alive)
         .filter_map(|snapshot| {
             actor_script_check_actor_subpixels(snapshot).map(
-                |(reference_x_fraction, reference_y_fraction)| ActorScriptCheckActorSample {
+                |(actor_x_fraction, actor_y_fraction)| ActorScriptCheckActorSample {
                     kind: actor_script_check_actor_kind_label(snapshot.kind).to_string(),
                     x: snapshot.position.x,
                     y: snapshot.position.y,
-                    reference_x_fraction,
-                    reference_y_fraction,
+                    actor_x_fraction,
+                    actor_y_fraction,
                 },
             )
         })
@@ -692,8 +692,8 @@ fn actor_script_check_actor_subpixels(
         | ActorKind::Swarmer
         | ActorKind::Baiter
         | ActorKind::Human => snapshot
-            .reference_subpixels()
-            .map(|subpixels| (subpixels.x, subpixels.y)),
+            .actor_subpixels()
+            .map(|subpixels| (subpixels.x(), subpixels.y())),
         _ => None,
     }
 }
@@ -720,7 +720,7 @@ fn actor_script_check_enemy_projectile_samples(
         .iter()
         .filter(|snapshot| snapshot.alive)
         .filter_map(|snapshot| {
-            let reference_state = snapshot.enemy_projectile_reference_state()?;
+            let actor_state = snapshot.enemy_projectile_actor_state()?;
             let kind = match snapshot.kind {
                 ActorKind::EnemyLaser => "enemy_laser",
                 ActorKind::Bomb => "bomb",
@@ -730,11 +730,11 @@ fn actor_script_check_enemy_projectile_samples(
                 kind: kind.to_string(),
                 x: snapshot.position.x,
                 y: snapshot.position.y,
-                reference_x_fraction: reference_state.x_fraction,
-                reference_y_fraction: reference_state.y_fraction,
-                reference_x_velocity: reference_state.x_velocity,
-                reference_y_velocity: reference_state.y_velocity,
-                lifetime_ticks: reference_state.lifetime_ticks,
+                actor_x_fraction: actor_state.x_fraction(),
+                actor_y_fraction: actor_state.y_fraction(),
+                actor_x_velocity: actor_state.x_velocity(),
+                actor_y_velocity: actor_state.y_velocity(),
+                lifetime_ticks: actor_state.lifetime_ticks,
             })
         })
         .take(ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_LIMIT)
@@ -752,29 +752,29 @@ fn actor_script_check_projectile_spawn_command_samples(
             GameCommand::Spawn(SpawnRequest::EnemyLaser {
                 position,
                 velocity,
-                reference_state,
-            }) => Some(("enemy_laser", *position, *velocity, *reference_state)),
-            GameCommand::Spawn(SpawnRequest::Bomb { position, reference_state }) => Some((
+                actor_state,
+            }) => Some(("enemy_laser", *position, *velocity, *actor_state)),
+            GameCommand::Spawn(SpawnRequest::Bomb { position, actor_state }) => Some((
                 "bomb",
                 *position,
                 crate::actor_game::Velocity::default(),
-                *reference_state,
+                *actor_state,
             )),
             _ => None,
         })
         .take(ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_LIMIT)
         .map(
-            |(kind, position, velocity, reference_state)| ActorScriptCheckProjectileSpawnSample {
+            |(kind, position, velocity, actor_state)| ActorScriptCheckProjectileSpawnSample {
                 kind: kind.to_string(),
                 x: position.x,
                 y: position.y,
                 velocity_dx: velocity.dx,
                 velocity_dy: velocity.dy,
-                reference_x_fraction: reference_state.map(|reference_state| reference_state.x_fraction),
-                reference_y_fraction: reference_state.map(|reference_state| reference_state.y_fraction),
-                reference_x_velocity: reference_state.map(|reference_state| reference_state.x_velocity),
-                reference_y_velocity: reference_state.map(|reference_state| reference_state.y_velocity),
-                lifetime_ticks: reference_state.map(|reference_state| reference_state.lifetime_ticks),
+                actor_x_fraction: actor_state.map(|actor_state| actor_state.x_fraction()),
+                actor_y_fraction: actor_state.map(|actor_state| actor_state.y_fraction()),
+                actor_x_velocity: actor_state.map(|actor_state| actor_state.x_velocity()),
+                actor_y_velocity: actor_state.map(|actor_state| actor_state.y_velocity()),
+                lifetime_ticks: actor_state.map(|actor_state| actor_state.lifetime_ticks),
             },
         )
         .collect()

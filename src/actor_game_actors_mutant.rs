@@ -5,7 +5,7 @@ struct Mutant {
     id: ActorId,
     position: Point,
     drift: i16,
-    reference_state: Option<MutantReferenceState>,
+    actor_state: Option<MutantActorState>,
 }
 
 impl Mutant {
@@ -14,10 +14,10 @@ impl Mutant {
             id,
             position: spawn.position,
             drift: spawn
-                .reference_state
-                .map(|reference_state| drift_from_motion_word(reference_state.x_velocity))
+                .actor_state
+                .map(|actor_state| drift_from_motion_word(actor_state.x_velocity()))
                 .unwrap_or(-1),
-            reference_state: spawn.reference_state,
+            actor_state: spawn.actor_state,
         }
     }
 
@@ -26,37 +26,37 @@ impl Mutant {
     }
 
     fn scene_position(&self) -> Point {
-        mutant_dive_scene_position(self.position, self.reference_state)
+        mutant_dive_scene_position(self.position, self.actor_state)
     }
 
     fn collision_position(&self) -> Point {
-        mutant_dive_collision_position(self.position, self.reference_state)
+        mutant_dive_collision_position(self.position, self.actor_state)
     }
 
-    fn advance_runtime_motion(
+    fn advance_actor_motion(
         &mut self,
         prompt: &StepPrompt,
         behavior: ActorBehaviorProfile,
         commands: &mut Vec<GameCommand>,
     ) -> bool {
-        let Some(reference_state) = &mut self.reference_state else {
+        let Some(actor_state) = &mut self.actor_state else {
             return false;
         };
-        if reference_state.sleep_ticks > 0 {
-            if let Some((position, velocity, projectile_reference_state)) =
+        if actor_state.sleep_ticks > 0 {
+            if let Some((position, velocity, projectile_actor_state)) =
                 mutant_dive_forced_shot(
                     self.position,
-                    *reference_state,
+                    *actor_state,
                     prompt,
                     behavior,
                 )
             {
-                reference_state.dive_entry_shot_deferred = true;
-                reference_state.shot_timer = MUTANT_DIVE_COLLISION_PENDING_SHOT_TIMER;
+                actor_state.dive_entry_shot_deferred = true;
+                actor_state.shot_timer = MUTANT_DIVE_COLLISION_PENDING_SHOT_TIMER;
                 push_enemy_projectile_command(
                     position,
                     velocity,
-                    projectile_reference_state,
+                    projectile_actor_state,
                     SoundCue::MutantShot,
                     commands,
                 );
@@ -64,24 +64,24 @@ impl Mutant {
             if let Some(player_position) = prompt.player_position()
                 && mutant_dive_fires_visible_entry_shot(
                     self.position,
-                    *reference_state,
+                    *actor_state,
                     player_position,
                 )
             {
-                reference_state.dive_entry_shot_deferred = true;
+                actor_state.dive_entry_shot_deferred = true;
                 let shot_rng = mutant_shot_rng(prompt, self.id, self.position);
                 let shot_position =
-                    mutant_dive_shot_position(self.position, *reference_state);
+                    mutant_dive_shot_position(self.position, *actor_state);
                 push_mutant_shot(
                     shot_position,
                     prompt,
                     behavior,
-                    *reference_state,
+                    *actor_state,
                     shot_rng,
                     commands,
                 );
             }
-            reference_state.sleep_ticks = reference_state.sleep_ticks.saturating_sub(1);
+            actor_state.sleep_ticks = actor_state.sleep_ticks.saturating_sub(1);
             return true;
         }
 
@@ -90,18 +90,20 @@ impl Mutant {
         };
         let profile = prompt.wave_tuning;
         let player_absolute_x = absolute_world_x(player_position, 0);
-        let object_absolute_x = absolute_world_x(self.position, reference_state.x_fraction);
-        reference_state.x_velocity = mutant_x_velocity(
-            profile.mutant_x_velocity,
-            player_absolute_x,
-            object_absolute_x,
-        );
-        reference_state.y_velocity = mutant_y_velocity(
-            profile,
-            player_position.y,
-            player_absolute_x,
-            object_absolute_x,
-            self.position,
+        let object_absolute_x = absolute_world_x(self.position, actor_state.x_fraction());
+        actor_state.set_velocity(
+            mutant_x_velocity(
+                profile.mutant_x_velocity,
+                player_absolute_x,
+                object_absolute_x,
+            ),
+            mutant_y_velocity(
+                profile,
+                player_position.y,
+                player_absolute_x,
+                object_absolute_x,
+                self.position,
+            ),
         );
 
         let mut next_sleep_ticks = MUTANT_LOOP_SLEEP_TICKS;
@@ -111,11 +113,11 @@ impl Mutant {
             self.position,
         ) {
             let forced_dive_shot =
-                mutant_dive_fires_path_shot(self.position, *reference_state);
+                mutant_dive_fires_path_shot(self.position, *actor_state);
             let forced_dive_shot_position = self.position;
-            let mut hop_rng = actor_rng_from_snapshot(reference_state.hop_rng);
+            let mut hop_rng = actor_rng_from_snapshot(actor_state.hop_rng);
             let hop_state = hop_rng.advance();
-            reference_state.hop_rng = hop_state.snapshot();
+            actor_state.hop_rng = hop_state.snapshot();
             self.position.y =
                 mutant_hop_y(self.position.y, profile.mutant_random_y, hop_state.seed);
 
@@ -123,66 +125,54 @@ impl Mutant {
                 let shot_rng = mutant_shot_rng(prompt, self.id, self.position);
                 let shot_position = mutant_dive_shot_position(
                     forced_dive_shot_position,
-                    *reference_state,
+                    *actor_state,
                 );
                 push_mutant_shot(
                     shot_position,
                     prompt,
                     behavior,
-                    *reference_state,
+                    *actor_state,
                     shot_rng,
                     commands,
                 );
-                reference_state.shot_timer = MUTANT_DIVE_POST_SHOT_TIMER;
+                actor_state.shot_timer = MUTANT_DIVE_POST_SHOT_TIMER;
             } else {
-                reference_state.shot_timer = reference_state.shot_timer.wrapping_sub(1);
-                if reference_state.shot_timer == 0 {
+                actor_state.shot_timer = actor_state.shot_timer.wrapping_sub(1);
+                if actor_state.shot_timer == 0 {
                     if mutant_dive_suppresses_regular_shot(
                         self.position,
-                        *reference_state,
+                        *actor_state,
                     ) {
-                        reference_state.shot_timer = MUTANT_DIVE_COLLISION_PENDING_SHOT_TIMER;
-                    } else if mutant_dive_defers_first_shot(self.position, *reference_state)
+                        actor_state.shot_timer = MUTANT_DIVE_COLLISION_PENDING_SHOT_TIMER;
+                    } else if mutant_dive_defers_first_shot(self.position, *actor_state)
                     {
-                        reference_state.dive_entry_shot_deferred = true;
-                        reference_state.shot_timer = MUTANT_DIVE_DEFERRED_SHOT_TIMER;
+                        actor_state.dive_entry_shot_deferred = true;
+                        actor_state.shot_timer = MUTANT_DIVE_DEFERRED_SHOT_TIMER;
                         next_sleep_ticks = 0;
                     } else {
                         let shot_rng = mutant_shot_rng(prompt, self.id, self.position);
                         let default_reset = mutant_shot_reset(profile, shot_rng.seed);
                         let shot_position =
-                            mutant_dive_shot_position(self.position, *reference_state);
+                            mutant_dive_shot_position(self.position, *actor_state);
                         let fired = push_mutant_shot(
                             shot_position,
                             prompt,
                             behavior,
-                            *reference_state,
+                            *actor_state,
                             shot_rng,
                             commands,
                         );
-                        reference_state.shot_timer =
-                            mutant_dive_post_shot_timer(*reference_state, fired)
+                        actor_state.shot_timer =
+                            mutant_dive_post_shot_timer(*actor_state, fired)
                                 .unwrap_or(default_reset);
                     }
                 }
             }
         }
 
-        let (x, x_fraction) = step_motion_axis(
-            self.position.x,
-            reference_state.x_fraction,
-            reference_state.x_velocity,
-        );
-        let (y, y_fraction) = step_wrapping_motion_y(
-            self.position.y,
-            reference_state.y_fraction,
-            reference_state.y_velocity,
-        );
-        self.position = Point::new(x, y);
-        reference_state.x_fraction = x_fraction;
-        reference_state.y_fraction = y_fraction;
-        reference_state.sleep_ticks = next_sleep_ticks;
-        self.drift = drift_from_motion_word(reference_state.x_velocity);
+        self.position = actor_state.advance_motion(self.position);
+        actor_state.sleep_ticks = next_sleep_ticks;
+        self.drift = drift_from_motion_word(actor_state.x_velocity());
         true
     }
 }
@@ -198,7 +188,7 @@ impl AssetActor for Mutant {
         let previous_position = self.position;
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Mutant);
-            if !self.advance_runtime_motion(prompt, behavior, &mut commands)
+            if !self.advance_actor_motion(prompt, behavior, &mut commands)
                 && let Some(position) = move_by_hostile_mode(
                     self.position,
                     behavior.mutant_mode,
@@ -230,7 +220,7 @@ impl AssetActor for Mutant {
                 )),
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                reference_state: ActorReferenceState::mutant(self.reference_state),
+                actor_state: ActorInternalState::mutant(self.actor_state),
             },
             commands,
             draws,
@@ -351,19 +341,19 @@ fn push_mutant_shot(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
-    reference_state: MutantReferenceState,
+    actor_state: MutantActorState,
     shot_rng: ActorRngSnapshot,
     commands: &mut Vec<GameCommand>,
 ) -> bool {
-    let Some((velocity, projectile_reference_state)) =
-        mutant_fireball(position, prompt, behavior, reference_state, shot_rng)
+    let Some((velocity, projectile_actor_state)) =
+        mutant_fireball(position, prompt, behavior, actor_state, shot_rng)
     else {
         return false;
     };
     push_enemy_projectile_command(
         position,
         velocity,
-        projectile_reference_state,
+        projectile_actor_state,
         SoundCue::MutantShot,
         commands,
     );
@@ -374,15 +364,15 @@ fn mutant_fireball(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
-    reference_state: MutantReferenceState,
+    actor_state: MutantActorState,
     shot_rng: ActorRngSnapshot,
-) -> Option<(Velocity, EnemyProjectileReferenceState)> {
+) -> Option<(Velocity, EnemyProjectileActorState)> {
     let lifetime_ticks =
         projectile_lifetime_ticks(behavior.mutant_shot_lifetime_steps);
     enemy_fireball_projectile(
         position,
-        reference_state.x_fraction,
-        reference_state.y_fraction,
+        actor_state.x_fraction(),
+        actor_state.y_fraction(),
         prompt,
         shot_rng,
         lifetime_ticks,

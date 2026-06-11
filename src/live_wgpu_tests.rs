@@ -444,7 +444,7 @@ mod tests {
                 "  first_playing_enemy_counts: landers=15,bombers=0,pods=0,mutants=0,swarmers=0\n",
                 "  first_playing_world_counts: enemies=2,humans=2\n",
                 "  first_playing_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0\n",
-                "  first_playing_reference_debug: world_scroll_left=0x0000,rng=seed=0xbe,hseed=0xb1,lseed=0x06\n",
+                "  first_playing_actor_debug: world_scroll_left=0x0000,rng=seed=0xbe,hseed=0xb1,lseed=0x06\n",
                 "  first_playing_actor_samples: none\n",
                 "  first_playing_enemy_projectile_samples: none\n",
                 "  first_playing_sound_commands: 0xea\n",
@@ -464,10 +464,10 @@ mod tests {
                 "swarmer@2[score_delta=150,score=150,explosions=swarmer@62,120[explosion_anchor=none],sounds=0xf8,spawns=none];",
                 "baiter@2[score_delta=200,score=200,explosions=baiter@62,120[explosion_anchor=none],sounds=0xf8,spawns=none]\n",
                 "  hostile_projectile_matrix: ",
-                "lander@1[samples=enemy_laser@210,45[velocity=-3/3,reference_debug=frac=0xe9/0x60,vel=0xfd00/0x0300,life=90],sounds=0xfc];",
-                "mutant@454[samples=enemy_laser@0,222[velocity=1/-1,reference_debug=frac=0x50/0x00,vel=0x009c/0xfe5c,life=90],sounds=0xf6];",
-                "swarmer@0[samples=enemy_laser@62,120[velocity=3/0,reference_debug=none],sounds=0xf3];",
-                "baiter@79[samples=enemy_laser@28,120[velocity=1/-1,reference_debug=frac=0x00/0x00,vel=0x002c/0xffc4,life=20],sounds=0xfc]\n",
+                "lander@1[samples=enemy_laser@210,45[velocity=-3/3,actor_debug=frac=0xe9/0x60,vel=0xfd00/0x0300,life=90],sounds=0xfc];",
+                "mutant@454[samples=enemy_laser@0,222[velocity=1/-1,actor_debug=frac=0x50/0x00,vel=0x009c/0xfe5c,life=90],sounds=0xf6];",
+                "swarmer@0[samples=enemy_laser@62,120[velocity=3/0,actor_debug=none],sounds=0xf3];",
+                "baiter@79[samples=enemy_laser@28,120[velocity=1/-1,actor_debug=frac=0x00/0x00,vel=0x002c/0xffc4,life=20],sounds=0xfc]\n",
                 "  first_enemy_projectile: unavailable,reason=enemy_projectile_not_observed_after_512_steps\n",
                 "  wave_clear_assist_steps: 4\n",
                 "  wave_clear_next_wave: 2\n",
@@ -487,7 +487,7 @@ mod tests {
                 "  next_playing_enemy_counts: landers=20,bombers=3,pods=1,mutants=0,swarmers=0\n",
                 "  next_playing_world_counts: enemies=2,humans=2\n",
                 "  next_playing_reserve_counts: landers=0,bombers=0,pods=0,mutants=0,swarmers=0\n",
-                "  next_playing_reference_debug: world_scroll_left=0x0000,rng=seed=0x82,hseed=0x35,lseed=0x88\n",
+                "  next_playing_actor_debug: world_scroll_left=0x0000,rng=seed=0x82,hseed=0x35,lseed=0x88\n",
                 "  next_playing_actor_samples: none\n",
                 "  next_playing_enemy_projectile_samples: none\n",
                 "  next_playing_sound_commands: none\n",
@@ -514,9 +514,9 @@ mod tests {
                 "cycle 12\n",
                 "williams_logo 1 forever 12 20\n",
                 "defender_wordmark 2 4 48 36\n",
-                "message 3 3 HALLD_TITLE 0x3854\n",
+                "message 3 3 HALLD_TITLE hall_title\n",
                 "scoring_surface 4 6\n",
-                "message 5 4 SWARMV 0x5CA8\n",
+                "message 5 4 SWARMV swarmer_instruction\n",
                 "[behavior]\n",
                 "kind lander lander_mode drift\n",
                 "[wave]\n",
@@ -802,7 +802,7 @@ mod tests {
     #[test]
     fn actor_script_check_reports_enemy_projectile_and_sound_samples() {
         let path = write_actor_script_file(
-            "actor-script-reference-projectile-check",
+            "actor-script-arcade-projectile-check",
             concat!(
                 "[attract]\n",
                 "text 1 forever 12 20 PROJECTILE CHECK\n",
@@ -830,10 +830,10 @@ mod tests {
                 kind: "enemy_laser".to_string(),
                 x: 0,
                 y: 220,
-                reference_x_fraction: 0xec,
-                reference_y_fraction: 0x5c,
-                reference_x_velocity: 0x009c,
-                reference_y_velocity: 0xfe5c,
+                actor_x_fraction: 0xec,
+                actor_y_fraction: 0x5c,
+                actor_x_velocity: 0x009c,
+                actor_y_velocity: 0xfe5c,
                 lifetime_ticks: 90,
             }]
         );
@@ -853,14 +853,14 @@ mod tests {
     #[test]
     fn actor_script_check_reports_wave_tuning_overrides_at_play_start() {
         let path = write_actor_script_file(
-            "actor-script-reference-wave-check",
+            "actor-script-arcade-wave-check",
             concat!(
                 "[attract]\n",
                 "text 1 forever 12 20 ARCADE CHECK\n",
                 "[behavior]\n",
                 "kind lander lander_mode drift\n",
                 "[wave]\n",
-                "name reference check waves\n",
+                "name arcade check waves\n",
                 "wave_tuning 1 wave_size 5 landers 1 bombers 1 pods 1 mutants 1 swarmers 1 ",
                 "swarmer_x_velocity 64 swarmer_shot_time 11 baiter_time 24 ",
                 "mutant_x_velocity 48 mutant_random_y 2 mutant_shot_time 12\n",
@@ -890,57 +890,57 @@ mod tests {
                     kind: "lander".to_string(),
                     x: 251,
                     y: 44,
-                    reference_x_fraction: 0x33,
-                    reference_y_fraction: 0xe0,
+                    actor_x_fraction: 0x33,
+                    actor_y_fraction: 0xe0,
                 },
                 ActorScriptCheckActorSample {
                     kind: "bomber".to_string(),
                     x: 227,
                     y: 104,
-                    reference_x_fraction: 0xe0,
-                    reference_y_fraction: 0x00,
+                    actor_x_fraction: 0xe0,
+                    actor_y_fraction: 0x00,
                 },
                 ActorScriptCheckActorSample {
                     kind: "pod".to_string(),
                     x: 184,
                     y: 72,
-                    reference_x_fraction: 0x20,
-                    reference_y_fraction: 0x00,
+                    actor_x_fraction: 0x20,
+                    actor_y_fraction: 0x00,
                 },
                 ActorScriptCheckActorSample {
                     kind: "mutant".to_string(),
                     x: 148,
                     y: 96,
-                    reference_x_fraction: 0x00,
-                    reference_y_fraction: 0x00,
+                    actor_x_fraction: 0x00,
+                    actor_y_fraction: 0x00,
                 },
                 ActorScriptCheckActorSample {
                     kind: "swarmer".to_string(),
                     x: 236,
                     y: 66,
-                    reference_x_fraction: 0x00,
-                    reference_y_fraction: 0x00,
+                    actor_x_fraction: 0x00,
+                    actor_y_fraction: 0x00,
                 },
                 ActorScriptCheckActorSample {
                     kind: "human".to_string(),
                     x: 24,
                     y: 224,
-                    reference_x_fraction: 0xc3,
-                    reference_y_fraction: 0x00,
+                    actor_x_fraction: 0xc3,
+                    actor_y_fraction: 0x00,
                 },
                 ActorScriptCheckActorSample {
                     kind: "human".to_string(),
                     x: 28,
                     y: 225,
-                    reference_x_fraction: 0x81,
-                    reference_y_fraction: 0x00,
+                    actor_x_fraction: 0x81,
+                    actor_y_fraction: 0x00,
                 },
                 ActorScriptCheckActorSample {
                     kind: "human".to_string(),
                     x: 78,
                     y: 224,
-                    reference_x_fraction: 0x30,
-                    reference_y_fraction: 0x00,
+                    actor_x_fraction: 0x30,
+                    actor_y_fraction: 0x00,
                 },
             ]
         );
@@ -958,7 +958,7 @@ mod tests {
     }
 
     #[test]
-    fn actor_script_check_reports_reserve_and_reference_state_at_play_start() {
+    fn actor_script_check_reports_reserve_and_actor_state_at_play_start() {
         let path = write_actor_script_file(
             "actor-script-reserve-check",
             concat!(
@@ -990,7 +990,7 @@ mod tests {
         assert!(
             report
                 .to_text()
-                .contains("first_playing_reference_debug: world_scroll_left=0x0000,rng=seed=")
+                .contains("first_playing_actor_debug: world_scroll_left=0x0000,rng=seed=")
         );
     }
 

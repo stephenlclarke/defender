@@ -7,7 +7,7 @@ use crate::{
         ActorFrame, ActorKind, ActorRuntimeAdapter, AttractScript, GameInput, Phase, Point,
         SpriteKey, VisualEffect,
     },
-    reference_assets::{MessageId, message_text},
+    arcade_assets::{MessageId, message_text},
     game::{GameEvent, GameOverSnapshot, SoundEvent},
     renderer::{
         NativeRenderPipeline, NativeSceneRenderer, RenderLayer, SceneDrawPlan, SpriteId,

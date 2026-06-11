@@ -6,8 +6,6 @@ const OBJECT_EVIDENCE_TABLE_BASE_ADDRESS: u16 = 0xA23C;
 const OBJECT_EVIDENCE_SLOT_STRIDE: u16 = 0x17;
 const OBJECT_EVIDENCE_DEFAULT_TYPE: u8 = 0x00;
 const BOMBER_ANIMATION_FRAME_COUNT: u8 = 4;
-const ENEMY_BOMB_OUTPUT_ROUTINE_ADDRESS: u16 = 0xE498;
-const FIREBALL_OUTPUT_ROUTINE_ADDRESS: u16 = 0xE4D9;
 const ENEMY_BOMB_OBJECT_BITMAP_NAME: &str = "BMBP1";
 const ENEMY_BOMB_OBJECT_BITMAP_DESCRIPTOR_ADDRESS: u16 = 0xF95B;
 const ENEMY_BOMB_PRIMARY_IMAGE_ADDRESS: u16 = 0xCCB0;
@@ -15,11 +13,11 @@ const ENEMY_BOMB_ALTERNATE_IMAGE_ADDRESS: u16 = 0xCCB6;
 const ENEMY_BOMB_OBJECT_BITMAP_SIZE: (u8, u8) = (2, 3);
 const BAITER_ANIMATION_FRAME_COUNT: u8 = 3;
 // Clean stores process sleep as frames remaining after the current update.
-// Reference PTIME values of 6/4/1 therefore wake after 5/3/0 clean sleeps.
+// Arcade PTIME values of 6/4/1 therefore wake after 5/3/0 clean sleeps.
 const LANDER_ANIMATION_FRAME_COUNT: u8 = 3;
 
-fn baiter_screen_x_velocity(reference_x_velocity: u16) -> u16 {
-    reference_x_velocity.wrapping_shl(2)
+fn baiter_screen_x_velocity(actor_x_velocity: u16) -> u16 {
+    actor_x_velocity.wrapping_shl(2)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -554,7 +554,7 @@
                     && sprite.position == target_position
                     && sprite.size == target_size
             }),
-            "scoring laser test must use the visible reference target"
+            "scoring laser test must use the visible arcade target"
         );
         let target_front_edge = target_position[0];
         let target_center_y =
@@ -876,7 +876,7 @@
     }
 
     #[test]
-    fn actor_attract_scoring_instruction_labels_follow_reference_reveal_cadence() {
+    fn actor_attract_scoring_instruction_labels_follow_arcade_reveal_cadence() {
         assert_eq!(
             ATTRACT_INSTRUCTION_TEXT_LINES
                 .iter()
@@ -904,7 +904,7 @@
     }
 
     #[test]
-    fn default_actor_attract_script_loops_after_reference_scoring_cycle() {
+    fn default_actor_attract_script_loops_after_arcade_scoring_cycle() {
         let script = AttractScript::default_title();
         let high_scores = HighScoreTable::default().entries;
 
@@ -947,7 +947,7 @@
     }
 
     #[test]
-    fn actor_scanner_mini_terrain_records_match_reference_slice() {
+    fn actor_scanner_mini_terrain_records_match_arcade_slice() {
         let records = scanner_mini_terrain_records();
 
         assert_eq!(records.len(), SCANNER_TERRAIN_RECORDS);
@@ -1104,7 +1104,7 @@
             defender_wordmark 9 12 70 80\n\
             text 2 5 12 20 CUSTOM ATTRACT\n\
             high_scores 4 forever 80 100 9 3\n\
-            hall_scores 4 forever 0x1886 0x5986 -11 -6\n\
+            hall_scores 4 forever hall_todays_table hall_all_time_table -11 -6\n\
             scoring_surface 4 forever\n\
             credits 4 forever 12 228 82 228\n\
             credits_nonzero 4 8 14 226 84 226\n\
@@ -1304,7 +1304,7 @@
 
     #[test]
     fn parsed_attract_script_draws_message_text_with_controls() {
-        let script = "message 1 forever ELECV 0x3258"
+        let script = "message 1 forever ELECV presents_text"
             .parse::<AttractScript>()
             .expect("message text script action should parse");
         assert_eq!(
@@ -1343,7 +1343,7 @@
                 && sprite.layer == RenderLayer::Overlay
         }));
 
-        let prompt_script = "message 1 forever credits_prompt 0x3C80"
+        let prompt_script = "message 1 forever credits_prompt player_start_prompt"
             .parse::<AttractScript>()
             .expect("credits prompt message key should parse");
         assert_eq!(
@@ -1358,7 +1358,7 @@
 
     #[test]
     fn parsed_attract_script_draws_message_text_with_visual_offset() {
-        let script = "message 1 forever ELECV 0x3258 -11 -7"
+        let script = "message 1 forever ELECV presents_text -11 -7"
             .parse::<AttractScript>()
             .expect("message text script action should parse with offset");
         assert_eq!(
@@ -1404,7 +1404,7 @@
         assert_eq!(error.line, 1);
         assert!(error.to_string().contains("unknown sprite key"));
 
-        let error = AttractScript::parse_text("message 1 forever NO_SUCH_MESSAGE 0x3258\n")
+        let error = AttractScript::parse_text("message 1 forever NO_SUCH_MESSAGE presents_text\n")
             .expect_err("unknown message key should fail");
         assert_eq!(error.line, 1);
         assert!(error.to_string().contains("unknown message key"));

@@ -1,36 +1,30 @@
     fn projectile_runtime_at_screen(
         position: Point,
         background_left: u16,
-    ) -> (Point, EnemyProjectileReferenceState) {
+    ) -> (Point, EnemyProjectileActorState) {
         let screen_x = u16::try_from(position.x).expect("test screen x should be non-negative");
         let absolute_x = background_left.wrapping_add(screen_x << OBJECT_WORLD_TO_SCREEN_SHIFT);
         let [x, x_fraction] = absolute_x.to_be_bytes();
         (
             Point::new(i16::from(x), position.y),
-            EnemyProjectileReferenceState {
-                x_fraction,
-                y_fraction: 0,
-                x_velocity: 0,
-                y_velocity: 0,
-                lifetime_ticks: 0,
-            },
+            EnemyProjectileActorState::new(ActorMotion::stationary(x_fraction, 0), 0),
         )
     }
 
     fn spawn_enemy_laser_at_screen(driver: &mut ActorGameDriver, position: Point) -> ActorId {
-        let (runtime_position, reference_state) =
+        let (runtime_position, actor_state) =
             projectile_runtime_at_screen(position, driver.background_left);
         driver.spawn_enemy_laser_from_spawn(
             runtime_position,
             Velocity::new(0, 0),
-            Some(reference_state),
+            Some(actor_state),
         )
     }
 
     fn spawn_bomb_at_screen(driver: &mut ActorGameDriver, position: Point) -> ActorId {
-        let (runtime_position, reference_state) =
+        let (runtime_position, actor_state) =
             projectile_runtime_at_screen(position, driver.background_left);
-        driver.spawn_bomb(runtime_position, Some(reference_state))
+        driver.spawn_bomb(runtime_position, Some(actor_state))
     }
 
     #[test]
@@ -878,8 +872,8 @@
             scrolled_state.world.humans[0].position,
             ScreenPosition::new(0x2E, 220)
         );
-        assert_eq!(still_state.world.humans[0].reference_x_fraction, 0x80);
-        assert_eq!(scrolled_state.world.humans[0].reference_x_fraction, 0x80);
+        assert_eq!(still_state.world.humans[0].actor_x_fraction, 0x80);
+        assert_eq!(scrolled_state.world.humans[0].actor_x_fraction, 0x80);
 
         let still = still_report.render_scene();
         let scrolled = scrolled_report.render_scene();
@@ -892,13 +886,13 @@
             Some([182.0, 220.0])
         );
 
-        let human_reference_snapshot = still_report
+        let human_actor_snapshot = still_report
             .snapshots
             .iter()
             .find(|snapshot| snapshot.kind == ActorKind::Human)
-            .expect("reference-state-backed human snapshot should be present");
-        let projected = actor_collision_body_for_snapshot(human_reference_snapshot, 0)
-            .expect("reference-state-backed human should be projected while visible");
+            .expect("actor-state-backed human snapshot should be present");
+        let projected = actor_collision_body_for_snapshot(human_actor_snapshot, 0)
+            .expect("actor-state-backed human should be projected while visible");
         assert_eq!(projected.position, Point::new(186, 220));
     }
 
@@ -906,11 +900,8 @@
     fn actor_collisions_project_world_hostiles_against_background() {
         let mut lander = actor_snapshot(2, ActorKind::Lander, Point::new(0x30, 80));
         lander.bounds = Some(Rect::from_center(lander.position, 8, 8));
-        lander.reference_state = ActorReferenceState::lander(Some(LanderReferenceState {
-            x_fraction: 0,
-            y_fraction: 0,
-            x_velocity: 0,
-            y_velocity: 0,
+        lander.actor_state = ActorInternalState::lander(Some(LanderActorState {
+            motion: ActorMotion::new(0, 0, 0, 0),
             shot_timer: 0,
             sleep_ticks: 0,
             animation_frame: crate::SpriteFrameIndex::new(0),
@@ -918,7 +909,7 @@
         }));
 
         let projected = actor_collision_body_for_snapshot(&lander, 0)
-            .expect("reference-state-backed lander should be projected while visible");
+            .expect("actor-state-backed lander should be projected while visible");
         assert_eq!(projected.position, Point::new(192, 80));
         assert!(
             projected
@@ -927,22 +918,22 @@
         );
         assert!(
             actor_collision_body_for_snapshot(&lander, 0x4000).is_none(),
-            "offscreen reference-state-backed hostiles should not collide with screen-space player/laser bodies"
+            "offscreen actor-state-backed hostiles should not collide with screen-space player/laser bodies"
         );
     }
 
     #[test]
-    fn reference_state_falling_human_rescue_uses_projected_world_position() {
-        let mut human = Human::with_reference_state(
+    fn actor_state_falling_human_rescue_uses_projected_world_position() {
+        let mut human = Human::with_actor_state(
             ActorId::new(7),
             Point::new(0x40, 100),
             HumanMode::Falling { velocity: 0 },
-            Some(HumanReferenceState {
-                x_fraction: 0,
-                y_fraction: 0,
-                animation_frame: crate::SpriteFrameIndex::new(0),
-                target_slot_index: 0,
-            }),
+            Some(HumanActorState::new(
+                0,
+                0,
+                crate::SpriteFrameIndex::new(0),
+                0,
+            )),
         );
         let mut player = actor_snapshot(1, ActorKind::Player, Point::new(128, 101));
         player.bounds = Some(Rect::from_center(player.position, 18, 10));
@@ -955,8 +946,8 @@
         assert_eq!(
             reply
                 .snapshot
-                .reference_state.as_human()
-                .map(|reference_state| reference_state.x_fraction),
+                .actor_state.as_human()
+                .map(|actor_state| actor_state.x_fraction()),
             Some(0)
         );
         assert!(
@@ -1087,41 +1078,32 @@
         player.direction = Some(Direction::Right);
         let mut lander = actor_snapshot(12, ActorKind::Lander, Point::new(0x3F, 0x2C));
         lander.velocity = Velocity::new(-2, 1);
-        lander.reference_state = ActorReferenceState::lander(Some(LanderReferenceState {
-            x_fraction: 0x4A,
-            y_fraction: 0xE0,
-            x_velocity: 0xFFEE,
-            y_velocity: 0x0070,
+        lander.actor_state = ActorInternalState::lander(Some(LanderActorState {
+            motion: ActorMotion::new(0x4A, 0xE0, 0xFFEE, 0x0070),
             shot_timer: 0x3B,
             sleep_ticks: 0x04,
             animation_frame: crate::SpriteFrameIndex::new(1),
             target_human_index: Some(2),
         }));
         let mut human = actor_snapshot(13, ActorKind::Human, Point::new(0x1C, 0xE1));
-        human.reference_state = ActorReferenceState::human(Some(HumanReferenceState {
-            x_fraction: 0x81,
-            y_fraction: 0,
-            animation_frame: crate::SpriteFrameIndex::new(3),
-            target_slot_index: 1,
-        }));
+        human.actor_state = ActorInternalState::human(Some(HumanActorState::new(
+            0x81,
+            0,
+            crate::SpriteFrameIndex::new(3),
+            1,
+        )));
         let mut laser = actor_snapshot(14, ActorKind::Laser, Point::new(80, 72));
         laser.velocity = Velocity::new(8, 0);
         laser.direction = Some(Direction::Right);
         let mut enemy_laser = actor_snapshot(15, ActorKind::EnemyLaser, Point::new(90, 80));
         enemy_laser.velocity = Velocity::new(-3, 2);
-        enemy_laser.reference_state = ActorReferenceState::enemy_projectile(Some(EnemyProjectileReferenceState {
-            x_fraction: 0x22,
-            y_fraction: 0x77,
-            x_velocity: 0xFD00,
-            y_velocity: 0x0200,
+        enemy_laser.actor_state = ActorInternalState::enemy_projectile(Some(EnemyProjectileActorState {
+            motion: ActorMotion::new(0x22, 0x77, 0xFD00, 0x0200),
             lifetime_ticks: 17,
         }));
         let mut bomb = actor_snapshot(16, ActorKind::Bomb, Point::new(100, 84));
-        bomb.reference_state = ActorReferenceState::enemy_projectile(Some(EnemyProjectileReferenceState {
-            x_fraction: 0x44,
-            y_fraction: 0x55,
-            x_velocity: 0,
-            y_velocity: 0,
+        bomb.actor_state = ActorInternalState::enemy_projectile(Some(EnemyProjectileActorState {
+            motion: ActorMotion::new(0x44, 0x55, 0, 0),
             lifetime_ticks: 9,
         }));
 
@@ -1208,12 +1190,9 @@
         assert_eq!(state.world.enemies[0].kind, CleanEnemyKind::Lander);
         assert_eq!(state.world.enemies[0].velocity, ScreenVelocity::new(-2, 1));
         assert_eq!(
-            state.world.enemies[0].lander_reference_state,
-            Some(LanderReferenceStateSnapshot {
-                x_fraction: 0x4A,
-                y_fraction: 0xE0,
-                x_velocity: 0xFFEE,
-                y_velocity: 0x0070,
+            state.world.enemies[0].lander_actor_state,
+            Some(LanderDebugStateSnapshot {
+                motion: ActorDebugMotion::new(0x4A, 0xE0, 0xFFEE, 0x0070),
                 shot_timer: 0x3B,
                 sleep_ticks: 0x04,
                 animation_frame: 1,
@@ -1236,10 +1215,10 @@
             .find(|projectile| projectile.kind == EnemyProjectileKind::Fireball)
             .expect("actor enemy laser should bridge as an enemy fireball");
         assert_eq!(fireball.velocity, ScreenVelocity::new(-3, 2));
-        assert_eq!(fireball.reference_x_fraction, 0x22);
-        assert_eq!(fireball.reference_y_fraction, 0x77);
-        assert_eq!(fireball.reference_x_velocity, 0xFD00);
-        assert_eq!(fireball.reference_y_velocity, 0x0200);
+        assert_eq!(fireball.actor_x_fraction, 0x22);
+        assert_eq!(fireball.actor_y_fraction, 0x77);
+        assert_eq!(fireball.actor_x_velocity, 0xFD00);
+        assert_eq!(fireball.actor_y_velocity, 0x0200);
         assert_eq!(fireball.lifetime_ticks, 17);
         let bomber_bomb = state
             .world
@@ -1247,10 +1226,10 @@
             .iter()
             .find(|projectile| projectile.kind == EnemyProjectileKind::BomberBombShell)
             .expect("actor bomb should bridge as a bomber bomb projectile");
-        assert_eq!(bomber_bomb.reference_x_fraction, 0x44);
-        assert_eq!(bomber_bomb.reference_y_fraction, 0x55);
-        assert_eq!(bomber_bomb.reference_x_velocity, 0);
-        assert_eq!(bomber_bomb.reference_y_velocity, 0);
+        assert_eq!(bomber_bomb.actor_x_fraction, 0x44);
+        assert_eq!(bomber_bomb.actor_y_fraction, 0x55);
+        assert_eq!(bomber_bomb.actor_x_velocity, 0);
+        assert_eq!(bomber_bomb.actor_y_velocity, 0);
         assert_eq!(bomber_bomb.lifetime_ticks, 9);
         assert!(
             state

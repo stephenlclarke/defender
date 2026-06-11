@@ -8,68 +8,68 @@ impl ActorWaveTuning {
     pub fn for_wave(wave: u16) -> Self {
         let wave = u8::try_from(wave.min(u16::from(u8::MAX))).unwrap_or(u8::MAX);
         Self {
-            landers: actor_wave_tuning_u8(crate::reference_assets::WaveMetric::Landers, wave),
-            bombers: actor_wave_tuning_u8(crate::reference_assets::WaveMetric::Bombers, wave),
-            pods: actor_wave_tuning_u8(crate::reference_assets::WaveMetric::Pods, wave),
-            mutants: actor_wave_tuning_u8(crate::reference_assets::WaveMetric::Mutants, wave),
-            swarmers: actor_wave_tuning_u8(crate::reference_assets::WaveMetric::Swarmers, wave),
-            wave_size: actor_wave_tuning_u8(crate::reference_assets::WaveMetric::WaveSize, wave),
+            landers: actor_wave_tuning_u8(crate::arcade_assets::WaveMetric::Landers, wave),
+            bombers: actor_wave_tuning_u8(crate::arcade_assets::WaveMetric::Bombers, wave),
+            pods: actor_wave_tuning_u8(crate::arcade_assets::WaveMetric::Pods, wave),
+            mutants: actor_wave_tuning_u8(crate::arcade_assets::WaveMetric::Mutants, wave),
+            swarmers: actor_wave_tuning_u8(crate::arcade_assets::WaveMetric::Swarmers, wave),
+            wave_size: actor_wave_tuning_u8(crate::arcade_assets::WaveMetric::WaveSize, wave),
             lander_x_velocity: actor_wave_tuning_u8(
-                crate::reference_assets::WaveMetric::LanderXVelocity,
+                crate::arcade_assets::WaveMetric::LanderXVelocity,
                 wave,
             ),
             lander_y_velocity: actor_wave_tuning_u16(
-                crate::reference_assets::WaveMetric::LanderYVelocityHigh,
-                crate::reference_assets::WaveMetric::LanderYVelocityLow,
+                crate::arcade_assets::WaveMetric::LanderYVelocityHigh,
+                crate::arcade_assets::WaveMetric::LanderYVelocityLow,
                 wave,
             ),
             bomber_x_velocity: actor_wave_tuning_u8(
-                crate::reference_assets::WaveMetric::BomberXVelocity,
+                crate::arcade_assets::WaveMetric::BomberXVelocity,
                 wave,
             ),
             swarmer_x_velocity: actor_wave_tuning_u8(
-                crate::reference_assets::WaveMetric::SwarmerXVelocity,
+                crate::arcade_assets::WaveMetric::SwarmerXVelocity,
                 wave,
             ),
             swarmer_shot_time: actor_wave_tuning_u32(
-                crate::reference_assets::WaveMetric::SwarmerShotTime,
+                crate::arcade_assets::WaveMetric::SwarmerShotTime,
                 wave,
             ),
             swarmer_acceleration_mask: actor_wave_tuning_u8(
-                crate::reference_assets::WaveMetric::SwarmerAccelerationMask,
+                crate::arcade_assets::WaveMetric::SwarmerAccelerationMask,
                 wave,
             ),
             baiter_delay: actor_wave_tuning_u32(
-                crate::reference_assets::WaveMetric::BaiterDelay,
+                crate::arcade_assets::WaveMetric::BaiterDelay,
                 wave,
             ),
             baiter_shot_time: actor_wave_tuning_u32(
-                crate::reference_assets::WaveMetric::BaiterShotTime,
+                crate::arcade_assets::WaveMetric::BaiterShotTime,
                 wave,
             ),
             baiter_seek_probability: actor_wave_tuning_u8(
-                crate::reference_assets::WaveMetric::BaiterSeekProbability,
+                crate::arcade_assets::WaveMetric::BaiterSeekProbability,
                 wave,
             ),
             lander_shot_time: actor_wave_tuning_u32(
-                crate::reference_assets::WaveMetric::LanderShotTime,
+                crate::arcade_assets::WaveMetric::LanderShotTime,
                 wave,
             ),
             mutant_random_y: actor_wave_tuning_u8(
-                crate::reference_assets::WaveMetric::MutantRandomY,
+                crate::arcade_assets::WaveMetric::MutantRandomY,
                 wave,
             ),
             mutant_y_velocity: actor_wave_tuning_u16(
-                crate::reference_assets::WaveMetric::MutantYVelocityHigh,
-                crate::reference_assets::WaveMetric::MutantYVelocityLow,
+                crate::arcade_assets::WaveMetric::MutantYVelocityHigh,
+                crate::arcade_assets::WaveMetric::MutantYVelocityLow,
                 wave,
             ),
             mutant_x_velocity: actor_wave_tuning_u8(
-                crate::reference_assets::WaveMetric::MutantXVelocity,
+                crate::arcade_assets::WaveMetric::MutantXVelocity,
                 wave,
             ),
             mutant_shot_time: actor_wave_tuning_u32(
-                crate::reference_assets::WaveMetric::MutantShotTime,
+                crate::arcade_assets::WaveMetric::MutantShotTime,
                 wave,
             ),
         }
@@ -392,14 +392,14 @@ const fn actor_sign_extend_u8_to_u16(value: u8) -> u16 {
     u16::from_be_bytes([sign, value])
 }
 
-fn actor_wave_tuning_u8(metric: crate::reference_assets::WaveMetric, wave: u8) -> u8 {
+fn actor_wave_tuning_u8(metric: crate::arcade_assets::WaveMetric, wave: u8) -> u8 {
     u8::try_from(actor_wave_tuning_value(metric, wave))
         .unwrap_or_else(|_| panic!("actor wave metric should fit u8"))
 }
 
 fn actor_wave_tuning_u16(
-    high_metric: crate::reference_assets::WaveMetric,
-    low_metric: crate::reference_assets::WaveMetric,
+    high_metric: crate::arcade_assets::WaveMetric,
+    low_metric: crate::arcade_assets::WaveMetric,
     wave: u8,
 ) -> u16 {
     u16::from_be_bytes([
@@ -408,13 +408,13 @@ fn actor_wave_tuning_u16(
     ])
 }
 
-fn actor_wave_tuning_u32(metric: crate::reference_assets::WaveMetric, wave: u8) -> u32 {
+fn actor_wave_tuning_u32(metric: crate::arcade_assets::WaveMetric, wave: u8) -> u32 {
     u32::try_from(actor_wave_tuning_value(metric, wave))
         .unwrap_or_else(|_| panic!("actor wave metric should be non-negative"))
 }
 
-fn actor_wave_tuning_value(metric: crate::reference_assets::WaveMetric, wave: u8) -> i32 {
-    crate::reference_assets::wave_metric_value(
+fn actor_wave_tuning_value(metric: crate::arcade_assets::WaveMetric, wave: u8) -> i32 {
+    crate::arcade_assets::wave_metric_value(
         metric,
         wave,
         actor_wave_inter_delta_iterations(wave.max(1)),

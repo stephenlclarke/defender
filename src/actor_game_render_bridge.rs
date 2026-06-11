@@ -274,7 +274,7 @@ fn push_actor_wave_completion_status_sprites(scene: &mut RenderScene, report: &S
     }
 
     for (message, screen_cell) in WAVE_COMPLETION_STATUS_LINES {
-        let text = crate::reference_assets::message_text(*message);
+        let text = crate::arcade_assets::message_text(*message);
         push_message_text_bytes_sprites(
             scene,
             text.as_bytes(),
@@ -390,7 +390,7 @@ fn push_actor_message_sprites(
 ) {
     push_controlled_message_sprites(
         scene,
-        crate::reference_assets::message_text(message),
+        crate::arcade_assets::message_text(message),
         screen_cell,
         layer,
     );
@@ -503,7 +503,7 @@ fn generate_scanner_mini_terrain_records(
 }
 
 fn main_terrain_record_bytes() -> &'static [u8; MAIN_TERRAIN_RECORD_BYTE_COUNT] {
-    crate::reference_assets::MAIN_TERRAIN_BYTES
+    crate::arcade_assets::MAIN_TERRAIN_BYTES
 }
 
 fn offset_new_sprites(scene: &mut RenderScene, first_sprite: usize, offset: [f32; 2]) {
@@ -552,15 +552,15 @@ fn actor_draw_screen_position(report: &StepReport, draw: &DrawCommand) -> Option
         return Some(draw.position);
     };
 
-    actor_project_reference_state_draw(snapshot, draw.position, report.background_left)
+    actor_project_actor_state_draw(snapshot, draw.position, report.background_left)
 }
 
-fn actor_project_reference_state_draw(
+fn actor_project_actor_state_draw(
     snapshot: &ActorSnapshot,
     draw_position: Point,
     background_left: u16,
 ) -> Option<Point> {
-    let Some(x_fraction) = actor_reference_state_x_fraction(snapshot) else {
+    let Some(x_fraction) = actor_actor_state_x_fraction(snapshot) else {
         return Some(draw_position);
     };
     if draw_position != snapshot.position && snapshot.kind != ActorKind::Human {
@@ -569,8 +569,8 @@ fn actor_project_reference_state_draw(
     actor_screen_position_from_world(draw_position, x_fraction, background_left)
 }
 
-fn actor_reference_state_x_fraction(snapshot: &ActorSnapshot) -> Option<u8> {
-    snapshot.reference_x_fraction()
+fn actor_actor_state_x_fraction(snapshot: &ActorSnapshot) -> Option<u8> {
+    snapshot.actor_x_fraction()
 }
 
 fn actor_screen_position_from_world(

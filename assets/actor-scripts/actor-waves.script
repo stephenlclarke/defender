@@ -1,5 +1,5 @@
-# Actor runtime reference wave progression.
-# `wave_tunings` expands from the embedded reference wave table.
+# Actor arcade wave progression.
+# `wave_tunings` expands from the embedded arcade wave table.
 
-name actor-reference-wave-table
+name actor-arcade-wave-table
 wave_tunings 1 16

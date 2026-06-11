@@ -26,12 +26,56 @@ pub struct EnemySnapshot {
     pub kind: EnemyKind,
     pub position: ScreenPosition,
     pub velocity: ScreenVelocity,
-    pub lander_reference_state: Option<LanderReferenceStateSnapshot>,
-    pub mutant_reference_state: Option<MutantReferenceStateSnapshot>,
-    pub bomber_reference_state: Option<BomberReferenceStateSnapshot>,
-    pub swarmer_reference_state: Option<SwarmerReferenceStateSnapshot>,
-    pub baiter_reference_state: Option<BaiterReferenceStateSnapshot>,
-    pub pod_reference_state: Option<PodReferenceStateSnapshot>,
+    pub(crate) lander_actor_state: Option<LanderDebugStateSnapshot>,
+    pub(crate) mutant_actor_state: Option<MutantDebugStateSnapshot>,
+    pub(crate) bomber_actor_state: Option<BomberDebugStateSnapshot>,
+    pub(crate) swarmer_actor_state: Option<SwarmerDebugStateSnapshot>,
+    pub(crate) baiter_actor_state: Option<BaiterDebugStateSnapshot>,
+    pub(crate) pod_actor_state: Option<PodDebugStateSnapshot>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ActorDebugMotion {
+    x_fraction: u8,
+    y_fraction: u8,
+    x_velocity: u16,
+    y_velocity: u16,
+}
+
+impl ActorDebugMotion {
+    pub(crate) const fn new(
+        x_fraction: u8,
+        y_fraction: u8,
+        x_velocity: u16,
+        y_velocity: u16,
+    ) -> Self {
+        Self {
+            x_fraction,
+            y_fraction,
+            x_velocity,
+            y_velocity,
+        }
+    }
+
+    pub(crate) const fn x_fraction(self) -> u8 {
+        self.x_fraction
+    }
+
+    pub(crate) const fn y_velocity(self) -> u16 {
+        self.y_velocity
+    }
+
+    fn world_position_words(self, position: ScreenPosition) -> (u16, u16) {
+        world_position_words(position, self.x_fraction, self.y_fraction)
+    }
+
+    const fn velocity_words(self) -> (u16, u16) {
+        (self.x_velocity, self.y_velocity)
+    }
+
+    fn baiter_velocity_words(self) -> (u16, u16) {
+        (baiter_screen_x_velocity(self.x_velocity), self.y_velocity)
+    }
 }
 
 impl EnemySnapshot {
@@ -40,33 +84,33 @@ impl EnemySnapshot {
             kind,
             position,
             velocity,
-            lander_reference_state: None,
-            mutant_reference_state: None,
-            bomber_reference_state: None,
-            swarmer_reference_state: None,
-            baiter_reference_state: None,
-            pod_reference_state: None,
+            lander_actor_state: None,
+            mutant_actor_state: None,
+            bomber_actor_state: None,
+            swarmer_actor_state: None,
+            baiter_actor_state: None,
+            pod_actor_state: None,
         }
     }
 
     fn object_bitmap_descriptor(self) -> ObjectBitmapDescriptor {
         match self.kind {
             EnemyKind::Lander => lander_object_bitmap_descriptor(
-                self.lander_reference_state
-                    .map(|reference_state| reference_state.animation_frame)
+                self.lander_actor_state
+                    .map(|actor_state| actor_state.animation_frame)
                     .unwrap_or_default(),
             ),
             EnemyKind::Mutant => MUTANT_OBJECT_BITMAP_DESCRIPTOR,
             EnemyKind::Bomber => bomber_object_bitmap_descriptor(
-                self.bomber_reference_state
-                    .map(|reference_state| reference_state.animation_frame)
+                self.bomber_actor_state
+                    .map(|actor_state| actor_state.animation_frame)
                     .unwrap_or_default(),
             ),
             EnemyKind::Pod => POD_OBJECT_BITMAP_DESCRIPTOR,
             EnemyKind::Swarmer => SWARMER_OBJECT_BITMAP_DESCRIPTOR,
             EnemyKind::Baiter => baiter_object_bitmap_descriptor(
-                self.baiter_reference_state
-                    .map(|reference_state| reference_state.animation_frame)
+                self.baiter_actor_state
+                    .map(|actor_state| actor_state.animation_frame)
                     .unwrap_or_default(),
             ),
         }
@@ -75,64 +119,28 @@ impl EnemySnapshot {
     fn world_position_words(self) -> (u16, u16) {
         match self.kind {
             EnemyKind::Lander => self
-                .lander_reference_state
-                .map(|reference_state| {
-                    world_position_words(
-                        self.position,
-                        reference_state.x_fraction,
-                        reference_state.y_fraction,
-                    )
-                })
+                .lander_actor_state
+                .map(|actor_state| actor_state.motion.world_position_words(self.position))
                 .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
             EnemyKind::Mutant => self
-                .mutant_reference_state
-                .map(|reference_state| {
-                    world_position_words(
-                        self.position,
-                        reference_state.x_fraction,
-                        reference_state.y_fraction,
-                    )
-                })
+                .mutant_actor_state
+                .map(|actor_state| actor_state.motion.world_position_words(self.position))
                 .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
             EnemyKind::Bomber => self
-                .bomber_reference_state
-                .map(|reference_state| {
-                    world_position_words(
-                        self.position,
-                        reference_state.x_fraction,
-                        reference_state.y_fraction,
-                    )
-                })
+                .bomber_actor_state
+                .map(|actor_state| actor_state.motion.world_position_words(self.position))
                 .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
             EnemyKind::Pod => self
-                .pod_reference_state
-                .map(|reference_state| {
-                    world_position_words(
-                        self.position,
-                        reference_state.x_fraction,
-                        reference_state.y_fraction,
-                    )
-                })
+                .pod_actor_state
+                .map(|actor_state| actor_state.motion.world_position_words(self.position))
                 .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
             EnemyKind::Swarmer => self
-                .swarmer_reference_state
-                .map(|reference_state| {
-                    world_position_words(
-                        self.position,
-                        reference_state.x_fraction,
-                        reference_state.y_fraction,
-                    )
-                })
+                .swarmer_actor_state
+                .map(|actor_state| actor_state.motion.world_position_words(self.position))
                 .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
             EnemyKind::Baiter => self
-                .baiter_reference_state
-                .map(|reference_state| {
-                    world_position_words(
-                        self.position,
-                        reference_state.x_fraction,
-                        reference_state.y_fraction,
-                    )
-                })
+                .baiter_actor_state
+                .map(|actor_state| actor_state.motion.world_position_words(self.position))
                 .unwrap_or_else(|| world_position_words(self.position, 0, 0)),
         }
     }
@@ -140,104 +148,81 @@ impl EnemySnapshot {
     fn motion_velocity_words(self) -> (u16, u16) {
         match self.kind {
             EnemyKind::Lander => self
-                .lander_reference_state
-                .map(|reference_state| (reference_state.x_velocity, reference_state.y_velocity))
+                .lander_actor_state
+                .map(|actor_state| actor_state.motion.velocity_words())
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Mutant => self
-                .mutant_reference_state
-                .map(|reference_state| (reference_state.x_velocity, reference_state.y_velocity))
+                .mutant_actor_state
+                .map(|actor_state| actor_state.motion.velocity_words())
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Bomber => self
-                .bomber_reference_state
-                .map(|reference_state| (reference_state.x_velocity, reference_state.y_velocity))
+                .bomber_actor_state
+                .map(|actor_state| actor_state.motion.velocity_words())
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Pod => self
-                .pod_reference_state
-                .map(|reference_state| (reference_state.x_velocity, reference_state.y_velocity))
+                .pod_actor_state
+                .map(|actor_state| actor_state.motion.velocity_words())
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Swarmer => self
-                .swarmer_reference_state
-                .map(|reference_state| (reference_state.x_velocity, reference_state.y_velocity))
+                .swarmer_actor_state
+                .map(|actor_state| actor_state.motion.velocity_words())
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
             EnemyKind::Baiter => self
-                .baiter_reference_state
-                .map(|reference_state| {
-                    (
-                        baiter_screen_x_velocity(reference_state.x_velocity),
-                        reference_state.y_velocity,
-                    )
-                })
+                .baiter_actor_state
+                .map(|actor_state| actor_state.motion.baiter_velocity_words())
                 .unwrap_or_else(|| fixed_point_velocity_words(self.velocity)),
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LanderReferenceStateSnapshot {
-    pub x_fraction: u8,
-    pub y_fraction: u8,
-    pub x_velocity: u16,
-    pub y_velocity: u16,
-    pub shot_timer: u8,
-    pub sleep_ticks: u8,
-    pub animation_frame: u8,
-    pub target_human_index: Option<usize>,
+pub(crate) struct LanderDebugStateSnapshot {
+    pub(crate) motion: ActorDebugMotion,
+    pub(crate) shot_timer: u8,
+    pub(crate) sleep_ticks: u8,
+    pub(crate) animation_frame: u8,
+    pub(crate) target_human_index: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MutantReferenceStateSnapshot {
-    pub x_fraction: u8,
-    pub y_fraction: u8,
-    pub x_velocity: u16,
-    pub y_velocity: u16,
-    pub shot_timer: u8,
-    pub sleep_ticks: u8,
-    pub hop_rng: GameRngSnapshot,
-    pub render_x_correction: u16,
-    pub dive_entry_shot_deferred: bool,
+pub(crate) struct MutantDebugStateSnapshot {
+    pub(crate) motion: ActorDebugMotion,
+    pub(crate) shot_timer: u8,
+    pub(crate) sleep_ticks: u8,
+    pub(crate) hop_rng: GameRngSnapshot,
+    pub(crate) render_x_correction: u16,
+    pub(crate) dive_entry_shot_deferred: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BomberReferenceStateSnapshot {
-    pub x_fraction: u8,
-    pub y_fraction: u8,
-    pub x_velocity: u16,
-    pub y_velocity: u16,
-    pub animation_frame: u8,
-    pub cruise_altitude: u8,
-    pub sleep_ticks: u8,
-    pub slot: u8,
+pub(crate) struct BomberDebugStateSnapshot {
+    pub(crate) motion: ActorDebugMotion,
+    pub(crate) animation_frame: u8,
+    pub(crate) cruise_altitude: u8,
+    pub(crate) sleep_ticks: u8,
+    pub(crate) slot: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SwarmerReferenceStateSnapshot {
-    pub x_fraction: u8,
-    pub y_fraction: u8,
-    pub x_velocity: u16,
-    pub y_velocity: u16,
-    pub acceleration: u8,
-    pub shot_timer: u8,
-    pub sleep_ticks: u8,
-    pub horizontal_seek_pending: bool,
+pub(crate) struct SwarmerDebugStateSnapshot {
+    pub(crate) motion: ActorDebugMotion,
+    pub(crate) acceleration: u8,
+    pub(crate) shot_timer: u8,
+    pub(crate) sleep_ticks: u8,
+    pub(crate) horizontal_seek_pending: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BaiterReferenceStateSnapshot {
-    pub x_fraction: u8,
-    pub y_fraction: u8,
-    pub x_velocity: u16,
-    pub y_velocity: u16,
-    pub shot_timer: u8,
-    pub sleep_ticks: u8,
-    pub animation_frame: u8,
+pub(crate) struct BaiterDebugStateSnapshot {
+    pub(crate) motion: ActorDebugMotion,
+    pub(crate) shot_timer: u8,
+    pub(crate) sleep_ticks: u8,
+    pub(crate) animation_frame: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PodReferenceStateSnapshot {
-    pub x_fraction: u8,
-    pub y_fraction: u8,
-    pub x_velocity: u16,
-    pub y_velocity: u16,
+pub(crate) struct PodDebugStateSnapshot {
+    pub(crate) motion: ActorDebugMotion,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -268,32 +253,19 @@ pub enum EnemyProjectileKind {
     BomberBombShell,
 }
 
-impl EnemyProjectileKind {
-    pub const fn output_routine_address(self) -> u16 {
-        match self {
-            Self::Fireball => FIREBALL_OUTPUT_ROUTINE_ADDRESS,
-            Self::BomberBombShell => ENEMY_BOMB_OUTPUT_ROUTINE_ADDRESS,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EnemyProjectileSnapshot {
     pub position: ScreenPosition,
     pub velocity: ScreenVelocity,
     pub kind: EnemyProjectileKind,
-    pub reference_x_fraction: u8,
-    pub reference_y_fraction: u8,
-    pub reference_x_velocity: u16,
-    pub reference_y_velocity: u16,
+    pub(crate) actor_x_fraction: u8,
+    pub(crate) actor_y_fraction: u8,
+    pub(crate) actor_x_velocity: u16,
+    pub(crate) actor_y_velocity: u16,
     pub lifetime_ticks: u8,
 }
 
 impl EnemyProjectileSnapshot {
-    pub const fn output_routine_address(self) -> u16 {
-        self.kind.output_routine_address()
-    }
-
     const fn bomb_object_bitmap_name(self) -> &'static str {
         ENEMY_BOMB_OBJECT_BITMAP_NAME
     }
@@ -301,13 +273,13 @@ impl EnemyProjectileSnapshot {
     fn world_position_words(self) -> (u16, u16) {
         world_position_words(
             self.position,
-            self.reference_x_fraction,
-            self.reference_y_fraction,
+            self.actor_x_fraction,
+            self.actor_y_fraction,
         )
     }
 
     const fn motion_velocity_words(self) -> (u16, u16) {
-        (self.reference_x_velocity, self.reference_y_velocity)
+        (self.actor_x_velocity, self.actor_y_velocity)
     }
 }
 
@@ -345,11 +317,11 @@ pub struct HumanSnapshot {
     pub position: ScreenPosition,
     pub carried: bool,
     pub carried_by_player: bool,
-    pub reference_x_fraction: u8,
+    pub(crate) actor_x_fraction: u8,
     pub animation_frame: u8,
-    pub reference_fall_velocity: u16,
-    pub reference_fall_y_fraction: u8,
-    pub reference_target_slot_address: Option<u16>,
+    pub(crate) actor_fall_velocity: u16,
+    pub(crate) actor_fall_y_fraction: u8,
+    pub(crate) actor_target_slot_address: Option<u16>,
 }
 
 impl HumanSnapshot {
@@ -358,24 +330,24 @@ impl HumanSnapshot {
             position,
             carried: false,
             carried_by_player: false,
-            reference_x_fraction: 0,
+            actor_x_fraction: 0,
             animation_frame: 0,
-            reference_fall_velocity: 0,
-            reference_fall_y_fraction: 0,
-            reference_target_slot_address: None,
+            actor_fall_velocity: 0,
+            actor_fall_y_fraction: 0,
+            actor_target_slot_address: None,
         }
     }
 
     fn world_position_words(self) -> (u16, u16) {
         world_position_words(
             self.position,
-            self.reference_x_fraction,
-            self.reference_fall_y_fraction,
+            self.actor_x_fraction,
+            self.actor_fall_y_fraction,
         )
     }
 
     fn motion_velocity_words(self) -> (u16, u16) {
-        (0, self.reference_fall_velocity)
+        (0, self.actor_fall_velocity)
     }
 }
 
@@ -418,12 +390,12 @@ pub struct TerrainBlowSnapshot {
     pub explosion_pass: u8,
     pub explosion_pass_limit: u8,
     pub sleep_ticks_remaining: Option<u8>,
-    pub flash_color_byte: u8,
-    pub overload_counter: u8,
-    pub terrain_erase_entries: u16,
-    pub scanner_terrain_erase_entries: u16,
-    pub terrain_words_remaining: u16,
-    pub scanner_terrain_words_remaining: u16,
+    pub(crate) flash_color_byte: u8,
+    pub(crate) overload_counter: u8,
+    pub(crate) terrain_erase_entries: u16,
+    pub(crate) scanner_terrain_erase_entries: u16,
+    pub(crate) terrain_words_remaining: u16,
+    pub(crate) scanner_terrain_words_remaining: u16,
     pub explosions_per_pass: u8,
 }
 
@@ -484,7 +456,8 @@ impl TerrainBlowSnapshot {
         self.status_terrain_blown && self.terrain_words_remaining == 0
     }
 
-    pub const fn scanner_terrain_erased(self) -> bool {
+    #[cfg(test)]
+    pub(crate) const fn scanner_terrain_erased(self) -> bool {
         self.status_terrain_blown && self.scanner_terrain_words_remaining == 0
     }
 }
@@ -492,7 +465,7 @@ impl TerrainBlowSnapshot {
 pub const OBJECT_EVIDENCE_DETAIL_LIMIT: usize = 16;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum ObjectEvidenceList {
+pub(crate) enum ObjectEvidenceList {
     #[default]
     Active,
     Inactive,
@@ -500,7 +473,7 @@ pub enum ObjectEvidenceList {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ObjectEvidenceCategory {
+pub(crate) enum ObjectEvidenceCategory {
     Lander,
     Mutant,
     Bomber,
@@ -513,22 +486,22 @@ pub enum ObjectEvidenceCategory {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct ObjectEvidenceDetailSnapshot {
-    pub list: ObjectEvidenceList,
-    pub object_category: Option<ObjectEvidenceCategory>,
-    pub address: Option<u16>,
-    pub slot: Option<u16>,
-    pub screen_position: Option<ScreenPosition>,
-    pub world_position: Option<(u16, u16)>,
-    pub velocity: Option<(u16, u16)>,
-    pub object_bitmap_descriptor_address: Option<u16>,
-    pub object_bitmap_name: Option<&'static str>,
-    pub object_bitmap_size: Option<(u8, u8)>,
-    pub primary_image_address: Option<u16>,
-    pub alternate_image_address: Option<u16>,
-    pub mapped_sprite: Option<SpriteId>,
-    pub object_type: Option<u8>,
-    pub scanner_color: Option<u16>,
+pub(crate) struct ObjectEvidenceDetailSnapshot {
+    pub(crate) list: ObjectEvidenceList,
+    pub(crate) object_category: Option<ObjectEvidenceCategory>,
+    pub(crate) address: Option<u16>,
+    pub(crate) slot: Option<u16>,
+    pub(crate) screen_position: Option<ScreenPosition>,
+    pub(crate) world_position: Option<(u16, u16)>,
+    pub(crate) velocity: Option<(u16, u16)>,
+    pub(crate) object_bitmap_descriptor_address: Option<u16>,
+    pub(crate) object_bitmap_name: Option<&'static str>,
+    pub(crate) object_bitmap_size: Option<(u8, u8)>,
+    pub(crate) primary_image_address: Option<u16>,
+    pub(crate) alternate_image_address: Option<u16>,
+    pub(crate) mapped_sprite: Option<SpriteId>,
+    pub(crate) object_type: Option<u8>,
+    pub(crate) scanner_color: Option<u16>,
 }
 
 impl ObjectEvidenceDetailSnapshot {
@@ -552,20 +525,20 @@ impl ObjectEvidenceDetailSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct ObjectEvidenceSnapshot {
-    pub active_count: u16,
-    pub inactive_count: u16,
-    pub projectile_count: u16,
-    pub visible_count: u16,
-    pub evidence_crc32: Option<u32>,
-    pub detail_count: u8,
-    pub details: [ObjectEvidenceDetailSnapshot; OBJECT_EVIDENCE_DETAIL_LIMIT],
+pub(crate) struct ObjectEvidenceSnapshot {
+    pub(crate) active_count: u16,
+    pub(crate) inactive_count: u16,
+    pub(crate) projectile_count: u16,
+    pub(crate) visible_count: u16,
+    pub(crate) evidence_crc32: Option<u32>,
+    pub(crate) detail_count: u8,
+    pub(crate) details: [ObjectEvidenceDetailSnapshot; OBJECT_EVIDENCE_DETAIL_LIMIT],
 }
 
 pub const SCANNER_RADAR_BLIP_LIMIT: usize = OBJECT_EVIDENCE_DETAIL_LIMIT;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum ScannerRadarStage {
+pub(crate) enum ScannerRadarStage {
     #[default]
     InactiveObjectScan,
     ActiveAndShellScan,
@@ -583,19 +556,19 @@ impl ScannerRadarStage {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum ScannerRadarBlipKind {
+pub(crate) enum ScannerRadarBlipKind {
     #[default]
     ActiveObject,
     InactiveObject,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ScannerRadarBlipSnapshot {
-    pub kind: ScannerRadarBlipKind,
-    pub object_address: Option<u16>,
-    pub erase_table_address: u16,
-    pub screen_cell: crate::ScreenAddress,
-    pub color_word: u16,
+pub(crate) struct ScannerRadarBlipSnapshot {
+    pub(crate) kind: ScannerRadarBlipKind,
+    pub(crate) object_address: Option<u16>,
+    pub(crate) erase_table_address: u16,
+    pub(crate) screen_cell: crate::ScreenAddress,
+    pub(crate) color_word: u16,
 }
 
 impl ScannerRadarBlipSnapshot {
@@ -615,28 +588,28 @@ impl Default for ScannerRadarBlipSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ScannerRadarPlayerBlipSnapshot {
-    pub erase_table_address: u16,
-    pub screen_cell: crate::ScreenAddress,
-    pub body_word: u16,
-    pub tail_byte: u8,
-    pub upper_byte: u8,
+pub(crate) struct ScannerRadarPlayerBlipSnapshot {
+    pub(crate) erase_table_address: u16,
+    pub(crate) screen_cell: crate::ScreenAddress,
+    pub(crate) body_word: u16,
+    pub(crate) tail_byte: u8,
+    pub(crate) upper_byte: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ScannerRadarSnapshot {
-    pub enabled: bool,
-    pub stage: ScannerRadarStage,
-    pub stage_sleep_ticks: u8,
-    pub process_sleep_ticks: [u8; 3],
-    pub selected_map: u8,
-    pub scan_left: Option<u16>,
-    pub terrain_enabled: bool,
-    pub object_erase_start: u16,
-    pub setend: u16,
-    pub blip_count: u8,
-    pub blips: [ScannerRadarBlipSnapshot; SCANNER_RADAR_BLIP_LIMIT],
-    pub player_blip: Option<ScannerRadarPlayerBlipSnapshot>,
+pub(crate) struct ScannerRadarSnapshot {
+    pub(crate) enabled: bool,
+    pub(crate) stage: ScannerRadarStage,
+    pub(crate) stage_sleep_ticks: u8,
+    pub(crate) process_sleep_ticks: [u8; 3],
+    pub(crate) selected_map: u8,
+    pub(crate) scan_left: Option<u16>,
+    pub(crate) terrain_enabled: bool,
+    pub(crate) object_erase_start: u16,
+    pub(crate) setend: u16,
+    pub(crate) blip_count: u8,
+    pub(crate) blips: [ScannerRadarBlipSnapshot; SCANNER_RADAR_BLIP_LIMIT],
+    pub(crate) player_blip: Option<ScannerRadarPlayerBlipSnapshot>,
 }
 
 impl ScannerRadarSnapshot {
@@ -742,14 +715,14 @@ pub const EXPANDED_OBJECT_DETAIL_LIMIT: usize = 16;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct SpriteAssetImageSpec {
-    pub(crate) bitmap: crate::reference_assets::ObjectBitmapId,
+    pub(crate) bitmap: crate::arcade_assets::ObjectBitmapId,
     pub(crate) rows: u8,
     pub(crate) byte_columns: u8,
 }
 
 impl SpriteAssetImageSpec {
     pub(crate) const fn new(
-        bitmap: crate::reference_assets::ObjectBitmapId,
+        bitmap: crate::arcade_assets::ObjectBitmapId,
         rows: u8,
         byte_columns: u8,
     ) -> Self {
@@ -762,7 +735,7 @@ impl SpriteAssetImageSpec {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum ExpandedObjectKind {
+pub(crate) enum ExpandedObjectKind {
     #[default]
     Appearance,
     Explosion,
@@ -770,22 +743,22 @@ pub enum ExpandedObjectKind {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct ExpandedObjectDetailSnapshot {
-    pub kind: ExpandedObjectKind,
-    pub slot_address: Option<u16>,
-    pub size: u16,
-    pub descriptor_address: Option<u16>,
+pub(crate) struct ExpandedObjectDetailSnapshot {
+    pub(crate) kind: ExpandedObjectKind,
+    pub(crate) slot_address: Option<u16>,
+    pub(crate) size: u16,
+    pub(crate) descriptor_address: Option<u16>,
     pub(crate) sprite_asset_image: Option<SpriteAssetImageSpec>,
-    pub object_bitmap_size: Option<(u8, u8)>,
-    pub mapped_sprite: Option<SpriteId>,
-    pub erase_address: Option<u16>,
-    pub center: Option<ScreenPosition>,
-    pub top_left: Option<ScreenPosition>,
-    pub object_address: Option<u16>,
-    pub score_popup_lifetime_ticks: Option<u8>,
-    pub score_popup_value: Option<u16>,
-    pub explosion_step: Option<u8>,
-    pub explosion_lifetime_steps: Option<u8>,
+    pub(crate) object_bitmap_size: Option<(u8, u8)>,
+    pub(crate) mapped_sprite: Option<SpriteId>,
+    pub(crate) erase_address: Option<u16>,
+    pub(crate) center: Option<ScreenPosition>,
+    pub(crate) top_left: Option<ScreenPosition>,
+    pub(crate) object_address: Option<u16>,
+    pub(crate) score_popup_lifetime_ticks: Option<u8>,
+    pub(crate) score_popup_value: Option<u16>,
+    pub(crate) explosion_step: Option<u8>,
+    pub(crate) explosion_lifetime_steps: Option<u8>,
 }
 
 impl ExpandedObjectDetailSnapshot {
@@ -809,11 +782,11 @@ impl ExpandedObjectDetailSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct ExpandedObjectEvidenceSnapshot {
-    pub active_count: u16,
-    pub last_slot_address: Option<u16>,
-    pub detail_count: u8,
-    pub details: [ExpandedObjectDetailSnapshot; EXPANDED_OBJECT_DETAIL_LIMIT],
+pub(crate) struct ExpandedObjectEvidenceSnapshot {
+    pub(crate) active_count: u16,
+    pub(crate) last_slot_address: Option<u16>,
+    pub(crate) detail_count: u8,
+    pub(crate) details: [ExpandedObjectDetailSnapshot; EXPANDED_OBJECT_DETAIL_LIMIT],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

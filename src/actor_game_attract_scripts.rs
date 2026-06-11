@@ -473,11 +473,11 @@ fn parse_attract_script_event(
         }
         "message" => {
             let message = parse_attract_message_id(line_number, parts.next())?;
-            let screen_cell = ScreenAddress::new(parse_attract_u16(
+            let screen_cell = parse_attract_screen_anchor(
                 line_number,
                 parts.next(),
-                "top-left screen cell",
-            )?);
+                "message placement anchor",
+            )?;
             let visual_offset = parse_optional_attract_point(line_number, &mut parts)?;
             Ok(AttractScriptEvent::message_text_with_offset(
                 start_after_steps,
@@ -540,16 +540,16 @@ fn parse_attract_script_event(
             ))
         }
         "hall_scores" | "hall_of_fame_scores" | "hall_of_fame_table" => {
-            let todays_table_cell = ScreenAddress::new(parse_attract_u16(
+            let todays_table_cell = parse_attract_screen_anchor(
                 line_number,
                 parts.next(),
-                "today's table screen cell",
-            )?);
-            let all_time_table_cell = ScreenAddress::new(parse_attract_u16(
+                "today's score-table placement anchor",
+            )?;
+            let all_time_table_cell = parse_attract_screen_anchor(
                 line_number,
                 parts.next(),
-                "all-time table screen cell",
-            )?);
+                "all-time score-table placement anchor",
+            )?;
             let visual_offset = parse_attract_point(line_number, &mut parts)?;
             reject_extra_attract_fields(line_number, parts)?;
             Ok(AttractScriptEvent::hall_scores(
@@ -675,24 +675,35 @@ fn parse_attract_usize(
     })
 }
 
-fn parse_attract_u16(
+fn parse_attract_screen_anchor(
     line_number: usize,
     token: Option<&str>,
     field: &str,
-) -> Result<u16, AttractScriptParseError> {
+) -> Result<ScreenAddress, AttractScriptParseError> {
     let token = token
         .ok_or_else(|| AttractScriptParseError::new(line_number, format!("missing {field}")))?;
-    let parsed = token
-        .strip_prefix("0x")
-        .or_else(|| token.strip_prefix("0X"))
-        .map_or_else(|| token.parse::<u16>(), |hex| u16::from_str_radix(hex, 16))
-        .map_err(|error| {
-            AttractScriptParseError::new(
-                line_number,
-                format!("{field} `{token}` is invalid: {error}"),
-            )
-        })?;
-    Ok(parsed)
+    match normalize_script_token(token).as_str() {
+        "williams_electronics" | "presents_text" => Ok(ATTRACT_PRESENTS_ELECTRONICS_CELL),
+        "hall_title" => Ok(ATTRACT_HALL_TITLE_MESSAGE_CELL),
+        "hall_todays" => Ok(ATTRACT_HALL_TODAYS_MESSAGE_CELL),
+        "hall_all_time" => Ok(ATTRACT_HALL_ALL_TIME_MESSAGE_CELL),
+        "hall_greatest_left" => Ok(ATTRACT_HALL_GREATEST_LEFT_MESSAGE_CELL),
+        "hall_greatest_right" => Ok(ATTRACT_HALL_GREATEST_RIGHT_MESSAGE_CELL),
+        "hall_todays_table" | "todays_score_table" => Ok(ATTRACT_HALL_TODAYS_TABLE_CELL),
+        "hall_all_time_table" | "all_time_score_table" => Ok(ATTRACT_HALL_ALL_TIME_TABLE_CELL),
+        "scanner_instruction" => Ok(ATTRACT_INSTRUCTION_TEXT_LINES[0].1),
+        "lander_instruction" => Ok(ATTRACT_INSTRUCTION_TEXT_LINES[1].1),
+        "mutant_instruction" => Ok(ATTRACT_INSTRUCTION_TEXT_LINES[2].1),
+        "baiter_instruction" => Ok(ATTRACT_INSTRUCTION_TEXT_LINES[3].1),
+        "bomber_instruction" => Ok(ATTRACT_INSTRUCTION_TEXT_LINES[4].1),
+        "swarmer_pod_instruction" => Ok(ATTRACT_INSTRUCTION_TEXT_LINES[5].1),
+        "swarmer_instruction" => Ok(ATTRACT_INSTRUCTION_TEXT_LINES[6].1),
+        "player_start_prompt" => Ok(PLAYER_START_PROMPT_SCREEN_CELL),
+        _ => Err(AttractScriptParseError::new(
+            line_number,
+            format!("unknown {field} `{token}`"),
+        )),
+    }
 }
 
 fn parse_attract_message_id(
@@ -702,7 +713,7 @@ fn parse_attract_message_id(
     let token = token.ok_or_else(|| {
         AttractScriptParseError::new(line_number, "message action needs a message key")
     })?;
-    crate::reference_assets::message_id_from_script_key(token).ok_or_else(|| {
+    crate::arcade_assets::message_id_from_script_key(token).ok_or_else(|| {
         AttractScriptParseError::new(line_number, format!("unknown message key `{token}`"))
     })
 }
@@ -1041,7 +1052,7 @@ impl AttractScriptAction {
                 visual_offset,
             } => vec![DrawCommand::message_text_with_offset(
                 actor,
-                crate::reference_assets::message_text(*message),
+                crate::arcade_assets::message_text(*message),
                 *screen_cell,
                 *visual_offset,
             )],
@@ -1234,7 +1245,7 @@ impl AttractScriptAction {
 }
 
 fn credits_prompt_text() -> &'static str {
-    crate::reference_assets::message_text(CREDITS_MESSAGE)
+    crate::arcade_assets::message_text(CREDITS_MESSAGE)
 }
 
 fn hall_score_seed_entries() -> [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] {
@@ -1255,7 +1266,7 @@ fn hall_score_entries(
 }
 
 fn high_score_seed_entry(index: usize) -> HighScoreTableEntrySnapshot {
-    let seed = crate::reference_assets::HIGH_SCORE_SEEDS
+    let seed = crate::arcade_assets::HIGH_SCORE_SEEDS
         .get(index)
         .unwrap_or_else(|| panic!("missing embedded high-score seed row {index}"));
     HighScoreTableEntrySnapshot {

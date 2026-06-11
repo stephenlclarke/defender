@@ -1,4 +1,4 @@
-//! Actor runtime smoke runner.
+//! Actor smoke runner.
 //!
 //! This command path exercises the actor driver through `ActorRuntimeAdapter`
 //! and the native draw planner while actor frames also expose a clean

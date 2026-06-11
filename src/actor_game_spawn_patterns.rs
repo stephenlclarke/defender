@@ -28,24 +28,27 @@ impl ActorLanderSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            reference_state: None,
+            actor_state: None,
             spawn_visibility: LanderSpawnVisibility::Normal,
         }
     }
 
     const fn from_first_wave_record(start: FirstWaveLanderSpawnRecord) -> Self {
+        let (position, motion) = ActorMotion::from_world_words(
+            start.world_x,
+            start.world_y,
+            start.x_velocity,
+            start.y_velocity,
+        );
         Self {
-            position: Point::new((start.world_x >> 8) as i16, (start.world_y >> 8) as i16),
-            reference_state: Some(LanderReferenceState {
-                x_fraction: (start.world_x & SPAWN_WORLD_FRACTION_MASK) as u8,
-                y_fraction: (start.world_y & SPAWN_WORLD_FRACTION_MASK) as u8,
-                x_velocity: start.x_velocity,
-                y_velocity: start.y_velocity,
-                shot_timer: start.shot_timer,
-                sleep_ticks: start.sleep_ticks,
-                animation_frame: start.animation_frame,
-                target_human_index: start.target_human_index,
-            }),
+            position,
+            actor_state: Some(LanderActorState::new(
+                motion,
+                start.shot_timer,
+                start.sleep_ticks,
+                start.animation_frame,
+                start.target_human_index,
+            )),
             spawn_visibility: LanderSpawnVisibility::Normal,
         }
     }
@@ -83,16 +86,13 @@ impl ActorLanderSpawn {
 
         Self {
             position: Point::new(i16::from(x), i16::from(y)),
-            reference_state: Some(LanderReferenceState {
-                x_fraction,
-                y_fraction: 0,
-                x_velocity,
-                y_velocity,
+            actor_state: Some(LanderActorState::new(
+                ActorMotion::new(x_fraction, 0, x_velocity, y_velocity),
                 shot_timer,
-                sleep_ticks: 0,
-                animation_frame: SpriteFrameIndex::new(0),
+                0,
+                SpriteFrameIndex::new(0),
                 target_human_index,
-            }),
+            )),
             spawn_visibility: LanderSpawnVisibility::Normal,
         }
     }
@@ -102,7 +102,7 @@ impl ActorBomberSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            reference_state: None,
+            actor_state: None,
         }
     }
 
@@ -114,16 +114,13 @@ impl ActorBomberSpawn {
         };
         Self {
             position,
-            reference_state: Some(BomberReferenceState {
-                x_fraction: 0,
-                y_fraction: 0,
-                x_velocity: actor_sign_extend_u8_to_u16(velocity_low),
-                y_velocity: 0,
-                animation_frame: SpriteFrameIndex::new(0),
-                cruise_altitude: BOMBER_CRUISE_ALTITUDE,
-                sleep_ticks: 0,
-                slot: (spawn_index % 4) as u8,
-            }),
+            actor_state: Some(BomberActorState::new(
+                ActorMotion::new(0, 0, actor_sign_extend_u8_to_u16(velocity_low), 0),
+                SpriteFrameIndex::new(0),
+                BOMBER_CRUISE_ALTITUDE,
+                0,
+                (spawn_index % 4) as u8,
+            )),
         }
     }
 
@@ -153,16 +150,13 @@ impl ActorBomberSpawn {
                 let [x, x_fraction] = world_x_word.to_be_bytes();
                 bombers.push(Self {
                     position: Point::new(i16::from(x), BOMBER_CRUISE_ALTITUDE),
-                    reference_state: Some(BomberReferenceState {
-                        x_fraction,
-                        y_fraction: 0,
-                        x_velocity,
-                        y_velocity: 0,
-                        animation_frame: SpriteFrameIndex::new(0),
-                        cruise_altitude: BOMBER_CRUISE_ALTITUDE,
-                        sleep_ticks: 0,
-                        slot: (squad_remaining - 1) as u8,
-                    }),
+                    actor_state: Some(BomberActorState::new(
+                        ActorMotion::new(x_fraction, 0, x_velocity, 0),
+                        SpriteFrameIndex::new(0),
+                        BOMBER_CRUISE_ALTITUDE,
+                        0,
+                        (squad_remaining - 1) as u8,
+                    )),
                 });
             }
 
@@ -177,7 +171,7 @@ impl ActorPodSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            reference_state: None,
+            actor_state: None,
         }
     }
 
@@ -189,12 +183,12 @@ impl ActorPodSpawn {
         };
         Self {
             position,
-            reference_state: Some(PodReferenceState {
-                x_fraction: 0,
-                y_fraction: 0,
-                x_velocity: actor_sign_extend_u8_to_u16(velocity_low),
-                y_velocity: 0,
-            }),
+            actor_state: Some(PodActorState::new(ActorMotion::new(
+                0,
+                0,
+                actor_sign_extend_u8_to_u16(velocity_low),
+                0,
+            ))),
         }
     }
 
@@ -223,12 +217,12 @@ impl ActorPodSpawn {
 
         Self {
             position: Point::new(i16::from(x), i16::from(y)),
-            reference_state: Some(PodReferenceState {
+            actor_state: Some(PodActorState::new(ActorMotion::new(
                 x_fraction,
-                y_fraction: 0,
+                0,
                 x_velocity,
-                y_velocity: actor_sign_extend_u8_to_u16(y_velocity_low),
-            }),
+                actor_sign_extend_u8_to_u16(y_velocity_low),
+            ))),
         }
     }
 }
@@ -237,7 +231,7 @@ impl ActorSwarmerSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            reference_state: None,
+            actor_state: None,
         }
     }
 
@@ -259,16 +253,13 @@ impl ActorSwarmerSpawn {
 
         Self {
             position,
-            reference_state: Some(SwarmerReferenceState {
-                x_fraction: 0,
-                y_fraction: 0,
-                x_velocity,
-                y_velocity,
+            actor_state: Some(SwarmerActorState::new(
+                ActorMotion::new(0, 0, x_velocity, y_velocity),
                 acceleration,
                 sleep_ticks,
                 shot_timer,
-                horizontal_seek_pending: true,
-            }),
+                true,
+            )),
         }
     }
 
@@ -301,9 +292,8 @@ impl ActorSwarmerSpawn {
         (0..count)
             .map(|_| {
                 let mut spawn = Self::from_pod_release(actor_rng, profile, position);
-                if let Some(reference_state) = &mut spawn.reference_state {
-                    reference_state.x_fraction = x_fraction;
-                    reference_state.y_fraction = y_fraction;
+                if let Some(actor_state) = &mut spawn.actor_state {
+                    actor_state.set_subpixels(x_fraction, y_fraction);
                 }
                 spawn
             })
@@ -315,7 +305,7 @@ impl ActorBaiterSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            reference_state: None,
+            actor_state: None,
         }
     }
 
@@ -340,17 +330,14 @@ impl ActorBaiterSpawn {
             HUMAN_GROUND_Y - BAITER_VERTICAL_SPACING,
         );
         let position = Point::new(spawn_x, spawn_y);
-        let mut reference_state = BaiterReferenceState {
-            x_fraction: 0,
-            y_fraction: 0,
-            x_velocity: 0,
-            y_velocity: 0,
-            shot_timer: BAITER_INITIAL_SHOT_TIMER,
-            sleep_ticks: 0,
-            animation_frame: SpriteFrameIndex::new(0),
-        };
+        let mut actor_state = BaiterActorState::new(
+            ActorMotion::at_rest(),
+            BAITER_INITIAL_SHOT_TIMER,
+            0,
+            SpriteFrameIndex::new(0),
+        );
         update_baiter_velocity(
-            &mut reference_state,
+            &mut actor_state,
             position,
             profile,
             player_position,
@@ -360,7 +347,7 @@ impl ActorBaiterSpawn {
         );
         Self {
             position,
-            reference_state: Some(reference_state),
+            actor_state: Some(actor_state),
         }
     }
 }
@@ -369,7 +356,7 @@ impl ActorMutantSpawn {
     pub const fn new(position: Point) -> Self {
         Self {
             position,
-            reference_state: None,
+            actor_state: None,
         }
     }
 
@@ -386,11 +373,8 @@ impl ActorMutantSpawn {
             actor_rng.advance_rmax(profile.mutant_shot_time.min(u32::from(u8::MAX)) as u8);
         Self {
             position,
-            reference_state: Some(MutantReferenceState {
-                x_fraction: 0,
-                y_fraction: 0,
-                x_velocity: 0,
-                y_velocity: 0,
+            actor_state: Some(MutantActorState {
+                motion: ActorMotion::at_rest(),
                 shot_timer,
                 sleep_ticks: 0,
                 hop_rng: actor_rng.snapshot(),
@@ -423,11 +407,8 @@ impl ActorMutantSpawn {
 
         Self {
             position: Point::new(i16::from(x), i16::from(y)),
-            reference_state: Some(MutantReferenceState {
-                x_fraction,
-                y_fraction: 0,
-                x_velocity: 0,
-                y_velocity: 0,
+            actor_state: Some(MutantActorState {
+                motion: ActorMotion::stationary(x_fraction, 0),
                 shot_timer,
                 sleep_ticks: 0,
                 hop_rng: actor_rng.snapshot(),
@@ -497,12 +478,12 @@ fn push_target_list_restore_human_group(
         humans.push(ActorHumanSpawn {
             position: Point::new(i16::from(spawn_x), i16::from(ASTRONAUT_RESTORE_Y)),
             mode: HumanMode::Grounded,
-            reference_state: Some(HumanReferenceState {
-                x_fraction: state.lseed,
-                y_fraction: 0,
+            actor_state: Some(HumanActorState::new(
+                state.lseed,
+                0,
                 animation_frame,
-                target_slot_index: slot_index,
-            }),
+                slot_index,
+            )),
         });
         slot_index += 1;
     }
@@ -513,7 +494,7 @@ fn select_next_lander_target_slot_index(
     cursor: &mut Option<usize>,
     humans: &[ActorHumanSpawn],
 ) -> Option<usize> {
-    if !humans.iter().any(|human| human.reference_state.is_some()) {
+    if !humans.iter().any(|human| human.actor_state.is_some()) {
         return None;
     }
 
@@ -525,8 +506,8 @@ fn select_next_lander_target_slot_index(
         probe = next_target_list_slot_index(probe);
         if humans.iter().any(|human| {
             human
-                .reference_state
-                .is_some_and(|reference_state| reference_state.target_slot_index == probe)
+                .actor_state
+                .is_some_and(|actor_state| actor_state.target_slot_index == probe)
         }) {
             *cursor = Some(probe);
             return Some(probe);
@@ -560,7 +541,7 @@ impl ActorHumanSpawn {
         Self {
             position,
             mode,
-            reference_state: None,
+            actor_state: None,
         }
     }
 
@@ -571,12 +552,12 @@ impl ActorHumanSpawn {
         Self {
             position: Point::new((start.world_x >> 8) as i16, (start.world_y >> 8) as i16),
             mode: HumanMode::Grounded,
-            reference_state: Some(HumanReferenceState {
-                x_fraction: (start.world_x & SPAWN_WORLD_FRACTION_MASK) as u8,
-                y_fraction: (start.world_y & SPAWN_WORLD_FRACTION_MASK) as u8,
-                animation_frame: start.animation_frame,
+            actor_state: Some(HumanActorState::new(
+                (start.world_x & SPAWN_WORLD_FRACTION_MASK) as u8,
+                (start.world_y & SPAWN_WORLD_FRACTION_MASK) as u8,
+                start.animation_frame,
                 target_slot_index,
-            }),
+            )),
         }
     }
 }

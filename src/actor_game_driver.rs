@@ -1,3 +1,5 @@
+const PLAYER_INITIAL_SPAWN_POSITION: Point = Point::new(42, 120);
+
 pub struct ActorGameDriver {
     step: u64,
     phase: Phase,
@@ -467,7 +469,7 @@ impl ActorGameDriver {
 
     fn spawn_player(&mut self) -> ActorId {
         let id = self.allocate_actor_id();
-        self.spawn_actor(PlayerShip::new(id, Point::new(42, 120)));
+        self.spawn_actor(PlayerShip::new(id, PLAYER_INITIAL_SPAWN_POSITION));
         id
     }
 
@@ -508,14 +510,14 @@ impl ActorGameDriver {
     fn spawn_bomb(
         &mut self,
         position: Point,
-        reference_state: Option<EnemyProjectileReferenceState>,
+        actor_state: Option<EnemyProjectileActorState>,
     ) -> ActorId {
         let id = self.allocate_actor_id();
         let lifetime = self
             .behavior_script
             .behavior_for(id, ActorKind::Bomb)
             .bomb_lifetime_steps;
-        self.spawn_actor(Bomb::new(id, position, lifetime, reference_state));
+        self.spawn_actor(Bomb::new(id, position, lifetime, actor_state));
         id
     }
 
@@ -577,10 +579,10 @@ impl ActorGameDriver {
         &mut self,
         position: Point,
         velocity: Velocity,
-        reference_state: Option<EnemyProjectileReferenceState>,
+        actor_state: Option<EnemyProjectileActorState>,
     ) -> ActorId {
         let id = self.allocate_actor_id();
-        self.spawn_actor(EnemyLaserShot::new(id, position, velocity, reference_state));
+        self.spawn_actor(EnemyLaserShot::new(id, position, velocity, actor_state));
         id
     }
 
@@ -668,7 +670,7 @@ impl ActorGameDriver {
             }
             if mutant_dive_collision_window_pending(
                 enemy.position,
-                enemy.reference_state.as_mutant(),
+                enemy.actor_state.as_mutant(),
             ) {
                 continue;
             }
@@ -736,12 +738,12 @@ impl ActorGameDriver {
                 GameCommand::Spawn(SpawnRequest::EnemyLaser {
                     position,
                     velocity,
-                    reference_state,
+                    actor_state,
                 }) => {
                     if enemy_projectile_spawn_in_bounds(position)
                         && reserve_enemy_projectile_slot(&mut active_enemy_projectiles)
                     {
-                        self.spawn_enemy_laser_from_spawn(position, velocity, reference_state);
+                        self.spawn_enemy_laser_from_spawn(position, velocity, actor_state);
                     }
                 }
                 GameCommand::Spawn(SpawnRequest::Lander { position }) => {
@@ -750,11 +752,11 @@ impl ActorGameDriver {
                 }
                 GameCommand::Spawn(SpawnRequest::Mutant {
                     position,
-                    reference_state,
+                    actor_state,
                 }) => {
                     let actor = self.spawn_mutant_from_spawn(ActorMutantSpawn {
                         position,
-                        reference_state,
+                        actor_state,
                     });
                     self.apply_next_wave_spawn_behavior(ActorKind::Mutant, actor);
                 }
@@ -764,15 +766,15 @@ impl ActorGameDriver {
                 }
                 GameCommand::Spawn(SpawnRequest::Bomb {
                     position,
-                    reference_state,
+                    actor_state,
                 }) => {
-                    if bomb_projectile_spawn_in_world_bounds(position, reference_state)
+                    if bomb_projectile_spawn_in_world_bounds(position, actor_state)
                         && enemy_projectile_slot_available(active_enemy_projectiles)
                         && bomb_projectile_slot_available(active_bomb_projectiles)
                     {
                         active_enemy_projectiles += 1;
                         active_bomb_projectiles += 1;
-                        self.spawn_bomb(position, reference_state);
+                        self.spawn_bomb(position, actor_state);
                     }
                 }
                 GameCommand::Spawn(SpawnRequest::Pod { position }) => {
@@ -781,21 +783,21 @@ impl ActorGameDriver {
                 }
                 GameCommand::Spawn(SpawnRequest::Swarmer {
                     position,
-                    reference_state,
+                    actor_state,
                 }) => {
                     let actor = self.spawn_swarmer_from_spawn(ActorSwarmerSpawn {
                         position,
-                        reference_state,
+                        actor_state,
                     });
                     self.apply_next_wave_spawn_behavior(ActorKind::Swarmer, actor);
                 }
                 GameCommand::Spawn(SpawnRequest::Baiter {
                     position,
-                    reference_state,
+                    actor_state,
                 }) => {
                     let actor = self.spawn_baiter_from_spawn(ActorBaiterSpawn {
                         position,
-                        reference_state,
+                        actor_state,
                     });
                     self.apply_next_wave_spawn_behavior(ActorKind::Baiter, actor);
                 }
@@ -836,17 +838,17 @@ impl ActorGameDriver {
                     human,
                     position,
                 } => {
-                    let reference_state = self
+                    let actor_state = self
                         .snapshots
                         .get(&human)
-                        .and_then(|snapshot| snapshot.reference_state.as_human());
+                        .and_then(|snapshot| snapshot.actor_state.as_human());
                     self.snapshots.remove(&human);
                     self.actors.remove(&human);
-                    self.spawn_actor(Human::with_reference_state(
+                    self.spawn_actor(Human::with_actor_state(
                         human,
                         position,
                         HumanMode::CarriedBy(lander),
-                        reference_state,
+                        actor_state,
                     ));
                 }
                 GameCommand::SmartBomb { consume_stock } => {
@@ -1511,8 +1513,8 @@ impl ActorGameDriver {
 
         let human_count = self.human_snapshot_count();
         self.snapshots.values().find_map(|snapshot| {
-            let reference_state = snapshot.reference_state.as_human()?;
-            (reference_state.target_slot_index == next_cursor
+            let actor_state = snapshot.actor_state.as_human()?;
+            (actor_state.target_slot_index == next_cursor
                 && actor_human_walk_targetable(human_count, snapshot))
             .then_some(next_cursor)
         })
@@ -1652,7 +1654,7 @@ impl ActorGameDriver {
                             );
                             commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
                                 position: spawn.position,
-                                reference_state: spawn.reference_state,
+                                actor_state: spawn.actor_state,
                             }));
                             let actor = self.spawn_mutant_from_spawn(spawn);
                             self.apply_next_wave_spawn_behavior(ActorKind::Mutant, actor);
@@ -1698,7 +1700,7 @@ impl ActorGameDriver {
                     );
                     commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
                         position: spawn.position,
-                        reference_state: spawn.reference_state,
+                        actor_state: spawn.actor_state,
                     }));
                     let actor = self.spawn_mutant_from_spawn(spawn);
                     self.apply_next_wave_spawn_behavior(ActorKind::Mutant, actor);
@@ -1716,7 +1718,7 @@ impl ActorGameDriver {
                     ) {
                         commands.push(GameCommand::Spawn(SpawnRequest::Swarmer {
                             position: spawn.position,
-                            reference_state: spawn.reference_state,
+                            actor_state: spawn.actor_state,
                         }));
                         let actor = self.spawn_swarmer_from_spawn(spawn);
                         self.apply_next_wave_spawn_behavior(ActorKind::Swarmer, actor);
@@ -1887,8 +1889,8 @@ impl ActorGameDriver {
         for spawn in wave_profile.lander_spawns.iter().copied() {
             let actor = self.spawn_lander_from_spawn(spawn);
             if let Some(target_index) = spawn
-                .reference_state
-                .and_then(|reference_state| reference_state.target_human_index)
+                .actor_state
+                .and_then(|actor_state| actor_state.target_human_index)
             {
                 self.target_human_cursor = Some(target_index);
             }
@@ -1925,7 +1927,7 @@ impl ActorGameDriver {
 
     fn has_targetable_human_snapshots(&self) -> bool {
         self.snapshots.values().any(|snapshot| {
-            snapshot.kind == ActorKind::Human && snapshot.alive && snapshot.reference_state.as_human().is_some()
+            snapshot.kind == ActorKind::Human && snapshot.alive && snapshot.actor_state.as_human().is_some()
         })
     }
 
@@ -1966,8 +1968,8 @@ impl ActorGameDriver {
                 snapshot.kind == ActorKind::Human
                     && snapshot.alive
                     && snapshot
-                        .reference_state.as_human()
-                        .is_some_and(|reference_state| reference_state.target_slot_index == probe)
+                        .actor_state.as_human()
+                        .is_some_and(|actor_state| actor_state.target_slot_index == probe)
             }) {
                 self.target_human_cursor = Some(probe);
                 return Some(probe);
@@ -2074,7 +2076,7 @@ impl ActorGameDriver {
                 );
                 GameCommand::Spawn(SpawnRequest::Swarmer {
                     position: spawn.position,
-                    reference_state: spawn.reference_state,
+                    actor_state: spawn.actor_state,
                 })
             })
             .collect()
@@ -2123,7 +2125,7 @@ impl ActorGameDriver {
         let spawn = ActorBaiterSpawn::from_player_position(profile, player_position, active_baiters);
         commands.push(GameCommand::Spawn(SpawnRequest::Baiter {
             position: spawn.position,
-            reference_state: spawn.reference_state,
+            actor_state: spawn.actor_state,
         }));
     }
 

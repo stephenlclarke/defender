@@ -376,7 +376,7 @@ impl VisualStateSnapshot {
 
     pub(crate) fn attract_williams_logo_tint_for_step(self, page_step: u16) -> Color {
         if let Some(color_byte) = ATTRACT_TITLE_REFERENCE_LOGO_COLOR_BYTES
-            .get(attract_title_reference_sample_index(page_step))
+            .get(attract_title_sample_index(page_step))
             .copied()
             .filter(|color_byte| *color_byte != 0)
         {
@@ -472,39 +472,39 @@ pub struct WaveProfileSnapshot {
 impl WaveProfileSnapshot {
     pub fn for_wave(wave: u8) -> Self {
         Self {
-            landers: wave_table_u8(crate::reference_assets::WaveMetric::Landers, wave),
-            bombers: wave_table_u8(crate::reference_assets::WaveMetric::Bombers, wave),
-            pods: wave_table_u8(crate::reference_assets::WaveMetric::Pods, wave),
-            mutants: wave_table_u8(crate::reference_assets::WaveMetric::Mutants, wave),
-            swarmers: wave_table_u8(crate::reference_assets::WaveMetric::Swarmers, wave),
-            lander_x_velocity: wave_table_u8(crate::reference_assets::WaveMetric::LanderXVelocity, wave),
+            landers: wave_table_u8(crate::arcade_assets::WaveMetric::Landers, wave),
+            bombers: wave_table_u8(crate::arcade_assets::WaveMetric::Bombers, wave),
+            pods: wave_table_u8(crate::arcade_assets::WaveMetric::Pods, wave),
+            mutants: wave_table_u8(crate::arcade_assets::WaveMetric::Mutants, wave),
+            swarmers: wave_table_u8(crate::arcade_assets::WaveMetric::Swarmers, wave),
+            lander_x_velocity: wave_table_u8(crate::arcade_assets::WaveMetric::LanderXVelocity, wave),
             lander_y_velocity: wave_table_u16(
-                crate::reference_assets::WaveMetric::LanderYVelocityHigh,
-                crate::reference_assets::WaveMetric::LanderYVelocityLow,
+                crate::arcade_assets::WaveMetric::LanderYVelocityHigh,
+                crate::arcade_assets::WaveMetric::LanderYVelocityLow,
                 wave,
             ),
-            mutant_random_y: wave_table_u8(crate::reference_assets::WaveMetric::MutantRandomY, wave),
+            mutant_random_y: wave_table_u8(crate::arcade_assets::WaveMetric::MutantRandomY, wave),
             mutant_y_velocity: wave_table_u16(
-                crate::reference_assets::WaveMetric::MutantYVelocityHigh,
-                crate::reference_assets::WaveMetric::MutantYVelocityLow,
+                crate::arcade_assets::WaveMetric::MutantYVelocityHigh,
+                crate::arcade_assets::WaveMetric::MutantYVelocityLow,
                 wave,
             ),
-            mutant_x_velocity: wave_table_u8(crate::reference_assets::WaveMetric::MutantXVelocity, wave),
-            swarmer_x_velocity: wave_table_u8(crate::reference_assets::WaveMetric::SwarmerXVelocity, wave),
-            wave_time: wave_table_u32(crate::reference_assets::WaveMetric::WaveTime, wave),
-            wave_size: wave_table_u8(crate::reference_assets::WaveMetric::WaveSize, wave),
-            lander_shot_time: wave_table_u32(crate::reference_assets::WaveMetric::LanderShotTime, wave),
-            bomber_x_velocity: wave_table_u8(crate::reference_assets::WaveMetric::BomberXVelocity, wave),
-            mutant_shot_time: wave_table_u32(crate::reference_assets::WaveMetric::MutantShotTime, wave),
-            swarmer_shot_time: wave_table_u32(crate::reference_assets::WaveMetric::SwarmerShotTime, wave),
+            mutant_x_velocity: wave_table_u8(crate::arcade_assets::WaveMetric::MutantXVelocity, wave),
+            swarmer_x_velocity: wave_table_u8(crate::arcade_assets::WaveMetric::SwarmerXVelocity, wave),
+            wave_time: wave_table_u32(crate::arcade_assets::WaveMetric::WaveTime, wave),
+            wave_size: wave_table_u8(crate::arcade_assets::WaveMetric::WaveSize, wave),
+            lander_shot_time: wave_table_u32(crate::arcade_assets::WaveMetric::LanderShotTime, wave),
+            bomber_x_velocity: wave_table_u8(crate::arcade_assets::WaveMetric::BomberXVelocity, wave),
+            mutant_shot_time: wave_table_u32(crate::arcade_assets::WaveMetric::MutantShotTime, wave),
+            swarmer_shot_time: wave_table_u32(crate::arcade_assets::WaveMetric::SwarmerShotTime, wave),
             swarmer_acceleration_mask: wave_table_u8(
-                crate::reference_assets::WaveMetric::SwarmerAccelerationMask,
+                crate::arcade_assets::WaveMetric::SwarmerAccelerationMask,
                 wave,
             ),
-            baiter_delay: wave_table_u32(crate::reference_assets::WaveMetric::BaiterDelay, wave),
-            baiter_shot_time: wave_table_u32(crate::reference_assets::WaveMetric::BaiterShotTime, wave),
+            baiter_delay: wave_table_u32(crate::arcade_assets::WaveMetric::BaiterDelay, wave),
+            baiter_shot_time: wave_table_u32(crate::arcade_assets::WaveMetric::BaiterShotTime, wave),
             baiter_seek_probability: wave_table_u8(
-                crate::reference_assets::WaveMetric::BaiterSeekProbability,
+                crate::arcade_assets::WaveMetric::BaiterSeekProbability,
                 wave,
             ),
         }
@@ -514,13 +514,13 @@ impl WaveProfileSnapshot {
 const DEFAULT_DIFFICULTY_INITIAL: u8 = 5;
 const DEFAULT_DIFFICULTY_CEILING: u8 = 15;
 
-fn wave_table_u8(metric: crate::reference_assets::WaveMetric, wave: u8) -> u8 {
+fn wave_table_u8(metric: crate::arcade_assets::WaveMetric, wave: u8) -> u8 {
     u8::try_from(wave_table_value(metric, wave)).expect("wave profile value should fit u8")
 }
 
 fn wave_table_u16(
-    high_metric: crate::reference_assets::WaveMetric,
-    low_metric: crate::reference_assets::WaveMetric,
+    high_metric: crate::arcade_assets::WaveMetric,
+    low_metric: crate::arcade_assets::WaveMetric,
     wave: u8,
 ) -> u16 {
     u16::from_be_bytes([
@@ -529,12 +529,12 @@ fn wave_table_u16(
     ])
 }
 
-fn wave_table_u32(metric: crate::reference_assets::WaveMetric, wave: u8) -> u32 {
+fn wave_table_u32(metric: crate::arcade_assets::WaveMetric, wave: u8) -> u32 {
     u32::try_from(wave_table_value(metric, wave)).expect("wave profile value should be non-negative")
 }
 
-fn wave_table_value(metric: crate::reference_assets::WaveMetric, wave: u8) -> i32 {
-    crate::reference_assets::wave_metric_value(
+fn wave_table_value(metric: crate::arcade_assets::WaveMetric, wave: u8) -> i32 {
+    crate::arcade_assets::wave_metric_value(
         metric,
         wave,
         wave_tuning_difficulty_iterations(wave.max(1)),

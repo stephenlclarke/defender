@@ -4,7 +4,7 @@ struct Lander {
     position: Point,
     drift: i16,
     mode: LanderMode,
-    reference_state: Option<LanderReferenceState>,
+    actor_state: Option<LanderActorState>,
     spawn_visibility: LanderSpawnVisibility,
 }
 
@@ -34,14 +34,14 @@ impl Lander {
             id,
             position: spawn.position,
             drift: spawn
-                .reference_state
-                .map(|reference_state| {
-                    lander_drift_from_motion_word(reference_state.x_velocity)
+                .actor_state
+                .map(|actor_state| {
+                    lander_drift_from_motion_word(actor_state.x_velocity())
                 })
                 .unwrap_or(-1),
             mode: LanderMode::Seeking,
             spawn_visibility: spawn.spawn_visibility,
-            reference_state: spawn.reference_state,
+            actor_state: spawn.actor_state,
         }
     }
 
@@ -61,11 +61,11 @@ impl AssetActor for Lander {
             x_velocity,
             delta,
         } = command;
-        if let Some(reference_state) = &mut self.reference_state
-            && reference_state.target_human_index == Some(target_human_index)
-            && reference_state.x_velocity == x_velocity
+        if let Some(actor_state) = &mut self.actor_state
+            && actor_state.target_human_index == Some(target_human_index)
+            && actor_state.x_velocity() == x_velocity
         {
-            reference_state.shot_timer = reference_state.shot_timer.wrapping_add(delta);
+            actor_state.shot_timer = actor_state.shot_timer.wrapping_add(delta);
         }
     }
 
@@ -118,7 +118,7 @@ impl AssetActor for Lander {
                 )),
                 bounds: self.output_visible().then_some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
-                reference_state: ActorReferenceState::lander(self.reference_state),
+                actor_state: ActorInternalState::lander(self.actor_state),
             },
             commands,
             draws,
@@ -149,7 +149,7 @@ impl Lander {
                 }
             }
             LanderBehaviorMode::Drift => {
-                if !self.advance_fixed_point_motion() {
+                if !self.advance_actor_motion() {
                     self.drift(behavior);
                 }
             }
@@ -180,7 +180,7 @@ impl Lander {
                 commands.push(GameCommand::PlaySound(SoundCue::LanderPickup));
                 return;
             }
-            if self.advance_fixed_point_motion() {
+            if self.advance_actor_motion() {
                 return;
             }
             self.position = step_toward(self.position, target.position, behavior.lander_seek_speed);
@@ -190,14 +190,14 @@ impl Lander {
         if let Some(player) = prompt.player_position() {
             self.drift = if player.x < self.position.x { -1 } else { 1 };
         }
-        if !self.advance_fixed_point_motion() {
+        if !self.advance_actor_motion() {
             self.drift(behavior);
         }
     }
 
     fn target_human<'a>(&self, prompt: &'a StepPrompt) -> Option<&'a ActorSnapshot> {
-        self.reference_state
-            .and_then(|reference_state| reference_state.target_human_index)
+        self.actor_state
+            .and_then(|actor_state| actor_state.target_human_index)
             .and_then(|target_slot_index| prompt.target_human(target_slot_index))
     }
 
@@ -208,28 +208,16 @@ impl Lander {
         ));
     }
 
-    fn advance_fixed_point_motion(&mut self) -> bool {
-        let Some(reference_state) = &mut self.reference_state else {
+    fn advance_actor_motion(&mut self) -> bool {
+        let Some(actor_state) = &mut self.actor_state else {
             return false;
         };
-        if reference_state.x_velocity == 0 && reference_state.y_velocity == 0 {
+        if actor_state.is_stationary() {
             return false;
         }
 
-        let (x, x_fraction) = step_motion_axis(
-            self.position.x,
-            reference_state.x_fraction,
-            reference_state.x_velocity,
-        );
-        let (y, y_fraction) = step_wrapping_motion_y(
-            self.position.y,
-            reference_state.y_fraction,
-            reference_state.y_velocity,
-        );
-        self.position = Point::new(x, y);
-        reference_state.x_fraction = x_fraction;
-        reference_state.y_fraction = y_fraction;
-        self.drift = lander_drift_from_motion_word(reference_state.x_velocity);
+        self.position = actor_state.advance_motion(self.position);
+        self.drift = lander_drift_from_motion_word(actor_state.x_velocity());
         true
     }
 
@@ -256,27 +244,27 @@ impl Lander {
             commands.push(GameCommand::Destroy(human_id));
             commands.push(GameCommand::Spawn(SpawnRequest::Mutant {
                 position: self.position,
-                reference_state: self.mutant_reference_state_conversion(prompt),
+                actor_state: self.mutant_actor_state_conversion(prompt),
             }));
             commands.push(GameCommand::PlaySound(SoundCue::MutantSpawn));
         }
     }
 
-    fn mutant_reference_state_conversion(&self, prompt: &StepPrompt) -> Option<MutantReferenceState> {
-        let reference_state = self.reference_state?;
+    fn mutant_actor_state_conversion(&self, prompt: &StepPrompt) -> Option<MutantActorState> {
+        let actor_state = self.actor_state?;
         let hop_rng = prompt.actor_rng?;
-        Some(MutantReferenceState::from_lander_conversion(
-            reference_state,
+        Some(MutantActorState::from_lander_conversion(
+            actor_state,
             prompt.wave_tuning,
             hop_rng,
         ))
     }
 
     fn tick_runtime_sleep(&mut self) -> bool {
-        if let Some(reference_state) = &mut self.reference_state
-            && reference_state.sleep_ticks > 0
+        if let Some(actor_state) = &mut self.actor_state
+            && actor_state.sleep_ticks > 0
         {
-            reference_state.sleep_ticks = reference_state.sleep_ticks.saturating_sub(1);
+            actor_state.sleep_ticks = actor_state.sleep_ticks.saturating_sub(1);
             return true;
         }
         false
@@ -289,12 +277,12 @@ impl Lander {
         commands: &mut Vec<GameCommand>,
     ) {
         let mut runtime_shot_fired = false;
-        if let Some(reference_state) = &mut self.reference_state {
-            if reference_state.shot_timer > 0 {
-                reference_state.shot_timer = reference_state.shot_timer.saturating_sub(1);
+        if let Some(actor_state) = &mut self.actor_state {
+            if actor_state.shot_timer > 0 {
+                actor_state.shot_timer = actor_state.shot_timer.saturating_sub(1);
             }
-            if reference_state.shot_timer == 0 {
-                reference_state.shot_timer = clamped_lander_fire_timer_reset(behavior);
+            if actor_state.shot_timer == 0 {
+                actor_state.shot_timer = clamped_lander_fire_timer_reset(behavior);
                 runtime_shot_fired = true;
             }
         }
@@ -302,7 +290,7 @@ impl Lander {
             self.fire_lander_shot(prompt, behavior, commands);
             return;
         }
-        if self.reference_state.is_some() {
+        if self.actor_state.is_some() {
             return;
         }
 
@@ -319,10 +307,10 @@ impl Lander {
         commands: &mut Vec<GameCommand>,
     ) {
         let velocity = self.lander_shot_velocity(prompt, behavior);
-        let projectile_reference_state = self.reference_state.map(|reference_state| {
-            enemy_projectile_reference_state(
-                reference_state.x_fraction,
-                reference_state.y_fraction,
+        let projectile_actor_state = self.actor_state.map(|actor_state| {
+            enemy_projectile_actor_state(
+                actor_state.x_fraction(),
+                actor_state.y_fraction(),
                 velocity,
                 behavior.lander_shot_lifetime_steps,
             )
@@ -330,7 +318,7 @@ impl Lander {
         commands.push(GameCommand::Spawn(SpawnRequest::EnemyLaser {
             position: self.position,
             velocity,
-            reference_state: projectile_reference_state,
+            actor_state: projectile_actor_state,
         }));
         commands.push(GameCommand::PlaySound(SoundCue::LanderShot));
     }
@@ -352,9 +340,9 @@ impl Lander {
     }
 
     fn draw_effect(&self) -> VisualEffect {
-        self.reference_state
-            .map(|reference_state| VisualEffect::LanderSpriteFrame {
-                animation_frame: reference_state.animation_frame,
+        self.actor_state
+            .map(|actor_state| VisualEffect::LanderSpriteFrame {
+                animation_frame: actor_state.animation_frame,
             })
             .unwrap_or(VisualEffect::Static)
     }

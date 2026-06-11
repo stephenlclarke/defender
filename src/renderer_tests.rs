@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::reference_assets::{MessageId, ObjectBitmapId, message_text};
+    use crate::arcade_assets::{MessageId, ObjectBitmapId, message_text};
     use super::{
         ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT, AtlasRegion, Color, GpuRendererSettings,
         NativeRenderPipeline, NativeRendererResources, NativeSceneRenderer, ObjectBitmapPalette,

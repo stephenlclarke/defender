@@ -28,7 +28,7 @@ const APPEARANCE_GROWTH_ACTIVE_BIT: u16 = 0x8000;
 const TRANSPARENT_COLOR: Color = Color::from_rgba(0, 0, 0, 0);
 const SPRITE_GRAY_TINT: Color = Color::from_rgba(170, 170, 186, OPAQUE_ALPHA);
 
-fn attract_title_reference_sample_index(page_step: u16) -> usize {
+fn attract_title_sample_index(page_step: u16) -> usize {
     usize::from(page_step / ATTRACT_TITLE_REFERENCE_SAMPLE_INTERVAL_STEPS).saturating_sub(1)
 }
 
@@ -403,11 +403,11 @@ fn rotate_terrain_right_byte(data_byte: u8) -> u8 {
 }
 
 fn terrain_pattern_bytes() -> &'static [u8; TERRAIN_TDATA_BYTES] {
-    crate::reference_assets::TERRAIN_PATTERN_BYTES
+    crate::arcade_assets::TERRAIN_PATTERN_BYTES
 }
 
 fn main_terrain_record_bytes() -> &'static [u8; MAIN_TERRAIN_RECORD_BYTE_COUNT] {
-    crate::reference_assets::MAIN_TERRAIN_BYTES
+    crate::arcade_assets::MAIN_TERRAIN_BYTES
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -418,7 +418,7 @@ struct SpriteAssetPixel {
 }
 
 fn sprite_asset_pixels(spec: SpriteAssetImageSpec) -> Vec<SpriteAssetPixel> {
-    let bytes = crate::reference_assets::object_bitmap_bytes(spec.bitmap);
+    let bytes = crate::arcade_assets::object_bitmap_bytes(spec.bitmap);
     let expected_byte_count = usize::from(spec.rows) * usize::from(spec.byte_columns);
     if bytes.len() != expected_byte_count {
         return Vec::new();

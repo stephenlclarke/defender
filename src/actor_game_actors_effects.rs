@@ -4,30 +4,30 @@ struct Human {
     position: Point,
     mode: HumanMode,
     safe_landing_awarded: bool,
-    reference_state: Option<HumanReferenceState>,
+    actor_state: Option<HumanActorState>,
 }
 
 impl Human {
     fn new(id: ActorId, position: Point, mode: HumanMode) -> Self {
-        Self::with_reference_state(id, position, mode, None)
+        Self::with_actor_state(id, position, mode, None)
     }
 
     fn from_spawn(id: ActorId, spawn: ActorHumanSpawn) -> Self {
-        Self::with_reference_state(id, spawn.position, spawn.mode, spawn.reference_state)
+        Self::with_actor_state(id, spawn.position, spawn.mode, spawn.actor_state)
     }
 
-    fn with_reference_state(
+    fn with_actor_state(
         id: ActorId,
         position: Point,
         mode: HumanMode,
-        reference_state: Option<HumanReferenceState>,
+        actor_state: Option<HumanActorState>,
     ) -> Self {
         Self {
             id,
             position,
             mode,
             safe_landing_awarded: false,
-            reference_state,
+            actor_state,
         }
     }
 
@@ -37,12 +37,12 @@ impl Human {
 
     fn screen_bounds(&self, background_left: u16) -> Option<Rect> {
         let bounds = self.bounds();
-        let Some(reference_state) = self.reference_state else {
+        let Some(actor_state) = self.actor_state else {
             return Some(bounds);
         };
         let position = actor_screen_position_from_world(
             self.position,
-            reference_state.x_fraction,
+            actor_state.x_fraction(),
             background_left,
         )?;
         let delta = Velocity::new(position.x - self.position.x, position.y - self.position.y);
@@ -54,10 +54,10 @@ impl Human {
         actor_rng: Option<ActorRngSnapshot>,
         human_walk_target_slot: Option<usize>,
     ) {
-        let Some(reference_state) = self.reference_state else {
+        let Some(actor_state) = self.actor_state else {
             return;
         };
-        if human_walk_target_slot != Some(reference_state.target_slot_index) {
+        if human_walk_target_slot != Some(actor_state.target_slot_index) {
             return;
         }
 
@@ -67,8 +67,8 @@ impl Human {
     }
 
     fn advance_seeded_walk(&mut self, walk_seed: u8) {
-        if let Some(reference_state) = &mut self.reference_state {
-            let animation_frame = reference_state.animation_frame.index() % 4;
+        if let Some(actor_state) = &mut self.actor_state {
+            let animation_frame = actor_state.animation_frame.index() % 4;
             let (next_animation_frame, target_y, velocity) = if animation_frame <= 1 {
                 if walk_seed <= HUMAN_TURN_SEED_MAX {
                     (2, None, HUMAN_RIGHT_X_VELOCITY)
@@ -92,10 +92,10 @@ impl Human {
                 self.position.y = actor_step_human_toward_walk_target_y(self.position.y, target_y);
             }
             let (x, x_fraction) =
-                step_motion_axis(self.position.x, reference_state.x_fraction, velocity);
+                step_motion_axis(self.position.x, actor_state.x_fraction(), velocity);
             self.position.x = x;
-            reference_state.x_fraction = x_fraction;
-            reference_state.animation_frame = SpriteFrameIndex::new(next_animation_frame);
+            actor_state.set_subpixels(x_fraction, actor_state.y_fraction());
+            actor_state.animation_frame = SpriteFrameIndex::new(next_animation_frame);
         }
     }
 
@@ -217,7 +217,7 @@ impl AssetActor for Human {
                 direction: None,
                 bounds: human_collision_bounds(self.mode, self.position),
                 alive: prompt.phase == Phase::Playing,
-                reference_state: ActorReferenceState::human(self.reference_state),
+                actor_state: ActorInternalState::human(self.actor_state),
             },
             commands,
             draws,
@@ -227,9 +227,9 @@ impl AssetActor for Human {
 
 impl Human {
     fn draw_effect(&self) -> VisualEffect {
-        self.reference_state
-            .map(|reference_state| VisualEffect::HumanSpriteFrame {
-                animation_frame: reference_state.animation_frame,
+        self.actor_state
+            .map(|actor_state| VisualEffect::HumanSpriteFrame {
+                animation_frame: actor_state.animation_frame,
             })
             .unwrap_or(VisualEffect::Static)
     }
@@ -252,8 +252,8 @@ fn actor_human_walk_targetable(human_count: usize, snapshot: &ActorSnapshot) -> 
     snapshot.kind == ActorKind::Human
         && snapshot.alive
         && snapshot.bounds.is_some()
-        && snapshot.reference_state.as_human().is_some_and(|reference_state| {
-            human_count != usize::from(START_HUMAN_COUNT) || reference_state.target_slot_index < 2
+        && snapshot.actor_state.as_human().is_some_and(|actor_state| {
+            human_count != usize::from(START_HUMAN_COUNT) || actor_state.target_slot_index < 2
         })
 }
 
@@ -308,7 +308,7 @@ impl AssetActor for ScorePopup {
                 direction: None,
                 bounds: None,
                 alive: self.age < behavior.score_popup_lifetime_steps,
-                reference_state: ActorReferenceState::NONE,
+                actor_state: ActorInternalState::NONE,
             },
             commands,
             draws,
@@ -375,7 +375,7 @@ impl AssetActor for LaserShot {
                 direction: Some(self.direction),
                 bounds: Some(self.bounds()),
                 alive: self.age < behavior.laser_lifetime_steps,
-                reference_state: ActorReferenceState::NONE,
+                actor_state: ActorInternalState::NONE,
             },
             commands,
             draws,
@@ -387,7 +387,7 @@ impl AssetActor for LaserShot {
 struct EnemyLaserShot {
     id: ActorId,
     position: Point,
-    reference_state: EnemyProjectileReferenceState,
+    actor_state: EnemyProjectileActorState,
     lifetime_steps: Option<u16>,
 }
 
@@ -396,24 +396,20 @@ impl EnemyLaserShot {
         id: ActorId,
         position: Point,
         velocity: Velocity,
-        reference_state: Option<EnemyProjectileReferenceState>,
+        actor_state: Option<EnemyProjectileActorState>,
     ) -> Self {
-        let reference_state = reference_state.unwrap_or(EnemyProjectileReferenceState {
-            x_fraction: 0,
-            y_fraction: 0,
-            x_velocity: projectile_velocity_word(velocity.dx),
-            y_velocity: projectile_velocity_word(velocity.dy),
-            lifetime_ticks: 0,
+        let actor_state = actor_state.unwrap_or_else(|| {
+            EnemyProjectileActorState::from_velocity(0, 0, velocity, 0)
         });
-        let lifetime_steps = if reference_state.lifetime_ticks == 0 {
+        let lifetime_steps = if actor_state.lifetime_ticks == 0 {
             None
         } else {
-            Some(u16::from(reference_state.lifetime_ticks))
+            Some(u16::from(actor_state.lifetime_ticks))
         };
         Self {
             id,
             position,
-            reference_state,
+            actor_state,
             lifetime_steps,
         }
     }
@@ -433,24 +429,12 @@ impl EnemyLaserShot {
         let lifetime_steps = self
             .lifetime_steps
             .get_or_insert(behavior.lander_shot_lifetime_steps);
-        self.reference_state.lifetime_ticks = projectile_lifetime_ticks(*lifetime_steps);
+        self.actor_state.lifetime_ticks = projectile_lifetime_ticks(*lifetime_steps);
     }
 
     fn advance_projectile_motion(&mut self) -> Velocity {
         let previous_position = self.position;
-        let (x, x_fraction) = step_projectile_axis(
-            self.position.x,
-            self.reference_state.x_fraction,
-            self.reference_state.x_velocity,
-        );
-        let (y, y_fraction) = step_projectile_axis(
-            self.position.y,
-            self.reference_state.y_fraction,
-            self.reference_state.y_velocity,
-        );
-        self.position = Point::new(x, y);
-        self.reference_state.x_fraction = x_fraction;
-        self.reference_state.y_fraction = y_fraction;
+        self.position = self.actor_state.advance_projectile_motion(self.position);
         observed_velocity(previous_position, self.position)
     }
 }
@@ -471,7 +455,7 @@ impl AssetActor for EnemyLaserShot {
                 && let Some(lifetime_steps) = &mut self.lifetime_steps
             {
                 *lifetime_steps = lifetime_steps.saturating_sub(1);
-                self.reference_state.lifetime_ticks =
+                self.actor_state.lifetime_ticks =
                     projectile_lifetime_ticks(*lifetime_steps);
             }
             if self.lifetime_steps.is_some_and(|steps| steps > 0) {
@@ -498,7 +482,7 @@ impl AssetActor for EnemyLaserShot {
                 direction: Some(direction_for_velocity(movement_velocity, Direction::Right)),
                 bounds: Some(self.bounds()),
                 alive,
-                reference_state: ActorReferenceState::enemy_projectile(Some(self.reference_state)),
+                actor_state: ActorInternalState::enemy_projectile(Some(self.actor_state)),
             },
             commands,
             draws,
@@ -568,7 +552,7 @@ impl AssetActor for Explosion {
                 direction: None,
                 bounds: None,
                 alive: self.age < lifetime_steps,
-                reference_state: ActorReferenceState::NONE,
+                actor_state: ActorInternalState::NONE,
             },
             commands,
             draws,

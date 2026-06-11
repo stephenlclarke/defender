@@ -143,7 +143,7 @@
     }
 
     #[test]
-    fn actor_one_player_start_uses_reference_playfield_delay_without_start_prompt() {
+    fn actor_one_player_start_uses_arcade_playfield_delay_without_start_prompt() {
         let mut driver = ActorGameDriver::new();
         driver.credits = 1;
         let mut runtime = ActorRuntimeAdapter::with_driver(driver);

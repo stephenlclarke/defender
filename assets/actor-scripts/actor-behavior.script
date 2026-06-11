@@ -1,4 +1,4 @@
-# Actor runtime baseline behavior profile.
+# Actor baseline behavior profile.
 # Format: default <field> <value...>
 
 default player_speed 1

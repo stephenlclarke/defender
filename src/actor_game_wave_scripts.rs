@@ -235,7 +235,7 @@ impl ActorWaveScript {
         spawn_behavior_presets: Vec<ActorWaveSpawnBehaviorPresetManifest>,
     ) -> Self {
         if waves.is_empty() {
-            waves.push(Self::reference_tuned_profile(1));
+            waves.push(Self::arcade_tuned_profile(1));
         }
         waves.sort_by_key(|profile| profile.wave);
         Self {
@@ -262,30 +262,30 @@ impl ActorWaveScript {
             .unwrap_or_else(|error| panic!("embedded actor wave script is invalid: {error}"))
     }
 
-    pub fn reference_table_progression() -> Self {
+    pub fn arcade_wave_progression() -> Self {
         let waves = (1..=ACTOR_DATA_BACKED_WAVES)
-            .map(Self::reference_tuned_profile)
+            .map(Self::arcade_tuned_profile)
             .collect::<Vec<_>>();
-        Self::new("actor-reference-wave-table", waves)
+        Self::new("actor-arcade-wave-table", waves)
     }
 
-    fn reference_tuned_profile(wave: u16) -> ActorWaveProfile {
+    fn arcade_tuned_profile(wave: u16) -> ActorWaveProfile {
         let wave_tuning = ActorWaveTuning::for_wave(wave);
-        Self::reference_tuned_profile_from_tuning(wave, wave_tuning)
+        Self::arcade_tuned_profile_from_tuning(wave, wave_tuning)
     }
 
-    fn reference_tuned_profile_from_tuning(
+    fn arcade_tuned_profile_from_tuning(
         wave: u16,
         wave_tuning: ActorWaveTuning,
     ) -> ActorWaveProfile {
-        Self::reference_tuned_profile_from_tuning_with_behavior(
+        Self::arcade_tuned_profile_from_tuning_with_behavior(
             wave,
             wave_tuning,
             &ActorBehaviorScript::from_default_profile(),
         )
     }
 
-    fn reference_tuned_profile_from_tuning_with_behavior(
+    fn arcade_tuned_profile_from_tuning_with_behavior(
         wave: u16,
         wave_tuning: ActorWaveTuning,
         base_behavior: &ActorBehaviorScript,
@@ -473,7 +473,7 @@ impl ParsedActorWaveScript {
                 parse_wave_tuning_profile_updates(line_number, &mut wave_tuning, parts)?;
                 self.push_profile(
                     line_number,
-                    ParsedActorWaveProfile::reference_tuned_from_tuning_with_behavior(
+                    ParsedActorWaveProfile::arcade_tuned_from_tuning_with_behavior(
                         wave,
                         wave_tuning,
                         &self.base_behavior,
@@ -499,7 +499,7 @@ impl ParsedActorWaveScript {
                     )?;
                     self.push_profile(
                         line_number,
-                        ParsedActorWaveProfile::reference_tuned_from_tuning_with_behavior(
+                        ParsedActorWaveProfile::arcade_tuned_from_tuning_with_behavior(
                             wave,
                             wave_tuning,
                             &self.base_behavior,
@@ -851,7 +851,7 @@ impl ParsedActorWaveScript {
             .ok_or_else(|| {
                 ActorWaveScriptParseError::new(
                     line_number,
-                    format!("wave range references undefined wave `{wave}`"),
+                    format!("wave range uses undefined wave `{wave}`"),
                 )
             })
     }
@@ -1040,12 +1040,12 @@ impl ParsedActorWaveProfile {
         }
     }
 
-    fn reference_tuned_from_tuning_with_behavior(
+    fn arcade_tuned_from_tuning_with_behavior(
         wave: u16,
         wave_tuning: ActorWaveTuning,
         base_behavior: &ActorBehaviorScript,
     ) -> Self {
-        let profile = ActorWaveScript::reference_tuned_profile_from_tuning_with_behavior(
+        let profile = ActorWaveScript::arcade_tuned_profile_from_tuning_with_behavior(
             wave,
             wave_tuning,
             base_behavior,

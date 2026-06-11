@@ -11,9 +11,9 @@ use crate::{
         HighScoreTablesSnapshot, HumanSnapshot as CleanHumanSnapshot, PlayerSnapshot,
         PlayerStockSnapshot, ProjectileSnapshot as CleanProjectileSnapshot,
         ScorePopupKind as CleanScorePopupKind, ScorePopupSnapshot as CleanScorePopupSnapshot,
-        ScoreSnapshot, SoundEvent, SpriteAssetImageSpec, BaiterReferenceStateSnapshot, BomberReferenceStateSnapshot,
-        LanderReferenceStateSnapshot, MutantReferenceStateSnapshot, PodReferenceStateSnapshot, GameRngSnapshot,
-        SwarmerReferenceStateSnapshot, TERRAIN_BLOW_COMPLETE_STEP, TERRAIN_BLOW_FLASH_COLOR_BYTES,
+        ScoreSnapshot, SoundEvent, SpriteAssetImageSpec, ActorDebugMotion, BaiterDebugStateSnapshot,
+        BomberDebugStateSnapshot, LanderDebugStateSnapshot, MutantDebugStateSnapshot, PodDebugStateSnapshot, GameRngSnapshot,
+        SwarmerDebugStateSnapshot, TERRAIN_BLOW_COMPLETE_STEP, TERRAIN_BLOW_FLASH_COLOR_BYTES,
         TERRAIN_BLOW_EXPLOSION_BIRTHS, TERRAIN_BLOW_OVERLOAD_COUNTER, TERRAIN_BLOW_START_SOUND_STEPS,
         TERRAIN_EXPLOSION_LIFETIME_STEPS, TerrainBlowSnapshot, TerrainBlowStage, TerrainSegment,
         VISUAL_STATE, WaveProfileSnapshot, WorldSnapshot, WorldVector, wave_tuning_landscape_tint,
@@ -462,7 +462,7 @@ const FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y: i16 = 0xA0;
 
 #[cfg(test)]
 fn actor_message_text(message: MessageId) -> &'static str {
-    crate::reference_assets::message_text(message)
+    crate::arcade_assets::message_text(message)
 }
 const MUTANT_DIVE_CONVERSION_X_CORRECTION: u16 = 0x0120;
 const MUTANT_DIVE_DEFERRED_SHOT_TIMER: u8 = 5;

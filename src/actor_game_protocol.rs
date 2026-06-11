@@ -4,7 +4,7 @@ struct CollisionBody {
     kind: ActorKind,
     position: Point,
     bounds: Rect,
-    reference_state: ActorReferenceState,
+    actor_state: ActorInternalState,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,22 +16,22 @@ pub struct ActorSnapshot {
     pub direction: Option<Direction>,
     pub bounds: Option<Rect>,
     pub alive: bool,
-    reference_state: ActorReferenceState,
+    actor_state: ActorInternalState,
 }
 
 impl ActorSnapshot {
-    pub(crate) fn reference_subpixels(&self) -> Option<ActorReferenceSubpixels> {
-        self.reference_state.subpixels()
+    pub(crate) fn actor_subpixels(&self) -> Option<ActorSubpixels> {
+        self.actor_state.subpixels()
     }
 
-    pub(crate) fn reference_x_fraction(&self) -> Option<u8> {
-        self.reference_subpixels().map(|subpixels| subpixels.x)
+    pub(crate) fn actor_x_fraction(&self) -> Option<u8> {
+        self.actor_subpixels().map(ActorSubpixels::x)
     }
 
-    pub(crate) fn enemy_projectile_reference_state(
+    pub(crate) fn enemy_projectile_actor_state(
         &self,
-    ) -> Option<EnemyProjectileReferenceState> {
-        self.reference_state.as_enemy_projectile()
+    ) -> Option<EnemyProjectileActorState> {
+        self.actor_state.as_enemy_projectile()
     }
 
     fn collision_body(&self) -> Option<CollisionBody> {
@@ -40,7 +40,7 @@ impl ActorSnapshot {
             kind: self.kind,
             position: self.position,
             bounds: self.bounds?,
-            reference_state: self.reference_state,
+            actor_state: self.actor_state,
         })
     }
 }
@@ -138,32 +138,32 @@ pub(crate) enum SpawnRequest {
     EnemyLaser {
         position: Point,
         velocity: Velocity,
-        reference_state: Option<EnemyProjectileReferenceState>,
+        actor_state: Option<EnemyProjectileActorState>,
     },
     Lander {
         position: Point,
     },
     Mutant {
         position: Point,
-        reference_state: Option<MutantReferenceState>,
+        actor_state: Option<MutantActorState>,
     },
     Bomber {
         position: Point,
     },
     Bomb {
         position: Point,
-        reference_state: Option<EnemyProjectileReferenceState>,
+        actor_state: Option<EnemyProjectileActorState>,
     },
     Pod {
         position: Point,
     },
     Swarmer {
         position: Point,
-        reference_state: Option<SwarmerReferenceState>,
+        actor_state: Option<SwarmerActorState>,
     },
     Baiter {
         position: Point,
-        reference_state: Option<BaiterReferenceState>,
+        actor_state: Option<BaiterActorState>,
     },
     Explosion {
         position: Point,
@@ -273,10 +273,10 @@ impl StepPrompt {
                 && snapshot.alive
                 && snapshot.bounds.is_some()
                 && snapshot
-                    .reference_state
+                    .actor_state
                     .as_human()
-                    .is_some_and(|reference_state| {
-                        reference_state.target_slot_index == target_slot_index
+                    .is_some_and(|actor_state| {
+                        actor_state.target_slot_index == target_slot_index
                     })
         })
     }
@@ -727,86 +727,98 @@ fn clean_enemy_snapshot(snapshot: &ActorSnapshot) -> Option<CleanEnemySnapshot> 
         screen_position(snapshot.position),
         screen_velocity(snapshot.velocity),
     );
-    enemy.lander_reference_state = snapshot.reference_state.as_lander().map(clean_lander_reference_state);
-    enemy.bomber_reference_state = snapshot.reference_state.as_bomber().map(clean_bomber_reference_state);
-    enemy.pod_reference_state = snapshot.reference_state.as_pod().map(clean_pod_reference_state);
-    enemy.swarmer_reference_state = snapshot.reference_state.as_swarmer().map(clean_swarmer_reference_state);
-    enemy.baiter_reference_state = snapshot.reference_state.as_baiter().map(clean_baiter_reference_state);
-    enemy.mutant_reference_state = snapshot.reference_state.as_mutant().map(clean_mutant_reference_state);
+    enemy.lander_actor_state = snapshot.actor_state.as_lander().map(clean_lander_actor_state);
+    enemy.bomber_actor_state = snapshot.actor_state.as_bomber().map(clean_bomber_actor_state);
+    enemy.pod_actor_state = snapshot.actor_state.as_pod().map(clean_pod_actor_state);
+    enemy.swarmer_actor_state = snapshot.actor_state.as_swarmer().map(clean_swarmer_actor_state);
+    enemy.baiter_actor_state = snapshot.actor_state.as_baiter().map(clean_baiter_actor_state);
+    enemy.mutant_actor_state = snapshot.actor_state.as_mutant().map(clean_mutant_actor_state);
     Some(enemy)
 }
 
-fn clean_lander_reference_state(reference_state: LanderReferenceState) -> LanderReferenceStateSnapshot {
-    LanderReferenceStateSnapshot {
-        x_fraction: reference_state.x_fraction,
-        y_fraction: reference_state.y_fraction,
-        x_velocity: reference_state.x_velocity,
-        y_velocity: reference_state.y_velocity,
-        shot_timer: reference_state.shot_timer,
-        sleep_ticks: reference_state.sleep_ticks,
-        animation_frame: reference_state.animation_frame.index(),
-        target_human_index: reference_state.target_human_index,
+fn clean_lander_actor_state(actor_state: LanderActorState) -> LanderDebugStateSnapshot {
+    LanderDebugStateSnapshot {
+        motion: ActorDebugMotion::new(
+            actor_state.x_fraction(),
+            actor_state.y_fraction(),
+            actor_state.x_velocity(),
+            actor_state.y_velocity(),
+        ),
+        shot_timer: actor_state.shot_timer,
+        sleep_ticks: actor_state.sleep_ticks,
+        animation_frame: actor_state.animation_frame.index(),
+        target_human_index: actor_state.target_human_index,
     }
 }
 
-fn clean_bomber_reference_state(reference_state: BomberReferenceState) -> BomberReferenceStateSnapshot {
-    BomberReferenceStateSnapshot {
-        x_fraction: reference_state.x_fraction,
-        y_fraction: reference_state.y_fraction,
-        x_velocity: reference_state.x_velocity,
-        y_velocity: reference_state.y_velocity,
-        animation_frame: reference_state.animation_frame.index(),
-        cruise_altitude: screen_coordinate(reference_state.cruise_altitude),
-        sleep_ticks: reference_state.sleep_ticks,
-        slot: reference_state.slot,
+fn clean_bomber_actor_state(actor_state: BomberActorState) -> BomberDebugStateSnapshot {
+    BomberDebugStateSnapshot {
+        motion: ActorDebugMotion::new(
+            actor_state.x_fraction(),
+            actor_state.y_fraction(),
+            actor_state.x_velocity(),
+            actor_state.y_velocity(),
+        ),
+        animation_frame: actor_state.animation_frame.index(),
+        cruise_altitude: screen_coordinate(actor_state.cruise_altitude),
+        sleep_ticks: actor_state.sleep_ticks,
+        slot: actor_state.slot,
     }
 }
 
-fn clean_pod_reference_state(reference_state: PodReferenceState) -> PodReferenceStateSnapshot {
-    PodReferenceStateSnapshot {
-        x_fraction: reference_state.x_fraction,
-        y_fraction: reference_state.y_fraction,
-        x_velocity: reference_state.x_velocity,
-        y_velocity: reference_state.y_velocity,
+fn clean_pod_actor_state(actor_state: PodActorState) -> PodDebugStateSnapshot {
+    PodDebugStateSnapshot {
+        motion: ActorDebugMotion::new(
+            actor_state.x_fraction(),
+            actor_state.y_fraction(),
+            actor_state.x_velocity(),
+            actor_state.y_velocity(),
+        ),
     }
 }
 
-fn clean_swarmer_reference_state(reference_state: SwarmerReferenceState) -> SwarmerReferenceStateSnapshot {
-    SwarmerReferenceStateSnapshot {
-        x_fraction: reference_state.x_fraction,
-        y_fraction: reference_state.y_fraction,
-        x_velocity: reference_state.x_velocity,
-        y_velocity: reference_state.y_velocity,
-        acceleration: reference_state.acceleration,
-        shot_timer: reference_state.shot_timer,
-        sleep_ticks: reference_state.sleep_ticks,
-        horizontal_seek_pending: reference_state.horizontal_seek_pending,
+fn clean_swarmer_actor_state(actor_state: SwarmerActorState) -> SwarmerDebugStateSnapshot {
+    SwarmerDebugStateSnapshot {
+        motion: ActorDebugMotion::new(
+            actor_state.x_fraction(),
+            actor_state.y_fraction(),
+            actor_state.x_velocity(),
+            actor_state.y_velocity(),
+        ),
+        acceleration: actor_state.acceleration,
+        shot_timer: actor_state.shot_timer,
+        sleep_ticks: actor_state.sleep_ticks,
+        horizontal_seek_pending: actor_state.horizontal_seek_pending,
     }
 }
 
-fn clean_baiter_reference_state(reference_state: BaiterReferenceState) -> BaiterReferenceStateSnapshot {
-    BaiterReferenceStateSnapshot {
-        x_fraction: reference_state.x_fraction,
-        y_fraction: reference_state.y_fraction,
-        x_velocity: reference_state.x_velocity,
-        y_velocity: reference_state.y_velocity,
-        shot_timer: reference_state.shot_timer,
-        sleep_ticks: reference_state.sleep_ticks,
-        animation_frame: reference_state.animation_frame.index(),
+fn clean_baiter_actor_state(actor_state: BaiterActorState) -> BaiterDebugStateSnapshot {
+    BaiterDebugStateSnapshot {
+        motion: ActorDebugMotion::new(
+            actor_state.x_fraction(),
+            actor_state.y_fraction(),
+            actor_state.x_velocity(),
+            actor_state.y_velocity(),
+        ),
+        shot_timer: actor_state.shot_timer,
+        sleep_ticks: actor_state.sleep_ticks,
+        animation_frame: actor_state.animation_frame.index(),
     }
 }
 
-fn clean_mutant_reference_state(reference_state: MutantReferenceState) -> MutantReferenceStateSnapshot {
-    MutantReferenceStateSnapshot {
-        x_fraction: reference_state.x_fraction,
-        y_fraction: reference_state.y_fraction,
-        x_velocity: reference_state.x_velocity,
-        y_velocity: reference_state.y_velocity,
-        shot_timer: reference_state.shot_timer,
-        sleep_ticks: reference_state.sleep_ticks,
-        hop_rng: clean_actor_rng(reference_state.hop_rng),
-        render_x_correction: reference_state.render_x_correction,
-        dive_entry_shot_deferred: reference_state.dive_entry_shot_deferred,
+fn clean_mutant_actor_state(actor_state: MutantActorState) -> MutantDebugStateSnapshot {
+    MutantDebugStateSnapshot {
+        motion: ActorDebugMotion::new(
+            actor_state.x_fraction(),
+            actor_state.y_fraction(),
+            actor_state.x_velocity(),
+            actor_state.y_velocity(),
+        ),
+        shot_timer: actor_state.shot_timer,
+        sleep_ticks: actor_state.sleep_ticks,
+        hop_rng: clean_actor_rng(actor_state.hop_rng),
+        render_x_correction: actor_state.render_x_correction,
+        dive_entry_shot_deferred: actor_state.dive_entry_shot_deferred,
     }
 }
 
@@ -828,9 +840,9 @@ fn actor_humans_for_report(report: &StepReport) -> Vec<CleanHumanSnapshot> {
             human.carried = report.draws.iter().any(|draw| {
                 draw.actor == snapshot.id && matches!(draw.sprite, SpriteKey::HumanCarried)
             });
-            if let Some(reference_state) = snapshot.reference_state.as_human() {
-                human.reference_x_fraction = reference_state.x_fraction;
-                human.animation_frame = reference_state.animation_frame.index();
+            if let Some(actor_state) = snapshot.actor_state.as_human() {
+                human.actor_x_fraction = actor_state.x_fraction();
+                human.animation_frame = actor_state.animation_frame.index();
             }
             human
         })
@@ -868,21 +880,21 @@ fn actor_enemy_projectiles_for_report(report: &StepReport) -> Vec<CleanEnemyProj
             } else {
                 EnemyProjectileKind::Fireball
             },
-            reference_x_fraction: snapshot
-                .reference_state.as_enemy_projectile()
-                .map_or(0, |reference_state| reference_state.x_fraction),
-            reference_y_fraction: snapshot
-                .reference_state.as_enemy_projectile()
-                .map_or(0, |reference_state| reference_state.y_fraction),
-            reference_x_velocity: snapshot
-                .reference_state.as_enemy_projectile()
-                .map_or(0, |reference_state| reference_state.x_velocity),
-            reference_y_velocity: snapshot
-                .reference_state.as_enemy_projectile()
-                .map_or(0, |reference_state| reference_state.y_velocity),
+            actor_x_fraction: snapshot
+                .actor_state.as_enemy_projectile()
+                .map_or(0, |actor_state| actor_state.x_fraction()),
+            actor_y_fraction: snapshot
+                .actor_state.as_enemy_projectile()
+                .map_or(0, |actor_state| actor_state.y_fraction()),
+            actor_x_velocity: snapshot
+                .actor_state.as_enemy_projectile()
+                .map_or(0, |actor_state| actor_state.x_velocity()),
+            actor_y_velocity: snapshot
+                .actor_state.as_enemy_projectile()
+                .map_or(0, |actor_state| actor_state.y_velocity()),
             lifetime_ticks: snapshot
-                .reference_state.as_enemy_projectile()
-                .map_or(0, |reference_state| reference_state.lifetime_ticks),
+                .actor_state.as_enemy_projectile()
+                .map_or(0, |actor_state| actor_state.lifetime_ticks),
         })
         .collect()
 }
@@ -999,19 +1011,18 @@ fn projectile_lifetime_ticks(remaining_steps: u16) -> u8 {
     remaining_steps.min(u16::from(u8::MAX)) as u8
 }
 
-fn enemy_projectile_reference_state(
+fn enemy_projectile_actor_state(
     x_fraction: u8,
     y_fraction: u8,
     velocity: Velocity,
     lifetime_steps: u16,
-) -> EnemyProjectileReferenceState {
-    EnemyProjectileReferenceState {
+) -> EnemyProjectileActorState {
+    EnemyProjectileActorState::from_velocity(
         x_fraction,
         y_fraction,
-        x_velocity: projectile_velocity_word(velocity.dx),
-        y_velocity: projectile_velocity_word(velocity.dy),
-        lifetime_ticks: projectile_lifetime_ticks(lifetime_steps),
-    }
+        velocity,
+        projectile_lifetime_ticks(lifetime_steps),
+    )
 }
 
 fn step_projectile_axis(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {

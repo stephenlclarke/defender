@@ -71,52 +71,52 @@ impl ExplosionKind {
     const fn sprite_asset_image(self) -> SpriteAssetImageSpec {
         match self {
             Self::Lander => SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::LanderFrame1Primary,
+                crate::arcade_assets::ObjectBitmapId::LanderFrame1Primary,
                 8,
                 5,
             ),
             Self::Mutant => SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::MutantPrimary,
+                crate::arcade_assets::ObjectBitmapId::MutantPrimary,
                 8,
                 5,
             ),
             Self::Bomber => SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::BomberFrame1Primary,
+                crate::arcade_assets::ObjectBitmapId::BomberFrame1Primary,
                 8,
                 4,
             ),
             Self::Pod => SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::PodPrimary,
+                crate::arcade_assets::ObjectBitmapId::PodPrimary,
                 8,
                 4,
             ),
             Self::Baiter => SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::BaiterFrame1Primary,
+                crate::arcade_assets::ObjectBitmapId::BaiterFrame1Primary,
                 4,
                 6,
             ),
             Self::Bomb => SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::BombExplosion,
+                crate::arcade_assets::ObjectBitmapId::BombExplosion,
                 8,
                 4,
             ),
             Self::Swarmer => SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::SwarmerExplosion,
+                crate::arcade_assets::ObjectBitmapId::SwarmerExplosion,
                 8,
                 4,
             ),
             Self::Astronaut => SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::AstronautExplosion,
+                crate::arcade_assets::ObjectBitmapId::AstronautExplosion,
                 8,
                 4,
             ),
             Self::PlayerShip => SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::PlayerShipRightPrimary,
+                crate::arcade_assets::ObjectBitmapId::PlayerShipRightPrimary,
                 6,
                 8,
             ),
             Self::Terrain => SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::TerrainExplosion,
+                crate::arcade_assets::ObjectBitmapId::TerrainExplosion,
                 6,
                 8,
             ),
@@ -168,11 +168,11 @@ impl ExplosionSnapshot {
     }
 
     fn spawn_from_enemy(enemy: EnemySnapshot) -> Self {
-        let descriptor = reference_enemy_explosion_object_bitmap_descriptor(enemy);
+        let descriptor = actor_enemy_explosion_object_bitmap_descriptor(enemy);
         Self {
             kind: ExplosionKind::for_enemy(enemy.kind),
             position: enemy.position,
-            explosion_anchor: reference_enemy_explosion_anchor(enemy),
+            explosion_anchor: actor_enemy_explosion_anchor(enemy),
             growth_size: EXPLOSION_INITIAL_SIZE,
             steps_remaining: EXPLOSION_LIFETIME_STEPS,
             object_bitmap_name: descriptor.name,
@@ -244,8 +244,8 @@ fn explosion_display_size(explosion: ExplosionSnapshot) -> u16 {
     explosion.growth_size
 }
 
-fn reference_enemy_explosion_anchor(enemy: EnemySnapshot) -> Option<ScreenPosition> {
-    (reference_enemy_uses_mutant_dive_projection(enemy)
+fn actor_enemy_explosion_anchor(enemy: EnemySnapshot) -> Option<ScreenPosition> {
+    (actor_enemy_uses_mutant_dive_projection(enemy)
         && matches!(
             enemy.position,
             MUTANT_DIVE_EXPLOSION_TOP_LEFT | MUTANT_DIVE_EXPLOSION_LOWER_TOP_LEFT
@@ -253,7 +253,7 @@ fn reference_enemy_explosion_anchor(enemy: EnemySnapshot) -> Option<ScreenPositi
     .then_some(MUTANT_DIVE_EXPLOSION_ANCHOR)
 }
 
-fn reference_enemy_explosion_object_bitmap_descriptor(
+fn actor_enemy_explosion_object_bitmap_descriptor(
     enemy: EnemySnapshot,
 ) -> ObjectBitmapDescriptor {
     if enemy.kind == EnemyKind::Swarmer {
@@ -313,21 +313,21 @@ pub struct WorldSnapshot {
     pub enemies: Vec<EnemySnapshot>,
     pub enemy_reserve: EnemyReserveSnapshot,
     pub humans: Vec<HumanSnapshot>,
-    pub target_list_cursor_address: Option<u16>,
-    pub astronaut_cursor_address: Option<u16>,
-    pub human_walk_sleep_ticks: u8,
-    pub velocity_ticks_remaining: u8,
-    pub enemy_projectile_scan_ticks_remaining: u8,
+    pub(crate) target_list_cursor_address: Option<u16>,
+    pub(crate) astronaut_cursor_address: Option<u16>,
+    pub(crate) human_walk_sleep_ticks: u8,
+    pub(crate) velocity_ticks_remaining: u8,
+    pub(crate) enemy_projectile_scan_ticks_remaining: u8,
     pub projectiles: Vec<ProjectileSnapshot>,
     pub enemy_projectiles: Vec<EnemyProjectileSnapshot>,
     pub enemy_appearances: Vec<EnemyAppearanceSnapshot>,
     pub score_popups: Vec<ScorePopupSnapshot>,
     pub explosions: Vec<ExplosionSnapshot>,
-    pub actor_rng: GameRngSnapshot,
-    pub object_evidence: ObjectEvidenceSnapshot,
-    pub expanded_objects: ExpandedObjectEvidenceSnapshot,
+    pub(crate) actor_rng: GameRngSnapshot,
+    pub(crate) object_evidence: ObjectEvidenceSnapshot,
+    pub(crate) expanded_objects: ExpandedObjectEvidenceSnapshot,
     pub player_explosion: Option<PlayerExplosionCloudSnapshot>,
-    pub scanner: ScannerRadarSnapshot,
+    pub(crate) scanner: ScannerRadarSnapshot,
 }
 
 impl WorldSnapshot {
@@ -748,7 +748,7 @@ fn world_position_words(position: ScreenPosition, x_fraction: u8, y_fraction: u8
     )
 }
 
-fn reference_active_object_screen_position(
+fn actor_active_object_screen_position(
     position: ScreenPosition,
     x_fraction: u8,
     background_left: u16,
@@ -772,68 +772,91 @@ fn reference_active_object_screen_position(
     Some(ScreenPosition::new(screen_x, position.y))
 }
 
-fn reference_enemy_screen_position(
+fn actor_enemy_screen_position(
     enemy: EnemySnapshot,
     background_left: u16,
 ) -> Option<ScreenPosition> {
-    if let Some(mutant_reference_state) = enemy.mutant_reference_state {
-        let corrected_world_x_word = u16::from_be_bytes([enemy.position.x, mutant_reference_state.x_fraction])
-            .wrapping_add(mutant_reference_state.render_x_correction);
+    if let Some(mutant_actor_state) = enemy.mutant_actor_state {
+        let corrected_world_x_word = u16::from_be_bytes([
+            enemy.position.x,
+            mutant_actor_state.motion.x_fraction(),
+        ])
+        .wrapping_add(mutant_actor_state.render_x_correction);
         let [x, x_fraction] = corrected_world_x_word.to_be_bytes();
-        return reference_active_object_screen_position(
+        return actor_active_object_screen_position(
             ScreenPosition::new(x, enemy.position.y),
             x_fraction,
             background_left,
         );
     }
 
-    enemy_reference_x_fraction(enemy)
+    enemy_actor_x_fraction(enemy)
         .and_then(|x_fraction| {
-            reference_active_object_screen_position(enemy.position, x_fraction, background_left)
+            actor_active_object_screen_position(enemy.position, x_fraction, background_left)
         })
         .or_else(|| {
-            enemy_reference_x_fraction(enemy)
+            enemy_actor_x_fraction(enemy)
                 .is_none()
                 .then_some(enemy.position)
         })
 }
 
-fn reference_first_wave_mutant_uses_dive_projection(
-    mutant_reference_state: MutantReferenceStateSnapshot,
+fn first_wave_mutant_uses_dive_projection(
+    mutant_actor_state: MutantDebugStateSnapshot,
 ) -> bool {
-    mutant_reference_state.render_x_correction == FIRST_WAVE_MUTANT_DIVE_CONVERSION_X_CORRECTION
-        && mutant_reference_state.y_velocity == FIRST_WAVE_MUTANT_DIVE_Y_VELOCITY
+    mutant_actor_state.render_x_correction == FIRST_WAVE_MUTANT_DIVE_CONVERSION_X_CORRECTION
+        && mutant_actor_state.motion.y_velocity() == FIRST_WAVE_MUTANT_DIVE_Y_VELOCITY
 }
 
-fn reference_enemy_uses_mutant_dive_projection(enemy: EnemySnapshot) -> bool {
+fn actor_enemy_uses_mutant_dive_projection(enemy: EnemySnapshot) -> bool {
     enemy
-        .mutant_reference_state
-        .is_some_and(reference_first_wave_mutant_uses_dive_projection)
+        .mutant_actor_state
+        .is_some_and(first_wave_mutant_uses_dive_projection)
 }
 
 fn enemy_appearance_position(enemy: EnemySnapshot) -> ScreenPosition {
-    reference_enemy_screen_position(enemy, 0).unwrap_or(enemy.position)
+    actor_enemy_screen_position(enemy, 0).unwrap_or(enemy.position)
 }
 
-fn enemy_reference_x_fraction(enemy: EnemySnapshot) -> Option<u8> {
+fn enemy_actor_x_fraction(enemy: EnemySnapshot) -> Option<u8> {
     enemy
-        .lander_reference_state
-        .map(|reference_state| reference_state.x_fraction)
-        .or_else(|| enemy.mutant_reference_state.map(|reference_state| reference_state.x_fraction))
-        .or_else(|| enemy.bomber_reference_state.map(|reference_state| reference_state.x_fraction))
-        .or_else(|| enemy.swarmer_reference_state.map(|reference_state| reference_state.x_fraction))
-        .or_else(|| enemy.baiter_reference_state.map(|reference_state| reference_state.x_fraction))
-        .or_else(|| enemy.pod_reference_state.map(|reference_state| reference_state.x_fraction))
+        .lander_actor_state
+        .map(|actor_state| actor_state.motion.x_fraction())
+        .or_else(|| {
+            enemy
+                .mutant_actor_state
+                .map(|actor_state| actor_state.motion.x_fraction())
+        })
+        .or_else(|| {
+            enemy
+                .bomber_actor_state
+                .map(|actor_state| actor_state.motion.x_fraction())
+        })
+        .or_else(|| {
+            enemy
+                .swarmer_actor_state
+                .map(|actor_state| actor_state.motion.x_fraction())
+        })
+        .or_else(|| {
+            enemy
+                .baiter_actor_state
+                .map(|actor_state| actor_state.motion.x_fraction())
+        })
+        .or_else(|| {
+            enemy
+                .pod_actor_state
+                .map(|actor_state| actor_state.motion.x_fraction())
+        })
 }
 
 fn fixed_point_velocity_words(velocity: ScreenVelocity) -> (u16, u16) {
     (
-        reference_fixed_velocity_word(velocity.dx),
-        reference_fixed_velocity_word(velocity.dy),
+        fixed_velocity_word(velocity.dx),
+        fixed_velocity_word(velocity.dy),
     )
 }
 
-fn reference_fixed_velocity_word(velocity: i8) -> u16 {
+fn fixed_velocity_word(velocity: i8) -> u16 {
     ((i16::from(velocity)) << 8) as u16
 }
 
@@ -846,7 +869,7 @@ struct ObjectTableIdentity {
 
 fn object_table_identity(detail_index: usize) -> ObjectTableIdentity {
     let slot = u16::try_from(detail_index)
-        .expect("clean object evidence detail index should fit reference object slot");
+        .expect("clean object evidence detail index should fit object evidence slot");
     ObjectTableIdentity {
         address: OBJECT_EVIDENCE_TABLE_BASE_ADDRESS.wrapping_add(OBJECT_EVIDENCE_SLOT_STRIDE.wrapping_mul(slot)),
         slot,
@@ -905,7 +928,7 @@ struct ObjectBitmapDescriptor {
 const PLAYER_PROJECTILE_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     ObjectBitmapDescriptor {
         name: "LASP1",
-        image: SpriteAssetImageSpec::new(crate::reference_assets::ObjectBitmapId::PlayerLaser, 1, 8),
+        image: SpriteAssetImageSpec::new(crate::arcade_assets::ObjectBitmapId::PlayerLaser, 1, 8),
         address: 0xF96F,
         size: (8, 1),
         primary_image_address: 0xF973,
@@ -916,7 +939,7 @@ const HUMAN_ASTP1_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     ObjectBitmapDescriptor {
         name: "ASTP1",
         image: SpriteAssetImageSpec::new(
-            crate::reference_assets::ObjectBitmapId::HumanStandingPrimary,
+            crate::arcade_assets::ObjectBitmapId::HumanStandingPrimary,
             8,
             2,
         ),
@@ -930,7 +953,7 @@ const HUMAN_ASTP2_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     ObjectBitmapDescriptor {
         name: "ASTP2",
         image: SpriteAssetImageSpec::new(
-            crate::reference_assets::ObjectBitmapId::HumanWalkingAPrimary,
+            crate::arcade_assets::ObjectBitmapId::HumanWalkingAPrimary,
             8,
             2,
         ),
@@ -944,7 +967,7 @@ const HUMAN_ASTP3_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     ObjectBitmapDescriptor {
         name: "ASTP3",
         image: SpriteAssetImageSpec::new(
-            crate::reference_assets::ObjectBitmapId::HumanWalkingBPrimary,
+            crate::arcade_assets::ObjectBitmapId::HumanWalkingBPrimary,
             8,
             2,
         ),
@@ -958,7 +981,7 @@ const HUMAN_ASTP4_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     ObjectBitmapDescriptor {
         name: "ASTP4",
         image: SpriteAssetImageSpec::new(
-            crate::reference_assets::ObjectBitmapId::HumanWalkingCPrimary,
+            crate::arcade_assets::ObjectBitmapId::HumanWalkingCPrimary,
             8,
             2,
         ),
@@ -970,7 +993,7 @@ const HUMAN_ASTP4_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor =
     };
 const MUTANT_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDescriptor {
     name: "SCZP1",
-    image: SpriteAssetImageSpec::new(crate::reference_assets::ObjectBitmapId::MutantPrimary, 8, 5),
+    image: SpriteAssetImageSpec::new(crate::arcade_assets::ObjectBitmapId::MutantPrimary, 8, 5),
     address: 0xF8CE,
     size: (5, 8),
     primary_image_address: 0xF9FB,
@@ -979,7 +1002,7 @@ const MUTANT_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDesc
 };
 const POD_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDescriptor {
     name: "PRBP1",
-    image: SpriteAssetImageSpec::new(crate::reference_assets::ObjectBitmapId::PodPrimary, 8, 4),
+    image: SpriteAssetImageSpec::new(crate::arcade_assets::ObjectBitmapId::PodPrimary, 8, 4),
     address: 0xF8F7,
     size: (4, 8),
     primary_image_address: 0xFA8B,
@@ -988,7 +1011,7 @@ const POD_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDescrip
 };
 const SWARMER_OBJECT_BITMAP_DESCRIPTOR: ObjectBitmapDescriptor = ObjectBitmapDescriptor {
     name: "SWPIC1",
-    image: SpriteAssetImageSpec::new(crate::reference_assets::ObjectBitmapId::SwarmerPrimary, 4, 3),
+    image: SpriteAssetImageSpec::new(crate::arcade_assets::ObjectBitmapId::SwarmerPrimary, 4, 3),
     address: 0xF97B,
     size: (3, 4),
     primary_image_address: 0xCCC8,
@@ -1001,7 +1024,7 @@ fn lander_object_bitmap_descriptor(animation_frame: u8) -> ObjectBitmapDescripto
         1 => ObjectBitmapDescriptor {
             name: "LNDP2",
             image: SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::LanderFrame2Primary,
+                crate::arcade_assets::ObjectBitmapId::LanderFrame2Primary,
                 8,
                 5,
             ),
@@ -1014,7 +1037,7 @@ fn lander_object_bitmap_descriptor(animation_frame: u8) -> ObjectBitmapDescripto
         2 => ObjectBitmapDescriptor {
             name: "LNDP3",
             image: SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::LanderFrame3Primary,
+                crate::arcade_assets::ObjectBitmapId::LanderFrame3Primary,
                 8,
                 5,
             ),
@@ -1027,7 +1050,7 @@ fn lander_object_bitmap_descriptor(animation_frame: u8) -> ObjectBitmapDescripto
         _ => ObjectBitmapDescriptor {
             name: "LNDP1",
             image: SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::LanderFrame1Primary,
+                crate::arcade_assets::ObjectBitmapId::LanderFrame1Primary,
                 8,
                 5,
             ),
@@ -1045,7 +1068,7 @@ fn bomber_object_bitmap_descriptor(animation_frame: u8) -> ObjectBitmapDescripto
         1 => ObjectBitmapDescriptor {
             name: "TIEP2",
             image: SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::BomberFrame2Primary,
+                crate::arcade_assets::ObjectBitmapId::BomberFrame2Primary,
                 8,
                 4,
             ),
@@ -1058,7 +1081,7 @@ fn bomber_object_bitmap_descriptor(animation_frame: u8) -> ObjectBitmapDescripto
         2 => ObjectBitmapDescriptor {
             name: "TIEP3",
             image: SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::BomberFrame3Primary,
+                crate::arcade_assets::ObjectBitmapId::BomberFrame3Primary,
                 8,
                 4,
             ),
@@ -1071,7 +1094,7 @@ fn bomber_object_bitmap_descriptor(animation_frame: u8) -> ObjectBitmapDescripto
         3 => ObjectBitmapDescriptor {
             name: "TIEP4",
             image: SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::BomberFrame4Primary,
+                crate::arcade_assets::ObjectBitmapId::BomberFrame4Primary,
                 8,
                 4,
             ),
@@ -1084,7 +1107,7 @@ fn bomber_object_bitmap_descriptor(animation_frame: u8) -> ObjectBitmapDescripto
         _ => ObjectBitmapDescriptor {
             name: "TIEP1",
             image: SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::BomberFrame1Primary,
+                crate::arcade_assets::ObjectBitmapId::BomberFrame1Primary,
                 8,
                 4,
             ),
@@ -1102,7 +1125,7 @@ fn baiter_object_bitmap_descriptor(animation_frame: u8) -> ObjectBitmapDescripto
         1 => ObjectBitmapDescriptor {
             name: "UFOP2",
             image: SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::BaiterFrame2Primary,
+                crate::arcade_assets::ObjectBitmapId::BaiterFrame2Primary,
                 4,
                 6,
             ),
@@ -1115,7 +1138,7 @@ fn baiter_object_bitmap_descriptor(animation_frame: u8) -> ObjectBitmapDescripto
         2 => ObjectBitmapDescriptor {
             name: "UFOP3",
             image: SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::BaiterFrame3Primary,
+                crate::arcade_assets::ObjectBitmapId::BaiterFrame3Primary,
                 4,
                 6,
             ),
@@ -1128,7 +1151,7 @@ fn baiter_object_bitmap_descriptor(animation_frame: u8) -> ObjectBitmapDescripto
         _ => ObjectBitmapDescriptor {
             name: "UFOP1",
             image: SpriteAssetImageSpec::new(
-                crate::reference_assets::ObjectBitmapId::BaiterFrame1Primary,
+                crate::arcade_assets::ObjectBitmapId::BaiterFrame1Primary,
                 4,
                 6,
             ),

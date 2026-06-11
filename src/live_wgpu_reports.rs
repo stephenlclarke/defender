@@ -28,7 +28,7 @@ use crate::{
         SoundCue, SpawnRequest, SpriteKey, VisualEffect, XyzzyController, XyzzyMode,
     },
     actor_smoke::ActorSmokeReport,
-    reference_assets::{MessageId, message_text},
+    arcade_assets::{MessageId, message_text},
     audio::LiveAudioMode,
     renderer::SpriteId,
 };
@@ -103,8 +103,8 @@ pub(crate) struct ActorScriptCheckActorSample {
     pub(crate) kind: String,
     pub(crate) x: i16,
     pub(crate) y: i16,
-    pub(crate) reference_x_fraction: u8,
-    pub(crate) reference_y_fraction: u8,
+    pub(crate) actor_x_fraction: u8,
+    pub(crate) actor_y_fraction: u8,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -112,10 +112,10 @@ pub(crate) struct ActorScriptCheckEnemyProjectileSample {
     pub(crate) kind: String,
     pub(crate) x: i16,
     pub(crate) y: i16,
-    pub(crate) reference_x_fraction: u8,
-    pub(crate) reference_y_fraction: u8,
-    pub(crate) reference_x_velocity: u16,
-    pub(crate) reference_y_velocity: u16,
+    pub(crate) actor_x_fraction: u8,
+    pub(crate) actor_y_fraction: u8,
+    pub(crate) actor_x_velocity: u16,
+    pub(crate) actor_y_velocity: u16,
     pub(crate) lifetime_ticks: u8,
 }
 
@@ -126,10 +126,10 @@ pub(crate) struct ActorScriptCheckProjectileSpawnSample {
     pub(crate) y: i16,
     pub(crate) velocity_dx: i16,
     pub(crate) velocity_dy: i16,
-    pub(crate) reference_x_fraction: Option<u8>,
-    pub(crate) reference_y_fraction: Option<u8>,
-    pub(crate) reference_x_velocity: Option<u16>,
-    pub(crate) reference_y_velocity: Option<u16>,
+    pub(crate) actor_x_fraction: Option<u8>,
+    pub(crate) actor_y_fraction: Option<u8>,
+    pub(crate) actor_x_velocity: Option<u16>,
+    pub(crate) actor_y_velocity: Option<u16>,
     pub(crate) lifetime_ticks: Option<u8>,
 }
 
@@ -644,7 +644,7 @@ impl ActorScriptCheckReport {
                 )
             });
         format!(
-            "actor script check passed\n  path: {}\n  attract_events: {}\n{}  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_enemy_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_reference_debug: world_scroll_left=0x{:04x},rng={}\n  first_playing_actor_samples: {}\n  first_playing_enemy_projectile_samples: {}\n  first_playing_sound_commands: {}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}{}{}{}{}{}{}{}{}{}{}  clean_exit: {}\n",
+            "actor script check passed\n  path: {}\n  attract_events: {}\n{}  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_enemy_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_actor_debug: world_scroll_left=0x{:04x},rng={}\n  first_playing_actor_samples: {}\n  first_playing_enemy_projectile_samples: {}\n  first_playing_sound_commands: {}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}{}{}{}{}{}{}{}{}{}{}  clean_exit: {}\n",
             self.path,
             self.attract_events,
             attract_cycle,
@@ -740,7 +740,7 @@ fn playing_summary_to_text(prefix: &str, summary: &ActorScriptCheckPlayingSummar
         summary.actor_rng_lseed,
     );
     format!(
-        "  {prefix}_wave: {}\n  {prefix}_wave_size: {}\n  {prefix}_enemy_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  {prefix}_world_counts: enemies={},humans={}\n  {prefix}_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  {prefix}_reference_debug: world_scroll_left=0x{:04x},rng={}\n  {prefix}_actor_samples: {}\n  {prefix}_enemy_projectile_samples: {}\n  {prefix}_sound_commands: {}\n  {prefix}_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  {prefix}_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  {prefix}_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  {prefix}_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n",
+        "  {prefix}_wave: {}\n  {prefix}_wave_size: {}\n  {prefix}_enemy_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  {prefix}_world_counts: enemies={},humans={}\n  {prefix}_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  {prefix}_actor_debug: world_scroll_left=0x{:04x},rng={}\n  {prefix}_actor_samples: {}\n  {prefix}_enemy_projectile_samples: {}\n  {prefix}_sound_commands: {}\n  {prefix}_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  {prefix}_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  {prefix}_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  {prefix}_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n",
         summary.wave,
         summary.wave_size,
         summary.enemy_landers,
@@ -786,7 +786,7 @@ fn actor_samples_summary(samples: &[ActorScriptCheckActorSample]) -> String {
         .map(|sample| {
             format!(
                 "{}@{},{}[frac=0x{:02x}/0x{:02x}]",
-                sample.kind, sample.x, sample.y, sample.reference_x_fraction, sample.reference_y_fraction
+                sample.kind, sample.x, sample.y, sample.actor_x_fraction, sample.actor_y_fraction
             )
         })
         .collect::<Vec<_>>()
@@ -806,10 +806,10 @@ fn enemy_projectile_samples_summary(samples: &[ActorScriptCheckEnemyProjectileSa
                 sample.kind,
                 sample.x,
                 sample.y,
-                sample.reference_x_fraction,
-                sample.reference_y_fraction,
-                sample.reference_x_velocity,
-                sample.reference_y_velocity,
+                sample.actor_x_fraction,
+                sample.actor_y_fraction,
+                sample.actor_x_velocity,
+                sample.actor_y_velocity,
                 sample.lifetime_ticks,
             )
         })
@@ -825,17 +825,17 @@ fn projectile_spawn_samples_summary(samples: &[ActorScriptCheckProjectileSpawnSa
     samples
         .iter()
         .map(|sample| {
-            let reference_state = match (
-                sample.reference_x_fraction,
-                sample.reference_y_fraction,
-                sample.reference_x_velocity,
-                sample.reference_y_velocity,
+            let actor_state = match (
+                sample.actor_x_fraction,
+                sample.actor_y_fraction,
+                sample.actor_x_velocity,
+                sample.actor_y_velocity,
                 sample.lifetime_ticks,
             ) {
                 (Some(x_fraction), Some(y_fraction), Some(x_velocity), Some(y_velocity), Some(lifetime_ticks)) => format!(
-                    "reference_debug=frac=0x{x_fraction:02x}/0x{y_fraction:02x},vel=0x{x_velocity:04x}/0x{y_velocity:04x},life={lifetime_ticks}"
+                    "actor_debug=frac=0x{x_fraction:02x}/0x{y_fraction:02x},vel=0x{x_velocity:04x}/0x{y_velocity:04x},life={lifetime_ticks}"
                 ),
-                _ => String::from("reference_debug=none"),
+                _ => String::from("actor_debug=none"),
             };
             format!(
                 "{}@{},{}[velocity={}/{},{}]",
@@ -844,7 +844,7 @@ fn projectile_spawn_samples_summary(samples: &[ActorScriptCheckProjectileSpawnSa
                 sample.y,
                 sample.velocity_dx,
                 sample.velocity_dy,
-                reference_state,
+                actor_state,
             )
         })
         .collect::<Vec<_>>()

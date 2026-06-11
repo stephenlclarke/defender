@@ -1,4 +1,4 @@
-use crate::reference_assets::{
+use crate::arcade_assets::{
     MESSAGE_GLYPH_ASSETS, ObjectBitmapId, SCORE_DIGIT_ASSETS, object_bitmap_bytes,
 };
 
