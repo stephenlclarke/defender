@@ -1,6 +1,10 @@
+use std::collections::BTreeMap;
+
 use crate::arcade_assets::{
     MESSAGE_GLYPH_ASSETS, ObjectBitmapId, SCORE_DIGIT_ASSETS, object_bitmap_bytes,
 };
+
+use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NativeRenderPipeline {
@@ -25,23 +29,23 @@ pub struct AtlasRegion {
 pub struct TextureAtlas {
     pub surface: SurfaceSize,
     pub regions: Vec<AtlasRegion>,
-    pixels: Vec<u8>,
+    pub(super) pixels: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct EmbeddedSprite {
-    surface: SurfaceSize,
-    pixels: Vec<u8>,
+pub(super) struct EmbeddedSprite {
+    pub(super) surface: SurfaceSize,
+    pub(super) pixels: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SpriteAtlasBlitRegion {
-    origin: [u32; 2],
-    size: [u32; 2],
+pub(super) struct SpriteAtlasBlitRegion {
+    pub(super) origin: [u32; 2],
+    pub(super) size: [u32; 2],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ObjectBitmapGrid {
+pub(super) struct ObjectBitmapGrid {
     rows: u8,
     byte_columns: u8,
     bytes: &'static [u8],
@@ -49,7 +53,7 @@ struct ObjectBitmapGrid {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ObjectBitmapPalette {
+pub(super) struct ObjectBitmapPalette {
     one: [u8; 4],
     a: [u8; 4],
     c: [u8; 4],
@@ -59,7 +63,7 @@ struct ObjectBitmapPalette {
 }
 
 impl ObjectBitmapPalette {
-    const fn white() -> Self {
+    pub(super) const fn white() -> Self {
         Self {
             one: WHITE_RGBA,
             a: WHITE_RGBA,
@@ -70,7 +74,7 @@ impl ObjectBitmapPalette {
         }
     }
 
-    fn defender_logo() -> Self {
+    pub(super) fn defender_logo() -> Self {
         Self {
             one: WHITE_RGBA,
             a: WHITE_RGBA,
@@ -81,7 +85,7 @@ impl ObjectBitmapPalette {
         }
     }
 
-    fn ship() -> Self {
+    pub(super) fn ship() -> Self {
         let white = pseudo_color_rgba(OBJECT_BITMAP_COLOR_TABLE[9]);
         Self {
             one: white,
@@ -93,7 +97,7 @@ impl ObjectBitmapPalette {
         }
     }
 
-    const fn player_shot() -> Self {
+    pub(super) const fn player_shot() -> Self {
         Self {
             one: WHITE_RGBA,
             a: WHITE_RGBA,
@@ -104,7 +108,7 @@ impl ObjectBitmapPalette {
         }
     }
 
-    fn bomb(phase: usize) -> Self {
+    pub(super) fn bomb(phase: usize) -> Self {
         let color = object_cycle_palette_color(phase);
         Self {
             one: WHITE_RGBA,
@@ -116,7 +120,7 @@ impl ObjectBitmapPalette {
         }
     }
 
-    fn tie(phase: usize) -> Self {
+    pub(super) fn tie(phase: usize) -> Self {
         let offset = (phase % 3) * 3;
         Self {
             one: WHITE_RGBA,
@@ -128,7 +132,7 @@ impl ObjectBitmapPalette {
         }
     }
 
-    const fn score_250(phase: usize) -> Self {
+    pub(super) const fn score_250(phase: usize) -> Self {
         const CYCLE: [[u8; 4]; 3] = [BLUE_RGBA, YELLOW_RGBA, WHITE_RGBA];
         Self {
             one: CYCLE[phase % CYCLE.len()],
@@ -140,7 +144,7 @@ impl ObjectBitmapPalette {
         }
     }
 
-    const fn score_500(phase: usize) -> Self {
+    pub(super) const fn score_500(phase: usize) -> Self {
         const CYCLE: [[u8; 4]; 3] = [RED_RGBA, BLUE_RGBA, YELLOW_RGBA];
         Self {
             one: WHITE_RGBA,
@@ -152,7 +156,7 @@ impl ObjectBitmapPalette {
         }
     }
 
-    const fn burst() -> Self {
+    pub(super) const fn burst() -> Self {
         Self {
             one: WHITE_RGBA,
             a: WHITE_RGBA,
@@ -164,86 +168,87 @@ impl ObjectBitmapPalette {
     }
 }
 
-const WHITE_RGBA: [u8; 4] = [255, 255, 255, 255];
-const YELLOW_RGBA: [u8; 4] = [255, 188, 0, 255];
-const RED_RGBA: [u8; 4] = [255, 80, 80, 255];
-const BLUE_RGBA: [u8; 4] = [40, 56, 220, 255];
-const GRAY_RGBA: [u8; 4] = [170, 170, 186, 255];
-const PURPLE_RGBA: [u8; 4] = [182, 48, 255, 255];
-const PALE_YELLOW_RGBA: [u8; 4] = [255, 234, 128, 255];
-const TRANSPARENT_RGBA: [u8; 4] = [0, 0, 0, 0];
-const OBJECT_BITMAP_COLOR_TABLE: [u8; 16] = [
+pub(super) const WHITE_RGBA: [u8; 4] = [255, 255, 255, 255];
+pub(super) const YELLOW_RGBA: [u8; 4] = [255, 188, 0, 255];
+pub(super) const RED_RGBA: [u8; 4] = [255, 80, 80, 255];
+pub(super) const BLUE_RGBA: [u8; 4] = [40, 56, 220, 255];
+pub(super) const GRAY_RGBA: [u8; 4] = [170, 170, 186, 255];
+pub(super) const PURPLE_RGBA: [u8; 4] = [182, 48, 255, 255];
+pub(super) const PALE_YELLOW_RGBA: [u8; 4] = [255, 234, 128, 255];
+pub(super) const TRANSPARENT_RGBA: [u8; 4] = [0, 0, 0, 0];
+pub(super) const OBJECT_BITMAP_COLOR_TABLE: [u8; 16] = [
     0x00, 0x00, 0x07, 0x28, 0x2F, 0x81, 0xA4, 0x15, 0xC7, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
-const BOMBER_COLOR_SEQUENCE: [u8; 9] = [0x81, 0x81, 0x2F, 0x81, 0x2F, 0x07, 0x2F, 0x81, 0x07];
-const OBJECT_COLOR_SEQUENCE: [u8; 37] = [
+pub(super) const BOMBER_COLOR_SEQUENCE: [u8; 9] =
+    [0x81, 0x81, 0x2F, 0x81, 0x2F, 0x07, 0x2F, 0x81, 0x07];
+pub(super) const OBJECT_COLOR_SEQUENCE: [u8; 37] = [
     0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x37, 0x2F, 0x27, 0x1F, 0x17, 0x47, 0x47, 0x87,
     0x87, 0xC7, 0xC7, 0xC6, 0xC5, 0xCC, 0xCB, 0xCA, 0xDA, 0xE8, 0xF8, 0xF9, 0xFA, 0xFB, 0xFD, 0xFF,
     0xBF, 0x3F, 0x3E, 0x3C, 0x00,
 ];
-const WILLIAMS_RED_GREEN_DAC_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255];
-const WILLIAMS_BLUE_DAC_LEVELS: [u8; 4] = [0, 95, 160, 255];
-const FONT_SHEET_PNG: &[u8] = include_bytes!("../assets/sprites/font-sheet.png");
-const SCORE_DIGIT_PIXEL_SIZE: [u32; 2] = [6, 8];
-const MESSAGE_GLYPH_ATLAS_START: [u32; 2] = [0, 104];
-const MESSAGE_GLYPH_ATLAS_ROW_STEP: u32 = 16;
-const MESSAGE_GLYPH_ATLAS_GAP: u32 = 2;
-const SCREEN_COLUMN_WIDTH_PIXELS_U8: u8 = 2;
-const SCREEN_COLUMN_WIDTH_PIXELS: f32 = SCREEN_COLUMN_WIDTH_PIXELS_U8 as f32;
-const MESSAGE_LINE_SPACING_ROWS: u8 = 0x0A;
-const ASTRONAUT_EXPLOSION_BYTES: [u8; 32] = [
+pub(super) const WILLIAMS_RED_GREEN_DAC_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255];
+pub(super) const WILLIAMS_BLUE_DAC_LEVELS: [u8; 4] = [0, 95, 160, 255];
+pub(super) const FONT_SHEET_PNG: &[u8] = include_bytes!("../assets/sprites/font-sheet.png");
+pub(super) const SCORE_DIGIT_PIXEL_SIZE: [u32; 2] = [6, 8];
+pub(super) const MESSAGE_GLYPH_ATLAS_START: [u32; 2] = [0, 104];
+pub(super) const MESSAGE_GLYPH_ATLAS_ROW_STEP: u32 = 16;
+pub(super) const MESSAGE_GLYPH_ATLAS_GAP: u32 = 2;
+pub(super) const SCREEN_COLUMN_WIDTH_PIXELS_U8: u8 = 2;
+pub(super) const SCREEN_COLUMN_WIDTH_PIXELS: f32 = SCREEN_COLUMN_WIDTH_PIXELS_U8 as f32;
+pub(super) const MESSAGE_LINE_SPACING_ROWS: u8 = 0x0A;
+pub(super) const ASTRONAUT_EXPLOSION_BYTES: [u8; 32] = [
     0x00, 0x00, 0x0D, 0x6C, 0x6C, 0x0D, 0x00, 0x00, 0x06, 0xE6, 0xC8, 0x83, 0x82, 0xC8, 0xEC, 0x06,
     0x60, 0x6D, 0x8C, 0x28, 0x28, 0x8C, 0x6D, 0x60, 0x00, 0x00, 0xE0, 0xC6, 0xC6, 0xE0, 0x00, 0x00,
 ];
-const NULL_OBJECT_BYTES: [u8; 1] = [0x00];
-const TERRAIN_EXPLOSION_BYTES: [u8; 48] = [
+pub(super) const NULL_OBJECT_BYTES: [u8; 1] = [0x00];
+pub(super) const TERRAIN_EXPLOSION_BYTES: [u8; 48] = [
     0x1C, 0x0D, 0x7F, 0xE7, 0x70, 0x00, 0x0F, 0x71, 0x71, 0x07, 0xDC, 0x77, 0x7C, 0x0D, 0x71, 0xC7,
     0x77, 0xDE, 0x07, 0x71, 0x17, 0x17, 0xDE, 0xF7, 0x71, 0x17, 0x71, 0x7C, 0xDE, 0xF0, 0x07, 0x77,
     0xC7, 0x71, 0x17, 0x70, 0x70, 0x7C, 0xD7, 0x77, 0x77, 0x70, 0x01, 0xCD, 0xFF, 0xD7, 0x70, 0xF0,
 ];
-const ASTRONAUT_EXPLOSION_GRID: ObjectBitmapGrid = ObjectBitmapGrid {
+pub(super) const ASTRONAUT_EXPLOSION_GRID: ObjectBitmapGrid = ObjectBitmapGrid {
     rows: 8,
     byte_columns: 4,
     bytes: &ASTRONAUT_EXPLOSION_BYTES,
     palette: ObjectBitmapPalette::burst(),
 };
-const NULL_OBJECT_GRID: ObjectBitmapGrid = ObjectBitmapGrid {
+pub(super) const NULL_OBJECT_GRID: ObjectBitmapGrid = ObjectBitmapGrid {
     rows: 1,
     byte_columns: 1,
     bytes: &NULL_OBJECT_BYTES,
     palette: ObjectBitmapPalette::white(),
 };
-const TERRAIN_EXPLOSION_GRID: ObjectBitmapGrid = ObjectBitmapGrid {
+pub(super) const TERRAIN_EXPLOSION_GRID: ObjectBitmapGrid = ObjectBitmapGrid {
     rows: 6,
     byte_columns: 8,
     bytes: &TERRAIN_EXPLOSION_BYTES,
     palette: ObjectBitmapPalette::burst(),
 };
-const HALL_OF_FAME_DEFENDER_LOGO_COLUMNS: u8 = 0x3C;
-const HALL_OF_FAME_DEFENDER_LOGO_ROWS: u8 = 0x18;
-const HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT: usize =
+pub(super) const HALL_OF_FAME_DEFENDER_LOGO_COLUMNS: u8 = 0x3C;
+pub(super) const HALL_OF_FAME_DEFENDER_LOGO_ROWS: u8 = 0x18;
+pub(super) const HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT: usize =
     HALL_OF_FAME_DEFENDER_LOGO_COLUMNS as usize * HALL_OF_FAME_DEFENDER_LOGO_ROWS as usize;
 pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS: usize = 15;
 pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS: usize = 1;
 pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT: usize =
     ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS * ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS;
-const COPYRIGHT_STRIP_COLUMNS: u8 = 40;
-const COPYRIGHT_STRIP_ROWS: u8 = 8;
-const COPYRIGHT_STRIP_BYTES: [u8; 80] = [
+pub(super) const COPYRIGHT_STRIP_COLUMNS: u8 = 40;
+pub(super) const COPYRIGHT_STRIP_ROWS: u8 = 8;
+pub(super) const COPYRIGHT_STRIP_BYTES: [u8; 80] = [
     0x3E, 0x41, 0x41, 0x22, 0x00, 0x3E, 0x41, 0x41, 0x3E, 0x00, 0x7F, 0x09, 0x09, 0x06, 0x00, 0x03,
     0x04, 0x78, 0x04, 0x03, 0x00, 0x7F, 0x09, 0x19, 0x66, 0x00, 0x41, 0x7F, 0x41, 0x00, 0x3E, 0x41,
     0x49, 0x3A, 0x00, 0x7F, 0x08, 0x08, 0x7F, 0x00, 0x01, 0x01, 0x7F, 0x01, 0x01, 0x00, 0x1C, 0x22,
     0x5D, 0x63, 0x55, 0x22, 0x1C, 0x22, 0x7F, 0x4B, 0x45, 0x22, 0x1C, 0x00, 0x00, 0x00, 0x42, 0x7F,
     0x40, 0x00, 0x26, 0x49, 0x49, 0x3E, 0x00, 0x36, 0x49, 0x49, 0x36, 0x00, 0x3E, 0x41, 0x41, 0x3E,
 ];
-const WILLIAMS_LOGO_COLUMNS: u8 = 46;
-const WILLIAMS_LOGO_ROWS: u8 = 19;
-const WILLIAMS_LOGO_PIXEL_COUNT: usize =
+pub(super) const WILLIAMS_LOGO_COLUMNS: u8 = 46;
+pub(super) const WILLIAMS_LOGO_ROWS: u8 = 19;
+pub(super) const WILLIAMS_LOGO_PIXEL_COUNT: usize =
     WILLIAMS_LOGO_COLUMNS as usize * 2 * WILLIAMS_LOGO_ROWS as usize;
-const WILLIAMS_LOGO_FIRST_SCREEN_COLUMN: u8 = 0x36;
-const WILLIAMS_LOGO_FIRST_SCREEN_ROW: u8 = 0x3C;
-const WILLIAMS_LOGO_DRAW_CONTROL_THRESHOLD: u8 = 0xAA;
-const WILLIAMS_LOGO_DRAW_PROGRAM_BYTES: [u8; 351] = [
+pub(super) const WILLIAMS_LOGO_FIRST_SCREEN_COLUMN: u8 = 0x36;
+pub(super) const WILLIAMS_LOGO_FIRST_SCREEN_ROW: u8 = 0x3C;
+pub(super) const WILLIAMS_LOGO_DRAW_CONTROL_THRESHOLD: u8 = 0xAA;
+pub(super) const WILLIAMS_LOGO_DRAW_PROGRAM_BYTES: [u8; 351] = [
     0xFE, 0x74, 0x40, 0x11, 0x11, 0x85, 0x81, 0x81, 0x81, 0x88, 0x82, 0x82, 0x22, 0x24, 0x22, 0x42,
     0x24, 0x24, 0x24, 0x44, 0x24, 0x44, 0x49, 0x44, 0x94, 0x41, 0x88, 0x14, 0x41, 0x88, 0x14, 0x41,
     0x88, 0x94, 0x41, 0x88, 0x94, 0x49, 0x88, 0x14, 0x98, 0x58, 0x94, 0x98, 0x18, 0x94, 0x46, 0x66,
@@ -267,7 +272,7 @@ const WILLIAMS_LOGO_DRAW_PROGRAM_BYTES: [u8; 351] = [
     0x44, 0x11, 0x88, 0x24, 0xFE, 0xC1, 0x3F, 0x44, 0x44, 0x44, 0x11, 0x11, 0x11, 0x11, 0x88, 0x88,
     0x88, 0x22, 0x22, 0x22, 0x20, 0xFE, 0xC3, 0x45, 0x22, 0x22, 0x44, 0x11, 0x81, 0x50, 0xFD,
 ];
-const HALL_OF_FAME_DEFENDER_LOGO_COMPRESSED_BYTES: [u8; 366] = [
+pub(super) const HALL_OF_FAME_DEFENDER_LOGO_COMPRESSED_BYTES: [u8; 366] = [
     0x10, 0xD1, 0xBD, 0x29, 0xC2, 0x9C, 0x29, 0xCB, 0xEA, 0xC2, 0x8C, 0x29, 0xC2, 0x81, 0x0D, 0x10,
     0xC2, 0x8D, 0x29, 0xC2, 0x9C, 0x29, 0xCB, 0xEA, 0x42, 0x94, 0x29, 0x42, 0x81, 0x0C, 0x3F, 0x29,
     0xC2, 0x94, 0xC2, 0x9C, 0x29, 0xC1, 0x8D, 0xA4, 0x29, 0x42, 0x94, 0x29, 0x3F, 0x3E, 0x29, 0x42,
@@ -587,11 +592,11 @@ impl TextureAtlas {
     }
 }
 
-fn transparent_rgba_pixels(surface: SurfaceSize) -> Option<Vec<u8>> {
+pub(super) fn transparent_rgba_pixels(surface: SurfaceSize) -> Option<Vec<u8>> {
     surface.rgba_len().map(|len| vec![0; len])
 }
 
-fn message_glyph_atlas_regions(surface: SurfaceSize) -> Vec<AtlasRegion> {
+pub(super) fn message_glyph_atlas_regions(surface: SurfaceSize) -> Vec<AtlasRegion> {
     let mut regions = Vec::with_capacity(SpriteId::MESSAGE_GLYPHS.len());
     let mut origin = MESSAGE_GLYPH_ATLAS_START;
     for (_, sprite, size) in SpriteId::MESSAGE_GLYPH_SPECS {
@@ -613,7 +618,7 @@ fn message_glyph_atlas_regions(surface: SurfaceSize) -> Vec<AtlasRegion> {
     regions
 }
 
-fn attract_defender_wordmark_block_regions() -> Vec<AtlasRegion> {
+pub(super) fn attract_defender_wordmark_block_regions() -> Vec<AtlasRegion> {
     let mut regions = Vec::with_capacity(ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT);
     for index in 0..ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT {
         let column = index % ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS;
@@ -631,7 +636,10 @@ fn attract_defender_wordmark_block_regions() -> Vec<AtlasRegion> {
     regions
 }
 
-fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) -> Vec<u8> {
+pub(super) fn default_sprite_atlas_pixels(
+    surface: SurfaceSize,
+    regions: &[AtlasRegion],
+) -> Vec<u8> {
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
 
     let player_ship = decode_object_bitmap_asset_rgba(
@@ -1008,7 +1016,7 @@ fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) ->
     pixels
 }
 
-fn decode_terrain_word_rgba(word: u16) -> EmbeddedSprite {
+pub(super) fn decode_terrain_word_rgba(word: u16) -> EmbeddedSprite {
     const WIDTH: u32 = 2;
     const HEIGHT: u32 = 2;
     let mut pixels = vec![0; (WIDTH * HEIGHT * 4) as usize];
@@ -1028,7 +1036,7 @@ fn decode_terrain_word_rgba(word: u16) -> EmbeddedSprite {
     }
 }
 
-fn decode_embedded_png_rgba(name: &'static str, bytes: &[u8]) -> EmbeddedSprite {
+pub(super) fn decode_embedded_png_rgba(name: &'static str, bytes: &[u8]) -> EmbeddedSprite {
     let decoder = png::Decoder::new(std::io::Cursor::new(bytes));
     let mut reader = decoder
         .read_info()
@@ -1057,17 +1065,14 @@ fn decode_embedded_png_rgba(name: &'static str, bytes: &[u8]) -> EmbeddedSprite 
     }
 }
 
-fn decode_object_bitmap_grid_rgba(name: &'static str, grid: ObjectBitmapGrid) -> EmbeddedSprite {
-    decode_object_bitmap_bytes_rgba(
-        name,
-        grid.rows,
-        grid.byte_columns,
-        grid.bytes,
-        grid.palette,
-    )
+pub(super) fn decode_object_bitmap_grid_rgba(
+    name: &'static str,
+    grid: ObjectBitmapGrid,
+) -> EmbeddedSprite {
+    decode_object_bitmap_bytes_rgba(name, grid.rows, grid.byte_columns, grid.bytes, grid.palette)
 }
 
-fn decode_object_bitmap_asset_rgba(
+pub(super) fn decode_object_bitmap_asset_rgba(
     bitmap: ObjectBitmapId,
     rows: u8,
     byte_columns: u8,
@@ -1077,7 +1082,7 @@ fn decode_object_bitmap_asset_rgba(
     decode_object_bitmap_bytes_rgba("object bitmap", rows, byte_columns, bytes, palette)
 }
 
-fn decode_object_bitmap_bytes_rgba(
+pub(super) fn decode_object_bitmap_bytes_rgba(
     name: &'static str,
     rows: u8,
     byte_columns: u8,
@@ -1108,7 +1113,7 @@ fn decode_object_bitmap_bytes_rgba(
     EmbeddedSprite { surface, pixels }
 }
 
-fn decode_score_digit_sprites() -> Vec<EmbeddedSprite> {
+pub(super) fn decode_score_digit_sprites() -> Vec<EmbeddedSprite> {
     let mut rows = SCORE_DIGIT_ASSETS
         .iter()
         .map(|asset| {
@@ -1125,7 +1130,11 @@ fn decode_score_digit_sprites() -> Vec<EmbeddedSprite> {
         })
         .collect::<Vec<_>>();
     rows.sort_by_key(|(digit, _)| *digit);
-    assert_eq!(rows.len(), 10, "embedded score digits must define ten sprites");
+    assert_eq!(
+        rows.len(),
+        10,
+        "embedded score digits must define ten sprites"
+    );
     for (expected, (digit, _)) in rows.iter().enumerate() {
         assert_eq!(
             usize::from(*digit),
@@ -1136,7 +1145,7 @@ fn decode_score_digit_sprites() -> Vec<EmbeddedSprite> {
     rows.into_iter().map(|(_, sprite)| sprite).collect()
 }
 
-fn decode_score_digit_rgba(
+pub(super) fn decode_score_digit_rgba(
     name: &'static str,
     digit: u8,
     columns: u8,
@@ -1168,7 +1177,7 @@ fn decode_score_digit_rgba(
     EmbeddedSprite { surface, pixels }
 }
 
-fn decode_message_glyph_sprites() -> Vec<(char, EmbeddedSprite)> {
+pub(super) fn decode_message_glyph_sprites() -> Vec<(char, EmbeddedSprite)> {
     let rows = MESSAGE_GLYPH_ASSETS
         .iter()
         .map(|asset| {
@@ -1198,7 +1207,7 @@ fn decode_message_glyph_sprites() -> Vec<(char, EmbeddedSprite)> {
     rows
 }
 
-fn decode_message_glyph_rgba(
+pub(super) fn decode_message_glyph_rgba(
     name: &'static str,
     character: char,
     columns: u8,
@@ -1230,7 +1239,7 @@ fn decode_message_glyph_rgba(
     EmbeddedSprite { surface, pixels }
 }
 
-fn object_bitmap_palette_color(index: u8, palette: ObjectBitmapPalette) -> [u8; 4] {
+pub(super) fn object_bitmap_palette_color(index: u8, palette: ObjectBitmapPalette) -> [u8; 4] {
     match index {
         0x0 => TRANSPARENT_RGBA,
         0x1 => palette.one,
@@ -1245,7 +1254,7 @@ fn object_bitmap_palette_color(index: u8, palette: ObjectBitmapPalette) -> [u8; 
     }
 }
 
-fn decode_hall_of_fame_defender_logo_rgba() -> EmbeddedSprite {
+pub(super) fn decode_hall_of_fame_defender_logo_rgba() -> EmbeddedSprite {
     let bytes = expand_hall_of_fame_defender_logo_bytes();
     let surface = SurfaceSize::new(
         u32::from(HALL_OF_FAME_DEFENDER_LOGO_COLUMNS) * 2,
@@ -1269,7 +1278,7 @@ fn decode_hall_of_fame_defender_logo_rgba() -> EmbeddedSprite {
     EmbeddedSprite { surface, pixels }
 }
 
-fn decode_attract_copyright_strip_rgba() -> EmbeddedSprite {
+pub(super) fn decode_attract_copyright_strip_rgba() -> EmbeddedSprite {
     let surface = SurfaceSize::new(
         u32::from(COPYRIGHT_STRIP_COLUMNS) * 2,
         u32::from(COPYRIGHT_STRIP_ROWS),
@@ -1294,7 +1303,7 @@ fn decode_attract_copyright_strip_rgba() -> EmbeddedSprite {
     EmbeddedSprite { surface, pixels }
 }
 
-fn decode_attract_williams_logo_rgba() -> EmbeddedSprite {
+pub(super) fn decode_attract_williams_logo_rgba() -> EmbeddedSprite {
     let surface = SurfaceSize::new(
         u32::from(WILLIAMS_LOGO_COLUMNS) * 2,
         u32::from(WILLIAMS_LOGO_ROWS),
@@ -1318,12 +1327,12 @@ pub(crate) fn attract_williams_logo_operation_pixel_counts() -> Vec<usize> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct AttractWilliamsLogoWalk {
+pub(super) struct AttractWilliamsLogoWalk {
     pixels: Vec<[u8; 2]>,
     operation_pixel_counts: Vec<usize>,
 }
 
-fn attract_williams_logo_walk() -> AttractWilliamsLogoWalk {
+pub(super) fn attract_williams_logo_walk() -> AttractWilliamsLogoWalk {
     let mut path = Vec::new();
     let mut operation_pixel_counts = Vec::new();
     let mut seen = [false; WILLIAMS_LOGO_PIXEL_COUNT];
@@ -1354,14 +1363,10 @@ fn attract_williams_logo_walk() -> AttractWilliamsLogoWalk {
         } else {
             let mut accumulator = draw_byte;
             loop {
-                accumulator =
-                    attract_williams_logo_horizontal_bit(accumulator, &mut cursor, true);
-                accumulator =
-                    attract_williams_logo_horizontal_bit(accumulator, &mut cursor, false);
-                accumulator =
-                    attract_williams_logo_vertical_bit(accumulator, &mut cursor, true);
-                accumulator =
-                    attract_williams_logo_vertical_bit(accumulator, &mut cursor, false);
+                accumulator = attract_williams_logo_horizontal_bit(accumulator, &mut cursor, true);
+                accumulator = attract_williams_logo_horizontal_bit(accumulator, &mut cursor, false);
+                accumulator = attract_williams_logo_vertical_bit(accumulator, &mut cursor, true);
+                accumulator = attract_williams_logo_vertical_bit(accumulator, &mut cursor, false);
                 push_attract_williams_logo_pixel(&mut path, &mut seen, cursor);
                 if accumulator == 0 {
                     break;
@@ -1377,7 +1382,7 @@ fn attract_williams_logo_walk() -> AttractWilliamsLogoWalk {
     }
 }
 
-fn attract_williams_logo_horizontal_bit(
+pub(super) fn attract_williams_logo_horizontal_bit(
     mut accumulator: u8,
     cursor: &mut u16,
     decrement: bool,
@@ -1396,7 +1401,7 @@ fn attract_williams_logo_horizontal_bit(
     accumulator
 }
 
-fn attract_williams_logo_vertical_bit(
+pub(super) fn attract_williams_logo_vertical_bit(
     mut accumulator: u8,
     cursor: &mut u16,
     decrement: bool,
@@ -1415,7 +1420,7 @@ fn attract_williams_logo_vertical_bit(
     accumulator
 }
 
-fn push_attract_williams_logo_pixel(
+pub(super) fn push_attract_williams_logo_pixel(
     path: &mut Vec<[u8; 2]>,
     seen: &mut [bool],
     cursor: u16,
@@ -1431,7 +1436,7 @@ fn push_attract_williams_logo_pixel(
     }
 }
 
-fn attract_williams_logo_pixel(cursor: u16) -> Option<[u8; 2]> {
+pub(super) fn attract_williams_logo_pixel(cursor: u16) -> Option<[u8; 2]> {
     let [x, y] = cursor.to_be_bytes();
     let column = x >> 1;
     let relative_column = column.checked_sub(WILLIAMS_LOGO_FIRST_SCREEN_COLUMN)?;
@@ -1447,7 +1452,8 @@ fn attract_williams_logo_pixel(cursor: u16) -> Option<[u8; 2]> {
     ])
 }
 
-fn expand_hall_of_fame_defender_logo_bytes() -> [u8; HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT] {
+pub(super) fn expand_hall_of_fame_defender_logo_bytes()
+-> [u8; HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT] {
     let mut output = [0; HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT];
     let mut cursor = 0usize;
     let mut length = 0u8;
@@ -1566,7 +1572,7 @@ pub(crate) fn attract_defender_appearance_pixels(
         .collect()
 }
 
-fn draw_defender_wordmark_block(
+pub(super) fn draw_defender_wordmark_block(
     pixels: &mut BTreeMap<[u32; 2], [u8; 4]>,
     surface: SurfaceSize,
     logo_bytes: &[u8; HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT],
@@ -1578,7 +1584,8 @@ fn draw_defender_wordmark_block(
     let palette = ObjectBitmapPalette::defender_logo();
     for dy in 0..2 {
         for dx in 0..2 {
-            let Some(nibble) = defender_wordmark_nibble(logo_bytes, wordmark_x + dx, wordmark_y + dy)
+            let Some(nibble) =
+                defender_wordmark_nibble(logo_bytes, wordmark_x + dx, wordmark_y + dy)
             else {
                 continue;
             };
@@ -1597,7 +1604,7 @@ fn draw_defender_wordmark_block(
     }
 }
 
-fn clear_defender_wordmark_block(
+pub(super) fn clear_defender_wordmark_block(
     pixels: &mut BTreeMap<[u32; 2], [u8; 4]>,
     target_x_byte: i32,
     target_y: i32,
@@ -1618,7 +1625,7 @@ fn clear_defender_wordmark_block(
     }
 }
 
-fn defender_wordmark_nibble(
+pub(super) fn defender_wordmark_nibble(
     logo_bytes: &[u8; HALL_OF_FAME_DEFENDER_LOGO_BYTE_COUNT],
     native_x: i32,
     native_y: i32,
@@ -1641,7 +1648,7 @@ fn defender_wordmark_nibble(
     }
 }
 
-fn write_native_rgba_pixel(
+pub(super) fn write_native_rgba_pixel(
     pixels: &mut BTreeMap<[u32; 2], [u8; 4]>,
     surface: SurfaceSize,
     native_x: i32,
@@ -1663,7 +1670,7 @@ fn write_native_rgba_pixel(
     pixels.insert(position, color);
 }
 
-const fn defender_wordmark_color_byte(nibble: u8) -> u8 {
+pub(super) const fn defender_wordmark_color_byte(nibble: u8) -> u8 {
     match (nibble & 0x0C) >> 2 {
         1 => 0x22,
         2 => 0xCC,
@@ -1672,7 +1679,7 @@ const fn defender_wordmark_color_byte(nibble: u8) -> u8 {
     }
 }
 
-fn pseudo_color_rgba(value: u8) -> [u8; 4] {
+pub(super) fn pseudo_color_rgba(value: u8) -> [u8; 4] {
     if value == 0 {
         return TRANSPARENT_RGBA;
     }
@@ -1685,11 +1692,11 @@ fn pseudo_color_rgba(value: u8) -> [u8; 4] {
     ]
 }
 
-fn object_cycle_palette_color(phase: usize) -> [u8; 4] {
+pub(super) fn object_cycle_palette_color(phase: usize) -> [u8; 4] {
     pseudo_color_rgba(OBJECT_COLOR_SEQUENCE[phase % (OBJECT_COLOR_SEQUENCE.len() - 1)])
 }
 
-fn blit_default_region(
+pub(super) fn blit_default_region(
     atlas_pixels: &mut [u8],
     atlas_surface: SurfaceSize,
     regions: &[AtlasRegion],
@@ -1712,7 +1719,7 @@ fn blit_default_region(
     );
 }
 
-fn blit_default_region_from_embedded_sprite(
+pub(super) fn blit_default_region_from_embedded_sprite(
     atlas_pixels: &mut [u8],
     atlas_surface: SurfaceSize,
     regions: &[AtlasRegion],
@@ -1736,7 +1743,7 @@ fn blit_default_region_from_embedded_sprite(
     );
 }
 
-fn fill_default_region(
+pub(super) fn fill_default_region(
     atlas_pixels: &mut [u8],
     atlas_surface: SurfaceSize,
     regions: &[AtlasRegion],
@@ -1766,7 +1773,7 @@ fn fill_default_region(
     }
 }
 
-fn blit_scaled_region(
+pub(super) fn blit_scaled_region(
     atlas_pixels: &mut [u8],
     atlas_surface: SurfaceSize,
     region: AtlasRegion,
@@ -1800,7 +1807,7 @@ fn blit_scaled_region(
     }
 }
 
-fn blit_star_region(
+pub(super) fn blit_star_region(
     atlas_pixels: &mut [u8],
     atlas_surface: SurfaceSize,
     regions: &[AtlasRegion],
@@ -1823,14 +1830,14 @@ fn blit_star_region(
     }
 }
 
-fn first_visible_pixel(embedded_sprite: &EmbeddedSprite) -> Option<&[u8]> {
+pub(super) fn first_visible_pixel(embedded_sprite: &EmbeddedSprite) -> Option<&[u8]> {
     embedded_sprite
         .pixels
         .chunks_exact(4)
         .find(|pixel| pixel[3] != 0)
 }
 
-fn copy_embedded_sprite_pixel(
+pub(super) fn copy_embedded_sprite_pixel(
     atlas_pixels: &mut [u8],
     atlas_surface: SurfaceSize,
     atlas_position: [u32; 2],
@@ -1852,6 +1859,6 @@ fn copy_embedded_sprite_pixel(
     }
 }
 
-fn atlas_pixel_offset(surface: SurfaceSize, position: [u32; 2]) -> usize {
+pub(super) fn atlas_pixel_offset(surface: SurfaceSize, position: [u32; 2]) -> usize {
     ((position[1] as usize * surface.width as usize) + position[0] as usize) * 4
 }

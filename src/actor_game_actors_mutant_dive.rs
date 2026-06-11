@@ -1,33 +1,37 @@
-const MUTANT_DIVE_PATH_Y_VELOCITY: u16 = 0x0090;
-const MUTANT_DIVE_ENTRY_SHOT_MAX_X: i16 = 0x04;
-const MUTANT_DIVE_ENTRY_SHOT_MAX_Y: i16 = 0x60;
-const MUTANT_DIVE_SUPPRESSED_FIRST_SHOT_WORLD_Y_MIN: u16 = 0x4000;
-const MUTANT_DIVE_SUPPRESSED_FIRST_SHOT_WORLD_Y_MAX: u16 = 0x4FFF;
-const MUTANT_DIVE_SUPPRESSED_SECOND_SHOT_WORLD_Y_MIN: u16 = 0x9000;
-const MUTANT_DIVE_SUPPRESSED_SECOND_SHOT_WORLD_Y_MAX: u16 = 0x9FFF;
-const MUTANT_DIVE_VISUAL_X_VELOCITY: u16 = 0x0030;
-const MUTANT_DIVE_PENDING_SHOT_TIMER_THRESHOLD: u8 = 0x80;
-const MUTANT_DIVE_COLLISION_PENDING_WORLD_Y_MIN: u16 = 0x9000;
+use super::*;
 
-fn mutant_dive_conversion_x_correction(
+pub(in crate::actor_game) const MUTANT_DIVE_PATH_Y_VELOCITY: u16 = 0x0090;
+pub(in crate::actor_game) const MUTANT_DIVE_ENTRY_SHOT_MAX_X: i16 = 0x04;
+pub(in crate::actor_game) const MUTANT_DIVE_ENTRY_SHOT_MAX_Y: i16 = 0x60;
+pub(in crate::actor_game) const MUTANT_DIVE_SUPPRESSED_FIRST_SHOT_WORLD_Y_MIN: u16 = 0x4000;
+pub(in crate::actor_game) const MUTANT_DIVE_SUPPRESSED_FIRST_SHOT_WORLD_Y_MAX: u16 = 0x4FFF;
+pub(in crate::actor_game) const MUTANT_DIVE_SUPPRESSED_SECOND_SHOT_WORLD_Y_MIN: u16 = 0x9000;
+pub(in crate::actor_game) const MUTANT_DIVE_SUPPRESSED_SECOND_SHOT_WORLD_Y_MAX: u16 = 0x9FFF;
+pub(in crate::actor_game) const MUTANT_DIVE_VISUAL_X_VELOCITY: u16 = 0x0030;
+pub(in crate::actor_game) const MUTANT_DIVE_PENDING_SHOT_TIMER_THRESHOLD: u8 = 0x80;
+pub(in crate::actor_game) const MUTANT_DIVE_COLLISION_PENDING_WORLD_Y_MIN: u16 = 0x9000;
+
+pub(in crate::actor_game) fn mutant_dive_conversion_x_correction(
     lander_actor_state: LanderActorState,
 ) -> Option<u16> {
     (lander_actor_state.target_human_index == Some(6) && lander_actor_state.x_velocity() == 0)
         .then_some(MUTANT_DIVE_CONVERSION_X_CORRECTION)
 }
 
-fn mutant_dive_has_conversion_correction(
+pub(in crate::actor_game) fn mutant_dive_has_conversion_correction(
     actor_state: MutantActorState,
 ) -> bool {
     actor_state.render_x_correction == MUTANT_DIVE_CONVERSION_X_CORRECTION
 }
 
-fn mutant_dive_uses_path_projection(actor_state: MutantActorState) -> bool {
+pub(in crate::actor_game) fn mutant_dive_uses_path_projection(
+    actor_state: MutantActorState,
+) -> bool {
     mutant_dive_has_conversion_correction(actor_state)
         && actor_state.y_velocity() == MUTANT_DIVE_PATH_Y_VELOCITY
 }
 
-fn mutant_dive_defers_first_shot(
+pub(in crate::actor_game) fn mutant_dive_defers_first_shot(
     position: Point,
     actor_state: MutantActorState,
 ) -> bool {
@@ -37,7 +41,7 @@ fn mutant_dive_defers_first_shot(
         && position.y <= MUTANT_DIVE_ENTRY_SHOT_MAX_Y
 }
 
-fn mutant_dive_fires_visible_entry_shot(
+pub(in crate::actor_game) fn mutant_dive_fires_visible_entry_shot(
     position: Point,
     actor_state: MutantActorState,
     player_position: Point,
@@ -51,7 +55,7 @@ fn mutant_dive_fires_visible_entry_shot(
         && player_position.y <= FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y
 }
 
-fn mutant_dive_suppresses_regular_shot(
+pub(in crate::actor_game) fn mutant_dive_suppresses_regular_shot(
     position: Point,
     actor_state: MutantActorState,
 ) -> bool {
@@ -61,15 +65,14 @@ fn mutant_dive_suppresses_regular_shot(
 
     let (_, world_y_word) =
         world_position_words(position, actor_state.x_fraction(), actor_state.y_fraction());
-    (MUTANT_DIVE_SUPPRESSED_FIRST_SHOT_WORLD_Y_MIN
-        ..=MUTANT_DIVE_SUPPRESSED_FIRST_SHOT_WORLD_Y_MAX)
+    (MUTANT_DIVE_SUPPRESSED_FIRST_SHOT_WORLD_Y_MIN..=MUTANT_DIVE_SUPPRESSED_FIRST_SHOT_WORLD_Y_MAX)
         .contains(&world_y_word)
         || (MUTANT_DIVE_SUPPRESSED_SECOND_SHOT_WORLD_Y_MIN
             ..=MUTANT_DIVE_SUPPRESSED_SECOND_SHOT_WORLD_Y_MAX)
             .contains(&world_y_word)
 }
 
-fn mutant_dive_fires_path_shot(
+pub(in crate::actor_game) fn mutant_dive_fires_path_shot(
     position: Point,
     actor_state: MutantActorState,
 ) -> bool {
@@ -86,7 +89,7 @@ fn mutant_dive_fires_path_shot(
     )
 }
 
-fn mutant_dive_post_shot_timer(
+pub(in crate::actor_game) fn mutant_dive_post_shot_timer(
     actor_state: MutantActorState,
     fired: bool,
 ) -> Option<u8> {
@@ -94,7 +97,7 @@ fn mutant_dive_post_shot_timer(
         .then_some(MUTANT_DIVE_POST_SHOT_TIMER)
 }
 
-fn mutant_dive_path_position(
+pub(in crate::actor_game) fn mutant_dive_path_position(
     position: Point,
     actor_state: MutantActorState,
 ) -> Option<Point> {
@@ -114,45 +117,45 @@ fn mutant_dive_path_position(
     mutant_dive_interpolated_path_position(world_y_word)
 }
 
-fn mutant_dive_interpolated_path_position(world_y_word: u16) -> Option<Point> {
+pub(in crate::actor_game) fn mutant_dive_interpolated_path_position(
+    world_y_word: u16,
+) -> Option<Point> {
     let first = MUTANT_DIVE_PATH_ANCHORS.first()?;
     let last = MUTANT_DIVE_PATH_ANCHORS.last()?;
     if world_y_word < first.world.y_word() || world_y_word > last.world.y_word() {
         return None;
     }
 
-    MUTANT_DIVE_PATH_ANCHORS
-        .windows(2)
-        .find_map(|anchors| {
-            let start = anchors[0];
-            let end = anchors[1];
-            if world_y_word < start.world.y_word()
-                || world_y_word > end.world.y_word()
-                || start.world.y_word() >= end.world.y_word()
-            {
-                return None;
-            }
+    MUTANT_DIVE_PATH_ANCHORS.windows(2).find_map(|anchors| {
+        let start = anchors[0];
+        let end = anchors[1];
+        if world_y_word < start.world.y_word()
+            || world_y_word > end.world.y_word()
+            || start.world.y_word() >= end.world.y_word()
+        {
+            return None;
+        }
 
-            Some(Point::new(
-                lerp_i16(
-                    start.screen.x,
-                    end.screen.x,
-                    world_y_word,
-                    start.world.y_word(),
-                    end.world.y_word(),
-                ),
-                lerp_i16(
-                    start.screen.y,
-                    end.screen.y,
-                    world_y_word,
-                    start.world.y_word(),
-                    end.world.y_word(),
-                ),
-            ))
-        })
+        Some(Point::new(
+            lerp_i16(
+                start.screen.x,
+                end.screen.x,
+                world_y_word,
+                start.world.y_word(),
+                end.world.y_word(),
+            ),
+            lerp_i16(
+                start.screen.y,
+                end.screen.y,
+                world_y_word,
+                start.world.y_word(),
+                end.world.y_word(),
+            ),
+        ))
+    })
 }
 
-fn lerp_i16(
+pub(in crate::actor_game) fn lerp_i16(
     start: i16,
     end: i16,
     value: u16,
@@ -167,7 +170,7 @@ fn lerp_i16(
     rounded.clamp(0, i32::from(u8::MAX)) as i16
 }
 
-fn mutant_dive_visual_position(
+pub(in crate::actor_game) fn mutant_dive_visual_position(
     position: Point,
     actor_state: MutantActorState,
 ) -> Option<Point> {
@@ -192,7 +195,7 @@ fn mutant_dive_visual_position(
     Some(Point::new(screen_x as i16, screen_y))
 }
 
-fn mutant_dive_scene_position(
+pub(in crate::actor_game) fn mutant_dive_scene_position(
     position: Point,
     actor_state: Option<MutantActorState>,
 ) -> Point {
@@ -204,7 +207,7 @@ fn mutant_dive_scene_position(
         .unwrap_or(position)
 }
 
-fn mutant_dive_collision_position(
+pub(in crate::actor_game) fn mutant_dive_collision_position(
     position: Point,
     actor_state: Option<MutantActorState>,
 ) -> Point {
@@ -217,7 +220,7 @@ fn mutant_dive_collision_position(
     mutant_dive_visual_position(position, actor_state).unwrap_or(position)
 }
 
-fn mutant_dive_collision_window_pending(
+pub(in crate::actor_game) fn mutant_dive_collision_window_pending(
     position: Point,
     actor_state: Option<MutantActorState>,
 ) -> bool {
@@ -235,7 +238,7 @@ fn mutant_dive_collision_window_pending(
             .contains(&world_y_word)
 }
 
-fn mutant_dive_uses_collision_projection(
+pub(in crate::actor_game) fn mutant_dive_uses_collision_projection(
     position: Point,
     actor_state: Option<MutantActorState>,
 ) -> bool {
@@ -249,24 +252,20 @@ fn mutant_dive_uses_collision_projection(
     let (_, world_y_word) =
         world_position_words(position, actor_state.x_fraction(), actor_state.y_fraction());
     actor_state.shot_timer >= MUTANT_DIVE_PENDING_SHOT_TIMER_THRESHOLD
-        && (MUTANT_DIVE_COLLISION_WORLD_Y_MIN
-            ..MUTANT_DIVE_COLLISION_WORLD_Y_MAX)
+        && (MUTANT_DIVE_COLLISION_WORLD_Y_MIN..MUTANT_DIVE_COLLISION_WORLD_Y_MAX)
             .contains(&world_y_word)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ActorExplosionPlacement {
-    position: Point,
-    explosion_anchor: Option<Point>,
+pub(in crate::actor_game) struct ActorExplosionPlacement {
+    pub(in crate::actor_game) position: Point,
+    pub(in crate::actor_game) explosion_anchor: Option<Point>,
 }
 
-fn actor_player_enemy_collision_explosion_placement(
+pub(in crate::actor_game) fn actor_player_enemy_collision_explosion_placement(
     enemy: &CollisionBody,
 ) -> ActorExplosionPlacement {
-    if mutant_dive_uses_collision_projection(
-        enemy.position,
-        enemy.actor_state.as_mutant(),
-    ) {
+    if mutant_dive_uses_collision_projection(enemy.position, enemy.actor_state.as_mutant()) {
         ActorExplosionPlacement {
             position: MUTANT_DIVE_COLLISION_EXPLOSION_TOP_LEFT,
             explosion_anchor: Some(MUTANT_DIVE_COLLISION_EXPLOSION_ANCHOR),
@@ -279,7 +278,7 @@ fn actor_player_enemy_collision_explosion_placement(
     }
 }
 
-fn mutant_dive_shot_position(
+pub(in crate::actor_game) fn mutant_dive_shot_position(
     position: Point,
     actor_state: MutantActorState,
 ) -> Point {
@@ -295,7 +294,7 @@ fn mutant_dive_shot_position(
     }
 }
 
-fn mutant_dive_forced_shot(
+pub(in crate::actor_game) fn mutant_dive_forced_shot(
     position: Point,
     actor_state: MutantActorState,
     prompt: &StepPrompt,
@@ -328,7 +327,7 @@ fn mutant_dive_forced_shot(
     }
 }
 
-fn mutant_dive_exact_projectile(
+pub(in crate::actor_game) fn mutant_dive_exact_projectile(
     projectile: MutantDiveProjectilePattern,
     behavior: ActorBehaviorProfile,
 ) -> (Point, Velocity, EnemyProjectileActorState) {

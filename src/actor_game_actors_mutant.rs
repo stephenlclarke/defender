@@ -1,17 +1,19 @@
-const MUTANT_HOP_DIRECTION_SIGN_BIT: u8 = 0x80;
-const MUTANT_COLLISION_WIDTH: i16 = 14;
-const MUTANT_COLLISION_HEIGHT: i16 = 12;
+use super::*;
+
+pub(in crate::actor_game) const MUTANT_HOP_DIRECTION_SIGN_BIT: u8 = 0x80;
+pub(in crate::actor_game) const MUTANT_COLLISION_WIDTH: i16 = 14;
+pub(in crate::actor_game) const MUTANT_COLLISION_HEIGHT: i16 = 12;
 
 #[derive(Debug)]
-struct Mutant {
-    id: ActorId,
-    position: Point,
-    drift: i16,
-    actor_state: Option<MutantActorState>,
+pub(in crate::actor_game) struct Mutant {
+    pub(in crate::actor_game) id: ActorId,
+    pub(in crate::actor_game) position: Point,
+    pub(in crate::actor_game) drift: i16,
+    pub(in crate::actor_game) actor_state: Option<MutantActorState>,
 }
 
 impl Mutant {
-    fn from_spawn(id: ActorId, spawn: ActorMutantSpawn) -> Self {
+    pub(in crate::actor_game) fn from_spawn(id: ActorId, spawn: ActorMutantSpawn) -> Self {
         Self {
             id,
             position: spawn.position,
@@ -50,12 +52,7 @@ impl Mutant {
         };
         if actor_state.sleep_ticks > 0 {
             if let Some((position, velocity, projectile_actor_state)) =
-                mutant_dive_forced_shot(
-                    self.position,
-                    *actor_state,
-                    prompt,
-                    behavior,
-                )
+                mutant_dive_forced_shot(self.position, *actor_state, prompt, behavior)
             {
                 actor_state.dive_entry_shot_deferred = true;
                 actor_state.shot_timer = MUTANT_DIVE_COLLISION_PENDING_SHOT_TIMER;
@@ -76,8 +73,7 @@ impl Mutant {
             {
                 actor_state.dive_entry_shot_deferred = true;
                 let shot_rng = mutant_shot_rng(prompt, self.id, self.position);
-                let shot_position =
-                    mutant_dive_shot_position(self.position, *actor_state);
+                let shot_position = mutant_dive_shot_position(self.position, *actor_state);
                 push_mutant_shot(
                     shot_position,
                     prompt,
@@ -113,13 +109,8 @@ impl Mutant {
         );
 
         let mut next_sleep_ticks = MUTANT_LOOP_SLEEP_TICKS;
-        if mutant_should_hop_and_shoot(
-            player_absolute_x,
-            object_absolute_x,
-            self.position,
-        ) {
-            let forced_dive_shot =
-                mutant_dive_fires_path_shot(self.position, *actor_state);
+        if mutant_should_hop_and_shoot(player_absolute_x, object_absolute_x, self.position) {
+            let forced_dive_shot = mutant_dive_fires_path_shot(self.position, *actor_state);
             let forced_dive_shot_position = self.position;
             let mut hop_rng = actor_rng_from_snapshot(actor_state.hop_rng);
             let hop_state = hop_rng.advance();
@@ -129,10 +120,8 @@ impl Mutant {
 
             if forced_dive_shot {
                 let shot_rng = mutant_shot_rng(prompt, self.id, self.position);
-                let shot_position = mutant_dive_shot_position(
-                    forced_dive_shot_position,
-                    *actor_state,
-                );
+                let shot_position =
+                    mutant_dive_shot_position(forced_dive_shot_position, *actor_state);
                 push_mutant_shot(
                     shot_position,
                     prompt,
@@ -145,21 +134,16 @@ impl Mutant {
             } else {
                 actor_state.shot_timer = actor_state.shot_timer.wrapping_sub(1);
                 if actor_state.shot_timer == 0 {
-                    if mutant_dive_suppresses_regular_shot(
-                        self.position,
-                        *actor_state,
-                    ) {
+                    if mutant_dive_suppresses_regular_shot(self.position, *actor_state) {
                         actor_state.shot_timer = MUTANT_DIVE_COLLISION_PENDING_SHOT_TIMER;
-                    } else if mutant_dive_defers_first_shot(self.position, *actor_state)
-                    {
+                    } else if mutant_dive_defers_first_shot(self.position, *actor_state) {
                         actor_state.dive_entry_shot_deferred = true;
                         actor_state.shot_timer = MUTANT_DIVE_DEFERRED_SHOT_TIMER;
                         next_sleep_ticks = 0;
                     } else {
                         let shot_rng = mutant_shot_rng(prompt, self.id, self.position);
                         let default_reset = mutant_shot_reset(profile, shot_rng.seed);
-                        let shot_position =
-                            mutant_dive_shot_position(self.position, *actor_state);
+                        let shot_position = mutant_dive_shot_position(self.position, *actor_state);
                         let fired = push_mutant_shot(
                             shot_position,
                             prompt,
@@ -168,9 +152,8 @@ impl Mutant {
                             shot_rng,
                             commands,
                         );
-                        actor_state.shot_timer =
-                            mutant_dive_post_shot_timer(*actor_state, fired)
-                                .unwrap_or(default_reset);
+                        actor_state.shot_timer = mutant_dive_post_shot_timer(*actor_state, fired)
+                            .unwrap_or(default_reset);
                     }
                 }
             }
@@ -234,11 +217,13 @@ impl AssetActor for Mutant {
     }
 }
 
-const fn hyperspace_background_left(hyperspace_seed: ActorHyperspaceSeed) -> u16 {
+pub(in crate::actor_game) const fn hyperspace_background_left(
+    hyperspace_seed: ActorHyperspaceSeed,
+) -> u16 {
     u16::from_be_bytes([hyperspace_seed.seed, hyperspace_seed.hseed])
 }
 
-const fn actor_rng_from_snapshot(snapshot: ActorRngSnapshot) -> ActorRng {
+pub(in crate::actor_game) const fn actor_rng_from_snapshot(snapshot: ActorRngSnapshot) -> ActorRng {
     ActorRng {
         seed: snapshot.seed,
         hseed: snapshot.hseed,
@@ -246,7 +231,7 @@ const fn actor_rng_from_snapshot(snapshot: ActorRngSnapshot) -> ActorRng {
     }
 }
 
-fn mutant_x_velocity(
+pub(in crate::actor_game) fn mutant_x_velocity(
     x_velocity_magnitude: u8,
     player_absolute_x: u16,
     object_absolute_x: u16,
@@ -259,7 +244,7 @@ fn mutant_x_velocity(
     actor_sign_extend_u8_to_u16(x_velocity_low)
 }
 
-fn mutant_y_velocity(
+pub(in crate::actor_game) fn mutant_y_velocity(
     profile: ActorWaveTuning,
     player_y: i16,
     player_absolute_x: u16,
@@ -294,7 +279,7 @@ fn mutant_y_velocity(
     }
 }
 
-fn mutant_should_hop_and_shoot(
+pub(in crate::actor_game) fn mutant_should_hop_and_shoot(
     player_absolute_x: u16,
     object_absolute_x: u16,
     position: Point,
@@ -307,7 +292,7 @@ fn mutant_should_hop_and_shoot(
             && position.y <= i16::from(PLAYFIELD_BOTTOM_EDGE_Y))
 }
 
-fn mutant_hop_y(position_y: i16, random_y: u8, seed: u8) -> i16 {
+pub(in crate::actor_game) fn mutant_hop_y(position_y: i16, random_y: u8, seed: u8) -> i16 {
     let step = if seed & MUTANT_HOP_DIRECTION_SIGN_BIT == 0 {
         0u8.wrapping_sub(random_y)
     } else {
@@ -320,7 +305,7 @@ fn mutant_hop_y(position_y: i16, random_y: u8, seed: u8) -> i16 {
     i16::from(y)
 }
 
-fn mutant_shot_rng(
+pub(in crate::actor_game) fn mutant_shot_rng(
     prompt: &StepPrompt,
     actor: ActorId,
     position: Point,
@@ -336,14 +321,14 @@ fn mutant_shot_rng(
     actor_rng.advance().snapshot()
 }
 
-fn mutant_shot_reset(profile: ActorWaveTuning, seed: u8) -> u8 {
+pub(in crate::actor_game) fn mutant_shot_reset(profile: ActorWaveTuning, seed: u8) -> u8 {
     bounded_actor_rng_value(
         profile.mutant_shot_time.max(1).min(u32::from(u8::MAX)) as u8,
         seed,
     )
 }
 
-fn push_mutant_shot(
+pub(in crate::actor_game) fn push_mutant_shot(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
@@ -366,15 +351,14 @@ fn push_mutant_shot(
     true
 }
 
-fn mutant_fireball(
+pub(in crate::actor_game) fn mutant_fireball(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
     actor_state: MutantActorState,
     shot_rng: ActorRngSnapshot,
 ) -> Option<(Velocity, EnemyProjectileActorState)> {
-    let lifetime_ticks =
-        projectile_lifetime_ticks(behavior.mutant_shot_lifetime_steps);
+    let lifetime_ticks = projectile_lifetime_ticks(behavior.mutant_shot_lifetime_steps);
     enemy_fireball_projectile(
         position,
         actor_state.x_fraction(),

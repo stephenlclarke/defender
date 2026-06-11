@@ -1,108 +1,106 @@
-use std::sync::OnceLock;
+use crate::{renderer::Color, systems::ScreenPosition};
 
-use crate::{
-    renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, screen_position_from_cell},
-    systems::{HighScoreInitialsState, ScreenPosition, ScreenVelocity},
-};
+use super::*;
 
 // Evidence-backed cabinet defaults from CMOS/high-score evidence.
 pub const HIGH_SCORE_TABLE_ENTRIES: usize = 8;
-const HALL_OF_FAME_STALL_STEPS: u8 = 60;
-const FIRST_WAVE_MUTANT_DIVE_CONVERSION_X_CORRECTION: u16 = 0x0120;
+pub(super) const HALL_OF_FAME_STALL_STEPS: u8 = 60;
+pub(super) const FIRST_WAVE_MUTANT_DIVE_CONVERSION_X_CORRECTION: u16 = 0x0120;
 
-const ATTRACT_PRESENTS_START_STEP: u16 = 236;
-const ATTRACT_HALL_OF_FAME_START_STEP: u16 = 600;
-const ATTRACT_COPYRIGHT_START_STEP: u16 = ATTRACT_HALL_OF_FAME_START_STEP;
-const ATTRACT_HALL_OF_FAME_STALL_INTERVAL_STEPS: u16 = 10;
+pub(super) const ATTRACT_PRESENTS_START_STEP: u16 = 236;
+pub(super) const ATTRACT_HALL_OF_FAME_START_STEP: u16 = 600;
+pub(super) const ATTRACT_COPYRIGHT_START_STEP: u16 = ATTRACT_HALL_OF_FAME_START_STEP;
+pub(super) const ATTRACT_HALL_OF_FAME_STALL_INTERVAL_STEPS: u16 = 10;
 pub(crate) const ATTRACT_SCORING_SEQUENCE_START_STEP: u16 = ATTRACT_HALL_OF_FAME_START_STEP
     + (HALL_OF_FAME_STALL_STEPS as u16 * ATTRACT_HALL_OF_FAME_STALL_INTERVAL_STEPS);
-const ATTRACT_LOGO_SLEEP_TICKS: u8 = 2;
-const ATTRACT_PRESENTS_SLEEP_TICKS: u8 = 5;
-const ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS: u8 = 0x30;
-const ATTRACT_COPYRIGHT_SLEEP_TICKS: u8 = 10;
-const ATTRACT_COPYRIGHT_STALL_TICKS: u8 = 60;
-const ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS: u8 = 0xE6;
+pub(super) const ATTRACT_LOGO_SLEEP_TICKS: u8 = 2;
+pub(super) const ATTRACT_PRESENTS_SLEEP_TICKS: u8 = 5;
+pub(super) const ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS: u8 = 0x30;
+pub(super) const ATTRACT_COPYRIGHT_SLEEP_TICKS: u8 = 10;
+pub(super) const ATTRACT_COPYRIGHT_STALL_TICKS: u8 = 60;
+pub(super) const ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS: u8 = 0xE6;
 pub(crate) const ATTRACT_DEFENDER_WORDMARK_START_STEP: u16 = 365;
-const ATTRACT_SCORING_RESCUE_DESCENT_TICKS: u16 = 0xE6;
-const ATTRACT_SCORING_RESCUE_ASCENT_TICKS: u16 = 0xA0;
-const ATTRACT_SCORING_RESCUE_LASER_TICKS: u16 = 0x15;
-const ATTRACT_SCORING_RESCUE_FALL_TICKS: u16 = 0x2D * 2;
-const ATTRACT_SCORING_RESCUE_SCORE_TICKS: u16 = 0x50;
-const ATTRACT_SCORING_RESCUE_RETURN_TICKS: u16 = 0x60;
-const ATTRACT_SCORING_LEGEND_APPROACH_TICKS: u16 = 0x5F;
-const ATTRACT_SCORING_LEGEND_LASER_TICKS: u16 = 0x17;
-const ATTRACT_SCORING_LEGEND_TRANSFER_TICKS: u16 = 0x20;
-const ATTRACT_SCORING_LEGEND_REVEAL_TICKS: u16 = 0x20;
-const ATTRACT_SCORING_LEGEND_ENTRY_TICKS: u16 = ATTRACT_SCORING_LEGEND_APPROACH_TICKS
+pub(super) const ATTRACT_SCORING_RESCUE_DESCENT_TICKS: u16 = 0xE6;
+pub(super) const ATTRACT_SCORING_RESCUE_ASCENT_TICKS: u16 = 0xA0;
+pub(super) const ATTRACT_SCORING_RESCUE_LASER_TICKS: u16 = 0x15;
+pub(super) const ATTRACT_SCORING_RESCUE_FALL_TICKS: u16 = 0x2D * 2;
+pub(super) const ATTRACT_SCORING_RESCUE_SCORE_TICKS: u16 = 0x50;
+pub(super) const ATTRACT_SCORING_RESCUE_RETURN_TICKS: u16 = 0x60;
+pub(super) const ATTRACT_SCORING_LEGEND_APPROACH_TICKS: u16 = 0x5F;
+pub(super) const ATTRACT_SCORING_LEGEND_LASER_TICKS: u16 = 0x17;
+pub(super) const ATTRACT_SCORING_LEGEND_TRANSFER_TICKS: u16 = 0x20;
+pub(super) const ATTRACT_SCORING_LEGEND_REVEAL_TICKS: u16 = 0x20;
+pub(super) const ATTRACT_SCORING_LEGEND_ENTRY_TICKS: u16 = ATTRACT_SCORING_LEGEND_APPROACH_TICKS
     + ATTRACT_SCORING_LEGEND_LASER_TICKS
     + ATTRACT_SCORING_LEGEND_TRANSFER_TICKS
     + ATTRACT_SCORING_LEGEND_REVEAL_TICKS;
-const ATTRACT_SCORING_LEGEND_HOLD_TICKS: u16 = 0xFF + 0xFF;
-const ATTRACT_SCORING_LEGEND_ENTRY_COUNT: u16 = 6;
-const ATTRACT_SCORING_RESCUE_SEQUENCE_TICKS: u16 = ATTRACT_SCORING_RESCUE_DESCENT_TICKS
+pub(super) const ATTRACT_SCORING_LEGEND_HOLD_TICKS: u16 = 0xFF + 0xFF;
+pub(super) const ATTRACT_SCORING_LEGEND_ENTRY_COUNT: u16 = 6;
+pub(super) const ATTRACT_SCORING_RESCUE_SEQUENCE_TICKS: u16 = ATTRACT_SCORING_RESCUE_DESCENT_TICKS
     + ATTRACT_SCORING_RESCUE_ASCENT_TICKS
     + ATTRACT_SCORING_RESCUE_LASER_TICKS
     + ATTRACT_SCORING_RESCUE_FALL_TICKS
     + ATTRACT_SCORING_RESCUE_SCORE_TICKS
     + ATTRACT_SCORING_RESCUE_RETURN_TICKS;
-const ATTRACT_SCORING_DEMO_TOTAL_TICKS: u16 = ATTRACT_SCORING_RESCUE_SEQUENCE_TICKS
+pub(super) const ATTRACT_SCORING_DEMO_TOTAL_TICKS: u16 = ATTRACT_SCORING_RESCUE_SEQUENCE_TICKS
     + (ATTRACT_SCORING_LEGEND_ENTRY_TICKS * ATTRACT_SCORING_LEGEND_ENTRY_COUNT)
     + ATTRACT_SCORING_LEGEND_HOLD_TICKS;
-const ATTRACT_CYCLE_STEPS: u16 =
+pub(super) const ATTRACT_CYCLE_STEPS: u16 =
     ATTRACT_SCORING_SEQUENCE_START_STEP + ATTRACT_SCORING_DEMO_TOTAL_TICKS;
-const COLTAB_COLOR_BYTES: [u8; 37] = [
+pub(super) const COLTAB_COLOR_BYTES: [u8; 37] = [
     0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x37, 0x2F, 0x27, 0x1F, 0x17, 0x47, 0x47, 0x87,
     0x87, 0xC7, 0xC7, 0xC6, 0xC5, 0xCC, 0xCB, 0xCA, 0xDA, 0xE8, 0xF8, 0xF9, 0xFA, 0xFB, 0xFD, 0xFF,
     0xBF, 0x3F, 0x3E, 0x3C, 0x00,
 ];
-const TIE_COLOR_BYTES: [u8; 9] = [0x81, 0x81, 0x2F, 0x81, 0x2F, 0x07, 0x2F, 0x81, 0x07];
-const COLTAB_ACTIVE_BYTES: usize = COLTAB_COLOR_BYTES.len() - 1;
-const ATTRACT_TITLE_REFERENCE_SAMPLE_INTERVAL_STEPS: u16 = 8;
-const ATTRACT_TITLE_REFERENCE_LOGO_COLOR_BYTES: [u8; 59] = [
+pub(super) const TIE_COLOR_BYTES: [u8; 9] = [0x81, 0x81, 0x2F, 0x81, 0x2F, 0x07, 0x2F, 0x81, 0x07];
+pub(super) const COLTAB_ACTIVE_BYTES: usize = COLTAB_COLOR_BYTES.len() - 1;
+pub(super) const ATTRACT_TITLE_REFERENCE_SAMPLE_INTERVAL_STEPS: u16 = 8;
+pub(super) const ATTRACT_TITLE_REFERENCE_LOGO_COLOR_BYTES: [u8; 59] = [
     0x00, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x2F, 0x07, 0x07, 0x07, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x2F,
     0x07, 0x07, 0x07, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x2F, 0x07, 0x07, 0x07, 0x07, 0x2F, 0x2F, 0x07,
     0x07, 0x07, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x07, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x07, 0x2F, 0x2F,
     0x07, 0x07, 0x07, 0x07, 0x2F, 0x07, 0x07, 0x07, 0x07, 0x07, 0x2F,
 ];
-const ATTRACT_WILLIAMS_TIE_COLOR_PRIME_STEPS: u16 = 6;
-const ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_STEPS: u16 = 6;
-const ATTRACT_WILLIAMS_TIE_COLOR_SLOT_OFFSET: usize = 2;
-const SCANNER_TERRAIN_PIXEL_SIZE: [f32; 2] = [1.0, 1.0];
-const SCANNER_TERRAIN_TINT: Color = Color::from_rgba(174, 81, 0, 255);
-const WAVE_LANDSCAPE_COLOR_BYTES: [u8; 8] = [0x81, 0x28, 0x07, 0x2F, 0x3F, 0x87, 0x15, 0x00];
-const WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255];
-const WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255];
-const NORMAL_PALETTE_BYTES: [u8; 16] = [
+pub(super) const ATTRACT_WILLIAMS_TIE_COLOR_PRIME_STEPS: u16 = 6;
+pub(super) const ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_STEPS: u16 = 6;
+pub(super) const ATTRACT_WILLIAMS_TIE_COLOR_SLOT_OFFSET: usize = 2;
+pub(super) const SCANNER_TERRAIN_PIXEL_SIZE: [f32; 2] = [1.0, 1.0];
+pub(super) const SCANNER_TERRAIN_TINT: Color = Color::from_rgba(174, 81, 0, 255);
+pub(super) const WAVE_LANDSCAPE_COLOR_BYTES: [u8; 8] =
+    [0x81, 0x28, 0x07, 0x2F, 0x3F, 0x87, 0x15, 0x00];
+pub(super) const WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255];
+pub(super) const WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255];
+pub(super) const NORMAL_PALETTE_BYTES: [u8; 16] = [
     0x00, 0x00, 0x07, 0x28, 0x2F, 0x81, 0xA4, 0x15, 0xC7, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
-const TERRAIN_TDATA_BYTES: usize = 0x100;
-const TERRAIN_PATTERN_STREAM_BASE: u16 = 0xC350;
-const MAIN_TERRAIN_RECORD_BYTE_COUNT: usize = 0x180;
-const TERRAIN_FLAVOR_RECORDS: usize = 0x98;
-const TERRAIN_SCREEN_WORDS: usize = 0x98;
-const SCANNER_TERRAIN_RECORDS: usize = 0x40;
-const SCANNER_MINI_TERRAIN_RECORDS: usize = MAIN_TERRAIN_RECORD_BYTE_COUNT / 3;
-const TERRAIN_WORD_7007: u16 = 0x7007;
-const TERRAIN_WORD_0770: u16 = 0x0770;
-const TERRAIN_WORD_SIZE: [f32; 2] = [2.0, 2.0];
-const SCANNER_PROCESS_SLEEP_TICKS: [u8; 3] = [2, 2, 4];
-const SCANNER_SELECTED_MAP: u8 = 1;
-const SCANNER_OBJECT_BASE_SCREEN: u16 = 0x3008;
-const SCANNER_SCAN_CENTER_OFFSET: u16 = 0x6D40;
-const SCANNER_OBJECT_ERASE_START: u16 = 0xB05D;
-const SCANNER_PLAYER_BASE_SCREEN: u16 = 0x4B07;
-const SCANNER_PLAYER_BODY_WORD: u16 = 0x9099;
-const SCANNER_PLAYER_TAIL_BYTE: u8 = 0x90;
-const SCANNER_PLAYER_UPPER_BYTE: u8 = 0x09;
-const SCANNER_LANDER_COLOR_WORD: u16 = 0x4433;
-const SCANNER_HUMAN_COLOR_WORD: u16 = 0x6666;
+pub(super) const TERRAIN_TDATA_BYTES: usize = 0x100;
+pub(super) const TERRAIN_PATTERN_STREAM_BASE: u16 = 0xC350;
+pub(super) const MAIN_TERRAIN_RECORD_BYTE_COUNT: usize = 0x180;
+pub(super) const TERRAIN_FLAVOR_RECORDS: usize = 0x98;
+pub(super) const TERRAIN_SCREEN_WORDS: usize = 0x98;
+pub(super) const SCANNER_TERRAIN_RECORDS: usize = 0x40;
+pub(super) const SCANNER_MINI_TERRAIN_RECORDS: usize = MAIN_TERRAIN_RECORD_BYTE_COUNT / 3;
+pub(super) const TERRAIN_WORD_7007: u16 = 0x7007;
+pub(super) const TERRAIN_WORD_0770: u16 = 0x0770;
+pub(super) const TERRAIN_WORD_SIZE: [f32; 2] = [2.0, 2.0];
+pub(super) const SCANNER_PROCESS_SLEEP_TICKS: [u8; 3] = [2, 2, 4];
+pub(super) const SCANNER_SELECTED_MAP: u8 = 1;
+pub(super) const SCANNER_OBJECT_BASE_SCREEN: u16 = 0x3008;
+pub(super) const SCANNER_SCAN_CENTER_OFFSET: u16 = 0x6D40;
+pub(super) const SCANNER_OBJECT_ERASE_START: u16 = 0xB05D;
+pub(super) const SCANNER_PLAYER_BASE_SCREEN: u16 = 0x4B07;
+pub(super) const SCANNER_PLAYER_BODY_WORD: u16 = 0x9099;
+pub(super) const SCANNER_PLAYER_TAIL_BYTE: u8 = 0x90;
+pub(super) const SCANNER_PLAYER_UPPER_BYTE: u8 = 0x09;
+pub(super) const SCANNER_LANDER_COLOR_WORD: u16 = 0x4433;
+pub(super) const SCANNER_HUMAN_COLOR_WORD: u16 = 0x6666;
 pub(crate) const SCORE_POPUP_LIFETIME_TICKS: u8 = 50;
 pub(crate) const EXPLOSION_INITIAL_SIZE: u16 = 0x0100;
 pub(crate) const EXPLOSION_SIZE_DELTA: u16 = 0x00AA;
 pub(crate) const EXPLOSION_KILL_SIZE_HIGH: u8 = 0x30;
 pub(crate) const EXPLOSION_LIFETIME_STEPS: u8 = 73;
-const APPEARANCE_INITIAL_SIZE: u16 = 0xAD00;
-const APPEARANCE_FINAL_SIZE: u16 = 0x8000;
+pub(super) const APPEARANCE_INITIAL_SIZE: u16 = 0xAD00;
+pub(super) const APPEARANCE_FINAL_SIZE: u16 = 0x8000;
 pub(crate) const TERRAIN_BLOW_STATUS_BIT: u8 = 0x02;
 pub(crate) const TERRAIN_BLOW_ITERATION_LIMIT: u8 = 16;
 pub(crate) const TERRAIN_BLOW_EXPLOSIONS_PER_PASS: u8 = 2;
@@ -111,9 +109,7 @@ pub(crate) const TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES: u16 = 0x98;
 pub(crate) const TERRAIN_BLOW_SCANNER_ERASE_ENTRIES: u16 = 0x40;
 pub(crate) const TERRAIN_BLOW_COMPLETE_STEP: u16 = 111;
 pub(crate) const TERRAIN_EXPLOSION_LIFETIME_STEPS: u8 = 81;
-const TERRAIN_EXPLOSION_GROWTH_STEPS: [u8;
-    TERRAIN_EXPLOSION_LIFETIME_STEPS
-    as usize] = [
+pub(super) const TERRAIN_EXPLOSION_GROWTH_STEPS: [u8; TERRAIN_EXPLOSION_LIFETIME_STEPS as usize] = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 22, 23, 24,
     25, 26, 26, 27, 28, 29, 29, 30, 31, 31, 32, 32, 33, 34, 34, 35, 36, 36, 37, 37, 38, 39, 39, 40,
     41, 41, 42, 43, 43, 44, 44, 45, 45, 46, 47, 47, 48, 48, 49, 49, 50, 50, 51, 51, 52, 52, 52, 53,
@@ -143,7 +139,7 @@ pub(crate) const TERRAIN_BLOW_EXPLOSION_BIRTHS: [(u16, ScreenPosition); 17] = [
 pub(crate) const TERRAIN_BLOW_FLASH_COLOR_BYTES: [u8; 16] = [
     0xC6, 0xCA, 0xC6, 0xC7, 0xF8, 0x87, 0x38, 0xC5, 0xE8, 0x47, 0xFA, 0x27, 0x38, 0x47, 0xCC, 0xDA,
 ];
-const TERRAIN_BLOW_FLASH_WINDOWS: [(u16, u16, u8); 16] = [
+pub(super) const TERRAIN_BLOW_FLASH_WINDOWS: [(u16, u16, u8); 16] = [
     (2, 3, 0xC6),
     (6, 7, 0xCA),
     (10, 11, 0xC6),
@@ -477,7 +473,10 @@ impl WaveProfileSnapshot {
             pods: wave_table_u8(crate::arcade_assets::WaveMetric::Pods, wave),
             mutants: wave_table_u8(crate::arcade_assets::WaveMetric::Mutants, wave),
             swarmers: wave_table_u8(crate::arcade_assets::WaveMetric::Swarmers, wave),
-            lander_x_velocity: wave_table_u8(crate::arcade_assets::WaveMetric::LanderXVelocity, wave),
+            lander_x_velocity: wave_table_u8(
+                crate::arcade_assets::WaveMetric::LanderXVelocity,
+                wave,
+            ),
             lander_y_velocity: wave_table_u16(
                 crate::arcade_assets::WaveMetric::LanderYVelocityHigh,
                 crate::arcade_assets::WaveMetric::LanderYVelocityLow,
@@ -489,20 +488,41 @@ impl WaveProfileSnapshot {
                 crate::arcade_assets::WaveMetric::MutantYVelocityLow,
                 wave,
             ),
-            mutant_x_velocity: wave_table_u8(crate::arcade_assets::WaveMetric::MutantXVelocity, wave),
-            swarmer_x_velocity: wave_table_u8(crate::arcade_assets::WaveMetric::SwarmerXVelocity, wave),
+            mutant_x_velocity: wave_table_u8(
+                crate::arcade_assets::WaveMetric::MutantXVelocity,
+                wave,
+            ),
+            swarmer_x_velocity: wave_table_u8(
+                crate::arcade_assets::WaveMetric::SwarmerXVelocity,
+                wave,
+            ),
             wave_time: wave_table_u32(crate::arcade_assets::WaveMetric::WaveTime, wave),
             wave_size: wave_table_u8(crate::arcade_assets::WaveMetric::WaveSize, wave),
-            lander_shot_time: wave_table_u32(crate::arcade_assets::WaveMetric::LanderShotTime, wave),
-            bomber_x_velocity: wave_table_u8(crate::arcade_assets::WaveMetric::BomberXVelocity, wave),
-            mutant_shot_time: wave_table_u32(crate::arcade_assets::WaveMetric::MutantShotTime, wave),
-            swarmer_shot_time: wave_table_u32(crate::arcade_assets::WaveMetric::SwarmerShotTime, wave),
+            lander_shot_time: wave_table_u32(
+                crate::arcade_assets::WaveMetric::LanderShotTime,
+                wave,
+            ),
+            bomber_x_velocity: wave_table_u8(
+                crate::arcade_assets::WaveMetric::BomberXVelocity,
+                wave,
+            ),
+            mutant_shot_time: wave_table_u32(
+                crate::arcade_assets::WaveMetric::MutantShotTime,
+                wave,
+            ),
+            swarmer_shot_time: wave_table_u32(
+                crate::arcade_assets::WaveMetric::SwarmerShotTime,
+                wave,
+            ),
             swarmer_acceleration_mask: wave_table_u8(
                 crate::arcade_assets::WaveMetric::SwarmerAccelerationMask,
                 wave,
             ),
             baiter_delay: wave_table_u32(crate::arcade_assets::WaveMetric::BaiterDelay, wave),
-            baiter_shot_time: wave_table_u32(crate::arcade_assets::WaveMetric::BaiterShotTime, wave),
+            baiter_shot_time: wave_table_u32(
+                crate::arcade_assets::WaveMetric::BaiterShotTime,
+                wave,
+            ),
             baiter_seek_probability: wave_table_u8(
                 crate::arcade_assets::WaveMetric::BaiterSeekProbability,
                 wave,
@@ -511,14 +531,14 @@ impl WaveProfileSnapshot {
     }
 }
 
-const DEFAULT_DIFFICULTY_INITIAL: u8 = 5;
-const DEFAULT_DIFFICULTY_CEILING: u8 = 15;
+pub(super) const DEFAULT_DIFFICULTY_INITIAL: u8 = 5;
+pub(super) const DEFAULT_DIFFICULTY_CEILING: u8 = 15;
 
-fn wave_table_u8(metric: crate::arcade_assets::WaveMetric, wave: u8) -> u8 {
+pub(super) fn wave_table_u8(metric: crate::arcade_assets::WaveMetric, wave: u8) -> u8 {
     u8::try_from(wave_table_value(metric, wave)).expect("wave profile value should fit u8")
 }
 
-fn wave_table_u16(
+pub(super) fn wave_table_u16(
     high_metric: crate::arcade_assets::WaveMetric,
     low_metric: crate::arcade_assets::WaveMetric,
     wave: u8,
@@ -529,11 +549,12 @@ fn wave_table_u16(
     ])
 }
 
-fn wave_table_u32(metric: crate::arcade_assets::WaveMetric, wave: u8) -> u32 {
-    u32::try_from(wave_table_value(metric, wave)).expect("wave profile value should be non-negative")
+pub(super) fn wave_table_u32(metric: crate::arcade_assets::WaveMetric, wave: u8) -> u32 {
+    u32::try_from(wave_table_value(metric, wave))
+        .expect("wave profile value should be non-negative")
 }
 
-fn wave_table_value(metric: crate::arcade_assets::WaveMetric, wave: u8) -> i32 {
+pub(super) fn wave_table_value(metric: crate::arcade_assets::WaveMetric, wave: u8) -> i32 {
     crate::arcade_assets::wave_metric_value(
         metric,
         wave,
@@ -541,7 +562,7 @@ fn wave_table_value(metric: crate::arcade_assets::WaveMetric, wave: u8) -> i32 {
     )
 }
 
-fn wave_tuning_difficulty_iterations(wave: u8) -> u16 {
+pub(super) fn wave_tuning_difficulty_iterations(wave: u8) -> u16 {
     let wave_delta = wave.saturating_sub(4);
     let pre_ceiling = DEFAULT_DIFFICULTY_INITIAL.saturating_add(wave_delta);
     u16::from(pre_ceiling.min(DEFAULT_DIFFICULTY_CEILING))

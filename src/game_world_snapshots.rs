@@ -1,3 +1,7 @@
+use crate::{ScreenPosition, ScreenVelocity, SpriteId};
+
+use super::*;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnemyKind {
     Lander,
@@ -9,7 +13,7 @@ pub enum EnemyKind {
 }
 
 impl EnemyKind {
-    const fn object_category(self) -> ObjectEvidenceCategory {
+    pub(super) const fn object_category(self) -> ObjectEvidenceCategory {
         match self {
             Self::Lander => ObjectEvidenceCategory::Lander,
             Self::Mutant => ObjectEvidenceCategory::Mutant,
@@ -65,7 +69,7 @@ impl ActorDebugMotion {
         self.y_velocity
     }
 
-    fn world_position_words(self, position: ScreenPosition) -> (u16, u16) {
+    pub(super) fn world_position_words(self, position: ScreenPosition) -> (u16, u16) {
         world_position_words(position, self.x_fraction, self.y_fraction)
     }
 
@@ -93,7 +97,7 @@ impl EnemySnapshot {
         }
     }
 
-    fn object_bitmap_descriptor(self) -> ObjectBitmapDescriptor {
+    pub(super) fn object_bitmap_descriptor(self) -> ObjectBitmapDescriptor {
         match self.kind {
             EnemyKind::Lander => lander_object_bitmap_descriptor(
                 self.lander_actor_state
@@ -116,7 +120,7 @@ impl EnemySnapshot {
         }
     }
 
-    fn world_position_words(self) -> (u16, u16) {
+    pub(super) fn world_position_words(self) -> (u16, u16) {
         match self.kind {
             EnemyKind::Lander => self
                 .lander_actor_state
@@ -145,7 +149,7 @@ impl EnemySnapshot {
         }
     }
 
-    fn motion_velocity_words(self) -> (u16, u16) {
+    pub(super) fn motion_velocity_words(self) -> (u16, u16) {
         match self.kind {
             EnemyKind::Lander => self
                 .lander_actor_state
@@ -232,8 +236,8 @@ pub struct GameRngSnapshot {
     pub lseed: u8,
 }
 
-const GAME_RNG_DEFAULT_HSEED: u8 = 0xA5;
-const GAME_RNG_DEFAULT_LSEED: u8 = 0x5A;
+pub(super) const GAME_RNG_DEFAULT_HSEED: u8 = 0xA5;
+pub(super) const GAME_RNG_DEFAULT_LSEED: u8 = 0x5A;
 
 impl Default for GameRngSnapshot {
     fn default() -> Self {
@@ -266,19 +270,15 @@ pub struct EnemyProjectileSnapshot {
 }
 
 impl EnemyProjectileSnapshot {
-    const fn bomb_object_bitmap_name(self) -> &'static str {
+    pub(super) const fn bomb_object_bitmap_name(self) -> &'static str {
         ENEMY_BOMB_OBJECT_BITMAP_NAME
     }
 
-    fn world_position_words(self) -> (u16, u16) {
-        world_position_words(
-            self.position,
-            self.actor_x_fraction,
-            self.actor_y_fraction,
-        )
+    pub(super) fn world_position_words(self) -> (u16, u16) {
+        world_position_words(self.position, self.actor_x_fraction, self.actor_y_fraction)
     }
 
-    const fn motion_velocity_words(self) -> (u16, u16) {
+    pub(super) const fn motion_velocity_words(self) -> (u16, u16) {
         (self.actor_x_velocity, self.actor_y_velocity)
     }
 }
@@ -293,7 +293,7 @@ pub struct EnemyReserveSnapshot {
 }
 
 impl EnemyReserveSnapshot {
-    fn total(self) -> u8 {
+    pub(super) fn total(self) -> u8 {
         self.landers
             .saturating_add(self.bombers)
             .saturating_add(self.pods)
@@ -301,7 +301,7 @@ impl EnemyReserveSnapshot {
             .saturating_add(self.swarmers)
     }
 
-    fn family_counts(self) -> [(EnemyKind, u8); 5] {
+    pub(super) fn family_counts(self) -> [(EnemyKind, u8); 5] {
         [
             (EnemyKind::Lander, self.landers),
             (EnemyKind::Bomber, self.bombers),
@@ -338,7 +338,7 @@ impl HumanSnapshot {
         }
     }
 
-    fn world_position_words(self) -> (u16, u16) {
+    pub(super) fn world_position_words(self) -> (u16, u16) {
         world_position_words(
             self.position,
             self.actor_x_fraction,
@@ -346,7 +346,7 @@ impl HumanSnapshot {
         )
     }
 
-    fn motion_velocity_words(self) -> (u16, u16) {
+    pub(super) fn motion_velocity_words(self) -> (u16, u16) {
         (0, self.actor_fall_velocity)
     }
 }
@@ -359,11 +359,11 @@ pub struct ProjectileSnapshot {
 }
 
 impl ProjectileSnapshot {
-    fn world_position_words(self) -> (u16, u16) {
+    pub(super) fn world_position_words(self) -> (u16, u16) {
         world_position_words(self.position, 0, 0)
     }
 
-    fn motion_velocity_words(self) -> (u16, u16) {
+    pub(super) fn motion_velocity_words(self) -> (u16, u16) {
         fixed_point_velocity_words(self.velocity)
     }
 }
@@ -707,7 +707,7 @@ impl Default for ScannerRadarSnapshot {
     }
 }
 
-fn world_vector_word(vector: WorldVector) -> u16 {
+pub(super) fn world_vector_word(vector: WorldVector) -> u16 {
     (vector.subpixels() >> 8) as u16
 }
 
@@ -795,8 +795,8 @@ pub enum ScorePopupKind {
     Points500,
 }
 
-const SCORE_POPUP_250_POINTS: u16 = 250;
-const SCORE_POPUP_500_POINTS: u16 = 500;
+pub(super) const SCORE_POPUP_250_POINTS: u16 = 250;
+pub(super) const SCORE_POPUP_500_POINTS: u16 = 500;
 
 impl ScorePopupKind {
     const fn value(self) -> u16 {
@@ -832,7 +832,7 @@ impl ScorePopupSnapshot {
         }
     }
 
-    fn expanded_object_detail(self) -> ExpandedObjectDetailSnapshot {
+    pub(super) fn expanded_object_detail(self) -> ExpandedObjectDetailSnapshot {
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::ScorePopup,
             object_bitmap_size: Some((6, 6)),
@@ -855,12 +855,12 @@ pub struct EnemyAppearanceSnapshot {
 }
 
 impl EnemyAppearanceSnapshot {
-    fn matches_enemy(self, enemy: EnemySnapshot) -> bool {
+    pub(super) fn matches_enemy(self, enemy: EnemySnapshot) -> bool {
         self.position == enemy_appearance_position(enemy)
             && self.mapped_sprite == enemy.object_bitmap_descriptor().mapped_sprite
     }
 
-    fn expanded_object_detail(self) -> ExpandedObjectDetailSnapshot {
+    pub(super) fn expanded_object_detail(self) -> ExpandedObjectDetailSnapshot {
         let (width, height) = self.object_bitmap_size;
         ExpandedObjectDetailSnapshot {
             kind: ExpandedObjectKind::Appearance,

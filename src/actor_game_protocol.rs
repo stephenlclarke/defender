@@ -1,10 +1,12 @@
+use super::*;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct CollisionBody {
-    owner: ActorId,
-    kind: ActorKind,
-    position: Point,
-    bounds: Rect,
-    actor_state: ActorInternalState,
+pub(in crate::actor_game) struct CollisionBody {
+    pub(in crate::actor_game) owner: ActorId,
+    pub(in crate::actor_game) kind: ActorKind,
+    pub(in crate::actor_game) position: Point,
+    pub(in crate::actor_game) bounds: Rect,
+    pub(in crate::actor_game) actor_state: ActorInternalState,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,7 +18,7 @@ pub struct ActorSnapshot {
     pub direction: Option<Direction>,
     pub bounds: Option<Rect>,
     pub alive: bool,
-    actor_state: ActorInternalState,
+    pub(in crate::actor_game) actor_state: ActorInternalState,
 }
 
 impl ActorSnapshot {
@@ -28,13 +30,11 @@ impl ActorSnapshot {
         self.actor_subpixels().map(ActorSubpixels::x)
     }
 
-    pub(crate) fn enemy_projectile_actor_state(
-        &self,
-    ) -> Option<EnemyProjectileActorState> {
+    pub(crate) fn enemy_projectile_actor_state(&self) -> Option<EnemyProjectileActorState> {
         self.actor_state.as_enemy_projectile()
     }
 
-    fn collision_body(&self) -> Option<CollisionBody> {
+    pub(in crate::actor_game) fn collision_body(&self) -> Option<CollisionBody> {
         Some(CollisionBody {
             owner: self.id,
             kind: self.kind,
@@ -53,7 +53,7 @@ pub enum HumanMode {
 }
 
 impl HumanMode {
-    const fn sprite(self) -> SpriteKey {
+    pub(in crate::actor_game) const fn sprite(self) -> SpriteKey {
         match self {
             Self::Grounded => SpriteKey::Human,
             Self::Falling { .. } => SpriteKey::HumanFalling,
@@ -254,20 +254,23 @@ impl StepPrompt {
             .map(|snapshot| snapshot.velocity)
     }
 
-    fn snapshot(&self, id: ActorId) -> Option<&ActorSnapshot> {
+    pub(in crate::actor_game) fn snapshot(&self, id: ActorId) -> Option<&ActorSnapshot> {
         self.snapshots
             .iter()
             .find(|snapshot| snapshot.id == id && snapshot.alive)
     }
 
-    fn nearest_human(&self, position: Point) -> Option<&ActorSnapshot> {
+    pub(in crate::actor_game) fn nearest_human(&self, position: Point) -> Option<&ActorSnapshot> {
         self.snapshots
             .iter()
             .filter(|snapshot| snapshot.kind == ActorKind::Human && snapshot.alive)
             .min_by_key(|snapshot| manhattan_distance(position, snapshot.position))
     }
 
-    fn target_human(&self, target_slot_index: usize) -> Option<&ActorSnapshot> {
+    pub(in crate::actor_game) fn target_human(
+        &self,
+        target_slot_index: usize,
+    ) -> Option<&ActorSnapshot> {
         self.snapshots.iter().find(|snapshot| {
             snapshot.kind == ActorKind::Human
                 && snapshot.alive
@@ -275,22 +278,20 @@ impl StepPrompt {
                 && snapshot
                     .actor_state
                     .as_human()
-                    .is_some_and(|actor_state| {
-                        actor_state.target_slot_index == target_slot_index
-                    })
+                    .is_some_and(|actor_state| actor_state.target_slot_index == target_slot_index)
         })
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ActorReply {
-    id: ActorId,
-    snapshot: ActorSnapshot,
-    commands: Vec<GameCommand>,
-    draws: Vec<DrawCommand>,
+pub(in crate::actor_game) struct ActorReply {
+    pub(in crate::actor_game) id: ActorId,
+    pub(in crate::actor_game) snapshot: ActorSnapshot,
+    pub(in crate::actor_game) commands: Vec<GameCommand>,
+    pub(in crate::actor_game) draws: Vec<DrawCommand>,
 }
 
-trait AssetActor: Send + 'static {
+pub(in crate::actor_game) trait AssetActor: Send + 'static {
     fn id(&self) -> ActorId;
 
     fn update(&mut self, prompt: &StepPrompt) -> ActorReply;
@@ -299,7 +300,7 @@ trait AssetActor: Send + 'static {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ActorDriverCommand {
+pub(in crate::actor_game) enum ActorDriverCommand {
     AdjustLanderFireTimer {
         target_human_index: usize,
         x_velocity: u16,
@@ -307,20 +308,20 @@ enum ActorDriverCommand {
     },
 }
 
-enum ActorRequest {
+pub(in crate::actor_game) enum ActorRequest {
     Prompt(Box<StepPrompt>),
     DriverCommand(ActorDriverCommand),
     Stop,
 }
 
-struct ThreadedAsset {
-    sender: Sender<ActorRequest>,
-    receiver: Receiver<ActorReply>,
-    handle: Option<JoinHandle<()>>,
+pub(in crate::actor_game) struct ThreadedAsset {
+    pub(in crate::actor_game) sender: Sender<ActorRequest>,
+    pub(in crate::actor_game) receiver: Receiver<ActorReply>,
+    pub(in crate::actor_game) handle: Option<JoinHandle<()>>,
 }
 
 impl ThreadedAsset {
-    fn spawn(actor: impl AssetActor) -> Self {
+    pub(in crate::actor_game) fn spawn(actor: impl AssetActor) -> Self {
         let (request_sender, request_receiver) = mpsc::channel();
         let (reply_sender, reply_receiver) = mpsc::channel();
         let handle = thread::spawn(move || run_actor_thread(actor, request_receiver, reply_sender));
@@ -331,14 +332,14 @@ impl ThreadedAsset {
         }
     }
 
-    fn prompt(&self, prompt: StepPrompt) -> Option<ActorReply> {
+    pub(in crate::actor_game) fn prompt(&self, prompt: StepPrompt) -> Option<ActorReply> {
         self.sender
             .send(ActorRequest::Prompt(Box::new(prompt)))
             .ok()?;
         self.receiver.recv().ok()
     }
 
-    fn apply_driver_command(&self, command: ActorDriverCommand) {
+    pub(in crate::actor_game) fn apply_driver_command(&self, command: ActorDriverCommand) {
         let _ = self.sender.send(ActorRequest::DriverCommand(command));
     }
 }
@@ -352,7 +353,7 @@ impl Drop for ThreadedAsset {
     }
 }
 
-fn run_actor_thread(
+pub(in crate::actor_game) fn run_actor_thread(
     mut actor: impl AssetActor,
     receiver: Receiver<ActorRequest>,
     sender: Sender<ActorReply>,
@@ -494,7 +495,7 @@ impl ActorStateBridge {
     }
 }
 
-fn clean_phase(phase: Phase) -> GamePhase {
+pub(in crate::actor_game) fn clean_phase(phase: Phase) -> GamePhase {
     match phase {
         Phase::Attract => GamePhase::Attract,
         Phase::Playing => GamePhase::Playing,
@@ -503,11 +504,13 @@ fn clean_phase(phase: Phase) -> GamePhase {
     }
 }
 
-fn clean_wave(wave: u16) -> u8 {
+pub(in crate::actor_game) fn clean_wave(wave: u16) -> u8 {
     u8::try_from(wave.max(1)).unwrap_or(u8::MAX)
 }
 
-fn actor_wave_profile_for_report(report: &StepReport) -> WaveProfileSnapshot {
+pub(in crate::actor_game) fn actor_wave_profile_for_report(
+    report: &StepReport,
+) -> WaveProfileSnapshot {
     let mut profile = WaveProfileSnapshot::for_wave(clean_wave(report.wave));
     let wave_tuning = report.wave_tuning;
     profile.landers = wave_tuning.landers;
@@ -533,7 +536,9 @@ fn actor_wave_profile_for_report(report: &StepReport) -> WaveProfileSnapshot {
     profile
 }
 
-fn attract_snapshot_for_report(report: &StepReport) -> AttractPresentationSnapshot {
+pub(in crate::actor_game) fn attract_snapshot_for_report(
+    report: &StepReport,
+) -> AttractPresentationSnapshot {
     if report.phase == Phase::Attract {
         AttractPresentationSnapshot::for_page_step(u16::try_from(report.step).unwrap_or(u16::MAX))
     } else {
@@ -541,7 +546,7 @@ fn attract_snapshot_for_report(report: &StepReport) -> AttractPresentationSnapsh
     }
 }
 
-fn player_snapshot_for_report(report: &StepReport) -> PlayerSnapshot {
+pub(in crate::actor_game) fn player_snapshot_for_report(report: &StepReport) -> PlayerSnapshot {
     let snapshot = report
         .snapshots
         .iter()
@@ -564,14 +569,14 @@ fn player_snapshot_for_report(report: &StepReport) -> PlayerSnapshot {
     }
 }
 
-fn clean_direction(direction: Direction) -> CleanDirection {
+pub(in crate::actor_game) fn clean_direction(direction: Direction) -> CleanDirection {
     match direction {
         Direction::Left => CleanDirection::Left,
         Direction::Right => CleanDirection::Right,
     }
 }
 
-fn player_direction_for_report(report: &StepReport) -> CleanDirection {
+pub(in crate::actor_game) fn player_direction_for_report(report: &StepReport) -> CleanDirection {
     report
         .draws
         .iter()
@@ -584,7 +589,9 @@ fn player_direction_for_report(report: &StepReport) -> CleanDirection {
         .unwrap_or(CleanDirection::Right)
 }
 
-fn high_score_tables_for_report(report: &StepReport) -> HighScoreTablesSnapshot {
+pub(in crate::actor_game) fn high_score_tables_for_report(
+    report: &StepReport,
+) -> HighScoreTablesSnapshot {
     let entries = hall_score_entries(&report.high_scores);
     HighScoreTablesSnapshot {
         all_time: entries,
@@ -592,7 +599,9 @@ fn high_score_tables_for_report(report: &StepReport) -> HighScoreTablesSnapshot 
     }
 }
 
-fn high_score_entry_for_report(report: &StepReport) -> Option<HighScoreEntrySnapshot> {
+pub(in crate::actor_game) fn high_score_entry_for_report(
+    report: &StepReport,
+) -> Option<HighScoreEntrySnapshot> {
     if report.phase != Phase::HighScoreEntry {
         return None;
     }
@@ -607,7 +616,9 @@ fn high_score_entry_for_report(report: &StepReport) -> Option<HighScoreEntrySnap
         })
 }
 
-fn game_over_snapshot_for_report(report: &StepReport) -> GameOverSnapshot {
+pub(in crate::actor_game) fn game_over_snapshot_for_report(
+    report: &StepReport,
+) -> GameOverSnapshot {
     if let Some(remaining) = report.player_death_sleep_remaining {
         return GameOverSnapshot {
             player_death_sleep_remaining: Some(remaining),
@@ -634,7 +645,7 @@ fn game_over_snapshot_for_report(report: &StepReport) -> GameOverSnapshot {
     }
 }
 
-fn world_snapshot_for_report(report: &StepReport) -> WorldSnapshot {
+pub(in crate::actor_game) fn world_snapshot_for_report(report: &StepReport) -> WorldSnapshot {
     if report.player_start.is_some() {
         return WorldSnapshot::default();
     }
@@ -663,7 +674,9 @@ fn world_snapshot_for_report(report: &StepReport) -> WorldSnapshot {
     world
 }
 
-fn actor_playfield_terrain_segments(report: &StepReport) -> Vec<TerrainSegment> {
+pub(in crate::actor_game) fn actor_playfield_terrain_segments(
+    report: &StepReport,
+) -> Vec<TerrainSegment> {
     if report.phase != Phase::Playing || report.terrain_blow.is_some() {
         return Vec::new();
     }
@@ -671,16 +684,16 @@ fn actor_playfield_terrain_segments(report: &StepReport) -> Vec<TerrainSegment> 
     playfield_terrain_segments()
 }
 
-fn playfield_terrain_segments() -> Vec<TerrainSegment> {
+pub(in crate::actor_game) fn playfield_terrain_segments() -> Vec<TerrainSegment> {
     PLAYFIELD_TERRAIN_SEGMENTS.to_vec()
 }
 
-fn actor_human_walk_target_y(position_x: i16, offset: u8) -> Option<i16> {
+pub(in crate::actor_game) fn actor_human_walk_target_y(position_x: i16, offset: u8) -> Option<i16> {
     actor_playfield_terrain_altitude_at_x(position_x)
         .map(|altitude| i16::from(altitude.wrapping_add(offset).min(HUMAN_MAX_TARGET_Y)))
 }
 
-fn actor_playfield_terrain_altitude_at_x(position_x: i16) -> Option<u8> {
+pub(in crate::actor_game) fn actor_playfield_terrain_altitude_at_x(position_x: i16) -> Option<u8> {
     let object_x = u16::from(u8::try_from(position_x).ok()?);
     playfield_terrain_segments()
         .into_iter()
@@ -692,7 +705,10 @@ fn actor_playfield_terrain_altitude_at_x(position_x: i16) -> Option<u8> {
         .map(|segment| segment.position.y)
 }
 
-fn actor_step_human_toward_walk_target_y(position_y: i16, target_y: i16) -> i16 {
+pub(in crate::actor_game) fn actor_step_human_toward_walk_target_y(
+    position_y: i16,
+    target_y: i16,
+) -> i16 {
     match position_y.cmp(&target_y) {
         Ordering::Less => position_y + 1,
         Ordering::Equal => position_y,
@@ -700,7 +716,9 @@ fn actor_step_human_toward_walk_target_y(position_y: i16, target_y: i16) -> i16 
     }
 }
 
-fn actor_enemies_for_report(report: &StepReport) -> Vec<CleanEnemySnapshot> {
+pub(in crate::actor_game) fn actor_enemies_for_report(
+    report: &StepReport,
+) -> Vec<CleanEnemySnapshot> {
     report
         .snapshots
         .iter()
@@ -708,7 +726,9 @@ fn actor_enemies_for_report(report: &StepReport) -> Vec<CleanEnemySnapshot> {
         .collect()
 }
 
-fn clean_enemy_snapshot(snapshot: &ActorSnapshot) -> Option<CleanEnemySnapshot> {
+pub(in crate::actor_game) fn clean_enemy_snapshot(
+    snapshot: &ActorSnapshot,
+) -> Option<CleanEnemySnapshot> {
     if snapshot.kind == ActorKind::Lander && snapshot.bounds.is_none() {
         return None;
     }
@@ -727,16 +747,33 @@ fn clean_enemy_snapshot(snapshot: &ActorSnapshot) -> Option<CleanEnemySnapshot> 
         screen_position(snapshot.position),
         screen_velocity(snapshot.velocity),
     );
-    enemy.lander_actor_state = snapshot.actor_state.as_lander().map(clean_lander_actor_state);
-    enemy.bomber_actor_state = snapshot.actor_state.as_bomber().map(clean_bomber_actor_state);
+    enemy.lander_actor_state = snapshot
+        .actor_state
+        .as_lander()
+        .map(clean_lander_actor_state);
+    enemy.bomber_actor_state = snapshot
+        .actor_state
+        .as_bomber()
+        .map(clean_bomber_actor_state);
     enemy.pod_actor_state = snapshot.actor_state.as_pod().map(clean_pod_actor_state);
-    enemy.swarmer_actor_state = snapshot.actor_state.as_swarmer().map(clean_swarmer_actor_state);
-    enemy.baiter_actor_state = snapshot.actor_state.as_baiter().map(clean_baiter_actor_state);
-    enemy.mutant_actor_state = snapshot.actor_state.as_mutant().map(clean_mutant_actor_state);
+    enemy.swarmer_actor_state = snapshot
+        .actor_state
+        .as_swarmer()
+        .map(clean_swarmer_actor_state);
+    enemy.baiter_actor_state = snapshot
+        .actor_state
+        .as_baiter()
+        .map(clean_baiter_actor_state);
+    enemy.mutant_actor_state = snapshot
+        .actor_state
+        .as_mutant()
+        .map(clean_mutant_actor_state);
     Some(enemy)
 }
 
-fn clean_lander_actor_state(actor_state: LanderActorState) -> LanderDebugStateSnapshot {
+pub(in crate::actor_game) fn clean_lander_actor_state(
+    actor_state: LanderActorState,
+) -> LanderDebugStateSnapshot {
     LanderDebugStateSnapshot {
         motion: ActorDebugMotion::new(
             actor_state.x_fraction(),
@@ -751,7 +788,9 @@ fn clean_lander_actor_state(actor_state: LanderActorState) -> LanderDebugStateSn
     }
 }
 
-fn clean_bomber_actor_state(actor_state: BomberActorState) -> BomberDebugStateSnapshot {
+pub(in crate::actor_game) fn clean_bomber_actor_state(
+    actor_state: BomberActorState,
+) -> BomberDebugStateSnapshot {
     BomberDebugStateSnapshot {
         motion: ActorDebugMotion::new(
             actor_state.x_fraction(),
@@ -766,7 +805,9 @@ fn clean_bomber_actor_state(actor_state: BomberActorState) -> BomberDebugStateSn
     }
 }
 
-fn clean_pod_actor_state(actor_state: PodActorState) -> PodDebugStateSnapshot {
+pub(in crate::actor_game) fn clean_pod_actor_state(
+    actor_state: PodActorState,
+) -> PodDebugStateSnapshot {
     PodDebugStateSnapshot {
         motion: ActorDebugMotion::new(
             actor_state.x_fraction(),
@@ -777,7 +818,9 @@ fn clean_pod_actor_state(actor_state: PodActorState) -> PodDebugStateSnapshot {
     }
 }
 
-fn clean_swarmer_actor_state(actor_state: SwarmerActorState) -> SwarmerDebugStateSnapshot {
+pub(in crate::actor_game) fn clean_swarmer_actor_state(
+    actor_state: SwarmerActorState,
+) -> SwarmerDebugStateSnapshot {
     SwarmerDebugStateSnapshot {
         motion: ActorDebugMotion::new(
             actor_state.x_fraction(),
@@ -792,7 +835,9 @@ fn clean_swarmer_actor_state(actor_state: SwarmerActorState) -> SwarmerDebugStat
     }
 }
 
-fn clean_baiter_actor_state(actor_state: BaiterActorState) -> BaiterDebugStateSnapshot {
+pub(in crate::actor_game) fn clean_baiter_actor_state(
+    actor_state: BaiterActorState,
+) -> BaiterDebugStateSnapshot {
     BaiterDebugStateSnapshot {
         motion: ActorDebugMotion::new(
             actor_state.x_fraction(),
@@ -806,7 +851,9 @@ fn clean_baiter_actor_state(actor_state: BaiterActorState) -> BaiterDebugStateSn
     }
 }
 
-fn clean_mutant_actor_state(actor_state: MutantActorState) -> MutantDebugStateSnapshot {
+pub(in crate::actor_game) fn clean_mutant_actor_state(
+    actor_state: MutantActorState,
+) -> MutantDebugStateSnapshot {
     MutantDebugStateSnapshot {
         motion: ActorDebugMotion::new(
             actor_state.x_fraction(),
@@ -822,7 +869,7 @@ fn clean_mutant_actor_state(actor_state: MutantActorState) -> MutantDebugStateSn
     }
 }
 
-const fn clean_actor_rng(actor_rng: ActorRngSnapshot) -> GameRngSnapshot {
+pub(in crate::actor_game) const fn clean_actor_rng(actor_rng: ActorRngSnapshot) -> GameRngSnapshot {
     GameRngSnapshot {
         seed: actor_rng.seed,
         hseed: actor_rng.hseed,
@@ -830,7 +877,9 @@ const fn clean_actor_rng(actor_rng: ActorRngSnapshot) -> GameRngSnapshot {
     }
 }
 
-fn actor_humans_for_report(report: &StepReport) -> Vec<CleanHumanSnapshot> {
+pub(in crate::actor_game) fn actor_humans_for_report(
+    report: &StepReport,
+) -> Vec<CleanHumanSnapshot> {
     report
         .snapshots
         .iter()
@@ -849,7 +898,9 @@ fn actor_humans_for_report(report: &StepReport) -> Vec<CleanHumanSnapshot> {
         .collect()
 }
 
-fn actor_projectiles_for_report(report: &StepReport) -> Vec<CleanProjectileSnapshot> {
+pub(in crate::actor_game) fn actor_projectiles_for_report(
+    report: &StepReport,
+) -> Vec<CleanProjectileSnapshot> {
     report
         .snapshots
         .iter()
@@ -865,7 +916,9 @@ fn actor_projectiles_for_report(report: &StepReport) -> Vec<CleanProjectileSnaps
         .collect()
 }
 
-fn actor_enemy_projectiles_for_report(report: &StepReport) -> Vec<CleanEnemyProjectileSnapshot> {
+pub(in crate::actor_game) fn actor_enemy_projectiles_for_report(
+    report: &StepReport,
+) -> Vec<CleanEnemyProjectileSnapshot> {
     report
         .snapshots
         .iter()
@@ -881,25 +934,32 @@ fn actor_enemy_projectiles_for_report(report: &StepReport) -> Vec<CleanEnemyProj
                 EnemyProjectileKind::Fireball
             },
             actor_x_fraction: snapshot
-                .actor_state.as_enemy_projectile()
+                .actor_state
+                .as_enemy_projectile()
                 .map_or(0, |actor_state| actor_state.x_fraction()),
             actor_y_fraction: snapshot
-                .actor_state.as_enemy_projectile()
+                .actor_state
+                .as_enemy_projectile()
                 .map_or(0, |actor_state| actor_state.y_fraction()),
             actor_x_velocity: snapshot
-                .actor_state.as_enemy_projectile()
+                .actor_state
+                .as_enemy_projectile()
                 .map_or(0, |actor_state| actor_state.x_velocity()),
             actor_y_velocity: snapshot
-                .actor_state.as_enemy_projectile()
+                .actor_state
+                .as_enemy_projectile()
                 .map_or(0, |actor_state| actor_state.y_velocity()),
             lifetime_ticks: snapshot
-                .actor_state.as_enemy_projectile()
+                .actor_state
+                .as_enemy_projectile()
                 .map_or(0, |actor_state| actor_state.lifetime_ticks),
         })
         .collect()
 }
 
-fn actor_explosions_for_report(report: &StepReport) -> Vec<CleanExplosionSnapshot> {
+pub(in crate::actor_game) fn actor_explosions_for_report(
+    report: &StepReport,
+) -> Vec<CleanExplosionSnapshot> {
     report
         .draws
         .iter()
@@ -922,7 +982,7 @@ fn actor_explosions_for_report(report: &StepReport) -> Vec<CleanExplosionSnapsho
         .collect()
 }
 
-fn clean_explosion_kind(kind: ExplosionKind) -> CleanExplosionKind {
+pub(in crate::actor_game) fn clean_explosion_kind(kind: ExplosionKind) -> CleanExplosionKind {
     match kind {
         ExplosionKind::Lander => CleanExplosionKind::Lander,
         ExplosionKind::Mutant => CleanExplosionKind::Mutant,
@@ -937,7 +997,9 @@ fn clean_explosion_kind(kind: ExplosionKind) -> CleanExplosionKind {
     }
 }
 
-fn actor_score_popups_for_report(report: &StepReport) -> Vec<CleanScorePopupSnapshot> {
+pub(in crate::actor_game) fn actor_score_popups_for_report(
+    report: &StepReport,
+) -> Vec<CleanScorePopupSnapshot> {
     report
         .draws
         .iter()
@@ -947,71 +1009,74 @@ fn actor_score_popups_for_report(report: &StepReport) -> Vec<CleanScorePopupSnap
                 SpriteKey::Score500 => CleanScorePopupKind::Points500,
                 _ => return None,
             };
-            Some(CleanScorePopupSnapshot::spawn(kind, screen_position(draw.position)))
+            Some(CleanScorePopupSnapshot::spawn(
+                kind,
+                screen_position(draw.position),
+            ))
         })
         .collect()
 }
 
-fn world_vector(value: i16) -> WorldVector {
+pub(in crate::actor_game) fn world_vector(value: i16) -> WorldVector {
     WorldVector::from_subpixels(i32::from(value) * WorldVector::SUBPIXELS_PER_PIXEL)
 }
 
-fn actor_world_word(value: u16) -> WorldVector {
+pub(in crate::actor_game) fn actor_world_word(value: u16) -> WorldVector {
     WorldVector::from_subpixels(i32::from(value) << 8)
 }
 
-fn scroll_background_right(background_left: u16, pixels: i16) -> u16 {
+pub(in crate::actor_game) fn scroll_background_right(background_left: u16, pixels: i16) -> u16 {
     background_left.wrapping_add(background_pixel_delta(pixels))
 }
 
-fn scroll_background_left(background_left: u16, pixels: i16) -> u16 {
+pub(in crate::actor_game) fn scroll_background_left(background_left: u16, pixels: i16) -> u16 {
     background_left.wrapping_sub(background_pixel_delta(pixels))
 }
 
-fn background_pixel_delta(pixels: i16) -> u16 {
+pub(in crate::actor_game) fn background_pixel_delta(pixels: i16) -> u16 {
     u16::try_from(pixels.max(0))
         .unwrap_or(u16::MAX)
         .wrapping_mul(BACKGROUND_WORD_PER_PIXEL)
 }
 
-fn screen_position(point: Point) -> ScreenPosition {
+pub(in crate::actor_game) fn screen_position(point: Point) -> ScreenPosition {
     ScreenPosition::new(screen_coordinate(point.x), screen_coordinate(point.y))
 }
 
-fn try_screen_position(point: Point) -> Option<ScreenPosition> {
+pub(in crate::actor_game) fn try_screen_position(point: Point) -> Option<ScreenPosition> {
     Some(ScreenPosition::new(
         u8::try_from(point.x).ok()?,
         u8::try_from(point.y).ok()?,
     ))
 }
 
-fn screen_velocity(velocity: Velocity) -> ScreenVelocity {
+pub(in crate::actor_game) fn screen_velocity(velocity: Velocity) -> ScreenVelocity {
     ScreenVelocity::new(
         screen_velocity_component(velocity.dx),
         screen_velocity_component(velocity.dy),
     )
 }
 
-fn screen_velocity_component(value: i16) -> i8 {
+pub(in crate::actor_game) fn screen_velocity_component(value: i16) -> i8 {
     i8::try_from(value.clamp(i16::from(i8::MIN), i16::from(i8::MAX)))
         .expect("screen velocity should be clamped to i8")
 }
 
-fn screen_coordinate(value: i16) -> u8 {
+pub(in crate::actor_game) fn screen_coordinate(value: i16) -> u8 {
     u8::try_from(value.clamp(SCREEN_MIN_COORDINATE, SCREEN_MAX_COORDINATE))
         .expect("screen coordinate should be clamped to u8")
 }
 
-fn projectile_velocity_word(value: i16) -> u16 {
+pub(in crate::actor_game) fn projectile_velocity_word(value: i16) -> u16 {
     let clamped = value.clamp(i16::from(i8::MIN), i16::from(i8::MAX)) as i8;
     ((i16::from(clamped)) << 8) as u16
 }
 
-fn projectile_lifetime_ticks(remaining_steps: u16) -> u8 {
+pub(in crate::actor_game) fn projectile_lifetime_ticks(remaining_steps: u16) -> u8 {
     remaining_steps.min(u16::from(u8::MAX)) as u8
 }
 
-fn enemy_projectile_actor_state(
+pub(in crate::actor_game) fn enemy_projectile_actor_state(
     x_fraction: u8,
     y_fraction: u8,
     velocity: Velocity,
@@ -1025,11 +1090,14 @@ fn enemy_projectile_actor_state(
     )
 }
 
-fn step_projectile_axis(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
+pub(in crate::actor_game) fn step_projectile_axis(
+    position: i16,
+    fraction: u8,
+    velocity: u16,
+) -> (i16, u8) {
     let fraction_scale = i32::from(MOTION_WORD_FRACTION_SCALE);
-    let next_axis_word = i32::from(position) * fraction_scale
-        + i32::from(fraction)
-        + i32::from(velocity as i16);
+    let next_axis_word =
+        i32::from(position) * fraction_scale + i32::from(fraction) + i32::from(velocity as i16);
     let next_position = next_axis_word.div_euclid(fraction_scale);
     let next_fraction = next_axis_word.rem_euclid(fraction_scale);
     (

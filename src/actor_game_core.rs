@@ -1,102 +1,59 @@
-use crate::{
-    MessageId, ScreenAddress, SoundCommand, SpriteFrameIndex, TimelineStep,
-    game::{
-        ATTRACT_SCORING_SEQUENCE_START_STEP as GAME_ATTRACT_SCORING_SEQUENCE_START_STEP,
-        AttractPresentationSnapshot, Direction as CleanDirection, EnemyKind as CleanEnemyKind,
-        EnemyProjectileSnapshot as CleanEnemyProjectileSnapshot, EnemyProjectileKind,
-        EnemyReserveSnapshot, EnemySnapshot as CleanEnemySnapshot,
-        ExplosionKind as CleanExplosionKind, ExplosionSnapshot as CleanExplosionSnapshot,
-        GameEvent, GameEvents, GameStepSnapshot, GameInput as CleanGameInput, GameOverSnapshot, GamePhase,
-        GameState, HIGH_SCORE_TABLE_ENTRIES, HighScoreEntrySnapshot, HighScoreTableEntrySnapshot,
-        HighScoreTablesSnapshot, HumanSnapshot as CleanHumanSnapshot, PlayerSnapshot,
-        PlayerStockSnapshot, ProjectileSnapshot as CleanProjectileSnapshot,
-        ScorePopupKind as CleanScorePopupKind, ScorePopupSnapshot as CleanScorePopupSnapshot,
-        ScoreSnapshot, SoundEvent, SpriteAssetImageSpec, ActorDebugMotion, BaiterDebugStateSnapshot,
-        BomberDebugStateSnapshot, LanderDebugStateSnapshot, MutantDebugStateSnapshot, PodDebugStateSnapshot, GameRngSnapshot,
-        SwarmerDebugStateSnapshot, TERRAIN_BLOW_COMPLETE_STEP, TERRAIN_BLOW_FLASH_COLOR_BYTES,
-        TERRAIN_BLOW_EXPLOSION_BIRTHS, TERRAIN_BLOW_OVERLOAD_COUNTER, TERRAIN_BLOW_START_SOUND_STEPS,
-        TERRAIN_EXPLOSION_LIFETIME_STEPS, TerrainBlowSnapshot, TerrainBlowStage, TerrainSegment,
-        VISUAL_STATE, WaveProfileSnapshot, WorldSnapshot, WorldVector, wave_tuning_landscape_tint,
-        appearance_growth_size_for_age, explosion_growth_size_for_age, explosion_render_scale,
-        push_appearance_cloud_pixels, push_background_terrain_sprites,
-        push_explosion_cloud_pixels, push_scanner_radar_sprites, terrain_blow_flash_tint,
-        terrain_explosion_growth_size_for_age,
-    },
-    renderer::{
-        Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
-        push_controlled_message_sprites, push_message_text_bytes_sprites,
-        attract_defender_appearance_pixels, attract_williams_logo_operation_pixel_counts,
-        attract_williams_logo_pixel_path, screen_position_from_cell,
-        screen_position_from_cell_with_offset,
-    },
-    systems::{
-        HighScoreEntrySystem, HighScoreInitialsState, PlayerStock, ScoreSystem, ScreenPosition,
-        ScreenVelocity,
-    },
-};
+use super::*;
 
-use std::{
-    cmp::Ordering,
-    collections::{BTreeMap, BTreeSet},
-    fmt,
-    str::FromStr,
-    sync::{
-        OnceLock,
-        mpsc::{self, Receiver, Sender},
-    },
-    thread::{self, JoinHandle},
-};
-
-const PLAYER_SPEED: i16 = 1;
-const ACTOR_RENDER_SURFACE: SurfaceSize = SurfaceSize::new(292, 240);
-const SCREEN_MIN_COORDINATE: i16 = 0;
-const SCREEN_MAX_COORDINATE: i16 = u8::MAX as i16;
-const MOTION_WORD_FRACTION_SCALE: i16 = 0x0100;
-const INITIAL_PLAYER_LIVES: u8 = 3;
-const INITIAL_SMART_BOMBS: u8 = 3;
-const PLAYER_LASER_COOLDOWN_STEPS: u8 = 8;
-const PLAYER_HYPERSPACE_HIDDEN_STEPS: u8 = 33;
-const PLAYER_HYPERSPACE_REMATERIALIZE_X: i16 = 128;
-const PLAYER_HYPERSPACE_REMATERIALIZE_Y: i16 = 120;
-const PLAYER_HYPERSPACE_DEATH_DELAY_STEPS: u8 = 39;
-const PLAYER_HYPERSPACE_DEATH_LOW_SEED: u8 = 0x0C;
-const HYPERSPACE_DEATH_LOW_SEED_THRESHOLD: u8 = 0xC0;
-const PLAYFIELD_TOP_EDGE_Y: u8 = 42;
-const PLAYFIELD_BOTTOM_EDGE_Y: u8 = 240;
-const MUTANT_RESTORE_AVOID_HALF_WIDTH: u16 = 300 * 32;
-const MUTANT_RESTORE_AVOID_WIDTH: u16 = 600 * 32;
-const ENEMY_PROJECTILE_SCAN_INITIAL_DELAY_STEPS: u8 = 6;
-const ENEMY_PROJECTILE_SCAN_CADENCE_STEPS: u8 = 8;
-const ENEMY_PROJECTILE_SLOT_LIMIT: usize = 20;
-const ENEMY_PROJECTILE_LIFETIME_TICKS: u8 = 20;
-const SMART_BOMB_DETONATION_DELAY_STEPS: u8 = 3;
-const SMART_BOMB_FLASH_STEPS: u8 = 5;
-const SMART_BOMB_RESERVE_DELAY_STEPS: u16 = 240;
-const SMART_BOMB_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEE);
-const CANNON_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE8);
-const TERRAIN_BLOW_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEB);
-const ASTRONAUT_CATCH_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF7);
-const ASTRONAUT_SHORT_CATCH_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE5);
-const APPEARANCE_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEA);
-const CREDIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE6);
-const START_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF5);
-const THRUST_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE9);
-const LASER_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEB);
-const EXPLOSION_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEE);
-const LANDER_HIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF9);
-const LANDER_PICKUP_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF4);
-const HUMAN_PULLED_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF1);
-const HUMAN_SAFE_LANDING_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE0);
-const MUTANT_HIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE8);
-const BOMBER_HIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xFE);
-const POD_HIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xFA);
-const SWARMER_OR_BAITER_HIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF8);
-const LANDER_OR_BAITER_SHOT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xFC);
-const MUTANT_SHOT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF6);
-const SWARMER_SHOT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF3);
-const GAME_OVER_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEC);
-const SMART_BOMB_SOUND_SEQUENCE: [(u8, SoundCommand); 7] = [
-
+pub(in crate::actor_game) const PLAYER_SPEED: i16 = 1;
+pub(in crate::actor_game) const ACTOR_RENDER_SURFACE: SurfaceSize = SurfaceSize::new(292, 240);
+pub(in crate::actor_game) const SCREEN_MIN_COORDINATE: i16 = 0;
+pub(in crate::actor_game) const SCREEN_MAX_COORDINATE: i16 = u8::MAX as i16;
+pub(in crate::actor_game) const MOTION_WORD_FRACTION_SCALE: i16 = 0x0100;
+pub(in crate::actor_game) const INITIAL_PLAYER_LIVES: u8 = 3;
+pub(in crate::actor_game) const INITIAL_SMART_BOMBS: u8 = 3;
+pub(in crate::actor_game) const PLAYER_LASER_COOLDOWN_STEPS: u8 = 8;
+pub(in crate::actor_game) const PLAYER_HYPERSPACE_HIDDEN_STEPS: u8 = 33;
+pub(in crate::actor_game) const PLAYER_HYPERSPACE_REMATERIALIZE_X: i16 = 128;
+pub(in crate::actor_game) const PLAYER_HYPERSPACE_REMATERIALIZE_Y: i16 = 120;
+pub(in crate::actor_game) const PLAYER_HYPERSPACE_DEATH_DELAY_STEPS: u8 = 39;
+pub(in crate::actor_game) const PLAYER_HYPERSPACE_DEATH_LOW_SEED: u8 = 0x0C;
+pub(in crate::actor_game) const HYPERSPACE_DEATH_LOW_SEED_THRESHOLD: u8 = 0xC0;
+pub(in crate::actor_game) const PLAYFIELD_TOP_EDGE_Y: u8 = 42;
+pub(in crate::actor_game) const PLAYFIELD_BOTTOM_EDGE_Y: u8 = 240;
+pub(in crate::actor_game) const MUTANT_RESTORE_AVOID_HALF_WIDTH: u16 = 300 * 32;
+pub(in crate::actor_game) const MUTANT_RESTORE_AVOID_WIDTH: u16 = 600 * 32;
+pub(in crate::actor_game) const ENEMY_PROJECTILE_SCAN_INITIAL_DELAY_STEPS: u8 = 6;
+pub(in crate::actor_game) const ENEMY_PROJECTILE_SCAN_CADENCE_STEPS: u8 = 8;
+pub(in crate::actor_game) const ENEMY_PROJECTILE_SLOT_LIMIT: usize = 20;
+pub(in crate::actor_game) const ENEMY_PROJECTILE_LIFETIME_TICKS: u8 = 20;
+pub(in crate::actor_game) const SMART_BOMB_DETONATION_DELAY_STEPS: u8 = 3;
+pub(in crate::actor_game) const SMART_BOMB_FLASH_STEPS: u8 = 5;
+pub(in crate::actor_game) const SMART_BOMB_RESERVE_DELAY_STEPS: u16 = 240;
+pub(in crate::actor_game) const SMART_BOMB_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEE);
+pub(in crate::actor_game) const CANNON_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE8);
+pub(in crate::actor_game) const TERRAIN_BLOW_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEB);
+pub(in crate::actor_game) const ASTRONAUT_CATCH_SOUND_COMMAND: SoundCommand =
+    SoundCommand::new(0xF7);
+pub(in crate::actor_game) const ASTRONAUT_SHORT_CATCH_SOUND_COMMAND: SoundCommand =
+    SoundCommand::new(0xE5);
+pub(in crate::actor_game) const APPEARANCE_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEA);
+pub(in crate::actor_game) const CREDIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE6);
+pub(in crate::actor_game) const START_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF5);
+pub(in crate::actor_game) const THRUST_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE9);
+pub(in crate::actor_game) const LASER_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEB);
+pub(in crate::actor_game) const EXPLOSION_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEE);
+pub(in crate::actor_game) const LANDER_HIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF9);
+pub(in crate::actor_game) const LANDER_PICKUP_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF4);
+pub(in crate::actor_game) const HUMAN_PULLED_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF1);
+pub(in crate::actor_game) const HUMAN_SAFE_LANDING_SOUND_COMMAND: SoundCommand =
+    SoundCommand::new(0xE0);
+pub(in crate::actor_game) const MUTANT_HIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xE8);
+pub(in crate::actor_game) const BOMBER_HIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xFE);
+pub(in crate::actor_game) const POD_HIT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xFA);
+pub(in crate::actor_game) const SWARMER_OR_BAITER_HIT_SOUND_COMMAND: SoundCommand =
+    SoundCommand::new(0xF8);
+pub(in crate::actor_game) const LANDER_OR_BAITER_SHOT_SOUND_COMMAND: SoundCommand =
+    SoundCommand::new(0xFC);
+pub(in crate::actor_game) const MUTANT_SHOT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF6);
+pub(in crate::actor_game) const SWARMER_SHOT_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xF3);
+pub(in crate::actor_game) const GAME_OVER_SOUND_COMMAND: SoundCommand = SoundCommand::new(0xEC);
+pub(in crate::actor_game) const SMART_BOMB_SOUND_SEQUENCE: [(u8, SoundCommand); 7] = [
     (4, SMART_BOMB_SOUND_COMMAND),
     (8, SMART_BOMB_SOUND_COMMAND),
     (12, SMART_BOMB_SOUND_COMMAND),
@@ -105,138 +62,147 @@ const SMART_BOMB_SOUND_SEQUENCE: [(u8, SoundCommand); 7] = [
     (24, SMART_BOMB_SOUND_COMMAND),
     (28, CANNON_SOUND_COMMAND),
 ];
-const TERRAIN_BLOW_SOUND_TAIL_SEQUENCE: [(u8, SoundCommand); 4] = [
-
+pub(in crate::actor_game) const TERRAIN_BLOW_SOUND_TAIL_SEQUENCE: [(u8, SoundCommand); 4] = [
     (4, SMART_BOMB_SOUND_COMMAND),
     (10, SMART_BOMB_SOUND_COMMAND),
     (16, CANNON_SOUND_COMMAND),
     (26, CANNON_SOUND_COMMAND),
 ];
-const ASTRONAUT_CATCH_SOUND_TAIL_SEQUENCE: [(u8, SoundCommand); 2] = [
-
+pub(in crate::actor_game) const ASTRONAUT_CATCH_SOUND_TAIL_SEQUENCE: [(u8, SoundCommand); 2] = [
     (10, ASTRONAUT_CATCH_SOUND_COMMAND),
     (20, ASTRONAUT_CATCH_SOUND_COMMAND),
 ];
-const PLAYER_SWITCH_DELAY_STEPS: u8 = 0x60;
-const FINAL_GAME_OVER_DELAY_STEPS: u8 = 40;
-const PLAYER_START_SOUND_DELAY_STEPS: u8 = 1;
-const PLAYER_START_PLAYFIELD_DELAY_STEPS: u8 = 138;
-const ENEMY_PROJECTILE_MAX_SCREEN_X: i16 = 0x98;
-const PLAYFIELD_START_RNG: ActorRng = ActorRng {
-
+pub(in crate::actor_game) const PLAYER_SWITCH_DELAY_STEPS: u8 = 0x60;
+pub(in crate::actor_game) const FINAL_GAME_OVER_DELAY_STEPS: u8 = 40;
+pub(in crate::actor_game) const PLAYER_START_SOUND_DELAY_STEPS: u8 = 1;
+pub(in crate::actor_game) const PLAYER_START_PLAYFIELD_DELAY_STEPS: u8 = 138;
+pub(in crate::actor_game) const ENEMY_PROJECTILE_MAX_SCREEN_X: i16 = 0x98;
+pub(in crate::actor_game) const PLAYFIELD_START_RNG: ActorRng = ActorRng {
     seed: 0x52,
     hseed: 0x62,
     lseed: 0x0C,
 };
-const DEFAULT_RNG: ActorRng = ActorRng {
-
+pub(in crate::actor_game) const DEFAULT_RNG: ActorRng = ActorRng {
     seed: 0,
     hseed: 0xA5,
     lseed: 0x5A,
 };
-const FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS: u16 = 449;
-const FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT: usize = 10;
-const FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT: usize = 6;
-const FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY: u8 = 2;
-const FIRST_WAVE_EARLY_RESERVE_TARGET2_X_VELOCITY: u16 = 0xFFEE;
-const FIRST_WAVE_EARLY_RESERVE_RNG: ActorRng = ActorRng {
-
+pub(in crate::actor_game) const FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS: u16 = 449;
+pub(in crate::actor_game) const FIRST_WAVE_EARLY_RESERVE_ACTIVE_LIMIT: usize = 10;
+pub(in crate::actor_game) const FIRST_WAVE_EARLY_RESERVE_TARGET_CURSOR_SLOT: usize = 6;
+pub(in crate::actor_game) const FIRST_WAVE_EARLY_RESERVE_TARGET2_SHOT_PHASE_DELAY: u8 = 2;
+pub(in crate::actor_game) const FIRST_WAVE_EARLY_RESERVE_TARGET2_X_VELOCITY: u16 = 0xFFEE;
+pub(in crate::actor_game) const FIRST_WAVE_EARLY_RESERVE_RNG: ActorRng = ActorRng {
     seed: 0x3A,
     hseed: 0xDA,
     lseed: 0x1F,
 };
-const FIRST_WAVE_LANDER_REFILL_ACTIVE_THRESHOLD: usize = 8;
-const FIRST_WAVE_LANDER_REFILL_DELAY_STEPS: u8 = 47;
-const FIRST_WAVE_LANDER_REFILL_APPEAR_SOUND_DELAY_STEPS: u8 = 1;
-const PLAYER_PLAYFIELD_TOP_Y: i16 = PLAYFIELD_TOP_EDGE_Y as i16;
-const PLAYER_BOUNDS_BOTTOM_Y: i16 = 220;
-const PLAYER_BOUNDS: Rect = Rect::new(
+pub(in crate::actor_game) const FIRST_WAVE_LANDER_REFILL_ACTIVE_THRESHOLD: usize = 8;
+pub(in crate::actor_game) const FIRST_WAVE_LANDER_REFILL_DELAY_STEPS: u8 = 47;
+pub(in crate::actor_game) const FIRST_WAVE_LANDER_REFILL_APPEAR_SOUND_DELAY_STEPS: u8 = 1;
+pub(in crate::actor_game) const PLAYER_PLAYFIELD_TOP_Y: i16 = PLAYFIELD_TOP_EDGE_Y as i16;
+pub(in crate::actor_game) const PLAYER_BOUNDS_BOTTOM_Y: i16 = 220;
+pub(in crate::actor_game) const PLAYER_BOUNDS: Rect = Rect::new(
     SCREEN_MIN_COORDINATE,
     PLAYER_PLAYFIELD_TOP_Y,
     SCREEN_MAX_COORDINATE,
     PLAYER_BOUNDS_BOTTOM_Y,
 );
-const PLAYER_SCROLL_CENTER_X: i16 = 128;
-const BACKGROUND_WORD_PER_PIXEL: u16 = 0x0100;
-const LASER_SPEED: i16 = 8;
-const LASER_LIFETIME: u16 = 34;
-const LANDER_FIRE_PERIOD: u64 = 96;
-const LANDER_SHOT_SPEED: i16 = 3;
-const LANDER_SHOT_LIFETIME: u16 = 90;
-const EXPLOSION_LIFETIME: u16 = 20;
-const SCORE_POPUP_LIFETIME: u16 = 50;
-const ATTRACT_PRESENTS_START_STEP: u64 = 236;
-const ATTRACT_DEFENDER_WORDMARK_START_STEP: u64 = 365;
-const ATTRACT_HALL_OF_FAME_START_STEP: u64 = 600;
-const ATTRACT_SCORING_SEQUENCE_START_STEP: u64 =
+pub(in crate::actor_game) const PLAYER_SCROLL_CENTER_X: i16 = 128;
+pub(in crate::actor_game) const BACKGROUND_WORD_PER_PIXEL: u16 = 0x0100;
+pub(in crate::actor_game) const LASER_SPEED: i16 = 8;
+pub(in crate::actor_game) const LASER_LIFETIME: u16 = 34;
+pub(in crate::actor_game) const LANDER_FIRE_PERIOD: u64 = 96;
+pub(in crate::actor_game) const LANDER_SHOT_SPEED: i16 = 3;
+pub(in crate::actor_game) const LANDER_SHOT_LIFETIME: u16 = 90;
+pub(in crate::actor_game) const EXPLOSION_LIFETIME: u16 = 20;
+pub(in crate::actor_game) const SCORE_POPUP_LIFETIME: u16 = 50;
+pub(in crate::actor_game) const ATTRACT_PRESENTS_START_STEP: u64 = 236;
+pub(in crate::actor_game) const ATTRACT_DEFENDER_WORDMARK_START_STEP: u64 = 365;
+pub(in crate::actor_game) const ATTRACT_HALL_OF_FAME_START_STEP: u64 = 600;
+pub(in crate::actor_game) const ATTRACT_SCORING_SEQUENCE_START_STEP: u64 =
     GAME_ATTRACT_SCORING_SEQUENCE_START_STEP as u64;
-const ATTRACT_CYCLE_STEPS: u64 =
+pub(in crate::actor_game) const ATTRACT_CYCLE_STEPS: u64 =
     ATTRACT_SCORING_SEQUENCE_START_STEP + ATTRACT_SCORING_DEMO_TOTAL_STEPS as u64;
-const HIGH_SCORE_HALL_STALL_STEPS: u8 = 60;
-const ATTRACT_WILLIAMS_LOGO_DURATION_STEPS: u64 = ATTRACT_HALL_OF_FAME_START_STEP - 1;
-const ATTRACT_PRESENTS_DURATION_STEPS: u64 =
+pub(in crate::actor_game) const HIGH_SCORE_HALL_STALL_STEPS: u8 = 60;
+pub(in crate::actor_game) const ATTRACT_WILLIAMS_LOGO_DURATION_STEPS: u64 =
+    ATTRACT_HALL_OF_FAME_START_STEP - 1;
+pub(in crate::actor_game) const ATTRACT_PRESENTS_DURATION_STEPS: u64 =
     ATTRACT_HALL_OF_FAME_START_STEP - ATTRACT_PRESENTS_START_STEP;
-const REPLAY_BONUS_SCORE: u32 = 10_000;
-const WAVE_COMPLETION_STATUS_LINES: &[(MessageId, ScreenAddress)] =
-
-    &[
-        (MessageId::WaveCompletePrefix, ScreenAddress::new(0x3850)),
-        (MessageId::Completed, ScreenAddress::new(0x3D60)),
-        (MessageId::BonusSurvivors, ScreenAddress::new(0x3C90)),
-    ];
-const WAVE_COMPLETION_WAVE_NUMBER_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x6550);
-const WAVE_COMPLETION_MULTIPLIER_NUMBER_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x5890);
-const SURVIVOR_BONUS_FIRST_HUMAN_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x3CA0);
-const SURVIVOR_BONUS_HUMAN_STEP: u8 = 0x04;
-const SURVIVOR_BONUS_HUMAN_LIMIT: usize = 10;
-const SURVIVOR_BONUS_HUMAN_SIZE: [f32; 2] = [4.0, 8.0];
-const SURVIVOR_BONUS_ASTRONAUT_SLEEP_STEPS: u8 = 4;
-const SURVIVOR_BONUS_WAVE_ADVANCE_SLEEP_STEPS: u8 = 0x80;
-const SURVIVOR_BONUS_POINTS_PER_MULTIPLIER: u32 = 100;
-const ATTRACT_DEFENDER_WORDMARK_DURATION_STEPS: u64 =
+pub(in crate::actor_game) const REPLAY_BONUS_SCORE: u32 = 10_000;
+pub(in crate::actor_game) const WAVE_COMPLETION_STATUS_LINES: &[(MessageId, ScreenAddress)] = &[
+    (MessageId::WaveCompletePrefix, ScreenAddress::new(0x3850)),
+    (MessageId::Completed, ScreenAddress::new(0x3D60)),
+    (MessageId::BonusSurvivors, ScreenAddress::new(0x3C90)),
+];
+pub(in crate::actor_game) const WAVE_COMPLETION_WAVE_NUMBER_SCREEN_CELL: ScreenAddress =
+    ScreenAddress::new(0x6550);
+pub(in crate::actor_game) const WAVE_COMPLETION_MULTIPLIER_NUMBER_SCREEN_CELL: ScreenAddress =
+    ScreenAddress::new(0x5890);
+pub(in crate::actor_game) const SURVIVOR_BONUS_FIRST_HUMAN_SCREEN_CELL: ScreenAddress =
+    ScreenAddress::new(0x3CA0);
+pub(in crate::actor_game) const SURVIVOR_BONUS_HUMAN_STEP: u8 = 0x04;
+pub(in crate::actor_game) const SURVIVOR_BONUS_HUMAN_LIMIT: usize = 10;
+pub(in crate::actor_game) const SURVIVOR_BONUS_HUMAN_SIZE: [f32; 2] = [4.0, 8.0];
+pub(in crate::actor_game) const SURVIVOR_BONUS_ASTRONAUT_SLEEP_STEPS: u8 = 4;
+pub(in crate::actor_game) const SURVIVOR_BONUS_WAVE_ADVANCE_SLEEP_STEPS: u8 = 0x80;
+pub(in crate::actor_game) const SURVIVOR_BONUS_POINTS_PER_MULTIPLIER: u32 = 100;
+pub(in crate::actor_game) const ATTRACT_DEFENDER_WORDMARK_DURATION_STEPS: u64 =
     ATTRACT_HALL_OF_FAME_START_STEP - ATTRACT_DEFENDER_WORDMARK_START_STEP;
-const ATTRACT_HALL_OF_FAME_DURATION_STEPS: u64 =
+pub(in crate::actor_game) const ATTRACT_HALL_OF_FAME_DURATION_STEPS: u64 =
     ATTRACT_SCORING_SEQUENCE_START_STEP - ATTRACT_HALL_OF_FAME_START_STEP;
-const WILLIAMS_REVEAL_STEPS: u16 = ATTRACT_PRESENTS_START_STEP as u16;
-const WILLIAMS_COLOR_PERIOD: u16 = 8;
-const ATTRACT_WILLIAMS_LOGO_POSITION: Point = Point::new(108, 60);
-const ATTRACT_DEFENDER_WORDMARK_POSITION: Point = Point::new(96, 144);
-const ATTRACT_CREDIT_LABEL_POSITION: Point = Point::new(176, 226);
-const ATTRACT_CREDIT_COUNT_POSITION: Point = Point::new(248, 226);
-const ATTRACT_HALL_TITLE_MESSAGE: MessageId = MessageId::HallTitle;
-const ATTRACT_HALL_TODAYS_MESSAGE: MessageId = MessageId::HallTodays;
-const ATTRACT_HALL_ALL_TIME_MESSAGE: MessageId = MessageId::HallAllTime;
-const ATTRACT_HALL_GREATEST_MESSAGE: MessageId = MessageId::HallGreatest;
-const ATTRACT_HALL_DEFENDER_LOGO_POSITION: Point = Point::new(85, 50);
-const ATTRACT_HALL_TITLE_MESSAGE_CELL: ScreenAddress = ScreenAddress::new(0x3854);
-const ATTRACT_HALL_TODAYS_MESSAGE_CELL: ScreenAddress = ScreenAddress::new(0x2268);
-const ATTRACT_HALL_ALL_TIME_MESSAGE_CELL: ScreenAddress = ScreenAddress::new(0x6068);
-const ATTRACT_HALL_GREATEST_LEFT_MESSAGE_CELL: ScreenAddress = ScreenAddress::new(0x1E72);
-const ATTRACT_HALL_GREATEST_RIGHT_MESSAGE_CELL: ScreenAddress = ScreenAddress::new(0x5F72);
-const ATTRACT_HALL_TODAYS_TABLE_CELL: ScreenAddress = ScreenAddress::new(0x1886);
-const ATTRACT_HALL_ALL_TIME_TABLE_CELL: ScreenAddress = ScreenAddress::new(0x5986);
-const ATTRACT_HALL_TABLE_ROW_STEP: u8 = 0x0A;
-const ATTRACT_HALL_TABLE_INITIALS_OFFSET: u8 = 0x05;
-const ATTRACT_HALL_TABLE_SCORE_OFFSET: u8 = 0x13;
-const ATTRACT_HALL_TABLE_VISUAL_OFFSET: Point = Point::new(-11, -6);
-const ATTRACT_HALL_SCORE_TEXT_LEN: usize = 6;
-const ATTRACT_SCORING_VISUAL_OFFSET: Point = Point::new(-11, -7);
-const ATTRACT_INSTRUCTION_TEXT_LINES: [(MessageId, ScreenAddress); 7] = [
-
+pub(in crate::actor_game) const WILLIAMS_REVEAL_STEPS: u16 = ATTRACT_PRESENTS_START_STEP as u16;
+pub(in crate::actor_game) const WILLIAMS_COLOR_PERIOD: u16 = 8;
+pub(in crate::actor_game) const ATTRACT_WILLIAMS_LOGO_POSITION: Point = Point::new(108, 60);
+pub(in crate::actor_game) const ATTRACT_DEFENDER_WORDMARK_POSITION: Point = Point::new(96, 144);
+pub(in crate::actor_game) const ATTRACT_CREDIT_LABEL_POSITION: Point = Point::new(176, 226);
+pub(in crate::actor_game) const ATTRACT_CREDIT_COUNT_POSITION: Point = Point::new(248, 226);
+pub(in crate::actor_game) const ATTRACT_HALL_TITLE_MESSAGE: MessageId = MessageId::HallTitle;
+pub(in crate::actor_game) const ATTRACT_HALL_TODAYS_MESSAGE: MessageId = MessageId::HallTodays;
+pub(in crate::actor_game) const ATTRACT_HALL_ALL_TIME_MESSAGE: MessageId = MessageId::HallAllTime;
+pub(in crate::actor_game) const ATTRACT_HALL_GREATEST_MESSAGE: MessageId = MessageId::HallGreatest;
+pub(in crate::actor_game) const ATTRACT_HALL_DEFENDER_LOGO_POSITION: Point = Point::new(85, 50);
+pub(in crate::actor_game) const ATTRACT_HALL_TITLE_MESSAGE_CELL: ScreenAddress =
+    ScreenAddress::new(0x3854);
+pub(in crate::actor_game) const ATTRACT_HALL_TODAYS_MESSAGE_CELL: ScreenAddress =
+    ScreenAddress::new(0x2268);
+pub(in crate::actor_game) const ATTRACT_HALL_ALL_TIME_MESSAGE_CELL: ScreenAddress =
+    ScreenAddress::new(0x6068);
+pub(in crate::actor_game) const ATTRACT_HALL_GREATEST_LEFT_MESSAGE_CELL: ScreenAddress =
+    ScreenAddress::new(0x1E72);
+pub(in crate::actor_game) const ATTRACT_HALL_GREATEST_RIGHT_MESSAGE_CELL: ScreenAddress =
+    ScreenAddress::new(0x5F72);
+pub(in crate::actor_game) const ATTRACT_HALL_TODAYS_TABLE_CELL: ScreenAddress =
+    ScreenAddress::new(0x1886);
+pub(in crate::actor_game) const ATTRACT_HALL_ALL_TIME_TABLE_CELL: ScreenAddress =
+    ScreenAddress::new(0x5986);
+pub(in crate::actor_game) const ATTRACT_HALL_TABLE_ROW_STEP: u8 = 0x0A;
+pub(in crate::actor_game) const ATTRACT_HALL_TABLE_INITIALS_OFFSET: u8 = 0x05;
+pub(in crate::actor_game) const ATTRACT_HALL_TABLE_SCORE_OFFSET: u8 = 0x13;
+pub(in crate::actor_game) const ATTRACT_HALL_TABLE_VISUAL_OFFSET: Point = Point::new(-11, -6);
+pub(in crate::actor_game) const ATTRACT_HALL_SCORE_TEXT_LEN: usize = 6;
+pub(in crate::actor_game) const ATTRACT_SCORING_VISUAL_OFFSET: Point = Point::new(-11, -7);
+pub(in crate::actor_game) const ATTRACT_INSTRUCTION_TEXT_LINES: [(MessageId, ScreenAddress); 7] = [
     (MessageId::ScannerInstruction, ScreenAddress::new(0x4330)),
     (MessageId::LanderInstruction, ScreenAddress::new(0x1C70)),
     (MessageId::MutantInstruction, ScreenAddress::new(0x3C70)),
     (MessageId::BaiterInstruction, ScreenAddress::new(0x5F70)),
     (MessageId::BomberInstruction, ScreenAddress::new(0x1CA8)),
-    (MessageId::SwarmerInstructionPrefix, ScreenAddress::new(0x40A8)),
+    (
+        MessageId::SwarmerInstructionPrefix,
+        ScreenAddress::new(0x40A8),
+    ),
     (MessageId::SwarmerInstruction, ScreenAddress::new(0x5CA8)),
 ];
-const FINAL_GAME_OVER_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x3E80);
-const PLAYER_START_PROMPT_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x3C80);
-const PLAYER_SWITCH_LABEL_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x3C78);
-const PLAYER_SWITCH_GAME_OVER_SCREEN_CELL: ScreenAddress = ScreenAddress::new(0x3E88);
-const TOP_DISPLAY_BORDER_SEGMENTS: [(u16, [f32; 2]); 6] = [
-
+pub(in crate::actor_game) const FINAL_GAME_OVER_SCREEN_CELL: ScreenAddress =
+    ScreenAddress::new(0x3E80);
+pub(in crate::actor_game) const PLAYER_START_PROMPT_SCREEN_CELL: ScreenAddress =
+    ScreenAddress::new(0x3C80);
+pub(in crate::actor_game) const PLAYER_SWITCH_LABEL_SCREEN_CELL: ScreenAddress =
+    ScreenAddress::new(0x3C78);
+pub(in crate::actor_game) const PLAYER_SWITCH_GAME_OVER_SCREEN_CELL: ScreenAddress =
+    ScreenAddress::new(0x3E88);
+pub(in crate::actor_game) const TOP_DISPLAY_BORDER_SEGMENTS: [(u16, [f32; 2]); 6] = [
     (0x0028, [312.0, 2.0]),
     (0x2F08, [2.0, 32.0]),
     (0x7008, [2.0, 32.0]),
@@ -244,120 +210,127 @@ const TOP_DISPLAY_BORDER_SEGMENTS: [(u16, [f32; 2]); 6] = [
     (0x4C07, [16.0, 2.0]),
     (0x4C28, [16.0, 2.0]),
 ];
-const ATTRACT_SCORING_SCANNER_TERRAIN_PIXEL_SIZE: [f32; 2] = [1.0, 1.0];
-const ATTRACT_SCORING_SCANNER_TERRAIN_TINT: Color = Color::from_rgba(174, 81, 0, 255);
-const ATTRACT_SCORING_SCANNER_BORDER_TINT: Color = Color::from_rgba(38, 0, 160, 255);
-const ATTRACT_SCORING_RESCUE_DESCENT_STEPS: u16 = 0xE6;
-const ATTRACT_SCORING_RESCUE_ASCENT_STEPS: u16 = 0xA0;
-const ATTRACT_SCORING_RESCUE_LASER_STEPS: u16 = 0x15;
-const ATTRACT_SCORING_RESCUE_FALL_STEPS: u16 = 0x2D * 2;
-const ATTRACT_SCORING_RESCUE_SCORE_STEPS: u16 = 0x50;
-const ATTRACT_SCORING_RESCUE_RETURN_STEPS: u16 = 0x60;
-const ATTRACT_SCORING_LEGEND_APPROACH_STEPS: u16 = 0x5F;
-const ATTRACT_SCORING_LEGEND_LASER_STEPS: u16 = 0x17;
-const ATTRACT_SCORING_LEGEND_TRANSFER_STEPS: u16 = 0x20;
-const ATTRACT_SCORING_LEGEND_REVEAL_STEPS: u16 = 0x20;
-const ATTRACT_SCORING_LEGEND_ENTRY_STEPS: u16 = ATTRACT_SCORING_LEGEND_APPROACH_STEPS
-    + ATTRACT_SCORING_LEGEND_LASER_STEPS
-    + ATTRACT_SCORING_LEGEND_TRANSFER_STEPS
-    + ATTRACT_SCORING_LEGEND_REVEAL_STEPS;
-const ATTRACT_SCORING_LEGEND_HOLD_STEPS: u16 = 0xFF + 0xFF;
-const ATTRACT_SCORING_LEGEND_ENTRIES: u16 = 6;
-const ATTRACT_SCORING_RESCUE_SEQUENCE_STEPS: u16 = ATTRACT_SCORING_RESCUE_DESCENT_STEPS
-    + ATTRACT_SCORING_RESCUE_ASCENT_STEPS
-    + ATTRACT_SCORING_RESCUE_LASER_STEPS
-    + ATTRACT_SCORING_RESCUE_FALL_STEPS
-    + ATTRACT_SCORING_RESCUE_SCORE_STEPS
-    + ATTRACT_SCORING_RESCUE_RETURN_STEPS;
-const ATTRACT_SCORING_DEMO_TOTAL_STEPS: u16 = ATTRACT_SCORING_RESCUE_SEQUENCE_STEPS
-    + ATTRACT_SCORING_LEGEND_ENTRY_STEPS * ATTRACT_SCORING_LEGEND_ENTRIES
-    + ATTRACT_SCORING_LEGEND_HOLD_STEPS;
-const ATTRACT_SCORING_PROTECTED_DEMO_STEP_OFFSET: u16 = 0;
-const ATTRACT_SCORING_PLAYER_WORLD_X: i32 = 0x0800;
-const ATTRACT_SCORING_PLAYER_WORLD_Y: i32 = 0x5000;
-const ATTRACT_SCORING_HUMAN_WORLD_X: i32 = 0x1E00;
-const ATTRACT_SCORING_HUMAN_WORLD_Y: i32 = 0xDB00;
-const ATTRACT_SCORING_LANDER_WORLD_X: i32 = 0x1DA0;
-const ATTRACT_SCORING_LANDER_WORLD_Y: i32 = 0x4000;
-const ATTRACT_SCORING_SCORE_500_WORLD_X: i32 = 0x1DFF;
-const ATTRACT_SCORING_SCORE_500_WORLD_Y: i32 = 0x9000;
-const ATTRACT_SCORING_SCORE_500_DROP_WORLD_X: i32 = 0x1C00;
-const ATTRACT_SCORING_SCORE_500_DROP_WORLD_Y: i32 = 0xE000;
-const ATTRACT_SCORING_CAUGHT_HUMAN_WORLD_X: i32 = 0x1E80;
-const ATTRACT_SCORING_CAUGHT_HUMAN_WORLD_Y: i32 = 0xA2E0;
-const ATTRACT_SCORING_GROUNDED_HUMAN_WORLD_Y: i32 = 0xDEE0;
-const ATTRACT_SCORING_RESCUE_SHIP_WORLD_X_VELOCITY: i32 = 0x0040;
-const ATTRACT_SCORING_RESCUE_SHIP_WORLD_Y_VELOCITY: i32 = 0x00D4;
-const ATTRACT_SCORING_RESCUE_HUMAN_WORLD_ACCELERATION: i32 = 0x0008;
-const ATTRACT_SCORING_RESCUE_DROP_WORLD_Y_VELOCITY: i32 = 0x00C0;
-const ATTRACT_SCORING_RESCUE_RETURN_WORLD_X_VELOCITY: i32 = -0x0040;
-const ATTRACT_SCORING_RESCUE_RETURN_WORLD_Y_VELOCITY: i32 = -0x0180;
-const ATTRACT_SCORING_OBJECT_REFERENCE_OFFSET: [f32; 2] = [-15.0, -10.0];
-const ATTRACT_SCORING_PLAYFIELD_SIZE: [f32; 2] = [320.0, 256.0];
-const ATTRACT_SCORING_SCANNER_ORIGIN: [f32; 2] = [84.0, 0.0];
-const ATTRACT_SCORING_SCANNER_SIZE: [f32; 2] = [128.0, 32.0];
-const ATTRACT_SCORING_PLAYER_SCANNER_SIZE: [f32; 2] = [3.0, 2.0];
-const ATTRACT_SCORING_OBJECT_SCANNER_SIZE: [f32; 2] = [2.0, 2.0];
-const ATTRACT_SCORING_PLAYER_SCANNER_COLOR_WORD: u16 = 0x9099;
-const ATTRACT_SCORING_HUMAN_SCANNER_COLOR_WORD: u16 = 0x6666;
-const ATTRACT_SCORING_LANDER_SCANNER_COLOR_WORD: u16 = 0x4433;
-const ATTRACT_SCORING_LEGEND_ORIGIN_WORLD_X: i32 = 0x1F00;
-const ATTRACT_SCORING_LEGEND_ORIGIN_START_WORLD_Y: i32 = 0xA000;
-const NORMAL_PALETTE_BYTES: [u8; 16] = [
-
+pub(in crate::actor_game) const ATTRACT_SCORING_SCANNER_TERRAIN_PIXEL_SIZE: [f32; 2] = [1.0, 1.0];
+pub(in crate::actor_game) const ATTRACT_SCORING_SCANNER_TERRAIN_TINT: Color =
+    Color::from_rgba(174, 81, 0, 255);
+pub(in crate::actor_game) const ATTRACT_SCORING_SCANNER_BORDER_TINT: Color =
+    Color::from_rgba(38, 0, 160, 255);
+pub(in crate::actor_game) const ATTRACT_SCORING_RESCUE_DESCENT_STEPS: u16 = 0xE6;
+pub(in crate::actor_game) const ATTRACT_SCORING_RESCUE_ASCENT_STEPS: u16 = 0xA0;
+pub(in crate::actor_game) const ATTRACT_SCORING_RESCUE_LASER_STEPS: u16 = 0x15;
+pub(in crate::actor_game) const ATTRACT_SCORING_RESCUE_FALL_STEPS: u16 = 0x2D * 2;
+pub(in crate::actor_game) const ATTRACT_SCORING_RESCUE_SCORE_STEPS: u16 = 0x50;
+pub(in crate::actor_game) const ATTRACT_SCORING_RESCUE_RETURN_STEPS: u16 = 0x60;
+pub(in crate::actor_game) const ATTRACT_SCORING_LEGEND_APPROACH_STEPS: u16 = 0x5F;
+pub(in crate::actor_game) const ATTRACT_SCORING_LEGEND_LASER_STEPS: u16 = 0x17;
+pub(in crate::actor_game) const ATTRACT_SCORING_LEGEND_TRANSFER_STEPS: u16 = 0x20;
+pub(in crate::actor_game) const ATTRACT_SCORING_LEGEND_REVEAL_STEPS: u16 = 0x20;
+pub(in crate::actor_game) const ATTRACT_SCORING_LEGEND_ENTRY_STEPS: u16 =
+    ATTRACT_SCORING_LEGEND_APPROACH_STEPS
+        + ATTRACT_SCORING_LEGEND_LASER_STEPS
+        + ATTRACT_SCORING_LEGEND_TRANSFER_STEPS
+        + ATTRACT_SCORING_LEGEND_REVEAL_STEPS;
+pub(in crate::actor_game) const ATTRACT_SCORING_LEGEND_HOLD_STEPS: u16 = 0xFF + 0xFF;
+pub(in crate::actor_game) const ATTRACT_SCORING_LEGEND_ENTRIES: u16 = 6;
+pub(in crate::actor_game) const ATTRACT_SCORING_RESCUE_SEQUENCE_STEPS: u16 =
+    ATTRACT_SCORING_RESCUE_DESCENT_STEPS
+        + ATTRACT_SCORING_RESCUE_ASCENT_STEPS
+        + ATTRACT_SCORING_RESCUE_LASER_STEPS
+        + ATTRACT_SCORING_RESCUE_FALL_STEPS
+        + ATTRACT_SCORING_RESCUE_SCORE_STEPS
+        + ATTRACT_SCORING_RESCUE_RETURN_STEPS;
+pub(in crate::actor_game) const ATTRACT_SCORING_DEMO_TOTAL_STEPS: u16 =
+    ATTRACT_SCORING_RESCUE_SEQUENCE_STEPS
+        + ATTRACT_SCORING_LEGEND_ENTRY_STEPS * ATTRACT_SCORING_LEGEND_ENTRIES
+        + ATTRACT_SCORING_LEGEND_HOLD_STEPS;
+pub(in crate::actor_game) const ATTRACT_SCORING_PROTECTED_DEMO_STEP_OFFSET: u16 = 0;
+pub(in crate::actor_game) const ATTRACT_SCORING_PLAYER_WORLD_X: i32 = 0x0800;
+pub(in crate::actor_game) const ATTRACT_SCORING_PLAYER_WORLD_Y: i32 = 0x5000;
+pub(in crate::actor_game) const ATTRACT_SCORING_HUMAN_WORLD_X: i32 = 0x1E00;
+pub(in crate::actor_game) const ATTRACT_SCORING_HUMAN_WORLD_Y: i32 = 0xDB00;
+pub(in crate::actor_game) const ATTRACT_SCORING_LANDER_WORLD_X: i32 = 0x1DA0;
+pub(in crate::actor_game) const ATTRACT_SCORING_LANDER_WORLD_Y: i32 = 0x4000;
+pub(in crate::actor_game) const ATTRACT_SCORING_SCORE_500_WORLD_X: i32 = 0x1DFF;
+pub(in crate::actor_game) const ATTRACT_SCORING_SCORE_500_WORLD_Y: i32 = 0x9000;
+pub(in crate::actor_game) const ATTRACT_SCORING_SCORE_500_DROP_WORLD_X: i32 = 0x1C00;
+pub(in crate::actor_game) const ATTRACT_SCORING_SCORE_500_DROP_WORLD_Y: i32 = 0xE000;
+pub(in crate::actor_game) const ATTRACT_SCORING_CAUGHT_HUMAN_WORLD_X: i32 = 0x1E80;
+pub(in crate::actor_game) const ATTRACT_SCORING_CAUGHT_HUMAN_WORLD_Y: i32 = 0xA2E0;
+pub(in crate::actor_game) const ATTRACT_SCORING_GROUNDED_HUMAN_WORLD_Y: i32 = 0xDEE0;
+pub(in crate::actor_game) const ATTRACT_SCORING_RESCUE_SHIP_WORLD_X_VELOCITY: i32 = 0x0040;
+pub(in crate::actor_game) const ATTRACT_SCORING_RESCUE_SHIP_WORLD_Y_VELOCITY: i32 = 0x00D4;
+pub(in crate::actor_game) const ATTRACT_SCORING_RESCUE_HUMAN_WORLD_ACCELERATION: i32 = 0x0008;
+pub(in crate::actor_game) const ATTRACT_SCORING_RESCUE_DROP_WORLD_Y_VELOCITY: i32 = 0x00C0;
+pub(in crate::actor_game) const ATTRACT_SCORING_RESCUE_RETURN_WORLD_X_VELOCITY: i32 = -0x0040;
+pub(in crate::actor_game) const ATTRACT_SCORING_RESCUE_RETURN_WORLD_Y_VELOCITY: i32 = -0x0180;
+pub(in crate::actor_game) const ATTRACT_SCORING_OBJECT_REFERENCE_OFFSET: [f32; 2] = [-15.0, -10.0];
+pub(in crate::actor_game) const ATTRACT_SCORING_PLAYFIELD_SIZE: [f32; 2] = [320.0, 256.0];
+pub(in crate::actor_game) const ATTRACT_SCORING_SCANNER_ORIGIN: [f32; 2] = [84.0, 0.0];
+pub(in crate::actor_game) const ATTRACT_SCORING_SCANNER_SIZE: [f32; 2] = [128.0, 32.0];
+pub(in crate::actor_game) const ATTRACT_SCORING_PLAYER_SCANNER_SIZE: [f32; 2] = [3.0, 2.0];
+pub(in crate::actor_game) const ATTRACT_SCORING_OBJECT_SCANNER_SIZE: [f32; 2] = [2.0, 2.0];
+pub(in crate::actor_game) const ATTRACT_SCORING_PLAYER_SCANNER_COLOR_WORD: u16 = 0x9099;
+pub(in crate::actor_game) const ATTRACT_SCORING_HUMAN_SCANNER_COLOR_WORD: u16 = 0x6666;
+pub(in crate::actor_game) const ATTRACT_SCORING_LANDER_SCANNER_COLOR_WORD: u16 = 0x4433;
+pub(in crate::actor_game) const ATTRACT_SCORING_LEGEND_ORIGIN_WORLD_X: i32 = 0x1F00;
+pub(in crate::actor_game) const ATTRACT_SCORING_LEGEND_ORIGIN_START_WORLD_Y: i32 = 0xA000;
+pub(in crate::actor_game) const NORMAL_PALETTE_BYTES: [u8; 16] = [
     0x00, 0x00, 0x07, 0x28, 0x2F, 0x81, 0xA4, 0x15, 0xC7, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
-const LASER_BYTE_PIXELS: i32 = 2;
-const LASER_BODY_BYTE: u8 = 0x11;
-const LASER_TIP_BYTE: u8 = 0x99;
-const LASER_BODY_CELLS: i32 = 4;
-const LASER_BODY_TINT: Color = Color::from_rgba(0x00, 0xB8, 0xFF, 0xFF);
-const LASER_TIP_TINT: Color = Color::from_rgba(0x8F, 0xE8, 0xFF, 0xFF);
-const LASER_FIZZLE_TINT: Color = Color::from_rgba(0x00, 0x78, 0xD8, 0xFF);
-const WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255];
-const WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255];
-const MAIN_TERRAIN_RECORD_BYTE_COUNT: usize = 0x180;
-const SCANNER_TERRAIN_RECORDS: usize = 0x40;
-const SCANNER_MINI_TERRAIN_RECORDS: usize = MAIN_TERRAIN_RECORD_BYTE_COUNT / 3;
-const SCANNER_OBJECT_BASE_SCREEN: u16 = 0x3008;
-const SCANNER_SCAN_CENTER_OFFSET: u16 = 0x6D40;
-const DEFENDER_WORDMARK_START_STEP: u64 = ATTRACT_DEFENDER_WORDMARK_START_STEP;
-const DEFENDER_WORDMARK_SLOTS: u16 = 15;
-const DEFENDER_WORDMARK_ROW_PAIRS: u16 = 6;
-const ATTRACT_DEFENDER_APPEARANCE_FINAL_TICK: u8 = 0x2E;
-const WILLIAMS_LOGO_SCENE_SIZE: [f32; 2] = [92.0, 19.0];
-const DEFENDER_WORDMARK_SCENE_SIZE: [f32; 2] = [120.0, 24.0];
-const PLAYER_SHIP_SCENE_SIZE: [f32; 2] = [16.0, 6.0];
-const PLAYER_PROJECTILE_SCENE_SIZE: [f32; 2] = [16.0, 1.0];
-const LANDER_SCENE_SIZE: [f32; 2] = [10.0, 8.0];
-const HUMAN_SCENE_SIZE: [f32; 2] = [4.0, 8.0];
-const MUTANT_SCENE_SIZE: [f32; 2] = [10.0, 8.0];
-const BAITER_SCENE_SIZE: [f32; 2] = [12.0, 4.0];
-const BOMBER_SCENE_SIZE: [f32; 2] = [8.0, 8.0];
-const POD_SCENE_SIZE: [f32; 2] = [8.0, 8.0];
-const SWARMER_SCENE_SIZE: [f32; 2] = [6.0, 4.0];
-const ENEMY_BOMB_SCENE_SIZE: [f32; 2] = [4.0, 3.0];
-const EXPLOSION_SCENE_SIZE: [f32; 2] = [8.0, 8.0];
-const PLAYER_EXPLOSION_PIXEL_SCENE_SIZE: [f32; 2] = [1.0, 1.0];
-const SCORE_POPUP_SCENE_SIZE: [f32; 2] = [12.0, 6.0];
-const SCORE_POPUP_500_COLOR_CYCLE: [Color; 3] = [
+pub(in crate::actor_game) const LASER_BYTE_PIXELS: i32 = 2;
+pub(in crate::actor_game) const LASER_BODY_BYTE: u8 = 0x11;
+pub(in crate::actor_game) const LASER_TIP_BYTE: u8 = 0x99;
+pub(in crate::actor_game) const LASER_BODY_CELLS: i32 = 4;
+pub(in crate::actor_game) const LASER_BODY_TINT: Color = Color::from_rgba(0x00, 0xB8, 0xFF, 0xFF);
+pub(in crate::actor_game) const LASER_TIP_TINT: Color = Color::from_rgba(0x8F, 0xE8, 0xFF, 0xFF);
+pub(in crate::actor_game) const LASER_FIZZLE_TINT: Color = Color::from_rgba(0x00, 0x78, 0xD8, 0xFF);
+pub(in crate::actor_game) const WILLIAMS_RED_GREEN_LEVELS: [u8; 8] =
+    [0, 38, 81, 118, 137, 174, 217, 255];
+pub(in crate::actor_game) const WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255];
+pub(in crate::actor_game) const MAIN_TERRAIN_RECORD_BYTE_COUNT: usize = 0x180;
+pub(in crate::actor_game) const SCANNER_TERRAIN_RECORDS: usize = 0x40;
+pub(in crate::actor_game) const SCANNER_MINI_TERRAIN_RECORDS: usize =
+    MAIN_TERRAIN_RECORD_BYTE_COUNT / 3;
+pub(in crate::actor_game) const SCANNER_OBJECT_BASE_SCREEN: u16 = 0x3008;
+pub(in crate::actor_game) const SCANNER_SCAN_CENTER_OFFSET: u16 = 0x6D40;
+pub(in crate::actor_game) const DEFENDER_WORDMARK_START_STEP: u64 =
+    ATTRACT_DEFENDER_WORDMARK_START_STEP;
+pub(in crate::actor_game) const DEFENDER_WORDMARK_SLOTS: u16 = 15;
+pub(in crate::actor_game) const DEFENDER_WORDMARK_ROW_PAIRS: u16 = 6;
+pub(in crate::actor_game) const ATTRACT_DEFENDER_APPEARANCE_FINAL_TICK: u8 = 0x2E;
+pub(in crate::actor_game) const WILLIAMS_LOGO_SCENE_SIZE: [f32; 2] = [92.0, 19.0];
+pub(in crate::actor_game) const DEFENDER_WORDMARK_SCENE_SIZE: [f32; 2] = [120.0, 24.0];
+pub(in crate::actor_game) const PLAYER_SHIP_SCENE_SIZE: [f32; 2] = [16.0, 6.0];
+pub(in crate::actor_game) const PLAYER_PROJECTILE_SCENE_SIZE: [f32; 2] = [16.0, 1.0];
+pub(in crate::actor_game) const LANDER_SCENE_SIZE: [f32; 2] = [10.0, 8.0];
+pub(in crate::actor_game) const HUMAN_SCENE_SIZE: [f32; 2] = [4.0, 8.0];
+pub(in crate::actor_game) const MUTANT_SCENE_SIZE: [f32; 2] = [10.0, 8.0];
+pub(in crate::actor_game) const BAITER_SCENE_SIZE: [f32; 2] = [12.0, 4.0];
+pub(in crate::actor_game) const BOMBER_SCENE_SIZE: [f32; 2] = [8.0, 8.0];
+pub(in crate::actor_game) const POD_SCENE_SIZE: [f32; 2] = [8.0, 8.0];
+pub(in crate::actor_game) const SWARMER_SCENE_SIZE: [f32; 2] = [6.0, 4.0];
+pub(in crate::actor_game) const ENEMY_BOMB_SCENE_SIZE: [f32; 2] = [4.0, 3.0];
+pub(in crate::actor_game) const EXPLOSION_SCENE_SIZE: [f32; 2] = [8.0, 8.0];
+pub(in crate::actor_game) const PLAYER_EXPLOSION_PIXEL_SCENE_SIZE: [f32; 2] = [1.0, 1.0];
+pub(in crate::actor_game) const SCORE_POPUP_SCENE_SIZE: [f32; 2] = [12.0, 6.0];
+pub(in crate::actor_game) const SCORE_POPUP_500_COLOR_CYCLE: [Color; 3] = [
     Color::from_rgba(0xFF, 0x50, 0x50, 0xFF),
     Color::from_rgba(0xFF, 0xBC, 0x00, 0xFF),
     Color::from_rgba(0x28, 0x38, 0xDC, 0xFF),
 ];
-const HUMAN_GROUND_Y: i16 = 214;
-const HUMAN_FALL_ACCELERATION: i16 = 1;
-const HUMAN_MAX_FALL_SPEED: i16 = 8;
-const HUMAN_SAFE_LANDING_SPEED: i16 = 3;
-const HUMAN_CARRIED_OFFSET_Y: i16 = 8;
-const ASTRONAUT_RESTORE_Y: u8 = 0xE0;
-const ASTRONAUT_TARGET_CURSOR_ENTRY_COUNT: usize = 16;
-const ASTRONAUT_PROCESS_SLEEP_TICKS: u8 = 2;
-const HUMAN_TURN_SEED_MAX: u8 = 8;
-const HUMAN_LEFT_TARGET_Y_OFFSET: u8 = 4;
-const HUMAN_RIGHT_TARGET_Y_OFFSET: u8 = 15;
-const HUMAN_MAX_TARGET_Y: u8 = 0xE8;
-const PLAYFIELD_TERRAIN_SEGMENTS: [TerrainSegment; 5] = [
+pub(in crate::actor_game) const HUMAN_GROUND_Y: i16 = 214;
+pub(in crate::actor_game) const HUMAN_FALL_ACCELERATION: i16 = 1;
+pub(in crate::actor_game) const HUMAN_MAX_FALL_SPEED: i16 = 8;
+pub(in crate::actor_game) const HUMAN_SAFE_LANDING_SPEED: i16 = 3;
+pub(in crate::actor_game) const HUMAN_CARRIED_OFFSET_Y: i16 = 8;
+pub(in crate::actor_game) const ASTRONAUT_RESTORE_Y: u8 = 0xE0;
+pub(in crate::actor_game) const ASTRONAUT_TARGET_CURSOR_ENTRY_COUNT: usize = 16;
+pub(in crate::actor_game) const ASTRONAUT_PROCESS_SLEEP_TICKS: u8 = 2;
+pub(in crate::actor_game) const HUMAN_TURN_SEED_MAX: u8 = 8;
+pub(in crate::actor_game) const HUMAN_LEFT_TARGET_Y_OFFSET: u8 = 4;
+pub(in crate::actor_game) const HUMAN_RIGHT_TARGET_Y_OFFSET: u8 = 15;
+pub(in crate::actor_game) const HUMAN_MAX_TARGET_Y: u8 = 0xE8;
+pub(in crate::actor_game) const PLAYFIELD_TERRAIN_SEGMENTS: [TerrainSegment; 5] = [
     TerrainSegment {
         position: ScreenPosition::new(0, 224),
         size: (64, 8),
@@ -379,134 +352,146 @@ const PLAYFIELD_TERRAIN_SEGMENTS: [TerrainSegment; 5] = [
         size: (44, 8),
     },
 ];
-const HUMAN_LEFT_X_VELOCITY: u16 = 0xFFE0;
-const HUMAN_RIGHT_X_VELOCITY: u16 = 0x0020;
-const INITIAL_POD_X_SPEED: u8 = 0x20;
-const BOMBER_SQUAD_SIZE: usize = 4;
-const POD_SWARMER_REQUEST_LIMIT: usize = 6;
-const ACTIVE_SWARMER_LIMIT: usize = 20;
-const ACTIVE_BAITER_LIMIT: usize = 12;
-const MINI_SWARMER_LOOP_SLEEP_TICKS: u8 = 3;
-const MINI_SWARMER_MAX_Y_VELOCITY: u16 = 0x0200;
-const MINI_SWARMER_MIN_Y_VELOCITY: u16 = 0xFE00;
-const MINI_SWARMER_TURN_WINDOW: u16 = 300 * 32;
-const MINI_SWARMER_TURN_WINDOW_HALF: u16 = 150 * 32;
-const MINI_SWARMER_RESTORE_X_LOW: u8 = 0x07;
-const BAITER_INITIAL_SHOT_TIMER: u8 = 8;
-const BAITER_LOOP_SLEEP_TICKS: u8 = 6;
-const BAITER_X_SEEK_SPEED: u8 = 0x40;
-const BAITER_Y_SEEK_BYTE: u8 = 0x01;
-const BAITER_X_SEEK_WINDOW_HALF_PIXELS: i16 = 20;
-const BAITER_Y_SEEK_WINDOW_HALF_PIXELS: i16 = 10;
-const BAITER_ANIMATION_FRAME_COUNT: u8 = 3;
-const ACTOR_BAITER_TIMER_PACING_STEPS: u8 = 15;
-const BOMBER_LOOP_SLEEP_TICKS: u8 = 1;
-const BOMBER_ANIMATION_FRAME_COUNT: u8 = 4;
-const BOMBER_CRUISE_ALTITUDE: i16 = 0x50;
-const BOMBER_MIN_CRUISE_ALTITUDE: i16 = 0x40;
-const BOMBER_MAX_CRUISE_ALTITUDE: i16 = 0x68;
-const BOMBER_CRUISE_WINDOW_HALF_PIXELS: i16 = 0x10;
-const ACTIVE_BOMBER_BOMB_LIMIT: usize = 10;
-const MAX_ACTIVE_WAVE_ENEMIES: usize = 5;
-const START_HUMAN_COUNT: u8 = 10;
-const TARGET_LIST_ENTRY_COUNT: usize = 32;
-const ACTOR_RNG_MULTIPLIER: u8 = 3;
-const ACTOR_RNG_INCREMENT: u8 = 17;
-const ACTOR_RNG_LSEED_MIX_SHIFT: u8 = 3;
-const ACTOR_RNG_CARRY_BIT: u8 = 0x01;
-const ACTOR_RNG_CARRY_SHIFT: u8 = 7;
-const STATUS_SCORE_POSITION: Point = Point::new(8, 6);
-const STATUS_HIGH_SCORE_POSITION: Point = Point::new(94, 6);
-const STATUS_PLAYER_TWO_SCORE_POSITION: Point = Point::new(208, 6);
-const STATUS_WAVE_POSITION: Point = Point::new(8, 32);
-const STATUS_CREDITS_POSITION: Point = Point::new(176, 226);
-const CREDITS_MESSAGE: MessageId = MessageId::CreditsPrompt;
-const PRESENTS_MESSAGE: MessageId = MessageId::WilliamsElectronics;
-const ATTRACT_PRESENTS_ELECTRONICS_CELL: ScreenAddress = ScreenAddress::new(0x3258);
-const ACTOR_HUD_SCORE_DIGIT_DISPLAY_COUNT: usize = 6;
-const ACTOR_HUD_SCORE_DISPLAY_MAX: u32 = 999_999;
-const ACTOR_HUD_PLAYER_ONE_SCORE_ORIGIN: [f32; 2] = [18.0, 21.0];
-const ACTOR_HUD_PLAYER_TWO_SCORE_ORIGIN: [f32; 2] = [214.0, 21.0];
-const ACTOR_HUD_SCORE_DIGIT_STEP: [f32; 2] = [8.0, 0.0];
-const ACTOR_HUD_SCORE_DIGIT_SIZE: [f32; 2] = [6.0, 8.0];
-const ACTOR_HUD_PLAYER_LIFE_STOCK_DISPLAY_LIMIT: u8 = 5;
-const ACTOR_HUD_SMART_BOMB_STOCK_DISPLAY_LIMIT: u8 = 3;
-const ACTOR_HUD_PLAYER_ONE_LIFE_STOCK_ORIGIN: [f32; 2] = [18.0, 13.0];
-const ACTOR_HUD_PLAYER_TWO_LIFE_STOCK_ORIGIN: [f32; 2] = [214.0, 13.0];
-const ACTOR_HUD_PLAYER_LIFE_STOCK_STEP: [f32; 2] = [12.0, 0.0];
-const ACTOR_HUD_PLAYER_LIFE_STOCK_SIZE: [f32; 2] = [10.0, 4.0];
-const ACTOR_HUD_PLAYER_ONE_SMART_BOMB_STOCK_ORIGIN: [f32; 2] = [70.0, 20.0];
-const ACTOR_HUD_PLAYER_TWO_SMART_BOMB_STOCK_ORIGIN: [f32; 2] = [266.0, 20.0];
-const ACTOR_HUD_SMART_BOMB_STOCK_STEP: [f32; 2] = [0.0, 4.0];
-const ACTOR_HUD_SMART_BOMB_STOCK_SIZE: [f32; 2] = [6.0, 3.0];
-const STATUS_FINAL_SCORE_POSITION: Point = Point::new(56, 92);
-const STATUS_HIGH_SCORE_ENTRY_PROMPT_POSITION: Point = Point::new(66, 120);
-const STATUS_HIGH_SCORE_ENTRY_INITIALS_POSITION: Point = Point::new(66, 104);
-const STATUS_HIGH_SCORE_TABLE_TITLE_POSITION: Point = Point::new(78, 112);
-const STATUS_HIGH_SCORE_TABLE_SCORE_X: i16 = 82;
-const STATUS_HIGH_SCORE_TABLE_START_Y: i16 = 128;
-const STATUS_HIGH_SCORE_TABLE_ROW_HEIGHT: i16 = 12;
-const LANDER_SEEK_SPEED: i16 = 1;
-const LANDER_DRIFT_SPEED: i16 = 1;
-const LANDER_CARRY_SPEED: i16 = 2;
-const LANDER_PICKUP_RADIUS_X: i16 = 6;
-const LANDER_PICKUP_RADIUS_Y: i16 = 8;
-const LANDER_CONVERSION_Y: i16 = 24;
-const MUTANT_SEEK_SPEED: i16 = 1;
-const MUTANT_SHOT_LIFETIME: u16 = 90;
-const MUTANT_LOOP_SLEEP_TICKS: u8 = 2;
-const MUTANT_X_DISTANCE_OFFSET: u16 = 380;
-const MUTANT_CLOSE_X_WINDOW: u16 = 0x0700;
-const MUTANT_VERTICAL_WINDOW: u8 = 8;
-const FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y: i16 = 0xA0;
+pub(in crate::actor_game) const HUMAN_LEFT_X_VELOCITY: u16 = 0xFFE0;
+pub(in crate::actor_game) const HUMAN_RIGHT_X_VELOCITY: u16 = 0x0020;
+pub(in crate::actor_game) const INITIAL_POD_X_SPEED: u8 = 0x20;
+pub(in crate::actor_game) const BOMBER_SQUAD_SIZE: usize = 4;
+pub(in crate::actor_game) const POD_SWARMER_REQUEST_LIMIT: usize = 6;
+pub(in crate::actor_game) const ACTIVE_SWARMER_LIMIT: usize = 20;
+pub(in crate::actor_game) const ACTIVE_BAITER_LIMIT: usize = 12;
+pub(in crate::actor_game) const MINI_SWARMER_LOOP_SLEEP_TICKS: u8 = 3;
+pub(in crate::actor_game) const MINI_SWARMER_MAX_Y_VELOCITY: u16 = 0x0200;
+pub(in crate::actor_game) const MINI_SWARMER_MIN_Y_VELOCITY: u16 = 0xFE00;
+pub(in crate::actor_game) const MINI_SWARMER_TURN_WINDOW: u16 = 300 * 32;
+pub(in crate::actor_game) const MINI_SWARMER_TURN_WINDOW_HALF: u16 = 150 * 32;
+pub(in crate::actor_game) const MINI_SWARMER_RESTORE_X_LOW: u8 = 0x07;
+pub(in crate::actor_game) const BAITER_INITIAL_SHOT_TIMER: u8 = 8;
+pub(in crate::actor_game) const BAITER_LOOP_SLEEP_TICKS: u8 = 6;
+pub(in crate::actor_game) const BAITER_X_SEEK_SPEED: u8 = 0x40;
+pub(in crate::actor_game) const BAITER_Y_SEEK_BYTE: u8 = 0x01;
+pub(in crate::actor_game) const BAITER_X_SEEK_WINDOW_HALF_PIXELS: i16 = 20;
+pub(in crate::actor_game) const BAITER_Y_SEEK_WINDOW_HALF_PIXELS: i16 = 10;
+pub(in crate::actor_game) const BAITER_ANIMATION_FRAME_COUNT: u8 = 3;
+pub(in crate::actor_game) const ACTOR_BAITER_TIMER_PACING_STEPS: u8 = 15;
+pub(in crate::actor_game) const BOMBER_LOOP_SLEEP_TICKS: u8 = 1;
+pub(in crate::actor_game) const BOMBER_ANIMATION_FRAME_COUNT: u8 = 4;
+pub(in crate::actor_game) const BOMBER_CRUISE_ALTITUDE: i16 = 0x50;
+pub(in crate::actor_game) const BOMBER_MIN_CRUISE_ALTITUDE: i16 = 0x40;
+pub(in crate::actor_game) const BOMBER_MAX_CRUISE_ALTITUDE: i16 = 0x68;
+pub(in crate::actor_game) const BOMBER_CRUISE_WINDOW_HALF_PIXELS: i16 = 0x10;
+pub(in crate::actor_game) const ACTIVE_BOMBER_BOMB_LIMIT: usize = 10;
+pub(in crate::actor_game) const MAX_ACTIVE_WAVE_ENEMIES: usize = 5;
+pub(in crate::actor_game) const START_HUMAN_COUNT: u8 = 10;
+pub(in crate::actor_game) const TARGET_LIST_ENTRY_COUNT: usize = 32;
+pub(in crate::actor_game) const ACTOR_RNG_MULTIPLIER: u8 = 3;
+pub(in crate::actor_game) const ACTOR_RNG_INCREMENT: u8 = 17;
+pub(in crate::actor_game) const ACTOR_RNG_LSEED_MIX_SHIFT: u8 = 3;
+pub(in crate::actor_game) const ACTOR_RNG_CARRY_BIT: u8 = 0x01;
+pub(in crate::actor_game) const ACTOR_RNG_CARRY_SHIFT: u8 = 7;
+pub(in crate::actor_game) const STATUS_SCORE_POSITION: Point = Point::new(8, 6);
+pub(in crate::actor_game) const STATUS_HIGH_SCORE_POSITION: Point = Point::new(94, 6);
+pub(in crate::actor_game) const STATUS_PLAYER_TWO_SCORE_POSITION: Point = Point::new(208, 6);
+pub(in crate::actor_game) const STATUS_WAVE_POSITION: Point = Point::new(8, 32);
+pub(in crate::actor_game) const STATUS_CREDITS_POSITION: Point = Point::new(176, 226);
+pub(in crate::actor_game) const CREDITS_MESSAGE: MessageId = MessageId::CreditsPrompt;
+pub(in crate::actor_game) const PRESENTS_MESSAGE: MessageId = MessageId::WilliamsElectronics;
+pub(in crate::actor_game) const ATTRACT_PRESENTS_ELECTRONICS_CELL: ScreenAddress =
+    ScreenAddress::new(0x3258);
+pub(in crate::actor_game) const ACTOR_HUD_SCORE_DIGIT_DISPLAY_COUNT: usize = 6;
+pub(in crate::actor_game) const ACTOR_HUD_SCORE_DISPLAY_MAX: u32 = 999_999;
+pub(in crate::actor_game) const ACTOR_HUD_PLAYER_ONE_SCORE_ORIGIN: [f32; 2] = [18.0, 21.0];
+pub(in crate::actor_game) const ACTOR_HUD_PLAYER_TWO_SCORE_ORIGIN: [f32; 2] = [214.0, 21.0];
+pub(in crate::actor_game) const ACTOR_HUD_SCORE_DIGIT_STEP: [f32; 2] = [8.0, 0.0];
+pub(in crate::actor_game) const ACTOR_HUD_SCORE_DIGIT_SIZE: [f32; 2] = [6.0, 8.0];
+pub(in crate::actor_game) const ACTOR_HUD_PLAYER_LIFE_STOCK_DISPLAY_LIMIT: u8 = 5;
+pub(in crate::actor_game) const ACTOR_HUD_SMART_BOMB_STOCK_DISPLAY_LIMIT: u8 = 3;
+pub(in crate::actor_game) const ACTOR_HUD_PLAYER_ONE_LIFE_STOCK_ORIGIN: [f32; 2] = [18.0, 13.0];
+pub(in crate::actor_game) const ACTOR_HUD_PLAYER_TWO_LIFE_STOCK_ORIGIN: [f32; 2] = [214.0, 13.0];
+pub(in crate::actor_game) const ACTOR_HUD_PLAYER_LIFE_STOCK_STEP: [f32; 2] = [12.0, 0.0];
+pub(in crate::actor_game) const ACTOR_HUD_PLAYER_LIFE_STOCK_SIZE: [f32; 2] = [10.0, 4.0];
+pub(in crate::actor_game) const ACTOR_HUD_PLAYER_ONE_SMART_BOMB_STOCK_ORIGIN: [f32; 2] =
+    [70.0, 20.0];
+pub(in crate::actor_game) const ACTOR_HUD_PLAYER_TWO_SMART_BOMB_STOCK_ORIGIN: [f32; 2] =
+    [266.0, 20.0];
+pub(in crate::actor_game) const ACTOR_HUD_SMART_BOMB_STOCK_STEP: [f32; 2] = [0.0, 4.0];
+pub(in crate::actor_game) const ACTOR_HUD_SMART_BOMB_STOCK_SIZE: [f32; 2] = [6.0, 3.0];
+pub(in crate::actor_game) const STATUS_FINAL_SCORE_POSITION: Point = Point::new(56, 92);
+pub(in crate::actor_game) const STATUS_HIGH_SCORE_ENTRY_PROMPT_POSITION: Point =
+    Point::new(66, 120);
+pub(in crate::actor_game) const STATUS_HIGH_SCORE_ENTRY_INITIALS_POSITION: Point =
+    Point::new(66, 104);
+pub(in crate::actor_game) const STATUS_HIGH_SCORE_TABLE_TITLE_POSITION: Point = Point::new(78, 112);
+pub(in crate::actor_game) const STATUS_HIGH_SCORE_TABLE_SCORE_X: i16 = 82;
+pub(in crate::actor_game) const STATUS_HIGH_SCORE_TABLE_START_Y: i16 = 128;
+pub(in crate::actor_game) const STATUS_HIGH_SCORE_TABLE_ROW_HEIGHT: i16 = 12;
+pub(in crate::actor_game) const LANDER_SEEK_SPEED: i16 = 1;
+pub(in crate::actor_game) const LANDER_DRIFT_SPEED: i16 = 1;
+pub(in crate::actor_game) const LANDER_CARRY_SPEED: i16 = 2;
+pub(in crate::actor_game) const LANDER_PICKUP_RADIUS_X: i16 = 6;
+pub(in crate::actor_game) const LANDER_PICKUP_RADIUS_Y: i16 = 8;
+pub(in crate::actor_game) const LANDER_CONVERSION_Y: i16 = 24;
+pub(in crate::actor_game) const MUTANT_SEEK_SPEED: i16 = 1;
+pub(in crate::actor_game) const MUTANT_SHOT_LIFETIME: u16 = 90;
+pub(in crate::actor_game) const MUTANT_LOOP_SLEEP_TICKS: u8 = 2;
+pub(in crate::actor_game) const MUTANT_X_DISTANCE_OFFSET: u16 = 380;
+pub(in crate::actor_game) const MUTANT_CLOSE_X_WINDOW: u16 = 0x0700;
+pub(in crate::actor_game) const MUTANT_VERTICAL_WINDOW: u8 = 8;
+pub(in crate::actor_game) const FIRST_WAVE_RESCUE_AIM_PLAYER_MIN_Y: i16 = 0xA0;
 
 #[cfg(test)]
-fn actor_message_text(message: MessageId) -> &'static str {
+pub(in crate::actor_game) fn actor_message_text(message: MessageId) -> &'static str {
     crate::arcade_assets::message_text(message)
 }
-const MUTANT_DIVE_CONVERSION_X_CORRECTION: u16 = 0x0120;
-const MUTANT_DIVE_DEFERRED_SHOT_TIMER: u8 = 5;
-const MUTANT_DIVE_POST_SHOT_TIMER: u8 = 0x2C;
-const MUTANT_DIVE_COLLISION_PENDING_SHOT_TIMER: u8 = 0xFE;
-const MUTANT_DIVE_ENTRY_WORLD_WORDS: (u16, u16) = (0x037C, 0x3380);
-const MUTANT_DIVE_FIRST_SHOT_WORLD_WORDS: (u16, u16) = (0x088C, 0x61B0);
-const MUTANT_DIVE_SECOND_SHOT_WORLD_WORDS: (u16, u16) = (0x07FC, 0x7800);
-const MUTANT_DIVE_FORCED_FIRST_SHOT_WORLD_WORDS: (u16, u16) = (0x082C, 0x5160);
-const MUTANT_DIVE_FORCED_SECOND_SHOT_WORLD_WORDS: (u16, u16) = (0x07FC, 0x8150);
-const MUTANT_DIVE_COLLISION_WORLD_Y_MIN: u16 = 0xA400;
-const MUTANT_DIVE_COLLISION_WORLD_Y_MAX: u16 = 0xA600;
-const MUTANT_DIVE_COLLISION_EXPLOSION_TOP_LEFT: Point = Point::new(0x20, 0xA2);
-const MUTANT_DIVE_COLLISION_EXPLOSION_ANCHOR: Point = Point::new(0x21, 0xA9);
-const MUTANT_DIVE_VISUAL_X_CORRECTION: u16 = 0x0168;
-const OBJECT_ACTIVE_LEFT_MARGIN: u16 = 100 * 32;
-const OBJECT_ACTIVE_WORLD_WIDTH: u16 = 500 * 32;
-const OBJECT_WORLD_TO_SCREEN_SHIFT: u8 = 6;
-const OBJECT_VISIBLE_SCREEN_WIDTH: u16 = 292;
-const BOMBER_DRIFT_SPEED: i16 = 1;
-const BOMBER_BOMB_PERIOD: u64 = 64;
-const POD_DRIFT_SPEED: i16 = 1;
-const SWARMER_SEEK_SPEED: i16 = 2;
-const SWARMER_FIRE_PERIOD: u64 = 58;
-const SWARMER_SHOT_SPEED: i16 = 3;
-const BAITER_SEEK_SPEED: i16 = 3;
-const BAITER_FIRE_PERIOD: u64 = 42;
-const BAITER_SHOT_SPEED: i16 = 4;
-const BOMB_LIFETIME: u16 = 96;
-const LANDER_SCORE: u32 = 150;
-const MUTANT_SCORE: u32 = 150;
-const BOMBER_SCORE: u32 = 250;
-const POD_SCORE: u32 = 1000;
-const SWARMER_SCORE: u32 = 150;
-const BAITER_SCORE: u32 = 200;
-const HUMAN_RESCUE_SCORE: u32 = 500;
-const HUMAN_SAFE_LANDING_SCORE: u32 = 250;
-const ACTOR_ATTRACT_SCRIPT: &str = include_str!("../assets/actor-scripts/actor-attract.script");
-const ACTOR_BEHAVIOR_SCRIPT: &str = include_str!("../assets/actor-scripts/actor-behavior.script");
-const ACTOR_WAVE_SCRIPT: &str = include_str!("../assets/actor-scripts/actor-waves.script");
-const ACTOR_DEFAULT_DIFFICULTY_INITIAL: u8 = 5;
-const ACTOR_DEFAULT_DIFFICULTY_CEILING: u8 = 15;
-const ACTOR_DATA_BACKED_WAVES: u16 = 16;
-const ACTOR_WAVE_ACTIVE_SPAWN_SLOTS: [Point; MAX_ACTIVE_WAVE_ENEMIES] = [
+pub(in crate::actor_game) const MUTANT_DIVE_CONVERSION_X_CORRECTION: u16 = 0x0120;
+pub(in crate::actor_game) const MUTANT_DIVE_DEFERRED_SHOT_TIMER: u8 = 5;
+pub(in crate::actor_game) const MUTANT_DIVE_POST_SHOT_TIMER: u8 = 0x2C;
+pub(in crate::actor_game) const MUTANT_DIVE_COLLISION_PENDING_SHOT_TIMER: u8 = 0xFE;
+pub(in crate::actor_game) const MUTANT_DIVE_ENTRY_WORLD_WORDS: (u16, u16) = (0x037C, 0x3380);
+pub(in crate::actor_game) const MUTANT_DIVE_FIRST_SHOT_WORLD_WORDS: (u16, u16) = (0x088C, 0x61B0);
+pub(in crate::actor_game) const MUTANT_DIVE_SECOND_SHOT_WORLD_WORDS: (u16, u16) = (0x07FC, 0x7800);
+pub(in crate::actor_game) const MUTANT_DIVE_FORCED_FIRST_SHOT_WORLD_WORDS: (u16, u16) =
+    (0x082C, 0x5160);
+pub(in crate::actor_game) const MUTANT_DIVE_FORCED_SECOND_SHOT_WORLD_WORDS: (u16, u16) =
+    (0x07FC, 0x8150);
+pub(in crate::actor_game) const MUTANT_DIVE_COLLISION_WORLD_Y_MIN: u16 = 0xA400;
+pub(in crate::actor_game) const MUTANT_DIVE_COLLISION_WORLD_Y_MAX: u16 = 0xA600;
+pub(in crate::actor_game) const MUTANT_DIVE_COLLISION_EXPLOSION_TOP_LEFT: Point =
+    Point::new(0x20, 0xA2);
+pub(in crate::actor_game) const MUTANT_DIVE_COLLISION_EXPLOSION_ANCHOR: Point =
+    Point::new(0x21, 0xA9);
+pub(in crate::actor_game) const MUTANT_DIVE_VISUAL_X_CORRECTION: u16 = 0x0168;
+pub(in crate::actor_game) const OBJECT_ACTIVE_LEFT_MARGIN: u16 = 100 * 32;
+pub(in crate::actor_game) const OBJECT_ACTIVE_WORLD_WIDTH: u16 = 500 * 32;
+pub(in crate::actor_game) const OBJECT_WORLD_TO_SCREEN_SHIFT: u8 = 6;
+pub(in crate::actor_game) const OBJECT_VISIBLE_SCREEN_WIDTH: u16 = 292;
+pub(in crate::actor_game) const BOMBER_DRIFT_SPEED: i16 = 1;
+pub(in crate::actor_game) const BOMBER_BOMB_PERIOD: u64 = 64;
+pub(in crate::actor_game) const POD_DRIFT_SPEED: i16 = 1;
+pub(in crate::actor_game) const SWARMER_SEEK_SPEED: i16 = 2;
+pub(in crate::actor_game) const SWARMER_FIRE_PERIOD: u64 = 58;
+pub(in crate::actor_game) const SWARMER_SHOT_SPEED: i16 = 3;
+pub(in crate::actor_game) const BAITER_SEEK_SPEED: i16 = 3;
+pub(in crate::actor_game) const BAITER_FIRE_PERIOD: u64 = 42;
+pub(in crate::actor_game) const BAITER_SHOT_SPEED: i16 = 4;
+pub(in crate::actor_game) const BOMB_LIFETIME: u16 = 96;
+pub(in crate::actor_game) const LANDER_SCORE: u32 = 150;
+pub(in crate::actor_game) const MUTANT_SCORE: u32 = 150;
+pub(in crate::actor_game) const BOMBER_SCORE: u32 = 250;
+pub(in crate::actor_game) const POD_SCORE: u32 = 1000;
+pub(in crate::actor_game) const SWARMER_SCORE: u32 = 150;
+pub(in crate::actor_game) const BAITER_SCORE: u32 = 200;
+pub(in crate::actor_game) const HUMAN_RESCUE_SCORE: u32 = 500;
+pub(in crate::actor_game) const HUMAN_SAFE_LANDING_SCORE: u32 = 250;
+pub(in crate::actor_game) const ACTOR_ATTRACT_SCRIPT: &str =
+    include_str!("../assets/actor-scripts/actor-attract.script");
+pub(in crate::actor_game) const ACTOR_BEHAVIOR_SCRIPT: &str =
+    include_str!("../assets/actor-scripts/actor-behavior.script");
+pub(in crate::actor_game) const ACTOR_WAVE_SCRIPT: &str =
+    include_str!("../assets/actor-scripts/actor-waves.script");
+pub(in crate::actor_game) const ACTOR_DEFAULT_DIFFICULTY_INITIAL: u8 = 5;
+pub(in crate::actor_game) const ACTOR_DEFAULT_DIFFICULTY_CEILING: u8 = 15;
+pub(in crate::actor_game) const ACTOR_DATA_BACKED_WAVES: u16 = 16;
+pub(in crate::actor_game) const ACTOR_WAVE_ACTIVE_SPAWN_SLOTS: [Point; MAX_ACTIVE_WAVE_ENEMIES] = [
     Point::new(0xE4, 0x2A),
     Point::new(228, 104),
     Point::new(184, 72),
@@ -514,7 +499,7 @@ const ACTOR_WAVE_ACTIVE_SPAWN_SLOTS: [Point; MAX_ACTIVE_WAVE_ENEMIES] = [
     Point::new(236, 66),
 ];
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ActorId(u64);
+pub struct ActorId(pub(in crate::actor_game) u64);
 
 impl ActorId {
     pub const fn new(value: u64) -> Self {
@@ -613,15 +598,15 @@ impl GameInput {
         }
     }
 
-    fn coin_insertions(self) -> u8 {
+    pub(in crate::actor_game) fn coin_insertions(self) -> u8 {
         u8::from(self.coin) + u8::from(self.coin_two) + u8::from(self.coin_three)
     }
 
-    fn wants_fire(self) -> bool {
+    pub(in crate::actor_game) fn wants_fire(self) -> bool {
         self.fire || self.xyzzy.auto_fire
     }
 
-    fn wants_stock_smart_bomb(self) -> bool {
+    pub(in crate::actor_game) fn wants_stock_smart_bomb(self) -> bool {
         self.smart_bomb && !self.xyzzy.overlay_smart_bomb
     }
 }
@@ -707,18 +692,18 @@ pub struct KeyboardPoll {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-struct HeldControls {
-    altitude_up: bool,
-    altitude_down: bool,
-    thrust: bool,
-    auto_up_manual_down: bool,
+pub(in crate::actor_game) struct HeldControls {
+    pub(in crate::actor_game) altitude_up: bool,
+    pub(in crate::actor_game) altitude_down: bool,
+    pub(in crate::actor_game) thrust: bool,
+    pub(in crate::actor_game) auto_up_manual_down: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeyboardMapper {
-    profile: KeyboardProfile,
-    held: HeldControls,
-    xyzzy: XyzzyController,
+    pub(in crate::actor_game) profile: KeyboardProfile,
+    pub(in crate::actor_game) held: HeldControls,
+    pub(in crate::actor_game) xyzzy: XyzzyController,
 }
 
 impl KeyboardMapper {
@@ -877,7 +862,11 @@ impl Default for KeyboardMapper {
     }
 }
 
-fn set_held_control(held: &mut bool, transition: KeyTransition, output: &mut bool) {
+pub(in crate::actor_game) fn set_held_control(
+    held: &mut bool,
+    transition: KeyTransition,
+    output: &mut bool,
+) {
     match transition {
         KeyTransition::Press | KeyTransition::Repeat => {
             *held = true;
@@ -889,10 +878,10 @@ fn set_held_control(held: &mut bool, transition: KeyTransition, output: &mut boo
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct XyzzyController {
-    active: bool,
-    sequence_index: usize,
-    auto_fire: bool,
-    invincible: bool,
+    pub(in crate::actor_game) active: bool,
+    pub(in crate::actor_game) sequence_index: usize,
+    pub(in crate::actor_game) auto_fire: bool,
+    pub(in crate::actor_game) invincible: bool,
 }
 
 impl XyzzyController {
@@ -1024,7 +1013,7 @@ impl Rect {
     }
 }
 
-const fn clamp_i16(value: i16, min: i16, max: i16) -> i16 {
+pub(in crate::actor_game) const fn clamp_i16(value: i16, min: i16, max: i16) -> i16 {
     if value < min {
         min
     } else if value > max {
@@ -1041,7 +1030,7 @@ pub enum Direction {
 }
 
 impl Direction {
-    const fn sign(self) -> i16 {
+    pub(in crate::actor_game) const fn sign(self) -> i16 {
         match self {
             Self::Left => -1,
             Self::Right => 1,
@@ -1108,7 +1097,7 @@ pub struct ActorRngSnapshot {
 }
 
 impl ActorRngSnapshot {
-    const fn hyperspace_seed(self) -> ActorHyperspaceSeed {
+    pub(in crate::actor_game) const fn hyperspace_seed(self) -> ActorHyperspaceSeed {
         ActorHyperspaceSeed {
             seed: self.seed,
             hseed: self.hseed,
@@ -1118,14 +1107,14 @@ impl ActorRngSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ActorRng {
-    seed: u8,
-    hseed: u8,
-    lseed: u8,
+pub(in crate::actor_game) struct ActorRng {
+    pub(in crate::actor_game) seed: u8,
+    pub(in crate::actor_game) hseed: u8,
+    pub(in crate::actor_game) lseed: u8,
 }
 
 impl ActorRng {
-    fn advance(&mut self) -> Self {
+    pub(in crate::actor_game) fn advance(&mut self) -> Self {
         let product_low = self
             .seed
             .wrapping_mul(ACTOR_RNG_MULTIPLIER)
@@ -1134,23 +1123,21 @@ impl ActorRng {
         a ^= self.lseed;
         let carry_into_hseed = (a & ACTOR_RNG_CARRY_BIT) != 0;
         let old_hseed = self.hseed;
-        self.hseed =
-            (u8::from(carry_into_hseed) << ACTOR_RNG_CARRY_SHIFT) | (self.hseed >> 1);
+        self.hseed = (u8::from(carry_into_hseed) << ACTOR_RNG_CARRY_SHIFT) | (self.hseed >> 1);
         let carry_into_lseed = (old_hseed & ACTOR_RNG_CARRY_BIT) != 0;
-        self.lseed =
-            (u8::from(carry_into_lseed) << ACTOR_RNG_CARRY_SHIFT) | (self.lseed >> 1);
+        self.lseed = (u8::from(carry_into_lseed) << ACTOR_RNG_CARRY_SHIFT) | (self.lseed >> 1);
         let (with_lseed, carry) = adc8(product_low, self.lseed, false);
         let (new_seed, _) = adc8(with_lseed, self.hseed, carry);
         self.seed = new_seed;
         *self
     }
 
-    fn advance_rmax(&mut self, max: u8) -> u8 {
+    pub(in crate::actor_game) fn advance_rmax(&mut self, max: u8) -> u8 {
         let state = self.advance();
         bounded_actor_rng_value(max, state.seed)
     }
 
-    const fn snapshot(self) -> ActorRngSnapshot {
+    pub(in crate::actor_game) const fn snapshot(self) -> ActorRngSnapshot {
         ActorRngSnapshot {
             seed: self.seed,
             hseed: self.hseed,
@@ -1270,9 +1257,9 @@ impl Default for ActorBehaviorProfile {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorBehaviorScript {
-    default_profile: ActorBehaviorProfile,
-    kind_profiles: BTreeMap<ActorKind, ActorBehaviorProfile>,
-    actor_profiles: BTreeMap<ActorId, ActorBehaviorProfile>,
+    pub(in crate::actor_game) default_profile: ActorBehaviorProfile,
+    pub(in crate::actor_game) kind_profiles: BTreeMap<ActorKind, ActorBehaviorProfile>,
+    pub(in crate::actor_game) actor_profiles: BTreeMap<ActorId, ActorBehaviorProfile>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1394,13 +1381,9 @@ impl ActorBehaviorScript {
         }
     }
 
-    fn with_hyperspace_seed(&self, seed: ActorHyperspaceSeed) -> Self {
+    pub(in crate::actor_game) fn with_hyperspace_seed(&self, seed: ActorHyperspaceSeed) -> Self {
         let mut script = self.clone();
-        if script
-            .default_profile
-            .player_hyperspace_seed
-            .is_none()
-        {
+        if script.default_profile.player_hyperspace_seed.is_none() {
             script.default_profile.player_hyperspace_seed = Some(seed);
         }
         for profile in script.kind_profiles.values_mut() {
@@ -1411,7 +1394,7 @@ impl ActorBehaviorScript {
         script
     }
 
-    fn with_input_overrides(
+    pub(in crate::actor_game) fn with_input_overrides(
         &self,
         input: GameInput,
         snapshots: impl Iterator<Item = ActorSnapshot>,
@@ -1474,7 +1457,7 @@ pub struct ActorBehaviorScriptParseError {
 }
 
 impl ActorBehaviorScriptParseError {
-    fn new(line: usize, message: impl Into<String>) -> Self {
+    pub(in crate::actor_game) fn new(line: usize, message: impl Into<String>) -> Self {
         Self {
             line,
             message: message.into(),
@@ -1494,7 +1477,7 @@ impl fmt::Display for ActorBehaviorScriptParseError {
 
 impl std::error::Error for ActorBehaviorScriptParseError {}
 
-fn parse_behavior_script_line(
+pub(in crate::actor_game) fn parse_behavior_script_line(
     line_number: usize,
     line: &str,
     script: &mut ActorBehaviorScript,
@@ -1540,7 +1523,7 @@ fn parse_behavior_script_line(
     }
 }
 
-fn apply_behavior_profile_field(
+pub(in crate::actor_game) fn apply_behavior_profile_field(
     line_number: usize,
     profile: &mut ActorBehaviorProfile,
     field: &str,

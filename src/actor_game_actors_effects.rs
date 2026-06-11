@@ -1,22 +1,24 @@
+use super::*;
+
 #[derive(Debug)]
-struct Human {
-    id: ActorId,
-    position: Point,
-    mode: HumanMode,
-    safe_landing_awarded: bool,
-    actor_state: Option<HumanActorState>,
+pub(in crate::actor_game) struct Human {
+    pub(in crate::actor_game) id: ActorId,
+    pub(in crate::actor_game) position: Point,
+    pub(in crate::actor_game) mode: HumanMode,
+    pub(in crate::actor_game) safe_landing_awarded: bool,
+    pub(in crate::actor_game) actor_state: Option<HumanActorState>,
 }
 
 impl Human {
-    fn new(id: ActorId, position: Point, mode: HumanMode) -> Self {
+    pub(in crate::actor_game) fn new(id: ActorId, position: Point, mode: HumanMode) -> Self {
         Self::with_actor_state(id, position, mode, None)
     }
 
-    fn from_spawn(id: ActorId, spawn: ActorHumanSpawn) -> Self {
+    pub(in crate::actor_game) fn from_spawn(id: ActorId, spawn: ActorHumanSpawn) -> Self {
         Self::with_actor_state(id, spawn.position, spawn.mode, spawn.actor_state)
     }
 
-    fn with_actor_state(
+    pub(in crate::actor_game) fn with_actor_state(
         id: ActorId,
         position: Point,
         mode: HumanMode,
@@ -235,20 +237,26 @@ impl Human {
     }
 }
 
-fn intersects_snapshot(snapshot: &ActorSnapshot, bounds: Rect) -> bool {
+pub(in crate::actor_game) fn intersects_snapshot(snapshot: &ActorSnapshot, bounds: Rect) -> bool {
     snapshot
         .bounds
         .is_some_and(|snapshot_bounds| snapshot_bounds.intersects(bounds))
 }
 
-fn human_collision_bounds(mode: HumanMode, position: Point) -> Option<Rect> {
+pub(in crate::actor_game) fn human_collision_bounds(
+    mode: HumanMode,
+    position: Point,
+) -> Option<Rect> {
     match mode {
         HumanMode::CarriedBy(_) => None,
         HumanMode::Grounded | HumanMode::Falling { .. } => Some(Rect::from_center(position, 4, 8)),
     }
 }
 
-fn actor_human_walk_targetable(human_count: usize, snapshot: &ActorSnapshot) -> bool {
+pub(in crate::actor_game) fn actor_human_walk_targetable(
+    human_count: usize,
+    snapshot: &ActorSnapshot,
+) -> bool {
     snapshot.kind == ActorKind::Human
         && snapshot.alive
         && snapshot.bounds.is_some()
@@ -258,15 +266,15 @@ fn actor_human_walk_targetable(human_count: usize, snapshot: &ActorSnapshot) -> 
 }
 
 #[derive(Debug)]
-struct ScorePopup {
-    id: ActorId,
-    position: Point,
-    points: u32,
-    age: u16,
+pub(in crate::actor_game) struct ScorePopup {
+    pub(in crate::actor_game) id: ActorId,
+    pub(in crate::actor_game) position: Point,
+    pub(in crate::actor_game) points: u32,
+    pub(in crate::actor_game) age: u16,
 }
 
 impl ScorePopup {
-    fn new(id: ActorId, position: Point, points: u32) -> Self {
+    pub(in crate::actor_game) fn new(id: ActorId, position: Point, points: u32) -> Self {
         Self {
             id,
             position,
@@ -317,15 +325,20 @@ impl AssetActor for ScorePopup {
 }
 
 #[derive(Debug)]
-struct LaserShot {
-    id: ActorId,
-    position: Point,
-    direction: Direction,
-    age: u16,
+pub(in crate::actor_game) struct LaserShot {
+    pub(in crate::actor_game) id: ActorId,
+    pub(in crate::actor_game) position: Point,
+    pub(in crate::actor_game) direction: Direction,
+    pub(in crate::actor_game) age: u16,
 }
 
 impl LaserShot {
-    fn new(id: ActorId, position: Point, direction: Direction, _owner: ActorId) -> Self {
+    pub(in crate::actor_game) fn new(
+        id: ActorId,
+        position: Point,
+        direction: Direction,
+        _owner: ActorId,
+    ) -> Self {
         Self {
             id,
             position,
@@ -384,23 +397,22 @@ impl AssetActor for LaserShot {
 }
 
 #[derive(Debug)]
-struct EnemyLaserShot {
-    id: ActorId,
-    position: Point,
-    actor_state: EnemyProjectileActorState,
-    lifetime_steps: Option<u16>,
+pub(in crate::actor_game) struct EnemyLaserShot {
+    pub(in crate::actor_game) id: ActorId,
+    pub(in crate::actor_game) position: Point,
+    pub(in crate::actor_game) actor_state: EnemyProjectileActorState,
+    pub(in crate::actor_game) lifetime_steps: Option<u16>,
 }
 
 impl EnemyLaserShot {
-    fn new(
+    pub(in crate::actor_game) fn new(
         id: ActorId,
         position: Point,
         velocity: Velocity,
         actor_state: Option<EnemyProjectileActorState>,
     ) -> Self {
-        let actor_state = actor_state.unwrap_or_else(|| {
-            EnemyProjectileActorState::from_velocity(0, 0, velocity, 0)
-        });
+        let actor_state = actor_state
+            .unwrap_or_else(|| EnemyProjectileActorState::from_velocity(0, 0, velocity, 0));
         let lifetime_steps = if actor_state.lifetime_ticks == 0 {
             None
         } else {
@@ -455,8 +467,7 @@ impl AssetActor for EnemyLaserShot {
                 && let Some(lifetime_steps) = &mut self.lifetime_steps
             {
                 *lifetime_steps = lifetime_steps.saturating_sub(1);
-                self.actor_state.lifetime_ticks =
-                    projectile_lifetime_ticks(*lifetime_steps);
+                self.actor_state.lifetime_ticks = projectile_lifetime_ticks(*lifetime_steps);
             }
             if self.lifetime_steps.is_some_and(|steps| steps > 0) {
                 movement_velocity = self.advance_projectile_motion();
@@ -491,16 +502,16 @@ impl AssetActor for EnemyLaserShot {
 }
 
 #[derive(Debug)]
-struct Explosion {
-    id: ActorId,
-    position: Point,
-    kind: ExplosionKind,
-    explosion_anchor: Option<Point>,
-    age: u16,
+pub(in crate::actor_game) struct Explosion {
+    pub(in crate::actor_game) id: ActorId,
+    pub(in crate::actor_game) position: Point,
+    pub(in crate::actor_game) kind: ExplosionKind,
+    pub(in crate::actor_game) explosion_anchor: Option<Point>,
+    pub(in crate::actor_game) age: u16,
 }
 
 impl Explosion {
-    fn new(
+    pub(in crate::actor_game) fn new(
         id: ActorId,
         position: Point,
         kind: ExplosionKind,
@@ -560,7 +571,10 @@ impl AssetActor for Explosion {
     }
 }
 
-fn explosion_lifetime_steps(kind: ExplosionKind, behavior: ActorBehaviorProfile) -> u16 {
+pub(in crate::actor_game) fn explosion_lifetime_steps(
+    kind: ExplosionKind,
+    behavior: ActorBehaviorProfile,
+) -> u16 {
     if kind == ExplosionKind::Terrain {
         return u16::from(TERRAIN_EXPLOSION_LIFETIME_STEPS);
     }

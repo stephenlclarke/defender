@@ -1,21 +1,28 @@
-const FIRST_WAVE_HUMAN_GROUND_WORLD_Y: u16 = 0xE000;
-const FIRST_WAVE_HUMAN_RAISED_WORLD_Y: u16 = 0xE100;
-const FIRST_WAVE_LANDER_UPPER_PATROL_WORLD_Y: u16 = 0x2CE0;
-const FIRST_WAVE_LANDER_LOWER_PATROL_WORLD_Y: u16 = 0x2C70;
-const FIRST_WAVE_LANDER_DRIFT_Y_VELOCITY: u16 = 0x0070;
-const FIRST_WAVE_REFILL_LANDER_DIVE_Y_VELOCITY: u16 = 0x0090;
-const FIRST_WAVE_LANDER_ENTRY_SLEEP_TICKS: u8 = 0x04;
-const FIRST_WAVE_LANDER_ASLEEP_ON_ENTRY: u8 = 0;
-const FIRST_WAVE_LANDER_VISIBLE_ON_NEXT_TICK: u8 = 1;
-const FIRST_WAVE_STATIONARY_LANDER_VELOCITY: u16 = 0;
-const FIRST_WAVE_REFILL_HIDDEN_ENTRY_SLEEP_TICKS: u8 = 6;
-const FIRST_WAVE_HUMAN_STANDING_FRAME: SpriteFrameIndex = SpriteFrameIndex::new(0);
-const FIRST_WAVE_HUMAN_WALKING_FRAME_A: SpriteFrameIndex = SpriteFrameIndex::new(2);
-const FIRST_WAVE_HUMAN_WALKING_FRAME_B: SpriteFrameIndex = SpriteFrameIndex::new(3);
-const FIRST_WAVE_LANDER_FRAME_A: SpriteFrameIndex = SpriteFrameIndex::new(0);
-const FIRST_WAVE_LANDER_FRAME_B: SpriteFrameIndex = SpriteFrameIndex::new(1);
+use super::*;
 
-const ACTOR_FIRST_WAVE_HUMAN_SPAWNS: [ActorHumanSpawn; 10] = [
+pub(in crate::actor_game) const FIRST_WAVE_HUMAN_GROUND_WORLD_Y: u16 = 0xE000;
+pub(in crate::actor_game) const FIRST_WAVE_HUMAN_RAISED_WORLD_Y: u16 = 0xE100;
+pub(in crate::actor_game) const FIRST_WAVE_LANDER_UPPER_PATROL_WORLD_Y: u16 = 0x2CE0;
+pub(in crate::actor_game) const FIRST_WAVE_LANDER_LOWER_PATROL_WORLD_Y: u16 = 0x2C70;
+pub(in crate::actor_game) const FIRST_WAVE_LANDER_DRIFT_Y_VELOCITY: u16 = 0x0070;
+pub(in crate::actor_game) const FIRST_WAVE_REFILL_LANDER_DIVE_Y_VELOCITY: u16 = 0x0090;
+pub(in crate::actor_game) const FIRST_WAVE_LANDER_ENTRY_SLEEP_TICKS: u8 = 0x04;
+pub(in crate::actor_game) const FIRST_WAVE_LANDER_ASLEEP_ON_ENTRY: u8 = 0;
+pub(in crate::actor_game) const FIRST_WAVE_LANDER_VISIBLE_ON_NEXT_TICK: u8 = 1;
+pub(in crate::actor_game) const FIRST_WAVE_STATIONARY_LANDER_VELOCITY: u16 = 0;
+pub(in crate::actor_game) const FIRST_WAVE_REFILL_HIDDEN_ENTRY_SLEEP_TICKS: u8 = 6;
+pub(in crate::actor_game) const FIRST_WAVE_HUMAN_STANDING_FRAME: SpriteFrameIndex =
+    SpriteFrameIndex::new(0);
+pub(in crate::actor_game) const FIRST_WAVE_HUMAN_WALKING_FRAME_A: SpriteFrameIndex =
+    SpriteFrameIndex::new(2);
+pub(in crate::actor_game) const FIRST_WAVE_HUMAN_WALKING_FRAME_B: SpriteFrameIndex =
+    SpriteFrameIndex::new(3);
+pub(in crate::actor_game) const FIRST_WAVE_LANDER_FRAME_A: SpriteFrameIndex =
+    SpriteFrameIndex::new(0);
+pub(in crate::actor_game) const FIRST_WAVE_LANDER_FRAME_B: SpriteFrameIndex =
+    SpriteFrameIndex::new(1);
+
+pub(in crate::actor_game) const ACTOR_FIRST_WAVE_HUMAN_SPAWNS: [ActorHumanSpawn; 10] = [
     ActorHumanSpawn::from_first_wave_record(
         0,
         FirstWaveHumanSpawnRecord {
@@ -98,7 +105,7 @@ const ACTOR_FIRST_WAVE_HUMAN_SPAWNS: [ActorHumanSpawn; 10] = [
     ),
 ];
 
-const ACTOR_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
+pub(in crate::actor_game) const ACTOR_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
     ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
         world_x: 0xFB33,
         world_y: FIRST_WAVE_LANDER_UPPER_PATROL_WORLD_Y,
@@ -151,7 +158,8 @@ const ACTOR_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
     }),
 ];
 
-const ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
+pub(in crate::actor_game) const ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn;
+    5] = [
     ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
         world_x: 0x689A,
         world_y: FIRST_WAVE_LANDER_LOWER_PATROL_WORLD_Y,
@@ -204,7 +212,7 @@ const ACTOR_FIRST_WAVE_EARLY_RESERVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
     }),
 ];
 
-const ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
+pub(in crate::actor_game) const ACTOR_FIRST_WAVE_REFILL_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
     ActorLanderSpawn::from_first_wave_record(FirstWaveLanderSpawnRecord {
         world_x: 0xBC29,
         world_y: 0x2CFD,

@@ -1,17 +1,20 @@
-const TOP_DISPLAY_LEFT_SCANNER_MARKER_CELL: u16 = 0x4C07;
-const TOP_DISPLAY_RIGHT_SCANNER_MARKER_CELL: u16 = 0x4C28;
-const ACTOR_RENDER_WILLIAMS_RED_GREEN_CHANNEL_MASK: u8 = 0x07;
-const ACTOR_RENDER_WILLIAMS_GREEN_CHANNEL_SHIFT: u8 = 3;
-const ACTOR_RENDER_WILLIAMS_BLUE_CHANNEL_SHIFT: u8 = 6;
-const ACTOR_RENDER_WILLIAMS_BLUE_CHANNEL_MASK: u8 = 0x03;
-const ACTOR_RENDER_OPAQUE_ALPHA: u8 = 0xFF;
-const ACTOR_RENDER_TRANSPARENT: Color = Color::from_rgba(0, 0, 0, 0);
-const ACTOR_RENDER_SCREEN_SIGN_BIT: u16 = 0x8000;
-const HUMAN_CARRIED_TINT: Color = Color::from_rgba(0xFF, 0xF8, 0x80, ACTOR_RENDER_OPAQUE_ALPHA);
+use super::*;
+
+pub(in crate::actor_game) const TOP_DISPLAY_LEFT_SCANNER_MARKER_CELL: u16 = 0x4C07;
+pub(in crate::actor_game) const TOP_DISPLAY_RIGHT_SCANNER_MARKER_CELL: u16 = 0x4C28;
+pub(in crate::actor_game) const ACTOR_RENDER_WILLIAMS_RED_GREEN_CHANNEL_MASK: u8 = 0x07;
+pub(in crate::actor_game) const ACTOR_RENDER_WILLIAMS_GREEN_CHANNEL_SHIFT: u8 = 3;
+pub(in crate::actor_game) const ACTOR_RENDER_WILLIAMS_BLUE_CHANNEL_SHIFT: u8 = 6;
+pub(in crate::actor_game) const ACTOR_RENDER_WILLIAMS_BLUE_CHANNEL_MASK: u8 = 0x03;
+pub(in crate::actor_game) const ACTOR_RENDER_OPAQUE_ALPHA: u8 = 0xFF;
+pub(in crate::actor_game) const ACTOR_RENDER_TRANSPARENT: Color = Color::from_rgba(0, 0, 0, 0);
+pub(in crate::actor_game) const ACTOR_RENDER_SCREEN_SIGN_BIT: u16 = 0x8000;
+pub(in crate::actor_game) const HUMAN_CARRIED_TINT: Color =
+    Color::from_rgba(0xFF, 0xF8, 0x80, ACTOR_RENDER_OPAQUE_ALPHA);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorRenderSceneBridge {
-    surface: SurfaceSize,
+    pub(in crate::actor_game) surface: SurfaceSize,
 }
 
 impl ActorRenderSceneBridge {
@@ -268,7 +271,10 @@ impl Default for ActorRenderSceneBridge {
     }
 }
 
-fn push_actor_wave_completion_status_sprites(scene: &mut RenderScene, report: &StepReport) {
+pub(in crate::actor_game) fn push_actor_wave_completion_status_sprites(
+    scene: &mut RenderScene,
+    report: &StepReport,
+) {
     if !should_show_actor_wave_completion_status(report) {
         return;
     }
@@ -301,7 +307,10 @@ fn push_actor_wave_completion_status_sprites(scene: &mut RenderScene, report: &S
     );
 }
 
-fn push_actor_survivor_bonus_icon_sprites(scene: &mut RenderScene, report: &StepReport) {
+pub(in crate::actor_game) fn push_actor_survivor_bonus_icon_sprites(
+    scene: &mut RenderScene,
+    report: &StepReport,
+) {
     if !should_show_actor_wave_completion_status(report) {
         return;
     }
@@ -321,7 +330,7 @@ fn push_actor_survivor_bonus_icon_sprites(scene: &mut RenderScene, report: &Step
     }
 }
 
-fn should_show_actor_wave_completion_status(report: &StepReport) -> bool {
+pub(in crate::actor_game) fn should_show_actor_wave_completion_status(report: &StepReport) -> bool {
     report.phase == Phase::Playing
         && (report.survivor_bonus.is_some()
             || report
@@ -334,7 +343,10 @@ fn should_show_actor_wave_completion_status(report: &StepReport) -> bool {
             .any(|snapshot| snapshot.kind == ActorKind::Player && snapshot.alive)
 }
 
-fn push_actor_player_switch_prompt_sprites(scene: &mut RenderScene, report: &StepReport) {
+pub(in crate::actor_game) fn push_actor_player_switch_prompt_sprites(
+    scene: &mut RenderScene,
+    report: &StepReport,
+) {
     let Some(player_switch) = report.player_switch else {
         return;
     };
@@ -353,7 +365,10 @@ fn push_actor_player_switch_prompt_sprites(scene: &mut RenderScene, report: &Ste
     );
 }
 
-fn push_actor_final_game_over_prompt_sprites(scene: &mut RenderScene, report: &StepReport) {
+pub(in crate::actor_game) fn push_actor_final_game_over_prompt_sprites(
+    scene: &mut RenderScene,
+    report: &StepReport,
+) {
     if report.player_death_sleep_remaining.is_none() {
         return;
     }
@@ -366,7 +381,10 @@ fn push_actor_final_game_over_prompt_sprites(scene: &mut RenderScene, report: &S
     );
 }
 
-fn push_actor_player_start_prompt_sprites(scene: &mut RenderScene, report: &StepReport) {
+pub(in crate::actor_game) fn push_actor_player_start_prompt_sprites(
+    scene: &mut RenderScene,
+    report: &StepReport,
+) {
     let Some(player_start) = report.player_start else {
         return;
     };
@@ -382,7 +400,7 @@ fn push_actor_player_start_prompt_sprites(scene: &mut RenderScene, report: &Step
     );
 }
 
-fn push_actor_message_sprites(
+pub(in crate::actor_game) fn push_actor_message_sprites(
     scene: &mut RenderScene,
     message: MessageId,
     screen_cell: ScreenAddress,
@@ -396,33 +414,30 @@ fn push_actor_message_sprites(
     );
 }
 
-const TWO_DIGIT_DISPLAY_MAX: u8 = 99;
-const DECIMAL_RADIX: u8 = 10;
-const SCORE_DIGIT_START_PLACE: u32 = 100_000;
+pub(in crate::actor_game) const TWO_DIGIT_DISPLAY_MAX: u8 = 99;
+pub(in crate::actor_game) const DECIMAL_RADIX: u8 = 10;
+pub(in crate::actor_game) const SCORE_DIGIT_START_PLACE: u32 = 100_000;
 
-fn actor_visible_survivor_bonus_icon_count(report: &StepReport) -> usize {
+pub(in crate::actor_game) fn actor_visible_survivor_bonus_icon_count(report: &StepReport) -> usize {
     report
         .survivor_bonus
         .map(|bonus| usize::from(bonus.visible_icons).min(SURVIVOR_BONUS_HUMAN_LIMIT))
         .unwrap_or(0)
 }
 
-fn actor_visible_decimal_digits(value: u8) -> ([u8; 2], usize) {
+pub(in crate::actor_game) fn actor_visible_decimal_digits(value: u8) -> ([u8; 2], usize) {
     let value = value.min(TWO_DIGIT_DISPLAY_MAX);
     if value < DECIMAL_RADIX {
         ([b'0' + value, b' '], 1)
     } else {
         (
-            [
-                b'0' + value / DECIMAL_RADIX,
-                b'0' + value % DECIMAL_RADIX,
-            ],
+            [b'0' + value / DECIMAL_RADIX, b'0' + value % DECIMAL_RADIX],
             2,
         )
     }
 }
 
-fn push_controlled_message_sprites_with_offset(
+pub(in crate::actor_game) fn push_controlled_message_sprites_with_offset(
     scene: &mut RenderScene,
     text: &str,
     screen_cell: ScreenAddress,
@@ -434,7 +449,10 @@ fn push_controlled_message_sprites_with_offset(
     offset_new_sprites(scene, first_sprite, point_position(visual_offset));
 }
 
-fn push_actor_playing_top_display_border(scene: &mut RenderScene, wave: u16) {
+pub(in crate::actor_game) fn push_actor_playing_top_display_border(
+    scene: &mut RenderScene,
+    wave: u16,
+) {
     for (screen_cell_word, size) in TOP_DISPLAY_BORDER_SEGMENTS {
         let screen_cell = crate::ScreenAddress::new(screen_cell_word);
         scene.push_sprite(SceneSprite {
@@ -454,14 +472,13 @@ fn push_actor_playing_top_display_border(scene: &mut RenderScene, wave: u16) {
     }
 }
 
-fn williams_color_byte_tint(value: u8) -> Color {
+pub(in crate::actor_game) fn williams_color_byte_tint(value: u8) -> Color {
     if value == 0 {
         return ACTOR_RENDER_TRANSPARENT;
     }
     Color::from_rgba(
-        WILLIAMS_RED_GREEN_LEVELS[usize::from(
-            value & ACTOR_RENDER_WILLIAMS_RED_GREEN_CHANNEL_MASK,
-        )],
+        WILLIAMS_RED_GREEN_LEVELS
+            [usize::from(value & ACTOR_RENDER_WILLIAMS_RED_GREEN_CHANNEL_MASK)],
         WILLIAMS_RED_GREEN_LEVELS[usize::from(
             (value >> ACTOR_RENDER_WILLIAMS_GREEN_CHANNEL_SHIFT)
                 & ACTOR_RENDER_WILLIAMS_RED_GREEN_CHANNEL_MASK,
@@ -474,21 +491,21 @@ fn williams_color_byte_tint(value: u8) -> Color {
     )
 }
 
-fn scanner_mini_terrain_records() -> &'static [ScannerMiniTerrainRecord; SCANNER_TERRAIN_RECORDS] {
-    static RECORDS: OnceLock<[ScannerMiniTerrainRecord; SCANNER_TERRAIN_RECORDS]> =
-        OnceLock::new();
+pub(in crate::actor_game) fn scanner_mini_terrain_records()
+-> &'static [ScannerMiniTerrainRecord; SCANNER_TERRAIN_RECORDS] {
+    static RECORDS: OnceLock<[ScannerMiniTerrainRecord; SCANNER_TERRAIN_RECORDS]> = OnceLock::new();
     RECORDS.get_or_init(|| {
         generate_scanner_mini_terrain_records(0u16.wrapping_sub(SCANNER_SCAN_CENTER_OFFSET))
     })
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-struct ScannerMiniTerrainRecord {
-    screen_cell: crate::ScreenAddress,
-    word: u16,
+pub(in crate::actor_game) struct ScannerMiniTerrainRecord {
+    pub(in crate::actor_game) screen_cell: crate::ScreenAddress,
+    pub(in crate::actor_game) word: u16,
 }
 
-fn generate_scanner_mini_terrain_records(
+pub(in crate::actor_game) fn generate_scanner_mini_terrain_records(
     scan_left: u16,
 ) -> [ScannerMiniTerrainRecord; SCANNER_TERRAIN_RECORDS] {
     let bytes = main_terrain_record_bytes();
@@ -512,11 +529,16 @@ fn generate_scanner_mini_terrain_records(
     records
 }
 
-fn main_terrain_record_bytes() -> &'static [u8; MAIN_TERRAIN_RECORD_BYTE_COUNT] {
+pub(in crate::actor_game) fn main_terrain_record_bytes()
+-> &'static [u8; MAIN_TERRAIN_RECORD_BYTE_COUNT] {
     crate::arcade_assets::MAIN_TERRAIN_BYTES
 }
 
-fn offset_new_sprites(scene: &mut RenderScene, first_sprite: usize, offset: [f32; 2]) {
+pub(in crate::actor_game) fn offset_new_sprites(
+    scene: &mut RenderScene,
+    first_sprite: usize,
+    offset: [f32; 2],
+) {
     if offset == [0.0, 0.0] {
         return;
     }
@@ -525,17 +547,20 @@ fn offset_new_sprites(scene: &mut RenderScene, first_sprite: usize, offset: [f32
     }
 }
 
-fn offset_f32_position(position: [f32; 2], offset: [f32; 2]) -> [f32; 2] {
+pub(in crate::actor_game) fn offset_f32_position(position: [f32; 2], offset: [f32; 2]) -> [f32; 2] {
     [position[0] + offset[0], position[1] + offset[1]]
 }
 
-fn actor_explosion_render_scale(growth_size: u16) -> f32 {
+pub(in crate::actor_game) fn actor_explosion_render_scale(growth_size: u16) -> f32 {
     explosion_render_scale(growth_size)
         .map(f32::from)
         .unwrap_or(1.0)
 }
 
-fn actor_explosion_growth_size_for_kind(kind: ExplosionKind, age: u16) -> u16 {
+pub(in crate::actor_game) fn actor_explosion_growth_size_for_kind(
+    kind: ExplosionKind,
+    age: u16,
+) -> u16 {
     if kind == ExplosionKind::Terrain {
         return terrain_explosion_growth_size_for_age(
             u8::try_from(age).unwrap_or(TERRAIN_EXPLOSION_LIFETIME_STEPS),
@@ -545,11 +570,14 @@ fn actor_explosion_growth_size_for_kind(kind: ExplosionKind, age: u16) -> u16 {
     explosion_growth_size_for_age(age)
 }
 
-fn point_position(point: Point) -> [f32; 2] {
+pub(in crate::actor_game) fn point_position(point: Point) -> [f32; 2] {
     [f32::from(point.x), f32::from(point.y)]
 }
 
-fn actor_draw_screen_position(report: &StepReport, draw: &DrawCommand) -> Option<Point> {
+pub(in crate::actor_game) fn actor_draw_screen_position(
+    report: &StepReport,
+    draw: &DrawCommand,
+) -> Option<Point> {
     if report.phase != Phase::Playing {
         return Some(draw.position);
     }
@@ -565,7 +593,7 @@ fn actor_draw_screen_position(report: &StepReport, draw: &DrawCommand) -> Option
     actor_project_actor_state_draw(snapshot, draw.position, report.background_left)
 }
 
-fn actor_project_actor_state_draw(
+pub(in crate::actor_game) fn actor_project_actor_state_draw(
     snapshot: &ActorSnapshot,
     draw_position: Point,
     background_left: u16,
@@ -579,11 +607,11 @@ fn actor_project_actor_state_draw(
     actor_screen_position_from_world(draw_position, x_fraction, background_left)
 }
 
-fn actor_actor_state_x_fraction(snapshot: &ActorSnapshot) -> Option<u8> {
+pub(in crate::actor_game) fn actor_actor_state_x_fraction(snapshot: &ActorSnapshot) -> Option<u8> {
     snapshot.actor_x_fraction()
 }
 
-fn actor_screen_position_from_world(
+pub(in crate::actor_game) fn actor_screen_position_from_world(
     position: Point,
     x_fraction: u8,
     background_left: u16,
@@ -604,7 +632,10 @@ fn actor_screen_position_from_world(
     Some(Point::new(screen_x as i16, position.y))
 }
 
-fn williams_reveal_visible_pixel_count(stroke_step: u16, total_pixels: usize) -> usize {
+pub(in crate::actor_game) fn williams_reveal_visible_pixel_count(
+    stroke_step: u16,
+    total_pixels: usize,
+) -> usize {
     if total_pixels == 0 {
         return 0;
     }
@@ -628,7 +659,10 @@ fn williams_reveal_visible_pixel_count(stroke_step: u16, total_pixels: usize) ->
         .clamp(1, total_pixels)
 }
 
-fn push_actor_playing_hud_sprites(scene: &mut RenderScene, report: &StepReport) {
+pub(in crate::actor_game) fn push_actor_playing_hud_sprites(
+    scene: &mut RenderScene,
+    report: &StepReport,
+) {
     if report.phase != Phase::Playing {
         return;
     }
@@ -661,7 +695,11 @@ fn push_actor_playing_hud_sprites(scene: &mut RenderScene, report: &StepReport) 
     }
 }
 
-fn push_actor_player_score_sprites(scene: &mut RenderScene, score: u32, origin: [f32; 2]) {
+pub(in crate::actor_game) fn push_actor_player_score_sprites(
+    scene: &mut RenderScene,
+    score: u32,
+    origin: [f32; 2],
+) {
     for (index, digit) in actor_visible_score_digits(score).iter().enumerate() {
         let Some(digit) = digit else {
             continue;
@@ -682,7 +720,9 @@ fn push_actor_player_score_sprites(scene: &mut RenderScene, score: u32, origin: 
     }
 }
 
-fn actor_visible_score_digits(score: u32) -> [Option<u8>; ACTOR_HUD_SCORE_DIGIT_DISPLAY_COUNT] {
+pub(in crate::actor_game) fn actor_visible_score_digits(
+    score: u32,
+) -> [Option<u8>; ACTOR_HUD_SCORE_DIGIT_DISPLAY_COUNT] {
     let score = score.min(ACTOR_HUD_SCORE_DISPLAY_MAX);
     let mut place = SCORE_DIGIT_START_PLACE;
     let mut digits = [None; ACTOR_HUD_SCORE_DIGIT_DISPLAY_COUNT];
@@ -703,7 +743,7 @@ fn actor_visible_score_digits(score: u32) -> [Option<u8>; ACTOR_HUD_SCORE_DIGIT_
     digits
 }
 
-fn push_actor_player_stock_sprites(
+pub(in crate::actor_game) fn push_actor_player_stock_sprites(
     scene: &mut RenderScene,
     stock: PlayerStockSnapshot,
     life_origin: [f32; 2],
@@ -729,7 +769,7 @@ fn push_actor_player_stock_sprites(
     );
 }
 
-fn push_actor_stock_sprite_series(
+pub(in crate::actor_game) fn push_actor_stock_sprite_series(
     scene: &mut RenderScene,
     sprite: SpriteId,
     count: u8,
@@ -749,7 +789,10 @@ fn push_actor_stock_sprite_series(
     }
 }
 
-fn actor_scene_sprite(sprite: SpriteKey, position: Point) -> Option<SceneSprite> {
+pub(in crate::actor_game) fn actor_scene_sprite(
+    sprite: SpriteKey,
+    position: Point,
+) -> Option<SceneSprite> {
     let (sprite, layer, size, tint) = match sprite {
         SpriteKey::WilliamsLogo => (
             SpriteId::ATTRACT_WILLIAMS_LOGO,

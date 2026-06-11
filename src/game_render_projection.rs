@@ -1,38 +1,47 @@
-const WILLIAMS_RED_GREEN_CHANNEL_MASK: u8 = 0x07;
-const WILLIAMS_GREEN_CHANNEL_SHIFT: u8 = 3;
-const WILLIAMS_BLUE_CHANNEL_SHIFT: u8 = 6;
-const WILLIAMS_BLUE_CHANNEL_MASK: u8 = 0x03;
-const OPAQUE_ALPHA: u8 = 0xFF;
-const LOW_NIBBLE_MASK: u8 = 0x0F;
-const VIDEO_WORD_PALETTE_INDEX_MASK: u16 = 0x000F;
-const SPRITE_TRANSPARENT_PALETTE_NIBBLE: u8 = 0x0;
-const SPRITE_WHITE_PALETTE_NIBBLES: [u8; 6] = [0x1, 0xA, 0xC, 0xD, 0xE, 0xF];
-const SPRITE_WILLIAMS_COLOR_NIBBLE_MIN: u8 = 0x2;
-const SPRITE_WILLIAMS_COLOR_NIBBLE_MAX: u8 = 0x9;
-const SPRITE_GRAY_PALETTE_NIBBLE: u8 = 0xB;
-const TERRAIN_FLAVOR_BANK_BIT: u8 = 0x20;
-const TERRAIN_SCREEN_ROW_START: u8 = 0x98;
-const BACKGROUND_TERRAIN_ALIGNMENT_MASK: u16 = 0xFFE0;
-const TERRAIN_GENERATION_LOOKAHEAD: u16 = 0x2610;
-const TERRAIN_INITIAL_ALTITUDE_OFFSET: u8 = 0xE0;
-const TERRAIN_SCAN_START_X: u16 = 0x0010;
-const TERRAIN_SCAN_ALIGNMENT_LIMIT: u16 = 0x0800;
-const TERRAIN_WORLD_STEP: u16 = 0x20;
-const TERRAIN_WRAP_SIGN_BIT: u16 = 0x8000;
-const TERRAIN_PATTERN_HIGH_BIT: u8 = 0x80;
-const TERRAIN_RIGHT_PRIME_STEPS: u16 = 0x0400;
-const TERRAIN_BIT_COUNTER_MAX: u8 = 7;
-const SCANNER_PLAYER_UPPER_CELL_DELTA: u16 = 0x00FF;
-const EXPANDED_OBJECT_SCALE_MASK: u8 = 0x7F;
-const APPEARANCE_GROWTH_ACTIVE_BIT: u16 = 0x8000;
-const TRANSPARENT_COLOR: Color = Color::from_rgba(0, 0, 0, 0);
-const SPRITE_GRAY_TINT: Color = Color::from_rgba(170, 170, 186, OPAQUE_ALPHA);
+use std::sync::OnceLock;
 
-fn attract_title_sample_index(page_step: u16) -> usize {
+use crate::{
+    Color, RenderLayer, RenderScene, SceneSprite, ScreenPosition, SpriteId,
+    renderer::screen_position_from_cell,
+};
+
+use super::*;
+
+pub(super) const WILLIAMS_RED_GREEN_CHANNEL_MASK: u8 = 0x07;
+pub(super) const WILLIAMS_GREEN_CHANNEL_SHIFT: u8 = 3;
+pub(super) const WILLIAMS_BLUE_CHANNEL_SHIFT: u8 = 6;
+pub(super) const WILLIAMS_BLUE_CHANNEL_MASK: u8 = 0x03;
+pub(super) const OPAQUE_ALPHA: u8 = 0xFF;
+pub(super) const LOW_NIBBLE_MASK: u8 = 0x0F;
+pub(super) const VIDEO_WORD_PALETTE_INDEX_MASK: u16 = 0x000F;
+pub(super) const SPRITE_TRANSPARENT_PALETTE_NIBBLE: u8 = 0x0;
+pub(super) const SPRITE_WHITE_PALETTE_NIBBLES: [u8; 6] = [0x1, 0xA, 0xC, 0xD, 0xE, 0xF];
+pub(super) const SPRITE_WILLIAMS_COLOR_NIBBLE_MIN: u8 = 0x2;
+pub(super) const SPRITE_WILLIAMS_COLOR_NIBBLE_MAX: u8 = 0x9;
+pub(super) const SPRITE_GRAY_PALETTE_NIBBLE: u8 = 0xB;
+pub(super) const TERRAIN_FLAVOR_BANK_BIT: u8 = 0x20;
+pub(super) const TERRAIN_SCREEN_ROW_START: u8 = 0x98;
+pub(super) const BACKGROUND_TERRAIN_ALIGNMENT_MASK: u16 = 0xFFE0;
+pub(super) const TERRAIN_GENERATION_LOOKAHEAD: u16 = 0x2610;
+pub(super) const TERRAIN_INITIAL_ALTITUDE_OFFSET: u8 = 0xE0;
+pub(super) const TERRAIN_SCAN_START_X: u16 = 0x0010;
+pub(super) const TERRAIN_SCAN_ALIGNMENT_LIMIT: u16 = 0x0800;
+pub(super) const TERRAIN_WORLD_STEP: u16 = 0x20;
+pub(super) const TERRAIN_WRAP_SIGN_BIT: u16 = 0x8000;
+pub(super) const TERRAIN_PATTERN_HIGH_BIT: u8 = 0x80;
+pub(super) const TERRAIN_RIGHT_PRIME_STEPS: u16 = 0x0400;
+pub(super) const TERRAIN_BIT_COUNTER_MAX: u8 = 7;
+pub(super) const SCANNER_PLAYER_UPPER_CELL_DELTA: u16 = 0x00FF;
+pub(super) const EXPANDED_OBJECT_SCALE_MASK: u8 = 0x7F;
+pub(super) const APPEARANCE_GROWTH_ACTIVE_BIT: u16 = 0x8000;
+pub(super) const TRANSPARENT_COLOR: Color = Color::from_rgba(0, 0, 0, 0);
+pub(super) const SPRITE_GRAY_TINT: Color = Color::from_rgba(170, 170, 186, OPAQUE_ALPHA);
+
+pub(super) fn attract_title_sample_index(page_step: u16) -> usize {
     usize::from(page_step / ATTRACT_TITLE_REFERENCE_SAMPLE_INTERVAL_STEPS).saturating_sub(1)
 }
 
-fn williams_color_byte_tint(value: u8) -> Color {
+pub(super) fn williams_color_byte_tint(value: u8) -> Color {
     if value == 0 {
         return TRANSPARENT_COLOR;
     }
@@ -62,16 +71,16 @@ pub(crate) fn terrain_blow_flash_tint(elapsed: u16) -> Color {
     williams_color_byte_tint(color)
 }
 
-fn video_palette_index_tint(index: u8) -> Color {
+pub(super) fn video_palette_index_tint(index: u8) -> Color {
     williams_color_byte_tint(NORMAL_PALETTE_BYTES[usize::from(index & LOW_NIBBLE_MASK)])
 }
 
-fn video_word_tint(word: u16) -> Color {
+pub(super) fn video_word_tint(word: u16) -> Color {
     video_palette_index_tint((word & VIDEO_WORD_PALETTE_INDEX_MASK) as u8)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct TerrainFlavorRecord {
+pub(super) struct TerrainFlavorRecord {
     offset: u8,
     word: u16,
 }
@@ -81,7 +90,7 @@ impl TerrainFlavorRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct TerrainDrawRecord {
+pub(super) struct TerrainDrawRecord {
     screen_cell: crate::ScreenAddress,
     word: u16,
 }
@@ -94,7 +103,7 @@ impl TerrainDrawRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ScannerMiniTerrainRecord {
+pub(super) struct ScannerMiniTerrainRecord {
     screen_cell: crate::ScreenAddress,
     word: u16,
 }
@@ -107,7 +116,7 @@ impl ScannerMiniTerrainRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct TerrainBitState {
+pub(super) struct TerrainBitState {
     data_index: usize,
     data_pointer: u16,
     data_byte: u8,
@@ -115,7 +124,7 @@ struct TerrainBitState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct TerrainGenerationState {
+pub(super) struct TerrainGenerationState {
     left: TerrainBitState,
     right: TerrainBitState,
     left_offset: u8,
@@ -142,7 +151,7 @@ pub(crate) fn push_background_terrain_sprites(
     }
 }
 
-fn terrain_word_sprite(word: u16) -> SpriteId {
+pub(super) fn terrain_word_sprite(word: u16) -> SpriteId {
     if word == TERRAIN_WORD_0770 {
         SpriteId::TERRAIN_TILE_ALT
     } else {
@@ -150,12 +159,15 @@ fn terrain_word_sprite(word: u16) -> SpriteId {
     }
 }
 
-fn default_background_terrain_records() -> &'static [TerrainDrawRecord; TERRAIN_SCREEN_WORDS] {
+pub(super) fn default_background_terrain_records()
+-> &'static [TerrainDrawRecord; TERRAIN_SCREEN_WORDS] {
     static RECORDS: OnceLock<[TerrainDrawRecord; TERRAIN_SCREEN_WORDS]> = OnceLock::new();
     RECORDS.get_or_init(|| generate_background_terrain_records(0))
 }
 
-fn background_terrain_records(background_left: u16) -> [TerrainDrawRecord; TERRAIN_SCREEN_WORDS] {
+pub(super) fn background_terrain_records(
+    background_left: u16,
+) -> [TerrainDrawRecord; TERRAIN_SCREEN_WORDS] {
     let terrain_left = background_terrain_left(background_left);
     if terrain_left == 0 {
         return *default_background_terrain_records();
@@ -163,13 +175,15 @@ fn background_terrain_records(background_left: u16) -> [TerrainDrawRecord; TERRA
     generate_background_terrain_records(terrain_left)
 }
 
-fn scanner_mini_terrain_records_for_scan_left(
+pub(super) fn scanner_mini_terrain_records_for_scan_left(
     scan_left: u16,
 ) -> [ScannerMiniTerrainRecord; SCANNER_TERRAIN_RECORDS] {
     generate_scanner_mini_terrain_records(scan_left)
 }
 
-fn generate_background_terrain_records(terrain_left: u16) -> [TerrainDrawRecord; TERRAIN_SCREEN_WORDS] {
+pub(super) fn generate_background_terrain_records(
+    terrain_left: u16,
+) -> [TerrainDrawRecord; TERRAIN_SCREEN_WORDS] {
     let data = terrain_pattern_bytes();
     let terrain_left = background_terrain_left(terrain_left);
     let (flavor_0, flavor_1, state) = initialize_terrain_flavor_tables(data, terrain_left);
@@ -191,8 +205,7 @@ fn generate_background_terrain_records(terrain_left: u16) -> [TerrainDrawRecord;
         *record = TerrainDrawRecord {
             screen_cell: crate::ScreenAddress::from_bytes(
                 TERRAIN_SCREEN_ROW_START.wrapping_sub(
-                    u8::try_from(entry_index)
-                        .expect("background terrain entry index fits in u8"),
+                    u8::try_from(entry_index).expect("background terrain entry index fits in u8"),
                 ),
                 terrain_record.offset,
             ),
@@ -202,11 +215,11 @@ fn generate_background_terrain_records(terrain_left: u16) -> [TerrainDrawRecord;
     records
 }
 
-const fn background_terrain_left(background_left: u16) -> u16 {
+pub(super) const fn background_terrain_left(background_left: u16) -> u16 {
     background_left & BACKGROUND_TERRAIN_ALIGNMENT_MASK
 }
 
-fn generate_scanner_mini_terrain_records(
+pub(super) fn generate_scanner_mini_terrain_records(
     scan_left: u16,
 ) -> [ScannerMiniTerrainRecord; SCANNER_TERRAIN_RECORDS] {
     let bytes = main_terrain_record_bytes();
@@ -230,7 +243,7 @@ fn generate_scanner_mini_terrain_records(
     records
 }
 
-fn initialize_terrain_flavor_tables(
+pub(super) fn initialize_terrain_flavor_tables(
     data: &[u8; TERRAIN_TDATA_BYTES],
     terrain_left: u16,
 ) -> (
@@ -292,7 +305,7 @@ fn initialize_terrain_flavor_tables(
     (flavor_0, flavor_1, state)
 }
 
-fn add_left_terrain_pixel(
+pub(super) fn add_left_terrain_pixel(
     state: &mut TerrainGenerationState,
     data: &[u8; TERRAIN_TDATA_BYTES],
     flavor_0: &mut [TerrainFlavorRecord; TERRAIN_FLAVOR_RECORDS],
@@ -332,7 +345,9 @@ fn add_left_terrain_pixel(
     }
 }
 
-fn initialize_right_terrain_state(data: &[u8; TERRAIN_TDATA_BYTES]) -> (TerrainBitState, u8) {
+pub(super) fn initialize_right_terrain_state(
+    data: &[u8; TERRAIN_TDATA_BYTES],
+) -> (TerrainBitState, u8) {
     let mut state = TerrainBitState {
         data_index: 0,
         data_pointer: TERRAIN_PATTERN_STREAM_BASE,
@@ -349,7 +364,7 @@ fn initialize_right_terrain_state(data: &[u8; TERRAIN_TDATA_BYTES]) -> (TerrainB
     (state, offset)
 }
 
-fn terrain_altitude_step(offset: u8, data_byte: u8) -> u8 {
+pub(super) fn terrain_altitude_step(offset: u8, data_byte: u8) -> u8 {
     if data_byte & TERRAIN_PATTERN_HIGH_BIT != 0 {
         offset.wrapping_sub(1)
     } else {
@@ -357,7 +372,7 @@ fn terrain_altitude_step(offset: u8, data_byte: u8) -> u8 {
     }
 }
 
-fn advance_terrain_right_state(
+pub(super) fn advance_terrain_right_state(
     state: &mut TerrainBitState,
     data: &[u8; TERRAIN_TDATA_BYTES],
 ) {
@@ -374,7 +389,7 @@ fn advance_terrain_right_state(
     }
 }
 
-fn advance_terrain_left_state(
+pub(super) fn advance_terrain_left_state(
     state: &mut TerrainBitState,
     data: &[u8; TERRAIN_TDATA_BYTES],
 ) {
@@ -394,7 +409,7 @@ fn advance_terrain_left_state(
     }
 }
 
-fn rotate_terrain_right_byte(data_byte: u8) -> u8 {
+pub(super) fn rotate_terrain_right_byte(data_byte: u8) -> u8 {
     (data_byte >> 1).wrapping_add(if data_byte & 1 == 0 {
         0
     } else {
@@ -402,22 +417,22 @@ fn rotate_terrain_right_byte(data_byte: u8) -> u8 {
     })
 }
 
-fn terrain_pattern_bytes() -> &'static [u8; TERRAIN_TDATA_BYTES] {
+pub(super) fn terrain_pattern_bytes() -> &'static [u8; TERRAIN_TDATA_BYTES] {
     crate::arcade_assets::TERRAIN_PATTERN_BYTES
 }
 
-fn main_terrain_record_bytes() -> &'static [u8; MAIN_TERRAIN_RECORD_BYTE_COUNT] {
+pub(super) fn main_terrain_record_bytes() -> &'static [u8; MAIN_TERRAIN_RECORD_BYTE_COUNT] {
     crate::arcade_assets::MAIN_TERRAIN_BYTES
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct SpriteAssetPixel {
+pub(super) struct SpriteAssetPixel {
     x: u8,
     y: u8,
     tint: Color,
 }
 
-fn sprite_asset_pixels(spec: SpriteAssetImageSpec) -> Vec<SpriteAssetPixel> {
+pub(super) fn sprite_asset_pixels(spec: SpriteAssetImageSpec) -> Vec<SpriteAssetPixel> {
     let bytes = crate::arcade_assets::object_bitmap_bytes(spec.bitmap);
     let expected_byte_count = usize::from(spec.rows) * usize::from(spec.byte_columns);
     if bytes.len() != expected_byte_count {
@@ -447,13 +462,13 @@ fn sprite_asset_pixels(spec: SpriteAssetImageSpec) -> Vec<SpriteAssetPixel> {
     pixels
 }
 
-fn sprite_asset_nibble_tint(index: u8) -> Option<Color> {
+pub(super) fn sprite_asset_nibble_tint(index: u8) -> Option<Color> {
     match index {
         SPRITE_TRANSPARENT_PALETTE_NIBBLE => None,
         index if SPRITE_WHITE_PALETTE_NIBBLES.contains(&index) => Some(Color::WHITE),
-        SPRITE_WILLIAMS_COLOR_NIBBLE_MIN..=SPRITE_WILLIAMS_COLOR_NIBBLE_MAX => Some(williams_color_byte_tint(
-            NORMAL_PALETTE_BYTES[usize::from(index)],
-        )),
+        SPRITE_WILLIAMS_COLOR_NIBBLE_MIN..=SPRITE_WILLIAMS_COLOR_NIBBLE_MAX => Some(
+            williams_color_byte_tint(NORMAL_PALETTE_BYTES[usize::from(index)]),
+        ),
         SPRITE_GRAY_PALETTE_NIBBLE => Some(SPRITE_GRAY_TINT),
         _ => None,
     }
@@ -514,7 +529,7 @@ pub(crate) fn push_scanner_radar_sprites(scene: &mut RenderScene, scanner: &Scan
     }
 }
 
-fn push_scanner_terrain_sprites(scene: &mut RenderScene, scan_left: u16) {
+pub(super) fn push_scanner_terrain_sprites(scene: &mut RenderScene, scan_left: u16) {
     for record in scanner_mini_terrain_records_for_scan_left(scan_left) {
         let origin = screen_position_from_cell(record.screen_cell);
         for (row, byte) in record.word.to_be_bytes().into_iter().enumerate() {
@@ -539,7 +554,7 @@ fn push_scanner_terrain_sprites(scene: &mut RenderScene, scan_left: u16) {
     }
 }
 
-fn push_scanner_word_pixels(
+pub(super) fn push_scanner_word_pixels(
     scene: &mut RenderScene,
     sprite: SpriteId,
     screen_cell: crate::ScreenAddress,
@@ -550,7 +565,7 @@ fn push_scanner_word_pixels(
     push_scanner_byte_pixels(scene, sprite, screen_cell.wrapping_add(1), bottom);
 }
 
-fn push_scanner_byte_pixels(
+pub(super) fn push_scanner_byte_pixels(
     scene: &mut RenderScene,
     sprite: SpriteId,
     screen_cell: crate::ScreenAddress,
@@ -572,7 +587,7 @@ fn push_scanner_byte_pixels(
     }
 }
 
-fn expanded_object_uses_pixel_cloud(detail: &ExpandedObjectDetailSnapshot) -> bool {
+pub(super) fn expanded_object_uses_pixel_cloud(detail: &ExpandedObjectDetailSnapshot) -> bool {
     match detail.kind {
         ExpandedObjectKind::Appearance => {
             appearance_growth_scale(detail.size).is_some() && detail.sprite_asset_image.is_some()
@@ -638,7 +653,7 @@ pub(crate) fn push_appearance_cloud_pixels(
     true
 }
 
-fn push_expanded_object_explosion_pixels(
+pub(super) fn push_expanded_object_explosion_pixels(
     scene: &mut RenderScene,
     detail: &ExpandedObjectDetailSnapshot,
 ) {
@@ -672,7 +687,7 @@ fn push_expanded_object_explosion_pixels(
     );
 }
 
-fn push_expanded_object_appearance_pixels(
+pub(super) fn push_expanded_object_appearance_pixels(
     scene: &mut RenderScene,
     detail: &ExpandedObjectDetailSnapshot,
 ) {
@@ -700,9 +715,9 @@ fn push_expanded_object_appearance_pixels(
     );
 }
 
-const PIXEL_CLOUD_EXPLOSION_FIRST_VISIBLE_STEP: u8 = 2;
+pub(super) const PIXEL_CLOUD_EXPLOSION_FIRST_VISIBLE_STEP: u8 = 2;
 
-fn push_expanded_object_pixel_cloud(
+pub(super) fn push_expanded_object_pixel_cloud(
     scene: &mut RenderScene,
     spec: SpriteAssetImageSpec,
     top_left: ScreenPosition,
@@ -748,18 +763,18 @@ fn push_expanded_object_pixel_cloud(
     }
 }
 
-fn pixel_cloud_tint(base_tint: Color, tick: u32, index: usize) -> Color {
+pub(super) fn pixel_cloud_tint(base_tint: Color, tick: u32, index: usize) -> Color {
     if tick < 2 && index.is_multiple_of(3) {
         return cycling_palette_tint(index);
     }
     base_tint
 }
 
-fn cycling_palette_tint(phase: usize) -> Color {
+pub(super) fn cycling_palette_tint(phase: usize) -> Color {
     williams_color_byte_tint(COLTAB_COLOR_BYTES[phase % COLTAB_ACTIVE_BYTES])
 }
 
-const EXPLOSION_RENDER_MAX_SCALE: u8 = 3;
+pub(super) const EXPLOSION_RENDER_MAX_SCALE: u8 = 3;
 
 pub(crate) fn explosion_render_scale(size: u16) -> Option<u16> {
     explosion_growth_scale(size).map(|scale| u16::from(scale.min(EXPLOSION_RENDER_MAX_SCALE)))
@@ -773,7 +788,7 @@ pub(crate) fn explosion_growth_scale(size: u16) -> Option<u8> {
     Some(high)
 }
 
-fn appearance_growth_scale(size: u16) -> Option<u8> {
+pub(super) fn appearance_growth_scale(size: u16) -> Option<u8> {
     if size & APPEARANCE_GROWTH_ACTIVE_BIT == 0 {
         return None;
     }
@@ -781,7 +796,7 @@ fn appearance_growth_scale(size: u16) -> Option<u8> {
     (scale > 0).then_some(scale)
 }
 
-fn appearance_growth_tick(size: u16) -> u8 {
+pub(super) fn appearance_growth_tick(size: u16) -> u8 {
     let start = APPEARANCE_INITIAL_SIZE.to_be_bytes()[0];
     let current = size.to_be_bytes()[0];
     start.saturating_sub(current)

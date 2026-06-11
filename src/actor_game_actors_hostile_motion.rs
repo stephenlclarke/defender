@@ -1,18 +1,20 @@
-fn drift_direction(drift: i16) -> Direction {
+use super::*;
+
+pub(in crate::actor_game) fn drift_direction(drift: i16) -> Direction {
     if drift < 0 {
         Direction::Left
     } else {
         Direction::Right
     }
 }
-fn step_toward(position: Point, target: Point, speed: i16) -> Point {
+pub(in crate::actor_game) fn step_toward(position: Point, target: Point, speed: i16) -> Point {
     Point::new(
         position.x + axis_step(target.x - position.x, speed),
         position.y + axis_step(target.y - position.y, speed),
     )
 }
 
-fn axis_step(delta: i16, speed: i16) -> i16 {
+pub(in crate::actor_game) fn axis_step(delta: i16, speed: i16) -> i16 {
     let speed = speed.max(0);
     if delta == 0 {
         0
@@ -23,7 +25,7 @@ fn axis_step(delta: i16, speed: i16) -> i16 {
     }
 }
 
-fn move_by_hostile_mode(
+pub(in crate::actor_game) fn move_by_hostile_mode(
     position: Point,
     mode: HostileMovementMode,
     prompt: &StepPrompt,
@@ -38,11 +40,14 @@ fn move_by_hostile_mode(
     }
 }
 
-fn observed_velocity(previous: Point, current: Point) -> Velocity {
+pub(in crate::actor_game) fn observed_velocity(previous: Point, current: Point) -> Velocity {
     Velocity::new(current.x - previous.x, current.y - previous.y)
 }
 
-fn direction_for_velocity(velocity: Velocity, fallback: Direction) -> Direction {
+pub(in crate::actor_game) fn direction_for_velocity(
+    velocity: Velocity,
+    fallback: Direction,
+) -> Direction {
     if velocity.dx < 0 {
         Direction::Left
     } else if velocity.dx > 0 {

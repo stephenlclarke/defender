@@ -1,36 +1,38 @@
-const BOMBER_BOMB_RANDOM_DROP_MASK: u8 = 0x07;
-const BOMBER_RANDOM_STEP_MASK: u8 = 0x3F;
-const BOMBER_RANDOM_STEP_CENTER: u8 = 0x20;
-const MOTION_BYTE_SIGN_BIT: u8 = 0x80;
-const BOMBER_CRUISE_RANDOM_NUDGE_SEED_MAX: u8 = 0x40;
-const BOMBER_CRUISE_NUDGE_MASK: u8 = 0x03;
-const BOMBER_CRUISE_NUDGE_CENTER: u8 = 2;
-const BOMBER_Y_VELOCITY_UP_CORRECTION: u16 = 0xFFF0;
-const BOMBER_Y_VELOCITY_DOWN_CORRECTION: u16 = 0x0010;
-const BOMBER_PLAYER_TRACKING_FAR_PIXELS: i16 = 0x20;
-const BOMBER_PLAYER_TRACKING_NEAR_PIXELS: i16 = 0x10;
-const MINI_SWARMER_RANDOM_STEP_MASK: u8 = 0x1F;
-const MINI_SWARMER_RANDOM_STEP_CENTER: u8 = 0x10;
-const BAITER_COLLISION_WIDTH: i16 = 12;
-const BAITER_COLLISION_HEIGHT: i16 = 4;
-const MOTION_WORD_SHIFT_LIMIT: u8 = 15;
-const MOTION_SEED_STEP_MULTIPLIER: u8 = 17;
-const MINI_SWARMER_DAMPING_SHIFT_STEPS: u8 = 2;
+use super::*;
+
+pub(in crate::actor_game) const BOMBER_BOMB_RANDOM_DROP_MASK: u8 = 0x07;
+pub(in crate::actor_game) const BOMBER_RANDOM_STEP_MASK: u8 = 0x3F;
+pub(in crate::actor_game) const BOMBER_RANDOM_STEP_CENTER: u8 = 0x20;
+pub(in crate::actor_game) const MOTION_BYTE_SIGN_BIT: u8 = 0x80;
+pub(in crate::actor_game) const BOMBER_CRUISE_RANDOM_NUDGE_SEED_MAX: u8 = 0x40;
+pub(in crate::actor_game) const BOMBER_CRUISE_NUDGE_MASK: u8 = 0x03;
+pub(in crate::actor_game) const BOMBER_CRUISE_NUDGE_CENTER: u8 = 2;
+pub(in crate::actor_game) const BOMBER_Y_VELOCITY_UP_CORRECTION: u16 = 0xFFF0;
+pub(in crate::actor_game) const BOMBER_Y_VELOCITY_DOWN_CORRECTION: u16 = 0x0010;
+pub(in crate::actor_game) const BOMBER_PLAYER_TRACKING_FAR_PIXELS: i16 = 0x20;
+pub(in crate::actor_game) const BOMBER_PLAYER_TRACKING_NEAR_PIXELS: i16 = 0x10;
+pub(in crate::actor_game) const MINI_SWARMER_RANDOM_STEP_MASK: u8 = 0x1F;
+pub(in crate::actor_game) const MINI_SWARMER_RANDOM_STEP_CENTER: u8 = 0x10;
+pub(in crate::actor_game) const BAITER_COLLISION_WIDTH: i16 = 12;
+pub(in crate::actor_game) const BAITER_COLLISION_HEIGHT: i16 = 4;
+pub(in crate::actor_game) const MOTION_WORD_SHIFT_LIMIT: u8 = 15;
+pub(in crate::actor_game) const MOTION_SEED_STEP_MULTIPLIER: u8 = 17;
+pub(in crate::actor_game) const MINI_SWARMER_DAMPING_SHIFT_STEPS: u8 = 2;
 
 #[derive(Debug)]
-struct Bomber {
-    id: ActorId,
-    position: Point,
-    drift: i16,
-    actor_state: Option<BomberActorState>,
+pub(in crate::actor_game) struct Bomber {
+    pub(in crate::actor_game) id: ActorId,
+    pub(in crate::actor_game) position: Point,
+    pub(in crate::actor_game) drift: i16,
+    pub(in crate::actor_game) actor_state: Option<BomberActorState>,
 }
 
 impl Bomber {
-    fn new(id: ActorId, position: Point) -> Self {
+    pub(in crate::actor_game) fn new(id: ActorId, position: Point) -> Self {
         Self::from_spawn(id, ActorBomberSpawn::new(position))
     }
 
-    fn from_spawn(id: ActorId, spawn: ActorBomberSpawn) -> Self {
+    pub(in crate::actor_game) fn from_spawn(id: ActorId, spawn: ActorBomberSpawn) -> Self {
         Self {
             id,
             position: spawn.position,
@@ -72,8 +74,10 @@ impl Bomber {
             actor_rng.seed,
             actor_state.animation_frame.index(),
         ));
-        actor_state
-            .set_y_velocity(bomber_seeded_y_velocity(actor_state.y_velocity(), actor_rng.seed));
+        actor_state.set_y_velocity(bomber_seeded_y_velocity(
+            actor_state.y_velocity(),
+            actor_rng.seed,
+        ));
         if self.position.y == 0 {
             let y_velocity = bomber_cruise_y_velocity(
                 actor_state.y_velocity(),
@@ -83,8 +87,7 @@ impl Bomber {
             );
             actor_state.set_y_velocity(y_velocity);
         } else if let Some(player) = prompt.player_position()
-            && let Some(delta) =
-                bomber_player_tracking_y_velocity_delta(self.position.y, player.y)
+            && let Some(delta) = bomber_player_tracking_y_velocity_delta(self.position.y, player.y)
         {
             actor_state.set_y_velocity(actor_state.y_velocity().wrapping_add(delta));
         }
@@ -124,7 +127,12 @@ impl Bomber {
             commands.push(GameCommand::Spawn(SpawnRequest::Bomb {
                 position: self.position,
                 actor_state: Some(EnemyProjectileActorState {
-                    motion: ActorMotion::new(actor_state.x_fraction(), actor_state.y_fraction(), 0, 0),
+                    motion: ActorMotion::new(
+                        actor_state.x_fraction(),
+                        actor_state.y_fraction(),
+                        0,
+                        0,
+                    ),
                     lifetime_ticks: bomber_bomb_lifetime_ticks(actor_rng),
                 }),
             }));
@@ -151,7 +159,7 @@ impl Bomber {
     }
 }
 
-fn bomber_sprite_frame_after_tie_seed(seed: u8, current: u8) -> u8 {
+pub(in crate::actor_game) fn bomber_sprite_frame_after_tie_seed(seed: u8, current: u8) -> u8 {
     let step = (seed & BOMBER_RANDOM_STEP_MASK).wrapping_sub(BOMBER_RANDOM_STEP_CENTER);
     if step & MOTION_BYTE_SIGN_BIT != 0 {
         current
@@ -162,7 +170,7 @@ fn bomber_sprite_frame_after_tie_seed(seed: u8, current: u8) -> u8 {
     }
 }
 
-fn bomber_seeded_y_velocity(previous: u16, seed: u8) -> u16 {
+pub(in crate::actor_game) fn bomber_seeded_y_velocity(previous: u16, seed: u8) -> u16 {
     let random_delta = actor_sign_extend_u8_to_u16(
         (seed & BOMBER_RANDOM_STEP_MASK).wrapping_sub(BOMBER_RANDOM_STEP_CENTER),
     );
@@ -172,7 +180,7 @@ fn bomber_seeded_y_velocity(previous: u16, seed: u8) -> u16 {
     velocity
 }
 
-fn bomber_cruise_y_velocity(
+pub(in crate::actor_game) fn bomber_cruise_y_velocity(
     mut velocity: u16,
     cruise_altitude: &mut i16,
     object_y: i16,
@@ -198,7 +206,10 @@ fn bomber_cruise_y_velocity(
     velocity
 }
 
-fn bomber_player_tracking_y_velocity_delta(object_y: i16, player_y: i16) -> Option<u16> {
+pub(in crate::actor_game) fn bomber_player_tracking_y_velocity_delta(
+    object_y: i16,
+    player_y: i16,
+) -> Option<u16> {
     let delta = object_y - player_y;
     if delta >= 0 {
         if delta >= BOMBER_PLAYER_TRACKING_FAR_PIXELS {
@@ -275,15 +286,15 @@ impl AssetActor for Bomber {
 }
 
 #[derive(Debug)]
-struct Bomb {
-    id: ActorId,
-    position: Point,
-    lifetime_steps: u16,
-    actor_state: EnemyProjectileActorState,
+pub(in crate::actor_game) struct Bomb {
+    pub(in crate::actor_game) id: ActorId,
+    pub(in crate::actor_game) position: Point,
+    pub(in crate::actor_game) lifetime_steps: u16,
+    pub(in crate::actor_game) actor_state: EnemyProjectileActorState,
 }
 
 impl Bomb {
-    fn new(
+    pub(in crate::actor_game) fn new(
         id: ActorId,
         position: Point,
         lifetime_steps: u16,
@@ -320,8 +331,7 @@ impl AssetActor for Bomb {
         if prompt.phase == Phase::Playing && self.lifetime_steps > 0 {
             if prompt.projectile_scan_tick {
                 self.lifetime_steps = self.lifetime_steps.saturating_sub(1);
-                self.actor_state.lifetime_ticks =
-                    projectile_lifetime_ticks(self.lifetime_steps);
+                self.actor_state.lifetime_ticks = projectile_lifetime_ticks(self.lifetime_steps);
             }
             if self.lifetime_steps > 0 {
                 draws.push(DrawCommand::sprite(self.id, SpriteKey::Bomb, self.position));
@@ -347,19 +357,19 @@ impl AssetActor for Bomb {
 }
 
 #[derive(Debug)]
-struct Pod {
-    id: ActorId,
-    position: Point,
-    drift: i16,
-    actor_state: Option<PodActorState>,
+pub(in crate::actor_game) struct Pod {
+    pub(in crate::actor_game) id: ActorId,
+    pub(in crate::actor_game) position: Point,
+    pub(in crate::actor_game) drift: i16,
+    pub(in crate::actor_game) actor_state: Option<PodActorState>,
 }
 
 impl Pod {
-    fn new(id: ActorId, position: Point) -> Self {
+    pub(in crate::actor_game) fn new(id: ActorId, position: Point) -> Self {
         Self::from_spawn(id, ActorPodSpawn::new(position))
     }
 
-    fn from_spawn(id: ActorId, spawn: ActorPodSpawn) -> Self {
+    pub(in crate::actor_game) fn from_spawn(id: ActorId, spawn: ActorPodSpawn) -> Self {
         Self {
             id,
             position: spawn.position,
@@ -437,19 +447,19 @@ impl AssetActor for Pod {
 }
 
 #[derive(Debug)]
-struct Swarmer {
-    id: ActorId,
-    position: Point,
-    drift: i16,
-    actor_state: Option<SwarmerActorState>,
+pub(in crate::actor_game) struct Swarmer {
+    pub(in crate::actor_game) id: ActorId,
+    pub(in crate::actor_game) position: Point,
+    pub(in crate::actor_game) drift: i16,
+    pub(in crate::actor_game) actor_state: Option<SwarmerActorState>,
 }
 
 impl Swarmer {
-    fn new(id: ActorId, position: Point) -> Self {
+    pub(in crate::actor_game) fn new(id: ActorId, position: Point) -> Self {
         Self::from_spawn(id, ActorSwarmerSpawn::new(position))
     }
 
-    fn from_spawn(id: ActorId, spawn: ActorSwarmerSpawn) -> Self {
+    pub(in crate::actor_game) fn from_spawn(id: ActorId, spawn: ActorSwarmerSpawn) -> Self {
         Self {
             id,
             position: spawn.position,
@@ -524,9 +534,17 @@ impl Swarmer {
             if actor_state.shot_timer == 0 {
                 actor_state.shot_timer = prompt
                     .actor_rng
-                    .map(|rng| bounded_actor_rng_value(clamped_swarmer_shot_reset(profile), rng.seed))
+                    .map(|rng| {
+                        bounded_actor_rng_value(clamped_swarmer_shot_reset(profile), rng.seed)
+                    })
                     .unwrap_or_else(|| clamped_swarmer_shot_reset(profile));
-                push_swarmer_shot(self.position, prompt, behavior, Some(*actor_state), commands);
+                push_swarmer_shot(
+                    self.position,
+                    prompt,
+                    behavior,
+                    Some(*actor_state),
+                    commands,
+                );
             }
         }
         actor_state.sleep_ticks = MINI_SWARMER_LOOP_SLEEP_TICKS;
@@ -591,7 +609,7 @@ impl AssetActor for Swarmer {
     }
 }
 
-fn push_swarmer_shot(
+pub(in crate::actor_game) fn push_swarmer_shot(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
@@ -622,7 +640,7 @@ fn push_swarmer_shot(
     commands.push(GameCommand::PlaySound(SoundCue::SwarmerShot));
 }
 
-fn mini_swarmer_fireball(
+pub(in crate::actor_game) fn mini_swarmer_fireball(
     position: Point,
     prompt: &StepPrompt,
     actor_state: SwarmerActorState,
@@ -633,7 +651,7 @@ fn mini_swarmer_fireball(
     if (player_delta.to_be_bytes()[0] ^ actor_state.x_velocity().to_be_bytes()[0])
         & MOTION_BYTE_SIGN_BIT
         != 0
-            || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
+        || actor_enemy_projectile_count(prompt) >= ENEMY_PROJECTILE_SLOT_LIMIT
     {
         return None;
     }
@@ -653,24 +671,24 @@ fn mini_swarmer_fireball(
     ))
 }
 
-fn clamped_swarmer_shot_reset(profile: ActorWaveTuning) -> u8 {
+pub(in crate::actor_game) fn clamped_swarmer_shot_reset(profile: ActorWaveTuning) -> u8 {
     profile.swarmer_shot_time.max(1).min(u32::from(u8::MAX)) as u8
 }
 
 #[derive(Debug)]
-struct Baiter {
-    id: ActorId,
-    position: Point,
-    drift: i16,
-    actor_state: Option<BaiterActorState>,
+pub(in crate::actor_game) struct Baiter {
+    pub(in crate::actor_game) id: ActorId,
+    pub(in crate::actor_game) position: Point,
+    pub(in crate::actor_game) drift: i16,
+    pub(in crate::actor_game) actor_state: Option<BaiterActorState>,
 }
 
 impl Baiter {
-    fn new(id: ActorId, position: Point) -> Self {
+    pub(in crate::actor_game) fn new(id: ActorId, position: Point) -> Self {
         Self::from_spawn(id, ActorBaiterSpawn::new(position))
     }
 
-    fn from_spawn(id: ActorId, spawn: ActorBaiterSpawn) -> Self {
+    pub(in crate::actor_game) fn from_spawn(id: ActorId, spawn: ActorBaiterSpawn) -> Self {
         Self {
             id,
             position: spawn.position,
@@ -756,7 +774,7 @@ impl Baiter {
     }
 }
 
-fn push_baiter_shot(
+pub(in crate::actor_game) fn push_baiter_shot(
     actor: ActorId,
     position: Point,
     prompt: &StepPrompt,
@@ -766,8 +784,7 @@ fn push_baiter_shot(
     commands: &mut Vec<GameCommand>,
 ) {
     if let Some(actor_state) = actor_state {
-        let shot_rng =
-            shot_rng.unwrap_or_else(|| baiter_shot_actor_rng(prompt, actor, position));
+        let shot_rng = shot_rng.unwrap_or_else(|| baiter_shot_actor_rng(prompt, actor, position));
         if let Some((velocity, projectile_actor_state)) =
             baiter_fireball(position, prompt, actor_state, shot_rng)
         {
@@ -791,7 +808,7 @@ fn push_baiter_shot(
     commands.push(GameCommand::PlaySound(SoundCue::BaiterShot));
 }
 
-fn baiter_shot_actor_rng(
+pub(in crate::actor_game) fn baiter_shot_actor_rng(
     prompt: &StepPrompt,
     actor: ActorId,
     position: Point,
@@ -803,11 +820,11 @@ fn baiter_shot_actor_rng(
     })
 }
 
-fn baiter_shot_timer_reset(profile: ActorWaveTuning, seed: u8) -> u8 {
+pub(in crate::actor_game) fn baiter_shot_timer_reset(profile: ActorWaveTuning, seed: u8) -> u8 {
     bounded_actor_rng_value(clamped_baiter_shot_timer_reset(profile), seed)
 }
 
-fn baiter_fireball(
+pub(in crate::actor_game) fn baiter_fireball(
     position: Point,
     prompt: &StepPrompt,
     actor_state: BaiterActorState,
@@ -823,7 +840,7 @@ fn baiter_fireball(
     )
 }
 
-fn baiter_shot_velocity(
+pub(in crate::actor_game) fn baiter_shot_velocity(
     position: Point,
     prompt: &StepPrompt,
     behavior: ActorBehaviorProfile,
@@ -831,7 +848,11 @@ fn baiter_shot_velocity(
     hostile_shot_velocity(position, prompt, behavior.baiter_shot_speed)
 }
 
-fn hostile_shot_velocity(position: Point, prompt: &StepPrompt, speed: i16) -> Velocity {
+pub(in crate::actor_game) fn hostile_shot_velocity(
+    position: Point,
+    prompt: &StepPrompt,
+    speed: i16,
+) -> Velocity {
     let speed = speed.max(1);
     if let Some(player) = prompt.player_position() {
         return Velocity::new(
@@ -909,15 +930,15 @@ impl AssetActor for Baiter {
     }
 }
 
-fn clamped_baiter_shot_timer_reset(profile: ActorWaveTuning) -> u8 {
+pub(in crate::actor_game) fn clamped_baiter_shot_timer_reset(profile: ActorWaveTuning) -> u8 {
     profile.baiter_shot_time.max(1).min(u32::from(u8::MAX)) as u8
 }
 
-fn baiter_screen_x_velocity(actor_x_velocity: u16) -> u16 {
+pub(in crate::actor_game) fn baiter_screen_x_velocity(actor_x_velocity: u16) -> u16 {
     actor_x_velocity.wrapping_shl(2)
 }
 
-fn update_baiter_velocity(
+pub(in crate::actor_game) fn update_baiter_velocity(
     actor_state: &mut BaiterActorState,
     position: Point,
     profile: ActorWaveTuning,
@@ -961,21 +982,25 @@ fn update_baiter_velocity(
     true
 }
 
-fn actor_arithmetic_shift_right_word(value: u16, shift: u8) -> u16 {
+pub(in crate::actor_game) fn actor_arithmetic_shift_right_word(value: u16, shift: u8) -> u16 {
     ((value as i16) >> shift.min(MOTION_WORD_SHIFT_LIMIT)) as u16
 }
 
-fn motion_velocity_word(value: i16) -> u16 {
+pub(in crate::actor_game) fn motion_velocity_word(value: i16) -> u16 {
     value as u16
 }
 
-fn motion_seed(step: u64, id: ActorId) -> u8 {
+pub(in crate::actor_game) fn motion_seed(step: u64, id: ActorId) -> u8 {
     (step as u8)
         .wrapping_mul(MOTION_SEED_STEP_MULTIPLIER)
         .wrapping_add(id.value() as u8)
 }
 
-fn mini_swarmer_seek_velocity(x_velocity_magnitude: u8, player_x: i16, swarmer_x: i16) -> u16 {
+pub(in crate::actor_game) fn mini_swarmer_seek_velocity(
+    x_velocity_magnitude: u8,
+    player_x: i16,
+    swarmer_x: i16,
+) -> u16 {
     if player_x >= swarmer_x {
         actor_sign_extend_u8_to_u16(x_velocity_magnitude)
     } else {
@@ -983,7 +1008,7 @@ fn mini_swarmer_seek_velocity(x_velocity_magnitude: u8, player_x: i16, swarmer_x
     }
 }
 
-fn mini_swarmer_y_velocity(
+pub(in crate::actor_game) fn mini_swarmer_y_velocity(
     previous_y_velocity: u16,
     acceleration: u8,
     player_y: i16,
@@ -1009,7 +1034,7 @@ fn mini_swarmer_y_velocity(
     ))
 }
 
-fn mini_swarmer_damping_adjustment(value: u16) -> u16 {
+pub(in crate::actor_game) fn mini_swarmer_damping_adjustment(value: u16) -> u16 {
     let [mut a, mut b] = value.to_be_bytes();
     a = !a;
     b = !b;

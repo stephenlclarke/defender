@@ -1,52 +1,54 @@
-const PLAYER_INITIAL_SPAWN_POSITION: Point = Point::new(42, 120);
+use super::*;
+
+pub(in crate::actor_game) const PLAYER_INITIAL_SPAWN_POSITION: Point = Point::new(42, 120);
 
 pub struct ActorGameDriver {
-    step: u64,
-    phase: Phase,
-    wave: u16,
-    current_player: u8,
-    player_count: u8,
-    score: u32,
-    player_two_score: u32,
-    credits: u8,
-    lives: u8,
-    smart_bombs: u8,
-    player_two_lives: u8,
-    player_two_smart_bombs: u8,
-    next_bonus: u32,
-    next_actor_id: u64,
-    actors: BTreeMap<ActorId, ThreadedAsset>,
-    snapshots: BTreeMap<ActorId, ActorSnapshot>,
-    high_scores: HighScoreTable,
-    high_score_initials: HighScoreInitialsState,
-    attract_script: AttractScript,
-    behavior_script: ActorBehaviorScript,
-    wave_script: ActorWaveScript,
-    wave_spawn_allocations: BTreeMap<ActorKind, usize>,
-    enemy_reserve: EnemyReserveSnapshot,
-    target_human_cursor: Option<usize>,
-    human_walk_cursor: Option<usize>,
-    human_walk_sleep_ticks: u8,
-    reserve_activation_ready: bool,
-    reserve_activation_cooldown_steps: u16,
-    first_wave_early_reserve_steps_remaining: Option<u16>,
-    first_wave_lander_refill_steps_remaining: Option<u8>,
-    background_left: u16,
-    baiter_timer_steps: Option<u32>,
-    baiter_pacing_steps_remaining: u8,
-    actor_rng: ActorRng,
-    projectile_scan_steps_remaining: u8,
-    pending_smart_bomb_detonation_steps: Option<u8>,
-    smart_bomb_flash_steps_remaining: u8,
-    pending_sound_commands: Vec<PendingActorSoundCommand>,
-    terrain_blow: Option<TerrainBlowSnapshot>,
-    free_play_admission: bool,
-    player_death_sleep_remaining: Option<u8>,
-    game_over_hall_of_fame_stall_remaining: Option<u8>,
-    pending_survivor_bonus: Option<PendingSurvivorBonus>,
-    pending_player_switch: Option<PendingPlayerSwitch>,
-    pending_player_start: Option<PendingPlayerStart>,
-    pending_start_sound_steps: Option<u8>,
+    pub(in crate::actor_game) step: u64,
+    pub(in crate::actor_game) phase: Phase,
+    pub(in crate::actor_game) wave: u16,
+    pub(in crate::actor_game) current_player: u8,
+    pub(in crate::actor_game) player_count: u8,
+    pub(in crate::actor_game) score: u32,
+    pub(in crate::actor_game) player_two_score: u32,
+    pub(in crate::actor_game) credits: u8,
+    pub(in crate::actor_game) lives: u8,
+    pub(in crate::actor_game) smart_bombs: u8,
+    pub(in crate::actor_game) player_two_lives: u8,
+    pub(in crate::actor_game) player_two_smart_bombs: u8,
+    pub(in crate::actor_game) next_bonus: u32,
+    pub(in crate::actor_game) next_actor_id: u64,
+    pub(in crate::actor_game) actors: BTreeMap<ActorId, ThreadedAsset>,
+    pub(in crate::actor_game) snapshots: BTreeMap<ActorId, ActorSnapshot>,
+    pub(in crate::actor_game) high_scores: HighScoreTable,
+    pub(in crate::actor_game) high_score_initials: HighScoreInitialsState,
+    pub(in crate::actor_game) attract_script: AttractScript,
+    pub(in crate::actor_game) behavior_script: ActorBehaviorScript,
+    pub(in crate::actor_game) wave_script: ActorWaveScript,
+    pub(in crate::actor_game) wave_spawn_allocations: BTreeMap<ActorKind, usize>,
+    pub(in crate::actor_game) enemy_reserve: EnemyReserveSnapshot,
+    pub(in crate::actor_game) target_human_cursor: Option<usize>,
+    pub(in crate::actor_game) human_walk_cursor: Option<usize>,
+    pub(in crate::actor_game) human_walk_sleep_ticks: u8,
+    pub(in crate::actor_game) reserve_activation_ready: bool,
+    pub(in crate::actor_game) reserve_activation_cooldown_steps: u16,
+    pub(in crate::actor_game) first_wave_early_reserve_steps_remaining: Option<u16>,
+    pub(in crate::actor_game) first_wave_lander_refill_steps_remaining: Option<u8>,
+    pub(in crate::actor_game) background_left: u16,
+    pub(in crate::actor_game) baiter_timer_steps: Option<u32>,
+    pub(in crate::actor_game) baiter_pacing_steps_remaining: u8,
+    pub(in crate::actor_game) actor_rng: ActorRng,
+    pub(in crate::actor_game) projectile_scan_steps_remaining: u8,
+    pub(in crate::actor_game) pending_smart_bomb_detonation_steps: Option<u8>,
+    pub(in crate::actor_game) smart_bomb_flash_steps_remaining: u8,
+    pub(in crate::actor_game) pending_sound_commands: Vec<PendingActorSoundCommand>,
+    pub(in crate::actor_game) terrain_blow: Option<TerrainBlowSnapshot>,
+    pub(in crate::actor_game) free_play_admission: bool,
+    pub(in crate::actor_game) player_death_sleep_remaining: Option<u8>,
+    pub(in crate::actor_game) game_over_hall_of_fame_stall_remaining: Option<u8>,
+    pub(in crate::actor_game) pending_survivor_bonus: Option<PendingSurvivorBonus>,
+    pub(in crate::actor_game) pending_player_switch: Option<PendingPlayerSwitch>,
+    pub(in crate::actor_game) pending_player_start: Option<PendingPlayerStart>,
+    pub(in crate::actor_game) pending_start_sound_steps: Option<u8>,
 }
 
 impl ActorGameDriver {
@@ -217,8 +219,7 @@ impl ActorGameDriver {
             None
         };
         if let Some(actor_rng) = actor_rng {
-            behavior_script =
-                behavior_script.with_hyperspace_seed(actor_rng.hyperspace_seed());
+            behavior_script = behavior_script.with_hyperspace_seed(actor_rng.hyperspace_seed());
         }
         let human_walk_target_slot = self.advance_human_walk_process(actor_rng);
         let projectile_scan_tick = if self.phase == Phase::Playing
@@ -467,7 +468,7 @@ impl ActorGameDriver {
         self.actors.insert(id, ThreadedAsset::spawn(actor));
     }
 
-    fn spawn_player(&mut self) -> ActorId {
+    pub(in crate::actor_game) fn spawn_player(&mut self) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(PlayerShip::new(id, PLAYER_INITIAL_SPAWN_POSITION));
         id
@@ -479,17 +480,23 @@ impl ActorGameDriver {
         id
     }
 
-    fn spawn_lander_from_spawn(&mut self, spawn: ActorLanderSpawn) -> ActorId {
+    pub(in crate::actor_game) fn spawn_lander_from_spawn(
+        &mut self,
+        spawn: ActorLanderSpawn,
+    ) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(Lander::from_spawn(id, spawn));
         id
     }
 
-    fn spawn_mutant(&mut self, position: Point) -> ActorId {
+    pub(in crate::actor_game) fn spawn_mutant(&mut self, position: Point) -> ActorId {
         self.spawn_mutant_from_spawn(ActorMutantSpawn::new(position))
     }
 
-    fn spawn_mutant_from_spawn(&mut self, spawn: ActorMutantSpawn) -> ActorId {
+    pub(in crate::actor_game) fn spawn_mutant_from_spawn(
+        &mut self,
+        spawn: ActorMutantSpawn,
+    ) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(Mutant::from_spawn(id, spawn));
         id
@@ -501,13 +508,16 @@ impl ActorGameDriver {
         id
     }
 
-    fn spawn_bomber_from_spawn(&mut self, spawn: ActorBomberSpawn) -> ActorId {
+    pub(in crate::actor_game) fn spawn_bomber_from_spawn(
+        &mut self,
+        spawn: ActorBomberSpawn,
+    ) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(Bomber::from_spawn(id, spawn));
         id
     }
 
-    fn spawn_bomb(
+    pub(in crate::actor_game) fn spawn_bomb(
         &mut self,
         position: Point,
         actor_state: Option<EnemyProjectileActorState>,
@@ -527,7 +537,7 @@ impl ActorGameDriver {
         id
     }
 
-    fn spawn_pod_from_spawn(&mut self, spawn: ActorPodSpawn) -> ActorId {
+    pub(in crate::actor_game) fn spawn_pod_from_spawn(&mut self, spawn: ActorPodSpawn) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(Pod::from_spawn(id, spawn));
         id
@@ -539,7 +549,10 @@ impl ActorGameDriver {
         id
     }
 
-    fn spawn_swarmer_from_spawn(&mut self, spawn: ActorSwarmerSpawn) -> ActorId {
+    pub(in crate::actor_game) fn spawn_swarmer_from_spawn(
+        &mut self,
+        spawn: ActorSwarmerSpawn,
+    ) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(Swarmer::from_spawn(id, spawn));
         id
@@ -551,7 +564,10 @@ impl ActorGameDriver {
         id
     }
 
-    fn spawn_baiter_from_spawn(&mut self, spawn: ActorBaiterSpawn) -> ActorId {
+    pub(in crate::actor_game) fn spawn_baiter_from_spawn(
+        &mut self,
+        spawn: ActorBaiterSpawn,
+    ) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(Baiter::from_spawn(id, spawn));
         id
@@ -563,19 +579,27 @@ impl ActorGameDriver {
         id
     }
 
-    fn spawn_human_from_spawn(&mut self, spawn: ActorHumanSpawn) -> ActorId {
+    pub(in crate::actor_game) fn spawn_human_from_spawn(
+        &mut self,
+        spawn: ActorHumanSpawn,
+    ) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(Human::from_spawn(id, spawn));
         id
     }
 
-    fn spawn_laser(&mut self, position: Point, direction: Direction, owner: ActorId) -> ActorId {
+    pub(in crate::actor_game) fn spawn_laser(
+        &mut self,
+        position: Point,
+        direction: Direction,
+        owner: ActorId,
+    ) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(LaserShot::new(id, position, direction, owner));
         id
     }
 
-    fn spawn_enemy_laser_from_spawn(
+    pub(in crate::actor_game) fn spawn_enemy_laser_from_spawn(
         &mut self,
         position: Point,
         velocity: Velocity,
@@ -586,7 +610,11 @@ impl ActorGameDriver {
         id
     }
 
-    fn spawn_explosion(&mut self, position: Point, kind: ExplosionKind) -> ActorId {
+    pub(in crate::actor_game) fn spawn_explosion(
+        &mut self,
+        position: Point,
+        kind: ExplosionKind,
+    ) -> ActorId {
         self.spawn_explosion_with_anchor(position, kind, None)
     }
 
@@ -607,7 +635,7 @@ impl ActorGameDriver {
         id
     }
 
-    fn resolve_collisions(
+    pub(in crate::actor_game) fn resolve_collisions(
         &mut self,
         behavior_script: &ActorBehaviorScript,
         commands: &mut Vec<GameCommand>,
@@ -668,10 +696,7 @@ impl ActorGameDriver {
             if hyperspace_clears_enemy_lasers && enemy.kind == ActorKind::EnemyLaser {
                 continue;
             }
-            if mutant_dive_collision_window_pending(
-                enemy.position,
-                enemy.actor_state.as_mutant(),
-            ) {
+            if mutant_dive_collision_window_pending(enemy.position, enemy.actor_state.as_mutant()) {
                 continue;
             }
             if player.bounds.intersects(enemy.bounds) {
@@ -701,7 +726,10 @@ impl ActorGameDriver {
         }
     }
 
-    fn apply_commands(&mut self, commands: &[GameCommand]) -> AppliedCommands {
+    pub(in crate::actor_game) fn apply_commands(
+        &mut self,
+        commands: &[GameCommand],
+    ) -> AppliedCommands {
         let mut applied = AppliedCommands::default();
         let mut active_enemy_projectiles = self.active_enemy_projectile_count();
         let mut active_bomb_projectiles = self.active_bomb_projectile_count();
@@ -814,7 +842,9 @@ impl ActorGameDriver {
                 GameCommand::Destroy(id) => {
                     let removed_kind = self.snapshots.get(&id).map(|snapshot| snapshot.kind);
                     if let Some(snapshot) = self.snapshots.get(&id) {
-                        if removed_enemy_projectiles.insert(id) && is_enemy_projectile_kind(snapshot.kind) {
+                        if removed_enemy_projectiles.insert(id)
+                            && is_enemy_projectile_kind(snapshot.kind)
+                        {
                             active_enemy_projectiles = active_enemy_projectiles.saturating_sub(1);
                         }
                         if removed_bomb_projectiles.insert(id) && snapshot.kind == ActorKind::Bomb {
@@ -1198,8 +1228,7 @@ impl ActorGameDriver {
             if let Some(start_sound_index) = start_sound_index {
                 terrain_blow.stage = TerrainBlowStage::ExplosionPassSleeping;
                 terrain_blow.explosion_pass = terrain_blow.explosion_pass.saturating_add(1);
-                terrain_blow.flash_color_byte =
-                    TERRAIN_BLOW_FLASH_COLOR_BYTES[start_sound_index];
+                terrain_blow.flash_color_byte = TERRAIN_BLOW_FLASH_COLOR_BYTES[start_sound_index];
             } else {
                 terrain_blow.stage = TerrainBlowStage::FlashClearedSleeping;
                 terrain_blow.flash_color_byte = 0;
@@ -1491,10 +1520,7 @@ impl ActorGameDriver {
         self.human_walk_sleep_ticks = 0;
     }
 
-    fn advance_human_walk_process(
-        &mut self,
-        actor_rng: Option<ActorRngSnapshot>,
-    ) -> Option<usize> {
+    fn advance_human_walk_process(&mut self, actor_rng: Option<ActorRngSnapshot>) -> Option<usize> {
         if actor_rng.is_none() || !self.has_targetable_human_snapshots() {
             return None;
         }
@@ -1521,9 +1547,8 @@ impl ActorGameDriver {
     }
 
     fn advance_reserve_activation_cooldown(&mut self) {
-        self.reserve_activation_cooldown_steps = self
-            .reserve_activation_cooldown_steps
-            .saturating_sub(1);
+        self.reserve_activation_cooldown_steps =
+            self.reserve_activation_cooldown_steps.saturating_sub(1);
     }
 
     fn advance_game_over_return(&mut self) {
@@ -1567,7 +1592,7 @@ impl ActorGameDriver {
         true
     }
 
-    fn apply_wave_profile(&mut self) {
+    pub(in crate::actor_game) fn apply_wave_profile(&mut self) {
         let wave_profile = self.wave_script.profile_for_wave(self.wave);
         self.behavior_script = wave_profile.behavior_script.clone();
         self.wave_spawn_allocations.clear();
@@ -1590,7 +1615,7 @@ impl ActorGameDriver {
             .unwrap_or_else(|| ActorWaveTuning::for_wave(self.wave.max(1)))
     }
 
-    fn reset_baiter_timer(&mut self) {
+    pub(in crate::actor_game) fn reset_baiter_timer(&mut self) {
         let wave_tuning_profile = self.current_wave_tuning_profile();
         self.baiter_timer_steps = Some(wave_tuning_profile.baiter_delay.max(1));
         self.baiter_pacing_steps_remaining = ACTOR_BAITER_TIMER_PACING_STEPS;
@@ -1622,8 +1647,7 @@ impl ActorGameDriver {
         self.first_wave_early_reserve_steps_remaining = None;
         self.clear_first_wave_lander_refill();
         let wave_tuning_profile = self.current_wave_tuning_profile();
-        let reserve_kinds =
-            reserve_wave_enemy_kinds(&mut self.enemy_reserve, wave_tuning_profile);
+        let reserve_kinds = reserve_wave_enemy_kinds(&mut self.enemy_reserve, wave_tuning_profile);
         let mut index = 0;
         while index < reserve_kinds.len() {
             match reserve_kinds[index] {
@@ -1754,16 +1778,14 @@ impl ActorGameDriver {
         self.activate_first_wave_lander_refill(commands);
     }
 
-    fn arm_first_wave_early_lander_reserve_delay(&mut self) {
+    pub(in crate::actor_game) fn arm_first_wave_early_lander_reserve_delay(&mut self) {
         self.first_wave_early_reserve_steps_remaining = (self.wave == 1
             && self.enemy_reserve.landers > 0)
             .then_some(FIRST_WAVE_EARLY_RESERVE_DELAY_STEPS);
     }
 
     fn schedule_first_wave_lander_refill_if_needed(&mut self) {
-        if self
-            .first_wave_lander_refill_steps_remaining
-            .is_some()
+        if self.first_wave_lander_refill_steps_remaining.is_some()
             || self.phase != Phase::Playing
             || self.wave != 1
             || self.pending_survivor_bonus.is_some()
@@ -1784,8 +1806,7 @@ impl ActorGameDriver {
             return;
         }
 
-        self.first_wave_lander_refill_steps_remaining =
-            Some(FIRST_WAVE_LANDER_REFILL_DELAY_STEPS);
+        self.first_wave_lander_refill_steps_remaining = Some(FIRST_WAVE_LANDER_REFILL_DELAY_STEPS);
     }
 
     fn activate_first_wave_early_lander_reserve_if_ready(
@@ -1884,7 +1905,7 @@ impl ActorGameDriver {
         }
     }
 
-    fn spawn_wave_hostiles(&mut self) {
+    pub(in crate::actor_game) fn spawn_wave_hostiles(&mut self) {
         let wave_profile = self.wave_script.profile_for_wave(self.wave).clone();
         for spawn in wave_profile.lander_spawns.iter().copied() {
             let actor = self.spawn_lander_from_spawn(spawn);
@@ -1927,7 +1948,9 @@ impl ActorGameDriver {
 
     fn has_targetable_human_snapshots(&self) -> bool {
         self.snapshots.values().any(|snapshot| {
-            snapshot.kind == ActorKind::Human && snapshot.alive && snapshot.actor_state.as_human().is_some()
+            snapshot.kind == ActorKind::Human
+                && snapshot.alive
+                && snapshot.actor_state.as_human().is_some()
         })
     }
 
@@ -1938,7 +1961,7 @@ impl ActorGameDriver {
             .count()
     }
 
-    fn wave_hostile_snapshot_count(&self) -> usize {
+    pub(in crate::actor_game) fn wave_hostile_snapshot_count(&self) -> usize {
         self.snapshots
             .values()
             .filter(|snapshot| is_hostile(snapshot.kind))
@@ -1968,7 +1991,8 @@ impl ActorGameDriver {
                 snapshot.kind == ActorKind::Human
                     && snapshot.alive
                     && snapshot
-                        .actor_state.as_human()
+                        .actor_state
+                        .as_human()
                         .is_some_and(|actor_state| actor_state.target_slot_index == probe)
             }) {
                 self.target_human_cursor = Some(probe);
@@ -2122,7 +2146,8 @@ impl ActorGameDriver {
         else {
             return;
         };
-        let spawn = ActorBaiterSpawn::from_player_position(profile, player_position, active_baiters);
+        let spawn =
+            ActorBaiterSpawn::from_player_position(profile, player_position, active_baiters);
         commands.push(GameCommand::Spawn(SpawnRequest::Baiter {
             position: spawn.position,
             actor_state: spawn.actor_state,
@@ -2136,7 +2161,7 @@ impl ActorGameDriver {
             .count()
     }
 
-    fn spawn_initial_humans(&mut self) {
+    pub(in crate::actor_game) fn spawn_initial_humans(&mut self) {
         let wave_profile = self.wave_script.profile_for_wave(self.wave).clone();
         for spawn in wave_profile.human_spawns.iter().copied() {
             let actor = self.spawn_human_from_spawn(spawn);

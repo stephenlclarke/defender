@@ -1,3 +1,5 @@
+use super::*;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpriteKey {
     WilliamsLogo,
@@ -163,7 +165,7 @@ impl SoundCue {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ActorSoundEventBridge {
-    thrust_active: bool,
+    pub(in crate::actor_game) thrust_active: bool,
 }
 
 impl ActorSoundEventBridge {
@@ -202,8 +204,8 @@ impl ActorSoundEventBridge {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttractScript {
-    events: Vec<AttractScriptEvent>,
-    cycle_steps: Option<u64>,
+    pub(in crate::actor_game) events: Vec<AttractScriptEvent>,
+    pub(in crate::actor_game) cycle_steps: Option<u64>,
 }
 
 impl AttractScript {
@@ -325,7 +327,7 @@ impl AttractScript {
         Self::with_cycle_steps(events, Some(ATTRACT_CYCLE_STEPS))
     }
 
-    fn draws_for(
+    pub(in crate::actor_game) fn draws_for(
         &self,
         actor: ActorId,
         step: u64,
@@ -417,7 +419,7 @@ impl fmt::Display for AttractScriptParseError {
 
 impl std::error::Error for AttractScriptParseError {}
 
-fn parse_attract_script_cycle_directive(
+pub(in crate::actor_game) fn parse_attract_script_cycle_directive(
     line_number: usize,
     line: &str,
 ) -> Result<Option<u64>, AttractScriptParseError> {
@@ -443,7 +445,7 @@ fn parse_attract_script_cycle_directive(
     Ok(Some(cycle_steps))
 }
 
-fn parse_attract_script_event(
+pub(in crate::actor_game) fn parse_attract_script_event(
     line_number: usize,
     line: &str,
 ) -> Result<AttractScriptEvent, AttractScriptParseError> {
@@ -473,11 +475,8 @@ fn parse_attract_script_event(
         }
         "message" => {
             let message = parse_attract_message_id(line_number, parts.next())?;
-            let screen_cell = parse_attract_screen_anchor(
-                line_number,
-                parts.next(),
-                "message placement anchor",
-            )?;
+            let screen_cell =
+                parse_attract_screen_anchor(line_number, parts.next(), "message placement anchor")?;
             let visual_offset = parse_optional_attract_point(line_number, &mut parts)?;
             Ok(AttractScriptEvent::message_text_with_offset(
                 start_after_steps,
@@ -589,7 +588,7 @@ fn parse_attract_script_event(
     }
 }
 
-fn parse_attract_point<'a>(
+pub(in crate::actor_game) fn parse_attract_point<'a>(
     line_number: usize,
     parts: &mut impl Iterator<Item = &'a str>,
 ) -> Result<Point, AttractScriptParseError> {
@@ -598,7 +597,7 @@ fn parse_attract_point<'a>(
     Ok(Point::new(x, y))
 }
 
-fn parse_optional_attract_point<'a>(
+pub(in crate::actor_game) fn parse_optional_attract_point<'a>(
     line_number: usize,
     parts: &mut impl Iterator<Item = &'a str>,
 ) -> Result<Point, AttractScriptParseError> {
@@ -611,7 +610,7 @@ fn parse_optional_attract_point<'a>(
     Ok(Point::new(x, y))
 }
 
-fn parse_attract_duration(
+pub(in crate::actor_game) fn parse_attract_duration(
     line_number: usize,
     token: Option<&str>,
 ) -> Result<Option<u64>, AttractScriptParseError> {
@@ -630,7 +629,7 @@ fn parse_attract_duration(
     }
 }
 
-fn parse_attract_u64(
+pub(in crate::actor_game) fn parse_attract_u64(
     line_number: usize,
     token: Option<&str>,
     field: &str,
@@ -645,7 +644,7 @@ fn parse_attract_u64(
     })
 }
 
-fn parse_attract_i16(
+pub(in crate::actor_game) fn parse_attract_i16(
     line_number: usize,
     token: Option<&str>,
     field: &str,
@@ -660,7 +659,7 @@ fn parse_attract_i16(
     })
 }
 
-fn parse_attract_usize(
+pub(in crate::actor_game) fn parse_attract_usize(
     line_number: usize,
     token: Option<&str>,
     field: &str,
@@ -675,7 +674,7 @@ fn parse_attract_usize(
     })
 }
 
-fn parse_attract_screen_anchor(
+pub(in crate::actor_game) fn parse_attract_screen_anchor(
     line_number: usize,
     token: Option<&str>,
     field: &str,
@@ -706,7 +705,7 @@ fn parse_attract_screen_anchor(
     }
 }
 
-fn parse_attract_message_id(
+pub(in crate::actor_game) fn parse_attract_message_id(
     line_number: usize,
     token: Option<&str>,
 ) -> Result<MessageId, AttractScriptParseError> {
@@ -718,7 +717,7 @@ fn parse_attract_message_id(
     })
 }
 
-fn parse_attract_sprite_key(
+pub(in crate::actor_game) fn parse_attract_sprite_key(
     line_number: usize,
     token: &str,
 ) -> Result<SpriteKey, AttractScriptParseError> {
@@ -752,7 +751,7 @@ fn parse_attract_sprite_key(
     }
 }
 
-fn reject_extra_attract_fields<'a>(
+pub(in crate::actor_game) fn reject_extra_attract_fields<'a>(
     line_number: usize,
     mut parts: impl Iterator<Item = &'a str>,
 ) -> Result<(), AttractScriptParseError> {
@@ -766,7 +765,7 @@ fn reject_extra_attract_fields<'a>(
     }
 }
 
-fn normalize_script_token(token: &str) -> String {
+pub(in crate::actor_game) fn normalize_script_token(token: &str) -> String {
     token.trim().replace('-', "_").to_ascii_lowercase()
 }
 
@@ -1130,12 +1129,8 @@ impl AttractScriptAction {
                 visual_offset,
             } => {
                 let entries = hall_score_seed_entries();
-                let mut draws = hall_score_table_draws(
-                    actor,
-                    entries,
-                    *todays_table_cell,
-                    *visual_offset,
-                );
+                let mut draws =
+                    hall_score_table_draws(actor, entries, *todays_table_cell, *visual_offset);
                 draws.extend(hall_score_table_draws(
                     actor,
                     entries,
@@ -1244,15 +1239,16 @@ impl AttractScriptAction {
     }
 }
 
-fn credits_prompt_text() -> &'static str {
+pub(in crate::actor_game) fn credits_prompt_text() -> &'static str {
     crate::arcade_assets::message_text(CREDITS_MESSAGE)
 }
 
-fn hall_score_seed_entries() -> [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] {
+pub(in crate::actor_game) fn hall_score_seed_entries()
+-> [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] {
     std::array::from_fn(high_score_seed_entry)
 }
 
-fn hall_score_entries(
+pub(in crate::actor_game) fn hall_score_entries(
     high_scores: &[u32; 5],
 ) -> [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] {
     std::array::from_fn(|index| {
@@ -1265,7 +1261,7 @@ fn hall_score_entries(
     })
 }
 
-fn high_score_seed_entry(index: usize) -> HighScoreTableEntrySnapshot {
+pub(in crate::actor_game) fn high_score_seed_entry(index: usize) -> HighScoreTableEntrySnapshot {
     let seed = crate::arcade_assets::HIGH_SCORE_SEEDS
         .get(index)
         .unwrap_or_else(|| panic!("missing embedded high-score seed row {index}"));
@@ -1280,7 +1276,7 @@ fn high_score_seed_entry(index: usize) -> HighScoreTableEntrySnapshot {
     }
 }
 
-fn hall_score_table_draws(
+pub(in crate::actor_game) fn hall_score_table_draws(
     actor: ActorId,
     entries: [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES],
     top_left_screen_cell: ScreenAddress,
@@ -1326,7 +1322,11 @@ fn hall_score_table_draws(
     draws
 }
 
-fn screen_point_with_offset(top_left_screen_cell: ScreenAddress, horizontal: u8, vertical: u8) -> Point {
+pub(in crate::actor_game) fn screen_point_with_offset(
+    top_left_screen_cell: ScreenAddress,
+    horizontal: u8,
+    vertical: u8,
+) -> Point {
     let [column, row] = top_left_screen_cell.word().to_be_bytes();
     Point::new(
         i16::from(column.wrapping_add(horizontal)) * 2,
@@ -1334,25 +1334,25 @@ fn screen_point_with_offset(top_left_screen_cell: ScreenAddress, horizontal: u8,
     )
 }
 
-fn offset_point(point: Point, offset: Point) -> Point {
+pub(in crate::actor_game) fn offset_point(point: Point, offset: Point) -> Point {
     Point::new(
         point.x.saturating_add(offset.x),
         point.y.saturating_add(offset.y),
     )
 }
 
-fn hall_score_initials_text(initials: [Option<char>; 3]) -> String {
+pub(in crate::actor_game) fn hall_score_initials_text(initials: [Option<char>; 3]) -> String {
     initials
         .into_iter()
         .map(|initial| initial.unwrap_or(' '))
         .collect()
 }
 
-const HALL_SCORE_DISPLAY_MAX: u32 = 999_999;
-const HALL_SCORE_START_PLACE: u32 = 100_000;
-const HALL_SCORE_RADIX: u32 = 10;
+pub(in crate::actor_game) const HALL_SCORE_DISPLAY_MAX: u32 = 999_999;
+pub(in crate::actor_game) const HALL_SCORE_START_PLACE: u32 = 100_000;
+pub(in crate::actor_game) const HALL_SCORE_RADIX: u32 = 10;
 
-fn hall_score_text(score: u32) -> String {
+pub(in crate::actor_game) fn hall_score_text(score: u32) -> String {
     let mut text = [b' '; ATTRACT_HALL_SCORE_TEXT_LEN];
     let mut place = HALL_SCORE_START_PLACE;
     let mut seen_non_zero = false;

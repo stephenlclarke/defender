@@ -1,28 +1,30 @@
-const MUTANT_DIVE_ENTRY_SHOT_SCREEN: Point = Point::new(0x13, 0x46);
-const MUTANT_DIVE_FIRST_PATH_SHOT_SCREEN: Point = Point::new(0x1E, 0x70);
-const MUTANT_DIVE_SECOND_PATH_SHOT_SCREEN: Point = Point::new(0x21, 0x87);
+use super::*;
 
-const MUTANT_DIVE_FORCED_FIRST_PROJECTILE_PATTERN: MutantDiveProjectilePattern =
-    MutantDiveProjectilePattern {
-        position: Point::new(0x1E, 0x54),
-        motion: ActorMotion::new(0x33, 0x56, 0xFFE0, 0x0138),
-    };
-const MUTANT_DIVE_FORCED_SECOND_PROJECTILE_PATTERN: MutantDiveProjectilePattern =
-    MutantDiveProjectilePattern {
-        position: Point::new(0x21, 0x7F),
-        motion: ActorMotion::new(0x6F, 0xE1, 0xFFF0, 0x00C0),
-    };
+pub(in crate::actor_game) const MUTANT_DIVE_ENTRY_SHOT_SCREEN: Point = Point::new(0x13, 0x46);
+pub(in crate::actor_game) const MUTANT_DIVE_FIRST_PATH_SHOT_SCREEN: Point = Point::new(0x1E, 0x70);
+pub(in crate::actor_game) const MUTANT_DIVE_SECOND_PATH_SHOT_SCREEN: Point = Point::new(0x21, 0x87);
+
+pub(in crate::actor_game) const MUTANT_DIVE_FORCED_FIRST_PROJECTILE_PATTERN:
+    MutantDiveProjectilePattern = MutantDiveProjectilePattern {
+    position: Point::new(0x1E, 0x54),
+    motion: ActorMotion::new(0x33, 0x56, 0xFFE0, 0x0138),
+};
+pub(in crate::actor_game) const MUTANT_DIVE_FORCED_SECOND_PROJECTILE_PATTERN:
+    MutantDiveProjectilePattern = MutantDiveProjectilePattern {
+    position: Point::new(0x21, 0x7F),
+    motion: ActorMotion::new(0x6F, 0xE1, 0xFFF0, 0x00C0),
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct MutantDiveProjectilePattern {
-    position: Point,
-    motion: ActorMotion,
+pub(in crate::actor_game) struct MutantDiveProjectilePattern {
+    pub(in crate::actor_game) position: Point,
+    pub(in crate::actor_game) motion: ActorMotion,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct MutantDivePathAnchor {
-    world: MutantDiveWorldPosition,
-    screen: Point,
+pub(in crate::actor_game) struct MutantDivePathAnchor {
+    pub(in crate::actor_game) world: MutantDiveWorldPosition,
+    pub(in crate::actor_game) screen: Point,
 }
 
 impl MutantDivePathAnchor {
@@ -35,29 +37,29 @@ impl MutantDivePathAnchor {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct MutantDiveWorldPosition {
-    x_word: u16,
-    y_word: u16,
+pub(in crate::actor_game) struct MutantDiveWorldPosition {
+    pub(in crate::actor_game) x_word: u16,
+    pub(in crate::actor_game) y_word: u16,
 }
 
 impl MutantDiveWorldPosition {
-    const fn new(x_word: u16, y_word: u16) -> Self {
+    pub(in crate::actor_game) const fn new(x_word: u16, y_word: u16) -> Self {
         Self { x_word, y_word }
     }
 
-    const fn y_word(self) -> u16 {
+    pub(in crate::actor_game) const fn y_word(self) -> u16 {
         self.y_word
     }
 
-    const fn matches(self, x_word: u16, y_word: u16) -> bool {
+    pub(in crate::actor_game) const fn matches(self, x_word: u16, y_word: u16) -> bool {
         self.x_word == x_word && self.y_word == y_word
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct MutantDiveVisualRow {
-    world_x_word: u16,
-    screen_y: i16,
+pub(in crate::actor_game) struct MutantDiveVisualRow {
+    pub(in crate::actor_game) world_x_word: u16,
+    pub(in crate::actor_game) screen_y: i16,
 }
 
 impl MutantDiveVisualRow {
@@ -68,7 +70,10 @@ impl MutantDiveVisualRow {
         }
     }
 
-    const fn screen_y_for_world_x(self, world_x_word: u16) -> Option<i16> {
+    pub(in crate::actor_game) const fn screen_y_for_world_x(
+        self,
+        world_x_word: u16,
+    ) -> Option<i16> {
         if self.world_x_word == world_x_word {
             Some(self.screen_y)
         } else {
@@ -77,7 +82,7 @@ impl MutantDiveVisualRow {
     }
 }
 
-const MUTANT_DIVE_PATH_ANCHORS: &[MutantDivePathAnchor] = &[
+pub(in crate::actor_game) const MUTANT_DIVE_PATH_ANCHORS: &[MutantDivePathAnchor] = &[
     MutantDivePathAnchor::new(0x031C, 0x3360, 0x12, 0x43),
     MutantDivePathAnchor::new(0x037C, 0x3380, 0x13, 0x46),
     MutantDivePathAnchor::new(0x034C, 0x33F0, 0x12, 0x43),
@@ -101,7 +106,7 @@ const MUTANT_DIVE_PATH_ANCHORS: &[MutantDivePathAnchor] = &[
     MutantDivePathAnchor::new(0x08EC, 0xA320, 0x20, 0xA2),
 ];
 
-const MUTANT_DIVE_VISUAL_ROWS: &[MutantDiveVisualRow] = &[
+pub(in crate::actor_game) const MUTANT_DIVE_VISUAL_ROWS: &[MutantDiveVisualRow] = &[
     MutantDiveVisualRow::new(0x0004, 0x36),
     MutantDiveVisualRow::new(0x0034, 0x36),
     MutantDiveVisualRow::new(0x0064, 0x37),

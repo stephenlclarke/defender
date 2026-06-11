@@ -1,15 +1,17 @@
-const HYPERSPACE_REENTRY_DIRECTION_BIT: u8 = 0x01;
-const HYPERSPACE_RIGHT_REENTRY_X: i16 = 0x20;
-const HYPERSPACE_LEFT_REENTRY_X: i16 = 0x70;
-const HYPERSPACE_REENTRY_Y_SEED_SHIFT: u8 = 1;
+use super::*;
+
+pub(in crate::actor_game) const HYPERSPACE_REENTRY_DIRECTION_BIT: u8 = 0x01;
+pub(in crate::actor_game) const HYPERSPACE_RIGHT_REENTRY_X: i16 = 0x20;
+pub(in crate::actor_game) const HYPERSPACE_LEFT_REENTRY_X: i16 = 0x70;
+pub(in crate::actor_game) const HYPERSPACE_REENTRY_Y_SEED_SHIFT: u8 = 1;
 
 #[derive(Debug)]
-struct AttractDirector {
-    id: ActorId,
+pub(in crate::actor_game) struct AttractDirector {
+    pub(in crate::actor_game) id: ActorId,
 }
 
 impl AttractDirector {
-    fn new(id: ActorId) -> Self {
+    pub(in crate::actor_game) fn new(id: ActorId) -> Self {
         Self { id }
     }
 }
@@ -57,14 +59,14 @@ impl AssetActor for AttractDirector {
 }
 
 #[derive(Debug)]
-struct ScriptedAttractProgram {
-    id: ActorId,
-    script: AttractScript,
-    elapsed_steps: u64,
+pub(in crate::actor_game) struct ScriptedAttractProgram {
+    pub(in crate::actor_game) id: ActorId,
+    pub(in crate::actor_game) script: AttractScript,
+    pub(in crate::actor_game) elapsed_steps: u64,
 }
 
 impl ScriptedAttractProgram {
-    fn new(id: ActorId, script: AttractScript) -> Self {
+    pub(in crate::actor_game) fn new(id: ActorId, script: AttractScript) -> Self {
         Self {
             id,
             script,
@@ -135,12 +137,12 @@ impl AssetActor for ScriptedAttractProgram {
 }
 
 #[derive(Debug)]
-struct StatusDisplay {
-    id: ActorId,
+pub(in crate::actor_game) struct StatusDisplay {
+    pub(in crate::actor_game) id: ActorId,
 }
 
 impl StatusDisplay {
-    fn new(id: ActorId) -> Self {
+    pub(in crate::actor_game) fn new(id: ActorId) -> Self {
         Self { id }
     }
 
@@ -233,7 +235,7 @@ impl StatusDisplay {
             direction: None,
             bounds: None,
             alive: true,
-                actor_state: ActorInternalState::NONE,
+            actor_state: ActorInternalState::NONE,
         }
     }
 }
@@ -260,13 +262,13 @@ impl AssetActor for StatusDisplay {
     }
 }
 
-const STATUS_SCORE_DISPLAY_MAX: u32 = 999_999;
+pub(in crate::actor_game) const STATUS_SCORE_DISPLAY_MAX: u32 = 999_999;
 
-fn format_status_score(score: u32) -> String {
+pub(in crate::actor_game) fn format_status_score(score: u32) -> String {
     format!("{:06}", score.min(STATUS_SCORE_DISPLAY_MAX))
 }
 
-fn format_high_score_initials(state: HighScoreInitialsState) -> String {
+pub(in crate::actor_game) fn format_high_score_initials(state: HighScoreInitialsState) -> String {
     state
         .initials
         .iter()
@@ -274,7 +276,7 @@ fn format_high_score_initials(state: HighScoreInitialsState) -> String {
         .collect()
 }
 
-fn player_message(player: u8) -> MessageId {
+pub(in crate::actor_game) fn player_message(player: u8) -> MessageId {
     if player == 2 {
         MessageId::PlayerTwo
     } else {
@@ -283,19 +285,19 @@ fn player_message(player: u8) -> MessageId {
 }
 
 #[derive(Debug)]
-struct PlayerShip {
-    id: ActorId,
-    position: Point,
-    direction: Direction,
-    reverse_held: bool,
-    laser_cooldown: u8,
-    hyperspace_steps_remaining: u8,
-    hyperspace_entry_lseed: Option<u8>,
-    hyperspace_death_steps_remaining: Option<u8>,
+pub(in crate::actor_game) struct PlayerShip {
+    pub(in crate::actor_game) id: ActorId,
+    pub(in crate::actor_game) position: Point,
+    pub(in crate::actor_game) direction: Direction,
+    pub(in crate::actor_game) reverse_held: bool,
+    pub(in crate::actor_game) laser_cooldown: u8,
+    pub(in crate::actor_game) hyperspace_steps_remaining: u8,
+    pub(in crate::actor_game) hyperspace_entry_lseed: Option<u8>,
+    pub(in crate::actor_game) hyperspace_death_steps_remaining: Option<u8>,
 }
 
 impl PlayerShip {
-    fn new(id: ActorId, position: Point) -> Self {
+    pub(in crate::actor_game) fn new(id: ActorId, position: Point) -> Self {
         Self {
             id,
             position,

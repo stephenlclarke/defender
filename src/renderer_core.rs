@@ -1,6 +1,6 @@
-use std::collections::{BTreeMap, BTreeSet};
-
 use crate::ScreenAddress;
+
+use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SurfaceSize {
@@ -70,7 +70,7 @@ impl ViewportLayout {
     }
 }
 
-fn scaled_viewport_dimension(scene_extent: u32, scale: f64, target_extent: u32) -> u32 {
+pub(super) fn scaled_viewport_dimension(scene_extent: u32, scale: f64, target_extent: u32) -> u32 {
     (f64::from(scene_extent) * scale)
         .round()
         .clamp(1.0, f64::from(target_extent)) as u32
@@ -216,7 +216,7 @@ pub struct RenderLayerCounts {
 }
 
 impl RenderLayerCounts {
-    fn add(&mut self, layer: RenderLayer) {
+    pub(super) fn add(&mut self, layer: RenderLayer) {
         match layer {
             RenderLayer::Terrain => self.terrain += 1,
             RenderLayer::Starfield => self.starfield += 1,
@@ -366,7 +366,7 @@ impl SpriteId {
         }
     }
 
-    const MESSAGE_GLYPH_SPECS: [(char, Self, [u32; 2]); 31] = [
+    pub(super) const MESSAGE_GLYPH_SPECS: [(char, Self, [u32; 2]); 31] = [
         (' ', Self::MESSAGE_GLYPH_SPACE, [2, 8]),
         (',', Self::MESSAGE_GLYPH_COMMA, [2, 8]),
         ('.', Self::MESSAGE_GLYPH_PERIOD, [2, 8]),
@@ -417,7 +417,6 @@ impl SpriteId {
             .find(|(glyph_character, _, _)| *glyph_character == character)
             .map(|(_, _, size)| *size)
     }
-
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -511,14 +510,14 @@ pub fn render_scene_with_atlas_to_rgba(
     SceneRaster::from_rgba(target, pixels)
 }
 
-fn opaque_scene_clear_color(scene: &RenderScene) -> [u8; 4] {
+pub(super) fn opaque_scene_clear_color(scene: &RenderScene) -> [u8; 4] {
     match scene.clear_color.rgba {
         [_, _, _, 0] => [0, 0, 0, 255],
         color => color,
     }
 }
 
-fn render_layer_order(layer: RenderLayer) -> u8 {
+pub(super) fn render_layer_order(layer: RenderLayer) -> u8 {
     match layer {
         RenderLayer::Terrain => 0,
         RenderLayer::Starfield => 1,
@@ -529,7 +528,7 @@ fn render_layer_order(layer: RenderLayer) -> u8 {
     }
 }
 
-fn blit_scene_raster_nearest(
+pub(super) fn blit_scene_raster_nearest(
     pixels: &mut [u8],
     target: SurfaceSize,
     layout: ViewportLayout,
@@ -559,7 +558,7 @@ fn blit_scene_raster_nearest(
     }
 }
 
-fn blit_scene_sprite_nearest(
+pub(super) fn blit_scene_sprite_nearest(
     pixels: &mut [u8],
     target: SurfaceSize,
     layout: ViewportLayout,
@@ -608,11 +607,11 @@ fn blit_scene_sprite_nearest(
     }
 }
 
-fn scaled_sprite_extent(extent: f32, scale: f32) -> u32 {
+pub(super) fn scaled_sprite_extent(extent: f32, scale: f32) -> u32 {
     (extent * scale).round().max(1.0) as u32
 }
 
-fn nearest_sample_coordinate(
+pub(super) fn nearest_sample_coordinate(
     target_coordinate: u32,
     target_extent: u32,
     sample_extent: u32,
@@ -625,7 +624,7 @@ fn nearest_sample_coordinate(
         .min(u64::from(sample_extent.saturating_sub(1))) as u32
 }
 
-fn rgba_index(surface: SurfaceSize, x: u32, y: u32) -> Option<usize> {
+pub(super) fn rgba_index(surface: SurfaceSize, x: u32, y: u32) -> Option<usize> {
     if x >= surface.width || y >= surface.height {
         return None;
     }
@@ -635,7 +634,7 @@ fn rgba_index(surface: SurfaceSize, x: u32, y: u32) -> Option<usize> {
     pixel_offset.checked_mul(4)
 }
 
-fn tint_rgba(input_pixel: &[u8], tint: Color) -> [u8; 4] {
+pub(super) fn tint_rgba(input_pixel: &[u8], tint: Color) -> [u8; 4] {
     [
         multiply_u8(input_pixel[0], tint.rgba[0]),
         multiply_u8(input_pixel[1], tint.rgba[1]),
@@ -644,11 +643,11 @@ fn tint_rgba(input_pixel: &[u8], tint: Color) -> [u8; 4] {
     ]
 }
 
-fn multiply_u8(left: u8, right: u8) -> u8 {
+pub(super) fn multiply_u8(left: u8, right: u8) -> u8 {
     ((u16::from(left) * u16::from(right) + 127) / 255) as u8
 }
 
-fn blend_rgba(destination: &mut [u8], input_pixel: &[u8]) {
+pub(super) fn blend_rgba(destination: &mut [u8], input_pixel: &[u8]) {
     let alpha = u16::from(input_pixel[3]);
     let inverse_alpha = 255 - alpha;
     for channel in 0..3 {
@@ -849,13 +848,18 @@ pub fn push_controlled_message_sprites(
         }
 
         let bytes = word.as_bytes();
-        push_message_text_bytes_sprites(scene, bytes, screen_position_from_cell(layout.cursor), layer);
+        push_message_text_bytes_sprites(
+            scene,
+            bytes,
+            screen_position_from_cell(layout.cursor),
+            layer,
+        );
         layout.cursor = message_text_cursor_after_bytes(layout.cursor, bytes);
         layout.cursor = message_text_cursor_after_bytes(layout.cursor, b" ");
     }
 }
 
-fn message_text_byte_sprite(byte: u8) -> Option<(Option<SpriteId>, [u32; 2])> {
+pub(super) fn message_text_byte_sprite(byte: u8) -> Option<(Option<SpriteId>, [u32; 2])> {
     if byte == b' ' {
         return Some((None, SpriteId::message_glyph_size(' ')?));
     }
@@ -869,7 +873,10 @@ fn message_text_byte_sprite(byte: u8) -> Option<(Option<SpriteId>, [u32; 2])> {
     Some((SpriteId::message_glyph(character), size))
 }
 
-fn message_text_cursor_after_bytes(mut cursor: ScreenAddress, bytes: &[u8]) -> ScreenAddress {
+pub(super) fn message_text_cursor_after_bytes(
+    mut cursor: ScreenAddress,
+    bytes: &[u8],
+) -> ScreenAddress {
     for byte in bytes {
         let Some((_sprite, size)) = message_text_byte_sprite(*byte) else {
             continue;
@@ -879,7 +886,10 @@ fn message_text_cursor_after_bytes(mut cursor: ScreenAddress, bytes: &[u8]) -> S
     cursor
 }
 
-fn message_text_cursor_advance(cursor: ScreenAddress, width_pixels: u32) -> ScreenAddress {
+pub(super) fn message_text_cursor_advance(
+    cursor: ScreenAddress,
+    width_pixels: u32,
+) -> ScreenAddress {
     let [column, row] = cursor.word().to_be_bytes();
     let width_columns = u8::try_from(width_pixels / u32::from(SCREEN_COLUMN_WIDTH_PIXELS_U8))
         .expect("message glyph width fits in u8");
@@ -887,7 +897,7 @@ fn message_text_cursor_advance(cursor: ScreenAddress, width_pixels: u32) -> Scre
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct MessageTextLayout {
+pub(super) struct MessageTextLayout {
     top_left: ScreenAddress,
     cursor: ScreenAddress,
     line_spacing: u8,
@@ -897,8 +907,10 @@ impl MessageTextLayout {
     fn apply(&mut self, control: MessageTextControl) {
         match control {
             MessageTextControl::HorizontalFromTopLeft(delta) => {
-                let [top_x, cursor_y] =
-                    [self.top_left.word().to_be_bytes()[0], self.cursor.word().to_be_bytes()[1]];
+                let [top_x, cursor_y] = [
+                    self.top_left.word().to_be_bytes()[0],
+                    self.cursor.word().to_be_bytes()[1],
+                ];
                 self.cursor = ScreenAddress::from_bytes(top_x.wrapping_add(delta), cursor_y);
             }
             MessageTextControl::HorizontalFromCursor(delta) => {
@@ -921,14 +933,15 @@ impl MessageTextLayout {
             MessageTextControl::ReturnLineFeed => {
                 let [top_x, _top_y] = self.top_left.word().to_be_bytes();
                 let cursor_y = self.cursor.word().to_be_bytes()[1];
-                self.cursor = ScreenAddress::from_bytes(top_x, cursor_y.wrapping_add(self.line_spacing));
+                self.cursor =
+                    ScreenAddress::from_bytes(top_x, cursor_y.wrapping_add(self.line_spacing));
             }
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum MessageTextControl {
+pub(super) enum MessageTextControl {
     HorizontalFromTopLeft(u8),
     HorizontalFromCursor(u8),
     VerticalFromTopLeft(u8),
@@ -937,7 +950,7 @@ enum MessageTextControl {
     ReturnLineFeed,
 }
 
-fn message_text_control(word: &str) -> Option<MessageTextControl> {
+pub(super) fn message_text_control(word: &str) -> Option<MessageTextControl> {
     let body = message_text_control_body(word)?;
     let (name, arguments) = body.split_once(':').unwrap_or((body, ""));
     match name {
@@ -967,12 +980,12 @@ fn message_text_control(word: &str) -> Option<MessageTextControl> {
     }
 }
 
-fn message_text_control_body(word: &str) -> Option<&str> {
+pub(super) fn message_text_control_body(word: &str) -> Option<&str> {
     word.strip_prefix('[')
         .and_then(|value| value.strip_suffix(']'))
 }
 
-fn message_text_control_byte(value: &str) -> Option<u8> {
+pub(super) fn message_text_control_byte(value: &str) -> Option<u8> {
     let hex = value.strip_prefix("0x")?;
     u8::from_str_radix(hex, 16).ok()
 }

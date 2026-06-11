@@ -1,4 +1,6 @@
-fn parse_behavior_actor_kind(
+use super::*;
+
+pub(in crate::actor_game) fn parse_behavior_actor_kind(
     line_number: usize,
     token: &str,
 ) -> Result<ActorKind, ActorBehaviorScriptParseError> {
@@ -29,7 +31,7 @@ fn parse_behavior_actor_kind(
     }
 }
 
-fn parse_behavior_i16_value(
+pub(in crate::actor_game) fn parse_behavior_i16_value(
     line_number: usize,
     values: &[&str],
     field: &str,
@@ -43,7 +45,7 @@ fn parse_behavior_i16_value(
     })
 }
 
-fn parse_behavior_u8_value(
+pub(in crate::actor_game) fn parse_behavior_u8_value(
     line_number: usize,
     values: &[&str],
     field: &str,
@@ -57,7 +59,7 @@ fn parse_behavior_u8_value(
     })
 }
 
-fn parse_behavior_u16_value(
+pub(in crate::actor_game) fn parse_behavior_u16_value(
     line_number: usize,
     values: &[&str],
     field: &str,
@@ -71,7 +73,7 @@ fn parse_behavior_u16_value(
     })
 }
 
-fn parse_behavior_u64_value(
+pub(in crate::actor_game) fn parse_behavior_u64_value(
     line_number: usize,
     values: &[&str],
     field: &str,
@@ -80,7 +82,7 @@ fn parse_behavior_u64_value(
     parse_behavior_u64(line_number, value, field)
 }
 
-fn parse_behavior_bool_value(
+pub(in crate::actor_game) fn parse_behavior_bool_value(
     line_number: usize,
     values: &[&str],
     field: &str,
@@ -96,7 +98,7 @@ fn parse_behavior_bool_value(
     }
 }
 
-fn parse_behavior_hyperspace_seed_value(
+pub(in crate::actor_game) fn parse_behavior_hyperspace_seed_value(
     line_number: usize,
     values: &[&str],
     field: &str,
@@ -117,7 +119,7 @@ fn parse_behavior_hyperspace_seed_value(
     }))
 }
 
-fn parse_lander_behavior_mode_value(
+pub(in crate::actor_game) fn parse_lander_behavior_mode_value(
     line_number: usize,
     values: &[&str],
     field: &str,
@@ -134,7 +136,7 @@ fn parse_lander_behavior_mode_value(
     }
 }
 
-fn parse_hostile_movement_mode_value(
+pub(in crate::actor_game) fn parse_hostile_movement_mode_value(
     line_number: usize,
     values: &[&str],
     field: &str,
@@ -150,7 +152,7 @@ fn parse_hostile_movement_mode_value(
     }
 }
 
-fn parse_behavior_single_value<'a>(
+pub(in crate::actor_game) fn parse_behavior_single_value<'a>(
     line_number: usize,
     values: &'a [&'a str],
     field: &str,
@@ -168,7 +170,7 @@ fn parse_behavior_single_value<'a>(
     }
 }
 
-fn parse_behavior_u64(
+pub(in crate::actor_game) fn parse_behavior_u64(
     line_number: usize,
     value: &str,
     field: &str,
@@ -192,7 +194,7 @@ fn parse_behavior_u64(
     })
 }
 
-fn parse_behavior_i64(
+pub(in crate::actor_game) fn parse_behavior_i64(
     line_number: usize,
     value: &str,
     field: &str,

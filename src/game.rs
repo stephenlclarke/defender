@@ -1,8 +1,21 @@
 //! Domain-facing gameplay contracts.
 
-include!("game_core.rs");
-include!("game_world_snapshots.rs");
-include!("game_visual_evidence.rs");
-include!("game_state.rs");
-include!("game_render_projection.rs");
-include!("game_input.rs");
+#[path = "game_core.rs"]
+mod core;
+#[path = "game_input.rs"]
+mod input;
+#[path = "game_render_projection.rs"]
+mod render_projection;
+#[path = "game_state.rs"]
+mod state;
+#[path = "game_visual_evidence.rs"]
+mod visual_evidence;
+#[path = "game_world_snapshots.rs"]
+mod world_snapshots;
+
+pub use core::*;
+pub use input::*;
+pub(crate) use render_projection::*;
+pub use state::*;
+pub use visual_evidence::*;
+pub use world_snapshots::*;

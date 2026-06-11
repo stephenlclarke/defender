@@ -1,33 +1,37 @@
-const ATTRACT_SCORING_HIGH_NIBBLE_MASK: u8 = 0xF0;
-const ATTRACT_SCORING_LOW_NIBBLE_MASK: u8 = 0x0F;
-const ATTRACT_SCORING_LANDER_DESCENT_WORLD_Y_STEP: i32 = 0x00A0;
-const ATTRACT_SCORING_RESCUE_ASCENT_WORLD_Y_STEP: i32 = 0x00B0;
-const ATTRACT_SCORING_LANDER_EXPLOSION_STEPS: u16 = 12;
-const ATTRACT_SCORING_RETURN_BONUS_STEP_DIVISOR: u16 = 2;
-const ATTRACT_SCORING_RETURN_BONUS_WORLD_Y_STEP: i32 = 0x0010;
-const ATTRACT_SCORING_OPAQUE_ALPHA: u8 = 0xFF;
-const ATTRACT_SCORING_COLOR_LOW_BYTE_MASK: u16 = 0x00FF;
-const ATTRACT_SCORING_TRANSPARENT_PALETTE_NIBBLE: u8 = 0x0;
-const ATTRACT_SCORING_WHITE_PALETTE_NIBBLES: [u8; 6] = [0x1, 0xA, 0xC, 0xD, 0xE, 0xF];
-const ATTRACT_SCORING_WILLIAMS_COLOR_NIBBLE_MIN: u8 = 0x2;
-const ATTRACT_SCORING_WILLIAMS_COLOR_NIBBLE_MAX: u8 = 0x9;
-const SCORE_POPUP_500_PRIMARY_CYCLE_NIBBLE: u8 = 0xD;
-const SCORE_POPUP_500_SECOND_CYCLE_NIBBLE: u8 = 0xE;
-const SCORE_POPUP_500_THIRD_CYCLE_NIBBLE: u8 = 0xF;
-const SCORE_POPUP_GRAY_NIBBLE: u8 = 0xB;
-const LASER_FIZZLE_LOW_BIT: u8 = 0x01;
-const LASER_FIZZLE_HIGH_BIT: u8 = 0x02;
-const LASER_FIZZLE_HIGH_BIT_SHIFT: u8 = 3;
-const ATTRACT_SCORING_NATIVE_X_ROUNDING_OFFSET: i32 = 0x10;
-const ATTRACT_SCORING_NATIVE_Y_ROUNDING_OFFSET: i32 = 0x80;
-const ATTRACT_SCORING_WORLD_X_TO_NATIVE_SHIFT: u8 = 5;
-const ATTRACT_SCORING_WORLD_Y_TO_NATIVE_SHIFT: u8 = 8;
-const ATTRACT_SCORING_NATIVE_X_MAX: i32 = 319;
-const ATTRACT_SCORING_NATIVE_Y_MAX: i32 = 255;
-const ATTRACT_SCORING_MATERIALIZE_FINAL_AGE: u32 = 0x2C;
-const ATTRACT_SCORING_GRAY_TINT: Color = Color::from_rgba(170, 170, 186, ATTRACT_SCORING_OPAQUE_ALPHA);
+use super::*;
 
-fn push_attract_scoring_top_display_border(scene: &mut RenderScene) {
+pub(in crate::actor_game) const ATTRACT_SCORING_HIGH_NIBBLE_MASK: u8 = 0xF0;
+pub(in crate::actor_game) const ATTRACT_SCORING_LOW_NIBBLE_MASK: u8 = 0x0F;
+pub(in crate::actor_game) const ATTRACT_SCORING_LANDER_DESCENT_WORLD_Y_STEP: i32 = 0x00A0;
+pub(in crate::actor_game) const ATTRACT_SCORING_RESCUE_ASCENT_WORLD_Y_STEP: i32 = 0x00B0;
+pub(in crate::actor_game) const ATTRACT_SCORING_LANDER_EXPLOSION_STEPS: u16 = 12;
+pub(in crate::actor_game) const ATTRACT_SCORING_RETURN_BONUS_STEP_DIVISOR: u16 = 2;
+pub(in crate::actor_game) const ATTRACT_SCORING_RETURN_BONUS_WORLD_Y_STEP: i32 = 0x0010;
+pub(in crate::actor_game) const ATTRACT_SCORING_OPAQUE_ALPHA: u8 = 0xFF;
+pub(in crate::actor_game) const ATTRACT_SCORING_COLOR_LOW_BYTE_MASK: u16 = 0x00FF;
+pub(in crate::actor_game) const ATTRACT_SCORING_TRANSPARENT_PALETTE_NIBBLE: u8 = 0x0;
+pub(in crate::actor_game) const ATTRACT_SCORING_WHITE_PALETTE_NIBBLES: [u8; 6] =
+    [0x1, 0xA, 0xC, 0xD, 0xE, 0xF];
+pub(in crate::actor_game) const ATTRACT_SCORING_WILLIAMS_COLOR_NIBBLE_MIN: u8 = 0x2;
+pub(in crate::actor_game) const ATTRACT_SCORING_WILLIAMS_COLOR_NIBBLE_MAX: u8 = 0x9;
+pub(in crate::actor_game) const SCORE_POPUP_500_PRIMARY_CYCLE_NIBBLE: u8 = 0xD;
+pub(in crate::actor_game) const SCORE_POPUP_500_SECOND_CYCLE_NIBBLE: u8 = 0xE;
+pub(in crate::actor_game) const SCORE_POPUP_500_THIRD_CYCLE_NIBBLE: u8 = 0xF;
+pub(in crate::actor_game) const SCORE_POPUP_GRAY_NIBBLE: u8 = 0xB;
+pub(in crate::actor_game) const LASER_FIZZLE_LOW_BIT: u8 = 0x01;
+pub(in crate::actor_game) const LASER_FIZZLE_HIGH_BIT: u8 = 0x02;
+pub(in crate::actor_game) const LASER_FIZZLE_HIGH_BIT_SHIFT: u8 = 3;
+pub(in crate::actor_game) const ATTRACT_SCORING_NATIVE_X_ROUNDING_OFFSET: i32 = 0x10;
+pub(in crate::actor_game) const ATTRACT_SCORING_NATIVE_Y_ROUNDING_OFFSET: i32 = 0x80;
+pub(in crate::actor_game) const ATTRACT_SCORING_WORLD_X_TO_NATIVE_SHIFT: u8 = 5;
+pub(in crate::actor_game) const ATTRACT_SCORING_WORLD_Y_TO_NATIVE_SHIFT: u8 = 8;
+pub(in crate::actor_game) const ATTRACT_SCORING_NATIVE_X_MAX: i32 = 319;
+pub(in crate::actor_game) const ATTRACT_SCORING_NATIVE_Y_MAX: i32 = 255;
+pub(in crate::actor_game) const ATTRACT_SCORING_MATERIALIZE_FINAL_AGE: u32 = 0x2C;
+pub(in crate::actor_game) const ATTRACT_SCORING_GRAY_TINT: Color =
+    Color::from_rgba(170, 170, 186, ATTRACT_SCORING_OPAQUE_ALPHA);
+
+pub(in crate::actor_game) fn push_attract_scoring_top_display_border(scene: &mut RenderScene) {
     for (screen_cell_word, size) in TOP_DISPLAY_BORDER_SEGMENTS {
         let screen_cell = crate::ScreenAddress::new(screen_cell_word);
         scene.push_sprite(SceneSprite {
@@ -43,7 +47,7 @@ fn push_attract_scoring_top_display_border(scene: &mut RenderScene) {
     }
 }
 
-fn push_attract_scoring_scanner_terrain(scene: &mut RenderScene) {
+pub(in crate::actor_game) fn push_attract_scoring_scanner_terrain(scene: &mut RenderScene) {
     for record in scanner_mini_terrain_records() {
         let origin = offset_f32_position(
             screen_position_from_cell(record.screen_cell),
@@ -71,7 +75,10 @@ fn push_attract_scoring_scanner_terrain(scene: &mut RenderScene) {
     }
 }
 
-fn push_attract_scoring_demo_scene(scene: &mut RenderScene, scoring_tick: TimelineStep) {
+pub(in crate::actor_game) fn push_attract_scoring_demo_scene(
+    scene: &mut RenderScene,
+    scoring_tick: TimelineStep,
+) {
     let snapshot = actor_attract_scoring_snapshot(scoring_tick);
     for object in snapshot.scanner_objects.iter().copied() {
         push_attract_scoring_scanner_object(scene, object);
@@ -116,22 +123,22 @@ fn push_attract_scoring_demo_scene(scene: &mut RenderScene, scoring_tick: Timeli
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ActorAttractScoringSnapshot {
-    display_step: TimelineStep,
-    scene_objects: Vec<ActorAttractScoringObject>,
-    scanner_objects: Vec<ActorAttractScoringObject>,
-    bonus: Option<ActorAttractScoringBonus>,
+pub(in crate::actor_game) struct ActorAttractScoringSnapshot {
+    pub(in crate::actor_game) display_step: TimelineStep,
+    pub(in crate::actor_game) scene_objects: Vec<ActorAttractScoringObject>,
+    pub(in crate::actor_game) scanner_objects: Vec<ActorAttractScoringObject>,
+    pub(in crate::actor_game) bonus: Option<ActorAttractScoringBonus>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ActorAttractScoringLegendEntry {
-    enemy: ActorAttractScoringEnemyKind,
-    legend_world_x: i32,
-    legend_world_y: i32,
-    scanner_tint_word: u16,
+pub(in crate::actor_game) struct ActorAttractScoringLegendEntry {
+    pub(in crate::actor_game) enemy: ActorAttractScoringEnemyKind,
+    pub(in crate::actor_game) legend_world_x: i32,
+    pub(in crate::actor_game) legend_world_y: i32,
+    pub(in crate::actor_game) scanner_tint_word: u16,
 }
 
-const ACTOR_ATTRACT_SCORING_LEGEND: [ActorAttractScoringLegendEntry;
+pub(in crate::actor_game) const ACTOR_ATTRACT_SCORING_LEGEND: [ActorAttractScoringLegendEntry;
     ATTRACT_SCORING_LEGEND_ENTRIES as usize] = [
     ActorAttractScoringLegendEntry {
         enemy: ActorAttractScoringEnemyKind::Lander,
@@ -172,23 +179,23 @@ const ACTOR_ATTRACT_SCORING_LEGEND: [ActorAttractScoringLegendEntry;
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ActorAttractScoringBonus {
-    sprite: SpriteId,
-    world_x: i32,
-    world_y: i32,
+pub(in crate::actor_game) struct ActorAttractScoringBonus {
+    pub(in crate::actor_game) sprite: SpriteId,
+    pub(in crate::actor_game) world_x: i32,
+    pub(in crate::actor_game) world_y: i32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ActorAttractScoringObject {
-    kind: ActorAttractScoringObjectKind,
-    world_x: i32,
-    world_y: i32,
-    visual: ActorAttractScoringVisual,
-    visual_step: u16,
+pub(in crate::actor_game) struct ActorAttractScoringObject {
+    pub(in crate::actor_game) kind: ActorAttractScoringObjectKind,
+    pub(in crate::actor_game) world_x: i32,
+    pub(in crate::actor_game) world_y: i32,
+    pub(in crate::actor_game) visual: ActorAttractScoringVisual,
+    pub(in crate::actor_game) visual_step: u16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ActorAttractScoringObjectKind {
+pub(in crate::actor_game) enum ActorAttractScoringObjectKind {
     PlayerShip,
     Human,
     PlayerShot,
@@ -196,7 +203,7 @@ enum ActorAttractScoringObjectKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ActorAttractScoringEnemyKind {
+pub(in crate::actor_game) enum ActorAttractScoringEnemyKind {
     Lander,
     Mutant,
     Baiter,
@@ -206,14 +213,14 @@ enum ActorAttractScoringEnemyKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ActorAttractScoringVisual {
+pub(in crate::actor_game) enum ActorAttractScoringVisual {
     Sprite,
     Explosion,
     Materialize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ActorAttractScoringStage {
+pub(in crate::actor_game) enum ActorAttractScoringStage {
     RescueDescend,
     RescueAscend,
     RescueLaser,
@@ -227,7 +234,9 @@ enum ActorAttractScoringStage {
     LegendHold,
 }
 
-fn actor_attract_scoring_snapshot(scoring_tick: TimelineStep) -> ActorAttractScoringSnapshot {
+pub(in crate::actor_game) fn actor_attract_scoring_snapshot(
+    scoring_tick: TimelineStep,
+) -> ActorAttractScoringSnapshot {
     let display_step = actor_attract_scoring_display_step(scoring_tick);
     let (stage, local_step) = actor_attract_scoring_stage_for_step(display_step);
     let scanner_display_step = TimelineStep::new(display_step.step() - (display_step.step() % 4));
@@ -241,7 +250,9 @@ fn actor_attract_scoring_snapshot(scoring_tick: TimelineStep) -> ActorAttractSco
     }
 }
 
-fn actor_attract_scoring_display_step(scoring_tick: TimelineStep) -> TimelineStep {
+pub(in crate::actor_game) fn actor_attract_scoring_display_step(
+    scoring_tick: TimelineStep,
+) -> TimelineStep {
     TimelineStep::new(
         (scoring_tick.step() % ATTRACT_SCORING_DEMO_TOTAL_STEPS
             + ATTRACT_SCORING_PROTECTED_DEMO_STEP_OFFSET)
@@ -249,7 +260,9 @@ fn actor_attract_scoring_display_step(scoring_tick: TimelineStep) -> TimelineSte
     )
 }
 
-fn actor_attract_scoring_tick_for_display_step(display_step: TimelineStep) -> TimelineStep {
+pub(in crate::actor_game) fn actor_attract_scoring_tick_for_display_step(
+    display_step: TimelineStep,
+) -> TimelineStep {
     TimelineStep::new(
         (display_step.step() % ATTRACT_SCORING_DEMO_TOTAL_STEPS + ATTRACT_SCORING_DEMO_TOTAL_STEPS
             - ATTRACT_SCORING_PROTECTED_DEMO_STEP_OFFSET)
@@ -257,7 +270,7 @@ fn actor_attract_scoring_tick_for_display_step(display_step: TimelineStep) -> Ti
     )
 }
 
-fn actor_attract_scoring_display_step_for_stage(
+pub(in crate::actor_game) fn actor_attract_scoring_display_step_for_stage(
     target_stage: ActorAttractScoringStage,
     local_step: u16,
 ) -> TimelineStep {
@@ -281,7 +294,9 @@ fn actor_attract_scoring_display_step_for_stage(
     TimelineStep::new(elapsed + local_step.min(ATTRACT_SCORING_LEGEND_HOLD_STEPS.saturating_sub(1)))
 }
 
-fn actor_attract_scoring_instruction_text_start_step(line_index: usize) -> u64 {
+pub(in crate::actor_game) fn actor_attract_scoring_instruction_text_start_step(
+    line_index: usize,
+) -> u64 {
     let Some(legend_index) = line_index.checked_sub(1) else {
         return ATTRACT_SCORING_SEQUENCE_START_STEP;
     };
@@ -291,13 +306,17 @@ fn actor_attract_scoring_instruction_text_start_step(line_index: usize) -> u64 {
         0,
     );
     ATTRACT_SCORING_SEQUENCE_START_STEP
-        + u64::from(actor_attract_scoring_tick_for_display_step(
-            next_actor_attract_scoring_text_process_step(reveal_display_step),
+        + u64::from(
+            actor_attract_scoring_tick_for_display_step(
+                next_actor_attract_scoring_text_process_step(reveal_display_step),
+            )
+            .step(),
         )
-        .step())
 }
 
-fn next_actor_attract_scoring_text_process_step(step: TimelineStep) -> TimelineStep {
+pub(in crate::actor_game) fn next_actor_attract_scoring_text_process_step(
+    step: TimelineStep,
+) -> TimelineStep {
     let step = step.step();
     let remainder = step % 6;
     if remainder == 0 {
@@ -307,7 +326,10 @@ fn next_actor_attract_scoring_text_process_step(step: TimelineStep) -> TimelineS
     }
 }
 
-const ACTOR_ATTRACT_SCORING_RESCUE_TIMELINE: [(ActorAttractScoringStage, u16); 6] = [
+pub(in crate::actor_game) const ACTOR_ATTRACT_SCORING_RESCUE_TIMELINE: [(
+    ActorAttractScoringStage,
+    u16,
+); 6] = [
     (
         ActorAttractScoringStage::RescueDescend,
         ATTRACT_SCORING_RESCUE_DESCENT_STEPS,
@@ -334,7 +356,9 @@ const ACTOR_ATTRACT_SCORING_RESCUE_TIMELINE: [(ActorAttractScoringStage, u16); 6
     ),
 ];
 
-fn actor_attract_scoring_legend_timeline(index: usize) -> [(ActorAttractScoringStage, u16); 4] {
+pub(in crate::actor_game) fn actor_attract_scoring_legend_timeline(
+    index: usize,
+) -> [(ActorAttractScoringStage, u16); 4] {
     [
         (
             ActorAttractScoringStage::LegendApproach(index),
@@ -355,7 +379,7 @@ fn actor_attract_scoring_legend_timeline(index: usize) -> [(ActorAttractScoringS
     ]
 }
 
-fn actor_attract_scoring_stage_for_step(
+pub(in crate::actor_game) fn actor_attract_scoring_stage_for_step(
     display_step: TimelineStep,
 ) -> (ActorAttractScoringStage, u16) {
     let mut display_step = display_step.step();
@@ -381,7 +405,7 @@ fn actor_attract_scoring_stage_for_step(
     )
 }
 
-fn actor_attract_scoring_objects_for_stage(
+pub(in crate::actor_game) fn actor_attract_scoring_objects_for_stage(
     stage: ActorAttractScoringStage,
     local_step: u16,
 ) -> Vec<ActorAttractScoringObject> {
@@ -528,7 +552,9 @@ fn actor_attract_scoring_objects_for_stage(
     objects
 }
 
-fn actor_attract_scoring_intercept_state(fall_step: u16) -> (i32, i32, i32) {
+pub(in crate::actor_game) fn actor_attract_scoring_intercept_state(
+    fall_step: u16,
+) -> (i32, i32, i32) {
     let mut ship_x = ATTRACT_SCORING_PLAYER_WORLD_X;
     let mut ship_y = ATTRACT_SCORING_PLAYER_WORLD_Y;
     let mut human_y = ATTRACT_SCORING_HUMAN_WORLD_Y
@@ -551,27 +577,30 @@ fn actor_attract_scoring_intercept_state(fall_step: u16) -> (i32, i32, i32) {
     (ship_x, ship_y, human_y)
 }
 
-fn actor_attract_scoring_drop_state(score_step: u16) -> (i32, i32, i32) {
+pub(in crate::actor_game) fn actor_attract_scoring_drop_state(score_step: u16) -> (i32, i32, i32) {
     let (ship_x, ship_y, _) =
         actor_attract_scoring_intercept_state(ATTRACT_SCORING_RESCUE_FALL_STEPS);
     (
         ship_x,
         ship_y + i32::from(score_step) * ATTRACT_SCORING_RESCUE_DROP_WORLD_Y_VELOCITY,
-        ATTRACT_SCORING_CAUGHT_HUMAN_WORLD_Y + i32::from(score_step) * ATTRACT_SCORING_RESCUE_DROP_WORLD_Y_VELOCITY,
+        ATTRACT_SCORING_CAUGHT_HUMAN_WORLD_Y
+            + i32::from(score_step) * ATTRACT_SCORING_RESCUE_DROP_WORLD_Y_VELOCITY,
     )
 }
 
-fn actor_attract_scoring_legend_player_position() -> (i32, i32) {
+pub(in crate::actor_game) fn actor_attract_scoring_legend_player_position() -> (i32, i32) {
     let (ship_x, ship_y, _) = actor_attract_scoring_drop_state(ATTRACT_SCORING_RESCUE_SCORE_STEPS);
     (
         ship_x
-            + i32::from(ATTRACT_SCORING_RESCUE_RETURN_STEPS) * ATTRACT_SCORING_RESCUE_RETURN_WORLD_X_VELOCITY,
+            + i32::from(ATTRACT_SCORING_RESCUE_RETURN_STEPS)
+                * ATTRACT_SCORING_RESCUE_RETURN_WORLD_X_VELOCITY,
         ship_y
-            + i32::from(ATTRACT_SCORING_RESCUE_RETURN_STEPS) * ATTRACT_SCORING_RESCUE_RETURN_WORLD_Y_VELOCITY,
+            + i32::from(ATTRACT_SCORING_RESCUE_RETURN_STEPS)
+                * ATTRACT_SCORING_RESCUE_RETURN_WORLD_Y_VELOCITY,
     )
 }
 
-fn append_actor_attract_scoring_legend_objects(
+pub(in crate::actor_game) fn append_actor_attract_scoring_legend_objects(
     objects: &mut Vec<ActorAttractScoringObject>,
     stage: ActorAttractScoringStage,
     local_step: u16,
@@ -602,7 +631,8 @@ fn append_actor_attract_scoring_legend_objects(
     };
 
     let entry = ACTOR_ATTRACT_SCORING_LEGEND[index];
-    let legend_enemy_world_y = actor_attract_scoring_legend_enemy_world_y(entry.enemy, player_world_y);
+    let legend_enemy_world_y =
+        actor_attract_scoring_legend_enemy_world_y(entry.enemy, player_world_y);
     match stage {
         ActorAttractScoringStage::LegendApproach(_) => {
             let enemy_y = actor_attract_scoring_lerp_world_y(
@@ -657,7 +687,9 @@ fn append_actor_attract_scoring_legend_objects(
     }
 }
 
-fn actor_attract_scoring_revealed_legend_entries(stage: ActorAttractScoringStage) -> usize {
+pub(in crate::actor_game) fn actor_attract_scoring_revealed_legend_entries(
+    stage: ActorAttractScoringStage,
+) -> usize {
     match stage {
         ActorAttractScoringStage::LegendHold => ACTOR_ATTRACT_SCORING_LEGEND.len(),
         ActorAttractScoringStage::LegendApproach(index)
@@ -668,14 +700,14 @@ fn actor_attract_scoring_revealed_legend_entries(stage: ActorAttractScoringStage
     }
 }
 
-fn actor_attract_scoring_legend_enemy_world_y(
+pub(in crate::actor_game) fn actor_attract_scoring_legend_enemy_world_y(
     enemy: ActorAttractScoringEnemyKind,
     player_world_y: i32,
 ) -> i32 {
     actor_attract_scoring_laser_aligned_enemy_world_y(enemy, player_world_y)
 }
 
-fn actor_attract_scoring_laser_aligned_enemy_world_y(
+pub(in crate::actor_game) fn actor_attract_scoring_laser_aligned_enemy_world_y(
     enemy: ActorAttractScoringEnemyKind,
     player_world_y: i32,
 ) -> i32 {
@@ -686,7 +718,12 @@ fn actor_attract_scoring_laser_aligned_enemy_world_y(
     (native_y.round() as i32) << 8
 }
 
-fn actor_attract_scoring_lerp_world_y(start_world_y: i32, end_world_y: i32, step: u16, steps: u16) -> i32 {
+pub(in crate::actor_game) fn actor_attract_scoring_lerp_world_y(
+    start_world_y: i32,
+    end_world_y: i32,
+    step: u16,
+    steps: u16,
+) -> i32 {
     let denominator = i64::from(steps.saturating_sub(1).max(1));
     let numerator = i64::from(step.min(steps.saturating_sub(1)));
     let start = i64::from(start_world_y);
@@ -694,15 +731,19 @@ fn actor_attract_scoring_lerp_world_y(start_world_y: i32, end_world_y: i32, step
     (start + delta * numerator / denominator) as i32
 }
 
-fn actor_attract_scoring_enemy_object(
+pub(in crate::actor_game) fn actor_attract_scoring_enemy_object(
     enemy: ActorAttractScoringEnemyKind,
     world_x: i32,
     world_y: i32,
 ) -> ActorAttractScoringObject {
-    actor_attract_scoring_object(ActorAttractScoringObjectKind::Enemy(enemy), world_x, world_y)
+    actor_attract_scoring_object(
+        ActorAttractScoringObjectKind::Enemy(enemy),
+        world_x,
+        world_y,
+    )
 }
 
-fn actor_attract_scoring_visual_enemy_object(
+pub(in crate::actor_game) fn actor_attract_scoring_visual_enemy_object(
     enemy: ActorAttractScoringEnemyKind,
     world_x: i32,
     world_y: i32,
@@ -718,7 +759,7 @@ fn actor_attract_scoring_visual_enemy_object(
     }
 }
 
-fn actor_attract_scoring_object(
+pub(in crate::actor_game) fn actor_attract_scoring_object(
     kind: ActorAttractScoringObjectKind,
     world_x: i32,
     world_y: i32,
@@ -732,7 +773,7 @@ fn actor_attract_scoring_object(
     }
 }
 
-fn actor_attract_scoring_bonus(
+pub(in crate::actor_game) fn actor_attract_scoring_bonus(
     stage: ActorAttractScoringStage,
     local_step: u16,
 ) -> Option<ActorAttractScoringBonus> {
@@ -761,7 +802,10 @@ fn actor_attract_scoring_bonus(
     }
 }
 
-fn push_attract_scoring_scene_object(scene: &mut RenderScene, object: ActorAttractScoringObject) {
+pub(in crate::actor_game) fn push_attract_scoring_scene_object(
+    scene: &mut RenderScene,
+    object: ActorAttractScoringObject,
+) {
     if matches!(object.kind, ActorAttractScoringObjectKind::PlayerShot) {
         return;
     }
@@ -794,7 +838,10 @@ fn push_attract_scoring_scene_object(scene: &mut RenderScene, object: ActorAttra
     });
 }
 
-fn push_attract_scoring_scanner_object(scene: &mut RenderScene, object: ActorAttractScoringObject) {
+pub(in crate::actor_game) fn push_attract_scoring_scanner_object(
+    scene: &mut RenderScene,
+    object: ActorAttractScoringObject,
+) {
     let (sprite, size, color_word) = match object.kind {
         ActorAttractScoringObjectKind::PlayerShip => (
             SpriteId::SCANNER_PLAYER_BLIP,
@@ -830,7 +877,7 @@ fn push_attract_scoring_scanner_object(scene: &mut RenderScene, object: ActorAtt
     });
 }
 
-fn push_actor_attract_scoring_laser_beam(
+pub(in crate::actor_game) fn push_actor_attract_scoring_laser_beam(
     scene: &mut RenderScene,
     player_ship: ActorAttractScoringObject,
     target: ActorAttractScoringObject,
@@ -850,14 +897,16 @@ fn push_actor_attract_scoring_laser_beam(
     push_actor_scoring_sparse_laser(scene, start[0], start[1], end[0], display_step);
 }
 
-fn actor_attract_scoring_laser_ship_anchor(position: [f32; 2]) -> [f32; 2] {
+pub(in crate::actor_game) fn actor_attract_scoring_laser_ship_anchor(
+    position: [f32; 2],
+) -> [f32; 2] {
     [
         position[0] + PLAYER_SHIP_SCENE_SIZE[0],
         position[1] + PLAYER_SHIP_SCENE_SIZE[1] / 2.0 + 1.0,
     ]
 }
 
-fn actor_attract_scoring_laser_enemy_anchor(
+pub(in crate::actor_game) fn actor_attract_scoring_laser_enemy_anchor(
     enemy: ActorAttractScoringEnemyKind,
     position: [f32; 2],
 ) -> [f32; 2] {
@@ -865,7 +914,7 @@ fn actor_attract_scoring_laser_enemy_anchor(
     [position[0], position[1] + size[1] / 2.0]
 }
 
-fn push_actor_attract_scoring_bonus(
+pub(in crate::actor_game) fn push_actor_attract_scoring_bonus(
     scene: &mut RenderScene,
     bonus: ActorAttractScoringBonus,
     display_step: u16,
@@ -885,7 +934,7 @@ fn push_actor_attract_scoring_bonus(
     });
 }
 
-fn push_actor_attract_scoring_score_500_pixels(
+pub(in crate::actor_game) fn push_actor_attract_scoring_score_500_pixels(
     scene: &mut RenderScene,
     position: [f32; 2],
     display_step: u16,
@@ -909,7 +958,9 @@ fn push_actor_attract_scoring_score_500_pixels(
                     tint,
                 );
             }
-            if let Some(tint) = actor_score_500_nibble_tint(byte & ATTRACT_SCORING_LOW_NIBBLE_MASK, phase) {
+            if let Some(tint) =
+                actor_score_500_nibble_tint(byte & ATTRACT_SCORING_LOW_NIBBLE_MASK, phase)
+            {
                 push_actor_fragment_pixel(
                     scene,
                     [
@@ -923,10 +974,13 @@ fn push_actor_attract_scoring_score_500_pixels(
     }
 }
 
-const SCORE_POPUP_500_PIXEL_BITMAP: crate::arcade_assets::ObjectBitmapId =
+pub(in crate::actor_game) const SCORE_POPUP_500_PIXEL_BITMAP: crate::arcade_assets::ObjectBitmapId =
     crate::arcade_assets::ObjectBitmapId::Score500Primary;
 
-fn actor_score_500_nibble_tint(nibble: u8, phase: usize) -> Option<Color> {
+pub(in crate::actor_game) fn actor_score_500_nibble_tint(
+    nibble: u8,
+    phase: usize,
+) -> Option<Color> {
     match nibble {
         ATTRACT_SCORING_TRANSPARENT_PALETTE_NIBBLE => None,
         SCORE_POPUP_500_PRIMARY_CYCLE_NIBBLE => {
@@ -942,7 +996,7 @@ fn actor_score_500_nibble_tint(nibble: u8, phase: usize) -> Option<Color> {
     }
 }
 
-fn push_actor_scoring_sparse_laser(
+pub(in crate::actor_game) fn push_actor_scoring_sparse_laser(
     scene: &mut RenderScene,
     start_x: f32,
     start_y: f32,
@@ -1000,7 +1054,7 @@ fn push_actor_scoring_sparse_laser(
     }
 }
 
-fn push_actor_scoring_laser_byte(
+pub(in crate::actor_game) fn push_actor_scoring_laser_byte(
     scene: &mut RenderScene,
     x: i32,
     y: i32,
@@ -1017,7 +1071,7 @@ fn push_actor_scoring_laser_byte(
     }
 }
 
-fn push_actor_scoring_laser_pixel(
+pub(in crate::actor_game) fn push_actor_scoring_laser_pixel(
     scene: &mut RenderScene,
     x: i32,
     y: i32,
@@ -1043,12 +1097,11 @@ fn push_actor_scoring_laser_pixel(
     });
 }
 
-const fn actor_laser_fizzle_byte(seed: u8) -> u8 {
-    (seed & LASER_FIZZLE_LOW_BIT)
-        | ((seed & LASER_FIZZLE_HIGH_BIT) << LASER_FIZZLE_HIGH_BIT_SHIFT)
+pub(in crate::actor_game) const fn actor_laser_fizzle_byte(seed: u8) -> u8 {
+    (seed & LASER_FIZZLE_LOW_BIT) | ((seed & LASER_FIZZLE_HIGH_BIT) << LASER_FIZZLE_HIGH_BIT_SHIFT)
 }
 
-fn push_actor_attract_scoring_fragment_pixels(
+pub(in crate::actor_game) fn push_actor_attract_scoring_fragment_pixels(
     scene: &mut RenderScene,
     object: ActorAttractScoringObject,
 ) {
@@ -1072,7 +1125,7 @@ fn push_actor_attract_scoring_fragment_pixels(
     }
 }
 
-fn push_actor_attract_scoring_materialize_pixels(
+pub(in crate::actor_game) fn push_actor_attract_scoring_materialize_pixels(
     scene: &mut RenderScene,
     enemy: ActorAttractScoringEnemyKind,
     position: [f32; 2],
@@ -1094,7 +1147,7 @@ fn push_actor_attract_scoring_materialize_pixels(
     );
 }
 
-fn push_actor_attract_scoring_explosion_pixels(
+pub(in crate::actor_game) fn push_actor_attract_scoring_explosion_pixels(
     scene: &mut RenderScene,
     enemy: ActorAttractScoringEnemyKind,
     position: [f32; 2],
@@ -1113,7 +1166,11 @@ fn push_actor_attract_scoring_explosion_pixels(
     );
 }
 
-fn push_actor_fragment_pixel(scene: &mut RenderScene, position: [f32; 2], tint: Color) {
+pub(in crate::actor_game) fn push_actor_fragment_pixel(
+    scene: &mut RenderScene,
+    position: [f32; 2],
+    tint: Color,
+) {
     if position[0] < 0.0
         || position[1] < 0.0
         || position[0] >= scene.surface.width as f32
@@ -1131,13 +1188,13 @@ fn push_actor_fragment_pixel(scene: &mut RenderScene, position: [f32; 2], tint: 
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct ActorAttractScoringSpriteFrameDescriptor {
-    sprite_asset_image: SpriteAssetImageSpec,
-    object_bitmap_size: (u8, u8),
-    sprite: SpriteId,
+pub(in crate::actor_game) struct ActorAttractScoringSpriteFrameDescriptor {
+    pub(in crate::actor_game) sprite_asset_image: SpriteAssetImageSpec,
+    pub(in crate::actor_game) object_bitmap_size: (u8, u8),
+    pub(in crate::actor_game) sprite: SpriteId,
 }
 
-fn actor_attract_scoring_enemy_sprite_frame_descriptor(
+pub(in crate::actor_game) fn actor_attract_scoring_enemy_sprite_frame_descriptor(
     enemy: ActorAttractScoringEnemyKind,
 ) -> ActorAttractScoringSpriteFrameDescriptor {
     match enemy {
@@ -1198,7 +1255,7 @@ fn actor_attract_scoring_enemy_sprite_frame_descriptor(
     }
 }
 
-fn actor_attract_scoring_enemy_explosion_kind(
+pub(in crate::actor_game) fn actor_attract_scoring_enemy_explosion_kind(
     enemy: ActorAttractScoringEnemyKind,
 ) -> ExplosionKind {
     match enemy {
@@ -1211,7 +1268,7 @@ fn actor_attract_scoring_enemy_explosion_kind(
     }
 }
 
-fn actor_attract_scoring_materialize_age(visual_step: u16) -> u16 {
+pub(in crate::actor_game) fn actor_attract_scoring_materialize_age(visual_step: u16) -> u16 {
     let step = u32::from(visual_step.min(ATTRACT_SCORING_LEGEND_TRANSFER_STEPS.saturating_sub(1)));
     let denominator = u32::from(
         ATTRACT_SCORING_LEGEND_TRANSFER_STEPS
@@ -1222,7 +1279,9 @@ fn actor_attract_scoring_materialize_age(visual_step: u16) -> u16 {
         .expect("materialize age fits in u16")
 }
 
-fn try_screen_position_from_scene_position(position: [f32; 2]) -> Option<ScreenPosition> {
+pub(in crate::actor_game) fn try_screen_position_from_scene_position(
+    position: [f32; 2],
+) -> Option<ScreenPosition> {
     if !position[0].is_finite() || !position[1].is_finite() {
         return None;
     }
@@ -1234,19 +1293,23 @@ fn try_screen_position_from_scene_position(position: [f32; 2]) -> Option<ScreenP
     Some(ScreenPosition::new(x as u8, y as u8))
 }
 
-fn actor_sprite_asset_nibble_tint(nibble: u8) -> Option<Color> {
+pub(in crate::actor_game) fn actor_sprite_asset_nibble_tint(nibble: u8) -> Option<Color> {
     match nibble {
         ATTRACT_SCORING_TRANSPARENT_PALETTE_NIBBLE => None,
         nibble if ATTRACT_SCORING_WHITE_PALETTE_NIBBLES.contains(&nibble) => Some(Color::WHITE),
-        ATTRACT_SCORING_WILLIAMS_COLOR_NIBBLE_MIN..=ATTRACT_SCORING_WILLIAMS_COLOR_NIBBLE_MAX => Some(williams_color_byte_tint(
-            NORMAL_PALETTE_BYTES[usize::from(nibble)],
-        )),
+        ATTRACT_SCORING_WILLIAMS_COLOR_NIBBLE_MIN..=ATTRACT_SCORING_WILLIAMS_COLOR_NIBBLE_MAX => {
+            Some(williams_color_byte_tint(
+                NORMAL_PALETTE_BYTES[usize::from(nibble)],
+            ))
+        }
         SCORE_POPUP_GRAY_NIBBLE => Some(ATTRACT_SCORING_GRAY_TINT),
         _ => None,
     }
 }
 
-fn actor_attract_scoring_enemy_sprite(enemy: ActorAttractScoringEnemyKind) -> SpriteId {
+pub(in crate::actor_game) fn actor_attract_scoring_enemy_sprite(
+    enemy: ActorAttractScoringEnemyKind,
+) -> SpriteId {
     match enemy {
         ActorAttractScoringEnemyKind::Lander => SpriteId::ENEMY_LANDER,
         ActorAttractScoringEnemyKind::Mutant => SpriteId::ENEMY_MUTANT,
@@ -1257,7 +1320,9 @@ fn actor_attract_scoring_enemy_sprite(enemy: ActorAttractScoringEnemyKind) -> Sp
     }
 }
 
-fn actor_attract_scoring_enemy_size(enemy: ActorAttractScoringEnemyKind) -> [f32; 2] {
+pub(in crate::actor_game) fn actor_attract_scoring_enemy_size(
+    enemy: ActorAttractScoringEnemyKind,
+) -> [f32; 2] {
     match enemy {
         ActorAttractScoringEnemyKind::Lander => LANDER_SCENE_SIZE,
         ActorAttractScoringEnemyKind::Mutant => MUTANT_SCENE_SIZE,
@@ -1268,15 +1333,21 @@ fn actor_attract_scoring_enemy_size(enemy: ActorAttractScoringEnemyKind) -> [f32
     }
 }
 
-fn actor_attract_scoring_scene_position(world_x: i32, world_y: i32) -> [f32; 2] {
+pub(in crate::actor_game) fn actor_attract_scoring_scene_position(
+    world_x: i32,
+    world_y: i32,
+) -> [f32; 2] {
     offset_f32_position(
         actor_attract_scoring_native_position(world_x, world_y),
         ATTRACT_SCORING_OBJECT_REFERENCE_OFFSET,
     )
 }
 
-fn actor_attract_scoring_scanner_position(object: ActorAttractScoringObject) -> [f32; 2] {
-    let [native_x, native_y] = actor_attract_scoring_native_position(object.world_x, object.world_y);
+pub(in crate::actor_game) fn actor_attract_scoring_scanner_position(
+    object: ActorAttractScoringObject,
+) -> [f32; 2] {
+    let [native_x, native_y] =
+        actor_attract_scoring_native_position(object.world_x, object.world_y);
     offset_f32_position(
         [
             ATTRACT_SCORING_SCANNER_ORIGIN[0]
@@ -1288,7 +1359,10 @@ fn actor_attract_scoring_scanner_position(object: ActorAttractScoringObject) -> 
     )
 }
 
-fn actor_attract_scoring_native_position(world_x: i32, world_y: i32) -> [f32; 2] {
+pub(in crate::actor_game) fn actor_attract_scoring_native_position(
+    world_x: i32,
+    world_y: i32,
+) -> [f32; 2] {
     [
         ((world_x + ATTRACT_SCORING_NATIVE_X_ROUNDING_OFFSET)
             >> ATTRACT_SCORING_WORLD_X_TO_NATIVE_SHIFT)

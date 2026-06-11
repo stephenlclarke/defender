@@ -1,8 +1,10 @@
-const ADC8_RESULT_MASK: u16 = 0x00FF;
-const ADC8_CARRY_THRESHOLD: u16 = 0x00FF;
-const ACTOR_U8_SIGN_BIT: u8 = 0x80;
-const ACTOR_POSITIVE_SIGN_EXTENSION: u8 = 0x00;
-const ACTOR_NEGATIVE_SIGN_EXTENSION: u8 = 0xFF;
+use super::*;
+
+pub(in crate::actor_game) const ADC8_RESULT_MASK: u16 = 0x00FF;
+pub(in crate::actor_game) const ADC8_CARRY_THRESHOLD: u16 = 0x00FF;
+pub(in crate::actor_game) const ACTOR_U8_SIGN_BIT: u8 = 0x80;
+pub(in crate::actor_game) const ACTOR_POSITIVE_SIGN_EXTENSION: u8 = 0x00;
+pub(in crate::actor_game) const ACTOR_NEGATIVE_SIGN_EXTENSION: u8 = 0xFF;
 
 impl ActorWaveTuning {
     pub fn for_wave(wave: u16) -> Self {
@@ -75,7 +77,7 @@ impl ActorWaveTuning {
         }
     }
 
-    fn lander_behavior(self) -> ActorBehaviorProfile {
+    pub(in crate::actor_game) fn lander_behavior(self) -> ActorBehaviorProfile {
         ActorBehaviorProfile {
             lander_seek_speed: lander_speed_from_velocity_byte(self.lander_x_velocity),
             lander_drift_speed: lander_speed_from_velocity_byte(self.lander_x_velocity),
@@ -84,7 +86,11 @@ impl ActorWaveTuning {
         }
     }
 
-    fn lander_spawns(self, wave: u16, humans: &[ActorHumanSpawn]) -> Vec<ActorLanderSpawn> {
+    pub(in crate::actor_game) fn lander_spawns(
+        self,
+        wave: u16,
+        humans: &[ActorHumanSpawn],
+    ) -> Vec<ActorLanderSpawn> {
         let mut first_wave_lander_index = 0;
         let mut actor_rng = DEFAULT_RNG;
         let mut target_cursor = Some(0usize);
@@ -112,7 +118,7 @@ impl ActorWaveTuning {
             .collect()
     }
 
-    fn human_spawns(self, wave: u16) -> Vec<ActorHumanSpawn> {
+    pub(in crate::actor_game) fn human_spawns(self, wave: u16) -> Vec<ActorHumanSpawn> {
         if wave == 1 {
             ACTOR_FIRST_WAVE_HUMAN_SPAWNS.to_vec()
         } else {
@@ -120,7 +126,7 @@ impl ActorWaveTuning {
         }
     }
 
-    fn bomber_spawns(self) -> Vec<ActorBomberSpawn> {
+    pub(in crate::actor_game) fn bomber_spawns(self) -> Vec<ActorBomberSpawn> {
         self.active_family_slots()
             .into_iter()
             .filter(|slot| slot.kind == WaveEnemyKind::Bomber)
@@ -130,7 +136,7 @@ impl ActorWaveTuning {
             .collect()
     }
 
-    fn pod_spawns(self) -> Vec<ActorPodSpawn> {
+    pub(in crate::actor_game) fn pod_spawns(self) -> Vec<ActorPodSpawn> {
         self.active_family_slots()
             .into_iter()
             .filter(|slot| slot.kind == WaveEnemyKind::Pod)
@@ -138,7 +144,7 @@ impl ActorWaveTuning {
             .collect()
     }
 
-    fn mutant_spawns(self) -> Vec<ActorMutantSpawn> {
+    pub(in crate::actor_game) fn mutant_spawns(self) -> Vec<ActorMutantSpawn> {
         self.active_family_slots()
             .into_iter()
             .filter(|slot| slot.kind == WaveEnemyKind::Mutant)
@@ -146,7 +152,7 @@ impl ActorWaveTuning {
             .collect()
     }
 
-    fn swarmer_spawns(self) -> Vec<ActorSwarmerSpawn> {
+    pub(in crate::actor_game) fn swarmer_spawns(self) -> Vec<ActorSwarmerSpawn> {
         let mut actor_rng = DEFAULT_RNG;
         self.active_family_slots()
             .into_iter()
@@ -155,7 +161,7 @@ impl ActorWaveTuning {
             .collect()
     }
 
-    fn enemy_reserve_after_active_batch(self) -> EnemyReserveSnapshot {
+    pub(in crate::actor_game) fn enemy_reserve_after_active_batch(self) -> EnemyReserveSnapshot {
         let mut reserve = EnemyReserveSnapshot {
             landers: self.landers,
             bombers: self.bombers,
@@ -216,14 +222,14 @@ impl ActorWaveTuning {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct WaveEnemySlot {
-    kind: WaveEnemyKind,
-    index: usize,
-    position: Point,
+pub(in crate::actor_game) struct WaveEnemySlot {
+    pub(in crate::actor_game) kind: WaveEnemyKind,
+    pub(in crate::actor_game) index: usize,
+    pub(in crate::actor_game) position: Point,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum WaveEnemyKind {
+pub(in crate::actor_game) enum WaveEnemyKind {
     Lander,
     Bomber,
     Pod,
@@ -232,12 +238,12 @@ enum WaveEnemyKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct WaveEnemyCounts {
-    landers: u8,
-    bombers: u8,
-    pods: u8,
-    mutants: u8,
-    swarmers: u8,
+pub(in crate::actor_game) struct WaveEnemyCounts {
+    pub(in crate::actor_game) landers: u8,
+    pub(in crate::actor_game) bombers: u8,
+    pub(in crate::actor_game) pods: u8,
+    pub(in crate::actor_game) mutants: u8,
+    pub(in crate::actor_game) swarmers: u8,
 }
 
 impl WaveEnemyCounts {
@@ -265,7 +271,7 @@ impl WaveEnemyCounts {
     }
 }
 
-fn push_wave_enemy_kind(
+pub(in crate::actor_game) fn push_wave_enemy_kind(
     kinds: &mut Vec<WaveEnemyKind>,
     counts: &mut WaveEnemyCounts,
     target: usize,
@@ -276,7 +282,7 @@ fn push_wave_enemy_kind(
     }
 }
 
-fn actor_enemy_reserve_total(reserve: EnemyReserveSnapshot) -> u8 {
+pub(in crate::actor_game) fn actor_enemy_reserve_total(reserve: EnemyReserveSnapshot) -> u8 {
     reserve
         .landers
         .saturating_add(reserve.bombers)
@@ -285,11 +291,11 @@ fn actor_enemy_reserve_total(reserve: EnemyReserveSnapshot) -> u8 {
         .saturating_add(reserve.swarmers)
 }
 
-fn actor_enemy_reserve_is_empty(reserve: EnemyReserveSnapshot) -> bool {
+pub(in crate::actor_game) fn actor_enemy_reserve_is_empty(reserve: EnemyReserveSnapshot) -> bool {
     actor_enemy_reserve_total(reserve) == 0
 }
 
-fn actor_enemy_reserve_take(
+pub(in crate::actor_game) fn actor_enemy_reserve_take(
     reserve: &mut EnemyReserveSnapshot,
     kind: WaveEnemyKind,
 ) -> bool {
@@ -307,16 +313,14 @@ fn actor_enemy_reserve_take(
     true
 }
 
-fn reserve_wave_enemy_kinds(
+pub(in crate::actor_game) fn reserve_wave_enemy_kinds(
     reserve: &mut EnemyReserveSnapshot,
     profile: ActorWaveTuning,
 ) -> Vec<WaveEnemyKind> {
     if reserve.landers > 0 {
         let target = MAX_ACTIVE_WAVE_ENEMIES.min(usize::from(reserve.landers));
         let mut kinds = Vec::with_capacity(target);
-        while kinds.len() < target
-            && actor_enemy_reserve_take(reserve, WaveEnemyKind::Lander)
-        {
+        while kinds.len() < target && actor_enemy_reserve_take(reserve, WaveEnemyKind::Lander) {
             kinds.push(WaveEnemyKind::Lander);
         }
         return kinds;
@@ -352,7 +356,7 @@ fn reserve_wave_enemy_kinds(
     kinds
 }
 
-fn push_actor_reserve_kind(
+pub(in crate::actor_game) fn push_actor_reserve_kind(
     kinds: &mut Vec<WaveEnemyKind>,
     reserve: &mut EnemyReserveSnapshot,
     target: usize,
@@ -363,27 +367,27 @@ fn push_actor_reserve_kind(
     }
 }
 
-fn lander_speed_from_velocity_byte(velocity: u8) -> i16 {
+pub(in crate::actor_game) fn lander_speed_from_velocity_byte(velocity: u8) -> i16 {
     i16::from((velocity / 16).max(1))
 }
 
-fn speed_pixels_from_velocity_byte(velocity: u8) -> i16 {
+pub(in crate::actor_game) fn speed_pixels_from_velocity_byte(velocity: u8) -> i16 {
     i16::from((velocity / 32).max(1))
 }
 
-fn adc8(lhs: u8, rhs: u8, carry: bool) -> (u8, bool) {
+pub(in crate::actor_game) fn adc8(lhs: u8, rhs: u8, carry: bool) -> (u8, bool) {
     let sum = u16::from(lhs) + u16::from(rhs) + u16::from(u8::from(carry));
     ((sum & ADC8_RESULT_MASK) as u8, sum > ADC8_CARRY_THRESHOLD)
 }
 
-fn bounded_actor_rng_value(max: u8, mut seed: u8) -> u8 {
+pub(in crate::actor_game) fn bounded_actor_rng_value(max: u8, mut seed: u8) -> u8 {
     while seed > max {
         seed >>= 1;
     }
     seed.wrapping_add(1)
 }
 
-const fn actor_sign_extend_u8_to_u16(value: u8) -> u16 {
+pub(in crate::actor_game) const fn actor_sign_extend_u8_to_u16(value: u8) -> u16 {
     let sign = if value & ACTOR_U8_SIGN_BIT == 0 {
         ACTOR_POSITIVE_SIGN_EXTENSION
     } else {
@@ -392,12 +396,15 @@ const fn actor_sign_extend_u8_to_u16(value: u8) -> u16 {
     u16::from_be_bytes([sign, value])
 }
 
-fn actor_wave_tuning_u8(metric: crate::arcade_assets::WaveMetric, wave: u8) -> u8 {
+pub(in crate::actor_game) fn actor_wave_tuning_u8(
+    metric: crate::arcade_assets::WaveMetric,
+    wave: u8,
+) -> u8 {
     u8::try_from(actor_wave_tuning_value(metric, wave))
         .unwrap_or_else(|_| panic!("actor wave metric should fit u8"))
 }
 
-fn actor_wave_tuning_u16(
+pub(in crate::actor_game) fn actor_wave_tuning_u16(
     high_metric: crate::arcade_assets::WaveMetric,
     low_metric: crate::arcade_assets::WaveMetric,
     wave: u8,
@@ -408,12 +415,18 @@ fn actor_wave_tuning_u16(
     ])
 }
 
-fn actor_wave_tuning_u32(metric: crate::arcade_assets::WaveMetric, wave: u8) -> u32 {
+pub(in crate::actor_game) fn actor_wave_tuning_u32(
+    metric: crate::arcade_assets::WaveMetric,
+    wave: u8,
+) -> u32 {
     u32::try_from(actor_wave_tuning_value(metric, wave))
         .unwrap_or_else(|_| panic!("actor wave metric should be non-negative"))
 }
 
-fn actor_wave_tuning_value(metric: crate::arcade_assets::WaveMetric, wave: u8) -> i32 {
+pub(in crate::actor_game) fn actor_wave_tuning_value(
+    metric: crate::arcade_assets::WaveMetric,
+    wave: u8,
+) -> i32 {
     crate::arcade_assets::wave_metric_value(
         metric,
         wave,
@@ -421,7 +434,7 @@ fn actor_wave_tuning_value(metric: crate::arcade_assets::WaveMetric, wave: u8) -
     )
 }
 
-fn actor_wave_inter_delta_iterations(wave: u8) -> u16 {
+pub(in crate::actor_game) fn actor_wave_inter_delta_iterations(wave: u8) -> u16 {
     let wave_delta = wave.saturating_sub(4);
     let pre_ceiling = ACTOR_DEFAULT_DIFFICULTY_INITIAL.saturating_add(wave_delta);
     u16::from(pre_ceiling.min(ACTOR_DEFAULT_DIFFICULTY_CEILING))

@@ -1,3 +1,7 @@
+use std::collections::BTreeSet;
+
+use super::*;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PaletteResource {
     pub colors: Vec<Color>,
@@ -105,7 +109,7 @@ impl SpriteQuadVertex {
     }
 }
 
-const SPRITE_QUAD_VERTICES: [SpriteQuadVertex; 4] = [
+pub(super) const SPRITE_QUAD_VERTICES: [SpriteQuadVertex; 4] = [
     SpriteQuadVertex {
         unit_position: [0.0, 0.0],
         unit_uv: [0.0, 0.0],
@@ -124,7 +128,7 @@ const SPRITE_QUAD_VERTICES: [SpriteQuadVertex; 4] = [
     },
 ];
 
-const SPRITE_QUAD_INDICES: [u16; 6] = [0, 2, 1, 2, 3, 1];
+pub(super) const SPRITE_QUAD_INDICES: [u16; 6] = [0, 2, 1, 2, 3, 1];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpriteQuadGeometry;
@@ -169,7 +173,7 @@ pub struct SpriteDrawInstance {
 }
 
 impl SpriteDrawInstance {
-    fn from_sprite(sprite: SceneSprite, region: AtlasRegion) -> Self {
+    pub(super) fn from_sprite(sprite: SceneSprite, region: AtlasRegion) -> Self {
         Self {
             sprite: sprite.sprite,
             atlas_origin: region.origin,
@@ -251,7 +255,7 @@ pub struct SpriteInstanceBuffer {
 }
 
 impl SpriteInstanceBuffer {
-    fn from_batch(batch: &SpriteDrawBatch, atlas_surface: SurfaceSize) -> Option<Self> {
+    pub(super) fn from_batch(batch: &SpriteDrawBatch, atlas_surface: SurfaceSize) -> Option<Self> {
         let records = batch
             .instances
             .iter()
@@ -283,7 +287,7 @@ pub struct SpriteInstanceUpload {
 }
 
 impl SpriteInstanceUpload {
-    fn from_instance_buffers(buffers: &[SpriteInstanceBuffer]) -> Option<Self> {
+    pub(super) fn from_instance_buffers(buffers: &[SpriteInstanceBuffer]) -> Option<Self> {
         let records = buffers
             .iter()
             .flat_map(|buffer| buffer.records.iter().copied())
@@ -368,7 +372,7 @@ pub struct SpriteBufferUploadPlan {
 }
 
 impl SpriteBufferUploadPlan {
-    fn from_instance_upload(upload: &SpriteInstanceUpload) -> Self {
+    pub(super) fn from_instance_upload(upload: &SpriteInstanceUpload) -> Self {
         Self {
             quad_vertices: SpriteBufferUpload::quad_vertices(),
             quad_indices: SpriteBufferUpload::quad_indices(),
@@ -461,7 +465,7 @@ pub struct SpriteRenderPassPlan {
 }
 
 impl SpriteRenderPassPlan {
-    fn from_uploads_and_commands(
+    pub(super) fn from_uploads_and_commands(
         uploads: &SpriteBufferUploadPlan,
         commands: &[SpriteDrawCommand],
     ) -> Option<Self> {

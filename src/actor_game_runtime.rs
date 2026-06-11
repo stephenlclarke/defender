@@ -1,3 +1,5 @@
+use super::*;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ActorStepSnapshot {
     pub state: GameState,
@@ -31,9 +33,9 @@ impl ActorStepSnapshot {
 }
 
 pub struct ActorRuntimeAdapter {
-    driver: ActorGameDriver,
-    sound_bridge: ActorSoundEventBridge,
-    render_bridge: ActorRenderSceneBridge,
+    pub(in crate::actor_game) driver: ActorGameDriver,
+    pub(in crate::actor_game) sound_bridge: ActorSoundEventBridge,
+    pub(in crate::actor_game) render_bridge: ActorRenderSceneBridge,
 }
 
 impl ActorRuntimeAdapter {
@@ -86,7 +88,11 @@ impl ActorRuntimeAdapter {
         self.step_snapshot_for_report(report)
     }
 
-    pub fn step_clean_input(&mut self, input: CleanGameInput, xyzzy: XyzzyMode) -> ActorStepSnapshot {
+    pub fn step_clean_input(
+        &mut self,
+        input: CleanGameInput,
+        xyzzy: XyzzyMode,
+    ) -> ActorStepSnapshot {
         self.step(GameInput::from_clean_input(input, xyzzy))
     }
 
@@ -111,31 +117,31 @@ impl Default for ActorRuntimeAdapter {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-struct HighScoreEntryStep {
-    accepted: bool,
-    submitted: bool,
+pub(in crate::actor_game) struct HighScoreEntryStep {
+    pub(in crate::actor_game) accepted: bool,
+    pub(in crate::actor_game) submitted: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-struct AppliedCommands {
-    sounds: Vec<SoundCue>,
-    draws: Vec<DrawCommand>,
-    bonus_awarded: bool,
+pub(in crate::actor_game) struct AppliedCommands {
+    pub(in crate::actor_game) sounds: Vec<SoundCue>,
+    pub(in crate::actor_game) draws: Vec<DrawCommand>,
+    pub(in crate::actor_game) bonus_awarded: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct PendingSurvivorBonus {
-    next_wave: u16,
-    multiplier: u8,
-    total_survivors: u8,
-    visible_icons: u8,
-    remaining_awards: u8,
-    astronaut_sleep_steps_remaining: u8,
-    wave_advance_sleep_steps_remaining: Option<u8>,
+pub(in crate::actor_game) struct PendingSurvivorBonus {
+    pub(in crate::actor_game) next_wave: u16,
+    pub(in crate::actor_game) multiplier: u8,
+    pub(in crate::actor_game) total_survivors: u8,
+    pub(in crate::actor_game) visible_icons: u8,
+    pub(in crate::actor_game) remaining_awards: u8,
+    pub(in crate::actor_game) astronaut_sleep_steps_remaining: u8,
+    pub(in crate::actor_game) wave_advance_sleep_steps_remaining: Option<u8>,
 }
 
 impl PendingSurvivorBonus {
-    fn new(current_wave: u16, next_wave: u16, survivors: usize) -> Self {
+    pub(in crate::actor_game) fn new(current_wave: u16, next_wave: u16, survivors: usize) -> Self {
         let total_survivors = u8::try_from(survivors.min(SURVIVOR_BONUS_HUMAN_LIMIT))
             .unwrap_or(SURVIVOR_BONUS_HUMAN_LIMIT as u8);
         Self {
@@ -153,7 +159,7 @@ impl PendingSurvivorBonus {
         u32::from(self.multiplier) * SURVIVOR_BONUS_POINTS_PER_MULTIPLIER
     }
 
-    fn award_next_survivor(&mut self) -> Option<u32> {
+    pub(in crate::actor_game) fn award_next_survivor(&mut self) -> Option<u32> {
         if self.remaining_awards == 0 {
             return None;
         }
@@ -167,7 +173,7 @@ impl PendingSurvivorBonus {
         Some(self.bonus_points())
     }
 
-    fn report(self, awarded_points: Option<u32>) -> SurvivorBonusReport {
+    pub(in crate::actor_game) fn report(self, awarded_points: Option<u32>) -> SurvivorBonusReport {
         SurvivorBonusReport {
             next_wave: self.next_wave,
             multiplier: self.multiplier,
@@ -182,14 +188,14 @@ impl PendingSurvivorBonus {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct PendingPlayerSwitch {
-    sleep_steps_remaining: u8,
-    from_player: u8,
-    to_player: u8,
+pub(in crate::actor_game) struct PendingPlayerSwitch {
+    pub(in crate::actor_game) sleep_steps_remaining: u8,
+    pub(in crate::actor_game) from_player: u8,
+    pub(in crate::actor_game) to_player: u8,
 }
 
 impl PendingPlayerSwitch {
-    const fn new(from_player: u8, to_player: u8) -> Self {
+    pub(in crate::actor_game) const fn new(from_player: u8, to_player: u8) -> Self {
         Self {
             sleep_steps_remaining: PLAYER_SWITCH_DELAY_STEPS,
             from_player,
@@ -197,7 +203,7 @@ impl PendingPlayerSwitch {
         }
     }
 
-    const fn report(self) -> PlayerSwitchReport {
+    pub(in crate::actor_game) const fn report(self) -> PlayerSwitchReport {
         PlayerSwitchReport {
             sleep_steps_remaining: self.sleep_steps_remaining,
             from_player: self.from_player,
@@ -207,20 +213,20 @@ impl PendingPlayerSwitch {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct PendingPlayerStart {
-    delay_steps_remaining: u8,
-    player: u8,
+pub(in crate::actor_game) struct PendingPlayerStart {
+    pub(in crate::actor_game) delay_steps_remaining: u8,
+    pub(in crate::actor_game) player: u8,
 }
 
 impl PendingPlayerStart {
-    const fn new(player: u8) -> Self {
+    pub(in crate::actor_game) const fn new(player: u8) -> Self {
         Self {
             delay_steps_remaining: PLAYER_START_PLAYFIELD_DELAY_STEPS,
             player,
         }
     }
 
-    const fn report(self) -> PlayerStartReport {
+    pub(in crate::actor_game) const fn report(self) -> PlayerStartReport {
         PlayerStartReport {
             delay_steps_remaining: self.delay_steps_remaining,
             player: self.player,
@@ -229,14 +235,14 @@ impl PendingPlayerStart {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct PendingActorSoundCommand {
-    steps_remaining: u8,
-    command: SoundCommand,
-    trigger: PendingActorSoundTrigger,
+pub(in crate::actor_game) struct PendingActorSoundCommand {
+    pub(in crate::actor_game) steps_remaining: u8,
+    pub(in crate::actor_game) command: SoundCommand,
+    pub(in crate::actor_game) trigger: PendingActorSoundTrigger,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PendingActorSoundTrigger {
+pub(in crate::actor_game) enum PendingActorSoundTrigger {
     SmartBomb,
     TerrainBlow,
     AstronautRescue,
@@ -244,14 +250,14 @@ enum PendingActorSoundTrigger {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SurvivorBonusStep {
+pub(in crate::actor_game) enum SurvivorBonusStep {
     Waiting,
     Award(u32),
     StartNextWave,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PlayerStartStep {
+pub(in crate::actor_game) enum PlayerStartStep {
     Waiting,
     StartPlayfield,
 }
@@ -394,7 +400,7 @@ impl fmt::Display for ActorDriverScriptsParseError {
 impl std::error::Error for ActorDriverScriptsParseError {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ActorDriverScriptBundleSection {
+pub(in crate::actor_game) enum ActorDriverScriptBundleSection {
     Attract,
     Behavior,
     Wave,
@@ -416,13 +422,13 @@ impl ActorDriverScriptBundleSection {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-struct ParsedActorDriverScriptSections {
-    attract: String,
-    behavior: String,
-    wave: String,
-    saw_attract: bool,
-    saw_behavior: bool,
-    saw_wave: bool,
+pub(in crate::actor_game) struct ParsedActorDriverScriptSections {
+    pub(in crate::actor_game) attract: String,
+    pub(in crate::actor_game) behavior: String,
+    pub(in crate::actor_game) wave: String,
+    pub(in crate::actor_game) saw_attract: bool,
+    pub(in crate::actor_game) saw_behavior: bool,
+    pub(in crate::actor_game) saw_wave: bool,
 }
 
 impl ParsedActorDriverScriptSections {
@@ -504,7 +510,7 @@ impl ParsedActorDriverScriptSections {
     }
 }
 
-fn parse_actor_driver_script_section_header(
+pub(in crate::actor_game) fn parse_actor_driver_script_section_header(
     line_number: usize,
     line: &str,
 ) -> Result<Option<ActorDriverScriptBundleSection>, ActorDriverScriptsParseError> {
@@ -520,7 +526,11 @@ fn parse_actor_driver_script_section_header(
     )?))
 }
 
-fn append_script_line_with_original_number(target: &mut String, line_number: usize, line: &str) {
+pub(in crate::actor_game) fn append_script_line_with_original_number(
+    target: &mut String,
+    line_number: usize,
+    line: &str,
+) {
     let current_line_count = target.lines().count();
     for _ in current_line_count..line_number.saturating_sub(1) {
         target.push('\n');
@@ -540,7 +550,9 @@ pub struct ActorDriverScriptManifest {
     pub current_wave_profile: ActorWaveProfileManifest,
 }
 
-fn actor_gameplay_events_for_report(report: &StepReport) -> Vec<GameEvent> {
+pub(in crate::actor_game) fn actor_gameplay_events_for_report(
+    report: &StepReport,
+) -> Vec<GameEvent> {
     let mut events = Vec::new();
     for command in &report.commands {
         match command {
@@ -595,7 +607,7 @@ fn actor_gameplay_events_for_report(report: &StepReport) -> Vec<GameEvent> {
     events
 }
 
-fn push_unique_game_event(events: &mut Vec<GameEvent>, event: GameEvent) {
+pub(in crate::actor_game) fn push_unique_game_event(events: &mut Vec<GameEvent>, event: GameEvent) {
     if !events.contains(&event) {
         events.push(event);
     }

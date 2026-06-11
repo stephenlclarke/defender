@@ -1,3 +1,5 @@
+use super::*;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorWaveProfile {
     pub wave: u16,
@@ -217,10 +219,10 @@ pub struct ActorWaveProfileManifest {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorWaveScript {
-    name: String,
-    waves: Vec<ActorWaveProfile>,
-    behavior_presets: Vec<ActorWaveBehaviorPresetManifest>,
-    spawn_behavior_presets: Vec<ActorWaveSpawnBehaviorPresetManifest>,
+    pub(in crate::actor_game) name: String,
+    pub(in crate::actor_game) waves: Vec<ActorWaveProfile>,
+    pub(in crate::actor_game) behavior_presets: Vec<ActorWaveBehaviorPresetManifest>,
+    pub(in crate::actor_game) spawn_behavior_presets: Vec<ActorWaveSpawnBehaviorPresetManifest>,
 }
 
 impl ActorWaveScript {
@@ -400,12 +402,13 @@ impl fmt::Display for ActorWaveScriptParseError {
 impl std::error::Error for ActorWaveScriptParseError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ParsedActorWaveScript {
-    name: String,
-    waves: Vec<ParsedActorWaveProfile>,
-    behavior_presets: BTreeMap<String, Vec<ParsedBehaviorPresetUpdate>>,
-    spawn_behavior_presets: BTreeMap<String, Vec<ParsedSpawnBehaviorPresetUpdate>>,
-    base_behavior: ActorBehaviorScript,
+pub(in crate::actor_game) struct ParsedActorWaveScript {
+    pub(in crate::actor_game) name: String,
+    pub(in crate::actor_game) waves: Vec<ParsedActorWaveProfile>,
+    pub(in crate::actor_game) behavior_presets: BTreeMap<String, Vec<ParsedBehaviorPresetUpdate>>,
+    pub(in crate::actor_game) spawn_behavior_presets:
+        BTreeMap<String, Vec<ParsedSpawnBehaviorPresetUpdate>>,
+    pub(in crate::actor_game) base_behavior: ActorBehaviorScript,
 }
 
 impl ParsedActorWaveScript {
@@ -986,40 +989,40 @@ impl ParsedActorWaveScript {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ParsedBehaviorPresetUpdate {
-    line_number: usize,
-    line: String,
+pub(in crate::actor_game) struct ParsedBehaviorPresetUpdate {
+    pub(in crate::actor_game) line_number: usize,
+    pub(in crate::actor_game) line: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ParsedSpawnBehaviorPresetUpdate {
-    line_number: usize,
-    field: String,
-    values: Vec<String>,
+pub(in crate::actor_game) struct ParsedSpawnBehaviorPresetUpdate {
+    pub(in crate::actor_game) line_number: usize,
+    pub(in crate::actor_game) field: String,
+    pub(in crate::actor_game) values: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy)]
-struct ParsedWaveSpawnBehaviorUpdate<'a> {
-    kind: ActorKind,
-    spawn_index: usize,
-    field: &'a str,
-    values: &'a [&'a str],
+pub(in crate::actor_game) struct ParsedWaveSpawnBehaviorUpdate<'a> {
+    pub(in crate::actor_game) kind: ActorKind,
+    pub(in crate::actor_game) spawn_index: usize,
+    pub(in crate::actor_game) field: &'a str,
+    pub(in crate::actor_game) values: &'a [&'a str],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ParsedActorWaveProfile {
-    wave: u16,
-    wave_tuning: Option<ActorWaveTuning>,
-    behavior_script: ActorBehaviorScript,
-    lander_spawns: Vec<ActorLanderSpawn>,
-    bomber_spawns: Vec<ActorBomberSpawn>,
-    pod_spawns: Vec<ActorPodSpawn>,
-    mutant_spawns: Vec<ActorMutantSpawn>,
-    swarmer_spawns: Vec<ActorSwarmerSpawn>,
-    baiter_spawns: Vec<ActorBaiterSpawn>,
-    human_spawns: Vec<ActorHumanSpawn>,
-    enemy_reserve: EnemyReserveSnapshot,
-    spawn_behavior_profiles: Vec<ActorWaveSpawnBehaviorProfile>,
+pub(in crate::actor_game) struct ParsedActorWaveProfile {
+    pub(in crate::actor_game) wave: u16,
+    pub(in crate::actor_game) wave_tuning: Option<ActorWaveTuning>,
+    pub(in crate::actor_game) behavior_script: ActorBehaviorScript,
+    pub(in crate::actor_game) lander_spawns: Vec<ActorLanderSpawn>,
+    pub(in crate::actor_game) bomber_spawns: Vec<ActorBomberSpawn>,
+    pub(in crate::actor_game) pod_spawns: Vec<ActorPodSpawn>,
+    pub(in crate::actor_game) mutant_spawns: Vec<ActorMutantSpawn>,
+    pub(in crate::actor_game) swarmer_spawns: Vec<ActorSwarmerSpawn>,
+    pub(in crate::actor_game) baiter_spawns: Vec<ActorBaiterSpawn>,
+    pub(in crate::actor_game) human_spawns: Vec<ActorHumanSpawn>,
+    pub(in crate::actor_game) enemy_reserve: EnemyReserveSnapshot,
+    pub(in crate::actor_game) spawn_behavior_profiles: Vec<ActorWaveSpawnBehaviorProfile>,
 }
 
 impl ParsedActorWaveProfile {
@@ -1108,7 +1111,7 @@ impl ParsedActorWaveProfile {
     }
 }
 
-fn apply_behavior_preset_updates(
+pub(in crate::actor_game) fn apply_behavior_preset_updates(
     updates: &[ParsedBehaviorPresetUpdate],
     behavior_script: &mut ActorBehaviorScript,
 ) -> Result<(), ActorWaveScriptParseError> {
@@ -1119,7 +1122,7 @@ fn apply_behavior_preset_updates(
     Ok(())
 }
 
-fn apply_spawn_behavior_preset_updates(
+pub(in crate::actor_game) fn apply_spawn_behavior_preset_updates(
     updates: &[ParsedSpawnBehaviorPresetUpdate],
     behavior_profile: &mut ActorBehaviorProfile,
 ) -> Result<(), ActorWaveScriptParseError> {
@@ -1131,7 +1134,7 @@ fn apply_spawn_behavior_preset_updates(
     Ok(())
 }
 
-fn parse_wave_point<'a>(
+pub(in crate::actor_game) fn parse_wave_point<'a>(
     line_number: usize,
     parts: &mut impl Iterator<Item = &'a str>,
 ) -> Result<Point, ActorWaveScriptParseError> {
@@ -1140,7 +1143,7 @@ fn parse_wave_point<'a>(
     Ok(Point::new(x, y))
 }
 
-fn parse_wave_human_mode<'a>(
+pub(in crate::actor_game) fn parse_wave_human_mode<'a>(
     line_number: usize,
     mut parts: impl Iterator<Item = &'a str>,
 ) -> Result<HumanMode, ActorWaveScriptParseError> {
@@ -1169,7 +1172,7 @@ fn parse_wave_human_mode<'a>(
     }
 }
 
-fn parse_wave_behavior_preset_name(
+pub(in crate::actor_game) fn parse_wave_behavior_preset_name(
     line_number: usize,
     token: Option<&str>,
 ) -> Result<String, ActorWaveScriptParseError> {
@@ -1186,7 +1189,7 @@ fn parse_wave_behavior_preset_name(
     Ok(name)
 }
 
-fn parse_wave_tuning_profile_updates<'a>(
+pub(in crate::actor_game) fn parse_wave_tuning_profile_updates<'a>(
     line_number: usize,
     wave_tuning: &mut ActorWaveTuning,
     mut parts: impl Iterator<Item = &'a str>,
@@ -1203,7 +1206,7 @@ fn parse_wave_tuning_profile_updates<'a>(
     Ok(())
 }
 
-fn apply_wave_tuning_profile_field(
+pub(in crate::actor_game) fn apply_wave_tuning_profile_field(
     line_number: usize,
     wave_tuning: &mut ActorWaveTuning,
     field: &str,
@@ -1232,8 +1235,7 @@ fn apply_wave_tuning_profile_field(
             wave_tuning.swarmer_shot_time = parse_wave_u32(line_number, Some(value), field)?
         }
         "swarmer_acceleration_mask" => {
-            wave_tuning.swarmer_acceleration_mask =
-                parse_wave_u8(line_number, Some(value), field)?
+            wave_tuning.swarmer_acceleration_mask = parse_wave_u8(line_number, Some(value), field)?
         }
         "baiter_time" | "baiter_delay" => {
             wave_tuning.baiter_delay = parse_wave_u32(line_number, Some(value), field)?
@@ -1269,7 +1271,7 @@ fn apply_wave_tuning_profile_field(
     Ok(())
 }
 
-fn parse_wave_actor_kind(
+pub(in crate::actor_game) fn parse_wave_actor_kind(
     line_number: usize,
     token: Option<&str>,
 ) -> Result<ActorKind, ActorWaveScriptParseError> {
@@ -1279,7 +1281,7 @@ fn parse_wave_actor_kind(
         .map_err(|error| ActorWaveScriptParseError::new(error.line, error.message))
 }
 
-fn parse_wave_usize(
+pub(in crate::actor_game) fn parse_wave_usize(
     line_number: usize,
     token: Option<&str>,
     field: &str,
@@ -1293,7 +1295,7 @@ fn parse_wave_usize(
     })
 }
 
-fn parse_wave_u8(
+pub(in crate::actor_game) fn parse_wave_u8(
     line_number: usize,
     token: Option<&str>,
     field: &str,
@@ -1307,7 +1309,7 @@ fn parse_wave_u8(
     })
 }
 
-fn parse_wave_u16(
+pub(in crate::actor_game) fn parse_wave_u16(
     line_number: usize,
     token: Option<&str>,
     field: &str,
@@ -1321,7 +1323,7 @@ fn parse_wave_u16(
     })
 }
 
-fn parse_wave_u32(
+pub(in crate::actor_game) fn parse_wave_u32(
     line_number: usize,
     token: Option<&str>,
     field: &str,
@@ -1335,7 +1337,7 @@ fn parse_wave_u32(
     })
 }
 
-fn parse_wave_i16(
+pub(in crate::actor_game) fn parse_wave_i16(
     line_number: usize,
     token: Option<&str>,
     field: &str,
@@ -1350,7 +1352,7 @@ fn parse_wave_i16(
     })
 }
 
-fn parse_wave_u64(
+pub(in crate::actor_game) fn parse_wave_u64(
     line_number: usize,
     token: Option<&str>,
     field: &str,
@@ -1360,7 +1362,7 @@ fn parse_wave_u64(
     parse_wave_u64_value(line_number, token, field)
 }
 
-fn parse_wave_u64_value(
+pub(in crate::actor_game) fn parse_wave_u64_value(
     line_number: usize,
     value: &str,
     field: &str,
@@ -1384,7 +1386,7 @@ fn parse_wave_u64_value(
     })
 }
 
-fn parse_wave_i64_value(
+pub(in crate::actor_game) fn parse_wave_i64_value(
     line_number: usize,
     value: &str,
     field: &str,
@@ -1421,7 +1423,7 @@ fn parse_wave_i64_value(
     })
 }
 
-fn reject_extra_wave_fields<'a>(
+pub(in crate::actor_game) fn reject_extra_wave_fields<'a>(
     line_number: usize,
     mut parts: impl Iterator<Item = &'a str>,
 ) -> Result<(), ActorWaveScriptParseError> {

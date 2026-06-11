@@ -1,5 +1,9 @@
-const SPRITE_SHADER_SOURCE: &str = r#"
-struct SceneProjection {
+use std::collections::BTreeSet;
+
+use super::*;
+
+pub(super) const SPRITE_SHADER_SOURCE: &str = r#"
+pub(super) struct SceneProjection {
     scale: vec2<f32>,
     translate: vec2<f32>,
 };
@@ -8,7 +12,7 @@ struct SceneProjection {
 @group(1) @binding(0) var sprite_atlas: texture_2d<f32>;
 @group(1) @binding(1) var sprite_sampler: sampler;
 
-struct SpriteInstance {
+pub(super) struct SpriteInstance {
     @location(0) scene_origin: vec2<f32>,
     @location(1) scene_size: vec2<f32>,
     @location(2) atlas_uv_origin: vec2<f32>,
@@ -16,19 +20,19 @@ struct SpriteInstance {
     @location(4) tint: vec4<f32>,
 };
 
-struct SpriteVertex {
+pub(super) struct SpriteVertex {
     @location(5) unit_position: vec2<f32>,
     @location(6) unit_uv: vec2<f32>,
 };
 
-struct SpriteVertexOut {
+pub(super) struct SpriteVertexOut {
     @builtin(position) position: vec4<f32>,
     @location(0) atlas_uv: vec2<f32>,
     @location(1) tint: vec4<f32>,
 };
 
 @vertex
-fn sprite_vs(instance: SpriteInstance, vertex: SpriteVertex) -> SpriteVertexOut {
+pub(super) fn sprite_vs(instance: SpriteInstance, vertex: SpriteVertex) -> SpriteVertexOut {
     let scene_position = instance.scene_origin + vertex.unit_position * instance.scene_size;
 
     var out: SpriteVertexOut;
@@ -43,7 +47,7 @@ fn sprite_vs(instance: SpriteInstance, vertex: SpriteVertex) -> SpriteVertexOut 
 }
 
 @fragment
-fn sprite_fs(in: SpriteVertexOut) -> @location(0) vec4<f32> {
+pub(super) fn sprite_fs(in: SpriteVertexOut) -> @location(0) vec4<f32> {
     return textureSample(sprite_atlas, sprite_sampler, in.atlas_uv) * in.tint;
 }
 "#;
@@ -128,7 +132,7 @@ pub struct SpritePipelinePlan {
 }
 
 impl SpritePipelinePlan {
-    fn for_settings(settings: GpuRendererSettings) -> Self {
+    pub(super) fn for_settings(settings: GpuRendererSettings) -> Self {
         Self {
             label: "defender.sprite.pipeline",
             shader: SpriteShaderPlan::default(),
@@ -328,11 +332,11 @@ impl SpriteAtlasTextureUpload {
     pub const SAMPLE_COUNT: u32 = 1;
     pub const DEPTH_OR_ARRAY_LAYERS: u32 = 1;
 
-    fn from_atlas(atlas: &TextureAtlas) -> Option<Self> {
+    pub(super) fn from_atlas(atlas: &TextureAtlas) -> Option<Self> {
         if atlas.surface.is_empty() {
             return None;
         }
-        if atlas.pixels.is_empty() || atlas.pixels.len() != atlas.surface.rgba_len()? {
+        if atlas.pixels().is_empty() || atlas.pixels().len() != atlas.surface.rgba_len()? {
             return None;
         }
 
@@ -348,8 +352,8 @@ impl SpriteAtlasTextureUpload {
             depth_or_array_layers: Self::DEPTH_OR_ARRAY_LAYERS,
             bytes_per_row: atlas.surface.width.checked_mul(4)?,
             rows_per_image: atlas.surface.height,
-            byte_len: atlas.pixels.len(),
-            bytes: atlas.pixels.clone(),
+            byte_len: atlas.pixels().len(),
+            bytes: atlas.pixels().to_vec(),
             non_blank: atlas.is_non_blank(),
         })
     }
@@ -398,7 +402,7 @@ impl SpriteResourceBindingPlan {
     pub const BIND_GROUP_COUNT: usize = 2;
     pub const BINDING_ENTRY_COUNT: usize = 3;
 
-    fn from_projection_and_atlas(
+    pub(super) fn from_projection_and_atlas(
         projection: SceneProjectionUniforms,
         atlas: &TextureAtlas,
     ) -> Option<Self> {
@@ -454,7 +458,7 @@ impl SpritePipelineLayoutPlan {
     pub const BINDING_ENTRY_COUNT: usize = SpriteResourceBindingPlan::BINDING_ENTRY_COUNT;
     pub const IMMEDIATE_SIZE: u32 = 0;
 
-    fn from_resource_bindings(bindings: &SpriteResourceBindingPlan) -> Self {
+    pub(super) fn from_resource_bindings(bindings: &SpriteResourceBindingPlan) -> Self {
         Self {
             label: "defender.sprite.pipeline_layout",
             bind_groups: vec![
@@ -497,7 +501,7 @@ impl SpriteRenderPipelineDescriptorPlan {
     pub const VERTEX_BUFFER_COUNT: usize = 2;
     pub const COLOR_TARGET_COUNT: usize = 1;
 
-    fn from_pipeline_and_layout(
+    pub(super) fn from_pipeline_and_layout(
         pipeline: &SpritePipelinePlan,
         layout: &SpritePipelineLayoutPlan,
     ) -> Self {
@@ -578,7 +582,7 @@ impl SpriteRenderPassEncoderPlan {
         SpriteRenderPipelineDescriptorPlan::VERTEX_BUFFER_COUNT;
     pub const SET_INDEX_BUFFER_COMMAND_COUNT: usize = 1;
 
-    fn from_render_pass_layout_and_descriptor(
+    pub(super) fn from_render_pass_layout_and_descriptor(
         render_pass: &SpriteRenderPassPlan,
         layout: &SpritePipelineLayoutPlan,
         descriptor: &SpriteRenderPipelineDescriptorPlan,
@@ -720,7 +724,7 @@ pub struct WgpuFramePlan {
 }
 
 impl WgpuFramePlan {
-    fn from_pass_raster_and_sprite_encoder(
+    pub(super) fn from_pass_raster_and_sprite_encoder(
         pass: &WgpuPassPlan,
         raster_upload: Option<SceneRasterUpload>,
         sprite_encoder: Option<&SpriteRenderPassEncoderPlan>,
@@ -858,7 +862,10 @@ pub struct SpriteDrawCommand {
 }
 
 impl SpriteDrawCommand {
-    fn from_instance_buffer(buffer: &SpriteInstanceBuffer, first_instance: u32) -> Option<Self> {
+    pub(super) fn from_instance_buffer(
+        buffer: &SpriteInstanceBuffer,
+        first_instance: u32,
+    ) -> Option<Self> {
         if buffer.records.is_empty() {
             return None;
         }
@@ -889,7 +896,7 @@ impl SpriteDrawCommand {
     }
 }
 
-fn sprite_draw_commands_from_instance_buffers(
+pub(super) fn sprite_draw_commands_from_instance_buffers(
     buffers: &[SpriteInstanceBuffer],
 ) -> Vec<SpriteDrawCommand> {
     let mut first_instance = 0;
@@ -961,7 +968,7 @@ impl NativeSceneRenderer {
 
     pub fn prepare_for_target(&self, scene: &RenderScene, target: SurfaceSize) -> SceneDrawPlan {
         let mut requested = BTreeSet::new();
-        if scene.raster.is_some() {
+        if scene.raster().is_some() {
             requested.insert(NativeRenderPipeline::TemporaryRaster);
         }
 
@@ -1061,9 +1068,9 @@ impl NativeSceneRenderer {
             ),
             _ => None,
         };
-        let raster_upload = scene.raster.as_ref().map(|raster| SceneRasterUpload {
+        let raster_upload = scene.raster().map(|raster| SceneRasterUpload {
             surface: raster.surface,
-            byte_len: raster.pixels.len(),
+            byte_len: raster.pixels().len(),
             visual_signature: scene.visual_signature,
             non_blank: raster.is_non_blank(),
         });
@@ -1099,7 +1106,7 @@ impl NativeSceneRenderer {
     }
 }
 
-fn push_sprite_instance(
+pub(super) fn push_sprite_instance(
     batches: &mut Vec<SpriteDrawBatch>,
     pipeline: NativeRenderPipeline,
     layer: RenderLayer,
@@ -1120,7 +1127,7 @@ fn push_sprite_instance(
     });
 }
 
-fn pipeline_for_layer(layer: RenderLayer) -> NativeRenderPipeline {
+pub(super) fn pipeline_for_layer(layer: RenderLayer) -> NativeRenderPipeline {
     match layer {
         RenderLayer::Terrain => NativeRenderPipeline::Terrain,
         RenderLayer::Starfield => NativeRenderPipeline::Starfield,

@@ -1,3 +1,5 @@
+use super::*;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorWaveTuning {
     pub landers: u8,
@@ -24,8 +26,8 @@ pub struct ActorWaveTuning {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ActorSubpixels {
-    x: u8,
-    y: u8,
+    pub(in crate::actor_game) x: u8,
+    pub(in crate::actor_game) y: u8,
 }
 
 impl ActorSubpixels {
@@ -49,15 +51,15 @@ mod actor_motion {
     };
 
     #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-    pub(super) struct ActorMotion {
-        x_fraction: u8,
-        y_fraction: u8,
-        x_velocity: u16,
-        y_velocity: u16,
+    pub(in crate::actor_game) struct ActorMotion {
+        pub(in crate::actor_game) x_fraction: u8,
+        pub(in crate::actor_game) y_fraction: u8,
+        pub(in crate::actor_game) x_velocity: u16,
+        pub(in crate::actor_game) y_velocity: u16,
     }
 
     impl ActorMotion {
-        pub(super) const fn new(
+        pub(in crate::actor_game) const fn new(
             x_fraction: u8,
             y_fraction: u8,
             x_velocity: u16,
@@ -71,15 +73,15 @@ mod actor_motion {
             }
         }
 
-        pub(super) const fn stationary(x_fraction: u8, y_fraction: u8) -> Self {
+        pub(in crate::actor_game) const fn stationary(x_fraction: u8, y_fraction: u8) -> Self {
             Self::new(x_fraction, y_fraction, 0, 0)
         }
 
-        pub(super) const fn at_rest() -> Self {
+        pub(in crate::actor_game) const fn at_rest() -> Self {
             Self::new(0, 0, 0, 0)
         }
 
-        pub(super) const fn from_world_words(
+        pub(in crate::actor_game) const fn from_world_words(
             world_x: u16,
             world_y: u16,
             x_velocity: u16,
@@ -93,53 +95,53 @@ mod actor_motion {
             )
         }
 
-        pub(super) const fn subpixels(self) -> ActorSubpixels {
+        pub(in crate::actor_game) const fn subpixels(self) -> ActorSubpixels {
             ActorSubpixels::new(self.x_fraction, self.y_fraction)
         }
 
-        pub(super) const fn x_fraction(self) -> u8 {
+        pub(in crate::actor_game) const fn x_fraction(self) -> u8 {
             self.x_fraction
         }
 
-        pub(super) const fn y_fraction(self) -> u8 {
+        pub(in crate::actor_game) const fn y_fraction(self) -> u8 {
             self.y_fraction
         }
 
-        pub(super) const fn x_velocity(self) -> u16 {
+        pub(in crate::actor_game) const fn x_velocity(self) -> u16 {
             self.x_velocity
         }
 
-        pub(super) const fn y_velocity(self) -> u16 {
+        pub(in crate::actor_game) const fn y_velocity(self) -> u16 {
             self.y_velocity
         }
 
-        pub(super) const fn is_stationary(self) -> bool {
+        pub(in crate::actor_game) const fn is_stationary(self) -> bool {
             self.x_velocity == 0 && self.y_velocity == 0
         }
 
-        pub(super) fn set_x_velocity(&mut self, x_velocity: u16) {
+        pub(in crate::actor_game) fn set_x_velocity(&mut self, x_velocity: u16) {
             self.x_velocity = x_velocity;
         }
 
-        pub(super) fn set_y_velocity(&mut self, y_velocity: u16) {
+        pub(in crate::actor_game) fn set_y_velocity(&mut self, y_velocity: u16) {
             self.y_velocity = y_velocity;
         }
 
-        pub(super) fn set_velocity(&mut self, x_velocity: u16, y_velocity: u16) {
+        pub(in crate::actor_game) fn set_velocity(&mut self, x_velocity: u16, y_velocity: u16) {
             self.x_velocity = x_velocity;
             self.y_velocity = y_velocity;
         }
 
-        pub(super) fn set_subpixels(&mut self, x_fraction: u8, y_fraction: u8) {
+        pub(in crate::actor_game) fn set_subpixels(&mut self, x_fraction: u8, y_fraction: u8) {
             self.x_fraction = x_fraction;
             self.y_fraction = y_fraction;
         }
 
-        pub(super) fn advance(&mut self, position: Point) -> Point {
+        pub(in crate::actor_game) fn advance(&mut self, position: Point) -> Point {
             self.advance_with_x_velocity(position, self.x_velocity)
         }
 
-        pub(super) fn advance_with_x_velocity(
+        pub(in crate::actor_game) fn advance_with_x_velocity(
             &mut self,
             position: Point,
             x_velocity: u16,
@@ -152,13 +154,13 @@ mod actor_motion {
             Point::new(x, y)
         }
 
-        pub(super) fn screen_velocity(self) -> Velocity {
+        pub(in crate::actor_game) fn screen_velocity(self) -> Velocity {
             screen_velocity_from_motion_words(self.x_velocity, self.y_velocity)
         }
     }
 }
 
-use actor_motion::ActorMotion;
+pub(in crate::actor_game) use actor_motion::ActorMotion;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) enum ActorInternalState {
@@ -306,7 +308,7 @@ impl ActorInternalState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct LanderActorState {
-    motion: ActorMotion,
+    pub(in crate::actor_game) motion: ActorMotion,
     pub(crate) shot_timer: u8,
     pub(crate) sleep_ticks: u8,
     pub(crate) animation_frame: SpriteFrameIndex,
@@ -314,7 +316,7 @@ pub(crate) struct LanderActorState {
 }
 
 impl LanderActorState {
-    const fn new(
+    pub(in crate::actor_game) const fn new(
         motion: ActorMotion,
         shot_timer: u8,
         sleep_ticks: u8,
@@ -334,39 +336,39 @@ impl LanderActorState {
         self.motion.subpixels()
     }
 
-    const fn x_fraction(self) -> u8 {
+    pub(in crate::actor_game) const fn x_fraction(self) -> u8 {
         self.motion.x_fraction()
     }
 
-    const fn y_fraction(self) -> u8 {
+    pub(in crate::actor_game) const fn y_fraction(self) -> u8 {
         self.motion.y_fraction()
     }
 
-    const fn x_velocity(self) -> u16 {
+    pub(in crate::actor_game) const fn x_velocity(self) -> u16 {
         self.motion.x_velocity()
     }
 
-    const fn y_velocity(self) -> u16 {
+    pub(in crate::actor_game) const fn y_velocity(self) -> u16 {
         self.motion.y_velocity()
     }
 
-    const fn is_stationary(self) -> bool {
+    pub(in crate::actor_game) const fn is_stationary(self) -> bool {
         self.motion.is_stationary()
     }
 
     #[cfg(test)]
-    fn set_x_velocity(&mut self, x_velocity: u16) {
+    pub(in crate::actor_game) fn set_x_velocity(&mut self, x_velocity: u16) {
         self.motion.set_x_velocity(x_velocity);
     }
 
-    fn advance_motion(&mut self, position: Point) -> Point {
+    pub(in crate::actor_game) fn advance_motion(&mut self, position: Point) -> Point {
         self.motion.advance(position)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct BomberActorState {
-    motion: ActorMotion,
+    pub(in crate::actor_game) motion: ActorMotion,
     pub(crate) animation_frame: SpriteFrameIndex,
     pub(crate) cruise_altitude: i16,
     pub(crate) sleep_ticks: u8,
@@ -374,7 +376,7 @@ pub(crate) struct BomberActorState {
 }
 
 impl BomberActorState {
-    const fn new(
+    pub(in crate::actor_game) const fn new(
         motion: ActorMotion,
         animation_frame: SpriteFrameIndex,
         cruise_altitude: i16,
@@ -394,38 +396,38 @@ impl BomberActorState {
         self.motion.subpixels()
     }
 
-    const fn x_fraction(self) -> u8 {
+    pub(in crate::actor_game) const fn x_fraction(self) -> u8 {
         self.motion.x_fraction()
     }
 
-    const fn y_fraction(self) -> u8 {
+    pub(in crate::actor_game) const fn y_fraction(self) -> u8 {
         self.motion.y_fraction()
     }
 
-    const fn x_velocity(self) -> u16 {
+    pub(in crate::actor_game) const fn x_velocity(self) -> u16 {
         self.motion.x_velocity()
     }
 
-    const fn y_velocity(self) -> u16 {
+    pub(in crate::actor_game) const fn y_velocity(self) -> u16 {
         self.motion.y_velocity()
     }
 
-    fn set_y_velocity(&mut self, y_velocity: u16) {
+    pub(in crate::actor_game) fn set_y_velocity(&mut self, y_velocity: u16) {
         self.motion.set_y_velocity(y_velocity);
     }
 
-    fn advance_motion(&mut self, position: Point) -> Point {
+    pub(in crate::actor_game) fn advance_motion(&mut self, position: Point) -> Point {
         self.motion.advance(position)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PodActorState {
-    motion: ActorMotion,
+    pub(in crate::actor_game) motion: ActorMotion,
 }
 
 impl PodActorState {
-    const fn new(motion: ActorMotion) -> Self {
+    pub(in crate::actor_game) const fn new(motion: ActorMotion) -> Self {
         Self { motion }
     }
 
@@ -433,35 +435,35 @@ impl PodActorState {
         self.motion.subpixels()
     }
 
-    const fn x_velocity(self) -> u16 {
+    pub(in crate::actor_game) const fn x_velocity(self) -> u16 {
         self.motion.x_velocity()
     }
 
-    const fn x_fraction(self) -> u8 {
+    pub(in crate::actor_game) const fn x_fraction(self) -> u8 {
         self.motion.x_fraction()
     }
 
-    const fn y_fraction(self) -> u8 {
+    pub(in crate::actor_game) const fn y_fraction(self) -> u8 {
         self.motion.y_fraction()
     }
 
-    const fn y_velocity(self) -> u16 {
+    pub(in crate::actor_game) const fn y_velocity(self) -> u16 {
         self.motion.y_velocity()
     }
 
     #[cfg(test)]
-    fn set_subpixels(&mut self, x_fraction: u8, y_fraction: u8) {
+    pub(in crate::actor_game) fn set_subpixels(&mut self, x_fraction: u8, y_fraction: u8) {
         self.motion.set_subpixels(x_fraction, y_fraction);
     }
 
-    fn advance_motion(&mut self, position: Point) -> Point {
+    pub(in crate::actor_game) fn advance_motion(&mut self, position: Point) -> Point {
         self.motion.advance(position)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SwarmerActorState {
-    motion: ActorMotion,
+    pub(in crate::actor_game) motion: ActorMotion,
     pub(crate) acceleration: u8,
     pub(crate) sleep_ticks: u8,
     pub(crate) shot_timer: u8,
@@ -469,7 +471,7 @@ pub(crate) struct SwarmerActorState {
 }
 
 impl SwarmerActorState {
-    const fn new(
+    pub(in crate::actor_game) const fn new(
         motion: ActorMotion,
         acceleration: u8,
         sleep_ticks: u8,
@@ -489,49 +491,49 @@ impl SwarmerActorState {
         self.motion.subpixels()
     }
 
-    const fn x_fraction(self) -> u8 {
+    pub(in crate::actor_game) const fn x_fraction(self) -> u8 {
         self.motion.x_fraction()
     }
 
-    const fn y_fraction(self) -> u8 {
+    pub(in crate::actor_game) const fn y_fraction(self) -> u8 {
         self.motion.y_fraction()
     }
 
-    const fn x_velocity(self) -> u16 {
+    pub(in crate::actor_game) const fn x_velocity(self) -> u16 {
         self.motion.x_velocity()
     }
 
-    const fn y_velocity(self) -> u16 {
+    pub(in crate::actor_game) const fn y_velocity(self) -> u16 {
         self.motion.y_velocity()
     }
 
-    fn set_subpixels(&mut self, x_fraction: u8, y_fraction: u8) {
+    pub(in crate::actor_game) fn set_subpixels(&mut self, x_fraction: u8, y_fraction: u8) {
         self.motion.set_subpixels(x_fraction, y_fraction);
     }
 
-    fn set_x_velocity(&mut self, x_velocity: u16) {
+    pub(in crate::actor_game) fn set_x_velocity(&mut self, x_velocity: u16) {
         self.motion.set_x_velocity(x_velocity);
     }
 
-    fn set_y_velocity(&mut self, y_velocity: u16) {
+    pub(in crate::actor_game) fn set_y_velocity(&mut self, y_velocity: u16) {
         self.motion.set_y_velocity(y_velocity);
     }
 
-    fn advance_motion(&mut self, position: Point) -> Point {
+    pub(in crate::actor_game) fn advance_motion(&mut self, position: Point) -> Point {
         self.motion.advance(position)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct BaiterActorState {
-    motion: ActorMotion,
+    pub(in crate::actor_game) motion: ActorMotion,
     pub(crate) shot_timer: u8,
     pub(crate) sleep_ticks: u8,
     pub(crate) animation_frame: SpriteFrameIndex,
 }
 
 impl BaiterActorState {
-    const fn new(
+    pub(in crate::actor_game) const fn new(
         motion: ActorMotion,
         shot_timer: u8,
         sleep_ticks: u8,
@@ -549,43 +551,47 @@ impl BaiterActorState {
         self.motion.subpixels()
     }
 
-    const fn x_fraction(self) -> u8 {
+    pub(in crate::actor_game) const fn x_fraction(self) -> u8 {
         self.motion.x_fraction()
     }
 
-    const fn y_fraction(self) -> u8 {
+    pub(in crate::actor_game) const fn y_fraction(self) -> u8 {
         self.motion.y_fraction()
     }
 
-    const fn x_velocity(self) -> u16 {
+    pub(in crate::actor_game) const fn x_velocity(self) -> u16 {
         self.motion.x_velocity()
     }
 
-    const fn y_velocity(self) -> u16 {
+    pub(in crate::actor_game) const fn y_velocity(self) -> u16 {
         self.motion.y_velocity()
     }
 
-    fn set_x_velocity(&mut self, x_velocity: u16) {
+    pub(in crate::actor_game) fn set_x_velocity(&mut self, x_velocity: u16) {
         self.motion.set_x_velocity(x_velocity);
     }
 
-    fn set_y_velocity(&mut self, y_velocity: u16) {
+    pub(in crate::actor_game) fn set_y_velocity(&mut self, y_velocity: u16) {
         self.motion.set_y_velocity(y_velocity);
     }
 
     #[cfg(test)]
-    fn set_subpixels(&mut self, x_fraction: u8, y_fraction: u8) {
+    pub(in crate::actor_game) fn set_subpixels(&mut self, x_fraction: u8, y_fraction: u8) {
         self.motion.set_subpixels(x_fraction, y_fraction);
     }
 
-    fn advance_motion_with_x_velocity(&mut self, position: Point, x_velocity: u16) -> Point {
+    pub(in crate::actor_game) fn advance_motion_with_x_velocity(
+        &mut self,
+        position: Point,
+        x_velocity: u16,
+    ) -> Point {
         self.motion.advance_with_x_velocity(position, x_velocity)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct MutantActorState {
-    motion: ActorMotion,
+    pub(in crate::actor_game) motion: ActorMotion,
     pub(crate) shot_timer: u8,
     pub(crate) sleep_ticks: u8,
     pub(crate) hop_rng: ActorRngSnapshot,
@@ -594,7 +600,7 @@ pub(crate) struct MutantActorState {
 }
 
 impl MutantActorState {
-    fn from_lander_conversion(
+    pub(in crate::actor_game) fn from_lander_conversion(
         lander_actor_state: LanderActorState,
         profile: ActorWaveTuning,
         hop_rng: ActorRngSnapshot,
@@ -617,52 +623,51 @@ impl MutantActorState {
         self.motion.subpixels()
     }
 
-    const fn x_fraction(self) -> u8 {
+    pub(in crate::actor_game) const fn x_fraction(self) -> u8 {
         self.motion.x_fraction()
     }
 
-    const fn y_fraction(self) -> u8 {
+    pub(in crate::actor_game) const fn y_fraction(self) -> u8 {
         self.motion.y_fraction()
     }
 
-    const fn x_velocity(self) -> u16 {
+    pub(in crate::actor_game) const fn x_velocity(self) -> u16 {
         self.motion.x_velocity()
     }
 
-    const fn y_velocity(self) -> u16 {
+    pub(in crate::actor_game) const fn y_velocity(self) -> u16 {
         self.motion.y_velocity()
     }
 
     #[cfg(test)]
-    fn set_subpixels(&mut self, x_fraction: u8, y_fraction: u8) {
+    pub(in crate::actor_game) fn set_subpixels(&mut self, x_fraction: u8, y_fraction: u8) {
         self.motion.set_subpixels(x_fraction, y_fraction);
     }
 
-    fn set_velocity(&mut self, x_velocity: u16, y_velocity: u16) {
+    pub(in crate::actor_game) fn set_velocity(&mut self, x_velocity: u16, y_velocity: u16) {
         self.motion.set_velocity(x_velocity, y_velocity);
     }
 
-    fn advance_motion(&mut self, position: Point) -> Point {
+    pub(in crate::actor_game) fn advance_motion(&mut self, position: Point) -> Point {
         self.motion.advance(position)
     }
-
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct EnemyProjectileActorState {
-    motion: ActorMotion,
+    pub(in crate::actor_game) motion: ActorMotion,
     pub(crate) lifetime_ticks: u8,
 }
 
 impl EnemyProjectileActorState {
-    const fn new(motion: ActorMotion, lifetime_ticks: u8) -> Self {
+    pub(in crate::actor_game) const fn new(motion: ActorMotion, lifetime_ticks: u8) -> Self {
         Self {
             motion,
             lifetime_ticks,
         }
     }
 
-    fn from_velocity(
+    pub(in crate::actor_game) fn from_velocity(
         x_fraction: u8,
         y_fraction: u8,
         velocity: Velocity,
@@ -700,7 +705,7 @@ impl EnemyProjectileActorState {
     }
 
     #[cfg(test)]
-    fn set_velocity(&mut self, x_velocity: u16, y_velocity: u16) {
+    pub(in crate::actor_game) fn set_velocity(&mut self, x_velocity: u16, y_velocity: u16) {
         self.motion.set_velocity(x_velocity, y_velocity);
     }
 
@@ -708,7 +713,7 @@ impl EnemyProjectileActorState {
         self.motion.set_subpixels(x_fraction, y_fraction);
     }
 
-    fn advance_projectile_motion(&mut self, position: Point) -> Point {
+    pub(in crate::actor_game) fn advance_projectile_motion(&mut self, position: Point) -> Point {
         let (x, x_fraction) =
             step_projectile_axis(position.x, self.x_fraction(), self.x_velocity());
         let (y, y_fraction) =
@@ -716,55 +721,54 @@ impl EnemyProjectileActorState {
         self.set_subpixels(x_fraction, y_fraction);
         Point::new(x, y)
     }
-
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorLanderSpawn {
     pub position: Point,
-    actor_state: Option<LanderActorState>,
-    spawn_visibility: LanderSpawnVisibility,
+    pub(in crate::actor_game) actor_state: Option<LanderActorState>,
+    pub(in crate::actor_game) spawn_visibility: LanderSpawnVisibility,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorBomberSpawn {
     pub position: Point,
-    actor_state: Option<BomberActorState>,
+    pub(in crate::actor_game) actor_state: Option<BomberActorState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorPodSpawn {
     pub position: Point,
-    actor_state: Option<PodActorState>,
+    pub(in crate::actor_game) actor_state: Option<PodActorState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorSwarmerSpawn {
     pub position: Point,
-    actor_state: Option<SwarmerActorState>,
+    pub(in crate::actor_game) actor_state: Option<SwarmerActorState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorBaiterSpawn {
     pub position: Point,
-    actor_state: Option<BaiterActorState>,
+    pub(in crate::actor_game) actor_state: Option<BaiterActorState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActorMutantSpawn {
     pub position: Point,
-    actor_state: Option<MutantActorState>,
+    pub(in crate::actor_game) actor_state: Option<MutantActorState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct HumanActorState {
-    motion: ActorMotion,
+    pub(in crate::actor_game) motion: ActorMotion,
     pub(crate) animation_frame: SpriteFrameIndex,
     pub(crate) target_slot_index: usize,
 }
 
 impl HumanActorState {
-    const fn new(
+    pub(in crate::actor_game) const fn new(
         x_fraction: u8,
         y_fraction: u8,
         animation_frame: SpriteFrameIndex,
@@ -781,15 +785,15 @@ impl HumanActorState {
         self.motion.subpixels()
     }
 
-    const fn x_fraction(self) -> u8 {
+    pub(in crate::actor_game) const fn x_fraction(self) -> u8 {
         self.motion.x_fraction()
     }
 
-    const fn y_fraction(self) -> u8 {
+    pub(in crate::actor_game) const fn y_fraction(self) -> u8 {
         self.motion.y_fraction()
     }
 
-    fn set_subpixels(&mut self, x_fraction: u8, y_fraction: u8) {
+    pub(in crate::actor_game) fn set_subpixels(&mut self, x_fraction: u8, y_fraction: u8) {
         self.motion.set_subpixels(x_fraction, y_fraction);
     }
 }
@@ -798,24 +802,24 @@ impl HumanActorState {
 pub struct ActorHumanSpawn {
     pub position: Point,
     pub mode: HumanMode,
-    actor_state: Option<HumanActorState>,
+    pub(in crate::actor_game) actor_state: Option<HumanActorState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct FirstWaveLanderSpawnRecord {
-    world_x: u16,
-    world_y: u16,
-    x_velocity: u16,
-    y_velocity: u16,
-    shot_timer: u8,
-    sleep_ticks: u8,
-    animation_frame: SpriteFrameIndex,
-    target_human_index: Option<usize>,
+pub(in crate::actor_game) struct FirstWaveLanderSpawnRecord {
+    pub(in crate::actor_game) world_x: u16,
+    pub(in crate::actor_game) world_y: u16,
+    pub(in crate::actor_game) x_velocity: u16,
+    pub(in crate::actor_game) y_velocity: u16,
+    pub(in crate::actor_game) shot_timer: u8,
+    pub(in crate::actor_game) sleep_ticks: u8,
+    pub(in crate::actor_game) animation_frame: SpriteFrameIndex,
+    pub(in crate::actor_game) target_human_index: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct FirstWaveHumanSpawnRecord {
-    world_x: u16,
-    world_y: u16,
-    animation_frame: SpriteFrameIndex,
+pub(in crate::actor_game) struct FirstWaveHumanSpawnRecord {
+    pub(in crate::actor_game) world_x: u16,
+    pub(in crate::actor_game) world_y: u16,
+    pub(in crate::actor_game) animation_frame: SpriteFrameIndex,
 }

@@ -1,22 +1,8 @@
-const OBJECT_ACTIVE_LEFT_MARGIN: u16 = 100 * 32;
-const OBJECT_ACTIVE_WORLD_WIDTH: u16 = 500 * 32;
-const OBJECT_WORLD_TO_SCREEN_SHIFT: u8 = 6;
-const OBJECT_VISIBLE_SCREEN_WIDTH: u16 = 292;
-const OBJECT_EVIDENCE_TABLE_BASE_ADDRESS: u16 = 0xA23C;
-const OBJECT_EVIDENCE_SLOT_STRIDE: u16 = 0x17;
-const OBJECT_EVIDENCE_DEFAULT_TYPE: u8 = 0x00;
-const BOMBER_ANIMATION_FRAME_COUNT: u8 = 4;
-const ENEMY_BOMB_OBJECT_BITMAP_NAME: &str = "BMBP1";
-const ENEMY_BOMB_OBJECT_BITMAP_DESCRIPTOR_ADDRESS: u16 = 0xF95B;
-const ENEMY_BOMB_PRIMARY_IMAGE_ADDRESS: u16 = 0xCCB0;
-const ENEMY_BOMB_ALTERNATE_IMAGE_ADDRESS: u16 = 0xCCB6;
-const ENEMY_BOMB_OBJECT_BITMAP_SIZE: (u8, u8) = (2, 3);
-const BAITER_ANIMATION_FRAME_COUNT: u8 = 3;
-// Clean stores process sleep as steps remaining after the current update.
-// Preserved sleep values of 6/4/1 therefore wake after 5/3/0 clean sleeps.
-const LANDER_ANIMATION_FRAME_COUNT: u8 = 3;
+use crate::{HighScoreInitialsState, RenderScene};
 
-fn baiter_screen_x_velocity(actor_x_velocity: u16) -> u16 {
+use super::*;
+
+pub(super) fn baiter_screen_x_velocity(actor_x_velocity: u16) -> u16 {
     actor_x_velocity.wrapping_shl(2)
 }
 
@@ -108,7 +94,7 @@ impl HighScoreTablesSnapshot {
     };
 }
 
-const EMPTY_HIGH_SCORE_TABLE: [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] = [
+pub(super) const EMPTY_HIGH_SCORE_TABLE: [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] = [
     HighScoreTableEntrySnapshot {
         rank: 1,
         score: 0,
@@ -151,7 +137,7 @@ const EMPTY_HIGH_SCORE_TABLE: [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENT
     },
 ];
 
-const DEFAULT_HIGH_SCORE_TABLE: [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] = [
+pub(super) const DEFAULT_HIGH_SCORE_TABLE: [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] = [
     HighScoreTableEntrySnapshot {
         rank: 1,
         score: 21_270,
@@ -223,9 +209,7 @@ pub enum SoundEvent {
     GameStarted,
     ThrustStarted,
     ThrustStopped,
-    UnmappedSoundCommand {
-        command: crate::SoundCommand,
-    },
+    UnmappedSoundCommand { command: crate::SoundCommand },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

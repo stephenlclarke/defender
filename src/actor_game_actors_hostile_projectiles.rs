@@ -1,12 +1,14 @@
-const BOMBER_BOMB_LIFETIME_RANDOM_MASK: u8 = 0x1F;
-const BOMBER_TIE_SLOT_MASK: u8 = 0x06;
-const BOMBER_TIE_SLOT_SHIFT: u8 = 1;
-const ENEMY_FIREBALL_RANDOM_DELTA_MASK: u8 = 0x1F;
-const ENEMY_FIREBALL_RANDOM_DELTA_CENTER: u8 = 0x10;
-const ENEMY_FIREBALL_VELOCITY_SHIFT: u32 = 2;
-const ENEMY_FIREBALL_PLAYER_VELOCITY_SEED_MIN: u8 = 120;
+use super::*;
 
-fn actor_enemy_projectile_count(prompt: &StepPrompt) -> usize {
+pub(in crate::actor_game) const BOMBER_BOMB_LIFETIME_RANDOM_MASK: u8 = 0x1F;
+pub(in crate::actor_game) const BOMBER_TIE_SLOT_MASK: u8 = 0x06;
+pub(in crate::actor_game) const BOMBER_TIE_SLOT_SHIFT: u8 = 1;
+pub(in crate::actor_game) const ENEMY_FIREBALL_RANDOM_DELTA_MASK: u8 = 0x1F;
+pub(in crate::actor_game) const ENEMY_FIREBALL_RANDOM_DELTA_CENTER: u8 = 0x10;
+pub(in crate::actor_game) const ENEMY_FIREBALL_VELOCITY_SHIFT: u32 = 2;
+pub(in crate::actor_game) const ENEMY_FIREBALL_PLAYER_VELOCITY_SEED_MIN: u8 = 120;
+
+pub(in crate::actor_game) fn actor_enemy_projectile_count(prompt: &StepPrompt) -> usize {
     prompt
         .snapshots
         .iter()
@@ -14,7 +16,7 @@ fn actor_enemy_projectile_count(prompt: &StepPrompt) -> usize {
         .count()
 }
 
-fn actor_bomb_projectile_count(prompt: &StepPrompt) -> usize {
+pub(in crate::actor_game) fn actor_bomb_projectile_count(prompt: &StepPrompt) -> usize {
     prompt
         .snapshots
         .iter()
@@ -22,15 +24,15 @@ fn actor_bomb_projectile_count(prompt: &StepPrompt) -> usize {
         .count()
 }
 
-fn bomber_bomb_lifetime_ticks(actor_rng: ActorRngSnapshot) -> u8 {
+pub(in crate::actor_game) fn bomber_bomb_lifetime_ticks(actor_rng: ActorRngSnapshot) -> u8 {
     (actor_rng.seed & BOMBER_BOMB_LIFETIME_RANDOM_MASK).wrapping_add(1)
 }
 
-fn bomber_tie_selected_slot(seed: u8) -> u8 {
+pub(in crate::actor_game) fn bomber_tie_selected_slot(seed: u8) -> u8 {
     (seed & BOMBER_TIE_SLOT_MASK) >> BOMBER_TIE_SLOT_SHIFT
 }
 
-fn push_enemy_projectile_command(
+pub(in crate::actor_game) fn push_enemy_projectile_command(
     position: Point,
     velocity: Velocity,
     projectile_actor_state: EnemyProjectileActorState,
@@ -45,7 +47,7 @@ fn push_enemy_projectile_command(
     commands.push(GameCommand::PlaySound(sound));
 }
 
-fn enemy_fireball_projectile(
+pub(in crate::actor_game) fn enemy_fireball_projectile(
     position: Point,
     x_fraction: u8,
     y_fraction: u8,

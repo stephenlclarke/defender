@@ -1,18 +1,20 @@
+use super::*;
+
 #[derive(Debug)]
-struct Lander {
-    id: ActorId,
-    position: Point,
-    drift: i16,
-    mode: LanderMode,
-    actor_state: Option<LanderActorState>,
-    spawn_visibility: LanderSpawnVisibility,
+pub(in crate::actor_game) struct Lander {
+    pub(in crate::actor_game) id: ActorId,
+    pub(in crate::actor_game) position: Point,
+    pub(in crate::actor_game) drift: i16,
+    pub(in crate::actor_game) mode: LanderMode,
+    pub(in crate::actor_game) actor_state: Option<LanderActorState>,
+    pub(in crate::actor_game) spawn_visibility: LanderSpawnVisibility,
 }
 
-const LANDER_COLLISION_WIDTH: i16 = 14;
-const LANDER_COLLISION_HEIGHT: i16 = 12;
+pub(in crate::actor_game) const LANDER_COLLISION_WIDTH: i16 = 14;
+pub(in crate::actor_game) const LANDER_COLLISION_HEIGHT: i16 = 12;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum LanderMode {
+pub(in crate::actor_game) enum LanderMode {
     Seeking,
     Carrying {
         human_id: ActorId,
@@ -21,26 +23,24 @@ enum LanderMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum LanderSpawnVisibility {
+pub(in crate::actor_game) enum LanderSpawnVisibility {
     Normal,
     VisibleFirstWaveRefill,
     HiddenFirstWaveRefill,
 }
 
 impl Lander {
-    fn new(id: ActorId, position: Point) -> Self {
+    pub(in crate::actor_game) fn new(id: ActorId, position: Point) -> Self {
         Self::from_spawn(id, ActorLanderSpawn::new(position))
     }
 
-    fn from_spawn(id: ActorId, spawn: ActorLanderSpawn) -> Self {
+    pub(in crate::actor_game) fn from_spawn(id: ActorId, spawn: ActorLanderSpawn) -> Self {
         Self {
             id,
             position: spawn.position,
             drift: spawn
                 .actor_state
-                .map(|actor_state| {
-                    lander_drift_from_motion_word(actor_state.x_velocity())
-                })
+                .map(|actor_state| lander_drift_from_motion_word(actor_state.x_velocity()))
                 .unwrap_or(-1),
             mode: LanderMode::Seeking,
             spawn_visibility: spawn.spawn_visibility,
@@ -355,18 +355,22 @@ impl Lander {
     }
 }
 
-const fn lander_drift_from_motion_word(x_velocity: u16) -> i16 {
+pub(in crate::actor_game) const fn lander_drift_from_motion_word(x_velocity: u16) -> i16 {
     drift_from_motion_word(x_velocity)
 }
 
-fn clamped_lander_fire_timer_reset(behavior: ActorBehaviorProfile) -> u8 {
+pub(in crate::actor_game) fn clamped_lander_fire_timer_reset(behavior: ActorBehaviorProfile) -> u8 {
     let clamped = behavior
         .lander_fire_period_steps
         .max(1)
         .min(u64::from(u8::MAX));
     u8::try_from(clamped).unwrap_or(u8::MAX)
 }
-fn pickup_distance(lander: Point, human: Point, behavior: ActorBehaviorProfile) -> bool {
+pub(in crate::actor_game) fn pickup_distance(
+    lander: Point,
+    human: Point,
+    behavior: ActorBehaviorProfile,
+) -> bool {
     (lander.x - human.x).abs() <= behavior.lander_pickup_radius_x
         && (lander.y - human.y).abs() <= behavior.lander_pickup_radius_y
 }
