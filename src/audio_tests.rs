@@ -11,7 +11,7 @@ mod tests {
             sound_actions_for_event,
         },
         game::{
-            Direction, GameEvents, GameFrame, GamePhase, GameState, PlayerSnapshot, ScoreSnapshot,
+            Direction, GameEvents, GameStepSnapshot, GamePhase, GameState, PlayerSnapshot, ScoreSnapshot,
             SoundEvent, WorldSnapshot, WorldVector,
         },
         renderer::{RenderScene, SurfaceSize},
@@ -52,10 +52,10 @@ mod tests {
         }
     }
 
-    fn game_frame_with_sounds(frame: u64, sounds: Vec<SoundEvent>) -> GameFrame {
-        GameFrame {
+    fn game_step_with_sounds(step: u64, sounds: Vec<SoundEvent>) -> GameStepSnapshot {
+        GameStepSnapshot {
             state: GameState {
-                frame,
+                step,
                 phase: GamePhase::Attract,
                 credits: 0,
                 current_player: 1,
@@ -77,7 +77,7 @@ mod tests {
                     next_bonus: 10_000,
                 },
                 attract: crate::AttractPresentationSnapshot::for_page_step(
-                    u16::try_from(frame).unwrap_or(u16::MAX),
+                    u16::try_from(step).unwrap_or(u16::MAX),
                 ),
                 post_game_playfield: None,
                 high_score_initials: crate::systems::HighScoreInitialsState::EMPTY,
@@ -88,7 +88,7 @@ mod tests {
                 world: WorldSnapshot::default(),
             },
             events: GameEvents::new(Vec::new(), sounds),
-            scene: RenderScene::empty(frame, SurfaceSize::new(292, 240)),
+            scene: RenderScene::empty(step, SurfaceSize::new(292, 240)),
         }
     }
 
@@ -177,7 +177,7 @@ mod tests {
     }
 
     #[test]
-    fn offline_timeline_renderer_places_events_on_frame_boundaries() {
+    fn offline_timeline_renderer_places_events_on_step_boundaries() {
         let samples = render_sound_event_timeline_to_samples(
             &[(1, vec![SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xE8) }])],
             2,
@@ -288,12 +288,12 @@ mod tests {
     }
 
     #[test]
-    fn live_audio_event_batch_uses_game_frame_sound_surface() {
-        let frame =
-            game_frame_with_sounds(42, vec![SoundEvent::CreditAdded, SoundEvent::GameStarted]);
-        let batch = LiveAudioEventBatch::from_game_frame(&frame).expect("sound event batch");
+    fn live_audio_event_batch_uses_game_step_sound_surface() {
+        let step_snapshot =
+            game_step_with_sounds(42, vec![SoundEvent::CreditAdded, SoundEvent::GameStarted]);
+        let batch = LiveAudioEventBatch::from_game_step(&step_snapshot).expect("sound event batch");
 
-        assert_eq!(batch.frame, 42);
+        assert_eq!(batch.step, 42);
         assert_eq!(
             batch.events().collect::<Vec<_>>(),
             vec![SoundEvent::CreditAdded, SoundEvent::GameStarted]
@@ -302,10 +302,10 @@ mod tests {
     }
 
     #[test]
-    fn live_audio_event_batch_ignores_silent_frames() {
-        let frame = game_frame_with_sounds(1, Vec::new());
+    fn live_audio_event_batch_ignores_silent_steps() {
+        let step_snapshot = game_step_with_sounds(1, Vec::new());
 
-        assert_eq!(LiveAudioEventBatch::from_game_frame(&frame), None);
+        assert_eq!(LiveAudioEventBatch::from_game_step(&step_snapshot), None);
     }
 
     #[test]
@@ -324,12 +324,12 @@ mod tests {
 
         let recorded = recorded.lock().expect("recorded audio batches");
         assert_eq!(recorded.len(), 2);
-        assert_eq!(recorded[0].frame, 10);
+        assert_eq!(recorded[0].step, 10);
         assert_eq!(
             recorded[0].events().collect::<Vec<_>>(),
             vec![SoundEvent::CreditAdded]
         );
-        assert_eq!(recorded[1].frame, 11);
+        assert_eq!(recorded[1].step, 11);
         assert_eq!(
             recorded[1].events().collect::<Vec<_>>(),
             vec![SoundEvent::GameStarted]

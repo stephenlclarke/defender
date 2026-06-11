@@ -1243,7 +1243,7 @@
 
     fn step_until_final_game_over_sleep_returns_to_attract(
         runtime: &mut ActorRuntimeAdapter,
-    ) -> ActorFrame {
+    ) -> ActorStepSnapshot {
         for expected_sleep in (1..FINAL_GAME_OVER_DELAY_STEPS).rev() {
             let waiting = runtime.step(GameInput::NONE);
             assert_eq!(waiting.report.phase, Phase::GameOver);
@@ -1274,7 +1274,7 @@
     fn step_until_player_switch_completes(
         runtime: &mut ActorRuntimeAdapter,
         to_player: u8,
-    ) -> ActorFrame {
+    ) -> ActorStepSnapshot {
         let from_player = if to_player == 1 { 2 } else { 1 };
         for expected_sleep in (1..PLAYER_SWITCH_DELAY_STEPS).rev() {
             let waiting = runtime.step(GameInput::NONE);
@@ -1354,30 +1354,30 @@
     fn step_until_player_start_completes(
         runtime: &mut ActorRuntimeAdapter,
         player: u8,
-    ) -> ActorFrame {
+    ) -> ActorStepSnapshot {
         let mut previous_delay = PLAYER_START_PLAYFIELD_DELAY_STEPS.saturating_add(1);
         for _ in 0..=PLAYER_START_PLAYFIELD_DELAY_STEPS {
-            let frame = runtime.step(GameInput::NONE);
-            if let Some(player_start) = frame.report.player_start {
+            let snapshot = runtime.step(GameInput::NONE);
+            if let Some(player_start) = snapshot.report.player_start {
                 assert_eq!(player_start.player, player);
                 assert!(player_start.delay_steps_remaining < previous_delay);
                 previous_delay = player_start.delay_steps_remaining;
-                assert!(!frame.events.gameplay().contains(&GameEvent::WaveStarted));
-                assert!(frame.state.world.enemies.is_empty());
-                if frame.report.player_count > 1 {
+                assert!(!snapshot.events.gameplay().contains(&GameEvent::WaveStarted));
+                assert!(snapshot.state.world.enemies.is_empty());
+                if snapshot.report.player_count > 1 {
                     assert_message_text(
-                        &frame.report,
+                        &snapshot.report,
                         player_message(player),
                         PLAYER_START_PROMPT_SCREEN_CELL,
                     );
                     assert_no_message_text(
-                        &frame.report,
+                        &snapshot.report,
                         MessageId::GameOver,
                         PLAYER_SWITCH_GAME_OVER_SCREEN_CELL,
                     );
                 } else {
                     assert_no_message_text(
-                        &frame.report,
+                        &snapshot.report,
                         player_message(player),
                         PLAYER_START_PROMPT_SCREEN_CELL,
                     );
@@ -1385,31 +1385,31 @@
                 continue;
             }
 
-            assert_eq!(frame.report.phase, Phase::Playing);
-            assert_eq!(frame.report.current_player, player);
+            assert_eq!(snapshot.report.phase, Phase::Playing);
+            assert_eq!(snapshot.report.current_player, player);
             assert_no_message_text(
-                &frame.report,
+                &snapshot.report,
                 player_message(player),
                 PLAYER_START_PROMPT_SCREEN_CELL,
             );
-            assert_no_message_text(&frame.report, MessageId::GameOver, PLAYER_SWITCH_GAME_OVER_SCREEN_CELL);
-            assert!(frame.events.gameplay().contains(&GameEvent::WaveStarted));
+            assert_no_message_text(&snapshot.report, MessageId::GameOver, PLAYER_SWITCH_GAME_OVER_SCREEN_CELL);
+            assert!(snapshot.events.gameplay().contains(&GameEvent::WaveStarted));
             assert_eq!(
-                frame.events.sounds(),
+                snapshot.events.sounds(),
                 &[SoundEvent::UnmappedSoundCommand { command: crate::SoundCommand::new(0xEA) }]
             );
-            assert_eq!(frame.report.sounds, [SoundCue::PlayerAppear]);
-            return frame;
+            assert_eq!(snapshot.report.sounds, [SoundCue::PlayerAppear]);
+            return snapshot;
         }
 
         panic!("player {player} start should complete after arcade delay");
     }
 
-    fn step_until_smart_bomb_detonates(runtime: &mut ActorRuntimeAdapter) -> ActorFrame {
+    fn step_until_smart_bomb_detonates(runtime: &mut ActorRuntimeAdapter) -> ActorStepSnapshot {
         for _ in 0..=SMART_BOMB_DETONATION_DELAY_STEPS {
-            let frame = runtime.step(GameInput::NONE);
-            if frame.report.smart_bomb_flash_steps_remaining == SMART_BOMB_FLASH_STEPS {
-                return frame;
+            let snapshot = runtime.step(GameInput::NONE);
+            if snapshot.report.smart_bomb_flash_steps_remaining == SMART_BOMB_FLASH_STEPS {
+                return snapshot;
             }
         }
 
@@ -1427,9 +1427,9 @@
         TERRAIN_BLOW_START_SOUND_STEPS
             .iter()
             .copied()
-            .map(|frame| {
+            .map(|snapshot| {
                 (
-                    frame,
+                    snapshot,
                     vec![SoundCue::SoundBoardCommand(SMART_BOMB_SOUND_COMMAND)],
                 )
             })

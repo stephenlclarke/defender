@@ -197,16 +197,16 @@
         assert_eq!(wave_lander.lander_drift_speed, 3);
 
         let mut runtime = ActorRuntimeAdapter::with_scripts(scripts);
-        let frame = runtime.step(GameInput::NONE);
+        let snapshot = runtime.step(GameInput::NONE);
 
         assert_eq!(
             runtime.driver().script_manifest().wave_script,
             manifest.wave_script
         );
-        assert!(frame.report.draws.iter().any(|draw| {
+        assert!(snapshot.report.draws.iter().any(|draw| {
             draw.text.as_deref() == Some("RUNTIME SCRIPT") && draw.position == Point::new(12, 20)
         }));
-        assert_eq!(frame.state.phase, GamePhase::Attract);
+        assert_eq!(snapshot.state.phase, GamePhase::Attract);
     }
 
     #[test]

@@ -11,6 +11,10 @@ const BOMBER_PLAYER_TRACKING_FAR_PIXELS: i16 = 0x20;
 const BOMBER_PLAYER_TRACKING_NEAR_PIXELS: i16 = 0x10;
 const MINI_SWARMER_RANDOM_STEP_MASK: u8 = 0x1F;
 const MINI_SWARMER_RANDOM_STEP_CENTER: u8 = 0x10;
+const BAITER_COLLISION_WIDTH: i16 = 12;
+const BAITER_COLLISION_HEIGHT: i16 = 4;
+const MOTION_WORD_SHIFT_LIMIT: u8 = 15;
+const MOTION_SEED_STEP_MULTIPLIER: u8 = 17;
 const MINI_SWARMER_DAMPING_SHIFT_STEPS: u8 = 2;
 
 #[derive(Debug)]
@@ -676,7 +680,11 @@ impl Baiter {
     }
 
     fn bounds(&self) -> Rect {
-        Rect::from_center(self.position, 12, 4)
+        Rect::from_center(
+            self.position,
+            BAITER_COLLISION_WIDTH,
+            BAITER_COLLISION_HEIGHT,
+        )
     }
 
     fn advance_actor_motion(
@@ -954,7 +962,7 @@ fn update_baiter_velocity(
 }
 
 fn actor_arithmetic_shift_right_word(value: u16, shift: u8) -> u16 {
-    ((value as i16) >> shift.min(15)) as u16
+    ((value as i16) >> shift.min(MOTION_WORD_SHIFT_LIMIT)) as u16
 }
 
 fn motion_velocity_word(value: i16) -> u16 {
@@ -962,7 +970,9 @@ fn motion_velocity_word(value: i16) -> u16 {
 }
 
 fn motion_seed(step: u64, id: ActorId) -> u8 {
-    (step as u8).wrapping_mul(17).wrapping_add(id.value() as u8)
+    (step as u8)
+        .wrapping_mul(MOTION_SEED_STEP_MULTIPLIER)
+        .wrapping_add(id.value() as u8)
 }
 
 fn mini_swarmer_seek_velocity(x_velocity_magnitude: u8, player_x: i16, swarmer_x: i16) -> u16 {

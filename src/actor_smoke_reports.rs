@@ -4,7 +4,7 @@ use anyhow::bail;
 
 use crate::{
     actor_game::{
-        ActorFrame, ActorKind, ActorRuntimeAdapter, AttractScript, GameInput, Phase, Point,
+        ActorStepSnapshot, ActorKind, ActorRuntimeAdapter, AttractScript, GameInput, Phase, Point,
         SpriteKey, VisualEffect,
     },
     arcade_assets::{MessageId, message_text},
@@ -14,15 +14,15 @@ use crate::{
     },
 };
 
-const ACTOR_SMOKE_FRAMES: u32 = 192;
-const ACTOR_SMOKE_COIN_FRAME: u32 = 1;
-const ACTOR_SMOKE_START_FRAME: u32 = 3;
-const ACTOR_SMOKE_FIRE_FRAME: u32 = 143;
-const ACTOR_SMOKE_THRUST_FRAME: u32 = 145;
-const ACTOR_SMOKE_REVERSE_FRAME: u32 = 147;
-const ACTOR_SMOKE_SMART_BOMB_FRAME: u32 = 149;
-const ACTOR_SMOKE_HYPERSPACE_FRAME: u32 = 151;
-const ACTOR_SMOKE_ALTITUDE_DOWN_FRAME: u32 = 153;
+const ACTOR_SMOKE_STEPS: u32 = 192;
+const ACTOR_SMOKE_COIN_STEP: u32 = 1;
+const ACTOR_SMOKE_START_STEP: u32 = 3;
+const ACTOR_SMOKE_FIRE_STEP: u32 = 143;
+const ACTOR_SMOKE_THRUST_STEP: u32 = 145;
+const ACTOR_SMOKE_REVERSE_STEP: u32 = 147;
+const ACTOR_SMOKE_SMART_BOMB_STEP: u32 = 149;
+const ACTOR_SMOKE_HYPERSPACE_STEP: u32 = 151;
+const ACTOR_SMOKE_ALTITUDE_DOWN_STEP: u32 = 153;
 const POST_GAME_PLAYER_COLLISIONS: u8 = 3;
 const POST_GAME_HALL_STALL_STEPS: u8 = 60;
 const POST_GAME_PLAYER_RESPAWN_SEARCH_STEPS: u16 = 160;
@@ -49,19 +49,19 @@ const REQUIRED_PIPELINES: [&str; 3] = ["sprites", "projectiles", "hud_text"];
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ActorSmokeReport {
-    pub(crate) frames: u32,
-    pub(crate) first_frame_size: Option<(u32, u32)>,
+    pub(crate) steps: u32,
+    pub(crate) initial_surface_size: Option<(u32, u32)>,
     pub(crate) distinct_scene_signatures: usize,
     pub(crate) saw_attract: bool,
     pub(crate) saw_credit: bool,
     pub(crate) saw_playing: bool,
-    pub(crate) attract_frames: u32,
-    pub(crate) credited_frames: u32,
-    pub(crate) playing_frames: u32,
-    pub(crate) actor_event_frames: u32,
-    pub(crate) actor_sound_frames: u32,
+    pub(crate) attract_steps: u32,
+    pub(crate) credited_steps: u32,
+    pub(crate) playing_steps: u32,
+    pub(crate) actor_event_steps: u32,
+    pub(crate) actor_sound_steps: u32,
     pub(crate) actor_sound_events: usize,
-    pub(crate) sprite_frames: u32,
+    pub(crate) sprite_steps: u32,
     pub(crate) sprite_instances: usize,
     pub(crate) sprite_draw_commands: usize,
     pub(crate) object_sprites: usize,
@@ -74,7 +74,7 @@ pub(crate) struct ActorSmokeReport {
     pub(crate) hud_draw_commands: usize,
     pub(crate) overlay_draw_commands: usize,
     pub(crate) covered_pipelines: Vec<String>,
-    pub(crate) wgpu_frame_commands: usize,
+    pub(crate) wgpu_render_commands: usize,
     pub(crate) temporary_raster_commands: usize,
     pub(crate) missing_sprite_regions: usize,
     pub(crate) injected_inputs: Vec<String>,
@@ -83,19 +83,19 @@ pub(crate) struct ActorSmokeReport {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ActorAttractCycleSmokeReport {
-    pub(crate) frames: u64,
+    pub(crate) steps: u64,
     pub(crate) cycle_steps: u64,
     pub(crate) distinct_scene_signatures: usize,
-    pub(crate) attract_frames: u64,
-    pub(crate) playing_frames: u64,
-    pub(crate) game_over_frames: u64,
-    pub(crate) high_score_entry_frames: u64,
-    pub(crate) actor_event_frames: u64,
-    pub(crate) actor_sound_frames: u64,
+    pub(crate) attract_steps: u64,
+    pub(crate) playing_steps: u64,
+    pub(crate) game_over_steps: u64,
+    pub(crate) high_score_entry_steps: u64,
+    pub(crate) actor_event_steps: u64,
+    pub(crate) actor_sound_steps: u64,
     pub(crate) actor_sound_events: usize,
     pub(crate) sprite_instances: usize,
     pub(crate) sprite_draw_commands: usize,
-    pub(crate) wgpu_frame_commands: usize,
+    pub(crate) wgpu_render_commands: usize,
     pub(crate) missing_sprite_regions: usize,
     pub(crate) saw_williams_reveal: bool,
     pub(crate) saw_defender_coalescence: bool,
@@ -108,12 +108,12 @@ pub(crate) struct ActorAttractCycleSmokeReport {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ActorPostGameSmokeReport {
-    pub(crate) frames: u32,
+    pub(crate) steps: u32,
     pub(crate) distinct_scene_signatures: usize,
-    pub(crate) playing_frames: u32,
-    pub(crate) high_score_entry_frames: u32,
-    pub(crate) game_over_frames: u32,
-    pub(crate) attract_frames: u32,
+    pub(crate) playing_steps: u32,
+    pub(crate) high_score_entry_steps: u32,
+    pub(crate) game_over_steps: u32,
+    pub(crate) attract_steps: u32,
     pub(crate) forced_player_collisions: u8,
     pub(crate) final_score: u32,
     pub(crate) final_lives: u8,
@@ -122,11 +122,11 @@ pub(crate) struct ActorPostGameSmokeReport {
     pub(crate) high_score_entry_events: usize,
     pub(crate) high_score_initial_accept_events: usize,
     pub(crate) high_score_submit_events: usize,
-    pub(crate) actor_sound_frames: u32,
+    pub(crate) actor_sound_steps: u32,
     pub(crate) actor_sound_events: usize,
     pub(crate) game_over_sound_events: usize,
     pub(crate) saw_game_over_hall_stall: bool,
-    pub(crate) hall_stall_frames: u32,
+    pub(crate) hall_stall_steps: u32,
     pub(crate) saw_attract_return: bool,
     pub(crate) saw_return_williams_reveal: bool,
     pub(crate) saw_player_sprite: bool,
@@ -135,39 +135,39 @@ pub(crate) struct ActorPostGameSmokeReport {
     pub(crate) saw_hall_of_fame: bool,
     pub(crate) sprite_instances: usize,
     pub(crate) sprite_draw_commands: usize,
-    pub(crate) wgpu_frame_commands: usize,
+    pub(crate) wgpu_render_commands: usize,
     pub(crate) missing_sprite_regions: usize,
     pub(crate) clean_exit: bool,
 }
 
 impl ActorSmokeReport {
     pub(crate) fn validate(&self) -> anyhow::Result<()> {
-        if self.frames == 0 {
-            bail!("actor smoke did not advance any frames");
+        if self.steps == 0 {
+            bail!("actor smoke did not advance any steps");
         }
-        if self.first_frame_size.is_none() {
-            bail!("actor smoke did not record a frame size");
+        if self.initial_surface_size.is_none() {
+            bail!("actor smoke did not record a surface size");
         }
         if self.distinct_scene_signatures < 3 {
             bail!("actor smoke did not produce dynamic scene signatures");
         }
-        if !self.saw_attract || self.attract_frames == 0 {
-            bail!("actor smoke did not observe attract frames");
+        if !self.saw_attract || self.attract_steps == 0 {
+            bail!("actor smoke did not observe attract steps");
         }
-        if !self.saw_credit || self.credited_frames == 0 {
-            bail!("actor smoke did not observe a credited attract frame");
+        if !self.saw_credit || self.credited_steps == 0 {
+            bail!("actor smoke did not observe a credited attract step");
         }
-        if !self.saw_playing || self.playing_frames == 0 {
-            bail!("actor smoke did not observe playing frames");
+        if !self.saw_playing || self.playing_steps == 0 {
+            bail!("actor smoke did not observe playing steps");
         }
-        if self.actor_event_frames == 0 {
+        if self.actor_event_steps == 0 {
             bail!("actor smoke did not produce clean gameplay events");
         }
-        if self.actor_sound_frames == 0 || self.actor_sound_events == 0 {
+        if self.actor_sound_steps == 0 || self.actor_sound_events == 0 {
             bail!("actor smoke did not produce clean sound events");
         }
-        if self.sprite_frames != self.frames {
-            bail!("actor smoke did not produce sprites for every frame");
+        if self.sprite_steps != self.steps {
+            bail!("actor smoke did not produce sprites for every step");
         }
         if self.sprite_instances == 0 || self.sprite_draw_commands == 0 {
             bail!("actor smoke did not produce sprite draw plans");
@@ -210,11 +210,11 @@ impl ActorSmokeReport {
                 bail!("actor smoke did not cover {required} pipeline");
             }
         }
-        if self.wgpu_frame_commands == 0 {
-            bail!("actor smoke did not produce wgpu frame commands");
+        if self.wgpu_render_commands == 0 {
+            bail!("actor smoke did not produce wgpu render commands");
         }
         if self.temporary_raster_commands != 0 {
-            bail!("actor smoke unexpectedly produced temporary raster frame commands");
+            bail!("actor smoke unexpectedly produced temporary raster render commands");
         }
         if self.missing_sprite_regions != 0 {
             bail!("actor smoke had missing sprite atlas regions");
@@ -232,24 +232,24 @@ impl ActorSmokeReport {
 
     pub(crate) fn to_text(&self) -> String {
         let frame_size = self
-            .first_frame_size
+            .initial_surface_size
             .map(|(width, height)| format!("{width}x{height}"))
             .unwrap_or_else(|| String::from("unrecorded"));
         format!(
-            "actor smoke passed\n  frames: {}\n  first_frame_size: {}\n  distinct_scene_signatures: {}\n  saw_attract: {} (frames: {})\n  saw_credit: {} (frames: {})\n  saw_playing: {} (frames: {})\n  actor_event_frames: {}\n  actor_sound_frames: {}\n  actor_sound_events: {}\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  object_sprites: {}\n  projectile_sprites: {}\n  hud_sprites: {}\n  overlay_sprites: {}\n  covered_sprites: {}\n  object_draw_commands: {}\n  projectile_draw_commands: {}\n  hud_draw_commands: {}\n  overlay_draw_commands: {}\n  covered_pipelines: {}\n  wgpu_frame_commands: {}\n  temporary_raster_commands: {}\n  missing_sprite_regions: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
-            self.frames,
+            "actor smoke passed\n  steps: {}\n  initial_surface_size: {}\n  distinct_scene_signatures: {}\n  saw_attract: {} (steps: {})\n  saw_credit: {} (steps: {})\n  saw_playing: {} (steps: {})\n  actor_event_steps: {}\n  actor_sound_steps: {}\n  actor_sound_events: {}\n  sprite_steps: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  object_sprites: {}\n  projectile_sprites: {}\n  hud_sprites: {}\n  overlay_sprites: {}\n  covered_sprites: {}\n  object_draw_commands: {}\n  projectile_draw_commands: {}\n  hud_draw_commands: {}\n  overlay_draw_commands: {}\n  covered_pipelines: {}\n  wgpu_render_commands: {}\n  temporary_raster_commands: {}\n  missing_sprite_regions: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
+            self.steps,
             frame_size,
             self.distinct_scene_signatures,
             self.saw_attract,
-            self.attract_frames,
+            self.attract_steps,
             self.saw_credit,
-            self.credited_frames,
+            self.credited_steps,
             self.saw_playing,
-            self.playing_frames,
-            self.actor_event_frames,
-            self.actor_sound_frames,
+            self.playing_steps,
+            self.actor_event_steps,
+            self.actor_sound_steps,
             self.actor_sound_events,
-            self.sprite_frames,
+            self.sprite_steps,
             self.sprite_instances,
             self.sprite_draw_commands,
             self.object_sprites,
@@ -262,7 +262,7 @@ impl ActorSmokeReport {
             self.hud_draw_commands,
             self.overlay_draw_commands,
             self.covered_pipelines.join(","),
-            self.wgpu_frame_commands,
+            self.wgpu_render_commands,
             self.temporary_raster_commands,
             self.missing_sprite_regions,
             self.injected_inputs.join(","),
@@ -273,42 +273,42 @@ impl ActorSmokeReport {
 
 impl ActorAttractCycleSmokeReport {
     pub(crate) fn validate(&self) -> anyhow::Result<()> {
-        if self.frames == 0 {
+        if self.steps == 0 {
             bail!("actor attract smoke did not advance any steps");
         }
         if self.cycle_steps == 0 {
             bail!("actor attract smoke did not find an attract cycle length");
         }
-        if self.frames < self.cycle_steps {
+        if self.steps < self.cycle_steps {
             bail!(
                 "actor attract smoke only advanced {} step(s), expected at least {}",
-                self.frames,
+                self.steps,
                 self.cycle_steps
             );
         }
-        if self.attract_frames != self.frames {
+        if self.attract_steps != self.steps {
             bail!("actor attract smoke left attract mode");
         }
-        if self.playing_frames != 0
-            || self.game_over_frames != 0
-            || self.high_score_entry_frames != 0
+        if self.playing_steps != 0
+            || self.game_over_steps != 0
+            || self.high_score_entry_steps != 0
         {
             bail!("actor attract smoke observed non-attract phases");
         }
         if self.distinct_scene_signatures < 8 {
             bail!("actor attract smoke did not produce dynamic attract scene signatures");
         }
-        if self.actor_event_frames != 0 {
+        if self.actor_event_steps != 0 {
             bail!("actor attract smoke unexpectedly produced gameplay events");
         }
-        if self.actor_sound_frames != 0 || self.actor_sound_events != 0 {
+        if self.actor_sound_steps != 0 || self.actor_sound_events != 0 {
             bail!("actor attract smoke unexpectedly produced sound events");
         }
         if self.sprite_instances == 0 || self.sprite_draw_commands == 0 {
             bail!("actor attract smoke did not produce sprite draw plans");
         }
-        if self.wgpu_frame_commands == 0 {
-            bail!("actor attract smoke did not produce wgpu frame commands");
+        if self.wgpu_render_commands == 0 {
+            bail!("actor attract smoke did not produce wgpu render commands");
         }
         if self.missing_sprite_regions != 0 {
             bail!("actor attract smoke had missing sprite atlas regions");
@@ -339,20 +339,20 @@ impl ActorAttractCycleSmokeReport {
 
     pub(crate) fn to_text(&self) -> String {
         format!(
-            "actor attract smoke passed\n  frames: {}\n  cycle_steps: {}\n  distinct_scene_signatures: {}\n  attract_frames: {}\n  non_attract_frames: {}\n  actor_event_frames: {}\n  actor_sound_frames: {}\n  actor_sound_events: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  wgpu_frame_commands: {}\n  missing_sprite_regions: {}\n  saw_williams_reveal: {}\n  saw_defender_coalescence: {}\n  saw_hall_of_fame: {}\n  saw_scoring_surface: {}\n  saw_final_scoring_instruction: {}\n  saw_cycle_return: {}\n  clean_exit: {}\n",
-            self.frames,
+            "actor attract smoke passed\n  steps: {}\n  cycle_steps: {}\n  distinct_scene_signatures: {}\n  attract_steps: {}\n  non_attract_steps: {}\n  actor_event_steps: {}\n  actor_sound_steps: {}\n  actor_sound_events: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  wgpu_render_commands: {}\n  missing_sprite_regions: {}\n  saw_williams_reveal: {}\n  saw_defender_coalescence: {}\n  saw_hall_of_fame: {}\n  saw_scoring_surface: {}\n  saw_final_scoring_instruction: {}\n  saw_cycle_return: {}\n  clean_exit: {}\n",
+            self.steps,
             self.cycle_steps,
             self.distinct_scene_signatures,
-            self.attract_frames,
-            self.playing_frames
-                .saturating_add(self.game_over_frames)
-                .saturating_add(self.high_score_entry_frames),
-            self.actor_event_frames,
-            self.actor_sound_frames,
+            self.attract_steps,
+            self.playing_steps
+                .saturating_add(self.game_over_steps)
+                .saturating_add(self.high_score_entry_steps),
+            self.actor_event_steps,
+            self.actor_sound_steps,
             self.actor_sound_events,
             self.sprite_instances,
             self.sprite_draw_commands,
-            self.wgpu_frame_commands,
+            self.wgpu_render_commands,
             self.missing_sprite_regions,
             self.saw_williams_reveal,
             self.saw_defender_coalescence,
@@ -367,22 +367,22 @@ impl ActorAttractCycleSmokeReport {
 
 impl ActorPostGameSmokeReport {
     pub(crate) fn validate(&self) -> anyhow::Result<()> {
-        if self.frames == 0 {
-            bail!("actor post-game smoke did not advance any frames");
+        if self.steps == 0 {
+            bail!("actor post-game smoke did not advance any steps");
         }
         if self.distinct_scene_signatures < 6 {
             bail!("actor post-game smoke did not produce dynamic scene signatures");
         }
-        if self.playing_frames == 0 {
-            bail!("actor post-game smoke did not observe playing frames");
+        if self.playing_steps == 0 {
+            bail!("actor post-game smoke did not observe playing steps");
         }
-        if self.high_score_entry_frames == 0 {
-            bail!("actor post-game smoke did not observe high-score-entry frames");
+        if self.high_score_entry_steps == 0 {
+            bail!("actor post-game smoke did not observe high-score-entry steps");
         }
-        if self.game_over_frames == 0 {
-            bail!("actor post-game smoke did not observe game-over frames");
+        if self.game_over_steps == 0 {
+            bail!("actor post-game smoke did not observe game-over steps");
         }
-        if self.attract_frames == 0 || !self.saw_attract_return {
+        if self.attract_steps == 0 || !self.saw_attract_return {
             bail!("actor post-game smoke did not return to attract");
         }
         if self.forced_player_collisions != POST_GAME_PLAYER_COLLISIONS {
@@ -413,14 +413,14 @@ impl ActorPostGameSmokeReport {
         if self.high_score_submit_events != 1 {
             bail!("actor post-game smoke did not submit one high-score entry");
         }
-        if self.actor_sound_frames == 0 || self.actor_sound_events == 0 {
+        if self.actor_sound_steps == 0 || self.actor_sound_events == 0 {
             bail!("actor post-game smoke did not produce clean sound events");
         }
         if self.game_over_sound_events == 0 {
             bail!("actor post-game smoke did not bridge the game-over sound command");
         }
         if !self.saw_game_over_hall_stall
-            || self.hall_stall_frames != u32::from(POST_GAME_HALL_STALL_STEPS)
+            || self.hall_stall_steps != u32::from(POST_GAME_HALL_STALL_STEPS)
         {
             bail!("actor post-game smoke did not observe the 60-step Hall-of-Fame stall");
         }
@@ -442,8 +442,8 @@ impl ActorPostGameSmokeReport {
         if self.sprite_instances == 0 || self.sprite_draw_commands == 0 {
             bail!("actor post-game smoke did not produce sprite draw plans");
         }
-        if self.wgpu_frame_commands == 0 {
-            bail!("actor post-game smoke did not produce wgpu frame commands");
+        if self.wgpu_render_commands == 0 {
+            bail!("actor post-game smoke did not produce wgpu render commands");
         }
         if self.missing_sprite_regions != 0 {
             bail!("actor post-game smoke had missing sprite atlas regions");
@@ -456,13 +456,13 @@ impl ActorPostGameSmokeReport {
 
     pub(crate) fn to_text(&self) -> String {
         format!(
-            "actor post-game smoke passed\n  frames: {}\n  distinct_scene_signatures: {}\n  playing_frames: {}\n  high_score_entry_frames: {}\n  game_over_frames: {}\n  attract_frames: {}\n  forced_player_collisions: {}\n  final_score: {}\n  final_lives: {}\n  player_destroyed_events: {}\n  game_over_events: {}\n  high_score_entry_events: {}\n  high_score_initial_accept_events: {}\n  high_score_submit_events: {}\n  actor_sound_frames: {}\n  actor_sound_events: {}\n  game_over_sound_events: {}\n  hall_stall_frames: {}\n  saw_attract_return: {}\n  saw_return_williams_reveal: {}\n  saw_player_sprite: {}\n  saw_pod_sprite: {}\n  saw_explosion_pixels: {}\n  saw_hall_of_fame: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  wgpu_frame_commands: {}\n  missing_sprite_regions: {}\n  clean_exit: {}\n",
-            self.frames,
+            "actor post-game smoke passed\n  steps: {}\n  distinct_scene_signatures: {}\n  playing_steps: {}\n  high_score_entry_steps: {}\n  game_over_steps: {}\n  attract_steps: {}\n  forced_player_collisions: {}\n  final_score: {}\n  final_lives: {}\n  player_destroyed_events: {}\n  game_over_events: {}\n  high_score_entry_events: {}\n  high_score_initial_accept_events: {}\n  high_score_submit_events: {}\n  actor_sound_steps: {}\n  actor_sound_events: {}\n  game_over_sound_events: {}\n  hall_stall_steps: {}\n  saw_attract_return: {}\n  saw_return_williams_reveal: {}\n  saw_player_sprite: {}\n  saw_pod_sprite: {}\n  saw_explosion_pixels: {}\n  saw_hall_of_fame: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  wgpu_render_commands: {}\n  missing_sprite_regions: {}\n  clean_exit: {}\n",
+            self.steps,
             self.distinct_scene_signatures,
-            self.playing_frames,
-            self.high_score_entry_frames,
-            self.game_over_frames,
-            self.attract_frames,
+            self.playing_steps,
+            self.high_score_entry_steps,
+            self.game_over_steps,
+            self.attract_steps,
             self.forced_player_collisions,
             self.final_score,
             self.final_lives,
@@ -471,10 +471,10 @@ impl ActorPostGameSmokeReport {
             self.high_score_entry_events,
             self.high_score_initial_accept_events,
             self.high_score_submit_events,
-            self.actor_sound_frames,
+            self.actor_sound_steps,
             self.actor_sound_events,
             self.game_over_sound_events,
-            self.hall_stall_frames,
+            self.hall_stall_steps,
             self.saw_attract_return,
             self.saw_return_williams_reveal,
             self.saw_player_sprite,
@@ -483,7 +483,7 @@ impl ActorPostGameSmokeReport {
             self.saw_hall_of_fame,
             self.sprite_instances,
             self.sprite_draw_commands,
-            self.wgpu_frame_commands,
+            self.wgpu_render_commands,
             self.missing_sprite_regions,
             self.clean_exit
         )
@@ -512,7 +512,7 @@ pub(crate) fn run_post_game() -> anyhow::Result<()> {
 }
 
 pub(crate) fn default_smoke_report() -> anyhow::Result<ActorSmokeReport> {
-    smoke_report(ACTOR_SMOKE_FRAMES)
+    smoke_report(ACTOR_SMOKE_STEPS)
 }
 
 pub(crate) fn default_attract_cycle_report() -> anyhow::Result<ActorAttractCycleSmokeReport> {
@@ -523,17 +523,17 @@ pub(crate) fn default_post_game_report() -> anyhow::Result<ActorPostGameSmokeRep
     post_game_report()
 }
 
-pub(crate) fn smoke_frame_count() -> u32 {
-    ACTOR_SMOKE_FRAMES
+pub(crate) fn smoke_step_count() -> u32 {
+    ACTOR_SMOKE_STEPS
 }
 
-pub(crate) fn smoke_actor_input(frame_index: u32) -> GameInput {
-    smoke_input(frame_index).value
+pub(crate) fn smoke_actor_input(step_index: u32) -> GameInput {
+    smoke_input(step_index).value
 }
 
-pub(crate) fn smoke_report(frames: u32) -> anyhow::Result<ActorSmokeReport> {
-    if frames == 0 {
-        bail!("actor smoke frame count must be positive");
+pub(crate) fn smoke_report(steps: u32) -> anyhow::Result<ActorSmokeReport> {
+    if steps == 0 {
+        bail!("actor smoke step count must be positive");
     }
 
     let mut runtime = ActorRuntimeAdapter::new();
@@ -544,15 +544,15 @@ pub(crate) fn smoke_report(frames: u32) -> anyhow::Result<ActorSmokeReport> {
     };
     let mut signatures = BTreeSet::new();
 
-    for frame_index in 0..frames {
-        let input = smoke_input(frame_index);
+    for step_index in 0..steps {
+        let input = smoke_input(step_index);
         if let Some(label) = input.label {
             record_unique_label(&mut report.injected_inputs, label);
         }
 
-        let frame = runtime.step(input.value);
-        let plan = renderer.prepare(&frame.scene);
-        observe_frame(&mut report, &mut signatures, &frame, &plan);
+        let step = runtime.step(input.value);
+        let plan = renderer.prepare(&step.scene);
+        observe_step(&mut report, &mut signatures, &step, &plan);
     }
 
     report.distinct_scene_signatures = signatures.len();
@@ -560,9 +560,9 @@ pub(crate) fn smoke_report(frames: u32) -> anyhow::Result<ActorSmokeReport> {
     Ok(report)
 }
 
-pub(crate) fn attract_cycle_report(frames: u64) -> anyhow::Result<ActorAttractCycleSmokeReport> {
-    if frames == 0 {
-        bail!("actor attract smoke frame count must be positive");
+pub(crate) fn attract_cycle_report(steps: u64) -> anyhow::Result<ActorAttractCycleSmokeReport> {
+    if steps == 0 {
+        bail!("actor attract smoke step count must be positive");
     }
 
     let cycle_steps = default_attract_cycle_steps()?;
@@ -575,10 +575,10 @@ pub(crate) fn attract_cycle_report(frames: u64) -> anyhow::Result<ActorAttractCy
     };
     let mut signatures = BTreeSet::new();
 
-    for _ in 0..frames {
-        let frame = runtime.step(GameInput::NONE);
-        let plan = renderer.prepare(&frame.scene);
-        observe_attract_cycle_frame(&mut report, &mut signatures, &frame, &plan);
+    for _ in 0..steps {
+        let step = runtime.step(GameInput::NONE);
+        let plan = renderer.prepare(&step.scene);
+        observe_attract_cycle_step(&mut report, &mut signatures, &step, &plan);
     }
 
     report.distinct_scene_signatures = signatures.len();
@@ -650,14 +650,14 @@ pub(crate) fn post_game_report() -> anyhow::Result<ActorPostGameSmokeReport> {
     }
 
     for _ in 0..POST_GAME_ATTRACT_RETURN_SEARCH_STEPS {
-        let frame = step_post_game(
+        let step = step_post_game(
             &mut runtime,
             &renderer,
             &mut report,
             &mut signatures,
             GameInput::NONE,
         );
-        if frame.report.phase == Phase::Attract {
+        if step.report.phase == Phase::Attract {
             report.saw_attract_return = true;
             break;
         }

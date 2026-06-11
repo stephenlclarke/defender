@@ -10,11 +10,11 @@ const FNV1A_64_PRIME: u64 = 0x0000_0100_0000_01B3;
 #[cfg(all(not(test), not(coverage)))]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct OffscreenWgpuSmokeReport {
-    frames: u32,
-    non_blank_frames: u32,
-    distinct_frame_signatures: usize,
-    first_frame_signature: Option<u64>,
-    last_frame_signature: Option<u64>,
+    steps: u32,
+    non_blank_steps: u32,
+    distinct_scene_signatures: usize,
+    first_scene_signature: Option<u64>,
+    last_scene_signature: Option<u64>,
 }
 
 #[cfg(all(not(test), not(coverage)))]
@@ -24,21 +24,21 @@ async fn render_actor_offscreen_smoke() -> anyhow::Result<OffscreenWgpuSmokeRepo
     let mut signatures = BTreeSet::new();
     let mut report = OffscreenWgpuSmokeReport::default();
 
-    for frame_index in 0..crate::actor_smoke::smoke_frame_count() {
-        let frame = runtime.step(crate::actor_smoke::smoke_actor_input(frame_index));
-        let rendered = renderer.render_scene(&frame.scene)?;
-        report.frames = report.frames.saturating_add(1);
+    for step_index in 0..crate::actor_smoke::smoke_step_count() {
+        let step = runtime.step(crate::actor_smoke::smoke_actor_input(step_index));
+        let rendered = renderer.render_scene(&step.scene)?;
+        report.steps = report.steps.saturating_add(1);
         if rendered.non_blank {
-            report.non_blank_frames = report.non_blank_frames.saturating_add(1);
+            report.non_blank_steps = report.non_blank_steps.saturating_add(1);
         }
         report
-            .first_frame_signature
+            .first_scene_signature
             .get_or_insert(rendered.signature);
-        report.last_frame_signature = Some(rendered.signature);
+        report.last_scene_signature = Some(rendered.signature);
         signatures.insert(rendered.signature);
     }
 
-    report.distinct_frame_signatures = signatures.len();
+    report.distinct_scene_signatures = signatures.len();
     Ok(report)
 }
 

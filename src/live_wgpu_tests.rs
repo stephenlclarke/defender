@@ -25,31 +25,31 @@ mod tests {
             render_path: "actor_game",
             fallback_presenter_used: false,
             window_created: false,
-            rendered_frames: 3,
-            first_frame_size: Some((640, 480)),
-            distinct_frame_signatures: 2,
-            saw_non_blank_frame: true,
+            rendered_steps: 3,
+            initial_surface_size: Some((640, 480)),
+            distinct_scene_signatures: 2,
+            saw_non_blank_scene: true,
             saw_attract: true,
             saw_credit: true,
             saw_playing: true,
-            attract_visual_frames: 1,
-            credit_visual_frames: 1,
-            playing_visual_frames: 1,
-            attract_distinct_frame_signatures: 1,
-            credit_distinct_frame_signatures: 1,
-            playing_distinct_frame_signatures: 1,
-            clean_game_frames: 0,
-            actor_frames: 3,
-            sprite_frames: 3,
+            attract_visual_steps: 1,
+            credit_visual_steps: 1,
+            playing_visual_steps: 1,
+            attract_distinct_scene_signatures: 1,
+            credit_distinct_scene_signatures: 1,
+            playing_distinct_scene_signatures: 1,
+            clean_game_steps: 0,
+            actor_steps: 3,
+            sprite_steps: 3,
             sprite_instances: 12,
             sprite_draw_commands: 4,
-            temporary_raster_frames: 0,
+            temporary_raster_steps: 0,
             temporary_raster_commands: 0,
-            offscreen_wgpu_frames: 3,
-            offscreen_non_blank_frames: 3,
-            offscreen_distinct_frame_signatures: 2,
-            offscreen_first_frame_signature: Some(0x1234_ABCD),
-            offscreen_last_frame_signature: Some(0xABCD_1234),
+            offscreen_wgpu_steps: 3,
+            offscreen_non_blank_steps: 3,
+            offscreen_distinct_scene_signatures: 2,
+            offscreen_first_scene_signature: Some(0x1234_ABCD),
+            offscreen_last_scene_signature: Some(0xABCD_1234),
             injected_inputs: vec![String::from("coin"), String::from("start_one")],
             clean_exit: true,
         };
@@ -61,25 +61,25 @@ mod tests {
                 "  render_path: actor_game\n",
                 "  fallback_presenter_used: false\n",
                 "  window_created: false\n",
-                "  rendered_frames: 3\n",
-                "  first_frame_size: 640x480\n",
-                "  distinct_frame_signatures: 2\n",
-                "  saw_non_blank_frame: true\n",
-                "  saw_attract: true (visual_frames: 1, visual_signatures: 1)\n",
-                "  saw_credit: true (visual_frames: 1, visual_signatures: 1)\n",
-                "  saw_playing: true (visual_frames: 1, visual_signatures: 1)\n",
-                "  clean_game_frames: 0\n",
-                "  actor_frames: 3\n",
-                "  sprite_frames: 3\n",
+                "  rendered_steps: 3\n",
+                "  initial_surface_size: 640x480\n",
+                "  distinct_scene_signatures: 2\n",
+                "  saw_non_blank_scene: true\n",
+                "  saw_attract: true (visual_steps: 1, visual_signatures: 1)\n",
+                "  saw_credit: true (visual_steps: 1, visual_signatures: 1)\n",
+                "  saw_playing: true (visual_steps: 1, visual_signatures: 1)\n",
+                "  clean_game_steps: 0\n",
+                "  actor_steps: 3\n",
+                "  sprite_steps: 3\n",
                 "  sprite_instances: 12\n",
                 "  sprite_draw_commands: 4\n",
-                "  temporary_raster_frames: 0\n",
+                "  temporary_raster_steps: 0\n",
                 "  temporary_raster_commands: 0\n",
-                "  offscreen_wgpu_frames: 3\n",
-                "  offscreen_non_blank_frames: 3\n",
-                "  offscreen_distinct_frame_signatures: 2\n",
-                "  offscreen_first_frame_signature: 000000001234abcd\n",
-                "  offscreen_last_frame_signature: 00000000abcd1234\n",
+                "  offscreen_wgpu_steps: 3\n",
+                "  offscreen_non_blank_steps: 3\n",
+                "  offscreen_distinct_scene_signatures: 2\n",
+                "  offscreen_first_scene_signature: 000000001234abcd\n",
+                "  offscreen_last_scene_signature: 00000000abcd1234\n",
                 "  injected_inputs: coin,start_one\n",
                 "  clean_exit: true\n",
             )
@@ -93,11 +93,11 @@ mod tests {
         assert_eq!(report.render_path, "actor_game");
         assert!(!report.fallback_presenter_used);
         assert!(!report.window_created);
-        assert_eq!(report.clean_game_frames, 0);
-        assert_eq!(report.actor_frames, report.rendered_frames);
-        assert_eq!(report.temporary_raster_frames, 0);
+        assert_eq!(report.clean_game_steps, 0);
+        assert_eq!(report.actor_steps, report.rendered_steps);
+        assert_eq!(report.temporary_raster_steps, 0);
         assert_eq!(report.temporary_raster_commands, 0);
-        assert!(report.sprite_frames > 0);
+        assert!(report.sprite_steps > 0);
         assert!(report.sprite_instances > 0);
         assert!(report.sprite_draw_commands > 0);
         assert!(report.saw_attract);
@@ -112,11 +112,11 @@ mod tests {
         assert_eq!(report.render_path, "actor_game");
         assert!(!report.fallback_presenter_used);
         assert!(!report.window_created);
-        assert_eq!(report.clean_game_frames, 0);
-        assert_eq!(report.actor_frames, report.rendered_frames);
-        assert_eq!(report.temporary_raster_frames, 0);
+        assert_eq!(report.clean_game_steps, 0);
+        assert_eq!(report.actor_steps, report.rendered_steps);
+        assert_eq!(report.temporary_raster_steps, 0);
         assert_eq!(report.temporary_raster_commands, 0);
-        assert!(report.sprite_frames > 0);
+        assert!(report.sprite_steps > 0);
         assert!(report.sprite_instances > 0);
         assert!(report.sprite_draw_commands > 0);
         assert!(report.saw_attract);
@@ -202,13 +202,13 @@ mod tests {
 
         let mut runtime = actor_runtime_from_script_path(Some(&path))
             .expect("actor script path should build a runtime");
-        let frame = runtime.step(crate::actor_game::GameInput::NONE);
+        let snapshot = runtime.step(crate::actor_game::GameInput::NONE);
 
         assert_eq!(
             runtime.driver().script_manifest().wave_script.name,
             "live script waves"
         );
-        assert!(frame.report.draws.iter().any(|draw| {
+        assert!(snapshot.report.draws.iter().any(|draw| {
             draw.text.as_deref() == Some("LIVE SCRIPT")
                 && draw.position == crate::actor_game::Point::new(12, 20)
         }));
@@ -271,8 +271,8 @@ mod tests {
             .expect("example script should declare a checked attract cycle");
         assert_eq!(attract_cycle.cycle_steps, 96);
         assert_eq!(attract_cycle.sampled_steps, 96);
-        assert_eq!(attract_cycle.attract_frames, 96);
-        assert_eq!(attract_cycle.non_attract_frames, 0);
+        assert_eq!(attract_cycle.attract_steps, 96);
+        assert_eq!(attract_cycle.non_attract_steps, 0);
         assert_eq!(attract_cycle.draw_commands, 193);
         assert_eq!(attract_cycle.scene_sprites, 22385);
         assert!(attract_cycle.saw_williams_reveal);
@@ -285,8 +285,8 @@ mod tests {
         assert_eq!(report.behavior_kind_profiles, 2);
         assert_eq!(report.behavior_actor_profiles, 0);
         assert_eq!(report.wave_profiles, 1);
-        assert_eq!(report.first_frame_phase, "Attract");
-        assert_eq!(report.first_frame_draws, 1);
+        assert_eq!(report.initial_step_phase, "Attract");
+        assert_eq!(report.initial_step_draws, 1);
         assert_eq!(report.first_playing_wave, 1);
         assert_eq!(report.first_playing_wave_size, 5);
         assert_eq!(report.first_playing_enemy_landers, 15);
@@ -430,15 +430,15 @@ mod tests {
                 "  attract_events: 8\n",
                 "  attract_cycle_steps: 96\n",
                 "  attract_cycle_sampled_steps: 96\n",
-                "  attract_cycle_frames: attract=96,non_attract=0\n",
+                "  attract_cycle_steps: attract=96,non_attract=0\n",
                 "  attract_cycle_draws: 193\n",
                 "  attract_cycle_scene_sprites: 22385\n",
                 "  attract_cycle_milestones: williams_reveal=true,defender_coalescence=true,hall_of_fame=true,scoring_surface=true,final_scoring_instruction=true,cycle_return=true\n",
                 "  behavior_kind_profiles: 2\n",
                 "  behavior_actor_profiles: 0\n",
                 "  wave_profiles: 1\n",
-                "  first_frame_phase: Attract\n",
-                "  first_frame_draws: 1\n",
+                "  initial_step_phase: Attract\n",
+                "  initial_step_draws: 1\n",
                 "  first_playing_wave: 1\n",
                 "  first_playing_wave_size: 5\n",
                 "  first_playing_enemy_counts: landers=15,bombers=0,pods=0,mutants=0,swarmers=0\n",
@@ -535,8 +535,8 @@ mod tests {
 
         assert_eq!(summary.cycle_steps, 12);
         assert_eq!(summary.sampled_steps, 12);
-        assert_eq!(summary.attract_frames, 12);
-        assert_eq!(summary.non_attract_frames, 0);
+        assert_eq!(summary.attract_steps, 12);
+        assert_eq!(summary.non_attract_steps, 0);
         assert!(summary.draw_commands > 0);
         assert!(summary.scene_sprites > 0);
         assert!(summary.saw_williams_reveal);
@@ -1381,18 +1381,18 @@ mod tests {
     }
 
     #[test]
-    fn actor_live_uses_actor_derived_game_frame_handoff() {
+    fn actor_live_uses_actor_derived_game_step_handoff() {
         let window_text = include_str!("live_wgpu_window.rs");
 
         assert!(
-            window_text.contains("let actor_frame = self.runtime.step_clean_input(input, xyzzy);")
+            window_text.contains("let actor_step = self.runtime.step_clean_input(input, xyzzy);")
         );
-        assert!(window_text.contains("let frame = actor_frame.game_frame();"));
-        assert!(window_text.contains("self.audio.submit_game_frame(&frame);"));
+        assert!(window_text.contains("let snapshot = actor_step.game_step_snapshot();"));
+        assert!(window_text.contains("self.audio.submit_game_step(&snapshot);"));
         let old_batch_call = [
             "LiveAudioEventBatch::new(",
-            "frame.report.step",
-            ", frame.events.sounds())",
+            "snapshot.report.step",
+            ", snapshot.events.sounds())",
         ]
         .concat();
         assert!(!window_text.contains(&old_batch_call));

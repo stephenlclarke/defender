@@ -30,10 +30,10 @@ struct ActorLiveApp {
     audio: LiveAudioRuntime,
     input: LiveInputState,
     accumulator: FixedStepAccumulator,
-    frame_duration: Duration,
+    step_duration: Duration,
     last_tick: Instant,
     next_wake_at: Instant,
-    latest_frame: Option<GameFrame>,
+    latest_step_snapshot: Option<GameStepSnapshot>,
     quit_requested: bool,
     window: Option<Arc<Window>>,
     presenter: Option<WgpuScenePresenter>,
@@ -48,23 +48,23 @@ impl ActorLiveApp {
         runtime: ActorRuntimeAdapter,
     ) -> Self {
         let now = Instant::now();
-        let frame_duration = Duration::from_micros(FrameRate::CABINET.frame_duration_micros());
+        let step_duration = Duration::from_micros(StepRate::CABINET.step_duration_micros());
         let mut app = Self {
             input_profile,
             runtime,
             audio,
             input: LiveInputState::default(),
-            accumulator: FixedStepAccumulator::new(FrameRate::CABINET),
-            frame_duration,
+            accumulator: FixedStepAccumulator::new(StepRate::CABINET),
+            step_duration,
             last_tick: now,
-            next_wake_at: now + frame_duration,
-            latest_frame: None,
+            next_wake_at: now + step_duration,
+            latest_step_snapshot: None,
             quit_requested: false,
             window: None,
             presenter: None,
             error: None,
         };
-        app.step_one_frame();
+        app.step_once();
         app
     }
 
@@ -94,7 +94,7 @@ impl ActorLiveApp {
         self.window = Some(window);
         self.presenter = Some(presenter);
         self.last_tick = Instant::now();
-        self.next_wake_at = self.last_tick + self.frame_duration;
+        self.next_wake_at = self.last_tick + self.step_duration;
         Ok(())
     }
 
@@ -134,16 +134,16 @@ impl ActorLiveApp {
         }
     }
 
-    fn step_one_frame(&mut self) {
+    fn step_once(&mut self) {
         let input = self.input.drain_game_input();
         let xyzzy = self.input.drain_xyzzy_mode();
-        let actor_frame = self.runtime.step_clean_input(input, xyzzy);
-        let frame = actor_frame.game_frame();
-        self.audio.submit_game_frame(&frame);
-        self.latest_frame = Some(frame);
+        let actor_step = self.runtime.step_clean_input(input, xyzzy);
+        let snapshot = actor_step.game_step_snapshot();
+        self.audio.submit_game_step(&snapshot);
+        self.latest_step_snapshot = Some(snapshot);
     }
 
-    fn step_due_frames(&mut self) -> bool {
+    fn step_due_updates(&mut self) -> bool {
         let now = Instant::now();
         let elapsed = now.saturating_duration_since(self.last_tick);
         self.last_tick = now;
@@ -152,25 +152,25 @@ impl ActorLiveApp {
         let due_steps = self.accumulator.consume_due_steps(MAX_STEPS_PER_TICK);
 
         for _ in 0..due_steps {
-            self.step_one_frame();
+            self.step_once();
         }
 
-        let micros_until_next = FrameRate::CABINET
-            .frame_duration_micros()
+        let micros_until_next = StepRate::CABINET
+            .step_duration_micros()
             .saturating_sub(self.accumulator.accumulated_micros())
             .max(1);
         self.next_wake_at = Instant::now() + Duration::from_micros(micros_until_next);
         due_steps > 0
     }
 
-    fn draw_frame(&mut self) -> anyhow::Result<()> {
-        let Some(frame) = &self.latest_frame else {
+    fn draw_scene(&mut self) -> anyhow::Result<()> {
+        let Some(snapshot) = &self.latest_step_snapshot else {
             return Ok(());
         };
         let Some(presenter) = &mut self.presenter else {
             return Ok(());
         };
-        presenter.draw_scene(&frame.scene)
+        presenter.draw_scene(&snapshot.scene)
     }
 }
 
@@ -205,7 +205,7 @@ impl ApplicationHandler for ActorLiveApp {
                 if let Some(window) = &self.window {
                     window.pre_present_notify();
                 }
-                if let Err(error) = self.draw_frame() {
+                if let Err(error) = self.draw_scene() {
                     self.handle_error(event_loop, error);
                 }
             }
@@ -219,7 +219,7 @@ impl ApplicationHandler for ActorLiveApp {
             return;
         }
 
-        if self.step_due_frames()
+        if self.step_due_updates()
             && let Some(window) = &self.window
         {
             window.request_redraw();
@@ -330,7 +330,7 @@ impl WgpuScenePresenter {
                 return Ok(());
             }
             wgpu::CurrentSurfaceTexture::Validation => {
-                anyhow::bail!("wgpu surface validation error while acquiring frame")
+                anyhow::bail!("wgpu surface validation error while acquiring swapchain texture")
             }
         };
 
@@ -340,7 +340,7 @@ impl WgpuScenePresenter {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("defender clean wgpu frame encoder"),
+                label: Some("defender clean wgpu render encoder"),
             });
         encode_scene_render_pass(&mut encoder, &view, &plan, self.sprite_resources.as_ref());
 

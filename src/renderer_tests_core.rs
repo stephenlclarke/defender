@@ -612,7 +612,7 @@
             Some(&sprite_encoder),
         );
 
-        assert_eq!(plan.label, "defender.frame.commands");
+        assert_eq!(plan.label, "defender.render.commands");
         assert_eq!(plan.command_count(), 5);
         assert!(!plan.has_ordered_sprite_only_commands());
         assert_eq!(plan.temporary_raster_count(), 1);

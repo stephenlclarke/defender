@@ -193,7 +193,7 @@
 
         let williams = driver.step(GameInput::NONE);
         let williams_scene = williams.render_scene();
-        assert_eq!(williams_scene.frame, williams.step);
+        assert_eq!(williams_scene.step, williams.step);
         assert_eq!(williams_scene.surface, ACTOR_RENDER_SURFACE);
         assert!(williams_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL
@@ -258,7 +258,7 @@
         assert!(state.world.scanner.scan_left.is_some());
         assert!(state.world.scanner.player_blip.is_some());
         assert!(state.world.object_evidence.detail_count > 0);
-        assert_eq!(scene.frame, report.step);
+        assert_eq!(scene.step, report.step);
         assert!(scene.sprites.iter().any(|sprite| {
             matches!(
                 sprite.sprite,
@@ -1165,7 +1165,7 @@
 
         let state = report.game_state();
 
-        assert_eq!(state.frame, 77);
+        assert_eq!(state.step, 77);
         assert_eq!(state.phase, GamePhase::HighScoreEntry);
         assert_eq!(state.credits, 1);
         assert_eq!(state.wave, 2);
@@ -1399,7 +1399,7 @@
         assert_eq!(credited.state.credits, 1);
         assert_eq!(credited.events.gameplay(), &[GameEvent::CreditAdded]);
         assert_eq!(credited.events.sounds(), &[SoundEvent::CreditAdded]);
-        assert_eq!(credited.scene.frame, credited.report.step);
+        assert_eq!(credited.scene.step, credited.report.step);
         assert!(credited.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL
                 && sprite.layer == RenderLayer::Overlay
@@ -1453,7 +1453,7 @@
                 .count(),
             5
         );
-        let clean_frame = settled.game_frame();
+        let clean_frame = settled.game_step_snapshot();
         assert_eq!(clean_frame.state, settled.state);
         assert_eq!(clean_frame.events, settled.events);
         assert_eq!(clean_frame.scene, settled.scene);

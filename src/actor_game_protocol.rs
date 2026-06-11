@@ -465,7 +465,7 @@ impl ActorStateBridge {
         let wave = clean_wave(report.wave);
         let high_score_tables = high_score_tables_for_report(report);
         GameState {
-            frame: report.step,
+            step: report.step,
             phase,
             credits: report.credits,
             current_player: report.current_player,
@@ -1027,11 +1027,11 @@ fn enemy_projectile_actor_state(
 
 fn step_projectile_axis(position: i16, fraction: u8, velocity: u16) -> (i16, u8) {
     let fraction_scale = i32::from(MOTION_WORD_FRACTION_SCALE);
-    let raw = i32::from(position) * fraction_scale
+    let next_axis_word = i32::from(position) * fraction_scale
         + i32::from(fraction)
         + i32::from(velocity as i16);
-    let next_position = raw.div_euclid(fraction_scale);
-    let next_fraction = raw.rem_euclid(fraction_scale);
+    let next_position = next_axis_word.div_euclid(fraction_scale);
+    let next_fraction = next_axis_word.rem_euclid(fraction_scale);
     (
         next_position.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16,
         next_fraction as u8,

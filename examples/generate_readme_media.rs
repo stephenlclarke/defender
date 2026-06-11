@@ -7,7 +7,7 @@ use std::{
 use anyhow::{Context, bail};
 use defender::{
     Color, GamePhase, RenderLayer, RenderScene, SpriteId, SurfaceSize,
-    actor_game::{ActorFrame, ActorRuntimeAdapter, GameInput},
+    actor_game::{ActorRuntimeAdapter, ActorStepSnapshot, GameInput},
     render_scene_to_rgba,
     renderer::SceneRaster,
 };
@@ -121,8 +121,8 @@ fn gameplay_raster() -> anyhow::Result<SceneRaster> {
 
     for step in 0..GAMEPLAY_SHOWCASE_SEARCH_STEPS {
         let input = gameplay_input(step, playing_steps);
-        let frame = runtime.step(input);
-        if frame.state.phase != GamePhase::Playing {
+        let snapshot = runtime.step(input);
+        if snapshot.state.phase != GamePhase::Playing {
             continue;
         }
 
@@ -131,7 +131,7 @@ fn gameplay_raster() -> anyhow::Result<SceneRaster> {
             continue;
         }
 
-        let Some(score) = gameplay_showcase_score(&frame) else {
+        let Some(score) = gameplay_showcase_score(&snapshot) else {
             continue;
         };
         let should_replace = match best_scene.as_ref() {
@@ -139,12 +139,12 @@ fn gameplay_raster() -> anyhow::Result<SceneRaster> {
             None => true,
         };
         if should_replace {
-            best_scene = Some((score, frame.scene.clone()));
+            best_scene = Some((score, snapshot.scene.clone()));
         }
     }
 
     let Some((_, scene)) = best_scene else {
-        bail!("actor runtime did not produce a gameplay showcase frame for README media")
+        bail!("actor runtime did not produce a gameplay showcase scene for README media")
     };
     let scene = gameplay_showcase_scene(scene);
 
@@ -166,12 +166,12 @@ fn gameplay_showcase_scene(mut scene: RenderScene) -> RenderScene {
     scene
 }
 
-fn gameplay_showcase_score(frame: &ActorFrame) -> Option<u32> {
-    if frame.state.phase != GamePhase::Playing {
+fn gameplay_showcase_score(snapshot: &ActorStepSnapshot) -> Option<u32> {
+    if snapshot.state.phase != GamePhase::Playing {
         return None;
     }
 
-    let counts = ShowcaseSpriteCounts::from_scene(&frame.scene);
+    let counts = ShowcaseSpriteCounts::from_scene(&snapshot.scene);
     counts.score()
 }
 
@@ -300,12 +300,12 @@ fn write_attract_gif(path: &Path) -> anyhow::Result<()> {
     let mut runtime = ActorRuntimeAdapter::new();
     let mut written = 0_u16;
     for step in 0..ATTRACT_SEQUENCE_STEPS {
-        let frame = runtime.step(GameInput::NONE);
+        let snapshot = runtime.step(GameInput::NONE);
         if step % ATTRACT_SAMPLE_INTERVAL_STEPS != 0 {
             continue;
         }
 
-        let raster = render_scene_to_rgba(&frame.scene, ATTRACT_TARGET)
+        let raster = render_scene_to_rgba(&snapshot.scene, ATTRACT_TARGET)
             .context("rasterizing attract scene")?;
         write_gif_frame(&mut encoder, raster)?;
         written += 1;

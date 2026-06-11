@@ -3,7 +3,7 @@ mod tests {
     use crate::game::{Direction, GameInput, ScoreSnapshot, WorldVector};
 
     use super::{
-        CollisionBox, CollisionSystem, EnemyMotionSystem, Fixed24, FixedStepAccumulator, FrameRate,
+        CollisionBox, CollisionSystem, EnemyMotionSystem, Fixed24, FixedStepAccumulator, StepRate,
         HighScoreEntrySystem, HighScoreInitialsState, OperatorActionTriggers,
         OperatorControlSystem, PlayerActionTriggers, PlayerControlIntent, PlayerControlSystem,
         PlayerDamageSystem, PlayerMotionState, PlayerMotionSystem, PlayerStock,
@@ -14,14 +14,14 @@ mod tests {
     };
 
     #[test]
-    fn frame_rate_uses_rounded_microsecond_duration() {
-        assert_eq!(FrameRate::CABINET.millihz(), 60_100);
-        assert_eq!(FrameRate::CABINET.frame_duration_micros(), 16_639);
+    fn step_rate_uses_rounded_microsecond_duration() {
+        assert_eq!(StepRate::CABINET.millihz(), 60_100);
+        assert_eq!(StepRate::CABINET.step_duration_micros(), 16_639);
     }
 
     #[test]
     fn fixed_step_accumulator_consumes_bounded_steps() {
-        let mut accumulator = FixedStepAccumulator::new(FrameRate::from_millihz(1_000));
+        let mut accumulator = FixedStepAccumulator::new(StepRate::from_millihz(1_000));
         accumulator.add_elapsed_micros(3_500_000);
 
         assert_eq!(accumulator.consume_due_steps(2), 2);

@@ -164,8 +164,8 @@ impl LiveAudioRuntime {
         self.sender.is_some()
     }
 
-    pub fn submit_game_frame(&self, frame: &GameFrame) {
-        if let Some(batch) = LiveAudioEventBatch::from_game_frame(frame) {
+    pub fn submit_game_step(&self, snapshot: &GameStepSnapshot) {
+        if let Some(batch) = LiveAudioEventBatch::from_game_step(snapshot) {
             self.submit_event_batch(batch);
         }
     }

@@ -7,7 +7,7 @@
             || {
                 let _ = super::decode_embedded_png_rgba("truncated-test", &truncated);
             },
-            "must contain a frame",
+            "must contain an image",
         );
 
         let rgb_png = encode_test_png(png::ColorType::Rgb, &[255, 0, 0]);
@@ -250,7 +250,7 @@
 
         let plan = NativeSceneRenderer::default().prepare(&scene);
 
-        assert_eq!(plan.frame, 34);
+        assert_eq!(plan.step, 34);
         assert_eq!(
             plan.viewport,
             ViewportLayout {

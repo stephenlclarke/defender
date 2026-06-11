@@ -10,9 +10,9 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
     let scripts = actor_scripts_from_path(path)?;
     let mut runtime = ActorRuntimeAdapter::with_scripts(scripts.clone());
     let manifest = runtime.driver().script_manifest();
-    let frame = runtime.step(ActorGameInput::NONE);
+    let snapshot = runtime.step(ActorGameInput::NONE);
     let (attract_cycle, attract_cycle_unavailable_reason) =
-        actor_script_check_attract_cycle(&mut runtime, manifest.attract_script.cycle_steps, &frame);
+        actor_script_check_attract_cycle(&mut runtime, manifest.attract_script.cycle_steps, &snapshot);
     let playing = run_actor_script_check_to_first_playing_wave(&mut runtime)?;
     let first_playing = actor_script_check_playing_summary(&playing);
     let (first_player_laser, first_player_laser_unavailable_reason) =
@@ -30,10 +30,10 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         next_wave_progression.next_playing.as_ref(),
     );
     let (next_playing_assist_steps, next_playing) = match next_wave_progression.next_playing {
-        Some(next_playing_frame) => (
-            Some(next_playing_frame.assist_steps),
+        Some(next_playing_step) => (
+            Some(next_playing_step.assist_steps),
             Some(actor_script_check_playing_summary(
-                &next_playing_frame.frame,
+                &next_playing_step.snapshot,
             )),
         ),
         None => (Some(ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT as u32), None),
@@ -47,8 +47,8 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
         behavior_kind_profiles: manifest.behavior_script.kind_profiles.len(),
         behavior_actor_profiles: manifest.behavior_script.actor_profiles.len(),
         wave_profiles: manifest.wave_script.waves.len(),
-        first_frame_phase: format!("{:?}", frame.state.phase),
-        first_frame_draws: frame.report.draws.len(),
+        initial_step_phase: format!("{:?}", snapshot.state.phase),
+        initial_step_draws: snapshot.report.draws.len(),
         first_playing_wave: first_playing.wave,
         first_playing_wave_size: first_playing.wave_size,
         first_playing_enemy_landers: first_playing.enemy_landers,
@@ -118,8 +118,8 @@ pub(crate) fn run_actor_script_check(path: &Path) -> anyhow::Result<ActorScriptC
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct ActorScriptCheckNextPlayingFrame {
-    frame: ActorFrame,
+struct ActorScriptCheckNextPlayingStep {
+    snapshot: ActorStepSnapshot,
     assist_steps: u32,
 }
 
@@ -129,7 +129,7 @@ struct ActorScriptCheckNextWaveProgression {
     wave_clear_unavailable_reason: Option<String>,
     wave_clear_advance_sleep: Option<ActorScriptCheckWaveClearSummary>,
     wave_clear_advance_sleep_unavailable_reason: Option<String>,
-    next_playing: Option<ActorScriptCheckNextPlayingFrame>,
+    next_playing: Option<ActorScriptCheckNextPlayingStep>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -148,7 +148,7 @@ struct ActorScriptCheckReserveActivationSequence {
 fn actor_script_check_attract_cycle(
     runtime: &mut ActorRuntimeAdapter,
     cycle_steps: Option<u64>,
-    first_frame: &ActorFrame,
+    first_snapshot: &ActorStepSnapshot,
 ) -> (Option<ActorScriptCheckAttractCycleSummary>, Option<String>) {
     let Some(cycle_steps) = cycle_steps else {
         return (None, Some(String::from("no_attract_cycle_declared")));
@@ -167,17 +167,17 @@ fn actor_script_check_attract_cycle(
         cycle_steps,
         ..ActorScriptCheckAttractCycleSummary::default()
     };
-    actor_script_check_observe_attract_cycle_frame(&mut summary, first_frame);
+    actor_script_check_observe_attract_cycle_step(&mut summary, first_snapshot);
     for _ in 1..cycle_steps {
-        let frame = runtime.step(ActorGameInput::NONE);
-        actor_script_check_observe_attract_cycle_frame(&mut summary, &frame);
+        let snapshot = runtime.step(ActorGameInput::NONE);
+        actor_script_check_observe_attract_cycle_step(&mut summary, &snapshot);
     }
     (Some(summary), None)
 }
 
-fn actor_script_check_observe_attract_cycle_frame(
+fn actor_script_check_observe_attract_cycle_step(
     summary: &mut ActorScriptCheckAttractCycleSummary,
-    frame: &ActorFrame,
+    snapshot: &ActorStepSnapshot,
 ) {
     let hall_title = message_text(MessageId::HallTitle);
     let final_scoring_instruction = message_text(MessageId::SwarmerInstruction);
@@ -186,19 +186,19 @@ fn actor_script_check_observe_attract_cycle_frame(
     let mut cycle_has_final_instruction = false;
 
     summary.sampled_steps = summary.sampled_steps.saturating_add(1);
-    if frame.report.phase == Phase::Attract {
-        summary.attract_frames = summary.attract_frames.saturating_add(1);
+    if snapshot.report.phase == Phase::Attract {
+        summary.attract_steps = summary.attract_steps.saturating_add(1);
     } else {
-        summary.non_attract_frames = summary.non_attract_frames.saturating_add(1);
+        summary.non_attract_steps = summary.non_attract_steps.saturating_add(1);
     }
     summary.draw_commands = summary
         .draw_commands
-        .saturating_add(frame.report.draws.len());
+        .saturating_add(snapshot.report.draws.len());
     summary.scene_sprites = summary
         .scene_sprites
-        .saturating_add(frame.scene.sprites.len());
+        .saturating_add(snapshot.scene.sprites.len());
 
-    for draw in &frame.report.draws {
+    for draw in &snapshot.report.draws {
         if draw.sprite == SpriteKey::WilliamsLogo
             && matches!(draw.effect, VisualEffect::WilliamsReveal { .. })
         {
@@ -218,7 +218,7 @@ fn actor_script_check_observe_attract_cycle_frame(
             summary.saw_final_scoring_instruction = true;
             cycle_has_final_instruction = true;
         }
-        if frame.report.step == summary.cycle_steps
+        if snapshot.report.step == summary.cycle_steps
             && draw.sprite == SpriteKey::WilliamsLogo
             && matches!(
                 draw.effect,
@@ -229,7 +229,7 @@ fn actor_script_check_observe_attract_cycle_frame(
         }
     }
 
-    for sprite in &frame.scene.sprites {
+    for sprite in &snapshot.scene.sprites {
         if sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL {
             summary.saw_williams_reveal = true;
         }
@@ -241,7 +241,7 @@ fn actor_script_check_observe_attract_cycle_frame(
         }
     }
 
-    if frame.report.step == summary.cycle_steps {
+    if snapshot.report.step == summary.cycle_steps {
         summary.saw_cycle_return =
             cycle_has_first_williams_step && !cycle_has_scoring_surface && !cycle_has_final_instruction;
     }
@@ -254,13 +254,13 @@ fn actor_script_check_first_enemy_projectile(
     Option<String>,
 )> {
     let mut runtime = ActorRuntimeAdapter::with_scripts(scripts);
-    let mut frame = run_actor_script_check_to_first_playing_wave(&mut runtime)?;
-    let mut recent_projectile_sound_commands = actor_script_check_projectile_sound_commands(&frame);
+    let mut snapshot = run_actor_script_check_to_first_playing_wave(&mut runtime)?;
+    let mut recent_projectile_sound_commands = actor_script_check_projectile_sound_commands(&snapshot);
 
     for sample_steps in 0..=ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_STEP_LIMIT {
-        let samples = actor_script_check_enemy_projectile_samples(&frame);
+        let samples = actor_script_check_enemy_projectile_samples(&snapshot);
         if !samples.is_empty() {
-            let sound_commands = actor_script_check_projectile_sound_commands(&frame);
+            let sound_commands = actor_script_check_projectile_sound_commands(&snapshot);
             let sound_commands = if sound_commands.is_empty() {
                 recent_projectile_sound_commands
             } else {
@@ -280,8 +280,8 @@ fn actor_script_check_first_enemy_projectile(
             break;
         }
 
-        frame = runtime.step(ActorGameInput::NONE);
-        let sound_commands = actor_script_check_projectile_sound_commands(&frame);
+        snapshot = runtime.step(ActorGameInput::NONE);
+        let sound_commands = actor_script_check_projectile_sound_commands(&snapshot);
         if !sound_commands.is_empty() {
             recent_projectile_sound_commands = sound_commands;
         }
@@ -318,13 +318,13 @@ fn actor_script_check_hostile_projectile_matrix_sample_for(
         format!("parsing built-in hostile projectile matrix script `{kind_label}`")
     })?;
     let mut runtime = ActorRuntimeAdapter::with_scripts(scripts);
-    let mut frame = run_actor_script_check_to_first_playing_wave(&mut runtime)
+    let mut snapshot = run_actor_script_check_to_first_playing_wave(&mut runtime)
         .with_context(|| format!("starting hostile projectile matrix script `{kind_label}`"))?;
 
     for sample_steps in 0..=ACTOR_SCRIPT_CHECK_PROJECTILE_SAMPLE_STEP_LIMIT {
-        let samples = actor_script_check_projectile_spawn_command_samples(&frame);
+        let samples = actor_script_check_projectile_spawn_command_samples(&snapshot);
         if !samples.is_empty() {
-            let sound_commands = actor_script_check_projectile_sound_commands(&frame);
+            let sound_commands = actor_script_check_projectile_sound_commands(&snapshot);
             return Ok(ActorScriptCheckHostileProjectileSample {
                 kind: kind_label.to_string(),
                 sample_steps: sample_steps as u32,
@@ -337,7 +337,7 @@ fn actor_script_check_hostile_projectile_matrix_sample_for(
             break;
         }
 
-        frame = runtime.step(actor_script_check_hostile_projectile_matrix_input(kind));
+        snapshot = runtime.step(actor_script_check_hostile_projectile_matrix_input(kind));
     }
 
     anyhow::bail!(
@@ -410,13 +410,13 @@ fn actor_script_check_first_player_laser(
     Option<String>,
 )> {
     let mut runtime = ActorRuntimeAdapter::with_scripts(scripts);
-    let mut frame = run_actor_script_check_to_first_playing_wave(&mut runtime)?;
+    let mut snapshot = run_actor_script_check_to_first_playing_wave(&mut runtime)?;
     let mut recent_laser_sound_commands = Vec::new();
 
     for sample_steps in 0..=ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT {
-        let samples = actor_script_check_player_laser_samples(&frame);
+        let samples = actor_script_check_player_laser_samples(&snapshot);
         if !samples.is_empty() {
-            let sound_commands = actor_script_check_laser_sound_commands(&frame);
+            let sound_commands = actor_script_check_laser_sound_commands(&snapshot);
             let sound_commands = if sound_commands.is_empty() {
                 recent_laser_sound_commands
             } else {
@@ -444,8 +444,8 @@ fn actor_script_check_first_player_laser(
         } else {
             ActorGameInput::NONE
         };
-        frame = runtime.step(input);
-        let sound_commands = actor_script_check_laser_sound_commands(&frame);
+        snapshot = runtime.step(input);
+        let sound_commands = actor_script_check_laser_sound_commands(&snapshot);
         if !sound_commands.is_empty() {
             recent_laser_sound_commands = sound_commands;
         }
@@ -467,16 +467,16 @@ fn actor_script_check_first_player_laser_hit(
     Option<String>,
 )> {
     let mut runtime = ActorRuntimeAdapter::with_scripts(scripts);
-    let mut frame = run_actor_script_check_to_first_playing_wave(&mut runtime)?;
+    let mut snapshot = run_actor_script_check_to_first_playing_wave(&mut runtime)?;
 
     for sample_steps in 0..=ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT {
-        let explosion_samples = actor_script_check_explosion_command_samples(&frame);
-        let sound_commands = actor_script_check_hit_sound_commands(&frame);
+        let explosion_samples = actor_script_check_explosion_command_samples(&snapshot);
+        let sound_commands = actor_script_check_hit_sound_commands(&snapshot);
         if !explosion_samples.is_empty() {
             return Ok((
                 Some(ActorScriptCheckFirstPlayerLaserHitSummary {
                     sample_steps: sample_steps as u32,
-                    score: frame.report.score,
+                    score: snapshot.report.score,
                     explosion_samples,
                     sound_commands,
                 }),
@@ -496,7 +496,7 @@ fn actor_script_check_first_player_laser_hit(
         } else {
             ActorGameInput::NONE
         };
-        frame = runtime.step(input);
+        snapshot = runtime.step(input);
     }
 
     Ok((
@@ -532,22 +532,22 @@ fn actor_script_check_hostile_laser_hit_matrix_sample_for(
         format!("parsing built-in hostile laser-hit matrix script `{kind_label}`")
     })?;
     let mut runtime = ActorRuntimeAdapter::with_scripts(scripts);
-    let mut frame = run_actor_script_check_to_first_playing_wave(&mut runtime)
+    let mut snapshot = run_actor_script_check_to_first_playing_wave(&mut runtime)
         .with_context(|| format!("starting hostile laser-hit matrix script `{kind_label}`"))?;
-    let initial_score = frame.report.score;
+    let initial_score = snapshot.report.score;
 
     for sample_steps in 0..=ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT {
-        let explosion_samples = actor_script_check_explosion_command_samples(&frame);
-        let sound_commands = actor_script_check_hit_sound_commands(&frame);
+        let explosion_samples = actor_script_check_explosion_command_samples(&snapshot);
+        let sound_commands = actor_script_check_hit_sound_commands(&snapshot);
         if !explosion_samples.is_empty() {
             return Ok(ActorScriptCheckHostileLaserHitSample {
                 kind: kind_label.to_string(),
                 sample_steps: sample_steps as u32,
-                score_delta: frame.report.score.saturating_sub(initial_score),
-                score: frame.report.score,
+                score_delta: snapshot.report.score.saturating_sub(initial_score),
+                score: snapshot.report.score,
                 explosion_samples,
                 sound_commands,
-                spawned_counts: actor_script_check_spawned_counts(&frame),
+                spawned_counts: actor_script_check_spawned_counts(&snapshot),
             });
         }
 
@@ -563,7 +563,7 @@ fn actor_script_check_hostile_laser_hit_matrix_sample_for(
         } else {
             ActorGameInput::NONE
         };
-        frame = runtime.step(input);
+        snapshot = runtime.step(input);
     }
 
     anyhow::bail!(
@@ -607,35 +607,35 @@ fn actor_script_check_hostile_laser_hit_matrix_script(kind: ActorKind) -> String
     )
 }
 
-fn actor_script_check_playing_summary(frame: &ActorFrame) -> ActorScriptCheckPlayingSummary {
-    let profile = frame.report.wave_tuning;
-    let reserve = frame.state.world.enemy_reserve;
-    debug_assert_eq!(reserve, frame.report.enemy_reserve);
-    let actor_rng = frame.report.actor_rng;
-    let player_behavior = first_playing_behavior_for(frame, ActorKind::Player);
-    let lander_behavior = first_playing_behavior_for(frame, ActorKind::Lander);
-    let mutant_behavior = first_playing_behavior_for(frame, ActorKind::Mutant);
-    let bomber_behavior = first_playing_behavior_for(frame, ActorKind::Bomber);
-    let pod_behavior = first_playing_behavior_for(frame, ActorKind::Pod);
-    let swarmer_behavior = first_playing_behavior_for(frame, ActorKind::Swarmer);
-    let baiter_behavior = first_playing_behavior_for(frame, ActorKind::Baiter);
+fn actor_script_check_playing_summary(snapshot: &ActorStepSnapshot) -> ActorScriptCheckPlayingSummary {
+    let profile = snapshot.report.wave_tuning;
+    let reserve = snapshot.state.world.enemy_reserve;
+    debug_assert_eq!(reserve, snapshot.report.enemy_reserve);
+    let actor_rng = snapshot.report.actor_rng;
+    let player_behavior = first_playing_behavior_for(snapshot, ActorKind::Player);
+    let lander_behavior = first_playing_behavior_for(snapshot, ActorKind::Lander);
+    let mutant_behavior = first_playing_behavior_for(snapshot, ActorKind::Mutant);
+    let bomber_behavior = first_playing_behavior_for(snapshot, ActorKind::Bomber);
+    let pod_behavior = first_playing_behavior_for(snapshot, ActorKind::Pod);
+    let swarmer_behavior = first_playing_behavior_for(snapshot, ActorKind::Swarmer);
+    let baiter_behavior = first_playing_behavior_for(snapshot, ActorKind::Baiter);
 
     ActorScriptCheckPlayingSummary {
-        wave: frame.report.wave,
+        wave: snapshot.report.wave,
         wave_size: profile.wave_size,
         enemy_landers: profile.landers,
         enemy_bombers: profile.bombers,
         enemy_pods: profile.pods,
         enemy_mutants: profile.mutants,
         enemy_swarmers: profile.swarmers,
-        world_enemies: frame.state.world.enemies.len(),
-        world_humans: frame.state.world.humans.len(),
+        world_enemies: snapshot.state.world.enemies.len(),
+        world_humans: snapshot.state.world.humans.len(),
         reserve_landers: reserve.landers,
         reserve_bombers: reserve.bombers,
         reserve_pods: reserve.pods,
         reserve_mutants: reserve.mutants,
         reserve_swarmers: reserve.swarmers,
-        world_scroll_left: frame.report.background_left,
+        world_scroll_left: snapshot.report.background_left,
         actor_rng_seed: actor_rng.map(|actor_rng| actor_rng.seed),
         actor_rng_hseed: actor_rng.map(|actor_rng| actor_rng.hseed),
         actor_rng_lseed: actor_rng.map(|actor_rng| actor_rng.lseed),
@@ -652,16 +652,16 @@ fn actor_script_check_playing_summary(frame: &ActorFrame) -> ActorScriptCheckPla
         baiter_mode: hostile_movement_mode_label(baiter_behavior.baiter_mode).to_string(),
         swarmer_fire_period_steps: swarmer_behavior.swarmer_fire_period_steps,
         baiter_fire_period_steps: baiter_behavior.baiter_fire_period_steps,
-        actor_samples: actor_script_check_actor_samples(frame),
-        enemy_projectile_samples: actor_script_check_enemy_projectile_samples(frame),
-        sound_commands: actor_script_check_sound_commands(frame),
+        actor_samples: actor_script_check_actor_samples(snapshot),
+        enemy_projectile_samples: actor_script_check_enemy_projectile_samples(snapshot),
+        sound_commands: actor_script_check_sound_commands(snapshot),
     }
 }
 
 fn actor_script_check_actor_samples(
-    frame: &ActorFrame,
+    snapshot: &ActorStepSnapshot,
 ) -> Vec<ActorScriptCheckActorSample> {
-    frame
+    snapshot
         .report
         .snapshots
         .iter()
@@ -712,9 +712,9 @@ fn actor_script_check_actor_kind_label(kind: ActorKind) -> &'static str {
 }
 
 fn actor_script_check_enemy_projectile_samples(
-    frame: &ActorFrame,
+    snapshot: &ActorStepSnapshot,
 ) -> Vec<ActorScriptCheckEnemyProjectileSample> {
-    frame
+    snapshot
         .report
         .snapshots
         .iter()
@@ -742,9 +742,9 @@ fn actor_script_check_enemy_projectile_samples(
 }
 
 fn actor_script_check_projectile_spawn_command_samples(
-    frame: &ActorFrame,
+    snapshot: &ActorStepSnapshot,
 ) -> Vec<ActorScriptCheckProjectileSpawnSample> {
-    frame
+    snapshot
         .report
         .commands
         .iter()
@@ -781,9 +781,9 @@ fn actor_script_check_projectile_spawn_command_samples(
 }
 
 fn actor_script_check_player_laser_samples(
-    frame: &ActorFrame,
+    snapshot: &ActorStepSnapshot,
 ) -> Vec<ActorScriptCheckPlayerLaserSample> {
-    frame
+    snapshot
         .report
         .snapshots
         .iter()
@@ -804,9 +804,9 @@ fn actor_script_check_player_laser_samples(
 }
 
 fn actor_script_check_explosion_command_samples(
-    frame: &ActorFrame,
+    snapshot: &ActorStepSnapshot,
 ) -> Vec<ActorScriptCheckExplosionSample> {
-    frame
+    snapshot
         .report
         .commands
         .iter()
@@ -828,8 +828,8 @@ fn actor_script_check_explosion_command_samples(
         .collect()
 }
 
-fn actor_script_check_sound_commands(frame: &ActorFrame) -> Vec<u8> {
-    frame
+fn actor_script_check_sound_commands(snapshot: &ActorStepSnapshot) -> Vec<u8> {
+    snapshot
         .report
         .sounds
         .iter()
@@ -838,8 +838,8 @@ fn actor_script_check_sound_commands(frame: &ActorFrame) -> Vec<u8> {
         .collect()
 }
 
-fn actor_script_check_hit_sound_commands(frame: &ActorFrame) -> Vec<u8> {
-    frame
+fn actor_script_check_hit_sound_commands(snapshot: &ActorStepSnapshot) -> Vec<u8> {
+    snapshot
         .report
         .sounds
         .iter()
@@ -857,8 +857,8 @@ fn actor_script_check_hit_sound_commands(frame: &ActorFrame) -> Vec<u8> {
         .collect()
 }
 
-fn actor_script_check_laser_sound_commands(frame: &ActorFrame) -> Vec<u8> {
-    frame
+fn actor_script_check_laser_sound_commands(snapshot: &ActorStepSnapshot) -> Vec<u8> {
+    snapshot
         .report
         .sounds
         .iter()
@@ -870,8 +870,8 @@ fn actor_script_check_laser_sound_commands(frame: &ActorFrame) -> Vec<u8> {
         .collect()
 }
 
-fn actor_script_check_projectile_sound_commands(frame: &ActorFrame) -> Vec<u8> {
-    frame
+fn actor_script_check_projectile_sound_commands(snapshot: &ActorStepSnapshot) -> Vec<u8> {
+    snapshot
         .report
         .sounds
         .iter()
@@ -918,17 +918,17 @@ fn actor_rng_summary(seed: Option<u8>, hseed: Option<u8>, lseed: Option<u8>) -> 
 }
 
 fn first_playing_behavior_for(
-    frame: &ActorFrame,
+    snapshot: &ActorStepSnapshot,
     kind: ActorKind,
 ) -> crate::actor_game::ActorBehaviorProfile {
-    let actor = frame
+    let actor = snapshot
         .report
         .snapshots
         .iter()
         .find(|snapshot| snapshot.kind == kind && snapshot.alive)
         .map(|snapshot| snapshot.id)
         .unwrap_or_else(|| ActorId::new(0));
-    frame.report.behavior_script.behavior_for(actor, kind)
+    snapshot.report.behavior_script.behavior_for(actor, kind)
 }
 
 fn lander_behavior_mode_label(mode: LanderBehaviorMode) -> &'static str {
@@ -948,7 +948,7 @@ fn hostile_movement_mode_label(mode: HostileMovementMode) -> &'static str {
 
 fn run_actor_script_check_to_first_playing_wave(
     runtime: &mut ActorRuntimeAdapter,
-) -> anyhow::Result<ActorFrame> {
+) -> anyhow::Result<ActorStepSnapshot> {
     runtime.step(ActorGameInput {
         coin: true,
         ..ActorGameInput::NONE
@@ -959,9 +959,9 @@ fn run_actor_script_check_to_first_playing_wave(
     });
 
     for _ in 0..ACTOR_SCRIPT_CHECK_PLAYING_STEP_LIMIT {
-        let frame = runtime.step(ActorGameInput::NONE);
-        if frame.report.phase == Phase::Playing && frame.report.player_start.is_none() {
-            return Ok(frame);
+        let snapshot = runtime.step(ActorGameInput::NONE);
+        if snapshot.report.phase == Phase::Playing && snapshot.report.player_start.is_none() {
+            return Ok(snapshot);
         }
     }
 
@@ -972,25 +972,25 @@ fn run_actor_script_check_to_first_playing_wave(
 
 fn run_actor_script_check_to_next_wave_progression(
     runtime: &mut ActorRuntimeAdapter,
-    first_playing: &ActorFrame,
+    first_playing: &ActorStepSnapshot,
 ) -> ActorScriptCheckNextWaveProgression {
-    let mut frame = first_playing.clone();
+    let mut snapshot = first_playing.clone();
     let mut wave_clear = None;
     let mut wave_clear_advance_sleep = None;
-    let first_wave = frame.report.wave;
+    let first_wave = snapshot.report.wave;
     for step in 1..=ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT {
-        let input = actor_script_check_next_wave_input(&frame);
-        frame = runtime.step(input);
+        let input = actor_script_check_next_wave_input(&snapshot);
+        snapshot = runtime.step(input);
         if wave_clear.is_none() {
-            wave_clear = actor_script_check_wave_clear_summary(&frame, step as u32);
+            wave_clear = actor_script_check_wave_clear_summary(&snapshot, step as u32);
         }
         if wave_clear_advance_sleep.is_none() {
             wave_clear_advance_sleep =
-                actor_script_check_wave_clear_advance_sleep_summary(&frame, step as u32);
+                actor_script_check_wave_clear_advance_sleep_summary(&snapshot, step as u32);
         }
-        if frame.report.phase == Phase::Playing
-            && frame.report.player_start.is_none()
-            && frame.report.wave > first_wave
+        if snapshot.report.phase == Phase::Playing
+            && snapshot.report.player_start.is_none()
+            && snapshot.report.wave > first_wave
         {
             return ActorScriptCheckNextWaveProgression {
                 wave_clear_unavailable_reason: wave_clear
@@ -1001,8 +1001,8 @@ fn run_actor_script_check_to_next_wave_progression(
                     .then(|| String::from("wave_clear_advance_sleep_not_observed")),
                 wave_clear_advance_sleep,
                 wave_clear,
-                next_playing: Some(ActorScriptCheckNextPlayingFrame {
-                    frame,
+                next_playing: Some(ActorScriptCheckNextPlayingStep {
+                    snapshot,
                     assist_steps: step as u32,
                 }),
             };
@@ -1023,10 +1023,10 @@ fn run_actor_script_check_to_next_wave_progression(
 }
 
 fn actor_script_check_wave_clear_summary(
-    frame: &ActorFrame,
+    snapshot: &ActorStepSnapshot,
     assist_steps: u32,
 ) -> Option<ActorScriptCheckWaveClearSummary> {
-    let next_wave = frame
+    let next_wave = snapshot
         .report
         .commands
         .iter()
@@ -1034,13 +1034,13 @@ fn actor_script_check_wave_clear_summary(
             GameCommand::WaveCleared { next_wave } => Some(*next_wave),
             _ => None,
         })?;
-    let survivor_bonus = frame.report.survivor_bonus;
+    let survivor_bonus = snapshot.report.survivor_bonus;
     Some(ActorScriptCheckWaveClearSummary {
         assist_steps,
         next_wave,
-        score: frame.report.score,
-        world_enemies: frame.state.world.enemies.len(),
-        world_humans: frame.state.world.humans.len(),
+        score: snapshot.report.score,
+        world_enemies: snapshot.state.world.enemies.len(),
+        world_humans: snapshot.state.world.humans.len(),
         total_survivors: survivor_bonus.map(|bonus| bonus.total_survivors),
         visible_icons: survivor_bonus.map(|bonus| bonus.visible_icons),
         remaining_awards: survivor_bonus.map(|bonus| bonus.remaining_awards),
@@ -1053,17 +1053,17 @@ fn actor_script_check_wave_clear_summary(
 }
 
 fn actor_script_check_wave_clear_advance_sleep_summary(
-    frame: &ActorFrame,
+    snapshot: &ActorStepSnapshot,
     assist_steps: u32,
 ) -> Option<ActorScriptCheckWaveClearSummary> {
-    let survivor_bonus = frame.report.survivor_bonus?;
+    let survivor_bonus = snapshot.report.survivor_bonus?;
     let wave_advance_sleep_steps_remaining = survivor_bonus.wave_advance_sleep_steps_remaining?;
     Some(ActorScriptCheckWaveClearSummary {
         assist_steps,
         next_wave: survivor_bonus.next_wave,
-        score: frame.report.score,
-        world_enemies: frame.state.world.enemies.len(),
-        world_humans: frame.state.world.humans.len(),
+        score: snapshot.report.score,
+        world_enemies: snapshot.state.world.enemies.len(),
+        world_humans: snapshot.state.world.humans.len(),
         total_survivors: Some(survivor_bonus.total_survivors),
         visible_icons: Some(survivor_bonus.visible_icons),
         remaining_awards: Some(survivor_bonus.remaining_awards),
@@ -1075,28 +1075,28 @@ fn actor_script_check_wave_clear_advance_sleep_summary(
 
 fn actor_script_check_reserve_activations(
     runtime: &mut ActorRuntimeAdapter,
-    next_playing: Option<&ActorScriptCheckNextPlayingFrame>,
+    next_playing: Option<&ActorScriptCheckNextPlayingStep>,
 ) -> ActorScriptCheckReserveActivationSequence {
     let Some(next_playing) = next_playing else {
         return ActorScriptCheckReserveActivationSequence::unavailable("next_playing_unavailable");
     };
-    if actor_script_check_reserve_total(next_playing.frame.report.enemy_reserve) == 0 {
+    if actor_script_check_reserve_total(next_playing.snapshot.report.enemy_reserve) == 0 {
         return ActorScriptCheckReserveActivationSequence::unavailable(
             "next_playing_has_no_reserve",
         );
     }
 
-    let mut frame = next_playing.frame.clone();
+    let mut snapshot = next_playing.snapshot.clone();
     let mut batches = Vec::new();
-    let wave = frame.report.wave;
+    let wave = snapshot.report.wave;
     for step in 1..=ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT {
-        let previous_reserve = frame.report.enemy_reserve;
-        let input = actor_script_check_assist_input(&frame);
-        frame = runtime.step(input);
-        let spawned_counts = actor_script_check_spawned_counts(&frame);
-        let spawned_samples = actor_script_check_spawned_actor_samples(&frame);
-        if frame.report.phase == Phase::Playing
-            && frame.report.wave == wave
+        let previous_reserve = snapshot.report.enemy_reserve;
+        let input = actor_script_check_assist_input(&snapshot);
+        snapshot = runtime.step(input);
+        let spawned_counts = actor_script_check_spawned_counts(&snapshot);
+        let spawned_samples = actor_script_check_spawned_actor_samples(&snapshot);
+        if snapshot.report.phase == Phase::Playing
+            && snapshot.report.wave == wave
             && actor_script_check_reserve_total(previous_reserve) > 0
             && !spawned_counts.is_empty()
         {
@@ -1104,12 +1104,12 @@ fn actor_script_check_reserve_activations(
                 assist_steps: step as u32,
                 spawned_counts,
                 spawned_samples,
-                playing: actor_script_check_playing_summary(&frame),
+                playing: actor_script_check_playing_summary(&snapshot),
             });
-            if actor_script_check_reserve_total(frame.report.enemy_reserve) == 0 {
+            if actor_script_check_reserve_total(snapshot.report.enemy_reserve) == 0 {
                 return actor_script_check_to_post_reserve_wave_clear(
                     runtime,
-                    frame,
+                    snapshot,
                     step as u32,
                     batches,
                 );
@@ -1121,7 +1121,7 @@ fn actor_script_check_reserve_activations(
                 );
             }
         }
-        if frame.report.wave > wave {
+        if snapshot.report.wave > wave {
             let status = if batches.is_empty() {
                 "wave_advanced_before_reserve_activation"
             } else {
@@ -1201,26 +1201,26 @@ impl ActorScriptCheckReserveActivationSequence {
 
 fn actor_script_check_to_post_reserve_wave_clear(
     runtime: &mut ActorRuntimeAdapter,
-    reserve_empty_frame: ActorFrame,
+    reserve_empty_snapshot: ActorStepSnapshot,
     reserve_empty_assist_steps: u32,
     batches: Vec<ActorScriptCheckReserveActivationSummary>,
 ) -> ActorScriptCheckReserveActivationSequence {
-    let mut frame = reserve_empty_frame;
-    let wave = frame.report.wave;
+    let mut snapshot = reserve_empty_snapshot;
+    let wave = snapshot.report.wave;
     for step in 1..=ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT {
-        let input = actor_script_check_assist_input(&frame);
-        frame = runtime.step(input);
+        let input = actor_script_check_assist_input(&snapshot);
+        snapshot = runtime.step(input);
         let assist_steps = reserve_empty_assist_steps.saturating_add(step as u32);
-        if let Some(summary) = actor_script_check_wave_clear_summary(&frame, assist_steps) {
+        if let Some(summary) = actor_script_check_wave_clear_summary(&snapshot, assist_steps) {
             return actor_script_check_to_post_reserve_wave_clear_advance_sleep(
                 runtime,
-                frame,
+                snapshot,
                 assist_steps,
                 batches,
                 summary,
             );
         }
-        if frame.report.wave > wave {
+        if snapshot.report.wave > wave {
             return ActorScriptCheckReserveActivationSequence::with_post_reserve_wave_clear_unavailable(
                 batches,
                 "wave_advanced_before_post_reserve_wave_clear",
@@ -1236,20 +1236,20 @@ fn actor_script_check_to_post_reserve_wave_clear(
 
 fn actor_script_check_to_post_reserve_wave_clear_advance_sleep(
     runtime: &mut ActorRuntimeAdapter,
-    wave_clear_frame: ActorFrame,
+    wave_clear_snapshot: ActorStepSnapshot,
     wave_clear_assist_steps: u32,
     batches: Vec<ActorScriptCheckReserveActivationSummary>,
     wave_clear: ActorScriptCheckWaveClearSummary,
 ) -> ActorScriptCheckReserveActivationSequence {
-    let mut frame = wave_clear_frame;
-    let wave = frame.report.wave;
+    let mut snapshot = wave_clear_snapshot;
+    let wave = snapshot.report.wave;
     if let Some(summary) =
-        actor_script_check_wave_clear_advance_sleep_summary(&frame, wave_clear_assist_steps)
+        actor_script_check_wave_clear_advance_sleep_summary(&snapshot, wave_clear_assist_steps)
     {
         let (next_steps, next_playing, next_reason) =
             actor_script_check_to_post_reserve_next_playing(
                 runtime,
-                frame,
+                snapshot,
                 wave_clear_assist_steps,
                 wave,
             );
@@ -1265,14 +1265,14 @@ fn actor_script_check_to_post_reserve_wave_clear_advance_sleep(
     }
 
     for step in 1..=ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT {
-        let input = actor_script_check_assist_input(&frame);
-        frame = runtime.step(input);
+        let input = actor_script_check_assist_input(&snapshot);
+        snapshot = runtime.step(input);
         let assist_steps = wave_clear_assist_steps.saturating_add(step as u32);
         if let Some(summary) =
-            actor_script_check_wave_clear_advance_sleep_summary(&frame, assist_steps)
+            actor_script_check_wave_clear_advance_sleep_summary(&snapshot, assist_steps)
         {
             let (next_steps, next_playing, next_reason) =
-                actor_script_check_to_post_reserve_next_playing(runtime, frame, assist_steps, wave);
+                actor_script_check_to_post_reserve_next_playing(runtime, snapshot, assist_steps, wave);
             return ActorScriptCheckReserveActivationSequence::with_post_reserve_wave_clear(
                 batches,
                 wave_clear,
@@ -1283,7 +1283,7 @@ fn actor_script_check_to_post_reserve_wave_clear_advance_sleep(
                 next_reason,
             );
         }
-        if frame.report.wave > wave {
+        if snapshot.report.wave > wave {
             return ActorScriptCheckReserveActivationSequence::with_post_reserve_wave_clear(
                 batches,
                 wave_clear,
@@ -1317,7 +1317,7 @@ fn actor_script_check_to_post_reserve_wave_clear_advance_sleep(
 
 fn actor_script_check_to_post_reserve_next_playing(
     runtime: &mut ActorRuntimeAdapter,
-    wave_sleep_frame: ActorFrame,
+    wave_sleep_snapshot: ActorStepSnapshot,
     wave_sleep_assist_steps: u32,
     previous_wave: u16,
 ) -> (
@@ -1325,18 +1325,18 @@ fn actor_script_check_to_post_reserve_next_playing(
     Option<ActorScriptCheckPlayingSummary>,
     Option<String>,
 ) {
-    let mut frame = wave_sleep_frame;
+    let mut snapshot = wave_sleep_snapshot;
     for step in 1..=ACTOR_SCRIPT_CHECK_NEXT_WAVE_STEP_LIMIT {
-        let input = actor_script_check_assist_input(&frame);
-        frame = runtime.step(input);
+        let input = actor_script_check_assist_input(&snapshot);
+        snapshot = runtime.step(input);
         let assist_steps = wave_sleep_assist_steps.saturating_add(step as u32);
-        if frame.report.phase == Phase::Playing
-            && frame.report.player_start.is_none()
-            && frame.report.wave > previous_wave
+        if snapshot.report.phase == Phase::Playing
+            && snapshot.report.player_start.is_none()
+            && snapshot.report.wave > previous_wave
         {
             return (
                 Some(assist_steps),
-                Some(actor_script_check_playing_summary(&frame)),
+                Some(actor_script_check_playing_summary(&snapshot)),
                 None,
             );
         }
@@ -1360,9 +1360,9 @@ fn actor_script_check_reserve_total(reserve: crate::game::EnemyReserveSnapshot) 
         .saturating_add(reserve.swarmers)
 }
 
-fn actor_script_check_spawned_counts(frame: &ActorFrame) -> ActorScriptCheckSpawnedCounts {
+fn actor_script_check_spawned_counts(snapshot: &ActorStepSnapshot) -> ActorScriptCheckSpawnedCounts {
     let mut counts = ActorScriptCheckSpawnedCounts::default();
-    for command in &frame.report.commands {
+    for command in &snapshot.report.commands {
         match command {
             GameCommand::Spawn(SpawnRequest::Lander { .. }) => {
                 counts.landers = counts.landers.saturating_add(1);
@@ -1386,9 +1386,9 @@ fn actor_script_check_spawned_counts(frame: &ActorFrame) -> ActorScriptCheckSpaw
 }
 
 fn actor_script_check_spawned_actor_samples(
-    frame: &ActorFrame,
+    snapshot: &ActorStepSnapshot,
 ) -> Vec<ActorScriptCheckSpawnedActorSample> {
-    frame
+    snapshot
         .report
         .commands
         .iter()
@@ -1426,14 +1426,14 @@ impl ActorScriptCheckSpawnedCounts {
     }
 }
 
-fn actor_script_check_next_wave_input(frame: &ActorFrame) -> ActorGameInput {
-    actor_script_check_assist_input(frame)
+fn actor_script_check_next_wave_input(snapshot: &ActorStepSnapshot) -> ActorGameInput {
+    actor_script_check_assist_input(snapshot)
 }
 
-fn actor_script_check_assist_input(frame: &ActorFrame) -> ActorGameInput {
-    if frame.report.phase == Phase::Playing
-        && frame.report.player_start.is_none()
-        && !frame.state.world.enemies.is_empty()
+fn actor_script_check_assist_input(snapshot: &ActorStepSnapshot) -> ActorGameInput {
+    if snapshot.report.phase == Phase::Playing
+        && snapshot.report.player_start.is_none()
+        && !snapshot.state.world.enemies.is_empty()
     {
         return ActorGameInput {
             xyzzy: XyzzyMode {
@@ -1478,12 +1478,12 @@ pub(crate) fn run_smoke(
     let actor_report = crate::actor_smoke::default_smoke_report()?;
     let offscreen_report = pollster::block_on(render_actor_offscreen_smoke())?;
     let mut report = LiveSmokeReport::from(actor_report);
-    report.saw_non_blank_frame = offscreen_report.non_blank_frames > 0;
-    report.offscreen_wgpu_frames = offscreen_report.frames;
-    report.offscreen_non_blank_frames = offscreen_report.non_blank_frames;
-    report.offscreen_distinct_frame_signatures = offscreen_report.distinct_frame_signatures;
-    report.offscreen_first_frame_signature = offscreen_report.first_frame_signature;
-    report.offscreen_last_frame_signature = offscreen_report.last_frame_signature;
+    report.saw_non_blank_scene = offscreen_report.non_blank_steps > 0;
+    report.offscreen_wgpu_steps = offscreen_report.steps;
+    report.offscreen_non_blank_steps = offscreen_report.non_blank_steps;
+    report.offscreen_distinct_scene_signatures = offscreen_report.distinct_scene_signatures;
+    report.offscreen_first_scene_signature = offscreen_report.first_scene_signature;
+    report.offscreen_last_scene_signature = offscreen_report.last_scene_signature;
     report.validate_actor_offscreen_wgpu()?;
     Ok(report)
 }
@@ -1493,12 +1493,12 @@ pub(crate) fn run_actor_wgpu_smoke() -> anyhow::Result<LiveSmokeReport> {
     let actor_report = crate::actor_smoke::default_smoke_report()?;
     let offscreen_report = pollster::block_on(render_actor_offscreen_smoke())?;
     let mut report = LiveSmokeReport::from(actor_report);
-    report.saw_non_blank_frame = offscreen_report.non_blank_frames > 0;
-    report.offscreen_wgpu_frames = offscreen_report.frames;
-    report.offscreen_non_blank_frames = offscreen_report.non_blank_frames;
-    report.offscreen_distinct_frame_signatures = offscreen_report.distinct_frame_signatures;
-    report.offscreen_first_frame_signature = offscreen_report.first_frame_signature;
-    report.offscreen_last_frame_signature = offscreen_report.last_frame_signature;
+    report.saw_non_blank_scene = offscreen_report.non_blank_steps > 0;
+    report.offscreen_wgpu_steps = offscreen_report.steps;
+    report.offscreen_non_blank_steps = offscreen_report.non_blank_steps;
+    report.offscreen_distinct_scene_signatures = offscreen_report.distinct_scene_signatures;
+    report.offscreen_first_scene_signature = offscreen_report.first_scene_signature;
+    report.offscreen_last_scene_signature = offscreen_report.last_scene_signature;
     report.validate_actor_offscreen_wgpu()?;
     Ok(report)
 }

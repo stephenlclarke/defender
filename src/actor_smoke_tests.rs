@@ -1,38 +1,38 @@
 #[cfg(test)]
 mod tests {
     use super::{
-        ACTOR_SMOKE_COIN_FRAME, ACTOR_SMOKE_FIRE_FRAME, ACTOR_SMOKE_FRAMES,
-        ACTOR_SMOKE_START_FRAME, ACTOR_SMOKE_THRUST_FRAME, ActorAttractCycleSmokeReport,
+        ACTOR_SMOKE_COIN_STEP, ACTOR_SMOKE_FIRE_STEP, ACTOR_SMOKE_STEPS,
+        ACTOR_SMOKE_START_STEP, ACTOR_SMOKE_THRUST_STEP, ActorAttractCycleSmokeReport,
         ActorPostGameSmokeReport, ActorSmokeReport, attract_cycle_report,
         default_attract_cycle_report, default_post_game_report, smoke_actor_input,
-        smoke_frame_count, smoke_input, smoke_report,
+        smoke_step_count, smoke_input, smoke_report,
     };
 
     #[test]
     fn smoke_report_exercises_actor_runtime_and_native_draw_plans() {
-        let report = smoke_report(ACTOR_SMOKE_FRAMES).expect("actor smoke report");
+        let report = smoke_report(ACTOR_SMOKE_STEPS).expect("actor smoke report");
 
-        assert_eq!(report.frames, ACTOR_SMOKE_FRAMES);
+        assert_eq!(report.steps, ACTOR_SMOKE_STEPS);
         assert!(report.saw_attract);
         assert!(report.saw_credit);
         assert!(report.saw_playing);
-        assert!(report.actor_event_frames > 0);
+        assert!(report.actor_event_steps > 0);
         assert!(report.actor_sound_events > 0);
         assert!(report.sprite_instances > 0);
         assert!(report.sprite_draw_commands > 0);
-        assert!(report.wgpu_frame_commands > 0);
+        assert!(report.wgpu_render_commands > 0);
         assert_eq!(report.temporary_raster_commands, 0);
         assert_eq!(report.missing_sprite_regions, 0);
         assert!(report.clean_exit);
     }
 
     #[test]
-    fn smoke_report_rejects_zero_frames() {
-        let error = smoke_report(0).expect_err("zero-frame smoke should fail");
+    fn smoke_report_rejects_zero_steps() {
+        let error = smoke_report(0).expect_err("zero-step smoke should fail");
 
         assert_eq!(
             error.to_string(),
-            "actor smoke frame count must be positive"
+            "actor smoke step count must be positive"
         );
     }
 
@@ -40,19 +40,19 @@ mod tests {
     fn attract_cycle_report_exercises_default_actor_attract_loop() {
         let report = default_attract_cycle_report().expect("actor attract cycle smoke report");
 
-        assert_eq!(report.frames, 3479);
+        assert_eq!(report.steps, 3479);
         assert_eq!(report.cycle_steps, 3479);
-        assert_eq!(report.attract_frames, report.frames);
-        assert_eq!(report.playing_frames, 0);
-        assert_eq!(report.game_over_frames, 0);
-        assert_eq!(report.high_score_entry_frames, 0);
-        assert_eq!(report.actor_event_frames, 0);
-        assert_eq!(report.actor_sound_frames, 0);
+        assert_eq!(report.attract_steps, report.steps);
+        assert_eq!(report.playing_steps, 0);
+        assert_eq!(report.game_over_steps, 0);
+        assert_eq!(report.high_score_entry_steps, 0);
+        assert_eq!(report.actor_event_steps, 0);
+        assert_eq!(report.actor_sound_steps, 0);
         assert_eq!(report.actor_sound_events, 0);
         assert!(report.distinct_scene_signatures >= 8);
         assert!(report.sprite_instances > 0);
         assert!(report.sprite_draw_commands > 0);
-        assert!(report.wgpu_frame_commands > 0);
+        assert!(report.wgpu_render_commands > 0);
         assert_eq!(report.missing_sprite_regions, 0);
         assert!(report.saw_williams_reveal);
         assert!(report.saw_defender_coalescence);
@@ -64,12 +64,12 @@ mod tests {
     }
 
     #[test]
-    fn attract_cycle_report_rejects_zero_frames() {
-        let error = attract_cycle_report(0).expect_err("zero-frame attract smoke should fail");
+    fn attract_cycle_report_rejects_zero_steps() {
+        let error = attract_cycle_report(0).expect_err("zero-step attract smoke should fail");
 
         assert_eq!(
             error.to_string(),
-            "actor attract smoke frame count must be positive"
+            "actor attract smoke step count must be positive"
         );
     }
 
@@ -77,12 +77,12 @@ mod tests {
     fn post_game_report_exercises_high_score_hall_return() {
         let report = default_post_game_report().expect("actor post-game smoke report");
 
-        assert!(report.frames >= 60);
-        assert!(report.playing_frames > 0);
-        assert!(report.high_score_entry_frames > 0);
-        assert_eq!(report.game_over_frames, 60);
-        assert_eq!(report.hall_stall_frames, 60);
-        assert!(report.attract_frames > 0);
+        assert!(report.steps >= 60);
+        assert!(report.playing_steps > 0);
+        assert!(report.high_score_entry_steps > 0);
+        assert_eq!(report.game_over_steps, 60);
+        assert_eq!(report.hall_stall_steps, 60);
+        assert!(report.attract_steps > 0);
         assert_eq!(report.forced_player_collisions, 3);
         assert!(report.final_score >= 3_000);
         assert_eq!(report.final_lives, 0);
@@ -101,7 +101,7 @@ mod tests {
         assert!(report.saw_hall_of_fame);
         assert!(report.sprite_instances > 0);
         assert!(report.sprite_draw_commands > 0);
-        assert!(report.wgpu_frame_commands > 0);
+        assert!(report.wgpu_render_commands > 0);
         assert_eq!(report.missing_sprite_regions, 0);
         assert!(report.clean_exit);
     }
@@ -109,13 +109,13 @@ mod tests {
     #[test]
     fn attract_cycle_report_validates_required_default_milestones() {
         let mut report = ActorAttractCycleSmokeReport {
-            frames: 3479,
+            steps: 3479,
             cycle_steps: 3479,
             distinct_scene_signatures: 8,
-            attract_frames: 3479,
+            attract_steps: 3479,
             sprite_instances: 1,
             sprite_draw_commands: 1,
-            wgpu_frame_commands: 1,
+            wgpu_render_commands: 1,
             saw_williams_reveal: true,
             saw_defender_coalescence: true,
             saw_hall_of_fame: true,
@@ -136,7 +136,7 @@ mod tests {
         );
 
         report.saw_cycle_return = true;
-        report.actor_sound_frames = 1;
+        report.actor_sound_steps = 1;
         let error = report
             .validate()
             .expect_err("attract sound event should fail");
@@ -149,12 +149,12 @@ mod tests {
     #[test]
     fn post_game_report_validates_high_score_return_contract() {
         let mut report = ActorPostGameSmokeReport {
-            frames: 72,
+            steps: 72,
             distinct_scene_signatures: 6,
-            playing_frames: 10,
-            high_score_entry_frames: 3,
-            game_over_frames: 60,
-            attract_frames: 1,
+            playing_steps: 10,
+            high_score_entry_steps: 3,
+            game_over_steps: 60,
+            attract_steps: 1,
             forced_player_collisions: 3,
             final_score: 3_000,
             player_destroyed_events: 3,
@@ -162,11 +162,11 @@ mod tests {
             high_score_entry_events: 1,
             high_score_initial_accept_events: 3,
             high_score_submit_events: 1,
-            actor_sound_frames: 4,
+            actor_sound_steps: 4,
             actor_sound_events: 6,
             game_over_sound_events: 1,
             saw_game_over_hall_stall: true,
-            hall_stall_frames: 60,
+            hall_stall_steps: 60,
             saw_attract_return: true,
             saw_return_williams_reveal: true,
             saw_player_sprite: true,
@@ -175,19 +175,19 @@ mod tests {
             saw_hall_of_fame: true,
             sprite_instances: 1,
             sprite_draw_commands: 1,
-            wgpu_frame_commands: 1,
+            wgpu_render_commands: 1,
             clean_exit: true,
             ..ActorPostGameSmokeReport::default()
         };
 
-        report.hall_stall_frames = 59;
+        report.hall_stall_steps = 59;
         let error = report.validate().expect_err("short Hall stall should fail");
         assert_eq!(
             error.to_string(),
             "actor post-game smoke did not observe the 60-step Hall-of-Fame stall"
         );
 
-        report.hall_stall_frames = 60;
+        report.hall_stall_steps = 60;
         report.saw_attract_return = false;
         let error = report
             .validate()
@@ -201,18 +201,18 @@ mod tests {
     #[test]
     fn smoke_report_validates_required_actor_play_states() {
         let mut report = ActorSmokeReport {
-            frames: 1,
-            first_frame_size: Some((292, 240)),
+            steps: 1,
+            initial_surface_size: Some((292, 240)),
             distinct_scene_signatures: 3,
-            sprite_frames: 1,
+            sprite_steps: 1,
             sprite_instances: 1,
             sprite_draw_commands: 1,
             object_sprites: 1,
             projectile_sprites: 1,
             hud_sprites: 1,
             overlay_sprites: 1,
-            actor_event_frames: 1,
-            actor_sound_frames: 1,
+            actor_event_steps: 1,
+            actor_sound_steps: 1,
             actor_sound_events: 1,
             covered_sprites: super::REQUIRED_SPRITES
                 .iter()
@@ -226,7 +226,7 @@ mod tests {
                 .iter()
                 .map(|label| (*label).to_owned())
                 .collect(),
-            wgpu_frame_commands: 1,
+            wgpu_render_commands: 1,
             injected_inputs: super::REQUIRED_INPUTS
                 .iter()
                 .map(|label| (*label).to_owned())
@@ -240,62 +240,62 @@ mod tests {
             .expect_err("missing attract should fail validation");
         assert_eq!(
             error.to_string(),
-            "actor smoke did not observe attract frames"
+            "actor smoke did not observe attract steps"
         );
 
         report.saw_attract = true;
-        report.attract_frames = 1;
+        report.attract_steps = 1;
         let error = report
             .validate()
             .expect_err("missing credited attract should fail validation");
         assert_eq!(
             error.to_string(),
-            "actor smoke did not observe a credited attract frame"
+            "actor smoke did not observe a credited attract step"
         );
 
         report.saw_credit = true;
-        report.credited_frames = 1;
+        report.credited_steps = 1;
         let error = report
             .validate()
             .expect_err("missing playing should fail validation");
         assert_eq!(
             error.to_string(),
-            "actor smoke did not observe playing frames"
+            "actor smoke did not observe playing steps"
         );
     }
 
     #[test]
     fn smoke_script_uses_release_frames_between_edge_inputs() {
-        assert!(smoke_input(ACTOR_SMOKE_COIN_FRAME).value.coin);
+        assert!(smoke_input(ACTOR_SMOKE_COIN_STEP).value.coin);
         assert_eq!(
-            smoke_input(ACTOR_SMOKE_COIN_FRAME + 1).value,
+            smoke_input(ACTOR_SMOKE_COIN_STEP + 1).value,
             crate::actor_game::GameInput::NONE
         );
-        assert!(smoke_input(ACTOR_SMOKE_START_FRAME).value.start_one);
+        assert!(smoke_input(ACTOR_SMOKE_START_STEP).value.start_one);
         assert_eq!(
-            smoke_input(ACTOR_SMOKE_START_FRAME + 1).value,
+            smoke_input(ACTOR_SMOKE_START_STEP + 1).value,
             crate::actor_game::GameInput::NONE
         );
-        assert!(smoke_input(ACTOR_SMOKE_FIRE_FRAME).value.fire);
+        assert!(smoke_input(ACTOR_SMOKE_FIRE_STEP).value.fire);
         assert_eq!(
-            smoke_input(ACTOR_SMOKE_FIRE_FRAME + 1).value,
+            smoke_input(ACTOR_SMOKE_FIRE_STEP + 1).value,
             crate::actor_game::GameInput::NONE
         );
-        assert!(smoke_input(ACTOR_SMOKE_THRUST_FRAME).value.thrust);
+        assert!(smoke_input(ACTOR_SMOKE_THRUST_STEP).value.thrust);
         assert_eq!(
-            smoke_input(ACTOR_SMOKE_THRUST_FRAME + 1).value,
+            smoke_input(ACTOR_SMOKE_THRUST_STEP + 1).value,
             crate::actor_game::GameInput::NONE
         );
     }
 
     #[test]
     fn smoke_script_helpers_match_current_actor_smoke_contract() {
-        assert_eq!(smoke_frame_count(), ACTOR_SMOKE_FRAMES);
-        assert!(smoke_actor_input(ACTOR_SMOKE_COIN_FRAME).coin);
-        assert!(smoke_actor_input(ACTOR_SMOKE_START_FRAME).start_one);
-        assert!(smoke_actor_input(ACTOR_SMOKE_FIRE_FRAME).fire);
+        assert_eq!(smoke_step_count(), ACTOR_SMOKE_STEPS);
+        assert!(smoke_actor_input(ACTOR_SMOKE_COIN_STEP).coin);
+        assert!(smoke_actor_input(ACTOR_SMOKE_START_STEP).start_one);
+        assert!(smoke_actor_input(ACTOR_SMOKE_FIRE_STEP).fire);
         assert_eq!(
-            smoke_actor_input(ACTOR_SMOKE_FIRE_FRAME + 1),
+            smoke_actor_input(ACTOR_SMOKE_FIRE_STEP + 1),
             crate::actor_game::GameInput::NONE
         );
     }
@@ -303,19 +303,19 @@ mod tests {
     #[test]
     fn smoke_report_formats_current_cli_output() {
         let report = ActorSmokeReport {
-            frames: 3,
-            first_frame_size: Some((292, 240)),
+            steps: 3,
+            initial_surface_size: Some((292, 240)),
             distinct_scene_signatures: 2,
             saw_attract: true,
-            attract_frames: 1,
+            attract_steps: 1,
             saw_credit: true,
-            credited_frames: 1,
+            credited_steps: 1,
             saw_playing: true,
-            playing_frames: 2,
-            actor_event_frames: 2,
-            actor_sound_frames: 2,
+            playing_steps: 2,
+            actor_event_steps: 2,
+            actor_sound_steps: 2,
             actor_sound_events: 3,
-            sprite_frames: 3,
+            sprite_steps: 3,
             sprite_instances: 12,
             sprite_draw_commands: 4,
             object_sprites: 2,
@@ -328,7 +328,7 @@ mod tests {
             hud_draw_commands: 1,
             overlay_draw_commands: 1,
             covered_pipelines: vec!["sprites".to_owned(), "hud_text".to_owned()],
-            wgpu_frame_commands: 9,
+            wgpu_render_commands: 9,
             injected_inputs: vec!["coin".to_owned(), "start_one".to_owned()],
             clean_exit: true,
             ..ActorSmokeReport::default()
@@ -337,7 +337,7 @@ mod tests {
         let text = report.to_text();
 
         assert!(text.starts_with("actor smoke passed\n"));
-        assert!(text.contains("first_frame_size: 292x240"));
+        assert!(text.contains("initial_surface_size: 292x240"));
         assert!(text.contains("covered_sprites: player_ship,enemy_lander"));
         assert!(text.contains("injected_inputs: coin,start_one"));
     }
@@ -345,13 +345,13 @@ mod tests {
     #[test]
     fn attract_cycle_report_formats_current_cli_output() {
         let report = ActorAttractCycleSmokeReport {
-            frames: 3479,
+            steps: 3479,
             cycle_steps: 3479,
             distinct_scene_signatures: 42,
-            attract_frames: 3479,
+            attract_steps: 3479,
             sprite_instances: 1200,
             sprite_draw_commands: 340,
-            wgpu_frame_commands: 680,
+            wgpu_render_commands: 680,
             saw_williams_reveal: true,
             saw_defender_coalescence: true,
             saw_hall_of_fame: true,
@@ -373,12 +373,12 @@ mod tests {
     #[test]
     fn post_game_report_formats_current_cli_output() {
         let report = ActorPostGameSmokeReport {
-            frames: 72,
+            steps: 72,
             distinct_scene_signatures: 9,
-            playing_frames: 8,
-            high_score_entry_frames: 3,
-            game_over_frames: 60,
-            attract_frames: 1,
+            playing_steps: 8,
+            high_score_entry_steps: 3,
+            game_over_steps: 60,
+            attract_steps: 1,
             forced_player_collisions: 3,
             final_score: 3_000,
             player_destroyed_events: 3,
@@ -386,10 +386,10 @@ mod tests {
             high_score_entry_events: 3,
             high_score_initial_accept_events: 3,
             high_score_submit_events: 1,
-            actor_sound_frames: 4,
+            actor_sound_steps: 4,
             actor_sound_events: 6,
             game_over_sound_events: 1,
-            hall_stall_frames: 60,
+            hall_stall_steps: 60,
             saw_attract_return: true,
             saw_return_williams_reveal: true,
             saw_player_sprite: true,
@@ -398,7 +398,7 @@ mod tests {
             saw_hall_of_fame: true,
             sprite_instances: 44,
             sprite_draw_commands: 22,
-            wgpu_frame_commands: 66,
+            wgpu_render_commands: 66,
             clean_exit: true,
             ..ActorPostGameSmokeReport::default()
         };
@@ -407,7 +407,7 @@ mod tests {
 
         assert!(text.starts_with("actor post-game smoke passed\n"));
         assert!(text.contains("forced_player_collisions: 3"));
-        assert!(text.contains("hall_stall_frames: 60"));
+        assert!(text.contains("hall_stall_steps: 60"));
         assert!(text.contains("saw_attract_return: true"));
     }
 }

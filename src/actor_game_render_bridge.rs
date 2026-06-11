@@ -396,6 +396,10 @@ fn push_actor_message_sprites(
     );
 }
 
+const TWO_DIGIT_DISPLAY_MAX: u8 = 99;
+const DECIMAL_RADIX: u8 = 10;
+const SCORE_DIGIT_START_PLACE: u32 = 100_000;
+
 fn actor_visible_survivor_bonus_icon_count(report: &StepReport) -> usize {
     report
         .survivor_bonus
@@ -404,11 +408,17 @@ fn actor_visible_survivor_bonus_icon_count(report: &StepReport) -> usize {
 }
 
 fn actor_visible_decimal_digits(value: u8) -> ([u8; 2], usize) {
-    let value = value.min(99);
-    if value < 10 {
+    let value = value.min(TWO_DIGIT_DISPLAY_MAX);
+    if value < DECIMAL_RADIX {
         ([b'0' + value, b' '], 1)
     } else {
-        ([b'0' + value / 10, b'0' + value % 10], 2)
+        (
+            [
+                b'0' + value / DECIMAL_RADIX,
+                b'0' + value % DECIMAL_RADIX,
+            ],
+            2,
+        )
     }
 }
 
@@ -674,12 +684,12 @@ fn push_actor_player_score_sprites(scene: &mut RenderScene, score: u32, origin: 
 
 fn actor_visible_score_digits(score: u32) -> [Option<u8>; ACTOR_HUD_SCORE_DIGIT_DISPLAY_COUNT] {
     let score = score.min(ACTOR_HUD_SCORE_DISPLAY_MAX);
-    let mut place = 100_000;
+    let mut place = SCORE_DIGIT_START_PLACE;
     let mut digits = [None; ACTOR_HUD_SCORE_DIGIT_DISPLAY_COUNT];
     let mut non_zero_seen = false;
 
     for (index, digit) in digits.iter_mut().enumerate() {
-        let value = ((score / place) % 10) as u8;
+        let value = ((score / place) % u32::from(DECIMAL_RADIX)) as u8;
         let counter = ACTOR_HUD_SCORE_DIGIT_DISPLAY_COUNT - index;
         if value == 0 && counter > 2 && !non_zero_seen {
             *digit = None;
@@ -687,7 +697,7 @@ fn actor_visible_score_digits(score: u32) -> [Option<u8>; ACTOR_HUD_SCORE_DIGIT_
             non_zero_seen = true;
             *digit = Some(value);
         }
-        place /= 10;
+        place /= u32::from(DECIMAL_RADIX);
     }
 
     digits

@@ -14,7 +14,7 @@ use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
 };
 
-use crate::game::{GameFrame, SoundEvent};
+use crate::game::{GameStepSnapshot, SoundEvent};
 use crate::sound_board::{
     OrganTune, RenderedSound, SoundAction, SoundBoardSynth, SpecialSound, sound_actions_for_command,
 };
@@ -33,18 +33,18 @@ pub enum LiveAudioMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LiveAudioEventBatch {
-    pub frame: u64,
+    pub step: u64,
     events: [Option<SoundEvent>; LIVE_AUDIO_EVENT_CAPACITY],
 }
 
 impl LiveAudioEventBatch {
-    pub fn new(frame: u64, events: &[SoundEvent]) -> Option<Self> {
+    pub fn new(step: u64, events: &[SoundEvent]) -> Option<Self> {
         if events.is_empty() || events.len() > LIVE_AUDIO_EVENT_CAPACITY {
             return None;
         }
 
         let mut batch = Self {
-            frame,
+            step,
             events: [None; LIVE_AUDIO_EVENT_CAPACITY],
         };
         for (slot, event) in batch.events.iter_mut().zip(events.iter().copied()) {
@@ -53,8 +53,8 @@ impl LiveAudioEventBatch {
         Some(batch)
     }
 
-    pub fn from_game_frame(frame: &GameFrame) -> Option<Self> {
-        Self::new(frame.state.frame, frame.events.sounds())
+    pub fn from_game_step(snapshot: &GameStepSnapshot) -> Option<Self> {
+        Self::new(snapshot.state.step, snapshot.events.sounds())
     }
 
     pub fn events(&self) -> impl Iterator<Item = SoundEvent> + '_ {
@@ -181,13 +181,13 @@ where
     T: Sample + FromSample<f32>,
 {
     let mut mixer = mixer.lock().ok();
-    for frame in output.chunks_mut(channels) {
+    for output_group in output.chunks_mut(channels) {
         let sample = mixer
             .as_mut()
             .map(|mixer| mixer.next_sample())
             .unwrap_or(0.0);
         let sample = T::from_sample(sample);
-        for output_sample in frame {
+        for output_sample in output_group {
             *output_sample = sample;
         }
     }

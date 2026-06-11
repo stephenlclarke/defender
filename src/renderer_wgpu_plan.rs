@@ -750,7 +750,7 @@ impl WgpuFramePlan {
         }
 
         Self {
-            label: "defender.frame.commands",
+            label: "defender.render.commands",
             commands,
         }
     }
@@ -908,7 +908,7 @@ fn sprite_draw_commands_from_instance_buffers(
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SceneDrawPlan {
-    pub frame: u64,
+    pub step: u64,
     pub surface: SurfaceSize,
     pub viewport: ViewportLayout,
     pub gpu_pass: WgpuPassPlan,
@@ -1074,7 +1074,7 @@ impl NativeSceneRenderer {
         );
 
         SceneDrawPlan {
-            frame: scene.frame,
+            step: scene.step,
             surface: scene.surface,
             viewport,
             gpu_pass,

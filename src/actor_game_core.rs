@@ -6,7 +6,7 @@ use crate::{
         EnemyProjectileSnapshot as CleanEnemyProjectileSnapshot, EnemyProjectileKind,
         EnemyReserveSnapshot, EnemySnapshot as CleanEnemySnapshot,
         ExplosionKind as CleanExplosionKind, ExplosionSnapshot as CleanExplosionSnapshot,
-        GameEvent, GameEvents, GameFrame, GameInput as CleanGameInput, GameOverSnapshot, GamePhase,
+        GameEvent, GameEvents, GameStepSnapshot, GameInput as CleanGameInput, GameOverSnapshot, GamePhase,
         GameState, HIGH_SCORE_TABLE_ENTRIES, HighScoreEntrySnapshot, HighScoreTableEntrySnapshot,
         HighScoreTablesSnapshot, HumanSnapshot as CleanHumanSnapshot, PlayerSnapshot,
         PlayerStockSnapshot, ProjectileSnapshot as CleanProjectileSnapshot,

@@ -1,4 +1,6 @@
 const MUTANT_HOP_DIRECTION_SIGN_BIT: u8 = 0x80;
+const MUTANT_COLLISION_WIDTH: i16 = 14;
+const MUTANT_COLLISION_HEIGHT: i16 = 12;
 
 #[derive(Debug)]
 struct Mutant {
@@ -22,7 +24,11 @@ impl Mutant {
     }
 
     fn bounds(&self) -> Rect {
-        Rect::from_center(self.collision_position(), 14, 12)
+        Rect::from_center(
+            self.collision_position(),
+            MUTANT_COLLISION_WIDTH,
+            MUTANT_COLLISION_HEIGHT,
+        )
     }
 
     fn scene_position(&self) -> Point {

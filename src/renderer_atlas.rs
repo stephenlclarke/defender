@@ -242,6 +242,7 @@ const WILLIAMS_LOGO_PIXEL_COUNT: usize =
     WILLIAMS_LOGO_COLUMNS as usize * 2 * WILLIAMS_LOGO_ROWS as usize;
 const WILLIAMS_LOGO_FIRST_SCREEN_COLUMN: u8 = 0x36;
 const WILLIAMS_LOGO_FIRST_SCREEN_ROW: u8 = 0x3C;
+const WILLIAMS_LOGO_DRAW_CONTROL_THRESHOLD: u8 = 0xAA;
 const WILLIAMS_LOGO_DRAW_PROGRAM_BYTES: [u8; 351] = [
     0xFE, 0x74, 0x40, 0x11, 0x11, 0x85, 0x81, 0x81, 0x81, 0x88, 0x82, 0x82, 0x22, 0x24, 0x22, 0x42,
     0x24, 0x24, 0x24, 0x44, 0x24, 0x44, 0x49, 0x44, 0x94, 0x41, 0x88, 0x14, 0x41, 0x88, 0x14, 0x41,
@@ -1039,7 +1040,7 @@ fn decode_embedded_png_rgba(name: &'static str, bytes: &[u8]) -> EmbeddedSprite 
         ))
     ];
     let info = reader.next_frame(&mut pixels).unwrap_or_else(|error| {
-        panic!("embedded sprite asset {name} must contain a frame: {error}")
+        panic!("embedded sprite asset {name} must contain an image: {error}")
     });
 
     if info.color_type != png::ColorType::Rgba || info.bit_depth != png::BitDepth::Eight {
@@ -1329,10 +1330,10 @@ fn attract_williams_logo_walk() -> AttractWilliamsLogoWalk {
     let mut pointer = 0usize;
     let mut cursor = 0u16;
 
-    while let Some(opcode) = WILLIAMS_LOGO_DRAW_PROGRAM_BYTES.get(pointer).copied() {
+    while let Some(draw_byte) = WILLIAMS_LOGO_DRAW_PROGRAM_BYTES.get(pointer).copied() {
         pointer += 1;
-        if opcode > 0xAA {
-            let complemented = !opcode;
+        if draw_byte > WILLIAMS_LOGO_DRAW_CONTROL_THRESHOLD {
+            let complemented = !draw_byte;
             if complemented == 0 {
                 continue;
             }
@@ -1351,7 +1352,7 @@ fn attract_williams_logo_walk() -> AttractWilliamsLogoWalk {
             push_attract_williams_logo_pixel(&mut path, &mut seen, cursor);
             operation_pixel_counts.push(path.len());
         } else {
-            let mut accumulator = opcode;
+            let mut accumulator = draw_byte;
             loop {
                 accumulator =
                     attract_williams_logo_horizontal_bit(accumulator, &mut cursor, true);

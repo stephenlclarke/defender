@@ -1,7 +1,7 @@
-// Typed arcade asset data generated from the retired table assets.
-// Keep this file data-only; runtime code should use semantic IDs, not raw original labels.
+// Typed arcade asset data used by the actor runtime.
+// Keep this file data-only; runtime code should use semantic IDs.
 
-// Some embedded frames are arcade assets that are not drawn by the current runtime yet.
+// Some embedded images are reserved for asset coverage and are not drawn by the current runtime yet.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ObjectBitmapId {

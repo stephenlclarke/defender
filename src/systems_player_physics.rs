@@ -50,27 +50,29 @@ impl Fixed24 {
     }
 
     fn new(value: i32) -> Self {
-        let raw = value & Self::MASK;
-        if raw & Self::SIGN == 0 {
-            Self { value: raw }
+        let masked_value = value & Self::MASK;
+        if masked_value & Self::SIGN == 0 {
+            Self {
+                value: masked_value,
+            }
         } else {
             Self {
-                value: raw | !Self::MASK,
+                value: masked_value | !Self::MASK,
             }
         }
     }
 
     fn from_bytes(bytes: [u8; 3]) -> Self {
-        let raw = i32::from_be_bytes([0, bytes[0], bytes[1], bytes[2]]);
-        Self::new(raw)
+        let packed_value = i32::from_be_bytes([0, bytes[0], bytes[1], bytes[2]]);
+        Self::new(packed_value)
     }
 
     fn to_bytes(self) -> [u8; 3] {
-        let raw = (self.value & Self::MASK) as u32;
+        let packed_value = (self.value & Self::MASK) as u32;
         [
-            ((raw >> 16) & BYTE_MASK) as u8,
-            ((raw >> 8) & BYTE_MASK) as u8,
-            (raw & BYTE_MASK) as u8,
+            ((packed_value >> 16) & BYTE_MASK) as u8,
+            ((packed_value >> 8) & BYTE_MASK) as u8,
+            (packed_value & BYTE_MASK) as u8,
         ]
     }
 
@@ -256,12 +258,17 @@ fn signed_word_less_or_equal(left: u16, right: u16) -> bool {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct FrameRate {
+pub struct StepRate {
     millihz: u32,
 }
 
-impl FrameRate {
-    pub const CABINET: Self = Self { millihz: 60_100 };
+impl StepRate {
+    const MICROS_PER_SECOND_MILLIHZ: u64 = 1_000_000_000;
+    const CABINET_STEP_RATE_MILLIHZ: u32 = 60_100;
+
+    pub const CABINET: Self = Self {
+        millihz: Self::CABINET_STEP_RATE_MILLIHZ,
+    };
 
     pub const fn from_millihz(millihz: u32) -> Self {
         Self { millihz }
@@ -271,22 +278,22 @@ impl FrameRate {
         self.millihz
     }
 
-    pub const fn frame_duration_micros(self) -> u64 {
+    pub const fn step_duration_micros(self) -> u64 {
         let rate = self.millihz as u64;
-        (1_000_000_000 + (rate / 2)) / rate
+        (Self::MICROS_PER_SECOND_MILLIHZ + (rate / 2)) / rate
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FixedStepAccumulator {
-    frame_rate: FrameRate,
+    step_rate: StepRate,
     accumulated_micros: u64,
 }
 
 impl FixedStepAccumulator {
-    pub const fn new(frame_rate: FrameRate) -> Self {
+    pub const fn new(step_rate: StepRate) -> Self {
         Self {
-            frame_rate,
+            step_rate,
             accumulated_micros: 0,
         }
     }
@@ -296,7 +303,7 @@ impl FixedStepAccumulator {
     }
 
     pub fn consume_due_steps(&mut self, max_steps: u32) -> u32 {
-        let frame_duration = self.frame_rate.frame_duration_micros();
+        let frame_duration = self.step_rate.step_duration_micros();
         let due = (self.accumulated_micros / frame_duration).min(u64::from(max_steps)) as u32;
         self.accumulated_micros -= u64::from(due) * frame_duration;
         due

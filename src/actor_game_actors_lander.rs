@@ -8,6 +8,9 @@ struct Lander {
     spawn_visibility: LanderSpawnVisibility,
 }
 
+const LANDER_COLLISION_WIDTH: i16 = 14;
+const LANDER_COLLISION_HEIGHT: i16 = 12;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LanderMode {
     Seeking,
@@ -46,7 +49,11 @@ impl Lander {
     }
 
     fn bounds(&self) -> Rect {
-        Rect::from_center(self.position, 14, 12)
+        Rect::from_center(
+            self.position,
+            LANDER_COLLISION_WIDTH,
+            LANDER_COLLISION_HEIGHT,
+        )
     }
 }
 

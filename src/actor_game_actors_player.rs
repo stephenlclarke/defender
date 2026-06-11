@@ -260,8 +260,10 @@ impl AssetActor for StatusDisplay {
     }
 }
 
+const STATUS_SCORE_DISPLAY_MAX: u32 = 999_999;
+
 fn format_status_score(score: u32) -> String {
-    format!("{:06}", score.min(999_999))
+    format!("{:06}", score.min(STATUS_SCORE_DISPLAY_MAX))
 }
 
 fn format_high_score_initials(state: HighScoreInitialsState) -> String {

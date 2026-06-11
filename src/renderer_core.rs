@@ -680,7 +680,7 @@ impl std::error::Error for SceneRasterError {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RenderScene {
-    pub frame: u64,
+    pub step: u64,
     pub surface: SurfaceSize,
     pub clear_color: Color,
     pub visual_signature: Option<u32>,
@@ -690,7 +690,7 @@ pub struct RenderScene {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RenderSceneSummary {
-    pub frame: u64,
+    pub step: u64,
     pub surface: SurfaceSize,
     pub visual_signature: Option<u32>,
     pub raster_count: usize,
@@ -699,9 +699,9 @@ pub struct RenderSceneSummary {
 }
 
 impl RenderScene {
-    pub fn empty(frame: u64, surface: SurfaceSize) -> Self {
+    pub fn empty(step: u64, surface: SurfaceSize) -> Self {
         Self {
-            frame,
+            step,
             surface,
             clear_color: Color { rgba: [0; 4] },
             visual_signature: None,
@@ -711,14 +711,14 @@ impl RenderScene {
     }
 
     pub fn from_rgba(
-        frame: u64,
+        step: u64,
         surface: SurfaceSize,
         pixels: Vec<u8>,
         visual_signature: Option<u32>,
     ) -> Result<Self, SceneRasterError> {
         let raster = SceneRaster::from_rgba(surface, pixels)?;
         Ok(Self {
-            frame,
+            step,
             surface,
             clear_color: Color { rgba: [0; 4] },
             visual_signature,
@@ -747,7 +747,7 @@ impl RenderScene {
         }
 
         RenderSceneSummary {
-            frame: self.frame,
+            step: self.step,
             surface: self.surface,
             visual_signature: self.visual_signature,
             raster_count: usize::from(self.raster.is_some()),

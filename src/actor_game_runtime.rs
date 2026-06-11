@@ -1,12 +1,12 @@
 #[derive(Debug, Clone, PartialEq)]
-pub struct ActorFrame {
+pub struct ActorStepSnapshot {
     pub state: GameState,
     pub report: StepReport,
     pub events: GameEvents,
     pub scene: RenderScene,
 }
 
-impl ActorFrame {
+impl ActorStepSnapshot {
     pub fn new(
         report: StepReport,
         state: GameState,
@@ -21,8 +21,8 @@ impl ActorFrame {
         }
     }
 
-    pub fn game_frame(&self) -> GameFrame {
-        GameFrame {
+    pub fn game_step_snapshot(&self) -> GameStepSnapshot {
+        GameStepSnapshot {
             state: self.state.clone(),
             events: self.events.clone(),
             scene: self.scene.clone(),
@@ -81,21 +81,21 @@ impl ActorRuntimeAdapter {
         &mut self.driver
     }
 
-    pub fn step(&mut self, input: GameInput) -> ActorFrame {
+    pub fn step(&mut self, input: GameInput) -> ActorStepSnapshot {
         let report = self.driver.step(input);
-        self.frame_for_report(report)
+        self.step_snapshot_for_report(report)
     }
 
-    pub fn step_clean_input(&mut self, input: CleanGameInput, xyzzy: XyzzyMode) -> ActorFrame {
+    pub fn step_clean_input(&mut self, input: CleanGameInput, xyzzy: XyzzyMode) -> ActorStepSnapshot {
         self.step(GameInput::from_clean_input(input, xyzzy))
     }
 
-    fn frame_for_report(&mut self, report: StepReport) -> ActorFrame {
+    fn step_snapshot_for_report(&mut self, report: StepReport) -> ActorStepSnapshot {
         let state = report.game_state();
         let gameplay_events = actor_gameplay_events_for_report(&report);
         let sound_events = self.sound_bridge.sound_events_for_report(&report);
         let scene = self.render_bridge.render_scene_for_report(&report);
-        ActorFrame::new(
+        ActorStepSnapshot::new(
             report,
             state,
             GameEvents::new(gameplay_events, sound_events),

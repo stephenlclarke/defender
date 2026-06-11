@@ -12,8 +12,8 @@ const ENEMY_BOMB_PRIMARY_IMAGE_ADDRESS: u16 = 0xCCB0;
 const ENEMY_BOMB_ALTERNATE_IMAGE_ADDRESS: u16 = 0xCCB6;
 const ENEMY_BOMB_OBJECT_BITMAP_SIZE: (u8, u8) = (2, 3);
 const BAITER_ANIMATION_FRAME_COUNT: u8 = 3;
-// Clean stores process sleep as frames remaining after the current update.
-// Arcade PTIME values of 6/4/1 therefore wake after 5/3/0 clean sleeps.
+// Clean stores process sleep as steps remaining after the current update.
+// Preserved sleep values of 6/4/1 therefore wake after 5/3/0 clean sleeps.
 const LANDER_ANIMATION_FRAME_COUNT: u8 = 3;
 
 fn baiter_screen_x_velocity(actor_x_velocity: u16) -> u16 {
@@ -22,7 +22,7 @@ fn baiter_screen_x_velocity(actor_x_velocity: u16) -> u16 {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GameState {
-    pub frame: u64,
+    pub step: u64,
     pub phase: GamePhase,
     pub credits: u8,
     pub current_player: u8,
@@ -259,7 +259,7 @@ impl Default for GameEvents {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct GameFrame {
+pub struct GameStepSnapshot {
     pub state: GameState,
     pub events: GameEvents,
     pub scene: RenderScene,

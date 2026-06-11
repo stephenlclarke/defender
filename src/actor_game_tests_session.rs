@@ -795,7 +795,7 @@
                     && sprite.position[0] < 224.0
                     && sprite.position[1] < 40.0
             }),
-            "gameplay status text must not overlap the scanner frame"
+            "gameplay status text must not overlap the scanner border"
         );
     }
 

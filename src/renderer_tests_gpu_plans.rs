@@ -9,7 +9,7 @@
             tint: Color::WHITE,
         });
 
-        assert_eq!(scene.frame, 7);
+        assert_eq!(scene.step, 7);
         assert_eq!(scene.sprites[0].sprite, SpriteId(3));
     }
 

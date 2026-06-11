@@ -23,7 +23,7 @@ use winit::{
 use crate::game::GameInput;
 use crate::{
     actor_game::{
-        ActorDriverScripts, ActorFrame, ActorId, ActorKind, ActorRuntimeAdapter, ExplosionKind,
+        ActorDriverScripts, ActorStepSnapshot, ActorId, ActorKind, ActorRuntimeAdapter, ExplosionKind,
         GameCommand, GameInput as ActorGameInput, HostileMovementMode, LanderBehaviorMode, Phase,
         SoundCue, SpawnRequest, SpriteKey, VisualEffect, XyzzyController, XyzzyMode,
     },
@@ -35,12 +35,12 @@ use crate::{
 #[cfg(all(not(test), not(coverage)))]
 use crate::{
     audio::LiveAudioRuntime,
-    game::GameFrame,
+    game::GameStepSnapshot,
     renderer::{
         GpuRendererSettings, NativeSceneRenderer, SceneDrawPlan, SpriteBindGroupRole,
         SpriteBufferRole, SpriteBufferUpload, SpriteRenderPassEncoderCommand, SurfaceSize,
     },
-    systems::{FixedStepAccumulator, FrameRate},
+    systems::{FixedStepAccumulator, StepRate},
 };
 
 #[cfg(all(not(test), not(coverage)))]
@@ -69,31 +69,31 @@ pub(crate) struct LiveSmokeReport {
     pub(crate) render_path: &'static str,
     pub(crate) fallback_presenter_used: bool,
     pub(crate) window_created: bool,
-    pub(crate) rendered_frames: u32,
-    pub(crate) first_frame_size: Option<(u32, u32)>,
-    pub(crate) distinct_frame_signatures: usize,
-    pub(crate) saw_non_blank_frame: bool,
+    pub(crate) rendered_steps: u32,
+    pub(crate) initial_surface_size: Option<(u32, u32)>,
+    pub(crate) distinct_scene_signatures: usize,
+    pub(crate) saw_non_blank_scene: bool,
     pub(crate) saw_attract: bool,
     pub(crate) saw_credit: bool,
     pub(crate) saw_playing: bool,
-    pub(crate) attract_visual_frames: u32,
-    pub(crate) credit_visual_frames: u32,
-    pub(crate) playing_visual_frames: u32,
-    pub(crate) attract_distinct_frame_signatures: usize,
-    pub(crate) credit_distinct_frame_signatures: usize,
-    pub(crate) playing_distinct_frame_signatures: usize,
-    pub(crate) clean_game_frames: u32,
-    pub(crate) actor_frames: u32,
-    pub(crate) sprite_frames: u32,
+    pub(crate) attract_visual_steps: u32,
+    pub(crate) credit_visual_steps: u32,
+    pub(crate) playing_visual_steps: u32,
+    pub(crate) attract_distinct_scene_signatures: usize,
+    pub(crate) credit_distinct_scene_signatures: usize,
+    pub(crate) playing_distinct_scene_signatures: usize,
+    pub(crate) clean_game_steps: u32,
+    pub(crate) actor_steps: u32,
+    pub(crate) sprite_steps: u32,
     pub(crate) sprite_instances: usize,
     pub(crate) sprite_draw_commands: usize,
-    pub(crate) temporary_raster_frames: u32,
+    pub(crate) temporary_raster_steps: u32,
     pub(crate) temporary_raster_commands: usize,
-    pub(crate) offscreen_wgpu_frames: u32,
-    pub(crate) offscreen_non_blank_frames: u32,
-    pub(crate) offscreen_distinct_frame_signatures: usize,
-    pub(crate) offscreen_first_frame_signature: Option<u64>,
-    pub(crate) offscreen_last_frame_signature: Option<u64>,
+    pub(crate) offscreen_wgpu_steps: u32,
+    pub(crate) offscreen_non_blank_steps: u32,
+    pub(crate) offscreen_distinct_scene_signatures: usize,
+    pub(crate) offscreen_first_scene_signature: Option<u64>,
+    pub(crate) offscreen_last_scene_signature: Option<u64>,
     pub(crate) injected_inputs: Vec<String>,
     pub(crate) clean_exit: bool,
 }
@@ -273,8 +273,8 @@ pub(crate) struct ActorScriptCheckWaveClearSummary {
 pub(crate) struct ActorScriptCheckAttractCycleSummary {
     pub(crate) cycle_steps: u64,
     pub(crate) sampled_steps: u64,
-    pub(crate) attract_frames: u64,
-    pub(crate) non_attract_frames: u64,
+    pub(crate) attract_steps: u64,
+    pub(crate) non_attract_steps: u64,
     pub(crate) draw_commands: usize,
     pub(crate) scene_sprites: usize,
     pub(crate) saw_williams_reveal: bool,
@@ -294,8 +294,8 @@ pub(crate) struct ActorScriptCheckReport {
     pub(crate) behavior_kind_profiles: usize,
     pub(crate) behavior_actor_profiles: usize,
     pub(crate) wave_profiles: usize,
-    pub(crate) first_frame_phase: String,
-    pub(crate) first_frame_draws: usize,
+    pub(crate) initial_step_phase: String,
+    pub(crate) initial_step_draws: usize,
     pub(crate) first_playing_wave: u16,
     pub(crate) first_playing_wave_size: u8,
     pub(crate) first_playing_enemy_landers: u8,
@@ -358,48 +358,48 @@ pub(crate) struct ActorScriptCheckReport {
 
 impl LiveSmokeReport {
     pub(crate) fn to_text(&self) -> String {
-        let frame_size = self
-            .first_frame_size
+        let surface_size = self
+            .initial_surface_size
             .map(|(width, height)| format!("{width}x{height}"))
             .unwrap_or_else(|| String::from("unrecorded"));
-        let offscreen_first_frame_signature = self
-            .offscreen_first_frame_signature
+        let offscreen_first_scene_signature = self
+            .offscreen_first_scene_signature
             .map(|signature| format!("{signature:016x}"))
             .unwrap_or_else(|| String::from("unrecorded"));
-        let offscreen_last_frame_signature = self
-            .offscreen_last_frame_signature
+        let offscreen_last_scene_signature = self
+            .offscreen_last_scene_signature
             .map(|signature| format!("{signature:016x}"))
             .unwrap_or_else(|| String::from("unrecorded"));
         format!(
-            "wgpu live smoke passed\n  render_path: {}\n  fallback_presenter_used: {}\n  window_created: {}\n  rendered_frames: {}\n  first_frame_size: {}\n  distinct_frame_signatures: {}\n  saw_non_blank_frame: {}\n  saw_attract: {} (visual_frames: {}, visual_signatures: {})\n  saw_credit: {} (visual_frames: {}, visual_signatures: {})\n  saw_playing: {} (visual_frames: {}, visual_signatures: {})\n  clean_game_frames: {}\n  actor_frames: {}\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  temporary_raster_frames: {}\n  temporary_raster_commands: {}\n  offscreen_wgpu_frames: {}\n  offscreen_non_blank_frames: {}\n  offscreen_distinct_frame_signatures: {}\n  offscreen_first_frame_signature: {}\n  offscreen_last_frame_signature: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
+            "wgpu live smoke passed\n  render_path: {}\n  fallback_presenter_used: {}\n  window_created: {}\n  rendered_steps: {}\n  initial_surface_size: {}\n  distinct_scene_signatures: {}\n  saw_non_blank_scene: {}\n  saw_attract: {} (visual_steps: {}, visual_signatures: {})\n  saw_credit: {} (visual_steps: {}, visual_signatures: {})\n  saw_playing: {} (visual_steps: {}, visual_signatures: {})\n  clean_game_steps: {}\n  actor_steps: {}\n  sprite_steps: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  temporary_raster_steps: {}\n  temporary_raster_commands: {}\n  offscreen_wgpu_steps: {}\n  offscreen_non_blank_steps: {}\n  offscreen_distinct_scene_signatures: {}\n  offscreen_first_scene_signature: {}\n  offscreen_last_scene_signature: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
             self.render_path,
             self.fallback_presenter_used,
             self.window_created,
-            self.rendered_frames,
-            frame_size,
-            self.distinct_frame_signatures,
-            self.saw_non_blank_frame,
+            self.rendered_steps,
+            surface_size,
+            self.distinct_scene_signatures,
+            self.saw_non_blank_scene,
             self.saw_attract,
-            self.attract_visual_frames,
-            self.attract_distinct_frame_signatures,
+            self.attract_visual_steps,
+            self.attract_distinct_scene_signatures,
             self.saw_credit,
-            self.credit_visual_frames,
-            self.credit_distinct_frame_signatures,
+            self.credit_visual_steps,
+            self.credit_distinct_scene_signatures,
             self.saw_playing,
-            self.playing_visual_frames,
-            self.playing_distinct_frame_signatures,
-            self.clean_game_frames,
-            self.actor_frames,
-            self.sprite_frames,
+            self.playing_visual_steps,
+            self.playing_distinct_scene_signatures,
+            self.clean_game_steps,
+            self.actor_steps,
+            self.sprite_steps,
             self.sprite_instances,
             self.sprite_draw_commands,
-            self.temporary_raster_frames,
+            self.temporary_raster_steps,
             self.temporary_raster_commands,
-            self.offscreen_wgpu_frames,
-            self.offscreen_non_blank_frames,
-            self.offscreen_distinct_frame_signatures,
-            offscreen_first_frame_signature,
-            offscreen_last_frame_signature,
+            self.offscreen_wgpu_steps,
+            self.offscreen_non_blank_steps,
+            self.offscreen_distinct_scene_signatures,
+            offscreen_first_scene_signature,
+            offscreen_last_scene_signature,
             self.injected_inputs.join(","),
             self.clean_exit
         )
@@ -407,28 +407,28 @@ impl LiveSmokeReport {
 
     #[cfg(all(not(test), not(coverage)))]
     fn validate_actor_offscreen_wgpu(&self) -> anyhow::Result<()> {
-        if self.offscreen_wgpu_frames != self.rendered_frames {
+        if self.offscreen_wgpu_steps != self.rendered_steps {
             anyhow::bail!(
-                "actor wgpu smoke rendered {} offscreen frame(s), expected {}",
-                self.offscreen_wgpu_frames,
-                self.rendered_frames
+                "actor wgpu smoke rendered {} offscreen step(s), expected {}",
+                self.offscreen_wgpu_steps,
+                self.rendered_steps
             );
         }
-        if self.offscreen_non_blank_frames != self.rendered_frames {
+        if self.offscreen_non_blank_steps != self.rendered_steps {
             anyhow::bail!(
-                "actor wgpu smoke rendered {} nonblank offscreen frame(s), expected {}",
-                self.offscreen_non_blank_frames,
-                self.rendered_frames
+                "actor wgpu smoke rendered {} nonblank offscreen step(s), expected {}",
+                self.offscreen_non_blank_steps,
+                self.rendered_steps
             );
         }
-        if self.offscreen_distinct_frame_signatures < 3 {
-            anyhow::bail!("actor wgpu smoke did not produce dynamic offscreen frame signatures");
+        if self.offscreen_distinct_scene_signatures < 3 {
+            anyhow::bail!("actor wgpu smoke did not produce dynamic offscreen scene signatures");
         }
-        if self.offscreen_first_frame_signature.is_none() {
-            anyhow::bail!("actor wgpu smoke did not record an offscreen frame signature");
+        if self.offscreen_first_scene_signature.is_none() {
+            anyhow::bail!("actor wgpu smoke did not record an offscreen scene signature");
         }
-        if self.offscreen_last_frame_signature.is_none() {
-            anyhow::bail!("actor wgpu smoke did not record a final offscreen frame signature");
+        if self.offscreen_last_scene_signature.is_none() {
+            anyhow::bail!("actor wgpu smoke did not record a final offscreen scene signature");
         }
         Ok(())
     }
@@ -446,11 +446,11 @@ impl ActorScriptCheckReport {
             .as_ref()
             .map(|summary| {
                 format!(
-                    "  attract_cycle_steps: {}\n  attract_cycle_sampled_steps: {}\n  attract_cycle_frames: attract={},non_attract={}\n  attract_cycle_draws: {}\n  attract_cycle_scene_sprites: {}\n  attract_cycle_milestones: williams_reveal={},defender_coalescence={},hall_of_fame={},scoring_surface={},final_scoring_instruction={},cycle_return={}\n",
+                    "  attract_cycle_steps: {}\n  attract_cycle_sampled_steps: {}\n  attract_cycle_steps: attract={},non_attract={}\n  attract_cycle_draws: {}\n  attract_cycle_scene_sprites: {}\n  attract_cycle_milestones: williams_reveal={},defender_coalescence={},hall_of_fame={},scoring_surface={},final_scoring_instruction={},cycle_return={}\n",
                     summary.cycle_steps,
                     summary.sampled_steps,
-                    summary.attract_frames,
-                    summary.non_attract_frames,
+                    summary.attract_steps,
+                    summary.non_attract_steps,
                     summary.draw_commands,
                     summary.scene_sprites,
                     summary.saw_williams_reveal,
@@ -644,15 +644,15 @@ impl ActorScriptCheckReport {
                 )
             });
         format!(
-            "actor script check passed\n  path: {}\n  attract_events: {}\n{}  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  first_frame_phase: {}\n  first_frame_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_enemy_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_actor_debug: world_scroll_left=0x{:04x},rng={}\n  first_playing_actor_samples: {}\n  first_playing_enemy_projectile_samples: {}\n  first_playing_sound_commands: {}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}{}{}{}{}{}{}{}{}{}{}  clean_exit: {}\n",
+            "actor script check passed\n  path: {}\n  attract_events: {}\n{}  behavior_kind_profiles: {}\n  behavior_actor_profiles: {}\n  wave_profiles: {}\n  initial_step_phase: {}\n  initial_step_draws: {}\n  first_playing_wave: {}\n  first_playing_wave_size: {}\n  first_playing_enemy_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_world_counts: enemies={},humans={}\n  first_playing_reserve_counts: landers={},bombers={},pods={},mutants={},swarmers={}\n  first_playing_actor_debug: world_scroll_left=0x{:04x},rng={}\n  first_playing_actor_samples: {}\n  first_playing_enemy_projectile_samples: {}\n  first_playing_sound_commands: {}\n  first_playing_player_behavior: takes_enemy_collision_damage={},laser_cooldown_steps={}\n  first_playing_lander_behavior: mode={},seek_speed={},drift_speed={},fire_period_steps={}\n  first_playing_hostile_modes: mutant={},bomber={},pod={},swarmer={},baiter={}\n  first_playing_hostile_fire: swarmer_period_steps={},baiter_period_steps={}\n{}{}{}{}{}{}{}{}{}{}{}{}  clean_exit: {}\n",
             self.path,
             self.attract_events,
             attract_cycle,
             self.behavior_kind_profiles,
             self.behavior_actor_profiles,
             self.wave_profiles,
-            self.first_frame_phase,
-            self.first_frame_draws,
+            self.initial_step_phase,
+            self.initial_step_draws,
             self.first_playing_wave,
             self.first_playing_wave_size,
             self.first_playing_enemy_landers,
@@ -975,31 +975,31 @@ impl From<ActorSmokeReport> for LiveSmokeReport {
             render_path: "actor_game",
             fallback_presenter_used: false,
             window_created: false,
-            rendered_frames: report.frames,
-            first_frame_size: report.first_frame_size,
-            distinct_frame_signatures: report.distinct_scene_signatures,
-            saw_non_blank_frame: report.sprite_frames > 0,
+            rendered_steps: report.steps,
+            initial_surface_size: report.initial_surface_size,
+            distinct_scene_signatures: report.distinct_scene_signatures,
+            saw_non_blank_scene: report.sprite_steps > 0,
             saw_attract: report.saw_attract,
             saw_credit: report.saw_credit,
             saw_playing: report.saw_playing,
-            attract_visual_frames: report.attract_frames,
-            credit_visual_frames: report.credited_frames,
-            playing_visual_frames: report.playing_frames,
-            attract_distinct_frame_signatures: usize::from(report.saw_attract),
-            credit_distinct_frame_signatures: usize::from(report.saw_credit),
-            playing_distinct_frame_signatures: usize::from(report.saw_playing),
-            clean_game_frames: 0,
-            actor_frames: report.frames,
-            sprite_frames: report.sprite_frames,
+            attract_visual_steps: report.attract_steps,
+            credit_visual_steps: report.credited_steps,
+            playing_visual_steps: report.playing_steps,
+            attract_distinct_scene_signatures: usize::from(report.saw_attract),
+            credit_distinct_scene_signatures: usize::from(report.saw_credit),
+            playing_distinct_scene_signatures: usize::from(report.saw_playing),
+            clean_game_steps: 0,
+            actor_steps: report.steps,
+            sprite_steps: report.sprite_steps,
             sprite_instances: report.sprite_instances,
             sprite_draw_commands: report.sprite_draw_commands,
-            temporary_raster_frames: 0,
+            temporary_raster_steps: 0,
             temporary_raster_commands: report.temporary_raster_commands,
-            offscreen_wgpu_frames: 0,
-            offscreen_non_blank_frames: 0,
-            offscreen_distinct_frame_signatures: 0,
-            offscreen_first_frame_signature: None,
-            offscreen_last_frame_signature: None,
+            offscreen_wgpu_steps: 0,
+            offscreen_non_blank_steps: 0,
+            offscreen_distinct_scene_signatures: 0,
+            offscreen_first_scene_signature: None,
+            offscreen_last_scene_signature: None,
             injected_inputs: report.injected_inputs,
             clean_exit: report.clean_exit,
         }

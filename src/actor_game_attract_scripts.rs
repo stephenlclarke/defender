@@ -1348,17 +1348,21 @@ fn hall_score_initials_text(initials: [Option<char>; 3]) -> String {
         .collect()
 }
 
+const HALL_SCORE_DISPLAY_MAX: u32 = 999_999;
+const HALL_SCORE_START_PLACE: u32 = 100_000;
+const HALL_SCORE_RADIX: u32 = 10;
+
 fn hall_score_text(score: u32) -> String {
     let mut text = [b' '; ATTRACT_HALL_SCORE_TEXT_LEN];
-    let mut place = 100_000;
+    let mut place = HALL_SCORE_START_PLACE;
     let mut seen_non_zero = false;
     for byte in &mut text {
-        let digit = ((score.min(999_999) / place) % 10) as u8;
+        let digit = ((score.min(HALL_SCORE_DISPLAY_MAX) / place) % HALL_SCORE_RADIX) as u8;
         if digit != 0 || seen_non_zero {
             seen_non_zero = true;
             *byte = b'0' + digit;
         }
-        place /= 10;
+        place /= HALL_SCORE_RADIX;
     }
     String::from_utf8_lossy(&text).into_owned()
 }

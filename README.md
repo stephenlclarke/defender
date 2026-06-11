@@ -21,15 +21,15 @@ arcade game.
 The live game uses a clean actor runtime, `wgpu` rendering, `winit` windowing,
 and synthesized audio driven by Williams sound-command families. Runtime
 tables, sprites, attract scripts, wave scripts, glyphs, and sound metadata are
-embedded in the binary, so normal play does not require local ROM files or an
-asset directory.
+embedded in the binary, so normal play does not require external asset files or
+an asset directory.
 
-The goal is faithful original-arcade behaviour: visuals, audio, sprite
+The goal is faithful arcade behaviour: visuals, audio, sprite
 behaviour, lasers, explosions, reverse direction, attract mode, side scrolling,
-waves, humans, and playability should match the MAME reference game as closely
-as practical while remaining a clean actor implementation.
+waves, humans, and playability should match accepted arcade reference behavior
+as closely as practical while remaining a clean actor implementation.
 
-![Defender gameplay frame](docs/defender.png)
+![Defender gameplay scene](docs/defender.png)
 
 <!-- markdownlint-disable MD033 -->
 <p align="center">
@@ -105,7 +105,7 @@ Important Makefile targets:
 
 The README media targets render the accepted actor runtime through the same
 sprite atlas path used by the native renderer. They do not depend on the
-retired conversion code.
+conversion tooling.
 
 ## Play
 
@@ -171,7 +171,7 @@ Extra keys and behaviour while `XYZZY` mode is active:
 - `H`: hyperspace becomes safe where possible.
 - falling humanoids always survive the landing.
 
-`XYZZY` is a deliberate compatibility/extra mode outside the original cabinet
+`XYZZY` is a deliberate compatibility/extra mode outside the standard cabinet
 rules.
 
 ## Runtime Notes
@@ -184,7 +184,7 @@ rules.
   `examples/actor-custom-attract.script`.
 - The retained actor scripts and tables live under `assets/arcade-scripts/`.
 - The retained sprite source image is `assets/sprites/font-sheet.png`; object
-  and terrain sprites are generated from the source-derived tables.
+  and terrain sprites are generated from embedded typed asset tables.
 - Committed README media lives at `docs/defender.png` and
   `docs/start-sequence.gif`.
 
@@ -216,15 +216,7 @@ These references were used for rules verification, media comparison, attract
 reconstruction, graphics reconstruction, and audio validation while keeping the
 normal runtime self-contained:
 
-- <https://github.com/mwenge/defender>: Motorola 6809 assembly for the
-  Williams red-label game.
-- <https://github.com/historicalsource/williams-soundroms>: Williams sound-ROM
-  source used to map sound-board command families.
 - <https://seanriddle.com/ripper.html>: Williams graphics-ripper notes.
-- <https://seanriddle.com/willy2.html>: Williams ROM and sound reference
-  material.
-- <https://www.thedefenderproject.com/defender-rom-versions-the-history/>:
-  Defender ROM-set and revision history.
 - <https://www.mamechannel.it/files_free/arcade_manuals_unpacked/defenderw.pdf>:
   Williams Defender operations manual.
 - <https://williamsarcades.com/Defender>: cabinet and control-panel reference.
@@ -233,12 +225,9 @@ normal runtime self-contained:
   and palette reference.
 - <https://thekingofgrabs.com/2018/02/15/defender-arcade/>: gameplay, laser,
   explosion, sprite, and attract-screen image reference.
-- <https://www.youtube.com/watch?v=gss3lxeqCok>: MAME red-label gameplay and
-  audio reference clip.
 - <https://www.youtube.com/watch?v=uOI7x1zWuLA>: Defender sound reference.
 - <https://www.youtube.com/watch?v=kOAidQcQcNI>: Defender sound reference.
-- <https://www.youtube.com/watch?v=6w2cKBWx2Uc>: original arcade attract-mode
-  capture.
+- <https://www.youtube.com/watch?v=6w2cKBWx2Uc>: arcade attract-mode capture.
 - <https://www.dougmahugh.com/defender-chapter01/>: bomber timing, radar,
   wave, humanoid, and scoring rules.
 - <https://www.dougmahugh.com/defender-chapter02/>: controls, hyperspace,

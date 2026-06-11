@@ -19,8 +19,8 @@ pub mod typed_values;
 pub use arcade_assets::MessageId;
 pub use game::{
     AttractPresentationPage, AttractPresentationSnapshot, Direction, EnemyKind,
-    EnemyReserveSnapshot, EnemySnapshot, GameEvent, GameEvents, GameFrame, GameInput,
-    GameOverSnapshot, GamePhase, GameState, HighScoreEntrySnapshot, HighScoreSubmissionSnapshot,
+    EnemyReserveSnapshot, EnemySnapshot, GameEvent, GameEvents, GameInput, GameOverSnapshot,
+    GamePhase, GameState, GameStepSnapshot, HighScoreEntrySnapshot, HighScoreSubmissionSnapshot,
     HighScoreTableEntrySnapshot, HighScoreTablesSnapshot, HumanSnapshot,
     PlayerExplosionCloudSnapshot, PlayerExplosionPieceSnapshot, PlayerSnapshot,
     PlayerStockSnapshot, ProjectileSnapshot, ScoreSnapshot, SoundEvent, TerrainBlowSnapshot,
@@ -46,13 +46,13 @@ pub use renderer::{
 };
 pub use systems::{
     CollisionBox, CollisionSystem, EnemyMotionStep, EnemyMotionSystem, FixedStepAccumulator,
-    FrameRate, HighScoreEntryStep, HighScoreEntrySystem, HighScoreInitialsState,
-    HighScoreInitialsStep, OperatorActionTriggers, OperatorControlStep, OperatorControlSystem,
-    PlayerActionTriggers, PlayerControlIntent, PlayerControlStep, PlayerControlSystem,
-    PlayerDamageStep, PlayerDamageSystem, PlayerEnemyHit, PlayerMotionState, PlayerMotionStep,
-    PlayerMotionSystem, PlayerStock, ProjectileEnemyHit, ProjectileLaunchOutcome,
-    ProjectileMotionStep, ProjectileMotionSystem, ProjectileState, ProjectileSystem, ScoreStep,
-    ScoreSystem, ScreenPosition, ScreenVelocity, SmartBombStep, SmartBombSystem, VerticalControl,
+    HighScoreEntryStep, HighScoreEntrySystem, HighScoreInitialsState, HighScoreInitialsStep,
+    OperatorActionTriggers, OperatorControlStep, OperatorControlSystem, PlayerActionTriggers,
+    PlayerControlIntent, PlayerControlStep, PlayerControlSystem, PlayerDamageStep,
+    PlayerDamageSystem, PlayerEnemyHit, PlayerMotionState, PlayerMotionStep, PlayerMotionSystem,
+    PlayerStock, ProjectileEnemyHit, ProjectileLaunchOutcome, ProjectileMotionStep,
+    ProjectileMotionSystem, ProjectileState, ProjectileSystem, ScoreStep, ScoreSystem,
+    ScreenPosition, ScreenVelocity, SmartBombStep, SmartBombSystem, StepRate, VerticalControl,
     WaveState, WaveStatus, WaveSystem,
 };
 pub use typed_values::{ScreenAddress, SoundCommand, SpriteFrameIndex, TimelineStep};
@@ -62,11 +62,11 @@ mod public_api_tests {
     #[test]
     fn public_actor_runtime_advances_from_attract() {
         let mut game = crate::actor_game::ActorRuntimeAdapter::new();
-        let frame = game.step(crate::actor_game::GameInput::NONE);
+        let snapshot = game.step(crate::actor_game::GameInput::NONE);
 
-        assert_eq!(frame.state.frame, 1);
-        assert_eq!(frame.state.phase, crate::GamePhase::Attract);
-        assert!(frame.scene.summary().sprite_count > 0);
+        assert_eq!(snapshot.state.step, 1);
+        assert_eq!(snapshot.state.phase, crate::GamePhase::Attract);
+        assert!(snapshot.scene.summary().sprite_count > 0);
     }
 
     #[test]

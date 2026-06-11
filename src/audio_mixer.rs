@@ -10,6 +10,10 @@ struct SynthMixer {
     thrust_voice: Option<SampleVoice>,
 }
 
+const MIXER_OUTPUT_MIN_SAMPLE: f32 = -0.85;
+const MIXER_OUTPUT_MAX_SAMPLE: f32 = 0.85;
+const MILLIHZ_PER_HZ: u128 = 1_000;
+
 impl SynthMixer {
     fn new(sample_rate_hz: u32) -> Self {
         Self {
@@ -76,32 +80,32 @@ impl SynthMixer {
         {
             self.foreground_voice = None;
         }
-        mixed.clamp(-0.85, 0.85)
+        mixed.clamp(MIXER_OUTPUT_MIN_SAMPLE, MIXER_OUTPUT_MAX_SAMPLE)
     }
 }
 
 pub fn render_sound_event_timeline_to_samples(
     timeline: &[(u64, Vec<SoundEvent>)],
-    total_frames: u64,
-    frame_rate_millihz: u32,
+    total_steps: u64,
+    step_rate_millihz: u32,
     sample_rate_hz: u32,
 ) -> Vec<f32> {
-    let frame_rate_millihz = frame_rate_millihz.max(1);
+    let step_rate_millihz = step_rate_millihz.max(1);
     let sample_rate_hz = sample_rate_hz.max(1);
-    let target_samples = sample_count_for_frame(total_frames, frame_rate_millihz, sample_rate_hz);
+    let target_samples = sample_count_for_step(total_steps, step_rate_millihz, sample_rate_hz);
     let mut entries = timeline
         .iter()
-        .filter(|(frame, events)| *frame < total_frames && !events.is_empty())
-        .map(|(frame, events)| (*frame, events.as_slice()))
+        .filter(|(step, events)| *step < total_steps && !events.is_empty())
+        .map(|(step, events)| (*step, events.as_slice()))
         .collect::<Vec<_>>();
-    entries.sort_by_key(|(frame, _)| *frame);
+    entries.sort_by_key(|(step, _)| *step);
 
     let mut entry_index = 0;
     let mut mixer = SynthMixer::new(sample_rate_hz);
     let mut samples = Vec::with_capacity(target_samples);
-    for frame in 0..total_frames {
-        while let Some((event_frame, events)) = entries.get(entry_index)
-            && *event_frame == frame
+    for step in 0..total_steps {
+        while let Some((event_step, events)) = entries.get(entry_index)
+            && *event_step == step
         {
             for event in *events {
                 mixer.queue_event(*event);
@@ -109,9 +113,9 @@ pub fn render_sound_event_timeline_to_samples(
             entry_index += 1;
         }
 
-        let next_frame_samples =
-            sample_count_for_frame(frame + 1, frame_rate_millihz, sample_rate_hz);
-        while samples.len() < next_frame_samples {
+        let next_step_samples =
+            sample_count_for_step(step + 1, step_rate_millihz, sample_rate_hz);
+        while samples.len() < next_step_samples {
             samples.push(mixer.next_sample());
         }
     }
@@ -120,9 +124,9 @@ pub fn render_sound_event_timeline_to_samples(
     samples
 }
 
-fn sample_count_for_frame(frame: u64, frame_rate_millihz: u32, sample_rate_hz: u32) -> usize {
-    let numerator = u128::from(frame) * u128::from(sample_rate_hz) * 1_000;
-    let denominator = u128::from(frame_rate_millihz);
+fn sample_count_for_step(step: u64, step_rate_millihz: u32, sample_rate_hz: u32) -> usize {
+    let numerator = u128::from(step) * u128::from(sample_rate_hz) * MILLIHZ_PER_HZ;
+    let denominator = u128::from(step_rate_millihz);
     usize::try_from(numerator.div_ceil(denominator)).unwrap_or(usize::MAX)
 }
 
