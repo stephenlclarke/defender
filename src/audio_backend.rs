@@ -142,7 +142,7 @@ fn build_device_stream(
     mixer: Arc<Mutex<SynthMixer>>,
 ) -> anyhow::Result<Stream> {
     let sample_format = supported_config.sample_format();
-    let config = supported_config.clone().into();
+    let config = (*supported_config).into();
 
     match sample_format {
         SampleFormat::F32 => build_typed_device_stream::<f32>(device, &config, mixer),
@@ -167,7 +167,7 @@ where
 
     device
         .build_output_stream(
-            config,
+            *config,
             move |output: &mut [T], _| write_mixed_samples(output, channels, &mixer),
             move |_error| {},
             None,

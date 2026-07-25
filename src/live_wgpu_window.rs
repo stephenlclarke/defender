@@ -259,6 +259,7 @@ impl WgpuScenePresenter {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
+                apply_limit_buckets: false,
             })
             .await
             .context("requesting clean wgpu adapter")?;
@@ -345,7 +346,7 @@ impl WgpuScenePresenter {
         encode_scene_render_pass(&mut encoder, &view, &plan, self.sprite_resources.as_ref());
 
         self.queue.submit([encoder.finish()]);
-        surface_texture.present();
+        self.queue.present(surface_texture);
         Ok(())
     }
 
