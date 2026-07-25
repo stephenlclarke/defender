@@ -61,6 +61,7 @@ impl WgpuOffscreenRenderer {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: None,
                 force_fallback_adapter: false,
+                apply_limit_buckets: false,
             })
             .await
             .context("requesting clean offscreen wgpu adapter")?;
@@ -172,7 +173,10 @@ impl WgpuOffscreenRenderer {
             .context("waiting for clean offscreen wgpu readback")?
             .context("mapping clean offscreen wgpu readback")?;
 
-        let mapped = readback_buffer.slice(..).get_mapped_range();
+        let mapped = readback_buffer
+            .slice(..)
+            .get_mapped_range()
+            .context("reading mapped clean offscreen buffer")?;
         let pixels = readback.unpadded_pixels(&mapped);
         drop(mapped);
         readback_buffer.unmap();
@@ -399,7 +403,7 @@ impl SpriteGpuResources {
 
         let shader = device.create_shader_module(pipeline_plan.shader.shader_module_descriptor());
         let color_targets = descriptor.color_targets();
-        let vertex_buffers = descriptor.vertex_buffer_layouts();
+        let vertex_buffers = descriptor.vertex_buffer_layouts().map(Some);
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some(descriptor.label),
             layout: Some(&pipeline_layout),

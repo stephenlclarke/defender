@@ -167,7 +167,7 @@ where
 
     device
         .build_output_stream(
-            config,
+            config.clone(),
             move |output: &mut [T], _| write_mixed_samples(output, channels, &mixer),
             move |_error| {},
             None,
