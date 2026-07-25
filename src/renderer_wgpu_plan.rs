@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use super::*;
 
 pub(super) const SPRITE_SHADER_SOURCE: &str = r#"
-pub(super) struct SceneProjection {
+struct SceneProjection {
     scale: vec2<f32>,
     translate: vec2<f32>,
 };
@@ -12,7 +12,7 @@ pub(super) struct SceneProjection {
 @group(1) @binding(0) var sprite_atlas: texture_2d<f32>;
 @group(1) @binding(1) var sprite_sampler: sampler;
 
-pub(super) struct SpriteInstance {
+struct SpriteInstance {
     @location(0) scene_origin: vec2<f32>,
     @location(1) scene_size: vec2<f32>,
     @location(2) atlas_uv_origin: vec2<f32>,
@@ -20,19 +20,19 @@ pub(super) struct SpriteInstance {
     @location(4) tint: vec4<f32>,
 };
 
-pub(super) struct SpriteVertex {
+struct SpriteVertex {
     @location(5) unit_position: vec2<f32>,
     @location(6) unit_uv: vec2<f32>,
 };
 
-pub(super) struct SpriteVertexOut {
+struct SpriteVertexOut {
     @builtin(position) position: vec4<f32>,
     @location(0) atlas_uv: vec2<f32>,
     @location(1) tint: vec4<f32>,
 };
 
 @vertex
-pub(super) fn sprite_vs(instance: SpriteInstance, vertex: SpriteVertex) -> SpriteVertexOut {
+fn sprite_vs(instance: SpriteInstance, vertex: SpriteVertex) -> SpriteVertexOut {
     let scene_position = instance.scene_origin + vertex.unit_position * instance.scene_size;
 
     var out: SpriteVertexOut;
@@ -47,7 +47,7 @@ pub(super) fn sprite_vs(instance: SpriteInstance, vertex: SpriteVertex) -> Sprit
 }
 
 @fragment
-pub(super) fn sprite_fs(in: SpriteVertexOut) -> @location(0) vec4<f32> {
+fn sprite_fs(in: SpriteVertexOut) -> @location(0) vec4<f32> {
     return textureSample(sprite_atlas, sprite_sampler, in.atlas_uv) * in.tint;
 }
 "#;
