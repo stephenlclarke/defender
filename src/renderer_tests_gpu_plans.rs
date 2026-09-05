@@ -510,14 +510,18 @@
         assert_ne!(sprite_alpha_rows(&ship), sprite_alpha_rows(&ship_left));
         assert!(
             ship.pixels
-                .chunks_exact(4)
-                .any(|pixel| pixel == PURPLE_RGBA.as_slice())
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|pixel| pixel == &PURPLE_RGBA)
         );
         assert_eq!(shot.surface, SurfaceSize::new(16, 1));
         assert!(
             shot.pixels
-                .chunks_exact(4)
-                .all(|pixel| pixel == PALE_YELLOW_RGBA.as_slice())
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .all(|pixel| pixel == &PALE_YELLOW_RGBA)
         );
         assert_eq!(human.surface, SurfaceSize::new(4, 8));
         assert_eq!(
@@ -526,7 +530,12 @@
                 "##..", "##..", "###.", "###.", "###.", ".#..", ".#..", ".#.."
             ]
         );
-        assert!(human.pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
+        assert!(human
+            .pixels
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .any(|pixel| pixel[3] != 0));
     }
 
     #[test]
@@ -788,7 +797,9 @@
         assert_eq!(
             sprite
                 .pixels
-                .chunks_exact(4)
+                .as_chunks::<4>()
+                .0
+                .iter()
                 .filter(|pixel| pixel[3] != 0)
                 .count(),
             660

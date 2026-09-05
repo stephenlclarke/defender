@@ -587,8 +587,10 @@ impl TextureAtlas {
 
     pub fn is_non_blank(&self) -> bool {
         self.pixels
-            .chunks_exact(4)
-            .any(|pixel| pixel != [0, 0, 0, 0].as_slice())
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .any(|pixel| pixel != &[0, 0, 0, 0])
     }
 }
 
@@ -1833,8 +1835,11 @@ pub(super) fn blit_star_region(
 pub(super) fn first_visible_pixel(embedded_sprite: &EmbeddedSprite) -> Option<&[u8]> {
     embedded_sprite
         .pixels
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .find(|pixel| pixel[3] != 0)
+        .map(<[u8; 4]>::as_slice)
 }
 
 pub(super) fn copy_embedded_sprite_pixel(

@@ -219,7 +219,7 @@
             .map(|vertex| projection.project_point(vertex.unit_position))
             .collect::<Vec<_>>();
 
-        for triangle in SpriteQuadGeometry::indices().chunks_exact(3) {
+        for triangle in SpriteQuadGeometry::indices().as_chunks::<3>().0 {
             let points = [
                 clip_vertices[triangle[0] as usize],
                 clip_vertices[triangle[1] as usize],

@@ -273,8 +273,10 @@ fn align_copy_bytes_per_row(bytes_per_row: u32) -> u32 {
 #[cfg(all(not(test), not(coverage)))]
 fn rendered_rgba_is_non_blank(pixels: &[u8]) -> bool {
     pixels
-        .chunks_exact(RGBA_BYTES_PER_PIXEL)
-        .any(|pixel| pixel != TRANSPARENT_BLACK_RGBA)
+        .as_chunks::<RGBA_BYTES_PER_PIXEL>()
+        .0
+        .iter()
+        .any(|pixel| pixel != &TRANSPARENT_BLACK_RGBA)
 }
 
 #[cfg(all(not(test), not(coverage)))]
