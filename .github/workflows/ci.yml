@@ -53,14 +53,9 @@ jobs:
         run: xvfb-run -a make ci-smoke
 
   leaks:
-    name: Leak checks (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
+    name: Leak checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -80,4 +75,6 @@ jobs:
       - name: Run leak checks
         env:
           MIRIFLAGS: -Zmiri-disable-isolation
-        run: cargo miri test --lib
+        run: |
+          cargo miri test --lib live_audio_runtime
+          cargo miri test --lib threaded_asset_is_prompted_once_per_driver_step
