@@ -39,6 +39,16 @@ jobs:
       - name: Install Markdown linting
         run: npm install --global markdownlint-cli@0.46.0
 
+      - name: Install workflow linter
+        uses: taiki-e/install-action@v2
+        with:
+          tool: actionlint
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
       - name: Diagnose CI prerequisites
         run: make ci-doctor
 

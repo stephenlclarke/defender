@@ -45,7 +45,24 @@ as closely as practical while remaining a clean actor implementation.
 
 ## Install
 
-Install directly from git with Cargo:
+Download a prebuilt binary from [GitHub Releases](https://github.com/stephenlclarke/defender/releases):
+
+| Platform | Download suffix |
+| --- | --- |
+| Apple Silicon macOS (ARM64) | `aarch64-apple-darwin.tar.gz` |
+| Intel/AMD Windows (64-bit) | `x86_64-pc-windows-msvc.zip` |
+
+Extract the archive and run `./defender` in Terminal on macOS, or
+`defender.exe` on Windows. No Rust installation, ROMs or external assets are
+required. Each download has a SHA-256 checksum. See the
+[player guide](docs/PLAYING.md) for requirements, controls, checksum verification
+and unsigned-download prompts.
+
+The [Desktop binaries workflow](https://github.com/stephenlclarke/defender/actions/workflows/release.yml)
+also provides development build artifacts. See [release instructions](docs/RELEASING.md)
+for publishing and local packaging.
+
+Alternatively, install directly from git with Cargo:
 
 ```sh
 cargo install --git https://github.com/stephenlclarke/defender defender
@@ -98,10 +115,13 @@ Important Makefile targets:
 - `make ci-smoke`: run CI smoke checks; Linux CI wraps this with `xvfb-run`.
 - `make ci-doctor`: check CI coverage and smoke prerequisites.
 - `make coverage`: generate lcov and Cobertura coverage reports.
-- `make docs-lint`: lint `README.md`.
+- `make docs-lint`: lint maintained player and contributor documentation.
 - `make diff-check`: run whitespace hygiene over the working tree diff.
 - `make clean`: remove Cargo build outputs and local scanner artifacts.
 - `make release-gate`: run the local release checks and verify README media.
+- `make release-build`: build the locked release executable for `RELEASE_TARGET`.
+- `make release-package`: build and archive `RELEASE_TARGET` with a checksum.
+- `make release-tools-test`: test packaging and lint GitHub Actions workflows.
 
 The README media targets render the accepted actor runtime through the same
 sprite atlas path used by the native renderer. They do not depend on the
@@ -182,7 +202,7 @@ rules.
   `cargo run -- --actor-script /path/to/driver.script`.
 - The checked custom-driver starting point is
   `examples/actor-custom-attract.script`.
-- The retained actor scripts and tables live under `assets/arcade-scripts/`.
+- The retained actor scripts and tables live under `assets/actor-scripts/`.
 - The retained sprite source image is `assets/sprites/font-sheet.png`; object
   and terrain sprites are generated from embedded typed asset tables.
 - Committed README media lives at `docs/defender.png` and
@@ -202,13 +222,19 @@ rules.
 
 ## Platform Support
 
-The live runtime uses `wgpu`, `winit`, and `cpal`.
+The live runtime uses `wgpu`, `winit`, and `cpal`. Its window creates a WGPU
+surface and presents GPU-rendered sprites. macOS uses Metal; Windows normally
+uses Direct3D 12, with Vulkan available where supported.
 
-The primary supported desktop path is macOS on the local development machine.
-The code is structured for portable native `wgpu` support, and CI-style smoke
-targets include headless/offscreen `wgpu` readback where the platform provides
-the required graphics stack. Linux headless validation may require Mesa/Vulkan,
-`xvfb-run`, and related packages documented by the Makefile doctor targets.
+Release targets are Apple Silicon macOS (ARM64, macOS 11+) and Intel/AMD Windows
+(x86-64, Windows 10+). Both targets build and run actor checks in GitHub Actions;
+macOS and Linux also run offscreen WGPU readback. Hosted Windows builds do not
+replace a graphics/audio playtest on Windows hardware. Binaries are unsigned;
+macOS notarization is not configured.
+
+Linux remains a development/CI platform. Headless validation requires
+Mesa/Vulkan, `xvfb-run`, and the packages checked by the Makefile doctor targets.
+See [desktop release details](docs/RELEASING.md).
 
 ## Source Materials
 
