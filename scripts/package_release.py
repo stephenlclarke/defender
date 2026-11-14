@@ -63,11 +63,15 @@ def package(target, version, output):
                 for entry in sorted(folder.iterdir()):
                     bundle.write(entry, f"{stem}/{entry.name}")
         else:
+            def archive_permissions(info):
+                info.mode = 0o755 if info.isdir() or info.name == f"{stem}/{name}" else 0o644
+                return info
+
             with tarfile.open(archive, "w:gz") as bundle:
-                bundle.add(folder, arcname=stem)
+                bundle.add(folder, arcname=stem, filter=archive_permissions)
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     archive.with_name(archive.name + ".sha256").write_text(
-        f"{digest}  {archive.name}\n", encoding="ascii"
+        f"{digest}  {archive.name}\n", encoding="ascii", newline="\n"
     )
     print(archive)
 
