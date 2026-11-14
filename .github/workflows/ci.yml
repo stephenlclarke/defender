@@ -40,9 +40,9 @@ jobs:
         run: npm install --global markdownlint-cli@0.46.0
 
       - name: Install workflow linter
-        uses: taiki-e/install-action@v2
-        with:
-          tool: actionlint
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Set up Python
         uses: actions/setup-python@v6
