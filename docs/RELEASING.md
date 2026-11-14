@@ -28,6 +28,8 @@ The tag triggers fresh native builds. After both jobs pass, the publish job veri
 
 Public release downloads live at [GitHub Releases](https://github.com/stephenlclarke/defender/releases). Each archive contains the executable, [player instructions](PLAYING.md) as `README.md`, and `SUPPORT.md`. Sprites, audio tables and default scripts are embedded; ROMs and external asset trees are not distributed.
 
+The initial release is [v0.1.0](https://github.com/stephenlclarke/defender/releases/tag/v0.1.0), matching the package version. For subsequent releases, increment the package version and tag rather than moving `v0.1.0`. Update version-specific download links in `README.md` and `docs/PLAYING.md` with each release.
+
 ## Local Packaging
 
 On an Apple Silicon Mac:

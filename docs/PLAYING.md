@@ -7,6 +7,8 @@ Download the archive for your computer from [GitHub Releases](https://github.com
 | Apple Silicon Mac (ARM64), macOS 11 or later | `aarch64-apple-darwin.tar.gz` | `defender` |
 | Intel/AMD 64-bit Windows 10 or later | `x86_64-pc-windows-msvc.zip` | `defender.exe` |
 
+Version `v0.1.0` downloads: [macOS ARM64](https://github.com/stephenlclarke/defender/releases/download/v0.1.0/defender-v0.1.0-aarch64-apple-darwin.tar.gz) or [Windows x86-64](https://github.com/stephenlclarke/defender/releases/download/v0.1.0/defender-v0.1.0-x86_64-pc-windows-msvc.zip). Download the matching `.sha256` sidecar from the release's **Assets** list to verify the archive. GitHub's automatic **Source code** archives contain the source, not the playable binary.
+
 Extract the archive first. On macOS, open Terminal in the extracted folder and run `./defender`. On Windows, run `defender.exe`, or open PowerShell in that folder and run `.\defender.exe`. Run with `--mute` to disable audio.
 
 The binaries are unsigned and the macOS binary is not notarized. If macOS blocks it, use System Settings > Privacy & Security > Open Anyway after verifying the download. Windows may show a SmartScreen warning for an unsigned download.

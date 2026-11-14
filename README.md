@@ -47,10 +47,10 @@ as closely as practical while remaining a clean actor implementation.
 
 Download a prebuilt binary from [GitHub Releases](https://github.com/stephenlclarke/defender/releases):
 
-| Platform | Download suffix |
+| Platform | Download v0.1.0 |
 | --- | --- |
-| Apple Silicon macOS (ARM64) | `aarch64-apple-darwin.tar.gz` |
-| Intel/AMD Windows (64-bit) | `x86_64-pc-windows-msvc.zip` |
+| Apple Silicon macOS (ARM64) | [macOS ARM64 archive](https://github.com/stephenlclarke/defender/releases/download/v0.1.0/defender-v0.1.0-aarch64-apple-darwin.tar.gz) |
+| Intel/AMD Windows (64-bit) | [Windows x86-64 archive](https://github.com/stephenlclarke/defender/releases/download/v0.1.0/defender-v0.1.0-x86_64-pc-windows-msvc.zip) |
 
 Extract the archive and run `./defender` in Terminal on macOS, or
 `defender.exe` on Windows. No Rust installation, ROMs or external assets are
