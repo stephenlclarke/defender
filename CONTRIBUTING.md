@@ -32,6 +32,10 @@ Run the repository's local validation before requesting review. Prefer the `Make
 
 Every behaviour change should include an appropriate test or a clear note explaining why automated coverage is not practical. Keep changes small enough that reviewers can understand the risk.
 
+## Desktop Builds And Releases
+
+The production renderer uses WGPU. Pull requests build and test macOS ARM64 and Windows x86-64 executables through the [Desktop binaries workflow](.github/workflows/release.yml). Linux CI retains its software WGPU smoke checks. Run `make release-tools-test` when changing packaging or workflows; it requires Python 3 and actionlint. The [release guide](docs/RELEASING.md) covers local packaging, downloadable development artifacts, version tags, and publishing GitHub Releases. The [player guide](docs/PLAYING.md) is included in each download.
+
 ## Protected Branch Safety
 
 These guardrails keep the repository safe for outside contributions:

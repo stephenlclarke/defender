@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help fmt test clippy release-gate ci ci-smoke ci-doctor coverage-doctor smoke-doctor coverage sq sq-ci sonar run run-wgpu live live-wgpu smoke smoke-wgpu actor-smoke actor-attract-smoke actor-post-game-smoke actor-wgpu-smoke live-smoke readme-gameplay-image readme-attract-sequence readme-media readme-media-check docs-lint diff-check clean
+.PHONY: help fmt test clippy release-gate release-build release-package release-tools-test ci ci-smoke ci-doctor coverage-doctor smoke-doctor coverage sq sq-ci sonar run run-wgpu live live-wgpu smoke smoke-wgpu actor-smoke actor-attract-smoke actor-post-game-smoke actor-wgpu-smoke live-smoke readme-gameplay-image readme-attract-sequence readme-media readme-media-check docs-lint diff-check clean
 
 CARGO ?= cargo
 RUSTUP ?= rustup
@@ -10,7 +10,9 @@ SONAR_ARGS ?= -Dsonar.qualitygate.wait=true
 XVFB_RUN ?= xvfb-run
 VULKANINFO ?= vulkaninfo
 UNAME_S ?= $(shell uname -s)
-DOCS_MARKDOWN := README.md
+DOCS_MARKDOWN := README.md CONTRIBUTING.md SUPPORT.md SECURITY.md CODE_OF_CONDUCT.md $(wildcard docs/*.md)
+RELEASE_TARGET ?= aarch64-apple-darwin
+RELEASE_VERSION ?= dev-local
 README_GAMEPLAY_IMAGE ?= docs/defender.png
 README_ATTRACT_SEQUENCE ?= docs/start-sequence.gif
 
@@ -23,6 +25,8 @@ help:
 		"  make clippy                      Run clippy with warnings denied" \
 		"  make smoke                       Run actor and WGPU smoke checks" \
 		"  make release-gate                Run local release checks without rewriting README media" \
+		"  make release-package             Build and package RELEASE_TARGET into dist/" \
+		"  make release-tools-test          Check release packaging and workflow syntax" \
 		"  make ci                          Run non-graphical CI checks and coverage" \
 		"  make ci-smoke                    Run CI smoke checks; wrap with xvfb-run on Linux CI" \
 		"  make ci-doctor                   Check CI coverage and smoke prerequisites" \
@@ -44,9 +48,19 @@ test:
 clippy:
 	$(CARGO) clippy --all-targets -- -D warnings
 
-release-gate: fmt test clippy smoke readme-media-check docs-lint diff-check
+release-gate: fmt test clippy smoke readme-media-check release-tools-test docs-lint diff-check
 
-ci: fmt test clippy coverage docs-lint diff-check
+ci: fmt test clippy coverage release-tools-test docs-lint diff-check
+
+release-build:
+	$(CARGO) build --locked --release --bin defender --target $(RELEASE_TARGET)
+
+release-package: release-build
+	python3 scripts/package_release.py --target $(RELEASE_TARGET) --version $(RELEASE_VERSION)
+
+release-tools-test:
+	python3 -m unittest discover -s scripts -p 'test_*.py'
+	actionlint
 
 ci-smoke: smoke-doctor smoke-wgpu actor-wgpu-smoke
 

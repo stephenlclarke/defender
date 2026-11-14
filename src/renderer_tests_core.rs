@@ -658,6 +658,19 @@
     }
 
     #[test]
+    fn sprite_shader_parses_and_validates_as_wgsl() {
+        let shader = SpriteShaderPlan::default();
+        let module = wgpu::naga::front::wgsl::parse_str(shader.source)
+            .expect("embedded sprite shader must parse as WGSL");
+        wgpu::naga::valid::Validator::new(
+            wgpu::naga::valid::ValidationFlags::all(),
+            wgpu::naga::valid::Capabilities::empty(),
+        )
+        .validate(&module)
+        .expect("embedded sprite shader must validate without optional GPU capabilities");
+    }
+
+    #[test]
     fn sprite_shader_plan_exposes_wgsl_descriptor_and_entries() {
         let shader = SpriteShaderPlan::default();
 

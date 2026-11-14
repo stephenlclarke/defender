@@ -10,5 +10,6 @@ assets/roms/
 cfg/
 nvram/
 target/
+dist/
 .scannerwork/
 __pycache__/
